@@ -494,10 +494,22 @@ _SUGGESTED_CANDIDATE_TAGS: tuple[str, ...] = (
     "crypto",
 )
 
-# Candidate slice (DAILY bars only: the multi-week trend + volume-confirmation
-# thesis is only honest at the 1d cadence).  Per-symbol single-asset
-# (``candidate_mix_type == "single"``).  ``min_hold_decisions`` /
-# ``cooldown_decisions`` are WEEKLY decision bars -- the proven min-hold rescue.
+# Candidate slice, per-symbol single-asset (``candidate_mix_type == "single"``).
+# MULTI-TIMEFRAME (1d / 4h / 1h): the decision clock is TIMESTAMP-based (ISO-week
+# bucketing in ``_week_key``), so it stays WEEKLY at every bar tf -- the sleeve
+# ingests finer bars but still decides once per calendar week.  Scaling rule
+# (mirrors ``residual_reversion``'s multi-tf precedent):
+#   * DECISION-denominated + timestamp-based UNCHANGED: ``mom_window_weeks`` (in
+#     weeks), ``min_hold_decisions`` / ``cooldown_decisions`` (in WEEKLY
+#     decisions) are identical across tf -- 4 weekly decisions is 4 weekly
+#     decisions regardless of bar size (the proven min-hold rescue).
+#   * BAR-denominated windows scale x6 (4h) / x24 (1h) to hold the wall-clock
+#     span: ``corr_window`` (trend-health horizon), ``vol_window`` (sizing), and
+#     ``bars_per_week`` (the weeks->bars conversion feeding ``mom_window_bars``;
+#     7 daily = 42 four-hour = 168 hourly bars per week -- 168 is the schema max).
+#   * Thresholds / ratios / bools UNCHANGED (``corr_entry`` / ``corr_exit`` /
+#     ``target_vol`` / ``allow_short``).
+# No window here reaches the ~9000-bar cap (corr_window tops out at 1680 @ 1h).
 _PRICE_VOLUME_CONTINUATION_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
     "1d": (
         {
@@ -523,6 +535,62 @@ _PRICE_VOLUME_CONTINUATION_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
             "min_hold_decisions": 4,
             "cooldown_decisions": 2,
             "vol_window": 30,
+            "target_vol": 0.20,
+            "allow_short": True,
+        },
+    ),
+    "4h": (
+        {
+            "variant": "corr70_mom8wk",
+            "corr_window": 420,
+            "mom_window_weeks": 8,
+            "bars_per_week": 42,
+            "corr_entry": 0.25,
+            "corr_exit": 0.0,
+            "min_hold_decisions": 4,
+            "cooldown_decisions": 2,
+            "vol_window": 180,
+            "target_vol": 0.20,
+            "allow_short": True,
+        },
+        {
+            "variant": "corr56_mom4wk",
+            "corr_window": 336,
+            "mom_window_weeks": 4,
+            "bars_per_week": 42,
+            "corr_entry": 0.30,
+            "corr_exit": 0.0,
+            "min_hold_decisions": 4,
+            "cooldown_decisions": 2,
+            "vol_window": 180,
+            "target_vol": 0.20,
+            "allow_short": True,
+        },
+    ),
+    "1h": (
+        {
+            "variant": "corr70_mom8wk",
+            "corr_window": 1680,
+            "mom_window_weeks": 8,
+            "bars_per_week": 168,
+            "corr_entry": 0.25,
+            "corr_exit": 0.0,
+            "min_hold_decisions": 4,
+            "cooldown_decisions": 2,
+            "vol_window": 720,
+            "target_vol": 0.20,
+            "allow_short": True,
+        },
+        {
+            "variant": "corr56_mom4wk",
+            "corr_window": 1344,
+            "mom_window_weeks": 4,
+            "bars_per_week": 168,
+            "corr_entry": 0.30,
+            "corr_exit": 0.0,
+            "min_hold_decisions": 4,
+            "cooldown_decisions": 2,
+            "vol_window": 720,
             "target_vol": 0.20,
             "allow_short": True,
         },

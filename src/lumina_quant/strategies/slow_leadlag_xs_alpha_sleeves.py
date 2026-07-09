@@ -635,12 +635,62 @@ _SUGGESTED_CANDIDATE_TAGS: tuple[str, ...] = (
     "crypto",
 )
 
-# Candidate slice (DAILY bars, internally weekly-sampled: ``spillover_window``/
-# ``min_history``/``min_hold_bars`` are WEEKLY decision bars).  Broad
-# cross-sectional long-short book -- the JEDC cost-surviving construction, NOT
-# the dead single-pair form.  ``min_hold_bars`` >= 8 weeks is the RPT-survival
-# design property (the redesign's entire purpose vs graveyard #6).
+# Candidate slice.  This sleeve INTERNALLY samples ONE close per ISO week
+# (``_snapshot_weekly_closes``) and decides on a timestamp-based WEEKLY clock
+# (``_week_key``), so EVERY window here is denominated in WEEKLY decision bars,
+# NOT raw bars: ``max_lag``/``spillover_window``/``min_history``/``vol_window``
+# and the ``min_hold_bars``/``cooldown_bars``/``max_hold_bars`` turnover brakes
+# are all weeks.  That makes the sleeve fully TIMEFRAME-AGNOSTIC -- feeding it
+# 4h or 1h bars only changes which intra-week close becomes the weekly snapshot
+# -- so the 4h and 1h cells reuse the 1d params VERBATIM (nothing scales).
+# Broad cross-sectional long-short book -- the JEDC cost-surviving construction,
+# NOT the dead single-pair form.  ``min_hold_bars`` >= 8 weeks is the
+# RPT-survival design property (the redesign's entire purpose vs graveyard #6).
 _SLOW_LEADLAG_XS_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "4h": (
+        {
+            "variant": "weekly_core",
+            "max_lag": 2,
+            "ridge_alpha": 1.0,
+            "spillover_window": 60,
+            "min_history": 40,
+            "entry_z": 0.50,
+            "exit_z": 0.10,
+            "max_longs": 3,
+            "max_shorts": 3,
+            "allow_short": True,
+            "min_symbols": 5,
+            "min_hold_bars": 8,
+            "cooldown_bars": 2,
+            "max_hold_bars": 260,
+            "vol_window": 20,
+            "target_gross_exposure": 1.0,
+            "target_vol": 0.20,
+            "stop_loss_pct": 0.10,
+        },
+    ),
+    "1h": (
+        {
+            "variant": "weekly_core",
+            "max_lag": 2,
+            "ridge_alpha": 1.0,
+            "spillover_window": 60,
+            "min_history": 40,
+            "entry_z": 0.50,
+            "exit_z": 0.10,
+            "max_longs": 3,
+            "max_shorts": 3,
+            "allow_short": True,
+            "min_symbols": 5,
+            "min_hold_bars": 8,
+            "cooldown_bars": 2,
+            "max_hold_bars": 260,
+            "vol_window": 20,
+            "target_gross_exposure": 1.0,
+            "target_vol": 0.20,
+            "stop_loss_pct": 0.10,
+        },
+    ),
     "1d": (
         {
             "variant": "weekly_core",

@@ -661,11 +661,72 @@ _SUGGESTED_CANDIDATE_TAGS: tuple[str, ...] = (
     "crypto",
 )
 
-# Candidate slice (daily bars; weekly rebalance via ``rebalance_bars``).  The
-# published effect is a 52-week window; the data-PC owns the 10/20/30/52wk
-# horizon factor_ic sweep, so we seed two anchoring lookbacks (~20wk and ~52wk of
-# 1d bars) with the residualized decoupler on.
+# Candidate slice (weekly rebalance via ``rebalance_bars``).  The published effect
+# is a 52-week window; the data-PC owns the 10/20/30/52wk horizon factor_ic sweep,
+# so we seed two anchoring lookbacks (~20wk and ~52wk) with the residualized
+# decoupler on.  This lane is a pure wall-clock cross-section: EVERY bar param
+# (low/vol windows, the min-history floor, and the ``rebalance_bars`` /
+# ``min_hold_bars`` decision clock) scales uniformly x6 at 4h and x24 at 1h so the
+# same calendar horizons are preserved; the fractions/counts (quantile_pct,
+# min_symbols, residualize, allow_short, target_gross_exposure) are unit-free and
+# stay fixed.  ``low_lookback_bars`` at 1h (8736) sits just under the ~9000-bar cap.
 _NEAR_LOW_RECOVERY_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "4h": (
+        {
+            "variant": "low52_recovery_resid",
+            "low_lookback_bars": 2184,
+            "min_history_bars": 360,
+            "vol_window": 120,
+            "quantile_pct": 0.25,
+            "rebalance_bars": 42,
+            "min_hold_bars": 84,
+            "min_symbols": 6,
+            "residualize": True,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+        },
+        {
+            "variant": "low20wk_recovery_resid",
+            "low_lookback_bars": 840,
+            "min_history_bars": 360,
+            "vol_window": 120,
+            "quantile_pct": 0.25,
+            "rebalance_bars": 42,
+            "min_hold_bars": 84,
+            "min_symbols": 6,
+            "residualize": True,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+        },
+    ),
+    "1h": (
+        {
+            "variant": "low52_recovery_resid",
+            "low_lookback_bars": 8736,
+            "min_history_bars": 1440,
+            "vol_window": 480,
+            "quantile_pct": 0.25,
+            "rebalance_bars": 168,
+            "min_hold_bars": 336,
+            "min_symbols": 6,
+            "residualize": True,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+        },
+        {
+            "variant": "low20wk_recovery_resid",
+            "low_lookback_bars": 3360,
+            "min_history_bars": 1440,
+            "vol_window": 480,
+            "quantile_pct": 0.25,
+            "rebalance_bars": 168,
+            "min_hold_bars": 336,
+            "min_symbols": 6,
+            "residualize": True,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+        },
+    ),
     "1d": (
         {
             "variant": "low52_recovery_resid",

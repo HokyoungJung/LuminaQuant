@@ -536,13 +536,62 @@ _SUGGESTED_CANDIDATE_TAGS: tuple[str, ...] = (
     "crypto",
 )
 
-# Candidate slice (DAILY bars only: the ``tsmom_short/mid/long`` defaults of
-# 28/56/84 are 4/8/12 weeks of 1d bars -- the multi-week TSMOM thesis is only
-# honest at the 1d cadence, so the sleeve is deliberately NOT wired at
-# intraday timeframes).  Per-symbol single-asset (``candidate_mix_type ==
-# "single"``).  ``min_hold_bars``/``cooldown_bars`` are WEEKLY decision bars --
-# the proven min-hold rescue that lifts RPT above the 10bps floor.
+# Candidate slice.  The ``tsmom_short/mid/long`` defaults of 28/56/84 are the
+# 4/8/12-WEEK wall-clock horizons the thesis rests on (28/56/84 * bars_per_day),
+# and every signal window here (TSMOM lookbacks, ``efficiency_period``,
+# ``adx_period``, the ``vol_persist_fast/slow`` ratio windows, and the vol-target
+# ``vol_window``) reads the RAW ingested bar series -- so at 4h/1h they scale x6
+# / x24 to keep those wall-clock spans (and the multi-week TSMOM thesis) honest
+# at intraday cadence rather than collapsing to a few days.  The decision clock
+# itself is a timestamp-based WEEKLY ISO key (``_week_key``), so
+# ``min_hold_bars``/``cooldown_bars``/``max_hold_bars`` are WEEKLY decision bars
+# -- timeframe-agnostic and UNCHANGED (the proven min-hold rescue that lifts RPT
+# above the 10bps floor).  Efficiency/ADX/vol-persist THRESHOLDS and ``target_vol``
+# are scale-invariant and unchanged.  Per-symbol single-asset
+# (``candidate_mix_type == "single"``).
 _LOW_TURNOVER_TREND_PERSISTENCE_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "4h": (
+        {
+            "variant": "core_4_8_12wk",
+            "tsmom_short": 168,
+            "tsmom_mid": 336,
+            "tsmom_long": 504,
+            "efficiency_period": 120,
+            "min_efficiency": 0.30,
+            "adx_period": 84,
+            "adx_min": 20.0,
+            "vol_persist_fast": 96,
+            "vol_persist_slow": 384,
+            "vol_persist_max": 1.5,
+            "min_hold_bars": 36,
+            "cooldown_bars": 4,
+            "max_hold_bars": 2000,
+            "vol_window": 336,
+            "target_vol": 0.20,
+            "allow_short": True,
+        },
+    ),
+    "1h": (
+        {
+            "variant": "core_4_8_12wk",
+            "tsmom_short": 672,
+            "tsmom_mid": 1344,
+            "tsmom_long": 2016,
+            "efficiency_period": 480,
+            "min_efficiency": 0.30,
+            "adx_period": 336,
+            "adx_min": 20.0,
+            "vol_persist_fast": 384,
+            "vol_persist_slow": 1536,
+            "vol_persist_max": 1.5,
+            "min_hold_bars": 36,
+            "cooldown_bars": 4,
+            "max_hold_bars": 2000,
+            "vol_window": 1344,
+            "target_vol": 0.20,
+            "allow_short": True,
+        },
+    ),
     "1d": (
         {
             "variant": "core_4_8_12wk",

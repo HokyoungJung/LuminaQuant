@@ -25,6 +25,7 @@ from typing import Any
 
 from lumina_quant.strategies.cgo_disposition_alpha_sleeves import (
     CrossSectionalCapitalGainsOverhangStrategy,
+    _CGO_DISPOSITION_SLICE,
 )
 from lumina_quant.strategies.near_high_anchoring_alpha_sleeves import (
     CrossSectionalNearHighAnchoringStrategy,
@@ -463,3 +464,47 @@ def test_schema_keys_snake_case_and_hyperparam() -> None:
         assert isinstance(value, HyperParam)
     for required in ("window_bars", "skip_recent", "v_clip_max", "quantile_pct", "min_hold_bars"):
         assert required in schema
+
+
+def test_slice_multi_timeframe_scaling() -> None:
+    """1h/4h cells mirror the 1d variants with x24/x6-scaled bar-denominated params."""
+    slice_map = _CGO_DISPOSITION_SLICE
+    assert set(slice_map.keys()) == {"1h", "4h", "1d"}
+    base = slice_map["1d"]
+    names = tuple(spec["variant"] for spec in base)
+    assert names == ("wk8", "wk13")
+    for timeframe, variants in slice_map.items():
+        assert len(variants) == len(base), timeframe
+        assert tuple(spec["variant"] for spec in variants) == names, timeframe
+
+    # Every bar-denominated window (reference/skip/vol/history) and the weekly
+    # decision clocks scale x6 (4h) / x24 (1h); ratios, counts and price/vol
+    # thresholds are timeframe-agnostic and stay identical.
+    scaled_keys = (
+        "window_bars",
+        "skip_recent",
+        "vol_window",
+        "rebalance_bars",
+        "min_hold_bars",
+        "min_history_bars",
+    )
+    unchanged_keys = (
+        "quantile_pct",
+        "min_symbols",
+        "allow_short",
+        "target_gross_exposure",
+        "target_vol",
+        "stop_loss_pct",
+    )
+    for factor, timeframe in ((6, "4h"), (24, "1h")):
+        for base_spec, tf_spec in zip(base, slice_map[timeframe], strict=True):
+            for key in scaled_keys:
+                assert tf_spec[key] == base_spec[key] * factor, (timeframe, key)
+            for key in unchanged_keys:
+                assert tf_spec[key] == base_spec[key], (timeframe, key)
+    for variants in slice_map.values():
+        for spec in variants:
+            # Per-symbol history floor still exceeds the reference window, and no
+            # window reaches the ~9000-bar cap.
+            assert spec["min_history_bars"] > spec["window_bars"], spec["variant"]
+            assert spec["window_bars"] <= 9000, spec["variant"]

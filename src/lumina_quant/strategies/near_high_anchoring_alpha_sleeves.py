@@ -535,15 +535,84 @@ _SUGGESTED_CANDIDATE_TAGS: tuple[str, ...] = (
     "crypto",
 )
 
-# Candidate slice (daily bars; weekly rebalance via ``rebalance_bars``).  The
-# published effect is a 52-week window; the data-PC owns the 10/20/30/52wk
-# horizon factor_ic sweep, so we seed only two anchoring lookbacks (~30wk and
-# ~52wk of 1d bars) to keep the candidate library thin.  ``min_history_bars``
-# is the per-symbol floor below which a young alt is skipped; between it and
+# Candidate slice (weekly rebalance via ``rebalance_bars``; the ``_evaluate``
+# clock is bar-count driven, so every bar-denominated window scales with the
+# bar size).  The published effect is a 52-week WALL-CLOCK window, so
+# ``high_lookback_bars`` (the trailing-high horizon) and its paired
+# ``min_history_bars`` admission floor scale x6 at 4h / x24 at 1h to preserve
+# the 52wk/30wk anchor (364 * bars_per_day: 1d=364, 4h=2184, 1h=8736); the
+# ``rebalance_bars``/``min_hold_bars`` cadence scales likewise so the weekly
+# rebalance and 1-week min-hold stay fixed in wall-clock terms; the
+# inverse-vol ``vol_window`` sizing estimator scales too so the risk read spans
+# the same wall-clock window.  Quantile/exposure/vol thresholds are
+# scale-invariant and unchanged.  The data-PC owns the 10/20/30/52wk horizon
+# factor_ic sweep; we seed two anchoring lookbacks (~30wk and ~52wk) per
+# timeframe to keep the candidate library thin.  ``min_history_bars`` is the
+# per-symbol floor below which a young alt is skipped; between it and
 # ``high_lookback_bars`` the symbol is admitted via the ``max_available``
 # fallback (the breadth-vs-anointing tradeoff resolved toward a tradeable
 # cross-section).
 _NEAR_HIGH_ANCHORING_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "4h": (
+        {
+            "variant": "wk52",
+            "high_lookback_bars": 2184,
+            "min_history_bars": 360,
+            "vol_window": 120,
+            "quantile_pct": 0.25,
+            "rebalance_bars": 42,
+            "min_hold_bars": 42,
+            "min_symbols": 5,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+            "target_vol": 0.20,
+            "stop_loss_pct": 0.10,
+        },
+        {
+            "variant": "wk30",
+            "high_lookback_bars": 1260,
+            "min_history_bars": 270,
+            "vol_window": 120,
+            "quantile_pct": 0.25,
+            "rebalance_bars": 42,
+            "min_hold_bars": 42,
+            "min_symbols": 5,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+            "target_vol": 0.20,
+            "stop_loss_pct": 0.10,
+        },
+    ),
+    "1h": (
+        {
+            "variant": "wk52",
+            "high_lookback_bars": 8736,
+            "min_history_bars": 1440,
+            "vol_window": 480,
+            "quantile_pct": 0.25,
+            "rebalance_bars": 168,
+            "min_hold_bars": 168,
+            "min_symbols": 5,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+            "target_vol": 0.20,
+            "stop_loss_pct": 0.10,
+        },
+        {
+            "variant": "wk30",
+            "high_lookback_bars": 5040,
+            "min_history_bars": 1080,
+            "vol_window": 480,
+            "quantile_pct": 0.25,
+            "rebalance_bars": 168,
+            "min_hold_bars": 168,
+            "min_symbols": 5,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+            "target_vol": 0.20,
+            "stop_loss_pct": 0.10,
+        },
+    ),
     "1d": (
         {
             "variant": "wk52",

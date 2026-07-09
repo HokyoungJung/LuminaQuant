@@ -594,3 +594,36 @@ def test_module_marker_constants() -> None:
     assert MODULE._STRATEGY_NAME == "MomentumCrashDynamicScalingOverlayStrategy"
     assert math.isfinite(MODULE._EPS)
     assert MODULE._SUGGESTED_FAMILY == "overlay"
+
+
+def test_slice_multi_timeframe_keys_and_bounds() -> None:
+    """Pin the 1d/4h/1h slice: mirrored variants + keys, scaled cells in-bounds.
+
+    Guards against a silent schema clamp so the written 1h values (some capped
+    at the schema maxima) equal the effective ones, and pins the two magnitude
+    thresholds (``dd_threshold`` / ``rebound_threshold``) as tf-invariant.
+    """
+    slice_dict = MODULE._MOMENTUM_CRASH_SCALING_OVERLAY_SLICE
+    assert set(slice_dict) == {"1d", "4h", "1h"}
+    counts = {tf: len(cells) for tf, cells in slice_dict.items()}
+    assert len(set(counts.values())) == 1, counts
+    base = {cell["variant"]: cell for cell in slice_dict["1d"]}
+    schema = MomentumCrashDynamicScalingOverlayStrategy.get_param_schema()
+    for tf, cells in slice_dict.items():
+        assert tuple(c["variant"] for c in cells) == tuple(base), (tf, counts)
+        for cell in cells:
+            assert set(cell) == set(base[cell["variant"]]), (tf, cell["variant"])
+            for key, value in cell.items():
+                if key == "variant" or isinstance(value, bool):
+                    continue
+                hp = schema[key]
+                if hp.low is not None:
+                    assert value >= hp.low, (tf, key, value)
+                if hp.high is not None:
+                    assert value <= hp.high, (tf, key, value)
+    # Magnitude thresholds are tf-invariant (their lookbacks scale, not them).
+    for tf in ("4h", "1h"):
+        for cell in slice_dict[tf]:
+            b = base[cell["variant"]]
+            assert cell["dd_threshold"] == b["dd_threshold"]
+            assert cell["rebound_threshold"] == b["rebound_threshold"]

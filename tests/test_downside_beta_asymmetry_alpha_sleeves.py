@@ -28,6 +28,7 @@ from lumina_quant.strategies.cross_sectional_anomaly_alpha_sleeves import (
 )
 from lumina_quant.strategies.downside_beta_asymmetry_alpha_sleeves import (
     CrossSectionalDownsideBetaAsymmetryStrategy,
+    _DOWNSIDE_BETA_ASYMMETRY_SLICE,
     _log_returns,
 )
 from lumina_quant.strategies.equity_xs_factor_alpha_sleeves import BettingAgainstBetaStrategy
@@ -460,3 +461,38 @@ def test_schema_keys_snake_case_and_hyperparam() -> None:
 
     lottery = LotterySkewnessStrategy  # imported for parity with the incumbent set
     assert lottery is not None
+
+
+def test_slice_multi_timeframe_scaling() -> None:
+    """1h/4h cells mirror the 1d variants with x24/x6-scaled bar-denominated params."""
+    slice_map = _DOWNSIDE_BETA_ASYMMETRY_SLICE
+    assert set(slice_map.keys()) == {"1h", "4h", "1d"}
+    base = slice_map["1d"]
+    names = tuple(spec["variant"] for spec in base)
+    assert names == ("monthly_core", "shortwin_ls")
+    for timeframe, variants in slice_map.items():
+        assert len(variants) == len(base), timeframe
+        assert tuple(spec["variant"] for spec in variants) == names, timeframe
+
+    # The semi-beta estimation window, realized-vol window, and monthly clocks
+    # scale x6 (4h) / x24 (1h).  ``min_side_obs`` is a statistical sample floor
+    # (not a wall-clock horizon) and stays fixed, as do the ratios/counts.
+    scaled_keys = ("window_bars", "rebalance_bars", "min_hold_bars", "vol_window")
+    unchanged_keys = (
+        "min_side_obs",
+        "quantile_pct",
+        "hysteresis_buffer_ranks",
+        "min_symbols",
+        "allow_short",
+        "target_gross_exposure",
+    )
+    for factor, timeframe in ((6, "4h"), (24, "1h")):
+        for base_spec, tf_spec in zip(base, slice_map[timeframe], strict=True):
+            for key in scaled_keys:
+                assert tf_spec[key] == base_spec[key] * factor, (timeframe, key)
+            for key in unchanged_keys:
+                assert tf_spec[key] == base_spec[key], (timeframe, key)
+    for variants in slice_map.values():
+        for spec in variants:
+            assert spec["min_side_obs"] < spec["window_bars"], spec["variant"]
+            assert spec["window_bars"] <= 9000, spec["variant"]

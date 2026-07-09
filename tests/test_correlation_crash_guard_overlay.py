@@ -590,3 +590,36 @@ def test_module_marker_constants() -> None:
     assert MODULE._STRATEGY_NAME == "AvgCorrelationCrashGuardOverlayStrategy"
     assert math.isfinite(MODULE._EPS)
     assert MODULE._SUGGESTED_FAMILY == "overlay"
+
+
+def test_slice_multi_timeframe_keys_and_bounds() -> None:
+    """Pin the 1d/4h/1h slice: mirrored variants + keys, scaled cells in-bounds.
+
+    Guards against a silent schema clamp so the written 1h values (``corr_window``
+    / ``corr_z_window`` capped at the schema maxima) equal the effective ones, and
+    pins the guard thresholds/scale as tf-invariant.
+    """
+    slice_dict = MODULE._CORRELATION_CRASH_GUARD_OVERLAY_SLICE
+    assert set(slice_dict) == {"1d", "4h", "1h"}
+    counts = {tf: len(cells) for tf, cells in slice_dict.items()}
+    assert len(set(counts.values())) == 1, counts
+    base = {cell["variant"]: cell for cell in slice_dict["1d"]}
+    schema = AvgCorrelationCrashGuardOverlayStrategy.get_param_schema()
+    for tf, cells in slice_dict.items():
+        assert tuple(c["variant"] for c in cells) == tuple(base), (tf, counts)
+        for cell in cells:
+            assert set(cell) == set(base[cell["variant"]]), (tf, cell["variant"])
+            for key, value in cell.items():
+                if key == "variant" or isinstance(value, bool):
+                    continue
+                hp = schema[key]
+                if hp.low is not None:
+                    assert value >= hp.low, (tf, key, value)
+                if hp.high is not None:
+                    assert value <= hp.high, (tf, key, value)
+    # De-risk thresholds/scale are tf-invariant (only the windows/dwell scale).
+    for tf in ("4h", "1h"):
+        for cell in slice_dict[tf]:
+            b = base[cell["variant"]]
+            for key in ("z_enter", "z_exit", "corr_abs_floor", "derisk_scale"):
+                assert cell[key] == b[key], (tf, key)

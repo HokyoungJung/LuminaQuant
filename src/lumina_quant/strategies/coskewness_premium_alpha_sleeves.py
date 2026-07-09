@@ -467,7 +467,72 @@ _SUGGESTED_CANDIDATE_TAGS: tuple[str, ...] = (
     "crypto",
 )
 
+# MULTI-TIMEFRAME (data-PC parquet carries 1h/4h but not 1d): the co-skewness
+# estimation ``coskew_window``, the realized-vol ``vol_window``, and the monthly
+# ``rebalance_bars``/``min_hold_bars`` decision clocks are WALL-CLOCK horizons,
+# so they scale x6 for 4h and x24 for 1h to preserve the same months-of-comoment
+# estimation and monthly cadence.  The ``beta_residualize`` toggle, the
+# ``quantile_pct`` ratio, the ``hysteresis_band`` churn threshold, the
+# ``min_symbols`` count, ``allow_short``, and ``target_gross_exposure`` are
+# timeframe-agnostic and stay UNCHANGED.  Longest window (raw_sort_ls @1h = 2880
+# bars) stays well under the ~9000-bar cap.
 _COSKEWNESS_PREMIUM_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "1h": (
+        {
+            "variant": "monthly_core",
+            "coskew_window": 2160,  # 90 x24 (~3mo of 1h bars)
+            "beta_residualize": True,
+            "quantile_pct": 0.25,
+            "rebalance_bars": 504,  # 21 x24 (~monthly cadence)
+            "min_hold_bars": 504,  # 21 x24
+            "hysteresis_band": 0.10,
+            "vol_window": 720,  # 30 x24 (~30d)
+            "min_symbols": 4,
+            "allow_short": True,
+            "target_gross_exposure": 0.36,
+        },
+        {
+            "variant": "raw_sort_ls",
+            "coskew_window": 2880,  # 120 x24 (~4mo of 1h bars)
+            "beta_residualize": False,
+            "quantile_pct": 0.25,
+            "rebalance_bars": 504,
+            "min_hold_bars": 504,
+            "hysteresis_band": 0.10,
+            "vol_window": 720,
+            "min_symbols": 4,
+            "allow_short": True,
+            "target_gross_exposure": 0.30,
+        },
+    ),
+    "4h": (
+        {
+            "variant": "monthly_core",
+            "coskew_window": 540,  # 90 x6 (~3mo of 4h bars)
+            "beta_residualize": True,
+            "quantile_pct": 0.25,
+            "rebalance_bars": 126,  # 21 x6 (~monthly cadence)
+            "min_hold_bars": 126,  # 21 x6
+            "hysteresis_band": 0.10,
+            "vol_window": 180,  # 30 x6 (~30d)
+            "min_symbols": 4,
+            "allow_short": True,
+            "target_gross_exposure": 0.36,
+        },
+        {
+            "variant": "raw_sort_ls",
+            "coskew_window": 720,  # 120 x6 (~4mo of 4h bars)
+            "beta_residualize": False,
+            "quantile_pct": 0.25,
+            "rebalance_bars": 126,
+            "min_hold_bars": 126,
+            "hysteresis_band": 0.10,
+            "vol_window": 180,
+            "min_symbols": 4,
+            "allow_short": True,
+            "target_gross_exposure": 0.30,
+        },
+    ),
     "1d": (
         {
             "variant": "monthly_core",

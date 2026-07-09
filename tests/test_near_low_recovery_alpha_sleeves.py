@@ -749,3 +749,25 @@ def test_schema_keys_snake_case_and_hyperparam() -> None:
         assert required in schema
     for cap in ("base_allocation", "max_symbol_exposure_pct", "max_order_value"):
         assert schema[cap].tunable is False
+
+
+def test_slice_multi_timeframe_cells_pinned() -> None:
+    """4h/1h cells mirror the 1d variants and scale the bar clocks x6 / x24."""
+    from lumina_quant.strategies.near_low_recovery_alpha_sleeves import (
+        _NEAR_LOW_RECOVERY_SLICE as sl,
+    )
+
+    assert {"1d", "4h", "1h"} <= set(sl)
+    base = tuple(cell["variant"] for cell in sl["1d"])
+    for tf in ("4h", "1h"):
+        assert tuple(cell["variant"] for cell in sl[tf]) == base
+    assert sl["4h"][0]["low_lookback_bars"] == 2184
+    assert sl["4h"][0]["rebalance_bars"] == 42
+    assert sl["4h"][0]["vol_window"] == 120
+    assert sl["1h"][0]["low_lookback_bars"] == 8736
+    assert sl["1h"][0]["rebalance_bars"] == 168
+    assert sl["1h"][0]["vol_window"] == 480
+    # Unit-free knobs stay fixed across timeframes.
+    for tf in ("1d", "4h", "1h"):
+        assert sl[tf][0]["quantile_pct"] == 0.25
+        assert sl[tf][0]["min_symbols"] == 6

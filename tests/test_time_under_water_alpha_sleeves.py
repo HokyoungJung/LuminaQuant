@@ -806,3 +806,23 @@ def test_schema_keys_snake_case_and_hyperparam() -> None:
         assert required in schema
     for cap in ("base_allocation", "max_symbol_exposure_pct", "max_order_value"):
         assert schema[cap].tunable is False
+
+
+def test_slice_multi_timeframe_cells_pinned() -> None:
+    """4h/1h add the scaled rebalance_bars clock; min_hold_decisions is invariant."""
+    from lumina_quant.strategies.time_under_water_alpha_sleeves import (
+        _TIME_UNDER_WATER_SLICE as sl,
+    )
+
+    assert {"1d", "4h", "1h"} <= set(sl)
+    base = tuple(cell["variant"] for cell in sl["1d"])
+    for tf in ("4h", "1h"):
+        assert tuple(cell["variant"] for cell in sl[tf]) == base
+    # The BAR-count decision clock is defaulted at 1d but pinned at sub-daily.
+    assert "rebalance_bars" not in sl["1d"][0]
+    assert sl["4h"][0]["rebalance_bars"] == 42
+    assert sl["1h"][0]["rebalance_bars"] == 168
+    assert sl["4h"][0]["lookback_bars"] == 2184
+    assert sl["1h"][0]["lookback_bars"] == 8736
+    for tf in ("1d", "4h", "1h"):
+        assert sl[tf][0]["min_hold_decisions"] == 4

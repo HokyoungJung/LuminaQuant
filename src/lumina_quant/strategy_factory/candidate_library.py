@@ -9455,7 +9455,7 @@ def _build_near_high_anchoring_candidates(ctx: _CandidateBuildContext) -> None:
     min_symbols = 5
     if len(crypto_symbols) < min_symbols:
         return
-    for timeframe in ctx._present("1d"):
+    for timeframe in ctx._present("1h", "4h", "1d"):
         tf_tag = timeframe.replace("/", "-")
         for spec in _NEAR_HIGH_ANCHORING_SLICE.get(timeframe, ()):
             params = {key: value for key, value in spec.items() if key != "variant"}
@@ -9498,7 +9498,7 @@ def _build_low_turnover_trend_persistence_candidates(ctx: _CandidateBuildContext
     crypto_symbols = ctx.crypto_only_symbols
     if not crypto_symbols:
         return
-    for timeframe in ctx._present("1d"):
+    for timeframe in ctx._present("1h", "4h", "1d"):
         tf_tag = timeframe.replace("/", "-")
         for spec in _LOW_TURNOVER_TREND_PERSISTENCE_SLICE.get(timeframe, ()):
             for symbol in crypto_symbols:
@@ -9544,7 +9544,7 @@ def _build_rebalancing_premium_harvest_candidates(ctx: _CandidateBuildContext) -
     min_symbols = 5
     if len(crypto_symbols) < min_symbols:
         return
-    for timeframe in ctx._present("1d"):
+    for timeframe in ctx._present("1h", "4h", "1d"):
         tf_tag = timeframe.replace("/", "-")
         for spec in _REBALANCING_PREMIUM_HARVEST_SLICE.get(timeframe, ()):
             params = {key: value for key, value in spec.items() if key != "variant"}
@@ -9588,7 +9588,7 @@ def _build_slow_leadlag_xs_candidates(ctx: _CandidateBuildContext) -> None:
     min_symbols = 5
     if len(crypto_symbols) < min_symbols:
         return
-    for timeframe in ctx._present("1d"):
+    for timeframe in ctx._present("1h", "4h", "1d"):
         tf_tag = timeframe.replace("/", "-")
         for spec in _SLOW_LEADLAG_XS_SLICE.get(timeframe, ()):
             params = {key: value for key, value in spec.items() if key != "variant"}
@@ -9632,7 +9632,7 @@ def _build_stationarity_gated_residual_reversion_candidates(ctx: _CandidateBuild
     min_symbols = 5
     if len(crypto_symbols) < min_symbols:
         return
-    for timeframe in ctx._present("4h", "1d"):
+    for timeframe in ctx._present("1h", "4h", "1d"):
         tf_tag = timeframe.replace("/", "-")
         for spec in _RESIDUAL_REVERSION_SLICE.get(timeframe, ()):
             params = {key: value for key, value in spec.items() if key != "variant"}
@@ -9945,7 +9945,7 @@ def _build_alpha_pool_v2b_candidates(ctx: _CandidateBuildContext) -> None:
     )
     if len(crypto_symbols) >= 5:
         for prefix, strategy_class, lane_slice, tags, family, note in xs_lanes:
-            for timeframe in ctx._present("1d"):
+            for timeframe in ctx._present("1h", "4h", "1d"):
                 tf_tag = timeframe.replace("/", "-")
                 for spec in lane_slice.get(timeframe, ()):
                     params = {key: value for key, value in spec.items() if key != "variant"}
@@ -9997,7 +9997,7 @@ def _build_alpha_pool_v2b_candidates(ctx: _CandidateBuildContext) -> None:
         ),
     )
     for prefix, strategy_class, lane_slice, tags, family, note in per_symbol_lanes:
-        for timeframe in ctx._present("1d"):
+        for timeframe in ctx._present("1h", "4h", "1d"):
             tf_tag = timeframe.replace("/", "-")
             for spec in lane_slice.get(timeframe, ()):
                 for symbol in crypto_symbols:
@@ -10047,7 +10047,7 @@ def _build_alpha_pool_v2b_candidates(ctx: _CandidateBuildContext) -> None:
     )
     if len(crypto_symbols) >= 2:
         for prefix, strategy_class, lane_slice, tags, note in overlay_lanes:
-            for timeframe in ctx._present("1d"):
+            for timeframe in ctx._present("1h", "4h", "1d"):
                 tf_tag = timeframe.replace("/", "-")
                 for spec in lane_slice.get(timeframe, ()):
                     params = {key: value for key, value in spec.items() if key != "variant"}

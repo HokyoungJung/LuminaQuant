@@ -500,3 +500,22 @@ def test_param_schema_is_snake_case() -> None:
     for name, hp in schema.items():
         assert name == name.lower() and " " not in name
         assert isinstance(hp, HyperParam)
+
+
+def test_slice_multi_timeframe_cells_pinned() -> None:
+    """4h/1h add the scaled bars_per_week; week counts and decisions are invariant."""
+    from lumina_quant.strategies.momentum_echo_alpha_sleeves import (
+        _MOMENTUM_ECHO_SLICE as sl,
+    )
+
+    assert {"1d", "4h", "1h"} <= set(sl)
+    base = tuple(cell["variant"] for cell in sl["1d"])
+    for tf in ("4h", "1h"):
+        assert tuple(cell["variant"] for cell in sl[tf]) == base
+    # The weeks->bars conversion factor is defaulted at 1d, pinned at sub-daily.
+    assert "bars_per_week" not in sl["1d"][0]
+    assert sl["4h"][0]["bars_per_week"] == 42
+    assert sl["1h"][0]["bars_per_week"] == 168
+    for tf in ("1d", "4h", "1h"):
+        assert sl[tf][0]["echo_start_weeks"] == 12
+        assert sl[tf][0]["min_hold_decisions"] == 4

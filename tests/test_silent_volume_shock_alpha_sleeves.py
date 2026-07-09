@@ -722,3 +722,24 @@ def test_schema_keys_snake_case_and_hyperparam() -> None:
         "min_history_bars",
     ):
         assert required in schema
+
+
+def test_slice_multi_timeframe_cells_pinned() -> None:
+    """4h/1h scale the episodic bar clocks; 1h tightens the v_shock_z trigger."""
+    from lumina_quant.strategies.silent_volume_shock_alpha_sleeves import (
+        _SILENT_VOLUME_SHOCK_SLICE as sl,
+    )
+
+    assert {"1d", "4h", "1h"} <= set(sl)
+    base = tuple(cell["variant"] for cell in sl["1d"])
+    for tf in ("4h", "1h"):
+        assert tuple(cell["variant"] for cell in sl[tf]) == base
+    assert sl["4h"][0]["shock_window"] == 540
+    assert sl["4h"][0]["min_hold_bars"] == 42
+    assert sl["1h"][0]["shock_window"] == 2160
+    assert sl["1h"][0]["min_hold_bars"] == 168
+    # 4h keeps the native trigger; 1h is stricter (cost-safety at 24x arming freq).
+    assert sl["1d"][0]["v_shock_z"] == 2.0
+    assert sl["4h"][0]["v_shock_z"] == 2.0
+    assert sl["1h"][0]["v_shock_z"] == 2.5
+    assert sl["1h"][1]["v_shock_z"] == 3.0

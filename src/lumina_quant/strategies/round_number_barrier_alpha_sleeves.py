@@ -469,7 +469,60 @@ _SUGGESTED_CANDIDATE_TAGS: tuple[str, ...] = (
     "crypto",
 )
 
+# Candidate slice.  This lane is EPISODIC per-symbol on a per-BAR clock, so the bar
+# knobs scale x6 / x24 to hold the same wall-clock: the ``approach_bars`` window over
+# which the approach return must traverse >= half a grid cell, and the
+# ``min_hold_bars`` / ``max_hold_bars`` / ``cooldown_bars`` position clocks (turnover
+# is governed by these, which preserve the episodic cost profile).  ``prox_band`` is
+# the barrier-proximity DEFINITION (a grid-relative distance band, timeframe
+# invariant) and ``mode_filter`` is categorical, so both stay fixed.  Variant NAMES
+# keep their band labels as stable slice identifiers.  All scaled windows stay well
+# under the ~9000-bar cap.
 _ROUND_NUMBER_BARRIER_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "4h": (
+        {
+            "variant": "rn_band15_both",
+            "prox_band": 0.15,
+            "approach_bars": 30,
+            "mode_filter": "both",
+            "min_hold_bars": 18,
+            "max_hold_bars": 60,
+            "cooldown_bars": 30,
+            "allow_short": True,
+        },
+        {
+            "variant": "rn_band10_bounce",
+            "prox_band": 0.10,
+            "approach_bars": 18,
+            "mode_filter": "bounce_only",
+            "min_hold_bars": 18,
+            "max_hold_bars": 60,
+            "cooldown_bars": 30,
+            "allow_short": True,
+        },
+    ),
+    "1h": (
+        {
+            "variant": "rn_band15_both",
+            "prox_band": 0.15,
+            "approach_bars": 120,
+            "mode_filter": "both",
+            "min_hold_bars": 72,
+            "max_hold_bars": 240,
+            "cooldown_bars": 120,
+            "allow_short": True,
+        },
+        {
+            "variant": "rn_band10_bounce",
+            "prox_band": 0.10,
+            "approach_bars": 72,
+            "mode_filter": "bounce_only",
+            "min_hold_bars": 72,
+            "max_hold_bars": 240,
+            "cooldown_bars": 120,
+            "allow_short": True,
+        },
+    ),
     "1d": (
         {
             "variant": "rn_band15_both",

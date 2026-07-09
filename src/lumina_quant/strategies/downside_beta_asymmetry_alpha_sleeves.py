@@ -496,7 +496,75 @@ _SUGGESTED_CANDIDATE_TAGS: tuple[str, ...] = (
     "crypto",
 )
 
+# MULTI-TIMEFRAME (data-PC parquet carries 1h/4h but not 1d): the downside-beta
+# estimation ``window_bars``, the realized-vol ``vol_window``, and the monthly
+# ``rebalance_bars``/``min_hold_bars`` decision clocks are WALL-CLOCK horizons,
+# so they scale x6 for 4h and x24 for 1h to preserve the same
+# months-of-estimation and monthly cadence.  ``min_side_obs`` is a STATISTICAL
+# sample floor for the semi-beta regression (a minimum count of down-/up-side
+# points needed for a stable slope, NOT a wall-clock horizon) and stays UNCHANGED
+# -- the larger scaled window simply supplies more qualifying observations.  The
+# ``quantile_pct`` ratio, the ``hysteresis_buffer_ranks`` rank buffer, the
+# ``min_symbols`` count, ``allow_short``, and ``target_gross_exposure`` are
+# timeframe-agnostic and stay UNCHANGED.  Longest window (monthly_core @1h = 4320
+# bars) stays under the ~9000-bar cap.
 _DOWNSIDE_BETA_ASYMMETRY_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "1h": (
+        {
+            "variant": "monthly_core",
+            "window_bars": 4320,  # 180 x24 (~6mo of 1h bars)
+            "min_side_obs": 20,  # statistical sample floor -> unchanged
+            "quantile_pct": 0.25,
+            "rebalance_bars": 720,  # 30 x24 (~monthly cadence)
+            "min_hold_bars": 504,  # 21 x24
+            "hysteresis_buffer_ranks": 1,
+            "vol_window": 720,  # 30 x24 (~30d)
+            "min_symbols": 5,
+            "allow_short": True,
+            "target_gross_exposure": 0.36,
+        },
+        {
+            "variant": "shortwin_ls",
+            "window_bars": 2160,  # 90 x24 (~3mo of 1h bars)
+            "min_side_obs": 16,
+            "quantile_pct": 0.20,
+            "rebalance_bars": 720,
+            "min_hold_bars": 504,
+            "hysteresis_buffer_ranks": 1,
+            "vol_window": 720,
+            "min_symbols": 5,
+            "allow_short": True,
+            "target_gross_exposure": 0.30,
+        },
+    ),
+    "4h": (
+        {
+            "variant": "monthly_core",
+            "window_bars": 1080,  # 180 x6 (~6mo of 4h bars)
+            "min_side_obs": 20,  # statistical sample floor -> unchanged
+            "quantile_pct": 0.25,
+            "rebalance_bars": 180,  # 30 x6 (~monthly cadence)
+            "min_hold_bars": 126,  # 21 x6
+            "hysteresis_buffer_ranks": 1,
+            "vol_window": 180,  # 30 x6 (~30d)
+            "min_symbols": 5,
+            "allow_short": True,
+            "target_gross_exposure": 0.36,
+        },
+        {
+            "variant": "shortwin_ls",
+            "window_bars": 540,  # 90 x6 (~3mo of 4h bars)
+            "min_side_obs": 16,
+            "quantile_pct": 0.20,
+            "rebalance_bars": 180,
+            "min_hold_bars": 126,
+            "hysteresis_buffer_ranks": 1,
+            "vol_window": 180,
+            "min_symbols": 5,
+            "allow_short": True,
+            "target_gross_exposure": 0.30,
+        },
+    ),
     "1d": (
         {
             "variant": "monthly_core",

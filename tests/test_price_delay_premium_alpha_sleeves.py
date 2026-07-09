@@ -693,3 +693,23 @@ def test_volume_invariance_not_a_dollar_volume_alias() -> None:
 
     assert baseline_book == volume_book, (baseline_book, volume_book)
     assert baseline_book, baseline_book
+
+
+def test_slice_multi_timeframe_cells_pinned() -> None:
+    """4h/1h scale delay_window (span) but hold the Dimson lag order and decisions."""
+    from lumina_quant.strategies.price_delay_premium_alpha_sleeves import (
+        _PRICE_DELAY_PREMIUM_SLICE as sl,
+    )
+
+    assert {"1d", "4h", "1h"} <= set(sl)
+    base = tuple(cell["variant"] for cell in sl["1d"])
+    for tf in ("4h", "1h"):
+        assert tuple(cell["variant"] for cell in sl[tf]) == base
+    assert sl["4h"][0]["delay_window"] == 1080
+    assert sl["1h"][0]["delay_window"] == 4320
+    assert sl["4h"][0]["vol_window"] == 180
+    assert sl["1h"][0]["vol_window"] == 720
+    # The Dimson lag ORDER and the weekly ISO decisions are timeframe invariant.
+    for tf in ("1d", "4h", "1h"):
+        assert sl[tf][0]["delay_lags"] == 5
+        assert sl[tf][0]["min_hold_decisions"] == 4

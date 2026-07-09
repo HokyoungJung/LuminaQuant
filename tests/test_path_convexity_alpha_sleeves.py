@@ -30,6 +30,7 @@ from typing import Any
 from lumina_quant.indicators.log_price_regression import orthonormal_path_convexity
 from lumina_quant.indicators.oscillators import rate_of_change
 from lumina_quant.strategies.path_convexity_alpha_sleeves import (
+    _PATH_CONVEXITY_SLICE,
     CrossSectionalPathConvexityStrategy,
 )
 from lumina_quant.strategies.profit_moonshot import ProfitMoonshotTrendStrategy
@@ -426,3 +427,26 @@ def test_schema_keys_snake_case_and_hyperparam() -> None:
         "target_gross_exposure",
     ):
         assert required in schema
+
+
+def test_slice_timeframe_expansion_scales_bar_windows() -> None:
+    """4h/1h cells mirror the 1d variants: the curvature / vol bar windows scale
+    x6/x24, while the weekly min-hold, quantile, and hysteresis-exit band stay
+    timeframe-invariant."""
+    slice_ = _PATH_CONVEXITY_SLICE
+    assert set(slice_) == {"4h", "1h", "1d"}
+    variants = {tf: tuple(cell["variant"] for cell in cells) for tf, cells in slice_.items()}
+    assert variants["4h"] == variants["1h"] == variants["1d"]
+    by = {tf: {cell["variant"]: cell for cell in cells} for tf, cells in slice_.items()}
+    for variant in variants["1d"]:
+        d, h4, h1 = by["1d"][variant], by["4h"][variant], by["1h"][variant]
+        for key in ("window_bars", "vol_window"):
+            assert h4[key] == d[key] * 6, (variant, key)
+            assert h1[key] == d[key] * 24, (variant, key)
+        for key in (
+            "quantile",
+            "hysteresis_exit_pct",
+            "min_hold_decisions",
+            "target_gross_exposure",
+        ):
+            assert h4[key] == d[key] == h1[key], (variant, key)

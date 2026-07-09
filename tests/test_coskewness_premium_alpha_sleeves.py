@@ -29,6 +29,7 @@ from lumina_quant.indicators.comoment import standardized_coskewness
 from lumina_quant.indicators.rolling_stats import rolling_beta, sample_std
 from lumina_quant.strategies.coskewness_premium_alpha_sleeves import (
     SystematicCoskewnessPremiumStrategy,
+    _COSKEWNESS_PREMIUM_SLICE,
     _simple_returns,
 )
 from lumina_quant.strategies.cross_sectional_anomaly_alpha_sleeves import (
@@ -431,3 +432,37 @@ def test_schema_keys_snake_case_and_hyperparam() -> None:
         assert isinstance(value, HyperParam)
     for required in ("coskew_window", "beta_residualize", "min_hold_bars", "hysteresis_band"):
         assert required in schema
+
+
+def test_slice_multi_timeframe_scaling() -> None:
+    """1h/4h cells mirror the 1d variants with x24/x6-scaled bar-denominated params."""
+    slice_map = _COSKEWNESS_PREMIUM_SLICE
+    assert set(slice_map.keys()) == {"1h", "4h", "1d"}
+    base = slice_map["1d"]
+    names = tuple(spec["variant"] for spec in base)
+    assert names == ("monthly_core", "raw_sort_ls")
+    for timeframe, variants in slice_map.items():
+        assert len(variants) == len(base), timeframe
+        assert tuple(spec["variant"] for spec in variants) == names, timeframe
+
+    # The co-moment estimation window, realized-vol window, and monthly clocks
+    # scale x6 (4h) / x24 (1h); the beta-residualize toggle, quantile ratio,
+    # churn band, symbol count, and gross target stay identical.
+    scaled_keys = ("coskew_window", "rebalance_bars", "min_hold_bars", "vol_window")
+    unchanged_keys = (
+        "beta_residualize",
+        "quantile_pct",
+        "hysteresis_band",
+        "min_symbols",
+        "allow_short",
+        "target_gross_exposure",
+    )
+    for factor, timeframe in ((6, "4h"), (24, "1h")):
+        for base_spec, tf_spec in zip(base, slice_map[timeframe], strict=True):
+            for key in scaled_keys:
+                assert tf_spec[key] == base_spec[key] * factor, (timeframe, key)
+            for key in unchanged_keys:
+                assert tf_spec[key] == base_spec[key], (timeframe, key)
+    for variants in slice_map.values():
+        for spec in variants:
+            assert spec["coskew_window"] <= 9000, spec["variant"]

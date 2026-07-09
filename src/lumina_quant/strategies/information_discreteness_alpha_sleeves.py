@@ -569,11 +569,76 @@ _SUGGESTED_CANDIDATE_TAGS: tuple[str, ...] = (
     "crypto",
 )
 
-# Candidate slice (DAILY bars, internally weekly-sampled: ``formation_bars`` /
-# ``skip_bars`` are DAILY bars, ``min_hold_decisions`` are WEEKLY decision bars).
-# Cross-sectional long-short book -- vanilla momentum CONDITIONED on the sign
-# census; the momentum leg is deliberately plain so the conditioning is isolated.
+# Candidate slice.  The decision clock is the internal ISO ``_week_key``
+# (timestamp-based, fires once per calendar week at ANY feed frequency), so the
+# WEEKLY-decision param ``min_hold_decisions`` is timeframe INVARIANT and stays
+# fixed at 4h/1h.  The formation window is DAY-scaled: ``formation_bars`` (8wk/4wk)
+# and the ``skip_bars`` skip-week scale x6 / x24 to hold the same 8wk/4wk/1wk
+# calendar spans, and ``vol_window`` scales likewise.  NOTE / HONEST FLAG for the
+# PM: ID is a magnitude-blind SIGN census, so at sub-daily bars the census counts
+# up- vs down-BARS (intraday sign continuity) rather than up- vs down-DAYS -- a
+# FINER granularity that changes the statistic's information content (a strong up
+# day can hold many down 4h/1h bars).  There is no daily-aggregating path in the
+# numeric, so the day-equivalent-SPAN scaling is the faithful transplant and the
+# granularity shift is recorded for the falsification read.  The continuity /
+# id_max / quantile fractions and symbol counts are unit-free and stay fixed.
 _INFORMATION_DISCRETENESS_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "4h": (
+        {
+            "variant": "fip_8wk_p50",
+            "formation_bars": 336,
+            "skip_bars": 42,
+            "continuity_pct": 0.50,
+            "id_max": 0.0,
+            "quantile_pct": 0.25,
+            "vol_window": 180,
+            "min_hold_decisions": 4,
+            "min_symbols": 6,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+        },
+        {
+            "variant": "fip_4wk_p33",
+            "formation_bars": 168,
+            "skip_bars": 42,
+            "continuity_pct": 0.33,
+            "id_max": 0.0,
+            "quantile_pct": 0.25,
+            "vol_window": 180,
+            "min_hold_decisions": 4,
+            "min_symbols": 6,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+        },
+    ),
+    "1h": (
+        {
+            "variant": "fip_8wk_p50",
+            "formation_bars": 1344,
+            "skip_bars": 168,
+            "continuity_pct": 0.50,
+            "id_max": 0.0,
+            "quantile_pct": 0.25,
+            "vol_window": 720,
+            "min_hold_decisions": 4,
+            "min_symbols": 6,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+        },
+        {
+            "variant": "fip_4wk_p33",
+            "formation_bars": 672,
+            "skip_bars": 168,
+            "continuity_pct": 0.33,
+            "id_max": 0.0,
+            "quantile_pct": 0.25,
+            "vol_window": 720,
+            "min_hold_decisions": 4,
+            "min_symbols": 6,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+        },
+    ),
     "1d": (
         {
             "variant": "fip_8wk_p50",

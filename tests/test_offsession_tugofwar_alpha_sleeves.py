@@ -424,6 +424,78 @@ def test_leg5_self_skips_below_min_symbols() -> None:
     assert not [s for s in candidate.events.items if s.signal_type in {"LONG", "SHORT"}]
 
 
+# --------------------------------------------------------------------------- #
+# (pm) POSTMORTEM of the measured 1h cell `offsession_tugofwar_1h_tow_42d_fade`
+# (research_note 2026-07-09: OOS Sharpe -33.95, return -63.19%, MDD 63.85%).  A
+# Sharpe that negative implicates a SIGN INVERSION or an every-bar TURNOVER
+# churn; these pin both as absent, so the loss is a DIRECTIONAL (wrong-signed /
+# absent) fade edge on this universe -- the docstring's declared wrong-sign
+# alternative (off-session moves are genuine Asia/Europe information ->
+# continuation), i.e. the pre-registered EXPECTED-NULL, not a code defect.
+# --------------------------------------------------------------------------- #
+
+
+def test_pm_fade_sign_shorts_high_tow_longs_low_tow() -> None:
+    """THEORY (Akbas-Boehmer-Jiang-Koch): persistent off-session strength
+    predicts NEGATIVELY -> FADE.  The high-TOW leg (NIGHTPUMP) must be SHORT and
+    the low-TOW leg (SESSIONGRIND) LONG.  Culprit-1 (sign) regression lock:
+    a silent flip masquerading as a fix for the OOS loss breaks here.
+    """
+    candidate = _make_candidate()
+    _feed(candidate, _ALL_SYMBOLS)
+    sides = _final_sides(candidate.events.items)
+    assert sides.get(NIGHT) == "SHORT"
+    assert sides.get(GRIND) == "LONG"
+
+
+def test_pm_decision_clock_is_weekly_iso_not_every_bar() -> None:
+    """The 1h cell decides on an ISO-week clock: ``_evaluate`` fires once per NEW
+    ISO week (the first week only seeds ``_last_eval_week``), NOT once per 1h bar.
+
+    Culprit-2 (turnover-churn) lock: at a weekly decision cadence over 1512 fed
+    bars the round-trip count -- and the 20bps cost bleed -- is far too small to
+    explain the measured -63% OOS return, so the loss is directional.
+    """
+    candidate = _make_candidate()
+    calls = {"n": 0}
+    original = candidate._evaluate
+
+    def _counting(event_time: Any) -> None:
+        calls["n"] += 1
+        original(event_time)
+
+    candidate._evaluate = _counting  # type: ignore[method-assign]
+    _feed(candidate, _ALL_SYMBOLS)
+    weeks = len({moment.isocalendar()[:2] for moment in _TIMES})
+    assert calls["n"] == weeks - 1  # one decision per new ISO week, seed week excluded
+    assert calls["n"] <= 12  # far below the 1512 one-hour bars fed
+
+
+def test_pm_vol_target_scalar_is_inert_at_hourly_vol_scale() -> None:
+    """DIAGNOSTIC (known limitation flagged for the handoff, NOT the loss cause).
+
+    Culprit-3 (sizing): the sleeve sizes off
+    ``realized_volatility(closes, window=vol_window)``, a PER-1h-BAR stdev
+    (``annualization=1.0``), while ``target_vol`` defaults to 0.20 (an
+    annualized-scale figure).  Hourly vol (~1e-3..2e-2) sits orders of magnitude
+    below 0.20, so ``scalar = min(1.0, target_vol / portfolio_vol)`` is pinned at
+    1.0 for every realistic hourly vol: the vol-target knob NEVER de-risks.  It
+    also NEVER inflates leverage (it is capped at 1.0), so it cannot manufacture
+    the -63% loss -- a correctly de-risked wrong-signed book still loses.  If this
+    lane is ever revived, fix the ``target_vol`` horizon mismatch first.
+    """
+    candidate = _make_candidate()
+    targets = {NIGHT: ("SHORT", -1.5, {}), GRIND: ("LONG", 1.5, {})}
+    for hourly_vol in (0.002, 0.005, 0.01, 0.02):
+        vols = {NIGHT: hourly_vol, GRIND: hourly_vol * 1.3}
+        _weights, scalar = candidate._inverse_vol_weights(targets, vols)
+        assert scalar == 1.0, (hourly_vol, scalar)
+    # Control: the scalar DOES de-risk once handed an annualized-scale vol > target,
+    # proving the pin above is a horizon-scale mismatch, not a dead code path.
+    _weights, scalar = candidate._inverse_vol_weights(targets, {NIGHT: 0.60, GRIND: 0.60})
+    assert scalar < 1.0
+
+
 def test_run_twice_bit_identical() -> None:
     first = _make_candidate()
     _feed(first, _ALL_SYMBOLS)

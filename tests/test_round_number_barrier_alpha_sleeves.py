@@ -561,3 +561,22 @@ def test_schema_keys_snake_case_and_hyperparam() -> None:
         "min_history_bars",
     ):
         assert required in schema
+
+
+def test_slice_multi_timeframe_cells_pinned() -> None:
+    """4h/1h scale the episodic bar clocks; prox_band stays timeframe invariant."""
+    from lumina_quant.strategies.round_number_barrier_alpha_sleeves import (
+        _ROUND_NUMBER_BARRIER_SLICE as sl,
+    )
+
+    assert {"1d", "4h", "1h"} <= set(sl)
+    base = tuple(cell["variant"] for cell in sl["1d"])
+    for tf in ("4h", "1h"):
+        assert tuple(cell["variant"] for cell in sl[tf]) == base
+    assert sl["4h"][0]["approach_bars"] == 30
+    assert sl["4h"][0]["min_hold_bars"] == 18
+    assert sl["1h"][0]["approach_bars"] == 120
+    assert sl["1h"][0]["min_hold_bars"] == 72
+    for tf in ("1d", "4h", "1h"):
+        assert sl[tf][0]["prox_band"] == 0.15
+        assert sl[tf][0]["mode_filter"] == "both"

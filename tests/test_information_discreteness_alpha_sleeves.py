@@ -576,3 +576,22 @@ def test_schema_keys_snake_case_and_hyperparam() -> None:
         assert required in schema
     for cap in ("zero_eps", "base_allocation", "max_order_value"):
         assert schema[cap].tunable is False
+
+
+def test_slice_multi_timeframe_cells_pinned() -> None:
+    """4h/1h scale the day-equivalent census window; decisions stay weekly-invariant."""
+    from lumina_quant.strategies.information_discreteness_alpha_sleeves import (
+        _INFORMATION_DISCRETENESS_SLICE as sl,
+    )
+
+    assert {"1d", "4h", "1h"} <= set(sl)
+    base = tuple(cell["variant"] for cell in sl["1d"])
+    for tf in ("4h", "1h"):
+        assert tuple(cell["variant"] for cell in sl[tf]) == base
+    assert sl["4h"][0]["formation_bars"] == 336
+    assert sl["4h"][0]["skip_bars"] == 42
+    assert sl["1h"][0]["formation_bars"] == 1344
+    assert sl["1h"][0]["skip_bars"] == 168
+    for tf in ("1d", "4h", "1h"):
+        assert sl[tf][0]["continuity_pct"] == 0.50
+        assert sl[tf][0]["min_hold_decisions"] == 4

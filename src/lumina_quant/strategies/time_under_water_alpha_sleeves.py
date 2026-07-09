@@ -696,10 +696,83 @@ _SUGGESTED_CANDIDATE_TAGS: tuple[str, ...] = (
     "crypto",
 )
 
-# Candidate slice (daily bars; weekly rebalance via ``rebalance_bars``).  The
-# data-PC owns the lookback {182,364} x score_mode {duration, duration_recovery}
-# grid; two cells are seeded to keep the candidate library thin.
+# Candidate slice (weekly rebalance via ``rebalance_bars``).  The data-PC owns
+# the lookback {182,364} x score_mode {duration, duration_recovery} grid; two
+# cells are seeded to keep the candidate library thin.  The decision clock here is
+# the BAR-count ``rebalance_bars`` (``_tick % rebalance_bars``), NOT an ISO-week
+# key, so 4h/1h cells set ``rebalance_bars`` explicitly (7 -> 42 -> 168) to keep
+# the weekly cadence -- ``min_hold_decisions`` then counts the SAME calendar weeks
+# and stays fixed.  The bar windows (lookback_bars, vol_window, recovery_window)
+# scale x6 / x24; the depth fractions, quantile_pct, min_symbols and exposure are
+# unit-free and stay fixed.  ``lookback_bars`` at 1h (8736) sits under the
+# ~9000-bar cap.
 _TIME_UNDER_WATER_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "4h": (
+        {
+            "variant": "tuw_52wk_duration",
+            "lookback_bars": 2184,
+            "depth_enter": -0.12,
+            "depth_exit": -0.08,
+            "depth_floor": -0.85,
+            "score_mode": "duration",
+            "quantile_pct": 0.25,
+            "rebalance_bars": 42,
+            "min_hold_decisions": 4,
+            "min_symbols": 5,
+            "vol_window": 120,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+        },
+        {
+            "variant": "tuw_26wk_recovery",
+            "lookback_bars": 1092,
+            "depth_enter": -0.12,
+            "depth_exit": -0.08,
+            "depth_floor": -0.85,
+            "score_mode": "duration_recovery",
+            "recovery_window": 168,
+            "quantile_pct": 0.25,
+            "rebalance_bars": 42,
+            "min_hold_decisions": 4,
+            "min_symbols": 5,
+            "vol_window": 120,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+        },
+    ),
+    "1h": (
+        {
+            "variant": "tuw_52wk_duration",
+            "lookback_bars": 8736,
+            "depth_enter": -0.12,
+            "depth_exit": -0.08,
+            "depth_floor": -0.85,
+            "score_mode": "duration",
+            "quantile_pct": 0.25,
+            "rebalance_bars": 168,
+            "min_hold_decisions": 4,
+            "min_symbols": 5,
+            "vol_window": 480,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+        },
+        {
+            "variant": "tuw_26wk_recovery",
+            "lookback_bars": 4368,
+            "depth_enter": -0.12,
+            "depth_exit": -0.08,
+            "depth_floor": -0.85,
+            "score_mode": "duration_recovery",
+            "recovery_window": 672,
+            "quantile_pct": 0.25,
+            "rebalance_bars": 168,
+            "min_hold_decisions": 4,
+            "min_symbols": 5,
+            "vol_window": 480,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+        },
+    ),
     "1d": (
         {
             "variant": "tuw_52wk_duration",

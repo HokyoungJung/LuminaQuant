@@ -613,10 +613,87 @@ _SUGGESTED_CANDIDATE_TAGS: tuple[str, ...] = (
     "crypto",
 )
 
-# Candidate slice (daily bars; weekly rebalance via ``rebalance_bars``).  The
-# data-PC owns the 1/2/4/8wk accumulation-window factor_ic sweep, so we seed only
-# two windows (~2wk and ~4wk of 1d bars) to keep the candidate library thin.
+# Candidate slice.  The data-PC owns the 1/2/4/8wk accumulation-window factor_ic
+# sweep, so we seed only two windows (~2wk and ~4wk) per timeframe to keep the
+# candidate library thin.  The bar-denominated windows (accumulation / momentum /
+# nearness / min-history / vol) scale x6 (4h) / x24 (1h) to hold their wall-clock
+# span, and ``rebalance_bars`` -- the bar-count weekly clock -- scales the same way
+# (7 -> 42 -> 168) to keep the weekly rebalance cadence.  The ``min_hold_decisions``
+# floor, the integer ``rank_hysteresis_buffer`` (rank positions), the quantile, and
+# the vol-target / exposure fractions are timeframe-invariant and stay fixed.
 _CLV_ACCUMULATION_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "4h": (
+        {
+            "variant": "acc4wk",
+            "accumulation_window_bars": 168,
+            "momentum_window_bars": 168,
+            "nearness_window_bars": 2184,
+            "min_history_bars": 180,
+            "vol_window": 180,
+            "quantile_pct": 0.25,
+            "rebalance_bars": 42,
+            "min_hold_decisions": 2,
+            "rank_hysteresis_buffer": 1,
+            "min_symbols": 6,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+            "target_vol": 0.20,
+            "stop_loss_pct": 0.10,
+        },
+        {
+            "variant": "acc2wk",
+            "accumulation_window_bars": 84,
+            "momentum_window_bars": 84,
+            "nearness_window_bars": 1260,
+            "min_history_bars": 180,
+            "vol_window": 180,
+            "quantile_pct": 0.25,
+            "rebalance_bars": 42,
+            "min_hold_decisions": 2,
+            "rank_hysteresis_buffer": 1,
+            "min_symbols": 6,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+            "target_vol": 0.20,
+            "stop_loss_pct": 0.10,
+        },
+    ),
+    "1h": (
+        {
+            "variant": "acc4wk",
+            "accumulation_window_bars": 672,
+            "momentum_window_bars": 672,
+            "nearness_window_bars": 8736,
+            "min_history_bars": 720,
+            "vol_window": 720,
+            "quantile_pct": 0.25,
+            "rebalance_bars": 168,
+            "min_hold_decisions": 2,
+            "rank_hysteresis_buffer": 1,
+            "min_symbols": 6,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+            "target_vol": 0.20,
+            "stop_loss_pct": 0.10,
+        },
+        {
+            "variant": "acc2wk",
+            "accumulation_window_bars": 336,
+            "momentum_window_bars": 336,
+            "nearness_window_bars": 5040,
+            "min_history_bars": 720,
+            "vol_window": 720,
+            "quantile_pct": 0.25,
+            "rebalance_bars": 168,
+            "min_hold_decisions": 2,
+            "rank_hysteresis_buffer": 1,
+            "min_symbols": 6,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+            "target_vol": 0.20,
+            "stop_loss_pct": 0.10,
+        },
+    ),
     "1d": (
         {
             "variant": "acc4wk",

@@ -33,6 +33,7 @@ from lumina_quant.strategies.low_turnover_trend_alpha_sleeves import (
     LowTurnoverTrendPersistenceStrategy,
 )
 from lumina_quant.strategies.price_volume_continuation_alpha_sleeves import (
+    _PRICE_VOLUME_CONTINUATION_SLICE,
     PriceVolumeCorrContinuationStrategy,
     _return_volume_change_correlation,
 )
@@ -394,3 +395,43 @@ def test_schema_keys_snake_case_and_hyperparam() -> None:
 
 def test_decision_cadence_at_least_30m() -> None:
     assert PriceVolumeCorrContinuationStrategy.decision_cadence_seconds >= 1800
+
+
+def test_slice_multi_timeframe_keys_and_bounds() -> None:
+    """Pin the 1d/4h/1h slice: mirrored variants + keys, scaled cells in-bounds.
+
+    Guards against a silent schema clamp (out-of-bounds slice value would be
+    coerced by ``resolve_params_from_schema`` so the written value would NOT be
+    the effective one) and pins the weekly DECISION-denominated params as
+    tf-invariant while the bar-denominated windows scale wall-clock.
+    """
+    slice_dict = _PRICE_VOLUME_CONTINUATION_SLICE
+    assert set(slice_dict) == {"1d", "4h", "1h"}
+    counts = {tf: len(cells) for tf, cells in slice_dict.items()}
+    assert len(set(counts.values())) == 1, counts
+    base = {cell["variant"]: cell for cell in slice_dict["1d"]}
+    schema = PriceVolumeCorrContinuationStrategy.get_param_schema()
+    for tf, cells in slice_dict.items():
+        assert tuple(c["variant"] for c in cells) == tuple(base), (tf, counts)
+        for cell in cells:
+            assert set(cell) == set(base[cell["variant"]]), (tf, cell["variant"])
+            for key, value in cell.items():
+                if key == "variant" or isinstance(value, bool):
+                    continue
+                hp = schema[key]
+                if hp.low is not None:
+                    assert value >= hp.low, (tf, key, value)
+                if hp.high is not None:
+                    assert value <= hp.high, (tf, key, value)
+    # Weekly DECISION clock + week horizon are timestamp-based -> tf-invariant.
+    for tf in ("4h", "1h"):
+        for cell in slice_dict[tf]:
+            b = base[cell["variant"]]
+            assert cell["min_hold_decisions"] == b["min_hold_decisions"]
+            assert cell["cooldown_decisions"] == b["cooldown_decisions"]
+            assert cell["mom_window_weeks"] == b["mom_window_weeks"]
+    # ``bars_per_week`` scales x6 (4h) / x24 (1h) so the momentum horizon holds.
+    for cell in slice_dict["4h"]:
+        assert cell["bars_per_week"] == 6 * base[cell["variant"]]["bars_per_week"]
+    for cell in slice_dict["1h"]:
+        assert cell["bars_per_week"] == 24 * base[cell["variant"]]["bars_per_week"]

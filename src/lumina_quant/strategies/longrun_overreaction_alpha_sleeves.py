@@ -423,7 +423,68 @@ _SUGGESTED_CANDIDATE_TAGS: tuple[str, ...] = (
     "crypto",
 )
 
+# MULTI-TIMEFRAME (data-PC parquet carries 1h/4h but not 1d): the De Bondt-Thaler
+# 3-6mo formation window, the skip-month excision, and the monthly rebalance are
+# WALL-CLOCK horizons, so every BAR-denominated param (``formation_bars``,
+# ``skip_bars``, and the ``rebalance_bars``/``min_hold_bars`` monthly decision
+# clocks) scales x6 for 4h and x24 for 1h to keep the same multi-month
+# formation/cadence.  The extremeness gate ``z_min``, the ``max_universe`` /
+# ``min_symbols`` counts, the ``quantile_pct`` ratio, and ``allow_short`` are
+# timeframe-agnostic and stay UNCHANGED.  Longest window (formation_126 @1h =
+# 3024 bars) stays well under the ~9000-bar cap.
 _LONGRUN_OVERREACTION_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "1h": (
+        {
+            "variant": "formation_126",
+            "formation_bars": 3024,  # 126 x24 (~6mo of 1h bars)
+            "skip_bars": 504,  # 21 x24 (~1mo)
+            "z_min": 1.0,
+            "max_universe": 12,
+            "rebalance_bars": 504,  # 21 x24 (~monthly cadence)
+            "min_hold_bars": 504,  # 21 x24
+            "quantile_pct": 0.25,
+            "min_symbols": 5,
+            "allow_short": True,
+        },
+        {
+            "variant": "formation_91",
+            "formation_bars": 2184,  # 91 x24 (~4.3mo of 1h bars)
+            "skip_bars": 504,
+            "z_min": 1.0,
+            "max_universe": 12,
+            "rebalance_bars": 504,
+            "min_hold_bars": 504,
+            "quantile_pct": 0.25,
+            "min_symbols": 5,
+            "allow_short": True,
+        },
+    ),
+    "4h": (
+        {
+            "variant": "formation_126",
+            "formation_bars": 756,  # 126 x6 (~6mo of 4h bars)
+            "skip_bars": 126,  # 21 x6 (~1mo)
+            "z_min": 1.0,
+            "max_universe": 12,
+            "rebalance_bars": 126,  # 21 x6 (~monthly cadence)
+            "min_hold_bars": 126,  # 21 x6
+            "quantile_pct": 0.25,
+            "min_symbols": 5,
+            "allow_short": True,
+        },
+        {
+            "variant": "formation_91",
+            "formation_bars": 546,  # 91 x6 (~4.3mo of 4h bars)
+            "skip_bars": 126,
+            "z_min": 1.0,
+            "max_universe": 12,
+            "rebalance_bars": 126,
+            "min_hold_bars": 126,
+            "quantile_pct": 0.25,
+            "min_symbols": 5,
+            "allow_short": True,
+        },
+    ),
     "1d": (
         {
             "variant": "formation_126",

@@ -39,6 +39,7 @@ from lumina_quant.strategies.intraday_overnight_alpha_sleeves import (
 )
 from lumina_quant.strategies.seasonal_xs_persistence_alpha_sleeves import (
     CrossSectionalSeasonalPersistenceStrategy,
+    _SEASONAL_XS_PERSISTENCE_SLICE,
     _quarter_id,
     _week_of_quarter,
 )
@@ -417,3 +418,36 @@ def test_schema_keys_snake_case_and_hyperparam() -> None:
         assert isinstance(value, HyperParam)
     for required in ("seasonal_lookback_quarters", "min_history_quarters", "min_hold_weeks"):
         assert required in schema
+
+
+def test_slice_multi_timeframe_scaling() -> None:
+    """1h/4h cells mirror 1d; only the bar-denominated vol window scales (x24/x6)."""
+    slice_map = _SEASONAL_XS_PERSISTENCE_SLICE
+    assert set(slice_map.keys()) == {"1h", "4h", "1d"}
+    base = slice_map["1d"]
+    names = tuple(spec["variant"] for spec in base)
+    assert names == ("k6", "k4")
+    for timeframe, variants in slice_map.items():
+        assert len(variants) == len(base), timeframe
+        assert tuple(spec["variant"] for spec in variants) == names, timeframe
+
+    # The quarter-aligned weekly decision clock is TIMESTAMP-based, so the
+    # quarter/week horizons stay timeframe-invariant; the ONLY bar-denominated
+    # param is the realized-vol window, which scales x6 (4h) / x24 (1h).
+    unchanged_keys = (
+        "seasonal_lookback_quarters",
+        "min_history_quarters",
+        "quantile_pct",
+        "min_hold_weeks",
+        "min_symbols",
+        "allow_short",
+        "target_gross_exposure",
+        "target_vol",
+        "stop_loss_pct",
+    )
+    for factor, timeframe in ((6, "4h"), (24, "1h")):
+        for base_spec, tf_spec in zip(base, slice_map[timeframe], strict=True):
+            assert tf_spec["vol_window"] == base_spec["vol_window"] * factor, timeframe
+            assert tf_spec["vol_window"] <= 9000, timeframe
+            for key in unchanged_keys:
+                assert tf_spec[key] == base_spec[key], (timeframe, key)

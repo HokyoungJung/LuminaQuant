@@ -557,7 +557,60 @@ _SUGGESTED_CANDIDATE_TAGS: tuple[str, ...] = (
     "crypto",
 )
 
+# Candidate slice.  The rebalance CLOCK is TIMESTAMP-based (``_period_key`` ->
+# ``YYYY-MM`` monthly / ISO ``YYYY-Www`` weekly), so the decision cadence is
+# already timeframe-agnostic -- ``rebalance_period``/``weighting`` and every
+# threshold/breadth param carry across timeframes UNCHANGED.  The only
+# bar-denominated knob is ``liquidity_window`` (the trailing-mean dollar-volume
+# horizon that shapes the diversity weights): it reads the raw ingested bar
+# series, so it scales x6 at 4h / x24 at 1h to keep the liquidity read over the
+# same ~wall-clock window (a monthly/weekly rebalance wants a stable multi-week
+# liquidity estimate, not a few-bar snapshot).
 _REBALANCING_PREMIUM_HARVEST_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "4h": (
+        {
+            "variant": "monthly_diversity",
+            "rebalance_period": _MONTHLY,
+            "weighting": _DIVERSITY,
+            "diversity_temperature": 1.0,
+            "liquidity_window": 120,
+            "max_basket_size": 12,
+            "min_symbols": 5,
+            "target_gross_exposure": 1.0,
+        },
+        {
+            "variant": "weekly_equal",
+            "rebalance_period": _WEEKLY,
+            "weighting": _EQUAL,
+            "diversity_temperature": 1.0,
+            "liquidity_window": 84,
+            "max_basket_size": 10,
+            "min_symbols": 5,
+            "target_gross_exposure": 1.0,
+        },
+    ),
+    "1h": (
+        {
+            "variant": "monthly_diversity",
+            "rebalance_period": _MONTHLY,
+            "weighting": _DIVERSITY,
+            "diversity_temperature": 1.0,
+            "liquidity_window": 480,
+            "max_basket_size": 12,
+            "min_symbols": 5,
+            "target_gross_exposure": 1.0,
+        },
+        {
+            "variant": "weekly_equal",
+            "rebalance_period": _WEEKLY,
+            "weighting": _EQUAL,
+            "diversity_temperature": 1.0,
+            "liquidity_window": 336,
+            "max_basket_size": 10,
+            "min_symbols": 5,
+            "target_gross_exposure": 1.0,
+        },
+    ),
     "1d": (
         {
             "variant": "monthly_diversity",

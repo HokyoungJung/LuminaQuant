@@ -480,10 +480,51 @@ _SUGGESTED_CANDIDATE_TAGS: tuple[str, ...] = (
     "crypto",
 )
 
-# Candidate slice (daily bars; weekly rebalance).  The data-PC owns the
-# {raw, vol-neutralized} x {90,180,360}d sweep, so we seed only the vol-neutralized
-# 180d pool-admission form here to keep the candidate library thin.
+# Candidate slice.  The data-PC owns the {raw, vol-neutralized} x {90,180,360}d
+# sweep, so we seed only the vol-neutralized 180d pool-admission form per timeframe
+# to keep the candidate library thin.  The bar-denominated ES / min-history windows
+# scale x6 (4h) / x24 (1h) to hold their ~180d wall-clock tail span, and
+# ``rebalance_bars`` -- the bar-count weekly clock -- scales the same way
+# (7 -> 42 -> 168) to keep the weekly rebalance cadence.  The ``min_hold_periods``
+# floor, the ``tail_q`` / ``hysteresis_band`` fractions, the quantile, and the
+# vol-target / exposure fractions are timeframe-invariant and stay fixed.
 _DOWNSIDE_TAIL_RISK_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "4h": (
+        {
+            "variant": "es180_volneutral",
+            "es_window": 1080,
+            "tail_q": 0.05,
+            "vol_neutralize": True,
+            "min_history_bars": 360,
+            "quantile_pct": 0.20,
+            "rebalance_bars": 42,
+            "min_hold_periods": 4,
+            "hysteresis_band": 0.10,
+            "min_symbols": 5,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+            "target_vol": 0.20,
+            "stop_loss_pct": 0.10,
+        },
+    ),
+    "1h": (
+        {
+            "variant": "es180_volneutral",
+            "es_window": 4320,
+            "tail_q": 0.05,
+            "vol_neutralize": True,
+            "min_history_bars": 1440,
+            "quantile_pct": 0.20,
+            "rebalance_bars": 168,
+            "min_hold_periods": 4,
+            "hysteresis_band": 0.10,
+            "min_symbols": 5,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+            "target_vol": 0.20,
+            "stop_loss_pct": 0.10,
+        },
+    ),
     "1d": (
         {
             "variant": "es180_volneutral",

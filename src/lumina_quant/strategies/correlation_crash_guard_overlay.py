@@ -492,6 +492,18 @@ _SUGGESTED_CANDIDATE_TAGS: tuple[str, ...] = (
     "crypto",
 )
 
+# MULTI-TIMEFRAME (1d / 4h / 1h) slice.  BAR-denominated windows and the dwell
+# clock scale x6 (4h) / x24 (1h) to preserve their wall-clock span: ``corr_window``
+# (correlation-regime horizon), ``corr_z_window`` (the rho-bar z-scoring window),
+# and ``min_dwell_bars`` (minimum engaged hold).  Thresholds / scales are
+# tf-invariant and UNCHANGED (``z_enter`` / ``z_exit`` / ``corr_abs_floor`` /
+# ``derisk_scale``) -- and because this is a DE-RISK-ONLY overlay, a somewhat
+# higher engage frequency at finer tf is safe (it can only down-weight), with the
+# ``rebalance_band`` suppressing churn.  SCHEMA CAP at 1h (silent-clamp guard --
+# written value == effective value): ``equicorr_guard`` would scale ``corr_window``
+# to 2304 and ``corr_z_window`` to 5760, and ``equicorr_guard_tight`` would scale
+# ``corr_z_window`` to 4320, so those are CAPPED to their schema maxima (2000 and
+# 4000) with the wall-clock span slightly shortened there.
 _CORRELATION_CRASH_GUARD_OVERLAY_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
     "1d": (
         {
@@ -513,6 +525,50 @@ _CORRELATION_CRASH_GUARD_OVERLAY_SLICE: dict[str, tuple[dict[str, Any], ...]] = 
             "corr_abs_floor": 0.40,
             "derisk_scale": 0.30,
             "min_dwell_bars": 18,
+        },
+    ),
+    "4h": (
+        {
+            "variant": "equicorr_guard",
+            "corr_window": 576,
+            "corr_z_window": 1440,
+            "z_enter": 1.5,
+            "z_exit": 0.5,
+            "corr_abs_floor": 0.35,
+            "derisk_scale": 0.35,
+            "min_dwell_bars": 144,
+        },
+        {
+            "variant": "equicorr_guard_tight",
+            "corr_window": 432,
+            "corr_z_window": 1080,
+            "z_enter": 1.75,
+            "z_exit": 0.4,
+            "corr_abs_floor": 0.40,
+            "derisk_scale": 0.30,
+            "min_dwell_bars": 108,
+        },
+    ),
+    "1h": (
+        {
+            "variant": "equicorr_guard",
+            "corr_window": 2000,  # capped from 96*24=2304 (schema max 2000)
+            "corr_z_window": 4000,  # capped from 240*24=5760 (schema max 4000)
+            "z_enter": 1.5,
+            "z_exit": 0.5,
+            "corr_abs_floor": 0.35,
+            "derisk_scale": 0.35,
+            "min_dwell_bars": 576,
+        },
+        {
+            "variant": "equicorr_guard_tight",
+            "corr_window": 1728,
+            "corr_z_window": 4000,  # capped from 180*24=4320 (schema max 4000)
+            "z_enter": 1.75,
+            "z_exit": 0.4,
+            "corr_abs_floor": 0.40,
+            "derisk_scale": 0.30,
+            "min_dwell_bars": 432,
         },
     ),
 }

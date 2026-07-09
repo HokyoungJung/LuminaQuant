@@ -555,6 +555,23 @@ _SUGGESTED_CANDIDATE_TAGS: tuple[str, ...] = (
     "crypto",
 )
 
+# MULTI-TIMEFRAME (1d / 4h / 1h) slice.  This is an EPISODIC per-symbol fade lane
+# with a HIGH prior of death, so the sub-daily cells are deliberately COST-SAFE:
+#   * BAR-denominated windows + hold/cooldown clocks scale x6 (4h) / x24 (1h) to
+#     preserve the wall-clock span: ``cs_smooth_window`` (spread smoothing),
+#     ``z_window_bars`` (stress-regime lookback), ``fade_lookback_bars`` (the
+#     faded return horizon), ``vol_window_bars`` (inverse-vol sizing),
+#     ``min_history_bars`` (warmup), and ``min_hold_bars`` / ``max_hold_bars`` /
+#     ``cooldown_bars`` (so a 5-bar/10-bar/5-bar daily hold stays ~5d/10d/5d).
+#   * EPISODE-FREQUENCY DECISION (the load-bearing cost choice): ``z_entry`` is
+#     RAISED at finer tf (2.0->2.25->2.5 strict; 1.75->2.0->2.25 lenient).  More
+#     bars per day means more chances to cross the stress z, so absent this the
+#     episode/entry frequency would explode and torch the sleeve on cost; raising
+#     the threshold holds the wall-clock episode rate roughly constant (a rarer,
+#     deeper tail per DM/Nagel liquidity-provision).
+#   * ``allow_short`` and the (defaulted) stop/take-profit PERCENTAGES are
+#     tf-invariant and UNCHANGED.
+# No scaled window reaches the ~9000-bar cap (z_window tops out at 2880 @ 1h).
 _SPREAD_STRESS_REVERSION_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
     "1d": (
         {
@@ -581,6 +598,62 @@ _SPREAD_STRESS_REVERSION_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
             "cooldown_bars": 4,
             "vol_window_bars": 24,
             "min_history_bars": 120,
+            "allow_short": True,
+        },
+    ),
+    "4h": (
+        {
+            "variant": "strict_gate",
+            "cs_smooth_window": 30,
+            "z_window_bars": 720,
+            "z_entry": 2.25,
+            "fade_lookback_bars": 18,
+            "min_hold_bars": 30,
+            "max_hold_bars": 60,
+            "cooldown_bars": 30,
+            "vol_window_bars": 180,
+            "min_history_bars": 900,
+            "allow_short": True,
+        },
+        {
+            "variant": "lenient_gate",
+            "cs_smooth_window": 30,
+            "z_window_bars": 540,
+            "z_entry": 2.0,
+            "fade_lookback_bars": 12,
+            "min_hold_bars": 24,
+            "max_hold_bars": 48,
+            "cooldown_bars": 24,
+            "vol_window_bars": 144,
+            "min_history_bars": 720,
+            "allow_short": True,
+        },
+    ),
+    "1h": (
+        {
+            "variant": "strict_gate",
+            "cs_smooth_window": 120,
+            "z_window_bars": 2880,
+            "z_entry": 2.5,
+            "fade_lookback_bars": 72,
+            "min_hold_bars": 120,
+            "max_hold_bars": 240,
+            "cooldown_bars": 120,
+            "vol_window_bars": 720,
+            "min_history_bars": 3600,
+            "allow_short": True,
+        },
+        {
+            "variant": "lenient_gate",
+            "cs_smooth_window": 120,
+            "z_window_bars": 2160,
+            "z_entry": 2.25,
+            "fade_lookback_bars": 48,
+            "min_hold_bars": 96,
+            "max_hold_bars": 192,
+            "cooldown_bars": 96,
+            "vol_window_bars": 576,
+            "min_history_bars": 2880,
             "allow_short": True,
         },
     ),
