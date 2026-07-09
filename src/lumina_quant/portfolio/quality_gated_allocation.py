@@ -53,7 +53,7 @@ from typing import Any
 
 import numpy as np
 
-from lumina_quant.portfolio.optimizer_core import metrics
+from lumina_quant.portfolio.optimizer_core import metrics, project_simplex_with_upper_bounds
 from lumina_quant.portfolio.optimizers_extra import ERCPortfolio, HRPPortfolio
 from lumina_quant.research.cost_realism import DEFAULT_PARTICIPATION, CostRegime, apply_cost_drag
 
@@ -81,6 +81,11 @@ REFERENCE_COST_REGIME_20BPS = CostRegime(
 # consulted for selection, objective, pruning, thresholding, tie-breaking,
 # correlation, or sizing.
 _SELECTION_INPUTS = ("train", "validation")
+
+# Correlation-clustering threshold for the optional shrinkage-aware HRP linkage
+# path; mirrors ``optimizers_extra.HRPPortfolio``'s default so the shrunk-linkage
+# variant differs from the OFF path ONLY by the Ledoit-Wolf correlation shrinkage.
+_HRP_CORR_THRESHOLD = 0.60
 
 
 def _round(value: Any, ndigits: int = 10) -> float:
@@ -117,6 +122,7 @@ def compute_sleeve_quality(
     regime: CostRegime = REFERENCE_COST_REGIME_20BPS,
     participation: float = DEFAULT_PARTICIPATION,
     periods_per_year: int = 365,
+    turnover_penalty_lambda: float = 0.0,
 ) -> dict[str, float]:
     """Cost-realistic quality score for one sleeve's gross return stream.
 
@@ -127,6 +133,14 @@ def compute_sleeve_quality(
     handles ``None`` / empty ``returns`` (treated as a zero-length series, which
     ``metrics()`` scores as all-zero -- a sleeve with no data never survives the
     ``net_sharpe > 0`` quality gate).
+
+    ``turnover_penalty_lambda`` (config-gated, default ``0.0`` = OFF) encodes the
+    RPT<10bps turnover-death lesson directly into the quality score
+    (Frazzini-Israel-Moskowitz 2012): when it is non-zero an extra
+    ``quality_score = net_sharpe - lambda * turnover`` field is exposed. When it
+    is OFF the returned mapping is byte-identical to the pre-penalty output -- no
+    key is added and no arithmetic touches the existing numbers -- so the emitted
+    manifest is unchanged.
     """
     gross = np.asarray(returns if returns is not None else [], dtype=np.float64).reshape(-1)
     turnover_value = float(turnover) if turnover is not None else 0.0
@@ -135,13 +149,209 @@ def compute_sleeve_quality(
     )
     stats = metrics(net, periods_per_year=periods_per_year)
     hit_rate = float(np.mean(net > 0.0)) if net.size > 0 else 0.0
-    return {
+    quality = {
         "n_obs": int(net.size),
         "turnover": turnover_value,
         "net_sharpe": _round(stats["sharpe"]),
         "net_calmar": _round(stats["calmar"]),
         "hit_rate": _round(hit_rate),
     }
+    if turnover_penalty_lambda != 0.0:
+        quality["quality_score"] = _round(
+            quality["net_sharpe"] - float(turnover_penalty_lambda) * turnover_value
+        )
+    return quality
+
+
+def _penalized_net_sharpe(score: Mapping[str, Any], turnover_penalty_lambda: float) -> float:
+    """Turnover-penalized quality score ``net_sharpe - lambda * turnover``.
+
+    Used for both the survivor gate and the weight tilt. When the penalty is OFF
+    (``lambda == 0.0``) the stored ``net_sharpe`` is returned verbatim -- no
+    arithmetic runs -- so the survivor set stays byte-identical to the pre-penalty
+    gate ``net_sharpe > 0``.
+    """
+    net_sharpe = float(score["net_sharpe"])
+    if turnover_penalty_lambda == 0.0:
+        return net_sharpe
+    return net_sharpe - float(turnover_penalty_lambda) * float(score.get("turnover", 0.0))
+
+
+def _sample_correlation_and_std(matrix: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Sample (MLE, divisor ``T``) correlation matrix + per-column std.
+
+    ``matrix`` is a finite ``(T, N)`` return matrix. Degenerate (zero-variance)
+    columns get a zero std and a unit self-correlation with zero cross terms, so
+    the result is always well-formed (diagonal exactly 1).
+    """
+    data = np.asarray(matrix, dtype=np.float64)
+    n = int(data.shape[1]) if data.ndim == 2 else 0
+    if data.ndim != 2 or data.shape[0] < 2 or n == 0:
+        return np.eye(n, dtype=np.float64), np.zeros(n, dtype=np.float64)
+    t = int(data.shape[0])
+    demeaned = data - data.mean(axis=0, keepdims=True)
+    sample_cov = (demeaned.T @ demeaned) / float(t)
+    std = np.sqrt(np.clip(np.diag(sample_cov), 0.0, None))
+    denom = np.outer(std, std)
+    corr = np.divide(sample_cov, denom, out=np.zeros_like(sample_cov), where=denom > 0.0)
+    np.fill_diagonal(corr, 1.0)
+    corr = np.clip(corr, -1.0, 1.0)
+    return corr, std
+
+
+def _hand_rolled_lw_correlation_shrinkage(
+    matrix: np.ndarray, correlation_shrinkage: bool | float
+) -> tuple[np.ndarray, float, np.ndarray]:
+    """Hand-rolled Ledoit-Wolf (2004) shrinkage of the sample CORRELATION toward
+    the identity target -- pure numpy, NO ``sklearn.covariance`` / scipy import.
+
+    Returns ``(R_shrunk, intensity, std)`` with
+    ``R_shrunk = (1 - d) * R + d * I`` (diagonal exactly 1, and PSD as a convex
+    blend of two PSD matrices). ``correlation_shrinkage is True`` uses the
+    closed-form analytic intensity
+    ``d = (sum_{i!=j} (1 - r_ij^2)^2 / T) / (sum_{i!=j} r_ij^2)`` -- the asymptotic
+    variance of the Pearson correlation over its off-diagonal Frobenius distance to
+    the identity, clipped to ``[0, 1]``; a numeric value is used directly as a
+    fixed intensity clipped to ``[0, 1]``.
+    """
+    corr, std = _sample_correlation_and_std(matrix)
+    n = int(corr.shape[0])
+    if n == 0:
+        return corr, 0.0, std
+    off = ~np.eye(n, dtype=bool)
+    if correlation_shrinkage is True:
+        t = float(np.asarray(matrix, dtype=np.float64).shape[0])
+        off_sq = corr[off] ** 2
+        denom = float(np.sum(off_sq))
+        if denom <= 0.0 or t < 2.0:
+            intensity = 0.0
+        else:
+            numer = float(np.sum((1.0 - off_sq) ** 2)) / t
+            intensity = min(1.0, max(0.0, numer / denom))
+    else:
+        intensity = min(1.0, max(0.0, float(correlation_shrinkage)))
+    shrunk = (1.0 - intensity) * corr + intensity * np.eye(n, dtype=np.float64)
+    np.fill_diagonal(shrunk, 1.0)
+    return shrunk, float(intensity), std
+
+
+def _inverse_variance_split(variances: np.ndarray) -> np.ndarray:
+    """Deterministic inverse-variance weights with an equal-weight fallback."""
+    var = np.asarray(variances, dtype=np.float64).reshape(-1)
+    n = int(var.size)
+    if n == 0:
+        return np.zeros(0, dtype=np.float64)
+    positive = var > 0.0
+    if not np.any(positive):
+        return np.full(n, 1.0 / float(n), dtype=np.float64)
+    inv = np.zeros(n, dtype=np.float64)
+    inv[positive] = 1.0 / var[positive]
+    total = float(inv.sum())
+    if total <= 0.0:
+        return np.full(n, 1.0 / float(n), dtype=np.float64)
+    return inv / total
+
+
+def _correlation_clusters(corr: np.ndarray, threshold: float) -> list[list[int]]:
+    """Greedy correlation clustering over ``corr`` (row/col order preserved).
+
+    Mirrors :func:`optimizer_core.cluster_by_correlation`: each index joins the
+    first existing cluster containing a member correlated at least ``threshold``
+    (absolute), otherwise it seeds a new cluster.
+    """
+    n = int(corr.shape[0])
+    thr = abs(float(threshold))
+    clusters: list[list[int]] = []
+    for i in range(n):
+        placed = False
+        for cluster in clusters:
+            if any(abs(float(corr[i, member])) >= thr for member in cluster):
+                cluster.append(i)
+                placed = True
+                break
+        if not placed:
+            clusters.append([i])
+    return clusters
+
+
+def _hrp_weights_with_correlation_shrinkage(
+    survivors: Sequence[str],
+    matrix: np.ndarray,
+    *,
+    correlation_shrinkage: bool | float,
+    corr_threshold: float = _HRP_CORR_THRESHOLD,
+) -> dict[str, float]:
+    """Correlation-cluster HRP over a Ledoit-Wolf-shrunk correlation linkage.
+
+    Mirrors :func:`optimizers_extra.hrp_weights_from_returns` (greedy correlation
+    clustering -> inverse-variance within each cluster -> inverse cluster-variance
+    across clusters), but the linkage correlation and the cluster covariance are
+    the hand-rolled shrunk correlation, giving more stable OOS weights. Reached
+    only when ``correlation_shrinkage`` is opted in; the OFF path keeps using the
+    unmodified ``HRPPortfolio`` so its numerics stay byte-identical.
+    """
+    ids = list(survivors)
+    n = len(ids)
+    if n == 0:
+        return {}
+    if n == 1:
+        return {ids[0]: 1.0}
+    shrunk, _intensity, std = _hand_rolled_lw_correlation_shrinkage(matrix, correlation_shrinkage)
+    if shrunk.shape != (n, n):
+        return dict.fromkeys(ids, 1.0 / float(n))
+    variances = std**2
+    shrunk_cov = np.outer(std, std) * shrunk
+    clusters = _correlation_clusters(shrunk, corr_threshold)
+
+    weights = np.zeros(n, dtype=np.float64)
+    cluster_variances: list[float] = []
+    cluster_local: list[tuple[list[int], np.ndarray]] = []
+    for members in clusters:
+        local = _inverse_variance_split(variances[members])
+        sub_cov = shrunk_cov[np.ix_(members, members)]
+        cluster_variances.append(max(0.0, float(local @ sub_cov @ local)))
+        cluster_local.append((members, local))
+
+    across = _inverse_variance_split(np.asarray(cluster_variances, dtype=np.float64))
+    for (members, local), alloc in zip(cluster_local, across):
+        for member, share in zip(members, local):
+            weights[member] = float(alloc) * float(share)
+
+    total = float(weights.sum())
+    if total <= 0.0:
+        return dict.fromkeys(ids, 1.0 / float(n))
+    weights = weights / total
+    return {ids[index]: float(weights[index]) for index in range(n)}
+
+
+def _turnover_tilted_weights(
+    raw_weights: Mapping[str, float],
+    survivors: Sequence[str],
+    quality: Mapping[str, Mapping[str, Any]],
+    turnover_penalty_lambda: float,
+    upper: float | Mapping[str, float] | None,
+) -> dict[str, float]:
+    """Tilt risk-parity weights by the turnover-penalized quality score.
+
+    ``tilted_i ~ raw_i * max(0, net_sharpe_i - lambda * turnover_i)``, renormalized
+    across survivors (and re-projected under ``upper`` caps when supplied), so a
+    higher-turnover sleeve with the same gross edge as a lower-turnover peer gets a
+    strictly smaller weight. Invoked only when the penalty is ON (``lambda > 0``);
+    the OFF path never calls this, so default-flag weights are byte-identical.
+    """
+    scores = {
+        sid: max(0.0, _penalized_net_sharpe(quality[sid], turnover_penalty_lambda))
+        for sid in survivors
+    }
+    tilted = {sid: max(0.0, float(raw_weights.get(sid, 0.0))) * scores[sid] for sid in survivors}
+    total = float(sum(tilted.values()))
+    if total <= 0.0:
+        return dict(raw_weights)
+    normalized = {sid: tilted[sid] / total for sid in survivors}
+    upper_map = _resolve_upper(upper, survivors)
+    if upper_map is not None:
+        normalized = project_simplex_with_upper_bounds(normalized, upper=upper_map, target_sum=1.0)
+    return normalized
 
 
 def _build_allocator(method: str) -> ERCPortfolio | HRPPortfolio:
@@ -173,6 +383,8 @@ def allocate_quality_gated(
     method: str = "erc",
     upper: float | Mapping[str, float] | None = None,
     min_sleeves: int = 1,
+    turnover_penalty_lambda: float = 0.0,
+    correlation_shrinkage: bool | float | None = None,
 ) -> dict[str, float]:
     """Quality-gate then risk-allocate across sleeves; returns ``id -> weight``.
 
@@ -188,6 +400,21 @@ def allocate_quality_gated(
     ``min_sleeves`` survivors, mirroring the conservative default of the
     downstream manifest consumer. Gracefully handles ``None``/empty
     ``sleeve_returns``/``turnovers`` and per-sleeve ``None``/empty series.
+
+    Two config-gated extensions (both default OFF -> the result is byte-identical
+    to the pre-extension allocator):
+
+    * ``turnover_penalty_lambda`` (default ``0.0``): the survivor gate uses the
+      turnover-penalized score ``net_sharpe - lambda * turnover`` (so a
+      high-turnover, marginal-edge sleeve is gated out), and when it is ``> 0`` the
+      final risk-parity weights are additionally tilted by that penalized score so a
+      higher-turnover sleeve is down-weighted relative to an equal-gross-edge,
+      lower-turnover peer (Frazzini-Israel-Moskowitz 2012).
+    * ``correlation_shrinkage`` (default ``None``): for ``method="hrp"`` only, the
+      correlation linkage is Ledoit-Wolf-shrunk toward the identity via a
+      hand-rolled closed form (``True`` = analytic intensity; a float = fixed
+      intensity in ``[0, 1]``) for more stable OOS weights. ``None``/``False`` keeps
+      the unmodified ``HRPPortfolio`` path; it is inert for ``method="erc"``.
     """
     if not sleeve_returns:
         return {}
@@ -200,7 +427,9 @@ def allocate_quality_gated(
         for sleeve_id, series in sleeve_returns.items()
     }
     survivors = sorted(
-        sleeve_id for sleeve_id, score in quality.items() if score["net_sharpe"] > 0.0
+        sleeve_id
+        for sleeve_id, score in quality.items()
+        if _penalized_net_sharpe(score, turnover_penalty_lambda) > 0.0
     )
     if len(survivors) < max(1, int(min_sleeves)):
         return {}
@@ -233,12 +462,30 @@ def allocate_quality_gated(
         # observations. Callers that need calendar-exact alignment must supply
         # equal-length, co-dated series themselves.
         matrix = np.column_stack([series[-min_len:] for series in net_series])
-        allocator = _build_allocator(method)
         upper_map = _resolve_upper(upper, survivors)
-        raw_weights = allocator.allocate(survivors, matrix, upper=upper_map)
+        if (
+            correlation_shrinkage not in (None, False)
+            and str(method or "erc").strip().lower() == "hrp"
+        ):
+            # Opt-in shrinkage-aware HRP linkage; OFF path (below) is untouched.
+            raw_weights = _hrp_weights_with_correlation_shrinkage(
+                survivors, matrix, correlation_shrinkage=correlation_shrinkage
+            )
+            if raw_weights and upper_map is not None:
+                raw_weights = project_simplex_with_upper_bounds(
+                    raw_weights, upper=upper_map, target_sum=1.0
+                )
+        else:
+            allocator = _build_allocator(method)
+            raw_weights = allocator.allocate(survivors, matrix, upper=upper_map)
         if not raw_weights:
             equal = 1.0 / float(len(survivors))
             raw_weights = dict.fromkeys(survivors, equal)
+
+    if turnover_penalty_lambda > 0.0:
+        raw_weights = _turnover_tilted_weights(
+            raw_weights, survivors, quality, turnover_penalty_lambda, upper
+        )
 
     return {sleeve_id: _round(raw_weights.get(sleeve_id, 0.0)) for sleeve_id in survivors}
 
@@ -253,6 +500,8 @@ def build_allocation_manifest(
     upper: float | Mapping[str, float] | None = None,
     min_sleeves: int = 1,
     gross_cap: float = 1.0,
+    turnover_penalty_lambda: float = 0.0,
+    correlation_shrinkage: bool | float | None = None,
 ) -> dict[str, Any]:
     """Build a manifest the live ``ArtifactPortfolioModeStrategy`` accepts as-is.
 
@@ -279,6 +528,11 @@ def build_allocation_manifest(
     survivors, this still emits a well-formed manifest with ``children: []`` --
     the consumer's own ``manifest_children_empty`` fail-closed path (not a
     special case here) safely routes that to 100% cash.
+
+    ``turnover_penalty_lambda`` and ``correlation_shrinkage`` are forwarded to
+    :func:`allocate_quality_gated` (and the penalty to the ``sleeve_quality``
+    block); both default OFF, in which case the emitted manifest is byte-identical
+    to the pre-extension output.
     """
     sleeves = sleeves or {}
     source_rows = [dict(artifact) for artifact in (source_artifacts or [])]
@@ -293,6 +547,8 @@ def build_allocation_manifest(
         method=method,
         upper=upper,
         min_sleeves=min_sleeves,
+        turnover_penalty_lambda=turnover_penalty_lambda,
+        correlation_shrinkage=correlation_shrinkage,
     )
 
     default_source_id = str(source_rows[0].get("id") or "") if len(source_rows) == 1 else ""
@@ -342,7 +598,11 @@ def build_allocation_manifest(
     active_weight = _round(sum(child["weight"] for child in children)) if children else 0.0
     sleeve_quality = {
         sid: compute_sleeve_quality(
-            sleeve_returns.get(sid), turnovers.get(sid), regime=regime, participation=participation
+            sleeve_returns.get(sid),
+            turnovers.get(sid),
+            regime=regime,
+            participation=participation,
+            turnover_penalty_lambda=turnover_penalty_lambda,
         )
         for sid in sorted(sleeves)
     }
