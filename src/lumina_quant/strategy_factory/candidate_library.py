@@ -2741,6 +2741,9 @@ class _CandidateBuildContext:
         _build_slow_leadlag_xs_candidates(self)
         _build_stationarity_gated_residual_reversion_candidates(self)
         _build_regime_adaptive_disagreement_candidates(self)
+        # Alpha-pool-expansion-v2b batch (2026-07-09): 12 leaves + 2 de-risk
+        # overlays, one thin batch builder; SLICE constants live in lane modules.
+        _build_alpha_pool_v2b_candidates(self)
         _build_metals_relative_value_basket_candidates(self)
         _build_liquidation_cascade_reversion_candidates(self)
         _build_orderbook_imbalance_reversion_candidates(self)
@@ -9755,6 +9758,321 @@ _METALS_RELATIVE_VALUE_BASKET_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
         },
     ),
 }
+
+
+def _build_alpha_pool_v2b_candidates(ctx: _CandidateBuildContext) -> None:
+    """Alpha-pool-expansion-v2b batch (2026-07-09): 12 leaves + 2 de-risk overlays.
+
+    Thin by design: SLICE constants, suggested families and tags live in the
+    lane modules. Every cross-sectional basket carries NO carry tag (honest
+    ``allow_multi_asset=True`` route at the data-PC handoff); the two overlay
+    wrappers are wired around a registered TSMOM child and can only de-risk.
+    """
+    from lumina_quant.strategies.cgo_disposition_alpha_sleeves import (
+        _CGO_DISPOSITION_SLICE,
+        _SUGGESTED_CANDIDATE_TAGS as _CGO_TAGS,
+        _SUGGESTED_FAMILY as _CGO_FAMILY,
+    )
+    from lumina_quant.strategies.clv_accumulation_alpha_sleeves import (
+        _CLV_ACCUMULATION_SLICE,
+        _SUGGESTED_CANDIDATE_TAGS as _CLV_TAGS,
+        _SUGGESTED_FAMILY as _CLV_FAMILY,
+    )
+    from lumina_quant.strategies.correlation_crash_guard_overlay import (
+        _CORRELATION_CRASH_GUARD_OVERLAY_SLICE,
+        _SUGGESTED_CANDIDATE_TAGS as _CORRG_TAGS,
+    )
+    from lumina_quant.strategies.coskewness_premium_alpha_sleeves import (
+        _COSKEWNESS_PREMIUM_SLICE,
+        _SUGGESTED_CANDIDATE_TAGS as _COSK_TAGS,
+        _SUGGESTED_FAMILY as _COSK_FAMILY,
+    )
+    from lumina_quant.strategies.downside_beta_asymmetry_alpha_sleeves import (
+        _DOWNSIDE_BETA_ASYMMETRY_SLICE,
+        _SUGGESTED_CANDIDATE_TAGS as _DBA_TAGS,
+        _SUGGESTED_FAMILY as _DBA_FAMILY,
+    )
+    from lumina_quant.strategies.downside_tail_risk_alpha_sleeves import (
+        _DOWNSIDE_TAIL_RISK_SLICE,
+        _SUGGESTED_CANDIDATE_TAGS as _DTR_TAGS,
+        _SUGGESTED_FAMILY as _DTR_FAMILY,
+    )
+    from lumina_quant.strategies.longrun_overreaction_alpha_sleeves import (
+        _LONGRUN_OVERREACTION_SLICE,
+        _SUGGESTED_CANDIDATE_TAGS as _LRO_TAGS,
+        _SUGGESTED_FAMILY as _LRO_FAMILY,
+    )
+    from lumina_quant.strategies.momentum_crash_scaling_overlay import (
+        _MOMENTUM_CRASH_SCALING_OVERLAY_SLICE,
+        _SUGGESTED_CANDIDATE_TAGS as _MCS_TAGS,
+    )
+    from lumina_quant.strategies.path_convexity_alpha_sleeves import (
+        _PATH_CONVEXITY_SLICE,
+        _SUGGESTED_CANDIDATE_TAGS as _PCX_TAGS,
+        _SUGGESTED_FAMILY as _PCX_FAMILY,
+    )
+    from lumina_quant.strategies.price_volume_continuation_alpha_sleeves import (
+        _PRICE_VOLUME_CONTINUATION_SLICE,
+        _SUGGESTED_CANDIDATE_TAGS as _PVC_TAGS,
+        _SUGGESTED_FAMILY as _PVC_FAMILY,
+    )
+    from lumina_quant.strategies.residual_momentum_alpha_sleeves import (
+        _RESIDUAL_MOMENTUM_SLICE,
+        _SUGGESTED_CANDIDATE_TAGS as _RM_TAGS,
+        _SUGGESTED_FAMILY as _RM_FAMILY,
+    )
+    from lumina_quant.strategies.seasonal_xs_persistence_alpha_sleeves import (
+        _SEASONAL_XS_PERSISTENCE_SLICE,
+        _SUGGESTED_CANDIDATE_TAGS as _SXP_TAGS,
+        _SUGGESTED_FAMILY as _SXP_FAMILY,
+    )
+    from lumina_quant.strategies.spread_stress_reversion_alpha_sleeves import (
+        _SPREAD_STRESS_REVERSION_SLICE,
+        _SUGGESTED_CANDIDATE_TAGS as _SSR_TAGS,
+        _SUGGESTED_FAMILY as _SSR_FAMILY,
+    )
+    from lumina_quant.strategies.trend_quality_xs_alpha_sleeves import (
+        _TREND_QUALITY_XS_SLICE,
+        _SUGGESTED_CANDIDATE_TAGS as _TQX_TAGS,
+        _SUGGESTED_FAMILY as _TQX_FAMILY,
+    )
+
+    crypto_symbols = tuple(ctx.crypto_only_symbols)
+
+    xs_lanes = (
+        (
+            "cgo_disposition",
+            "CrossSectionalCapitalGainsOverhangStrategy",
+            _CGO_DISPOSITION_SLICE,
+            _CGO_TAGS,
+            _CGO_FAMILY,
+            "Grinblatt-Han capital-gains-overhang XS long-short: turnover-decay "
+            "volume-weighted cost-basis reference, disposition-effect "
+            "underreaction, skip-recent + hard min-hold.",
+        ),
+        (
+            "seasonal_xs_persistence",
+            "CrossSectionalSeasonalPersistenceStrategy",
+            _SEASONAL_XS_PERSISTENCE_SLICE,
+            _SXP_TAGS,
+            _SXP_FAMILY,
+            "Heston-Sadka same-week-of-quarter RELATIVE persistence, time- and "
+            "XS-demeaned (provably neutral to absolute calendar effects).",
+        ),
+        (
+            "longrun_overreaction",
+            "LongRunOverreactionReversalStrategy",
+            _LONGRUN_OVERREACTION_SLICE,
+            _LRO_TAGS,
+            _LRO_FAMILY,
+            "De Bondt-Thaler long-run overreaction on liquid majors: monthly XS "
+            "fade of extreme 3-6mo formation returns, skip-month excision + "
+            "extremeness abstention gate.",
+        ),
+        (
+            "downside_beta_asymmetry",
+            "CrossSectionalDownsideBetaAsymmetryStrategy",
+            _DOWNSIDE_BETA_ASYMMETRY_SLICE,
+            _DBA_TAGS,
+            _DBA_FAMILY,
+            "Ang-Chen-Xing downside-risk premium: XS long-short on "
+            "beta_minus - beta_plus vs the BTC benchmark, inverse-vol sized, "
+            "monthly cadence + rank hysteresis.",
+        ),
+        (
+            "coskewness_premium",
+            "SystematicCoskewnessPremiumStrategy",
+            _COSKEWNESS_PREMIUM_SLICE,
+            _COSK_TAGS,
+            _COSK_FAMILY,
+            "Harvey-Siddique systematic co-skewness premium: beta-residualized "
+            "third co-moment with the market, long negative-coskew insurance "
+            "writing, monthly XS long-short.",
+        ),
+        (
+            "residual_momentum",
+            "TrendGatedResidualMomentumStrategy",
+            _RESIDUAL_MOMENTUM_SLICE,
+            _RM_TAGS,
+            _RM_FAMILY,
+            "Blitz-Huij-Martens residual momentum on BTC-purged returns with an "
+            "ADF NON-stationarity anti-gate (exact complement of the residual "
+            "reversion sleeve), weekly cadence + min-hold.",
+        ),
+        (
+            "clv_accumulation",
+            "CrossSectionalCloseLocationAccumulationStrategy",
+            _CLV_ACCUMULATION_SLICE,
+            _CLV_TAGS,
+            _CLV_FAMILY,
+            "Close-location-value accumulation XS long-short on 4wk Chaikin "
+            "money flow DOUBLY residualized on momentum and nearness z-scores "
+            "(signed-flow axis with the momentum/anchoring content stripped).",
+        ),
+        (
+            "downside_tail_risk",
+            "DownsideTailRiskPremiumStrategy",
+            _DOWNSIDE_TAIL_RISK_SLICE,
+            _DTR_TAGS,
+            _DTR_FAMILY,
+            "Crypto downside tail-risk premium: XS long-short on vol-neutralized "
+            "empirical ES_5% lower-tail level (Zhang 2021; Dobrynskaya 2024), "
+            "liquid-book restricted.",
+        ),
+        (
+            "trend_quality_xs",
+            "CrossSectionalRegressionTrendQualityStrategy",
+            _TREND_QUALITY_XS_SLICE,
+            _TQX_TAGS,
+            _TQX_FAMILY,
+            "Smooth-trend continuation: XS long-short on signed R-squared of "
+            "log-price-on-time OLS with a min-quality floor excluding jumpy "
+            "movers (distinct from the Kaufman-efficiency axis).",
+        ),
+        (
+            "path_convexity",
+            "CrossSectionalPathConvexityStrategy",
+            _PATH_CONVEXITY_SLICE,
+            _PCX_TAGS,
+            _PCX_FAMILY,
+            "Path convexity: XS long-short on the orthonormal quadratic "
+            "(curvature) coefficient of trailing log price with ZERO first-order "
+            "momentum loading by basis construction.",
+        ),
+    )
+    if len(crypto_symbols) >= 5:
+        for prefix, strategy_class, lane_slice, tags, family, note in xs_lanes:
+            for timeframe in ctx._present("1d"):
+                tf_tag = timeframe.replace("/", "-")
+                for spec in lane_slice.get(timeframe, ()):
+                    params = {key: value for key, value in spec.items() if key != "variant"}
+                    _add_candidate(
+                        ctx.candidates,
+                        name=f"{prefix}_{tf_tag}_{spec['variant']}",
+                        family=family,
+                        strategy_class=strategy_class,
+                        timeframe=timeframe,
+                        symbols=crypto_symbols,
+                        params=params,
+                        notes=(
+                            f"{note} Deliberately NOT tagged carry; evaluate with "
+                            f"allow_multi_asset=True ({timeframe}, {spec['variant']})."
+                        ),
+                        tags=tags,
+                        metadata={
+                            "timeframe": timeframe,
+                            "retune_profile": str(spec["variant"]),
+                            "symbol_scope": "crypto_basket",
+                            "allow_short": bool(spec.get("allow_short", True)),
+                            "admission_route": "allow_multi_asset_handoff",
+                            "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(
+                                timeframe, 1800
+                            ),
+                        },
+                    )
+
+    per_symbol_lanes = (
+        (
+            "price_volume_continuation",
+            "PriceVolumeCorrContinuationStrategy",
+            _PRICE_VOLUME_CONTINUATION_SLICE,
+            _PVC_TAGS,
+            _PVC_FAMILY,
+            "Ying-Karpoff volume-confirmed continuation: per-symbol weekly trend "
+            "gate holding exposure only while corr(return, log volume-change) "
+            "confirms the move; hysteresis bands + hard min-hold.",
+        ),
+        (
+            "spread_stress_reversion",
+            "SpreadStressLiquidityReversionStrategy",
+            _SPREAD_STRESS_REVERSION_SLICE,
+            _SSR_TAGS,
+            _SSR_FAMILY,
+            "Nagel liquidity-provision reversal gated on Corwin-Schultz HL-spread "
+            "z-stress episodes only (per-symbol, one entry per episode, min/max "
+            "hold + cooldown; HIGH prior of death stated in-module).",
+        ),
+    )
+    for prefix, strategy_class, lane_slice, tags, family, note in per_symbol_lanes:
+        for timeframe in ctx._present("1d"):
+            tf_tag = timeframe.replace("/", "-")
+            for spec in lane_slice.get(timeframe, ()):
+                for symbol in crypto_symbols:
+                    params = {key: value for key, value in spec.items() if key != "variant"}
+                    _add_candidate(
+                        ctx.candidates,
+                        name=(
+                            f"{prefix}_{tf_tag}_{spec['variant']}_{symbol.replace('/', '').lower()}"
+                        ),
+                        family=family,
+                        strategy_class=strategy_class,
+                        timeframe=timeframe,
+                        symbols=(symbol,),
+                        params=params,
+                        notes=f"{note} ({symbol} at {timeframe}, {spec['variant']}).",
+                        tags=tags,
+                        metadata={
+                            "timeframe": timeframe,
+                            "retune_profile": str(spec["variant"]),
+                            "symbol_scope": symbol,
+                            "allow_short": bool(spec.get("allow_short", True)),
+                            "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(
+                                timeframe, 1800
+                            ),
+                        },
+                    )
+
+    overlay_lanes = (
+        (
+            "momentum_crash_scaling_overlay",
+            "MomentumCrashDynamicScalingOverlayStrategy",
+            _MOMENTUM_CRASH_SCALING_OVERLAY_SLICE,
+            _MCS_TAGS,
+            "Daniel-Moskowitz continuous momentum-crash de-risk wrapper (bear x "
+            "rebound interaction + Barroso-Santa-Clara child-own-vol throttle, "
+            "clamped [0,1], bucket min-hold) around a registered TSMOM child.",
+        ),
+        (
+            "correlation_crash_guard_overlay",
+            "AvgCorrelationCrashGuardOverlayStrategy",
+            _CORRELATION_CRASH_GUARD_OVERLAY_SLICE,
+            _CORRG_TAGS,
+            "Average-pairwise-correlation (Engle-Kelly equicorrelation) crash "
+            "guard: de-risk-only wrapper engaging on correlation z-spikes with "
+            "hysteresis + dwell around a registered TSMOM child.",
+        ),
+    )
+    if len(crypto_symbols) >= 2:
+        for prefix, strategy_class, lane_slice, tags, note in overlay_lanes:
+            for timeframe in ctx._present("1d"):
+                tf_tag = timeframe.replace("/", "-")
+                for spec in lane_slice.get(timeframe, ()):
+                    params = {key: value for key, value in spec.items() if key != "variant"}
+                    params["child_strategy_class"] = "TopCapTimeSeriesMomentumStrategy"
+                    _add_candidate(
+                        ctx.candidates,
+                        name=f"{prefix}_{tf_tag}_{spec['variant']}",
+                        family="overlay",
+                        strategy_class=strategy_class,
+                        timeframe=timeframe,
+                        symbols=crypto_symbols,
+                        params=params,
+                        notes=(
+                            f"{note} De-risk only: the wrapper can never lever the "
+                            f"child beyond its own intent ({timeframe}, "
+                            f"{spec['variant']})."
+                        ),
+                        tags=tags,
+                        metadata={
+                            "timeframe": timeframe,
+                            "retune_profile": str(spec["variant"]),
+                            "symbol_scope": "crypto_basket",
+                            "child_strategy_class": "TopCapTimeSeriesMomentumStrategy",
+                            "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(
+                                timeframe, 1800
+                            ),
+                        },
+                    )
 
 
 def _build_metals_relative_value_basket_candidates(
