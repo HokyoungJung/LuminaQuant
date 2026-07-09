@@ -49,6 +49,11 @@ research:
   max_per_symbol_basket: 2
   max_per_lineage: 1
   max_per_family_basket: 1
+  # E1 (overfit_selection_gates): stamp per-candidate spa_pvalue + approx_pbo into
+  # the monthly-refit walk-forward runner's validation metric block (the DSR-less
+  # SPA/PBO axes the reject gate reads). Default OFF/byte-identical; ON here in the
+  # honest-research profile. Whole-search-deflated DSR is a data-PC stamp, not this.
+  emit_candidate_overfit_stats: true
   # Portfolio-layer honest gate (performance_lever_measurement 2026-07-08): run
   # DSR / CSCV-PBO / SPA on the weighted-portfolio NET stream, deflating the
   # portfolio DSR by the TOTAL allocation config-grid cells searched (the

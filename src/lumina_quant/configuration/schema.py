@@ -733,6 +733,14 @@ class ResearchConfig:
     max_per_symbol_basket: int | None = None
     max_per_lineage: int | None = None
     max_per_family_basket: int | None = None
+    # E1 (overfit_selection_gates): arm the monthly-refit walk-forward runner to
+    # stamp per-candidate ``spa_pvalue`` + ``approx_pbo`` into the ``validation``
+    # metric block (the DSR-less SPA/PBO axes the reject gate reads). ``False`` (the
+    # default) keeps the runner's emission byte-identical; the honest-research
+    # profiles turn it ON. Whole-search-deflated DSR is NOT emitted here (it needs
+    # the search-global num_trials the per-fold call site cannot know) -- that stays
+    # a data-PC aggregation-layer stamp.
+    emit_candidate_overfit_stats: bool = False
     # Honest cost/portfolio MEASUREMENT foundation (performance_lever_measurement
     # 2026-07-08). EVERY field below defaults to a strict no-op so the shipped
     # ``config.yaml`` / ``RuntimeConfig()`` load is byte-identical; they are turned
