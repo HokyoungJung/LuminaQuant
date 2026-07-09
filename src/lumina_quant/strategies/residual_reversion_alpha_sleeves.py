@@ -77,6 +77,7 @@ from collections import deque
 from dataclasses import dataclass
 from typing import Any
 
+from lumina_quant.core.plugin_registry import register
 from lumina_quant.indicators.alpha_features import log_return, realized_volatility
 from lumina_quant.indicators.common import safe_float, time_key
 from lumina_quant.indicators.rolling_stats import rolling_beta
@@ -180,6 +181,7 @@ class _AssetScore:
     realized_vol: float
 
 
+@register("strategy", _STRATEGY_NAME, interface="event_driven")
 class StationarityGatedResidualReversionStrategy(Strategy):
     """ADF-gated, market-neutral idiosyncratic residual reversion sleeve.
 

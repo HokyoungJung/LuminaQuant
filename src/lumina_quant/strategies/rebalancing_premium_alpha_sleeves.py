@@ -86,6 +86,7 @@ from collections import deque
 from dataclasses import dataclass
 from typing import Any
 
+from lumina_quant.core.plugin_registry import register
 from lumina_quant.indicators.common import safe_float, time_key
 from lumina_quant.indicators.ensemble_weights import softmax_weights
 from lumina_quant.indicators.flow_share import dense_rank_desc
@@ -179,6 +180,7 @@ def _mean_dollar_volume(closes: deque[float], volumes: deque[float], window: int
     return total / float(count)
 
 
+@register("strategy", _STRATEGY_NAME, interface="event_driven")
 class RebalancingPremiumHarvestStrategy(Strategy):
     """Harvest the rebalancing premium on a forecast-free diversity-weighted basket.
 

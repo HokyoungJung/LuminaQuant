@@ -80,6 +80,7 @@ from collections import deque
 from dataclasses import dataclass
 from typing import Any
 
+from lumina_quant.core.plugin_registry import register
 from lumina_quant.indicators.alpha_features import (
     realized_volatility,
     simple_return,
@@ -147,6 +148,7 @@ def _mode(raw: Any) -> str:
     return parsed if parsed in {"OUT", "LONG", "SHORT"} else "OUT"
 
 
+@register("strategy", _STRATEGY_NAME, interface="event_driven")
 class LowTurnoverTrendPersistenceStrategy(Strategy):
     """Per-symbol multi-horizon TSMOM with a hard min-hold + cooldown rescue.
 
@@ -533,5 +535,35 @@ _SUGGESTED_CANDIDATE_TAGS: tuple[str, ...] = (
     "multi_horizon",
     "crypto",
 )
+
+# Candidate slice (DAILY bars only: the ``tsmom_short/mid/long`` defaults of
+# 28/56/84 are 4/8/12 weeks of 1d bars -- the multi-week TSMOM thesis is only
+# honest at the 1d cadence, so the sleeve is deliberately NOT wired at
+# intraday timeframes).  Per-symbol single-asset (``candidate_mix_type ==
+# "single"``).  ``min_hold_bars``/``cooldown_bars`` are WEEKLY decision bars --
+# the proven min-hold rescue that lifts RPT above the 10bps floor.
+_LOW_TURNOVER_TREND_PERSISTENCE_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "1d": (
+        {
+            "variant": "core_4_8_12wk",
+            "tsmom_short": 28,
+            "tsmom_mid": 56,
+            "tsmom_long": 84,
+            "efficiency_period": 20,
+            "min_efficiency": 0.30,
+            "adx_period": 14,
+            "adx_min": 20.0,
+            "vol_persist_fast": 16,
+            "vol_persist_slow": 64,
+            "vol_persist_max": 1.5,
+            "min_hold_bars": 36,
+            "cooldown_bars": 4,
+            "max_hold_bars": 2000,
+            "vol_window": 56,
+            "target_vol": 0.20,
+            "allow_short": True,
+        },
+    ),
+}
 
 __all__ = ["LowTurnoverTrendPersistenceStrategy"]

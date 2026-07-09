@@ -99,6 +99,7 @@ from collections import deque
 from dataclasses import dataclass
 from typing import Any
 
+from lumina_quant.core.plugin_registry import register
 from lumina_quant.indicators.advanced_alpha import cross_leadlag_spillover
 from lumina_quant.indicators.alpha_features import realized_volatility
 from lumina_quant.indicators.common import safe_float, time_key
@@ -168,6 +169,7 @@ def _parse_leaders(raw: Any) -> tuple[str, ...]:
     return tuple(token for token in tokens if token)
 
 
+@register("strategy", _STRATEGY_NAME, interface="event_driven")
 class SlowCrossSectionalLeadLagStrategy(Strategy):
     """Weekly broad cross-sectional lead-lag: long high-loading laggards, short low.
 
@@ -632,5 +634,35 @@ _SUGGESTED_CANDIDATE_TAGS: tuple[str, ...] = (
     "min_hold",
     "crypto",
 )
+
+# Candidate slice (DAILY bars, internally weekly-sampled: ``spillover_window``/
+# ``min_history``/``min_hold_bars`` are WEEKLY decision bars).  Broad
+# cross-sectional long-short book -- the JEDC cost-surviving construction, NOT
+# the dead single-pair form.  ``min_hold_bars`` >= 8 weeks is the RPT-survival
+# design property (the redesign's entire purpose vs graveyard #6).
+_SLOW_LEADLAG_XS_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "1d": (
+        {
+            "variant": "weekly_core",
+            "max_lag": 2,
+            "ridge_alpha": 1.0,
+            "spillover_window": 60,
+            "min_history": 40,
+            "entry_z": 0.50,
+            "exit_z": 0.10,
+            "max_longs": 3,
+            "max_shorts": 3,
+            "allow_short": True,
+            "min_symbols": 5,
+            "min_hold_bars": 8,
+            "cooldown_bars": 2,
+            "max_hold_bars": 260,
+            "vol_window": 20,
+            "target_gross_exposure": 1.0,
+            "target_vol": 0.20,
+            "stop_loss_pct": 0.10,
+        },
+    ),
+}
 
 __all__ = ["SlowCrossSectionalLeadLagStrategy"]

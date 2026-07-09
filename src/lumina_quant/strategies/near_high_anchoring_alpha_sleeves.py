@@ -73,6 +73,7 @@ from collections import deque
 from dataclasses import dataclass
 from typing import Any
 
+from lumina_quant.core.plugin_registry import register
 from lumina_quant.indicators.alpha_features import realized_volatility
 from lumina_quant.indicators.common import safe_float, time_key
 from lumina_quant.strategies.adaptive_crypto_alpha_sleeves import (
@@ -119,6 +120,7 @@ def _coerce_float_list(value: Any) -> list[float]:
     return out
 
 
+@register("strategy", _STRATEGY_NAME, interface="event_driven")
 class CrossSectionalNearHighAnchoringStrategy(Strategy):
     """Long-short cross-sectional 52-week-high anchoring on PURE nearness.
 
@@ -532,5 +534,46 @@ _SUGGESTED_CANDIDATE_TAGS: tuple[str, ...] = (
     "zscore",
     "crypto",
 )
+
+# Candidate slice (daily bars; weekly rebalance via ``rebalance_bars``).  The
+# published effect is a 52-week window; the data-PC owns the 10/20/30/52wk
+# horizon factor_ic sweep, so we seed only two anchoring lookbacks (~30wk and
+# ~52wk of 1d bars) to keep the candidate library thin.  ``min_history_bars``
+# is the per-symbol floor below which a young alt is skipped; between it and
+# ``high_lookback_bars`` the symbol is admitted via the ``max_available``
+# fallback (the breadth-vs-anointing tradeoff resolved toward a tradeable
+# cross-section).
+_NEAR_HIGH_ANCHORING_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "1d": (
+        {
+            "variant": "wk52",
+            "high_lookback_bars": 364,
+            "min_history_bars": 60,
+            "vol_window": 20,
+            "quantile_pct": 0.25,
+            "rebalance_bars": 7,
+            "min_hold_bars": 7,
+            "min_symbols": 5,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+            "target_vol": 0.20,
+            "stop_loss_pct": 0.10,
+        },
+        {
+            "variant": "wk30",
+            "high_lookback_bars": 210,
+            "min_history_bars": 45,
+            "vol_window": 20,
+            "quantile_pct": 0.25,
+            "rebalance_bars": 7,
+            "min_hold_bars": 7,
+            "min_symbols": 5,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+            "target_vol": 0.20,
+            "stop_loss_pct": 0.10,
+        },
+    ),
+}
 
 __all__ = ["CrossSectionalNearHighAnchoringStrategy"]

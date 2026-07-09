@@ -68,6 +68,7 @@ from __future__ import annotations
 import math
 from typing import Any
 
+from lumina_quant.core.plugin_registry import register
 from lumina_quant.indicators.alpha_features import volatility_ratio
 from lumina_quant.strategies.disagreement_ensemble_alpha_sleeves import (
     DisagreementGatedEnsembleStrategy,
@@ -75,6 +76,7 @@ from lumina_quant.strategies.disagreement_ensemble_alpha_sleeves import (
 from lumina_quant.tuning import HyperParam
 
 
+@register("strategy", "RegimeAdaptiveDisagreementEnsembleStrategy", interface="event_driven")
 class RegimeAdaptiveDisagreementEnsembleStrategy(DisagreementGatedEnsembleStrategy):
     """Disagreement-gated ensemble whose gate widens in turbulent regimes.
 
