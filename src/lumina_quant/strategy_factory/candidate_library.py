@@ -2744,6 +2744,9 @@ class _CandidateBuildContext:
         # Alpha-pool-expansion-v2b batch (2026-07-09): 12 leaves + 2 de-risk
         # overlays, one thin batch builder; SLICE constants live in lane modules.
         _build_alpha_pool_v2b_candidates(self)
+        # Alpha-pool-expansion-v2c batch (2026-07-09): 9 leaves (the allocator
+        # lane lives in portfolio/quality_gated_allocation.py, nothing to wire).
+        _build_alpha_pool_v2c_candidates(self)
         _build_metals_relative_value_basket_candidates(self)
         _build_liquidation_cascade_reversion_candidates(self)
         _build_orderbook_imbalance_reversion_candidates(self)
@@ -10068,6 +10071,217 @@ def _build_alpha_pool_v2b_candidates(ctx: _CandidateBuildContext) -> None:
                             "retune_profile": str(spec["variant"]),
                             "symbol_scope": "crypto_basket",
                             "child_strategy_class": "TopCapTimeSeriesMomentumStrategy",
+                            "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(
+                                timeframe, 1800
+                            ),
+                        },
+                    )
+
+
+def _build_alpha_pool_v2c_candidates(ctx: _CandidateBuildContext) -> None:
+    """Alpha-pool-expansion-v2c batch (2026-07-09): 9 leaves, one thin builder.
+
+    SLICE constants, suggested families and tags live in the lane modules.
+    Cross-sectional baskets carry NO carry tag (honest ``allow_multi_asset=True``
+    route at the data-PC handoff); the family-meta-momentum allocator lane ships
+    as a config-gated portfolio function and needs no candidate wiring.
+    """
+    from lumina_quant.strategies.information_discreteness_alpha_sleeves import (
+        _INFORMATION_DISCRETENESS_SLICE,
+        _SUGGESTED_CANDIDATE_TAGS as _FIP_TAGS,
+        _SUGGESTED_FAMILY as _FIP_FAMILY,
+    )
+    from lumina_quant.strategies.momentum_echo_alpha_sleeves import (
+        _MOMENTUM_ECHO_SLICE,
+        _SUGGESTED_CANDIDATE_TAGS as _ECHO_TAGS,
+        _SUGGESTED_FAMILY as _ECHO_FAMILY,
+    )
+    from lumina_quant.strategies.near_low_recovery_alpha_sleeves import (
+        _NEAR_LOW_RECOVERY_SLICE,
+        _SUGGESTED_CANDIDATE_TAGS as _NLR_TAGS,
+        _SUGGESTED_FAMILY as _NLR_FAMILY,
+    )
+    from lumina_quant.strategies.offsession_tugofwar_alpha_sleeves import (
+        _OFFSESSION_TUGOFWAR_SLICE,
+        _SUGGESTED_CANDIDATE_TAGS as _TOW_TAGS,
+        _SUGGESTED_FAMILY as _TOW_FAMILY,
+    )
+    from lumina_quant.strategies.price_delay_premium_alpha_sleeves import (
+        _PRICE_DELAY_PREMIUM_SLICE,
+        _SUGGESTED_CANDIDATE_TAGS as _PDP_TAGS,
+        _SUGGESTED_FAMILY as _PDP_FAMILY,
+    )
+    from lumina_quant.strategies.round_number_barrier_alpha_sleeves import (
+        _ROUND_NUMBER_BARRIER_SLICE,
+        _SUGGESTED_CANDIDATE_TAGS as _RNB_TAGS,
+        _SUGGESTED_FAMILY as _RNB_FAMILY,
+    )
+    from lumina_quant.strategies.silent_volume_shock_alpha_sleeves import (
+        _SILENT_VOLUME_SHOCK_SLICE,
+        _SUGGESTED_CANDIDATE_TAGS as _SVS_TAGS,
+        _SUGGESTED_FAMILY as _SVS_FAMILY,
+    )
+    from lumina_quant.strategies.skew_innovation_alpha_sleeves import (
+        _SKEW_INNOVATION_SLICE,
+        _SUGGESTED_CANDIDATE_TAGS as _DSK_TAGS,
+        _SUGGESTED_FAMILY as _DSK_FAMILY,
+    )
+    from lumina_quant.strategies.time_under_water_alpha_sleeves import (
+        _TIME_UNDER_WATER_SLICE,
+        _SUGGESTED_CANDIDATE_TAGS as _TUW_TAGS,
+        _SUGGESTED_FAMILY as _TUW_FAMILY,
+    )
+
+    crypto_symbols = tuple(ctx.crypto_only_symbols)
+
+    xs_lanes = (
+        (
+            "near_low_recovery",
+            "CrossSectionalNearLowRecoveryStrategy",
+            _NEAR_LOW_RECOVERY_SLICE,
+            _NLR_TAGS,
+            _NLR_FAMILY,
+            "52-week-LOW capitulation-recovery anchor: rebound magnitude + "
+            "argmin recency, residualized on the near-high nearness statistic; "
+            "long aged recoveries, short fresh-low grinders.",
+        ),
+        (
+            "time_under_water",
+            "CrossSectionalTimeUnderWaterStrategy",
+            _TIME_UNDER_WATER_SLICE,
+            _TUW_TAGS,
+            _TUW_FAMILY,
+            "Drawdown-DURATION cross-section: time since running peak, "
+            "depth-residualized, underwater eligibility band — long "
+            "stagnation-exhaustion, short fresh-drawdown overhang.",
+        ),
+        (
+            "price_delay_premium",
+            "CrossSectionalPriceDelayPremiumStrategy",
+            _PRICE_DELAY_PREMIUM_SLICE,
+            _PDP_TAGS,
+            _PDP_FAMILY,
+            "Hou-Moskowitz D1 price-delay share (lagged-benchmark R2 fraction, "
+            "adjusted-R2 idio floor) as a months-persistent XS characteristic "
+            "— the low-turnover transform of the lead-lag friction.",
+        ),
+        (
+            "information_discreteness",
+            "InformationDiscretenessMomentumStrategy",
+            _INFORMATION_DISCRETENESS_SLICE,
+            _FIP_TAGS,
+            _FIP_FAMILY,
+            "Da-Gurun-Warachka frog-in-the-pan: magnitude-blind sign census "
+            "conditioning XS momentum; jump names excluded from both books.",
+        ),
+        (
+            "momentum_echo",
+            "CrossSectionalIntermediateEchoMomentumStrategy",
+            _MOMENTUM_ECHO_SLICE,
+            _ECHO_TAGS,
+            _ECHO_FAMILY,
+            "Novy-Marx momentum echo as the two-window spread "
+            "z(intermediate) - z(recent) — the spread form is inexpressible "
+            "in any incumbent momentum cell.",
+        ),
+        (
+            "skew_innovation",
+            "IdiosyncraticSkewInnovationStrategy",
+            _SKEW_INNOVATION_SLICE,
+            _DSK_TAGS,
+            _DSK_FAMILY,
+            "d(skew)/dt of beta-hedged residuals on non-overlapping windows: "
+            "fade building idiosyncratic skew, long collapsing skew (the "
+            "time-difference complement of the lottery/MAX level axis).",
+        ),
+        (
+            "offsession_tugofwar",
+            "CrossSectionalOffSessionTugOfWarStrategy",
+            _OFFSESSION_TUGOFWAR_SLICE,
+            _TOW_TAGS,
+            _TOW_FAMILY,
+            "TradFi-perp cash-anchor tug-of-war: per-UTC-day decomposition of "
+            "1h bars into cash-session vs unanchored off-session components; "
+            "XS fade of the persistent momentum-residualized off-session tilt.",
+        ),
+    )
+    if len(crypto_symbols) >= 5:
+        for prefix, strategy_class, lane_slice, tags, family, note in xs_lanes:
+            for timeframe in ctx._present(*lane_slice.keys()):
+                tf_tag = timeframe.replace("/", "-")
+                for spec in lane_slice.get(timeframe, ()):
+                    params = {key: value for key, value in spec.items() if key != "variant"}
+                    _add_candidate(
+                        ctx.candidates,
+                        name=f"{prefix}_{tf_tag}_{spec['variant']}",
+                        family=family,
+                        strategy_class=strategy_class,
+                        timeframe=timeframe,
+                        symbols=crypto_symbols,
+                        params=params,
+                        notes=(
+                            f"{note} Deliberately NOT tagged carry; evaluate with "
+                            f"allow_multi_asset=True ({timeframe}, {spec['variant']})."
+                        ),
+                        tags=tags,
+                        metadata={
+                            "timeframe": timeframe,
+                            "retune_profile": str(spec["variant"]),
+                            "symbol_scope": "crypto_basket",
+                            "allow_short": bool(spec.get("allow_short", True)),
+                            "admission_route": "allow_multi_asset_handoff",
+                            "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(
+                                timeframe, 1800
+                            ),
+                        },
+                    )
+
+    per_symbol_lanes = (
+        (
+            "silent_volume_shock",
+            "SilentVolumeShockResolutionStrategy",
+            _SILENT_VOLUME_SHOCK_SLICE,
+            _SVS_TAGS,
+            _SVS_FAMILY,
+            "Easley-O'Hara information-arrival lead structure: a quiet-price "
+            "2-sigma volume shock ARMS the symbol; entry only on the sign of "
+            "the subsequent vol-scaled resolution.",
+        ),
+        (
+            "round_number_barrier",
+            "RoundNumberBarrierStrategy",
+            _ROUND_NUMBER_BARRIER_SLICE,
+            _RNB_TAGS,
+            _RNB_FAMILY,
+            "Osler round-number barrier on an ex-ante-frozen power-of-ten "
+            "grid: one proximity transform + one approach-direction "
+            "interaction, episodic bounce/breakout (HIGH data-mining prior; "
+            "placebo-grid falsifier ships as a unit test).",
+        ),
+    )
+    for prefix, strategy_class, lane_slice, tags, family, note in per_symbol_lanes:
+        for timeframe in ctx._present(*lane_slice.keys()):
+            tf_tag = timeframe.replace("/", "-")
+            for spec in lane_slice.get(timeframe, ()):
+                for symbol in crypto_symbols:
+                    params = {key: value for key, value in spec.items() if key != "variant"}
+                    _add_candidate(
+                        ctx.candidates,
+                        name=(
+                            f"{prefix}_{tf_tag}_{spec['variant']}_{symbol.replace('/', '').lower()}"
+                        ),
+                        family=family,
+                        strategy_class=strategy_class,
+                        timeframe=timeframe,
+                        symbols=(symbol,),
+                        params=params,
+                        notes=f"{note} ({symbol} at {timeframe}, {spec['variant']}).",
+                        tags=tags,
+                        metadata={
+                            "timeframe": timeframe,
+                            "retune_profile": str(spec["variant"]),
+                            "symbol_scope": symbol,
+                            "allow_short": bool(spec.get("allow_short", True)),
                             "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(
                                 timeframe, 1800
                             ),

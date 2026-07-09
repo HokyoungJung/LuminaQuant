@@ -354,6 +354,129 @@ def _turnover_tilted_weights(
     return normalized
 
 
+# Dispersion floor for the family meta-momentum tilt: below this the family
+# Sharpe cross-section (or an equal-weight member stream's std) carries no usable
+# signal, so the tilt is inert and the base weights pass through unchanged.
+_FAMILY_MOMENTUM_EPS = 1e-12
+
+
+def _family_trailing_net_sharpe(stream: np.ndarray) -> float:
+    """Non-annualized net Sharpe ``mean / sample-std`` of one return stream.
+
+    The ``_series_sharpe`` idiom without the ``sqrt(periods_per_year)`` scale
+    (family-vs-family z-scoring is scale-free, so annualization is a no-op that
+    only adds a constant factor). Degenerate streams (fewer than 2 observations
+    or ~zero dispersion) score 0.0 -- never raises.
+    """
+    data = np.asarray(stream, dtype=np.float64).reshape(-1)
+    if data.size < 2:
+        return 0.0
+    mu = float(np.mean(data))
+    sigma = float(np.std(data, ddof=1))
+    if sigma <= _FAMILY_MOMENTUM_EPS:
+        return 0.0
+    return mu / sigma
+
+
+def _family_meta_momentum_tilted_weights(
+    base_weights: Mapping[str, float],
+    survivors: Sequence[str],
+    net_matrix: np.ndarray,
+    families: Mapping[str, str] | None,
+    *,
+    window: int,
+    strength: float,
+    cap: float,
+    min_families: int,
+    upper: float | Mapping[str, float] | None,
+) -> dict[str, float]:
+    """Bounded recency tilt on the base weights by trailing family net Sharpe.
+
+    Cross-sleeve FAMILY meta-momentum (Gupta-Kelly 2019 "Factor Momentum
+    Everywhere"; Ehsani-Linnainmaa 2022): over the LAST ``window`` observations of
+    the SAME trailing-aligned NET return ``net_matrix`` the covariance already
+    consumed (so no out-of-sample bar can enter by construction), score each
+    surviving-sleeve FAMILY by the non-annualized net Sharpe of its
+    equal-weighted member return stream, z-score those Sharpes ACROSS families,
+    and multiply each sleeve's base weight by
+    ``clip(1 + strength * z_family, 1 - cap, 1 + cap)`` before renormalizing and
+    re-projecting under ``upper`` caps. A recently-outperforming family is
+    up-weighted (never zeroed, never levered) within the ``+/- cap`` band; an
+    unmapped sleeve keeps a neutral ``1.0`` multiplier.
+
+    Invoked ONLY when ``window > 0`` (the caller's default ``0`` never reaches
+    here), so the flag-OFF allocator stays byte-identical. Degenerate inputs
+    (empty survivors, mis-shaped matrix, ``window`` exceeding the trailing length,
+    fewer than ``min_families`` distinct families among survivors, or zero
+    cross-family Sharpe dispersion) return the base weights unchanged. Pure numpy,
+    deterministic (sorted family iteration), never raises.
+    """
+    ids = list(survivors)
+    n = len(ids)
+    if n == 0:
+        return dict(base_weights)
+    matrix = np.asarray(net_matrix, dtype=np.float64)
+    if matrix.ndim != 2 or matrix.shape[1] != n or matrix.shape[0] < 2:
+        return dict(base_weights)
+    win = int(window)
+    if win < 2 or win > int(matrix.shape[0]):
+        # ``window >= min_len`` guard: an under-length window would leak the
+        # entire trailing block (or fail the min-observation floor) -- no-op.
+        return dict(base_weights)
+
+    family_of: dict[str, str | None] = {}
+    for sleeve_id in ids:
+        label: str | None = None
+        if families:
+            raw = families.get(sleeve_id)
+            if raw is not None:
+                label = str(raw)
+        family_of[sleeve_id] = label
+    distinct_families = sorted({label for label in family_of.values() if label is not None})
+    if len(distinct_families) < max(1, int(min_families)):
+        return dict(base_weights)
+
+    column_of = {sleeve_id: index for index, sleeve_id in enumerate(ids)}
+    trailing = matrix[-win:, :]
+    family_sharpe: dict[str, float] = {}
+    for label in distinct_families:
+        member_columns = [column_of[sid] for sid in ids if family_of[sid] == label]
+        if not member_columns:
+            continue
+        ew_stream = trailing[:, member_columns].mean(axis=1)
+        family_sharpe[label] = _family_trailing_net_sharpe(ew_stream)
+    if len(family_sharpe) < max(1, int(min_families)):
+        return dict(base_weights)
+
+    labels = sorted(family_sharpe)
+    sharpe_values = np.asarray([family_sharpe[label] for label in labels], dtype=np.float64)
+    mean_sharpe = float(np.mean(sharpe_values))
+    std_sharpe = float(np.std(sharpe_values, ddof=1)) if sharpe_values.size > 1 else 0.0
+    if std_sharpe <= _FAMILY_MOMENTUM_EPS:
+        return dict(base_weights)
+    z_by_family = {label: (family_sharpe[label] - mean_sharpe) / std_sharpe for label in labels}
+
+    low = 1.0 - float(cap)
+    high = 1.0 + float(cap)
+    tilted: dict[str, float] = {}
+    for sleeve_id in ids:
+        label = family_of[sleeve_id]
+        if label is None or label not in z_by_family:
+            multiplier = 1.0
+        else:
+            multiplier = min(high, max(low, 1.0 + float(strength) * z_by_family[label]))
+        tilted[sleeve_id] = max(0.0, float(base_weights.get(sleeve_id, 0.0))) * multiplier
+
+    total = float(sum(tilted.values()))
+    if total <= 0.0:
+        return dict(base_weights)
+    normalized = {sleeve_id: tilted[sleeve_id] / total for sleeve_id in ids}
+    upper_map = _resolve_upper(upper, ids)
+    if upper_map is not None:
+        normalized = project_simplex_with_upper_bounds(normalized, upper=upper_map, target_sum=1.0)
+    return normalized
+
+
 def _build_allocator(method: str) -> ERCPortfolio | HRPPortfolio:
     token = str(method or "erc").strip().lower()
     if token == "erc":
@@ -385,6 +508,11 @@ def allocate_quality_gated(
     min_sleeves: int = 1,
     turnover_penalty_lambda: float = 0.0,
     correlation_shrinkage: bool | float | None = None,
+    families: Mapping[str, str] | None = None,
+    family_momentum_window: int = 0,
+    family_momentum_tilt_strength: float = 0.5,
+    family_momentum_tilt_cap: float = 0.30,
+    min_families: int = 3,
 ) -> dict[str, float]:
     """Quality-gate then risk-allocate across sleeves; returns ``id -> weight``.
 
@@ -415,6 +543,16 @@ def allocate_quality_gated(
       hand-rolled closed form (``True`` = analytic intensity; a float = fixed
       intensity in ``[0, 1]``) for more stable OOS weights. ``None``/``False`` keeps
       the unmodified ``HRPPortfolio`` path; it is inert for ``method="erc"``.
+    * ``family_momentum_window`` (default ``0`` = OFF): when ``> 0`` a bounded
+      ``+/- family_momentum_tilt_cap`` recency tilt is applied AFTER the base
+      risk-parity weights and the (optional) turnover tilt, up-weighting sleeve
+      FAMILIES whose equal-weighted member stream had a higher trailing
+      ``family_momentum_window``-observation net Sharpe on the SAME trailing net
+      matrix the covariance used (Gupta-Kelly factor momentum, train/val-only by
+      construction). ``families`` maps sleeve id -> family label (unmapped sleeves
+      stay neutral); the tilt no-ops below ``min_families`` distinct families or
+      zero cross-family dispersion. ``family_momentum_window == 0`` leaves every
+      output byte-identical.
     """
     if not sleeve_returns:
         return {}
@@ -450,6 +588,9 @@ def allocate_quality_gated(
         )
 
     min_len = min((series.size for series in net_series), default=0)
+    # Captured for the optional family meta-momentum tilt below; stays ``None``
+    # in the covariance-less fallback so the tilt is a no-op there.
+    matrix: np.ndarray | None = None
     if min_len < 2:
         # Not enough overlapping observations to estimate a covariance
         # structure; fall back to equal weight across survivors rather than
@@ -487,6 +628,19 @@ def allocate_quality_gated(
             raw_weights, survivors, quality, turnover_penalty_lambda, upper
         )
 
+    if family_momentum_window > 0 and matrix is not None:
+        raw_weights = _family_meta_momentum_tilted_weights(
+            raw_weights,
+            survivors,
+            matrix,
+            families,
+            window=family_momentum_window,
+            strength=family_momentum_tilt_strength,
+            cap=family_momentum_tilt_cap,
+            min_families=min_families,
+            upper=upper,
+        )
+
     return {sleeve_id: _round(raw_weights.get(sleeve_id, 0.0)) for sleeve_id in survivors}
 
 
@@ -502,6 +656,11 @@ def build_allocation_manifest(
     gross_cap: float = 1.0,
     turnover_penalty_lambda: float = 0.0,
     correlation_shrinkage: bool | float | None = None,
+    families: Mapping[str, str] | None = None,
+    family_momentum_window: int = 0,
+    family_momentum_tilt_strength: float = 0.5,
+    family_momentum_tilt_cap: float = 0.30,
+    min_families: int = 3,
 ) -> dict[str, Any]:
     """Build a manifest the live ``ArtifactPortfolioModeStrategy`` accepts as-is.
 
@@ -529,15 +688,25 @@ def build_allocation_manifest(
     the consumer's own ``manifest_children_empty`` fail-closed path (not a
     special case here) safely routes that to 100% cash.
 
-    ``turnover_penalty_lambda`` and ``correlation_shrinkage`` are forwarded to
-    :func:`allocate_quality_gated` (and the penalty to the ``sleeve_quality``
-    block); both default OFF, in which case the emitted manifest is byte-identical
-    to the pre-extension output.
+    ``turnover_penalty_lambda``, ``correlation_shrinkage``, and the family
+    meta-momentum kwargs (``families`` / ``family_momentum_window`` / ...) are
+    forwarded to :func:`allocate_quality_gated` (and the penalty to the
+    ``sleeve_quality`` block); all default OFF, in which case the emitted manifest
+    is byte-identical to the pre-extension output. When ``families`` is not passed
+    explicitly it is derived from each sleeve spec's optional ``"family"`` key
+    (unmapped sleeves stay neutral under the tilt).
     """
     sleeves = sleeves or {}
     source_rows = [dict(artifact) for artifact in (source_artifacts or [])]
     sleeve_returns = {sid: (spec or {}).get("returns") for sid, spec in sleeves.items()}
     turnovers = {sid: (spec or {}).get("turnover", 0.0) for sid, spec in sleeves.items()}
+    if families is None:
+        derived = {
+            sid: str((spec or {}).get("family"))
+            for sid, spec in sleeves.items()
+            if (spec or {}).get("family") is not None
+        }
+        families = derived or None
 
     weights = allocate_quality_gated(
         sleeve_returns,
@@ -549,6 +718,11 @@ def build_allocation_manifest(
         min_sleeves=min_sleeves,
         turnover_penalty_lambda=turnover_penalty_lambda,
         correlation_shrinkage=correlation_shrinkage,
+        families=families,
+        family_momentum_window=family_momentum_window,
+        family_momentum_tilt_strength=family_momentum_tilt_strength,
+        family_momentum_tilt_cap=family_momentum_tilt_cap,
+        min_families=min_families,
     )
 
     default_source_id = str(source_rows[0].get("id") or "") if len(source_rows) == 1 else ""

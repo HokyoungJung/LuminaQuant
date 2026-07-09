@@ -245,6 +245,17 @@ _STRATEGY_TIER_HINTS: dict[str, str] = {
     "DownsideTailRiskPremiumStrategy": "research_only",
     "CrossSectionalRegressionTrendQualityStrategy": "research_only",
     "CrossSectionalPathConvexityStrategy": "research_only",
+    # Alpha-pool-expansion-v2c batch (2026-07-09): 9 leaves (allocator lane
+    # ships as a config-gated portfolio function, nothing to register).
+    "CrossSectionalNearLowRecoveryStrategy": "research_only",
+    "CrossSectionalTimeUnderWaterStrategy": "research_only",
+    "CrossSectionalPriceDelayPremiumStrategy": "research_only",
+    "InformationDiscretenessMomentumStrategy": "research_only",
+    "CrossSectionalIntermediateEchoMomentumStrategy": "research_only",
+    "IdiosyncraticSkewInnovationStrategy": "research_only",
+    "SilentVolumeShockResolutionStrategy": "research_only",
+    "RoundNumberBarrierStrategy": "research_only",
+    "CrossSectionalOffSessionTugOfWarStrategy": "research_only",
 }
 
 _STRATEGY_METADATA: dict[str, dict[str, Any]] = {
