@@ -106,7 +106,7 @@ Important: the stored goal status still shows G001 `in_progress` because the Cod
 | G001 — isolated baseline and integrity plumbing | implementation complete | one-descriptor receipts, generic receipt propagation, strict constructor seams, default-neutral portfolio seams, focused and full regressions |
 | G002 — sleeves and portfolio artifacts | implementation complete for planned local contracts | three research-only sleeves, native clocks/capsules, causal feature/funding seams, admission, allocators, manifest materializer, frozen config |
 | G003 — runner/statistics/external replay | **partial** | execution attribution, pure metrics/statistics/trial ledger, and strict runtime preflight exist; actual replay, selection, terminal state, CLI, and data-PC bundle remain |
-| G004 — integrate/review/verify/push | checkpoint-only | this portable checkpoint is tested and pushed; final completion review and data-backed performance verification remain |
+| G004 — integrate/review/verify/push | checkpoint-only | this portable checkpoint is tested and pushed; hosted CI has the full-history checkout required by the immutable prior-trial Git-blob contract; final completion review and data-backed performance verification remain |
 
 The exact original objectives and audit ledger must remain intact. Do not mark the aggregate goal complete on the continuation PC until G003/G004 and the mandatory independent review gate are finished.
 
@@ -222,6 +222,7 @@ Fresh checkpoint verification:
 - Hardcoded-parameter audit: `1668` total, `0` new, `1668` baselined. The deterministic baseline was regenerated because the new research strategy and inserted wrapper seams changed the scanner's line/column signatures; no scanner exemption was added.
 - Python compile and `git diff --check`: passed.
 - Full repository pytest: `4349 passed, 36 skipped, 3 xfailed` in `124.06s`; maximum RSS `562,336 KiB`, zero swap.
+- Hosted CI portability: the quality job now checks out full Git history (`fetch-depth: 0`). This is required because prior-trial accounting deliberately reads the frozen baseline blob `252910e54e280cc593365484cbc99d6ca87893f9:var/reports/ultragoal_full_pool_strategy/g004_frozen_candidate_manifest.json`. Runtime auto-fetch or a missing-history fallback was rejected because either would add network side effects or weaken fail-closed evidence.
 
 An earlier stable full-suite run after execution-attribution integration and namespace hardening produced `4287 passed, 36 skipped, 3 xfailed` with 4,326 collected nodes. This is evidence for that earlier state; use the fresh final run for the checkpoint commit.
 
@@ -232,6 +233,7 @@ git clone https://github.com/hoky1227/Quants-agent.git
 cd Quants-agent
 git fetch origin feat/alpha-max-20260710
 git switch --track -c feat/alpha-max-20260710 origin/feat/alpha-max-20260710
+git cat-file -e 252910e54e280cc593365484cbc99d6ca87893f9^{commit}
 uv sync --frozen --extra dev
 
 # Verify all normative hashes before editing.

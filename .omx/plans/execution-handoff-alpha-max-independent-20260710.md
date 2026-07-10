@@ -65,3 +65,5 @@ The implementation has advanced beyond the original execution handoff. The porta
 - this directory's Revision 5.14 Ralplan, PRD, test spec, registry, incumbent audit, consensus, architect review, and critic review.
 
 G001 and G002 local implementation contracts are complete. G003 is partial: execution attribution, pure metrics/statistics/trial accounting, and the strict runtime-contract foundation exist; actual two-engine replay, matrix orchestration, selection/terminal logic, physically separated CLIs, data-PC bundle, and performance evidence remain. The stored Ultragoal status was not falsified after the Codex goal became `usageLimited`; use the checkpoint document's actual-status table while preserving the original goal audit.
+
+Hosted-CI continuation invariant: the quality job must retain full Git history. The prior-trial ledger is intentionally bound to the immutable baseline blob at commit `252910e54e280cc593365484cbc99d6ca87893f9`; a shallow checkout cannot verify it. Keep `.github/workflows/ci.yml` on `actions/checkout` with `fetch-depth: 0`. Do not replace this with runtime fetching or a missing-object fallback.

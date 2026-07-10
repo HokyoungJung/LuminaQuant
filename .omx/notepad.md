@@ -1023,3 +1023,9 @@ Continued strategy digging after Rust fold acceleration. Added two clean-discove
 - Freeze-only moonshot: `codex_lagged_leaf_router_grid:h4_avg1_tr-0.02_tmdd0.50_val0.00_vmdd0.25_lagged_plus_val025_exact_unscaled`, OOS comp +79.42%, MDD 27.69%, hit 4/10, post-OOS/fresh-forward only.
 - Additional attempts failed promotion: row-level selector -18.87%, clean new-alpha TradFi+leaders -8.54%, raw TradFi lead-lag selector -91.21% despite invalid post-hoc upper bound +1324.50%.
 - Verification: py_compile pass; targeted pytest 59 passed; ruff check pass.
+
+## 2026-07-11 KST — Alpha-max portable checkpoint CI invariant
+
+- Branch `feat/alpha-max-20260710` preserves the complete Ralplan/PRD/test-spec/Ultragoal/audit/handoff package for continuation on another PC.
+- The alpha-max prior-trial ledger reads an immutable Git blob from baseline commit `252910e54e280cc593365484cbc99d6ca87893f9`; hosted quality CI therefore requires `actions/checkout` with `fetch-depth: 0`.
+- Do not add runtime network fetching or a permissive missing-history fallback. Missing baseline history is an integrity failure, not an empty prior family.
