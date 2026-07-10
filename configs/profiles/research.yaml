@@ -69,3 +69,13 @@ research:
   # cannot clear the gate. No cost_rate_multiplier here: this profile carries no
   # execution cost model (see backtest_cost_realistic.yaml for the cost floor).
   portfolio_honest_gate: true
+  # Equity-flow complements (eq-flow v5 follow-up, 2026-07-10): five ADDITIVE
+  # walk-forward variants / ranking treatments from the fold-by-fold equity-flow
+  # diagnosis (.omc/research/equity-flow-analysis-20260710.md). Default OFF /
+  # byte-identical (count pins hold); ON here so the next research run measures
+  # them. Variant params are PRE-REGISTERED constants in the walk-forward script.
+  walkforward_corr_guard_router_variant: true
+  walkforward_crash_scaled_conviction_variant: true
+  walkforward_val_saturation_conviction_variant: true
+  walkforward_partial_fold_bar_count_weighting: true
+  walkforward_regime_gated_strict_efficiency_variant: true
