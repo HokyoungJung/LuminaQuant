@@ -114,15 +114,17 @@ def load_recent_workflow_jobs(connection: Any, *, limit: int = 10) -> list[dict[
 
 
 def load_recent_workflow_jobs_payload(*, dsn: str | None = None, limit: int = 10) -> dict[str, Any]:
+    as_of = datetime.now(tz=UTC).isoformat()
     if dsn is not None and not str(dsn).strip():
-        return {"jobs": [], "status": "missing_dsn"}
+        return {"as_of": as_of, "jobs": [], "status": "missing_dsn"}
     resolved_dsn = resolve_dashboard_postgres_dsn(dsn)
     if not resolved_dsn:
-        return {"jobs": [], "status": "missing_dsn"}
+        return {"as_of": as_of, "jobs": [], "status": "missing_dsn"}
 
     conn = _connect_postgres(resolved_dsn)
     try:
         return {
+            "as_of": as_of,
             "jobs": load_recent_workflow_jobs(conn, limit=limit),
             "status": "ok",
         }

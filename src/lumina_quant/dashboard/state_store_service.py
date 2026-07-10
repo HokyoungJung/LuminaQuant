@@ -302,7 +302,12 @@ def load_metrics_state_frame(
         for meta in df["metadata"].tolist() if "metadata" in df.columns else []:
             info = parse_json_dict(meta)
             benchmark.append(info.get("benchmark_price"))
-            funding.append(info.get("funding_total"))
+            # Writers emit 'funding' (cumulative quote-currency amount, see
+            # cli/backtest.py); 'funding_total' is a legacy fallback only.
+            funding_value = info.get("funding")
+            if funding_value is None:
+                funding_value = info.get("funding_total")
+            funding.append(funding_value)
             symbol.append(info.get("symbol"))
 
         if benchmark:

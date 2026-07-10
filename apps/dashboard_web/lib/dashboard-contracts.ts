@@ -4,6 +4,22 @@ export interface BridgeErrorBody {
   ok?: boolean;
 }
 
+export interface RunSummary {
+  run_id: string;
+  mode: string;
+  status: string;
+  strategy: string;
+  started_at: string | null;
+}
+
+export interface EquityWindow {
+  start: string | null;
+  end: string | null;
+  points_total: number;
+  points_returned: number;
+  truncated: boolean;
+}
+
 export interface OverviewMetric {
   key: string;
   label: string;
@@ -37,6 +53,7 @@ export interface OverviewPayload {
   workflow_jobs: WorkflowJobRecord[];
   equity_curve: Array<OverviewPoint & { equity: number }>;
   drawdown_curve: Array<OverviewPoint & { drawdown: number }>;
+  equity_window?: EquityWindow;
   source: {
     mode: string;
     backend: string;
@@ -57,6 +74,7 @@ export interface WorkflowJobRecord {
 }
 
 export interface WorkflowJobsPayload {
+  as_of?: string;
   jobs: WorkflowJobRecord[];
   status: string;
 }
@@ -199,7 +217,11 @@ export interface PerformancePricePayload {
   performance_metrics: OverviewPayload['performance_metrics'];
   equity_curve: Array<OverviewPoint & { equity: number }>;
   drawdown_curve: Array<OverviewPoint & { drawdown: number }>;
+  equity_window?: EquityWindow;
+  /** Symbol behind benchmark_curve (primary run symbol); null when unknown. */
+  benchmark_symbol?: string | null;
   benchmark_curve: Array<{ timestamp: string; price: number }>;
+  /** Cumulative funding in quote currency (NOT a rate/fraction). */
   funding_curve: Array<{ timestamp: string; funding: number }>;
   trade_markers: Array<{
     timestamp: string;
@@ -211,6 +233,7 @@ export interface PerformancePricePayload {
     realized_return_pct: number | null;
     position_after: number;
   }>;
+  runs?: RunSummary[];
 }
 
 export interface ExecutionAnalyticsPayload {
@@ -252,6 +275,7 @@ export interface ExecutionAnalyticsPayload {
     realized_return_pct: number | null;
     holding_sec: number | null;
   }>;
+  runs?: RunSummary[];
 }
 
 export interface MarketDataPayload {
@@ -278,6 +302,8 @@ export interface MarketDataPayload {
   }>;
   indicator_summary: OverviewMetric[];
   warnings: string[];
+  runs?: RunSummary[];
+  symbols?: string[];
 }
 
 export interface OptimizationInsightsPayload {
@@ -334,6 +360,7 @@ export interface RawDataPayload {
     columns: string[];
     rows: Array<Record<string, unknown>>;
   }>;
+  runs?: RunSummary[];
 }
 
 export interface ReportExportPayload {
@@ -367,6 +394,7 @@ export interface ReportExportPayload {
     status?: string;
     evidence?: string[];
   };
+  runs?: RunSummary[];
 }
 
 export interface FactorInsightsPayload {

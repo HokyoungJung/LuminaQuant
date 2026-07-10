@@ -1,24 +1,19 @@
 import { PerformancePriceRuntime } from '@/components/performance-price-runtime';
 
+export const metadata = { title: 'Performance & Price · LuminaQuant' };
+
 export default function PerformancePricePage() {
   return (
     <div className="page-stack">
       <section className="hero-card">
-        <p className="eyebrow">Performance &amp; Price parity</p>
-        <h2>Equity, drawdown, and benchmark telemetry</h2>
+        <p className="eyebrow">Performance &amp; Price</p>
+        <h2>How did this run perform, and where were the trades?</h2>
         <p>
-          This route covers the highest-priority performance slice while staying Python-backed and 8GB-safe.
+          Equity against the BTC benchmark, drawdown and funding, plus every recorded trade for the
+          selected run.
         </p>
       </section>
-      <section className="section-card">
-        <div className="section-header">
-          <div>
-            <p className="eyebrow">Python-backed performance feed</p>
-            <h3>Latest run context</h3>
-          </div>
-        </div>
-        <PerformancePriceRuntime />
-      </section>
+      <PerformancePriceRuntime />
     </div>
   );
 }

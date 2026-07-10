@@ -242,11 +242,11 @@ Primary driver: `simulate_symbol_fold` Rust kernel replaces the pure-Python per-
 
 ## Dashboard
 
-`uv run lq dashboard --run` starts the Next.js 15 frontend. The Python backend exposes a `DashboardBridgeContractV2` JSON contract consumed by 10 Next.js routes:
+`uv run lq dashboard --run` starts the Next.js 15 frontend. The Python backend exposes a `DashboardBridgeContractV2` JSON contract consumed by 13 Next.js routes:
 
-`/` (home) · `/performance-price` · `/risk-health` · `/optimization-insights` · `/market-data` · `/execution-analytics` · `/exact-window` · `/raw-data` · `/report-export` · `/workflows`
+`/` (home) · `/performance-price` · `/market-data` · `/optimization-insights` · `/exact-window` · `/factor-insights` · `/alpha-evidence` · `/execution-analytics` · `/risk-health` · `/workflows` · `/raw-data` · `/report-export` · `/system`
 
-The workflows route provides no-code controls for backtest, optimize, and live sessions with asynchronous job management and log streaming.
+The workflows route lists managed backtest, optimize, and live jobs with polling status and two-step stop/kill controls.
 
 ---
 
