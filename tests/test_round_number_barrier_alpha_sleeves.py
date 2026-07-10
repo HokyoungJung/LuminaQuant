@@ -36,6 +36,7 @@ from typing import Any
 
 from lumina_quant.core.events import MarketEvent
 from lumina_quant.strategies.adaptive_crypto_alpha_sleeves import FalseBreakoutReversalStrategy
+from lumina_quant.strategies.external_alpha_sleeves import _bars_per_year_from_spacing
 from lumina_quant.strategies.hourly_shock_reversion import HourlyShockReversionStrategy
 from lumina_quant.strategies.near_high_anchoring_alpha_sleeves import (
     CrossSectionalNearHighAnchoringStrategy,
@@ -580,3 +581,38 @@ def test_slice_multi_timeframe_cells_pinned() -> None:
     for tf in ("1d", "4h", "1h"):
         assert sl[tf][0]["prox_band"] == 0.15
         assert sl[tf][0]["mode_filter"] == "both"
+
+
+# --------------------------------------------------------------------------- #
+# vol-target horizon fix (Class-B throttle): regression.
+#
+# ``target_vol`` DEFAULTS to 0.0 here, so the throttle is off by default and this
+# fix leaves default sizing byte-identical.  When ENABLED it must annualize the
+# per-bar realized vol by ``sqrt(bars_per_year)`` (cadence from the median bar
+# spacing) before comparing it to ``target_vol``.
+# --------------------------------------------------------------------------- #
+
+
+def test_vol_target_throttle_annualizes_realized_vol_on_breakout() -> None:
+    bars = _rn2_breakout_long()
+    # Enabled throttle: emitted scalar equals the ANNUALIZED-vol target ratio.
+    strat = _candidate(["A/USDT"], target_vol=0.05)
+    _feed_single(strat, "A/USDT", bars)
+    entries = _entries(strat)
+    assert [s.signal_type for s in entries] == ["LONG"]
+    meta = entries[0].metadata or {}
+    realized_vol = meta["realized_vol"]
+    scalar = meta["inverse_vol_scalar"]
+    assert realized_vol is not None and realized_vol > 0.0
+    bpy = _bars_per_year_from_spacing(list(strat._recent_times))
+    assert abs(bpy - 365.25) < 1e-9  # daily fixture cadence
+    expected = min(1.0, 0.05 / (realized_vol * math.sqrt(bpy)))
+    assert abs(scalar - expected) < 1e-12  # annualized, not per-bar, comparison
+    # Guaranteed engagement: a tiny target de-risks (annualized vol >> target).
+    tiny = _candidate(["A/USDT"], target_vol=1e-6)
+    _feed_single(tiny, "A/USDT", bars)
+    assert (_entries(tiny)[0].metadata or {})["inverse_vol_scalar"] < 1.0
+    # Default target_vol=0.0 -> throttle OFF -> scalar exactly 1.0 (byte-identical).
+    off = _candidate(["A/USDT"])
+    _feed_single(off, "A/USDT", bars)
+    assert (_entries(off)[0].metadata or {})["inverse_vol_scalar"] == 1.0

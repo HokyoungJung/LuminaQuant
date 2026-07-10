@@ -771,3 +771,39 @@ def test_slice_multi_timeframe_cells_pinned() -> None:
     for tf in ("1d", "4h", "1h"):
         assert sl[tf][0]["quantile_pct"] == 0.25
         assert sl[tf][0]["min_symbols"] == 6
+
+
+# --------------------------------------------------------------------------- #
+# vol-target horizon fix (Class-B throttle): regression.
+# --------------------------------------------------------------------------- #
+
+
+def test_vol_target_throttle_annualizes_per_bar_vol() -> None:
+    """The Class-B throttle annualizes the PER-BAR portfolio vol by the median
+    observed bar spacing (shared ``_annualize_per_bar_vol``) before comparing it to
+    ``target_vol``: a hurricane per-1h vol now DE-RISKS, a calm one does not, and
+    an unknown cadence stays at 1.0.
+    """
+    symbols = ["A/USDT", "B/USDT"]
+    strategy = CrossSectionalNearLowRecoveryStrategy(
+        _Bars(symbols), _Queue(), **dict(_CAND_KWARGS, target_vol=0.20)
+    )
+    base = 1_700_000_000.0
+    for i in range(12):
+        strategy._recent_times.append(base + i * 3600.0)  # clean 1h cadence
+    targets = {"A/USDT": ("LONG", 1.0, {}), "B/USDT": ("SHORT", -1.0, {})}
+    # Hurricane per-1h vol -> annualizes far above 0.20 -> throttle engages.
+    _weights, hot = strategy._inverse_vol_weights(targets, {"A/USDT": 0.02, "B/USDT": 0.026})
+    assert hot < 1.0, hot
+    # Calm per-1h vol -> annualizes below 0.20 -> no de-risk.
+    _weights, calm = strategy._inverse_vol_weights(targets, {"A/USDT": 0.0002, "B/USDT": 0.00026})
+    assert calm == 1.0, calm
+    # Determinism: same inputs -> identical scalar.
+    _weights, hot2 = strategy._inverse_vol_weights(targets, {"A/USDT": 0.02, "B/USDT": 0.026})
+    assert hot2 == hot
+    # Unknown cadence (no observed bars) -> conservative unity scalar.
+    fresh = CrossSectionalNearLowRecoveryStrategy(
+        _Bars(symbols), _Queue(), **dict(_CAND_KWARGS, target_vol=0.20)
+    )
+    _weights, unknown = fresh._inverse_vol_weights(targets, {"A/USDT": 0.02, "B/USDT": 0.026})
+    assert unknown == 1.0, unknown

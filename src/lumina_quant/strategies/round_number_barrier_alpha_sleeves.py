@@ -82,7 +82,9 @@ from lumina_quant.indicators.common import safe_float, time_key
 from lumina_quant.strategies.external_alpha_sleeves import (
     _EPS,
     _Snapshot,
+    _annualize_per_bar_vol,
     _emit,
+    _event_datetime_utc,
     _event_symbols,
     _market_snapshot,
     _safe_non_negative_int,
@@ -218,6 +220,10 @@ class RoundNumberBarrierStrategy(Strategy):
         }
         self._last_eval_time_key = ""
         self._tick = 0
+        # Recent decision-bar epochs (seconds) for deterministic bar-spacing
+        # inference: the vol-target scalar annualizes the per-bar vol via
+        # sqrt(bars_per_year) derived from the median gap here.
+        self._recent_times: deque[float] = deque(maxlen=16)
 
     # ------------------------------------------------------------------ #
     # state
@@ -226,6 +232,7 @@ class RoundNumberBarrierStrategy(Strategy):
         return {
             "last_eval_time_key": self._last_eval_time_key,
             "tick": int(self._tick),
+            "recent_times": list(self._recent_times),
             "symbol_state": {
                 symbol: {
                     "closes": list(item.closes),
@@ -248,6 +255,7 @@ class RoundNumberBarrierStrategy(Strategy):
             return
         self._last_eval_time_key = str(state.get("last_eval_time_key", ""))
         self._tick = _safe_non_negative_int(state.get("tick"))
+        _restore_deque(self._recent_times, state.get("recent_times"))
         raw = state.get("symbol_state")
         if not isinstance(raw, dict):
             return
@@ -318,6 +326,11 @@ class RoundNumberBarrierStrategy(Strategy):
     # evaluation
     # ------------------------------------------------------------------ #
     def _evaluate(self, event_time: Any) -> None:
+        # Record the decision-bar epoch so the vol-target scalar can infer bar
+        # spacing (this runs once per new bar, before per-symbol evaluation).
+        dt = _event_datetime_utc(event_time)
+        if dt is not None:
+            self._recent_times.append(dt.timestamp())
         for symbol, item in self._state.items():
             self._evaluate_symbol(symbol, item, event_time)
 
@@ -379,9 +392,15 @@ class RoundNumberBarrierStrategy(Strategy):
         target_mode = "LONG" if side > 0 else "SHORT"
         close = item.closes[-1]
         vol = realized_volatility(list(item.closes), window=self.vol_window)
+        # THROTTLE (Class-B): annualize the PER-BAR vol via sqrt(bars_per_year)
+        # (median observed bar spacing) before the annual-scale ``target_vol``
+        # compare, else the clamp is INERT.  Default ``target_vol=0.0`` leaves this
+        # off (byte-identical default sizing); unavailable spacing passes through.
         size_scalar = 1.0
         if self.target_vol > 0.0 and vol is not None and vol > _EPS:
-            size_scalar = min(1.0, self.target_vol / vol)
+            vol_ann = _annualize_per_bar_vol(vol, self._recent_times)
+            if vol_ann is not None and vol_ann > _EPS:
+                size_scalar = min(1.0, self.target_vol / vol_ann)
         alloc = max(0.0, self.base_allocation * size_scalar)
         metadata = _target_metadata(
             strategy=_STRATEGY_NAME,

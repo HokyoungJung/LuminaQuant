@@ -73,6 +73,7 @@ from lumina_quant.research_universe import (
 from lumina_quant.strategies.external_alpha_sleeves import (
     _EPS,
     _Snapshot,
+    _annualize_per_bar_vol,
     _emit,
     _event_datetime_utc,
     _event_symbols,
@@ -277,6 +278,10 @@ class CrossSectionalOffSessionTugOfWarStrategy(Strategy):
             for symbol in self.symbol_list
         }
         self._last_eval_week: tuple[int, int] | None = None
+        # Recent decision-bar epochs (seconds) for deterministic bar-spacing
+        # inference: the vol-target scalar annualizes the per-bar portfolio vol
+        # via sqrt(bars_per_year) derived from the median gap here.
+        self._recent_times: deque[float] = deque(maxlen=16)
 
     # ------------------------------------------------------------------ #
     # session classification
@@ -300,6 +305,7 @@ class CrossSectionalOffSessionTugOfWarStrategy(Strategy):
             "last_eval_week": (
                 list(self._last_eval_week) if self._last_eval_week is not None else None
             ),
+            "recent_times": list(self._recent_times),
             "symbol_state": {
                 symbol: {
                     "closes": list(item.closes),
@@ -321,6 +327,11 @@ class CrossSectionalOffSessionTugOfWarStrategy(Strategy):
     def set_state(self, state: dict[str, Any]) -> None:
         if not isinstance(state, dict):
             return
+        self._recent_times.clear()
+        for value in _coerce_float_list(state.get("recent_times"))[
+            -int(self._recent_times.maxlen or 0) :
+        ]:
+            self._recent_times.append(value)
         week = state.get("last_eval_week")
         if isinstance(week, (list, tuple)) and len(week) == 2:
             try:
@@ -425,6 +436,12 @@ class CrossSectionalOffSessionTugOfWarStrategy(Strategy):
         dt = _event_datetime_utc(event_time)
         if dt is None:
             return
+        # Record the decision-bar epoch so the vol-target scalar can infer bar
+        # spacing.  This hook fires once per updated symbol, so a monotonic guard
+        # keeps ``_recent_times`` to one entry per distinct bar.
+        epoch = dt.timestamp()
+        if not self._recent_times or epoch > self._recent_times[-1]:
+            self._recent_times.append(epoch)
         iso = dt.isocalendar()
         week = (int(iso[0]), int(iso[1]))
         if self._last_eval_week is None:
@@ -546,10 +563,20 @@ class CrossSectionalOffSessionTugOfWarStrategy(Strategy):
         total_inv = sum(inv.values())
         if total_inv <= _EPS:
             return {}, 1.0
+        # ``portfolio_vol`` is the inverse-vol-weighted PER-BAR vol; the
+        # ``inv / total_inv`` normalization above is scale-invariant (annualizing
+        # every vol_i cancels), so the risk-parity weights are horizon-free.
+        # The vol-target SCALAR, however, compares ``portfolio_vol`` against an
+        # annual-scale ``target_vol`` (0.20): annualize the per-bar estimate via
+        # sqrt(bars_per_year) inferred from observed bar spacing first, otherwise
+        # the Moreira-Muir clamp is INERT. When spacing is unavailable we pass
+        # through (scalar=1.0) rather than throttle on mismatched horizons.
         portfolio_vol = sum((inv[symbol] / total_inv) * vols[symbol] for symbol in inv)
         scalar = 1.0
         if self.target_vol > 0.0 and portfolio_vol > _EPS:
-            scalar = min(1.0, self.target_vol / portfolio_vol)
+            portfolio_vol_ann = _annualize_per_bar_vol(portfolio_vol, self._recent_times)
+            if portfolio_vol_ann is not None and portfolio_vol_ann > _EPS:
+                scalar = min(1.0, self.target_vol / portfolio_vol_ann)
         weights = {
             symbol: (inv[symbol] / total_inv) * self.target_gross_exposure * scalar
             for symbol in inv
