@@ -1,0 +1,74 @@
+{
+  "cell_id": "eqflow_momentum_lowbeta_composite_m2",
+  "created": "2026-07-10",
+  "schema_version": 1,
+  "kind": "preregistered_allocation_cell",
+  "rationale": "The momentum families on the board share the same fold history -- they all take the 2025-11 win and the 2026-07 loss together -- so stacking more momentum sleeves buys no genuine fold-complementarity. The only real fold-boundary diversification observed in the eq-flow analysis is at the momentum <-> low-beta carry boundary. This cell therefore pre-registers ONE momentum sleeve paired with the two genuine low-beta carry sleeves (the tradfi intraday open-impulse session sleeve and the state-VWAP dense-pair carry sleeve), so the M2 offline allocator measures a 3-family ERC blend rather than a momentum monoculture. Membership here is pre-registered; the weights are a data-PC measurement filled in after the sleeve return streams are materialized.",
+  "allocator": {
+    "method": "erc",
+    "min_families": 3,
+    "min_sleeves": 2,
+    "turnover_penalty_lambda": 0.0
+  },
+  "membership_is_preregistered_weights_are_measured": true,
+  "sleeves": {
+    "ll_router_mdd20_cap2": {
+      "family": "momentum",
+      "returns": null,
+      "turnover": null,
+      "returns_source": {
+        "artifact": "alpha_zoo_69_asset_monthly_refit_walkforward",
+        "artifact_script": "scripts/research/run_alpha_zoo_69_asset_monthly_refit_walkforward.py",
+        "candidate_label": "codex_lagged_leaf_router_grid:h4_avg1_tr-0.02_tmdd0.50_val0.00_vmdd0.25_lagged_plus_val025_fallback_mdd20_cap2",
+        "stream": "stitched monthly-refit locked-OOS per-fold NET return stream for this candidate label",
+        "turnover_source": "per-fold turnover for the same candidate label in the same artifact"
+      },
+      "source_artifact_id": "monthly_refit_walkforward"
+    },
+    "tradfi_intraday_open_impulse": {
+      "family": "tradfi_carry",
+      "returns": null,
+      "turnover": null,
+      "returns_source": {
+        "artifact": "alpha_zoo_69_asset_monthly_refit_walkforward",
+        "artifact_script": "scripts/research/run_alpha_zoo_69_asset_monthly_refit_walkforward.py",
+        "candidate_label": "tradfi_intraday_session_v1:open_impulse_close_top10_mdd15",
+        "stream": "stitched monthly-refit locked-OOS per-fold NET return stream for this candidate label",
+        "turnover_source": "per-fold turnover for the same candidate label in the same artifact"
+      },
+      "source_artifact_id": "monthly_refit_walkforward"
+    },
+    "state_vwap_pair_carry": {
+      "family": "pair_carry",
+      "returns": null,
+      "turnover": null,
+      "returns_source": {
+        "artifact": "state_vwap_pair_candidate_latest.json",
+        "artifact_path_symbol": "STATE_VWAP_PAIR_PATH (src/lumina_quant/strategies/artifact_portfolio_mode.py)",
+        "stream": "NET return stream of the state-VWAP dense-pair candidate recorded in this artifact",
+        "turnover_source": "turnover field of the same dense-pair candidate"
+      },
+      "source_artifact_id": "state_vwap_pair_dense_pairs"
+    }
+  },
+  "source_artifacts": [
+    {
+      "id": "monthly_refit_walkforward",
+      "path": "materialized by scripts/research/run_alpha_zoo_69_asset_monthly_refit_walkforward.py (default lumina_monthly_refit_walkforward_1m_oos_latest.json)",
+      "sha256": null,
+      "max_age_hours": 8760,
+      "ready": false,
+      "portfolio_ready": false,
+      "note": "data-PC fills sha256/ready after materializing the two walkforward sleeve streams (ll_router_mdd20_cap2, tradfi_intraday_open_impulse)"
+    },
+    {
+      "id": "state_vwap_pair_dense_pairs",
+      "path": "var/reports/exact_window_backtests/followup_status/portfolio_incumbent_autoresearch_grouped/portfolio_superiority_dense_pairs_current/state_vwap_pair_candidate_latest.json",
+      "sha256": null,
+      "max_age_hours": 8760,
+      "ready": false,
+      "portfolio_ready": false,
+      "note": "STATE_VWAP_PAIR_PATH; data-PC fills sha256/ready after materializing the pair-carry stream"
+    }
+  ]
+}
