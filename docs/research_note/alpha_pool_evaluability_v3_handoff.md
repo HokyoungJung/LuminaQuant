@@ -50,19 +50,29 @@ rescues the sign.
 
 ## 2. Re-run instructions (same contract as v2/v2b/v2c)
 1. `report_data_coverage.py` first; attach output.
-2. Build the manifest from the candidate library at the timeframes your coverage
-   supports (expect ~791 rows on 1h/4h for 7+ symbols; more with more symbols).
-   Dry-run with `--check-manifest`; report the evaluable count BEFORE running.
-3. Evaluate on `backtest_cost_realistic.yaml`, cost grid 10/15/20/30bps,
+2. **UNIVERSE MANDATE — use the FULL research universe, not a hand-picked subset:**
+   build the manifest with `BINANCE_EXTENDED_RESEARCH_SYMBOLS` (110 crypto
+   symbols; add the TradFi perp set for the off-session lane) INTERSECTED with
+   actual coverage from step 1, and REPORT the resulting universe size alongside
+   the results. Cross-sectional lanes take the whole basket per row — their
+   statistical power scales with universe breadth, and thin books were flagged as
+   loss amplifiers in the postmortem. Two former in-lane caps are widened this
+   wave (long-run `max_universe` 12→128; slow-leadlag book 3/3→10/10); no other
+   lane caps its cross-section by fixed count (quantile-based books scale
+   automatically).
+3. Build the manifest at the timeframes your coverage supports (~791 rows on
+   1h/4h with 7 symbols; substantially more with the full universe). Dry-run
+   with `--check-manifest`; report the evaluable count BEFORE running.
+4. Evaluate on `backtest_cost_realistic.yaml`, cost grid 10/15/20/30bps,
    strict gate (DSR 0.90 / SPA 0.05 / PBO 0.50), `emit_candidate_overfit_stats=ON`,
    admit+merge through `selection.apply_selection_reject_and_dedup`.
-4. Two-tier gate unchanged (pool admission relaxed / promotion (a)-(f) strict).
-5. NO-SURVIVORSHIP: report ALL rows, including insufficient_data rows WITH their
+5. Two-tier gate unchanged (pool admission relaxed / promotion (a)-(f) strict).
+6. NO-SURVIVORSHIP: report ALL rows, including insufficient_data rows WITH their
    `metadata.missing_symbols` so the next iteration can target coverage gaps.
-6. Allocator 3-arm (base M2 / MR1 tilt / family tilt) re-run once ≥2 sleeve
+7. Allocator 3-arm (base M2 / MR1 tilt / family tilt) re-run once ≥2 sleeve
    families produce non-empty streams — last round had only 2 streams, which is
    below the min_families=3 floor.
-7. 0% real allocation; research_only; no execution paths.
+8. 0% real allocation; research_only; no execution paths.
 
 Everything is byte-identical when the new cells are not requested: the 1d
 candidate set is unchanged, defaults untouched, and the manifest snapshot was
