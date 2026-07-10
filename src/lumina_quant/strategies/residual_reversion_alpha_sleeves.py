@@ -408,6 +408,12 @@ class StationarityGatedResidualReversionStrategy(Strategy):
             return None
 
         residual = raw_ret - beta * bench_ret
+        # vol-target horizon classification: category C (SCORE denominator, NOT a
+        # sizing throttle).  ``vol`` normalizes the residual into a risk-adjusted
+        # SIGNAL that is then cross-sectionally ranked; sizing is equal-weight
+        # (``target_gross_exposure / n``, beta-scaled) and never divides by vol.
+        # A global sqrt(bars_per_year) rescale of every ``vol`` cancels under the
+        # cross-sectional ranking, so there is no per-bar-vs-annual mismatch here.
         score = -residual / max(vol, _EPS)
         if not math.isfinite(score):
             return None

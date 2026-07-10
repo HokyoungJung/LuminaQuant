@@ -364,6 +364,11 @@ class LongRunOverreactionReversalStrategy(Strategy):
             # SCORE = -z, inverse-formation-vol sized: an extreme LOSER (z << 0)
             # scores high positive -> LONG; an extreme WINNER (z >> 0) scores
             # negative -> SHORT.
+            # vol-target horizon classification: category C (SCORE denominator, NOT
+            # a sizing throttle).  There is no ``target_vol`` here; sizing normalizes
+            # to ``target_gross_exposure`` downstream, and a global sqrt(bars_per_year)
+            # rescale of every ``vol`` cancels under the ranking / gross-normalization,
+            # so no per-bar-vs-annual horizon mismatch exists.
             score = -z / max(vol, _EPS)
             rows.append(
                 (

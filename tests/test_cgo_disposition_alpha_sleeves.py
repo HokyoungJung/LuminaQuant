@@ -508,3 +508,74 @@ def test_slice_multi_timeframe_scaling() -> None:
             # window reaches the ~9000-bar cap.
             assert spec["min_history_bars"] > spec["window_bars"], spec["variant"]
             assert spec["window_bars"] <= 9000, spec["variant"]
+
+
+# --------------------------------------------------------------------------- #
+# vol-target HORIZON fix (direct-method regression).  ``_inverse_vol_weights``
+# must annualize the per-bar portfolio vol via sqrt(bars_per_year) -- inferred
+# from the median gap of the recorded per-bar epochs -- before the
+# ``min(1, target_vol / vol)`` clamp.  The pre-fix code compared 0.20 against a
+# per-bar 0.0005..0.03 and was both spacing-INVARIANT and pinned at scalar==1.0.
+# --------------------------------------------------------------------------- #
+
+
+def _vt_epochs(count: int, spacing_s: int) -> list[float]:
+    return [float(1_700_000_000 + i * spacing_s) for i in range(count)]
+
+
+def _vt_targets(symbols: list[str]) -> dict[str, tuple[str, float, dict[str, Any]]]:
+    return {symbol: ("LONG", 1.0, {}) for symbol in symbols}
+
+
+def test_vol_target_scalar_annualized_and_spacing_sensitive() -> None:
+    symbols = ["A/USDT", "B/USDT", "C/USDT", "D/USDT"]
+    targets = _vt_targets(symbols)
+    stormy = dict.fromkeys(symbols, 0.03)
+
+    daily = _cgo(symbols, target_vol=0.20)
+    daily._recent_times.clear()
+    daily._recent_times.extend(_vt_epochs(10, 86_400))  # ~365 bars/yr
+    daily_w, daily_scalar = daily._inverse_vol_weights(targets, stormy)
+
+    hourly = _cgo(symbols, target_vol=0.20)
+    hourly._recent_times.clear()
+    hourly._recent_times.extend(_vt_epochs(10, 3_600))  # ~8766 bars/yr
+    _hourly_w, hourly_scalar = hourly._inverse_vol_weights(targets, stormy)
+
+    assert daily_scalar < 1.0  # stormy per-bar vol annualizes above target_vol
+    assert hourly_scalar < daily_scalar  # finer spacing => harder throttle
+    assert sum(daily_w.values()) < 1.0
+
+
+def test_vol_target_scalar_calm_passes_through() -> None:
+    symbols = ["A/USDT", "B/USDT", "C/USDT", "D/USDT"]
+    targets = _vt_targets(symbols)
+    strat = _cgo(symbols, target_vol=0.20)
+    strat._recent_times.clear()
+    strat._recent_times.extend(_vt_epochs(10, 86_400))
+    _w, scalar = strat._inverse_vol_weights(targets, dict.fromkeys(symbols, 0.0005))
+    assert scalar == 1.0
+
+
+def test_vol_target_scalar_passthrough_when_spacing_unavailable() -> None:
+    symbols = ["A/USDT", "B/USDT"]
+    targets = _vt_targets(symbols)
+    strat = _cgo(symbols, target_vol=0.20)
+    strat._recent_times.clear()  # < 2 timestamps -> horizon unknowable
+    _w, scalar = strat._inverse_vol_weights(targets, dict.fromkeys(symbols, 0.75))
+    assert scalar == 1.0
+
+
+def test_vol_target_scalar_determinism() -> None:
+    symbols = ["A/USDT", "B/USDT", "C/USDT"]
+    targets = _vt_targets(symbols)
+    vols = {"A/USDT": 0.02, "B/USDT": 0.04, "C/USDT": 0.03}
+
+    def _run() -> tuple[float, tuple[float, ...]]:
+        strat = _cgo(symbols, target_vol=0.20)
+        strat._recent_times.clear()
+        strat._recent_times.extend(_vt_epochs(10, 86_400))
+        weights, scalar = strat._inverse_vol_weights(targets, vols)
+        return round(scalar, 12), tuple(round(weights[s], 12) for s in symbols)
+
+    assert _run() == _run()

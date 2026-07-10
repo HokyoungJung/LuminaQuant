@@ -74,6 +74,7 @@ from lumina_quant.indicators.common import safe_float, time_key
 from lumina_quant.strategies.external_alpha_sleeves import (
     _EPS,
     _Snapshot,
+    _annualize_per_bar_vol,
     _emit,
     _event_datetime_utc,
     _event_symbols,
@@ -229,6 +230,11 @@ class CrossSectionalSeasonalPersistenceStrategy(Strategy):
         self._last_eval_time_key = ""
         self._last_decision_week: tuple[int, int] | None = None
         self._tick = 0
+        # Recent PER-BAR epochs (seconds): the vol-target scalar annualizes the
+        # per-bar portfolio vol via sqrt(bars_per_year) from the median gap here.
+        # Recorded at bar cadence (not the weekly decision clock) so the spacing
+        # matches the per-bar closes the realized-vol estimate is built from.
+        self._recent_times: deque[float] = deque(maxlen=16)
 
     # ------------------------------------------------------------------ #
     # state
@@ -240,6 +246,7 @@ class CrossSectionalSeasonalPersistenceStrategy(Strategy):
                 list(self._last_decision_week) if self._last_decision_week is not None else None
             ),
             "tick": int(self._tick),
+            "recent_times": list(self._recent_times),
             "symbol_state": {
                 symbol: {
                     "closes": list(item.closes),
@@ -273,6 +280,11 @@ class CrossSectionalSeasonalPersistenceStrategy(Strategy):
         raw_week = state.get("last_decision_week")
         self._last_decision_week = self._as_week_tuple(raw_week)
         self._tick = _safe_non_negative_int(state.get("tick"))
+        self._recent_times.clear()
+        for value in _coerce_float_list(state.get("recent_times"))[
+            -int(self._recent_times.maxlen or 0) :
+        ]:
+            self._recent_times.append(value)
         raw = state.get("symbol_state")
         if not isinstance(raw, dict):
             return
@@ -414,6 +426,12 @@ class CrossSectionalSeasonalPersistenceStrategy(Strategy):
         item.pending_sum.clear()
         item.pending_count.clear()
 
+    def _note_bar_time(self, event_time: Any) -> None:
+        """Record the decision-bar epoch for deterministic bar-spacing inference."""
+        dt = _event_datetime_utc(event_time)
+        if dt is not None:
+            self._recent_times.append(dt.timestamp())
+
     def calculate_signals_window(self, event: Any, aggregator: Any = None) -> None:
         _ = aggregator
         event_key = time_key(getattr(event, "time", None))
@@ -425,6 +443,7 @@ class CrossSectionalSeasonalPersistenceStrategy(Strategy):
         if updated and event_key and event_key != self._last_eval_time_key:
             self._last_eval_time_key = event_key
             self._tick += 1
+            self._note_bar_time(getattr(event, "time", None))
             self._evaluate(getattr(event, "time", None))
 
     def calculate_signals(self, event: Any) -> None:
@@ -441,6 +460,7 @@ class CrossSectionalSeasonalPersistenceStrategy(Strategy):
                 if key and key != self._last_eval_time_key:
                     self._last_eval_time_key = key
                     self._tick += 1
+                    self._note_bar_time(snapshot.time)
                     self._evaluate(snapshot.time)
 
     # ------------------------------------------------------------------ #
@@ -530,10 +550,19 @@ class CrossSectionalSeasonalPersistenceStrategy(Strategy):
         total_inv = sum(inv.values())
         if total_inv <= _EPS:
             return {}, 1.0
+        # ``portfolio_vol`` is the inverse-vol-weighted PER-BAR vol; the
+        # ``inv / total_inv`` normalization is scale-invariant, so the risk-parity
+        # weights are horizon-free.  The vol-target SCALAR compares it against an
+        # annual-scale ``target_vol`` (0.20): annualize the per-bar estimate via
+        # sqrt(bars_per_year) from observed bar spacing first, otherwise the
+        # Moreira-Muir clamp is INERT.  Pass through (scalar=1.0) when spacing is
+        # unavailable rather than throttle on mismatched horizons.
         portfolio_vol = sum((inv[symbol] / total_inv) * vols[symbol] for symbol in inv)
         scalar = 1.0
         if self.target_vol > 0.0 and portfolio_vol > _EPS:
-            scalar = min(1.0, self.target_vol / portfolio_vol)
+            portfolio_vol_ann = _annualize_per_bar_vol(portfolio_vol, self._recent_times)
+            if portfolio_vol_ann is not None and portfolio_vol_ann > _EPS:
+                scalar = min(1.0, self.target_vol / portfolio_vol_ann)
         weights = {
             symbol: (inv[symbol] / total_inv) * self.target_gross_exposure * scalar
             for symbol in inv
