@@ -126,7 +126,7 @@ def _patch_synthetic_pipeline(monkeypatch) -> None:
         _ = symbols, start_date, end_date, kwargs
         return {}
 
-    def _mock_strategy_signal(candidate, *, aligned, symbols):
+    def _mock_strategy_signal(candidate, *, aligned, symbols, scoring_config=None):
         _ = candidate, symbols
         length = len(aligned["datetime"])
         rng = np.random.default_rng(7)

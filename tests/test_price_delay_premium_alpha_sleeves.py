@@ -713,3 +713,46 @@ def test_slice_multi_timeframe_cells_pinned() -> None:
     for tf in ("1d", "4h", "1h"):
         assert sl[tf][0]["delay_lags"] == 5
         assert sl[tf][0]["min_hold_decisions"] == 4
+
+
+# --------------------------------------------------------------------------- #
+# v5 zero-alloc gate: a computed alloc of 0 must NOT emit a LONG/SHORT --
+# ``_target_metadata`` omits ``target_allocation`` at alloc 0 and the engine
+# would resize the entry to its DEFAULT allocation (an unsized, un-vol-gated bet).
+# The inverse-vol weights are computed INTERNALLY, so an empty ``vols`` map
+# forces every weight (and thus every alloc) to 0.
+# --------------------------------------------------------------------------- #
+
+
+def test_zero_alloc_entry_skipped_not_default_sized() -> None:
+    symbols = ["BTC/USDT", "FLIP/USDT", "FRESH/USDT", "N0/USDT", "N1/USDT", "N2/USDT"]
+    strat = _candidate(symbols)
+    flip = strat._state["FLIP/USDT"]
+    flip.mode = "LONG"
+    flip.entry_price = 100.0
+    flip.bars_held = 10_000
+    desired = {"FLIP/USDT": "SHORT", "FRESH/USDT": "LONG"}
+    # empty vols -> internal inverse-vol weights are all 0 -> alloc == 0
+    strat._emit_targets(desired, {}, {}, {}, "2026-01-01T00:00:00Z")
+    kinds = [(sig.symbol, str(sig.signal_type).upper()) for sig in strat.events.items]
+    assert not [sym for sym, kind in kinds if kind in {"LONG", "SHORT"}], kinds
+    # the side-flip EXIT still fired and FLIP is now flat (state matches the exit)
+    assert ("FLIP/USDT", "EXIT") in kinds
+    assert strat._state["FLIP/USDT"].mode == "OUT"
+    assert strat._state["FLIP/USDT"].entry_price is None
+
+    # a positive inverse-vol weight (from a real vol) DOES emit a sized entry
+    # carrying a strictly positive ``target_allocation``.
+    sized = _candidate(symbols)
+    sized._emit_targets(
+        {"FRESH/USDT": "LONG"},
+        {"FRESH/USDT": 0.5},
+        {"FRESH/USDT": 1.0},
+        {"FRESH/USDT": 0.1},
+        "2026-01-01T00:00:00Z",
+    )
+    entries = [
+        sig for sig in sized.events.items if str(sig.signal_type).upper() in {"LONG", "SHORT"}
+    ]
+    assert entries, "a positive inverse-vol weight must emit a sized entry"
+    assert all(float((sig.metadata or {}).get("target_allocation", 0.0)) > 0.0 for sig in entries)

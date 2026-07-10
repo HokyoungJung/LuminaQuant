@@ -354,9 +354,22 @@ class OLSBasisCrossSectionalBook(Strategy):
                 )
             weight = float(weights.get(symbol, 0.0))
             score = float(item.score) if item.score is not None else 0.0
+            alloc = max(0.0, weight)
+            if alloc <= 0.0:
+                # Zero-alloc entries omit ``target_allocation`` from metadata and
+                # the engine resizes them to its DEFAULT allocation -- an unsized,
+                # un-vol-gated position. Skip the entry; if a side-flip EXIT was
+                # just emitted, drop to OUT (mirroring ``_emit_exit``) so state
+                # matches it.
+                if item.mode != "OUT":
+                    item.mode = "OUT"
+                    item.entry_price = None
+                    item.bars_held = 0
+                    item.score = None
+                continue
             metadata = _target_metadata(
                 strategy=self._strategy_name,
-                target_allocation=max(0.0, weight),
+                target_allocation=alloc,
                 max_order_value=self.max_order_value,
                 score=score,
                 target_mode=target_mode,

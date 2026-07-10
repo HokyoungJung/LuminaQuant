@@ -13,6 +13,15 @@ StrategySignalHandler = Callable[
     None,
 ]
 
+# Optional route for candidates whose ``strategy_class`` has no bespoke handler:
+# ``(strategy_class, params, aligned, symbols) -> exposures | None``.  Returning
+# ``None`` (or raising) falls back to the generic proxy, which is now always
+# labelled in ``meta`` so proxy rows can never be silently attributed to a lane.
+UnmappedStrategyRouter = Callable[
+    [str, dict[str, Any], dict[str, np.ndarray], Sequence[str]],
+    "np.ndarray | None",
+]
+
 
 def _returns_from_close(closes: np.ndarray) -> np.ndarray:
     if closes.size < 2:
@@ -35,6 +44,7 @@ class StrategySignalDispatcher:
         *,
         aligned: dict[str, np.ndarray],
         symbols: Sequence[str],
+        unmapped_router: UnmappedStrategyRouter | None = None,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict[str, Any]]:
         strategy_class = str(candidate.get("strategy_class") or candidate.get("strategy") or "")
         params = dict(candidate.get("params") or {})
@@ -57,14 +67,35 @@ class StrategySignalDispatcher:
         meta: dict[str, Any] = {}
         handler = self.handlers.get(strategy_class)
         required_symbols = int(self.minimum_symbol_counts.get(strategy_class, 1))
-        if handler is None or len(symbols) < required_symbols:
+        if handler is None and unmapped_router is not None:
+            routed: np.ndarray | None = None
+            try:
+                routed = unmapped_router(strategy_class, params, aligned, symbols)
+            except Exception:
+                routed = None
+            if routed is not None and np.asarray(routed).shape == exposures.shape:
+                exposures[:] = np.asarray(routed, dtype=float)
+                meta["evaluation_mode"] = "registry_simulator"
+                meta["event_driven_proxy"] = True
+            else:
+                self._apply_generic_fallback(aligned=aligned, symbols=symbols, exposures=exposures)
+                meta["evaluation_mode"] = "generic_fallback_proxy"
+        elif handler is None or len(symbols) < required_symbols:
             self._apply_generic_fallback(aligned=aligned, symbols=symbols, exposures=exposures)
+            meta["evaluation_mode"] = "generic_fallback_proxy"
         else:
             handler(params, aligned, symbols, n, exposures, meta)
+            meta.setdefault("evaluation_mode", "handler")
 
+        # Previous-bar exposure with a ZERO first column: there is no position
+        # before the first bar.  (The old ``np.roll`` wrapped the LAST bar's
+        # exposure into bar 0, leaking end-of-sample state into the window head
+        # and charging a spurious first-bar trade.)
+        prev = np.zeros_like(exposures)
+        prev[:, 1:] = exposures[:, :-1]
         exposure = np.nanmean(exposures, axis=0)
-        portfolio_ret = np.nanmean(np.roll(exposures, 1, axis=1) * returns, axis=0)
-        turnover = np.nanmean(np.abs(exposures - np.roll(exposures, 1, axis=1)), axis=0)
+        portfolio_ret = np.nanmean(prev * returns, axis=0)
+        turnover = np.nanmean(np.abs(exposures - prev), axis=0)
         return portfolio_ret, turnover, exposure, meta
 
     @staticmethod

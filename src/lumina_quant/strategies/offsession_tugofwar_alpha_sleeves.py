@@ -6,9 +6,11 @@ component (log-return accrued over the core US cash-session hours, UTC
 ``[cash_start_hour_utc, cash_end_hour_utc)`` = ``[14, 20)``, Mon-Fri) and an
 UNANCHORED OFF-SESSION component (all remaining hours -- nights, weekends -- when
 the underlying cash market is closed and the perp price is set purely by 24/7
-crypto-native flow with no price-discovery anchor).  The two DST-ambiguous
-boundary hours (``cash_start-1`` and ``cash_end`` = ``{13, 20}``) are dropped from
-BOTH components.
+crypto-native flow with no price-discovery anchor).  The DST-ambiguous boundary
+hours (``cash_start-1``, ``cash_start`` and ``cash_end`` = ``{13, 14, 20}``) are
+dropped from BOTH components: the NYSE open sits at :30, so the open-straddling
+hour is ``13`` under EDT but ``14`` under EST -- both must go (accepting the
+symmetric loss of one fully-cash hour in each regime).
 
 The characteristic is ``TOW = mean(N_d) - mean(D_d)`` over a trailing formation of
 ``formation_days`` UTC days, where ``N_d`` / ``D_d`` are the day's summed
@@ -267,9 +269,16 @@ class CrossSectionalOffSessionTugOfWarStrategy(Strategy):
         self.max_symbol_exposure_pct = max(0.0, float(resolved["max_symbol_exposure_pct"]))
         self.max_order_value = max(0.0, float(resolved["max_order_value"]))
         self.min_price = max(0.0, float(resolved["min_price"]))
-        # Ambiguous (DST) hours dropped from both classes: {start-1, end}.
+        # Ambiguous (DST) hours dropped from both classes: {start-1, start, end}.
+        # The cash OPEN sits at :30, so the open-straddling hour is ``start-1``
+        # under EDT but ``start`` under EST; classifying the EST winter pre-open
+        # half-hour as CASH would leak unanchored drift into the D_d component.
         self._ambiguous_hours = frozenset(
-            {(self.cash_start_hour_utc - 1) % 24, self.cash_end_hour_utc % 24}
+            {
+                (self.cash_start_hour_utc - 1) % 24,
+                self.cash_start_hour_utc % 24,
+                self.cash_end_hour_utc % 24,
+            }
         )
         closes_size = max(8, self.vol_window + 8)
         days_size = max(8, self.formation_days + 8)
@@ -650,6 +659,17 @@ class CrossSectionalOffSessionTugOfWarStrategy(Strategy):
                 )
             weight = float(weights.get(symbol, 0.0))
             alloc = max(0.0, self.base_allocation * weight)
+            if alloc <= 0.0:
+                # Zero-alloc entries omit ``target_allocation`` from metadata and
+                # the engine resizes them to its DEFAULT allocation -- an unsized,
+                # un-vol-gated position. Skip the entry; if a side-flip EXIT was
+                # just emitted, drop to OUT so state matches it.
+                if item.mode != "OUT":
+                    item.mode = "OUT"
+                    item.entry_price = None
+                    item.decisions_held = 0
+                    item.score = None
+                continue
             metadata = _target_metadata(
                 strategy=_STRATEGY_NAME,
                 target_allocation=alloc,

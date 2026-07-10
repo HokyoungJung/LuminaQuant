@@ -228,7 +228,11 @@ class InformationDiscretenessMomentumStrategy(Strategy):
             self.formation_bars + self.skip_bars + 1,
             self.vol_window + 1,
         )
-        history = max(self.formation_bars + self.skip_bars, self.vol_window) + 8
+        # Deque must cover the FULL warmup gate (incl. the min_history_bars
+        # floor) or len(closes) saturates below _min_history and the lane goes
+        # permanently inert (v5 audit: the 1d fip_4wk_p33 cell — maxlen 43 vs
+        # gate 70 — never scored a single symbol).
+        history = max(self.formation_bars + self.skip_bars, self.vol_window, self._min_history) + 8
         self._state: dict[str, _State] = {
             symbol: _State(closes=deque(maxlen=history)) for symbol in self.symbol_list
         }
@@ -501,6 +505,19 @@ class InformationDiscretenessMomentumStrategy(Strategy):
                 )
             weight = float(weights.get(symbol, 0.0))
             alloc = max(0.0, self.base_allocation * weight)
+            if alloc <= 0.0:
+                # Zero-alloc entries omit ``target_allocation`` from metadata and
+                # the engine resizes them to its DEFAULT allocation -- an unsized,
+                # un-vol-gated position. Skip the entry; if a side-flip EXIT was
+                # just emitted, drop to OUT (mirroring ``_emit_exit``) so state
+                # matches it.
+                if item.mode != "OUT":
+                    item.mode = "OUT"
+                    item.entry_price = None
+                    item.bars_held = 0
+                    item.bars_since_exit = 0
+                    item.score = None
+                continue
             metadata = _target_metadata(
                 strategy=_STRATEGY_NAME,
                 target_allocation=alloc,

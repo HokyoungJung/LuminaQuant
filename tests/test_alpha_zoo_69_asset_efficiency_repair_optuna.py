@@ -52,6 +52,10 @@ def test_candidate_live_efficiency_score_penalizes_validation_spike_and_low_rpt(
 
 
 def test_stress_metrics_subtract_incremental_cost_from_return_and_rpt() -> None:
+    # ``turnover`` counts ONE-WAY trade events while the stress constants are
+    # ROUND-TRIP bps, so the incremental charge is ``extra_bps * turnover / 2``
+    # to match the base simulator's ``round_trip_bps * transition / 2``
+    # convention.  (The old expectations pinned the double-charged stress.)
     metrics = {
         "train_return": 0.20,
         "validation_return": 0.10,
@@ -61,10 +65,19 @@ def test_stress_metrics_subtract_incremental_cost_from_return_and_rpt() -> None:
 
     stressed = module._stress_metrics(metrics, {"train": 20.0, "validation": 10.0})
 
-    assert stressed["train_return_stress_15bps_proxy"] == pytest.approx(0.19)
-    assert stressed["validation_return_stress_20bps_proxy"] == pytest.approx(0.09)
-    assert stressed["train_return_per_turnover_stress_20bps_proxy"] == pytest.approx(40.0)
-    assert stressed["validation_return_per_turnover_stress_15bps_proxy"] == pytest.approx(35.0)
+    assert stressed["train_return_stress_15bps_proxy"] == pytest.approx(0.195)
+    assert stressed["validation_return_stress_20bps_proxy"] == pytest.approx(0.095)
+    assert stressed["train_return_per_turnover_stress_20bps_proxy"] == pytest.approx(45.0)
+    assert stressed["validation_return_per_turnover_stress_15bps_proxy"] == pytest.approx(37.5)
+
+
+def test_stress_metrics_match_base_simulator_round_trip_convention() -> None:
+    # One full round trip (entry + exit = 2 one-way events) at notional 1.0
+    # must cost exactly ``extra_bps`` — not ``2 * extra_bps``.
+    metrics = {"train_return": 0.10, "train_return_per_turnover_proxy_bps": 50.0}
+    stressed = module._stress_metrics(metrics, {"train": 2.0})
+    extra_20 = (20.0 - module.PRIMARY_COST_BPS) / 10_000.0
+    assert stressed["train_return_stress_20bps_proxy"] == pytest.approx(0.10 - extra_20)
 
 
 def test_selection_reasons_require_positive_20bps_stress() -> None:

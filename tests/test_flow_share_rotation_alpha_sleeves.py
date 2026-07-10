@@ -493,3 +493,135 @@ def test_schema_keys_snake_case_and_hyperparam() -> None:
         assert required in schema
     for cap in ("base_allocation", "max_symbol_exposure_pct", "max_order_value"):
         assert schema[cap].tunable is False
+
+
+# --------------------------------------------------------------------------- #
+# vol-target HORIZON fix (v5 audit): the inverse-vol ``min(1, target_vol /
+# portfolio_vol)`` scalar must ANNUALIZE the per-bar portfolio vol (via
+# sqrt(bars_per_year) inferred from observed bar spacing) before the clamp.
+# Pre-fix the scalar compared an annual-scale ``target_vol`` (~0.20) against a
+# tiny per-bar vol and was pinned at 1.0 (throttle inert).  These tests exercise
+# ``_inverse_vol_weights`` directly with a seeded ``_recent_times`` so the math
+# is isolated from the selection pipeline; a separate feed test proves the
+# per-bar recording hook actually populates ``_recent_times`` in the live path.
+# --------------------------------------------------------------------------- #
+
+_VT_KWARGS: dict[str, Any] = dict(
+    share_z_window=8,
+    confirm_window=3,
+    share_z_entry=1.0,
+    top_n=8,
+    vol_window=6,
+    allow_short=True,
+    min_symbols=5,
+    target_gross_exposure=1.0,
+    target_vol=0.20,
+    stop_loss_pct=0.0,
+    max_hold_bars=0,
+    min_price=0.01,
+)
+_VT_SYMBOLS = ["A/USDT", "B/USDT", "C/USDT", "D/USDT", "E/USDT"]
+
+
+def _seed_hourly_times(strategy: CrossSectionalFlowShareRotationStrategy, n: int = 12) -> None:
+    """Populate ``_recent_times`` with ``n`` epochs spaced ONE HOUR apart."""
+    base = 1_700_000_000
+    strategy._recent_times.clear()
+    for i in range(n):
+        strategy._recent_times.append(float(base + i * 3600))
+
+
+def _feed_daily(
+    strategy: CrossSectionalFlowShareRotationStrategy,
+    symbols: list[str],
+    prices: dict[str, list[float]],
+    volumes: dict[str, list[float]],
+    n: int,
+) -> None:
+    """Feed ``n`` MARKET_WINDOW bars spaced ONE DAY apart (epoch-second times)."""
+    base_epoch = 1_700_000_000
+    for idx in range(n):
+        stamp = base_epoch + idx * 86_400
+        bars_1s = {
+            symbol: [
+                {
+                    "time": stamp,
+                    "open": prices[symbol][idx],
+                    "high": prices[symbol][idx],
+                    "low": prices[symbol][idx],
+                    "close": prices[symbol][idx],
+                    "volume": volumes[symbol][idx],
+                }
+            ]
+            for symbol in symbols
+        }
+        strategy.calculate_signals(
+            SimpleNamespace(type="MARKET_WINDOW", time=stamp, bars_1s=bars_1s)
+        )
+
+
+def test_vol_target_scalar_throttles_high_vol_at_hourly_spacing() -> None:
+    """A high per-bar portfolio vol, annualized at 1h spacing, trips the clamp."""
+    strategy = CrossSectionalFlowShareRotationStrategy(_Bars(_VT_SYMBOLS), _Queue(), **_VT_KWARGS)
+    _seed_hourly_times(strategy)
+    targets = {"A/USDT": ("LONG", 1.0, {}), "B/USDT": ("LONG", 1.0, {})}
+    vols = {"A/USDT": 0.03, "B/USDT": 0.03}  # per-bar; annualized ~2.8 >> 0.20
+    _weights, scalar = strategy._inverse_vol_weights(targets, vols)
+    assert scalar < 1.0
+
+
+def test_vol_target_scalar_passthrough_calm_vol_at_hourly_spacing() -> None:
+    """A calm per-bar vol annualizes to well under ``target_vol`` -> scalar == 1."""
+    strategy = CrossSectionalFlowShareRotationStrategy(_Bars(_VT_SYMBOLS), _Queue(), **_VT_KWARGS)
+    _seed_hourly_times(strategy)
+    targets = {"A/USDT": ("LONG", 1.0, {}), "B/USDT": ("LONG", 1.0, {})}
+    vols = {"A/USDT": 0.0005, "B/USDT": 0.0005}  # annualized ~0.047 < 0.20
+    _weights, scalar = strategy._inverse_vol_weights(targets, vols)
+    assert scalar == 1.0
+
+
+def test_vol_target_scalar_passthrough_when_spacing_unavailable() -> None:
+    """With ``_recent_times`` empty the annualizer returns None -> pass-through 1.0
+    even though the raw per-bar vol would otherwise trip the clamp."""
+    strategy = CrossSectionalFlowShareRotationStrategy(_Bars(_VT_SYMBOLS), _Queue(), **_VT_KWARGS)
+    strategy._recent_times.clear()  # no inferable bar spacing
+    targets = {"A/USDT": ("LONG", 1.0, {}), "B/USDT": ("LONG", 1.0, {})}
+    vols = {"A/USDT": 0.03, "B/USDT": 0.03}
+    _weights, scalar = strategy._inverse_vol_weights(targets, vols)
+    assert scalar == 1.0
+
+
+def test_vol_target_state_roundtrip_carries_recent_times() -> None:
+    """The per-bar recording hook populates ``_recent_times`` in the live feed
+    path, and get_state/set_state carries it losslessly."""
+    n = 20
+    symbols, prices, volumes = _build_universe("RISER/USDT", _riser_series(n), n)
+    dense_volumes = {sym: (volumes[sym] or [0.0] * n) for sym in symbols}
+    strategy = CrossSectionalFlowShareRotationStrategy(_Bars(symbols), _Queue(), **_VT_KWARGS)
+    _feed_daily(strategy, symbols, prices, dense_volumes, n)
+    # The hook fired once per distinct bar => recent_times is populated.
+    assert list(strategy._recent_times), "expected the per-bar hook to record epochs"
+
+    state = strategy.get_state()
+    assert state["recent_times"] == list(strategy._recent_times)
+    restored = CrossSectionalFlowShareRotationStrategy(_Bars(symbols), _Queue(), **_VT_KWARGS)
+    restored.set_state(state)
+    assert list(restored._recent_times) == list(strategy._recent_times)
+
+
+def test_zero_weight_target_never_emits_default_sized_entry() -> None:
+    """v5 fix: alloc=0 omits ``target_allocation`` from metadata and the
+    engine resizes the entry to its DEFAULT allocation -- zero-weight targets
+    must not emit entries at all."""
+    strategy = CrossSectionalFlowShareRotationStrategy(
+        _Bars(list(_VT_SYMBOLS)), _Queue(), **_COMMON_KWARGS
+    )
+    targets = {"A/USDT": ("LONG", 1.0, {}), "B/USDT": ("SHORT", -1.0, {})}
+    strategy._emit_targets(targets, {}, 1.0, "2026-01-05T00:00:00Z")
+    assert not _entries(strategy.events.items)
+
+    strategy._emit_targets(targets, {"A/USDT": 0.5, "B/USDT": 0.5}, 1.0, "2026-01-05T01:00:00Z")
+    entries = _entries(strategy.events.items)
+    assert {sig.symbol for sig in entries} == {"A/USDT", "B/USDT"}
+    for sig in entries:
+        assert float(sig.metadata.get("target_allocation", 0.0)) > 0.0

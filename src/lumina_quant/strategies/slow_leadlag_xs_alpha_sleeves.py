@@ -559,12 +559,20 @@ class SlowCrossSectionalLeadLagStrategy(Strategy):
                 continue
             if target == "SHORT" and not self.allow_short:
                 continue
+            weight = float(weights.get(symbol, 0.0))
+            if weight <= 0.0:
+                # Selection vol-gate: a target whose realized vol was
+                # unavailable carries no risk-parity weight.  Entering with
+                # alloc=0 would omit ``target_allocation`` from metadata and
+                # the engine would resize the position to its DEFAULT
+                # allocation — an unsized, un-vol-gated entry.
+                continue
             self._enter(
                 symbol,
                 item,
                 target,
                 float(scores.get(symbol, 0.0)),
-                float(weights.get(symbol, 0.0)),
+                weight,
                 scalar,
                 price,
                 event_time,
@@ -582,6 +590,11 @@ class SlowCrossSectionalLeadLagStrategy(Strategy):
         event_time: Any,
     ) -> None:
         alloc = max(0.0, self.base_allocation * weight)
+        if alloc <= 0.0:
+            # Never emit an entry without a positive sizing target (see the
+            # vol-gate in ``_decide_book``); metadata without
+            # ``target_allocation`` falls back to engine default sizing.
+            return
         stop_loss = None
         if price is not None and self.stop_loss_pct > 0.0:
             stop_loss = price * (

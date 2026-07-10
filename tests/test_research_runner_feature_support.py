@@ -123,8 +123,8 @@ def test_load_candidate_signal_payload_reuses_alignment_cache(monkeypatch):
         calls["count"] += 1
         return aligned_payload
 
-    def _fake_strategy_signal(candidate, *, aligned, symbols):
-        _ = (candidate, aligned, symbols)
+    def _fake_strategy_signal(candidate, *, aligned, symbols, scoring_config=None):
+        _ = (candidate, aligned, symbols, scoring_config)
         length = len(bundle.datetime)
         return (
             np.zeros(length, dtype=float),
@@ -659,7 +659,10 @@ def test_lag_convergence_strategy_signal_trades_xpt_xpd_pair():
     assert returns_raw.shape == (length,)
     assert turnover.shape == (length,)
     assert exposure.shape == (length,)
-    assert meta == {}
+    assert set(meta) == {"evaluation_mode"} and meta["evaluation_mode"] in (
+        "handler",
+        "generic_fallback_proxy",
+    )
     assert np.allclose(exposure, 0.0)
     assert np.any(turnover > 0.0)
 
@@ -977,7 +980,10 @@ def test_mean_reversion_std_strategy_signal_produces_exposure():
     )
 
     assert exposure.shape == (length,)
-    assert meta == {}
+    assert set(meta) == {"evaluation_mode"} and meta["evaluation_mode"] in (
+        "handler",
+        "generic_fallback_proxy",
+    )
     assert np.any(np.abs(exposure) > 0.0)
     assert np.any(turnover > 0.0)
 
@@ -1055,7 +1061,10 @@ def test_mean_reversion_std_strategy_signal_can_residualize_btc():
         symbols=["BTC/USDT", "ETH/USDT"],
     )
 
-    assert raw_meta == {}
+    assert set(raw_meta) == {"evaluation_mode"} and raw_meta["evaluation_mode"] in (
+        "handler",
+        "generic_fallback_proxy",
+    )
     assert np.any(np.abs(raw_exposure) > 0.0)
     assert np.any(raw_turnover > 0.0)
     assert residual_meta.get("residualized_single_asset") is True
@@ -1483,7 +1492,10 @@ def test_liquidity_shock_reversion_strategy_signal_produces_exposure():
     )
 
     assert exposure.shape == (length,)
-    assert meta == {}
+    assert set(meta) == {"evaluation_mode"} and meta["evaluation_mode"] in (
+        "handler",
+        "generic_fallback_proxy",
+    )
     assert np.any(np.abs(exposure) > 0.0)
     assert np.any(turnover > 0.0)
 
@@ -1552,7 +1564,10 @@ def test_session_liquidity_vacuum_fade_strategy_signal_respects_session_gate():
     )
 
     assert exposure.shape == (length,)
-    assert meta == {}
+    assert set(meta) == {"evaluation_mode"} and meta["evaluation_mode"] in (
+        "handler",
+        "generic_fallback_proxy",
+    )
     assert np.max(exposure) > 0.0
     assert np.all(exposure >= 0.0)
     assert np.any(turnover > 0.0)
@@ -1595,7 +1610,10 @@ def test_basis_snapback_reversion_strategy_signal_produces_exposure():
     assert exposure.shape == (length,)
     assert np.any(np.abs(exposure) > 0.0)
     assert np.any(turnover > 0.0)
-    assert meta == {}
+    assert set(meta) == {"evaluation_mode"} and meta["evaluation_mode"] in (
+        "handler",
+        "generic_fallback_proxy",
+    )
 
 
 def test_basis_snapback_reversion_preserves_default_window(monkeypatch):
@@ -1711,7 +1729,10 @@ def test_vol_of_vol_exhaustion_fade_strategy_signal_produces_exposure(monkeypatc
     )
 
     assert exposure.shape == (length,)
-    assert meta == {}
+    assert set(meta) == {"evaluation_mode"} and meta["evaluation_mode"] in (
+        "handler",
+        "generic_fallback_proxy",
+    )
     assert np.any(exposure > 0.0)
     assert np.any(turnover > 0.0)
 
@@ -2191,7 +2212,10 @@ def test_cross_asset_liquidation_contagion_fade_strategy_signal_produces_exposur
 
     assert np.any(np.abs(exposure) > 0.0)
     assert np.any(turnover > 0.0)
-    assert meta == {}
+    assert set(meta) == {"evaluation_mode"} and meta["evaluation_mode"] in (
+        "handler",
+        "generic_fallback_proxy",
+    )
 
 
 def test_cross_asset_liquidation_contagion_position_series_resumes_after_nonfinite_close():
@@ -2253,7 +2277,10 @@ def test_multi_horizon_trend_exhaustion_fade_strategy_signal_produces_exposure()
 
     assert np.any(np.abs(exposure) > 0.0)
     assert np.any(turnover > 0.0)
-    assert meta == {}
+    assert set(meta) == {"evaluation_mode"} and meta["evaluation_mode"] in (
+        "handler",
+        "generic_fallback_proxy",
+    )
 
 
 def test_multi_horizon_trend_exhaustion_fade_preserves_default_short_window(monkeypatch):
@@ -2349,7 +2376,10 @@ def test_vwap_reversion_strategy_signal_produces_exposure():
     )
 
     assert exposure.shape == (length,)
-    assert meta == {}
+    assert set(meta) == {"evaluation_mode"} and meta["evaluation_mode"] in (
+        "handler",
+        "generic_fallback_proxy",
+    )
     assert np.any(exposure > 0.0)
     assert np.any(turnover > 0.0)
 
@@ -2411,7 +2441,10 @@ def test_rolling_breakout_strategy_signal_produces_exposure():
     )
 
     assert exposure.shape == (length,)
-    assert meta == {}
+    assert set(meta) == {"evaluation_mode"} and meta["evaluation_mode"] in (
+        "handler",
+        "generic_fallback_proxy",
+    )
     assert np.any(exposure > 0.0)
     assert np.any(turnover > 0.0)
 
@@ -3063,7 +3096,10 @@ def test_regime_breakout_strategy_signal_still_trades_persistent_breakout():
     )
 
     assert exposure.shape == (length,)
-    assert meta == {}
+    assert set(meta) == {"evaluation_mode"} and meta["evaluation_mode"] in (
+        "handler",
+        "generic_fallback_proxy",
+    )
     assert np.any(exposure > 0.0)
     assert np.any(turnover > 0.0)
 
@@ -3315,7 +3351,10 @@ def test_pair_trading_single_symbol_falls_back_to_generic_momentum():
     expected = np.where(mom >= 0.4, 1.0, np.where(mom <= -0.4, -1.0, 0.0))
 
     np.testing.assert_array_equal(exposure, expected)
-    assert meta == {}
+    assert set(meta) == {"evaluation_mode"} and meta["evaluation_mode"] in (
+        "handler",
+        "generic_fallback_proxy",
+    )
 
 
 def test_alpha101_formula_strategy_signal_uses_event_driven_proxy():

@@ -527,6 +527,19 @@ class CrossSectionalPriceDelayPremiumStrategy(Strategy):
             weight = float(weights.get(symbol, 0.0))
             delay = float(scores.get(symbol, 0.0))
             alloc = max(0.0, self.base_allocation * weight)
+            if alloc <= 0.0:
+                # Zero-alloc entries omit ``target_allocation`` from metadata and
+                # the engine resizes them to its DEFAULT allocation -- an unsized,
+                # un-vol-gated position. Skip the entry; if a side-flip EXIT was
+                # just emitted, drop to OUT (mirroring ``_emit_exit``) so state
+                # matches it.
+                if item.mode != "OUT":
+                    item.mode = "OUT"
+                    item.entry_price = None
+                    item.bars_held = 0
+                    item.bars_since_exit = 0
+                    item.score = None
+                continue
             metadata = _target_metadata(
                 strategy=_STRATEGY_NAME,
                 target_allocation=alloc,

@@ -58,7 +58,7 @@ def test_run_candidate_research_exact_split_emits_timestamped_streams(monkeypatc
         _ = symbols, start_date, end_date, kwargs
         return {}
 
-    def _mock_strategy_signal(candidate, *, aligned, symbols):
+    def _mock_strategy_signal(candidate, *, aligned, symbols, scoring_config=None):
         _ = candidate, symbols
         length = len(aligned["datetime"])
         returns = np.linspace(0.001, 0.003, length, dtype=float)
@@ -128,7 +128,7 @@ def test_run_candidate_research_exact_split_accepts_end_exclusive_contract(monke
         _ = symbols, start_date, end_date, kwargs
         return {}
 
-    def _mock_strategy_signal(candidate, *, aligned, symbols):
+    def _mock_strategy_signal(candidate, *, aligned, symbols, scoring_config=None):
         _ = candidate, symbols
         length = len(aligned["datetime"])
         returns = np.linspace(0.001, 0.003, length, dtype=float)

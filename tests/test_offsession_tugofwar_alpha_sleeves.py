@@ -513,3 +513,58 @@ def test_run_twice_bit_identical() -> None:
     a = [(s.symbol, s.signal_type, round(float(s.strength), 12)) for s in first.events.items]
     b = [(s.symbol, s.signal_type, round(float(s.strength), 12)) for s in second.events.items]
     assert a == b
+
+
+def test_ambiguous_hours_cover_both_dst_open_straddles() -> None:
+    """The NYSE open sits at :30, so the open-straddling hour is 13 under EDT
+    but 14 under EST -- both must be dropped from BOTH components (v5 fix:
+    the EST winter pre-open half-hour used to be classified as CASH)."""
+    strat = _make_candidate()
+    assert strat._ambiguous_hours == frozenset({13, 14, 20})
+    est_winter_weekday = datetime(2026, 1, 7, 14, 0, tzinfo=UTC)  # Wednesday
+    assert strat._classify_hour(est_winter_weekday) == "AMBIGUOUS"
+    fully_cash = datetime(2026, 1, 7, 15, 0, tzinfo=UTC)
+    assert strat._classify_hour(fully_cash) == "CASH"
+
+
+# --------------------------------------------------------------------------- #
+# v5 zero-alloc gate: a computed alloc of 0 must NOT emit a LONG/SHORT --
+# ``_target_metadata`` omits ``target_allocation`` at alloc 0 and the engine
+# would resize the entry to its DEFAULT allocation (an unsized, un-vol-gated bet).
+# --------------------------------------------------------------------------- #
+
+
+def test_zero_alloc_entry_skipped_not_default_sized() -> None:
+    # This lane admits only its fixed TradFi-ETF universe, so FLIP/FRESH must be
+    # real members of ``_TRADFI_EQUITY_ETF_UNIVERSE``.
+    symbols = list(_ALL_SYMBOLS)[:6]
+    flip_sym, fresh_sym = symbols[0], symbols[1]
+    strat = _make_candidate(symbols)
+    flip = strat._state[flip_sym]
+    flip.mode = "LONG"
+    flip.entry_price = 100.0
+    flip.decisions_held = 10_000  # clear the min-hold so the side flip is live
+    targets = {
+        flip_sym: ("SHORT", -1.0, {}),
+        fresh_sym: ("LONG", 1.0, {}),
+    }
+    # empty weights -> alloc == 0 for every targeted symbol
+    strat._emit_targets(targets, {}, 1.0, "2026-01-01T00:00:00Z")
+    kinds = [(sig.symbol, str(sig.signal_type).upper()) for sig in strat.events.items]
+    assert not [sym for sym, kind in kinds if kind in {"LONG", "SHORT"}], kinds
+    # the side-flip EXIT still fired and FLIP is now flat (state matches the exit)
+    assert (flip_sym, "EXIT") in kinds
+    assert strat._state[flip_sym].mode == "OUT"
+    assert strat._state[flip_sym].entry_price is None
+
+    # a positive inverse-vol weight DOES emit a sized entry carrying a strictly
+    # positive ``target_allocation``.
+    sized = _make_candidate(symbols)
+    sized._emit_targets(
+        {fresh_sym: ("LONG", 1.0, {})}, {fresh_sym: 0.5}, 1.0, "2026-01-01T00:00:00Z"
+    )
+    entries = [
+        sig for sig in sized.events.items if str(sig.signal_type).upper() in {"LONG", "SHORT"}
+    ]
+    assert entries, "a positive inverse-vol weight must emit a sized entry"
+    assert all(float((sig.metadata or {}).get("target_allocation", 0.0)) > 0.0 for sig in entries)

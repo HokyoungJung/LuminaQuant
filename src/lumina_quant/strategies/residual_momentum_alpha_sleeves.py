@@ -639,6 +639,12 @@ class TrendGatedResidualMomentumStrategy(Strategy):
                 self._flatten(item)
             weight = float(weights.get(symbol, 0.0))
             alloc = max(0.0, self.base_allocation * weight)
+            if alloc <= 0.0:
+                # Zero-alloc entries omit ``target_allocation`` from metadata and
+                # the engine resizes them to its DEFAULT allocation -- an unsized,
+                # un-vol-gated position. Skip the entry; any side-flip EXIT above
+                # already flattened the item, so state is consistently OUT.
+                continue
             stop_loss = None
             if price is not None and self.stop_loss_pct > 0.0:
                 stop_loss = price * (

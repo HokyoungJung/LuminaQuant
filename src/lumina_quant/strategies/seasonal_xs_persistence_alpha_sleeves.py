@@ -118,6 +118,23 @@ def _week_of_quarter(utc_ts: Any) -> int | None:
     return min(_MAX_BUCKET, day_within_quarter // 7)
 
 
+def _weeks_grid_adjacent(prev_key: tuple[int, int] | None, cur_key: tuple[int, int] | None) -> bool:
+    """True when ``cur_key`` is the grid week immediately after ``prev_key``.
+
+    Weeks are ``(quarter_id, week_of_quarter)`` with the tail fold capping the
+    bucket at ``_MAX_BUCKET``; every quarter's final grid week is the capped
+    bucket (all quarters have >= 85 days), so the successor of
+    ``(q, _MAX_BUCKET)`` is ``(q + 1, 0)``.
+    """
+    if prev_key is None or cur_key is None:
+        return False
+    prev_quarter, prev_week = prev_key
+    cur_quarter, cur_week = cur_key
+    if cur_quarter == prev_quarter and cur_week == prev_week + 1:
+        return True
+    return cur_quarter == prev_quarter + 1 and prev_week == _MAX_BUCKET and cur_week == 0
+
+
 @dataclass(slots=True)
 class _State:
     closes: deque[float]
@@ -127,6 +144,10 @@ class _State:
     cur_week_quarter: int = 0
     cur_week_last_close: float | None = None
     prev_week_close: float | None = None
+    # Grid week of ``prev_week_close`` -- a completed week's return is recorded
+    # ONLY when it is grid-adjacent to this week, so a data gap can never book
+    # a multi-week return into a single weekly bucket.
+    prev_week_key: tuple[int, int] | None = None
     # Current-quarter pending bucket returns (flushed to ``buckets`` when the
     # quarter rolls -- this is the one-period deferral / current-quarter cut).
     pending_quarter: int | None = None
@@ -257,6 +278,9 @@ class CrossSectionalSeasonalPersistenceStrategy(Strategy):
                     "cur_week_quarter": int(item.cur_week_quarter),
                     "cur_week_last_close": item.cur_week_last_close,
                     "prev_week_close": item.prev_week_close,
+                    "prev_week_key": (
+                        list(item.prev_week_key) if item.prev_week_key is not None else None
+                    ),
                     "pending_quarter": item.pending_quarter,
                     "pending_sum": {str(k): float(v) for k, v in item.pending_sum.items()},
                     "pending_count": {str(k): int(v) for k, v in item.pending_count.items()},
@@ -303,6 +327,7 @@ class CrossSectionalSeasonalPersistenceStrategy(Strategy):
                 item.cur_week_quarter = int(safe_float(payload.get("cur_week_quarter")) or 0)
                 item.cur_week_last_close = safe_float(payload.get("cur_week_last_close"))
                 item.prev_week_close = safe_float(payload.get("prev_week_close"))
+                item.prev_week_key = self._as_week_tuple(payload.get("prev_week_key"))
                 pending_q = payload.get("pending_quarter")
                 item.pending_quarter = int(pending_q) if pending_q is not None else None
                 item.pending_sum = self._as_int_float_map(payload.get("pending_sum"))
@@ -393,11 +418,17 @@ class CrossSectionalSeasonalPersistenceStrategy(Strategy):
             and item.prev_week_close > _EPS
             and completed_close is not None
             and completed_close > _EPS
+            # Gap guard: the completed week must be grid-adjacent to the week
+            # ``prev_week_close`` belongs to, otherwise ``ret`` spans a
+            # multi-week data gap and would pollute one bucket's seasonal
+            # estimate for the full K-quarter lookback.
+            and _weeks_grid_adjacent(item.prev_week_key, item.cur_week_key)
         ):
             ret = math.log(completed_close / item.prev_week_close)
             if math.isfinite(ret):
                 self._record_week(item, item.cur_week_quarter, item.cur_week_woq, ret)
         item.prev_week_close = completed_close
+        item.prev_week_key = item.cur_week_key
         item.cur_week_key = week_key
         item.cur_week_woq = woq
         item.cur_week_quarter = quarter
@@ -675,6 +706,17 @@ class CrossSectionalSeasonalPersistenceStrategy(Strategy):
                 )
             weight = float(weights.get(symbol, 0.0))
             alloc = max(0.0, self.base_allocation * weight)
+            if alloc <= 0.0:
+                # Zero-alloc entries omit ``target_allocation`` from metadata and
+                # the engine resizes them to its DEFAULT allocation -- an unsized,
+                # un-vol-gated position. Skip the entry; if a side-flip EXIT was
+                # just emitted, drop to OUT so state matches it.
+                if item.mode != "OUT":
+                    item.mode = "OUT"
+                    item.entry_price = None
+                    item.weeks_held = 0
+                    item.score = None
+                continue
             stop_loss = None
             if price is not None and self.stop_loss_pct > 0.0:
                 stop_loss = price * (
