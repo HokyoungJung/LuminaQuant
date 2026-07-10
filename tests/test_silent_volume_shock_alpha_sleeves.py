@@ -43,16 +43,14 @@ from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from typing import Any
 
+from lumina_quant.indicators.annualization import bars_per_year_from_spacing
 from lumina_quant.strategies.abnormal_return_continuation import (
     AbnormalReturnContinuationStrategy,
 )
 from lumina_quant.strategies.clv_accumulation_alpha_sleeves import (
     CrossSectionalCloseLocationAccumulationStrategy,
 )
-from lumina_quant.strategies.external_alpha_sleeves import (
-    LiquidityShockReversionStrategy,
-    _bars_per_year_from_spacing,
-)
+from lumina_quant.strategies.external_alpha_sleeves import LiquidityShockReversionStrategy
 from lumina_quant.strategies.flow_share_rotation_alpha_sleeves import (
     CrossSectionalFlowShareRotationStrategy,
 )
@@ -769,7 +767,7 @@ def test_vol_target_throttle_annualizes_realized_vol_on_resolution() -> None:
     realized_vol = meta["realized_vol"]
     scalar = meta["inverse_vol_scalar"]
     assert realized_vol is not None and realized_vol > 0.0
-    bpy = _bars_per_year_from_spacing(list(strat._recent_times))
+    bpy = bars_per_year_from_spacing(list(strat._recent_times))
     assert abs(bpy - 365.25) < 1e-9  # daily fixture cadence
     expected = min(1.0, 0.05 / (realized_vol * math.sqrt(bpy)))
     assert abs(scalar - expected) < 1e-12  # annualized, not per-bar, comparison

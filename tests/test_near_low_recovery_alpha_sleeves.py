@@ -780,7 +780,7 @@ def test_slice_multi_timeframe_cells_pinned() -> None:
 
 def test_vol_target_throttle_annualizes_per_bar_vol() -> None:
     """The Class-B throttle annualizes the PER-BAR portfolio vol by the median
-    observed bar spacing (shared ``_annualize_per_bar_vol``) before comparing it to
+    observed bar spacing (canonical ``annualize_per_bar_vol``) before comparing it to
     ``target_vol``: a hurricane per-1h vol now DE-RISKS, a calm one does not, and
     an unknown cadence stays at 1.0.
     """

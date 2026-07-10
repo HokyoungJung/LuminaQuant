@@ -78,11 +78,14 @@ from typing import Any
 
 from lumina_quant.core.plugin_registry import register
 from lumina_quant.indicators.alpha_features import realized_volatility, simple_return
+from lumina_quant.indicators.annualization import (
+    annualize_per_bar_vol,
+    bars_per_year_from_spacing,
+)
 from lumina_quant.indicators.common import safe_float, time_key
 from lumina_quant.strategies.external_alpha_sleeves import (
     _EPS,
     _Snapshot,
-    _annualize_per_bar_vol,
     _emit,
     _event_datetime_utc,
     _event_symbols,
@@ -398,7 +401,7 @@ class RoundNumberBarrierStrategy(Strategy):
         # off (byte-identical default sizing); unavailable spacing passes through.
         size_scalar = 1.0
         if self.target_vol > 0.0 and vol is not None and vol > _EPS:
-            vol_ann = _annualize_per_bar_vol(vol, self._recent_times)
+            vol_ann = annualize_per_bar_vol(vol, bars_per_year_from_spacing(self._recent_times))
             if vol_ann is not None and vol_ann > _EPS:
                 size_scalar = min(1.0, self.target_vol / vol_ann)
         alloc = max(0.0, self.base_allocation * size_scalar)

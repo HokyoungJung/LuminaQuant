@@ -35,8 +35,8 @@ from types import SimpleNamespace
 from typing import Any
 
 from lumina_quant.core.events import MarketEvent
+from lumina_quant.indicators.annualization import bars_per_year_from_spacing
 from lumina_quant.strategies.adaptive_crypto_alpha_sleeves import FalseBreakoutReversalStrategy
-from lumina_quant.strategies.external_alpha_sleeves import _bars_per_year_from_spacing
 from lumina_quant.strategies.hourly_shock_reversion import HourlyShockReversionStrategy
 from lumina_quant.strategies.near_high_anchoring_alpha_sleeves import (
     CrossSectionalNearHighAnchoringStrategy,
@@ -604,7 +604,7 @@ def test_vol_target_throttle_annualizes_realized_vol_on_breakout() -> None:
     realized_vol = meta["realized_vol"]
     scalar = meta["inverse_vol_scalar"]
     assert realized_vol is not None and realized_vol > 0.0
-    bpy = _bars_per_year_from_spacing(list(strat._recent_times))
+    bpy = bars_per_year_from_spacing(list(strat._recent_times))
     assert abs(bpy - 365.25) < 1e-9  # daily fixture cadence
     expected = min(1.0, 0.05 / (realized_vol * math.sqrt(bpy)))
     assert abs(scalar - expected) < 1e-12  # annualized, not per-bar, comparison

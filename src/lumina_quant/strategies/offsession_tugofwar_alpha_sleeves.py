@@ -63,6 +63,10 @@ from typing import Any
 
 from lumina_quant.core.plugin_registry import register
 from lumina_quant.indicators.alpha_features import realized_volatility
+from lumina_quant.indicators.annualization import (
+    annualize_per_bar_vol,
+    bars_per_year_from_spacing,
+)
 from lumina_quant.indicators.common import safe_float, time_key
 from lumina_quant.indicators.cross_sectional_residualize import cross_sectional_residualize
 from lumina_quant.research_universe import (
@@ -73,7 +77,6 @@ from lumina_quant.research_universe import (
 from lumina_quant.strategies.external_alpha_sleeves import (
     _EPS,
     _Snapshot,
-    _annualize_per_bar_vol,
     _emit,
     _event_datetime_utc,
     _event_symbols,
@@ -574,7 +577,8 @@ class CrossSectionalOffSessionTugOfWarStrategy(Strategy):
         portfolio_vol = sum((inv[symbol] / total_inv) * vols[symbol] for symbol in inv)
         scalar = 1.0
         if self.target_vol > 0.0 and portfolio_vol > _EPS:
-            portfolio_vol_ann = _annualize_per_bar_vol(portfolio_vol, self._recent_times)
+            bars_per_year = bars_per_year_from_spacing(self._recent_times)
+            portfolio_vol_ann = annualize_per_bar_vol(portfolio_vol, bars_per_year)
             if portfolio_vol_ann is not None and portfolio_vol_ann > _EPS:
                 scalar = min(1.0, self.target_vol / portfolio_vol_ann)
         weights = {
