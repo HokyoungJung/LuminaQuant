@@ -219,6 +219,7 @@ Fresh checkpoint verification:
 - G003-B1 runtime-contract slice: `42 passed` focused+adjacent at agent handoff.
 - Repository-wide Ruff check: passed.
 - Repository-wide Ruff format check: passed after formatting four branch-owned files; AST parity was identical for all four.
+- Hardcoded-parameter audit: `1668` total, `0` new, `1668` baselined. The deterministic baseline was regenerated because the new research strategy and inserted wrapper seams changed the scanner's line/column signatures; no scanner exemption was added.
 - Python compile and `git diff --check`: passed.
 - Full repository pytest: `4349 passed, 36 skipped, 3 xfailed` in `124.06s`; maximum RSS `562,336 KiB`, zero swap.
 

@@ -1,6 +1,7 @@
 # Alpha-Max portable checkpoint SHA-256 manifest
-# Generated 2026-07-11 KST before the Lore checkpoint commit.
+# Generated for the 2026-07-11 KST portable checkpoint.
 # Verify from the repository root with: sha256sum -c docs/research_note/alpha_max_checkpoint_sha256_20260711.txt
+cba057af0d6d3198d18c1f1afe7713293ab223b0d95fd94a95feee78c15a87c6  .github/hardcoded_params_baseline.json
 e974500e623f0907e08409d5d5702e4b9d04f34fc2365552b34cac87d3e1cb03  .omx/context/alpha-max-independent-20260710-20260709T231936Z.md
 f182571be28a5b75ee0c5bb5ea499afc703b205a71591eaac6f4171b510a8946  .omx/notepad.md
 cfe3a04620c52cc235d6f1cda1cac617ba30cd7327c753fc2f620d8250d51a4e  .omx/plans/alpha-max-current-trial-nodes-v1.json
@@ -21,7 +22,7 @@ d0be71a07a9ae86875728009dbfb0505067effdc32b4f60edfc80f3b85796bf6  .omx/reports/t
 372dc21df86544d26dccc6f34e21313255ecb7924578b3c7be80efd735b0809f  .omx/ultragoal/goals.json
 382e90bbfd6366b549dba7bd793af733dec81ca9825596e589c5778129060346  .omx/ultragoal/ledger.jsonl
 34f1ea894b0af984d4f76348f52fbca09fab45b9e3d5d963f257ec9d128ee356  configs/research/alpha_max_portfolio_20260710.json
-3d0a3f5c06294e1bc32ea119fd9a7a4a876d24e846831f66c6331c8f3acccd3a  docs/research_note/alpha_max_independent_checkpoint_20260711.md
+608a9f4ed4ef242c91f01fecb3980a88fbaa6cd10fa2951131f65030b10011d0  docs/research_note/alpha_max_independent_checkpoint_20260711.md
 4659dccb3d0bb1e8dd1e6617a93161fbec8076d8f3eed86dfc7e72f72ee56b18  src/lumina_quant/backtesting/backtest.py
 89411ff6e00888fe20c68dc9b2367cf2e3956ea15c27ba28801e3ee9675577f7  src/lumina_quant/backtesting/data_windowed_parquet.py
 7db67f7f267b9dd5803608e83e7a6fbafacd71a8e19ce35d3b6988e30d56952c  src/lumina_quant/backtesting/execution_model.py
