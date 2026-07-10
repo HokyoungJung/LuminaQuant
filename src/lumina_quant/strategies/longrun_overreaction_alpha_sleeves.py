@@ -439,7 +439,7 @@ _LONGRUN_OVERREACTION_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
             "formation_bars": 3024,  # 126 x24 (~6mo of 1h bars)
             "skip_bars": 504,  # 21 x24 (~1mo)
             "z_min": 1.0,
-            "max_universe": 12,
+            "max_universe": 128,
             "rebalance_bars": 504,  # 21 x24 (~monthly cadence)
             "min_hold_bars": 504,  # 21 x24
             "quantile_pct": 0.25,
@@ -451,7 +451,7 @@ _LONGRUN_OVERREACTION_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
             "formation_bars": 2184,  # 91 x24 (~4.3mo of 1h bars)
             "skip_bars": 504,
             "z_min": 1.0,
-            "max_universe": 12,
+            "max_universe": 128,
             "rebalance_bars": 504,
             "min_hold_bars": 504,
             "quantile_pct": 0.25,
@@ -465,7 +465,7 @@ _LONGRUN_OVERREACTION_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
             "formation_bars": 756,  # 126 x6 (~6mo of 4h bars)
             "skip_bars": 126,  # 21 x6 (~1mo)
             "z_min": 1.0,
-            "max_universe": 12,
+            "max_universe": 128,
             "rebalance_bars": 126,  # 21 x6 (~monthly cadence)
             "min_hold_bars": 126,  # 21 x6
             "quantile_pct": 0.25,
@@ -477,7 +477,7 @@ _LONGRUN_OVERREACTION_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
             "formation_bars": 546,  # 91 x6 (~4.3mo of 4h bars)
             "skip_bars": 126,
             "z_min": 1.0,
-            "max_universe": 12,
+            "max_universe": 128,
             "rebalance_bars": 126,
             "min_hold_bars": 126,
             "quantile_pct": 0.25,
@@ -491,7 +491,7 @@ _LONGRUN_OVERREACTION_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
             "formation_bars": 126,
             "skip_bars": 21,
             "z_min": 1.0,
-            "max_universe": 12,
+            "max_universe": 128,
             "rebalance_bars": 21,
             "min_hold_bars": 21,
             "quantile_pct": 0.25,
@@ -503,7 +503,7 @@ _LONGRUN_OVERREACTION_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
             "formation_bars": 91,
             "skip_bars": 21,
             "z_min": 1.0,
-            "max_universe": 12,
+            "max_universe": 128,
             "rebalance_bars": 21,
             "min_hold_bars": 21,
             "quantile_pct": 0.25,
