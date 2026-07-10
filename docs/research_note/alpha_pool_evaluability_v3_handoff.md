@@ -77,3 +77,27 @@ rescues the sign.
 Everything is byte-identical when the new cells are not requested: the 1d
 candidate set is unchanged, defaults untouched, and the manifest snapshot was
 re-pinned once (165→209 in the 2-symbol 1h/4h fixture) to admit the new cells.
+
+## 3. Sizing-discipline addendum (v4, same branch cycle)
+
+The postmortem's inert-vol-target finding generalized: a repo-wide audit found
+the annualized-scale `target_vol` (~0.20) compared against PER-BAR vol
+estimates across most sleeves — throttles pinned at their clamps (including a
+2x-ceiling pin in price_volume) at every timeframe. **Fixed in 14 throttle
+sites across the pool** (the offsession flagship included; its postmortem
+diagnostic now asserts the FIXED behavior): per-bar vol is annualized via
+`sqrt(bars_per_year)` inferred from observed bar spacing (canonical helpers in
+`indicators/annualization.py`, 365.25-day year), unknown cadence falls through
+to a unity scalar (never inflates). Normalized inverse-vol WEIGHTS were
+verified horizon-free (annualization cancels) and left untouched, as were the
+two per-bar-consistent overlays and `VolManagedRiskOverlay` (explicit per-bar
+target — not defective).
+
+**Impact on your grid: MDD/Calmar/vol of every cell now reflect an ACTIVE
+de-risk throttle** (at 1d too — correct Moreira-Muir behavior). Also emitted
+when `emit_candidate_overfit_stats=ON`: per-candidate `rpt_bps` (activates
+automatically once a turnover series/scalar is threaded onto the candidate
+row — see the runner's `_candidate_rpt_bps`), automating the RPT>=10bps gate.
+After the grid, run `scripts/research/analyze_candidate_grid.py <report-dir>`
+for the two-tier classification, cross-cost stability flags and the
+second-generation shortlist.
