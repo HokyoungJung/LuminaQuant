@@ -23,6 +23,11 @@ from typing import Any
 
 from lumina_quant.core.events import SignalEvent
 from lumina_quant.core.plugin_registry import register
+from lumina_quant.indicators.annualization import (
+    annualize_per_bar_vol as _canon_annualize_per_bar_vol,
+    bars_per_year_from_spacing as _canon_bars_per_year_from_spacing,
+    median_bar_spacing_seconds as _canon_median_bar_spacing_seconds,
+)
 from lumina_quant.indicators.alpha_features import (
     basis_bps,
     clipped_tanh_score,
@@ -183,6 +188,59 @@ def _event_datetime_utc(raw: Any) -> datetime | None:
     except Exception:
         return None
     return parsed.astimezone(UTC) if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
+
+
+# The vol-target annualization MATH lives once in ``indicators/annualization``
+# (canonical home, epoch-float inputs).  The wrappers below are a thin RAW-
+# timestamp adapter: they parse each raw event time (datetime / ISO string /
+# epoch) into epoch-seconds via ``_event_datetime_utc`` and then delegate, so
+# sleeves can keep passing whatever timestamp form their events carry while the
+# median-spacing / sqrt-annualize logic has a single source of truth.
+
+
+def _times_to_epochs(times: Any) -> list[float]:
+    """Parse raw timestamp-like values into epoch-seconds (unparseable dropped)."""
+    epochs: list[float] = []
+    for raw in list(times or []):
+        dt = _event_datetime_utc(raw)
+        if dt is not None:
+            epochs.append(dt.timestamp())
+    return epochs
+
+
+def _median_bar_spacing_seconds(times: Any) -> float | None:
+    """Median positive gap (seconds) between consecutive parsed timestamps.
+
+    ``times`` is any iterable of raw timestamp-like values (datetimes, epochs,
+    ISO strings); unparseable entries are dropped, then the canonical
+    ``median_bar_spacing_seconds`` computes the median positive spacing (``None``
+    when fewer than two usable timestamps or no positive spacing exists).
+    """
+    return _canon_median_bar_spacing_seconds(_times_to_epochs(times))
+
+
+def _bars_per_year_from_spacing(times: Any) -> float | None:
+    """Deterministic bars-per-year inferred from the median observed bar spacing.
+
+    Returns ``None`` when the spacing cannot be inferred (fewer than two usable
+    timestamps).  Callers must then pass through WITHOUT annualization rather
+    than guess a horizon.
+    """
+    return _canon_bars_per_year_from_spacing(_times_to_epochs(times))
+
+
+def _annualize_per_bar_vol(per_bar_vol: float, times: Any) -> float | None:
+    """Annualize a per-bar vol via ``sqrt(bars_per_year)`` from observed spacing.
+
+    This is the horizon bridge for vol-target sizing: a per-bar realized-vol
+    estimate (e.g. ~0.03 on a 1d bar) must be scaled to the same annual horizon
+    as an annual-scale ``target_vol`` (e.g. 0.20) before the Moreira-Muir
+    ``min(1, target_vol / vol)`` clamp; comparing the two directly leaves the
+    throttle INERT.  Returns ``None`` when spacing is unavailable -- the caller
+    must then leave sizing a pass-through rather than compare mismatched
+    horizons.
+    """
+    return _canon_annualize_per_bar_vol(per_bar_vol, _bars_per_year_from_spacing(times))
 
 
 def _session_key(raw_time: Any, *, start_minute_utc: int) -> str:

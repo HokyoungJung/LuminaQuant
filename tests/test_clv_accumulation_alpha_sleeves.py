@@ -29,6 +29,10 @@ from __future__ import annotations
 from types import SimpleNamespace
 from typing import Any
 
+from lumina_quant.indicators.annualization import (
+    annualize_per_bar_vol,
+    bars_per_year_from_spacing,
+)
 from lumina_quant.indicators.volume import chaikin_money_flow
 from lumina_quant.strategies.clv_accumulation_alpha_sleeves import (
     _CLV_ACCUMULATION_SLICE,
@@ -572,3 +576,97 @@ def test_slice_timeframe_expansion_scales_bar_windows() -> None:
             "stop_loss_pct",
         ):
             assert h4[key] == d[key] == h1[key], (variant, key)
+
+
+# --------------------------------------------------------------------------- #
+# vol-target horizon regression (worker-vt2)
+#
+# The ``target_vol`` clamp compares an annual-scale target (0.20) against the
+# inverse-vol-weighted PER-BAR portfolio vol.  It MUST first annualize that
+# per-bar vol via sqrt(bars_per_year) inferred from observed bar spacing, else
+# the Moreira-Muir clamp is inert (scalar pinned at 1.0).  The risk-parity
+# WEIGHTS themselves are horizon-free (normalized inverse-vol -> annualization
+# cancels), so only the SCALAR is annualized.
+# --------------------------------------------------------------------------- #
+
+_VT_SYMS = ["A", "B", "C", "D"]
+_HOUR_EPOCHS = [1_700_000_000.0 + i * 3600.0 for i in range(12)]  # 1h spacing
+
+
+def _vt_sleeve() -> CrossSectionalCloseLocationAccumulationStrategy:
+    return CrossSectionalCloseLocationAccumulationStrategy(_Bars(_VT_SYMS), _Queue())
+
+
+def _vt_targets() -> dict[str, Any]:
+    return {sym: ("LONG", 1.0, {}) for sym in _VT_SYMS}
+
+
+def test_vol_target_throttle_active_on_hourly_high_vol() -> None:
+    strat = _vt_sleeve()
+    for epoch in _HOUR_EPOCHS:
+        strat._recent_times.append(epoch)
+    vols = dict.fromkeys(_VT_SYMS, 0.05)  # per-bar 5% vol
+    _weights, scalar = strat._inverse_vol_weights(_vt_targets(), vols)
+    # equal per-symbol vols -> weighted portfolio_vol == 0.05 (per bar); annualized
+    # ~= 4.68 >> target_vol 0.20 -> scalar << 1. Recompute via the same public
+    # helpers the sleeve uses so the assertion is convention-agnostic.
+    assert scalar < 0.2, scalar
+    portfolio_vol_ann = annualize_per_bar_vol(0.05, bars_per_year_from_spacing(list(_HOUR_EPOCHS)))
+    assert scalar == min(1.0, 0.20 / portfolio_vol_ann)
+
+
+def test_vol_target_passthrough_without_bar_spacing() -> None:
+    strat = _vt_sleeve()  # no observed times -> spacing unknown
+    vols = dict.fromkeys(_VT_SYMS, 0.05)
+    _weights, scalar = strat._inverse_vol_weights(_vt_targets(), vols)
+    assert scalar == 1.0  # pass-through, never throttle on a mismatched horizon
+
+
+def test_vol_target_calm_leaves_scalar_unthrottled() -> None:
+    strat = _vt_sleeve()
+    for epoch in _HOUR_EPOCHS:
+        strat._recent_times.append(epoch)
+    calm = dict.fromkeys(_VT_SYMS, 0.0005)  # annualized ~= 0.047 < 0.20
+    _weights, scalar = strat._inverse_vol_weights(_vt_targets(), calm)
+    assert scalar == 1.0
+
+
+def test_vol_target_scalar_deterministic() -> None:
+    strat = _vt_sleeve()
+    for epoch in _HOUR_EPOCHS:
+        strat._recent_times.append(epoch)
+    vols = dict.fromkeys(_VT_SYMS, 0.05)
+    _w1, s1 = strat._inverse_vol_weights(_vt_targets(), vols)
+    _w2, s2 = strat._inverse_vol_weights(_vt_targets(), vols)
+    assert s1 == s2
+
+
+def test_vol_target_epochs_tracked_from_datetime_feed() -> None:
+    syms = ["A", "B", "C", "D", "E", "F", "G"]  # >= min_symbols so _evaluate runs
+    strat = CrossSectionalCloseLocationAccumulationStrategy(_Bars(syms), _Queue())
+    for idx in range(6):
+        epoch = 1_700_000_000.0 + idx * 3600.0  # numeric epoch -> parsed to a datetime
+        rows = {
+            sym: {"close": 100.0 + idx, "high": 101.0 + idx, "low": 99.0 + idx, "volume": 1000.0}
+            for sym in syms
+        }
+        strat.calculate_signals(
+            SimpleNamespace(
+                type="MARKET_WINDOW",
+                time=epoch,
+                bars_1s={sym: [dict(row, time=epoch)] for sym, row in rows.items()},
+            )
+        )
+    times = list(strat._recent_times)
+    assert len(times) >= 5, times
+    gaps = [round(times[i + 1] - times[i]) for i in range(len(times) - 1)]
+    assert gaps and all(gap == 3600 for gap in gaps), gaps  # 1h spacing tracked
+
+
+def test_vol_target_recent_times_survive_state_roundtrip() -> None:
+    strat = _vt_sleeve()
+    for epoch in _HOUR_EPOCHS:
+        strat._recent_times.append(epoch)
+    restored = _vt_sleeve()
+    restored.set_state(strat.get_state())
+    assert list(restored._recent_times) == list(_HOUR_EPOCHS)

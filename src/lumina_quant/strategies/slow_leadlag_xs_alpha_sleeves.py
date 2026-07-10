@@ -106,6 +106,7 @@ from lumina_quant.indicators.common import safe_float, time_key
 from lumina_quant.strategies.external_alpha_sleeves import (
     _EPS,
     _Snapshot,
+    _annualize_per_bar_vol,
     _emit,
     _event_datetime_utc,
     _event_symbols,
@@ -269,6 +270,11 @@ class SlowCrossSectionalLeadLagStrategy(Strategy):
         }
         self._last_decision_week = ""
         self._tick = 0
+        # Recent WEEKLY decision epochs (seconds): the vol-target scalar annualizes
+        # the per-week portfolio vol via sqrt(bars_per_year) from the median gap
+        # here.  Recorded on the weekly decision clock so the spacing matches the
+        # WEEKLY closes (``_snapshot_weekly_closes``) the realized vol is built on.
+        self._recent_times: deque[float] = deque(maxlen=16)
 
     # ------------------------------------------------------------------ #
     # state
@@ -277,6 +283,7 @@ class SlowCrossSectionalLeadLagStrategy(Strategy):
         return {
             "last_decision_week": self._last_decision_week,
             "tick": int(self._tick),
+            "recent_times": list(self._recent_times),
             "symbol_state": {
                 symbol: {
                     "closes": list(item.closes),
@@ -298,6 +305,7 @@ class SlowCrossSectionalLeadLagStrategy(Strategy):
             return
         self._last_decision_week = str(state.get("last_decision_week", ""))
         self._tick = _safe_non_negative_int(state.get("tick"))
+        _restore_deque(self._recent_times, state.get("recent_times"))
         raw = state.get("symbol_state")
         if not isinstance(raw, dict):
             return
@@ -458,10 +466,19 @@ class SlowCrossSectionalLeadLagStrategy(Strategy):
         total_inv = sum(inv.values())
         if total_inv <= _EPS:
             return {}, 1.0
+        # ``portfolio_vol`` is the inverse-vol-weighted PER-WEEK vol; the
+        # ``inv / total_inv`` normalization is scale-invariant, so the risk-parity
+        # weights are horizon-free.  The vol-target SCALAR compares it against an
+        # annual-scale ``target_vol`` (0.20): annualize the per-week estimate via
+        # sqrt(bars_per_year) from the observed (weekly) decision spacing first,
+        # otherwise the Moreira-Muir clamp is INERT.  Pass through (scalar=1.0)
+        # when spacing is unavailable rather than throttle on mismatched horizons.
         portfolio_vol = sum((inv[symbol] / total_inv) * vols[symbol] for symbol in inv)
         scalar = 1.0
         if self.target_vol > 0.0 and portfolio_vol > _EPS:
-            scalar = min(1.0, self.target_vol / portfolio_vol)
+            portfolio_vol_ann = _annualize_per_bar_vol(portfolio_vol, self._recent_times)
+            if portfolio_vol_ann is not None and portfolio_vol_ann > _EPS:
+                scalar = min(1.0, self.target_vol / portfolio_vol_ann)
         weights = {
             symbol: (inv[symbol] / total_inv) * self.target_gross_exposure * scalar
             for symbol in inv
@@ -472,6 +489,11 @@ class SlowCrossSectionalLeadLagStrategy(Strategy):
     # decision (weekly cadence)
     # ------------------------------------------------------------------ #
     def _evaluate(self, event_time: Any) -> None:
+        # Record the weekly decision epoch so the vol-target scalar can infer the
+        # (weekly) bar spacing that annualizes the per-week portfolio vol.
+        dt = _event_datetime_utc(event_time)
+        if dt is not None:
+            self._recent_times.append(dt.timestamp())
         self._snapshot_weekly_closes()
         scores = self._spillover_scores()
         signal_available = bool(scores)

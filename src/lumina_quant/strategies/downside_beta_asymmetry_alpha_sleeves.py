@@ -354,6 +354,11 @@ class CrossSectionalDownsideBetaAsymmetryStrategy(Strategy):
         return desired, rank, n
 
     def _inverse_vol_weights(self, book: list[str]) -> dict[str, float]:
+        # vol-target horizon classification: category A (NO-OP).  These are pure
+        # NORMALIZED inverse-vol risk-parity weights (``inv / total``) scaled to
+        # ``target_gross_exposure`` -- there is NO ``target_vol`` throttle here, and
+        # annualizing every ``vol_i`` by the same sqrt(bars_per_year) cancels in the
+        # normalization, so no per-bar-vs-annual horizon mismatch exists.
         if not book:
             return {}
         vols: dict[str, float | None] = {}

@@ -21,6 +21,7 @@ generator (no ``random`` module), so every run is bit-for-bit reproducible.
 
 from __future__ import annotations
 
+import math
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from typing import Any
@@ -477,3 +478,87 @@ def test_schema_keys_snake_case_and_hyperparam() -> None:
         assert required in schema
     for cap in ("target_allocation", "max_order_value"):
         assert schema[cap].tunable is False
+
+
+# --------------------------------------------------------------------------- #
+# vol-target HORIZON fix (direct-method regression).  ``_vol_scaled_allocation``
+# is a SINGLE-NAME Moreira-Muir vol-target: ``target_allocation * target_vol /
+# vol``, clamped to ``[0, 2 * target_allocation]``.  ``vol`` is a PER-BAR
+# realized vol; ``target_vol`` (0.20) is annual-scale.  The pre-fix code compared
+# them directly, so ``target_vol / vol`` (0.20 / 0.0005..0.05) always exceeded 1
+# and the allocation was PINNED at the 2x clamp on every bar -- an inert throttle
+# that ran full 2x gross.  The fix annualizes ``vol`` via sqrt(bars_per_year)
+# from the recorded bar spacing first.
+# --------------------------------------------------------------------------- #
+
+_VT_TARGET_ALLOC = 0.30
+
+
+def _vt_strategy() -> Any:
+    return LowTurnoverTrendPersistenceStrategy(
+        _Bars(["A/USDT"]),
+        _Queue(),
+        vol_window=6,
+        target_vol=0.20,
+        target_allocation=_VT_TARGET_ALLOC,
+        min_price=0.01,
+    )
+
+
+def _vt_daily_epochs(count: int) -> list[float]:
+    return [float(1_700_000_000 + i * 86_400) for i in range(count)]
+
+
+def _alt_closes(per_bar_ret: float, n: int = 14) -> list[float]:
+    """A ±``per_bar_ret`` alternating close path (realized vol ~= |ret|)."""
+    closes = [100.0]
+    price = 100.0
+    sign = 1.0
+    for _ in range(n):
+        price *= math.exp(sign * per_bar_ret)
+        closes.append(price)
+        sign = -sign
+    return closes
+
+
+def test_vol_scaled_allocation_annualizes_and_throttles_high_vol() -> None:
+    stormy = _alt_closes(0.05)
+    calm = _alt_closes(0.001)
+
+    storm_strat = _vt_strategy()
+    storm_strat._recent_times.clear()
+    storm_strat._recent_times.extend(_vt_daily_epochs(10))
+    storm_alloc = storm_strat._vol_scaled_allocation(stormy, conviction=1.0)
+
+    calm_strat = _vt_strategy()
+    calm_strat._recent_times.clear()
+    calm_strat._recent_times.extend(_vt_daily_epochs(10))
+    calm_alloc = calm_strat._vol_scaled_allocation(calm, conviction=1.0)
+
+    # Stormy: annualized vol > target_vol -> allocation throttled BELOW base.
+    # (The pre-fix code returned the 2x clamp here.)
+    assert storm_alloc < _VT_TARGET_ALLOC
+    # Calm: annualized vol << target_vol -> ratio saturates the 2x clamp.
+    assert calm_alloc == _VT_TARGET_ALLOC * 2.0
+    assert storm_alloc < calm_alloc
+
+
+def test_vol_scaled_allocation_passthrough_when_spacing_unavailable() -> None:
+    strat = _vt_strategy()
+    strat._recent_times.clear()  # < 2 timestamps -> horizon unknowable
+    # Even a violent per-bar vol cannot be annualized without spacing, so the
+    # allocation passes through at its base level (no 2x inflation, no throttle).
+    alloc = strat._vol_scaled_allocation(_alt_closes(0.05), conviction=1.0)
+    assert alloc == _VT_TARGET_ALLOC
+
+
+def test_vol_scaled_allocation_determinism() -> None:
+    closes = _alt_closes(0.03)
+
+    def _run() -> float:
+        strat = _vt_strategy()
+        strat._recent_times.clear()
+        strat._recent_times.extend(_vt_daily_epochs(10))
+        return round(strat._vol_scaled_allocation(closes, conviction=0.8), 12)
+
+    assert _run() == _run()

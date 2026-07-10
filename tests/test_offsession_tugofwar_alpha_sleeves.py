@@ -471,29 +471,38 @@ def test_pm_decision_clock_is_weekly_iso_not_every_bar() -> None:
     assert calls["n"] <= 12  # far below the 1512 one-hour bars fed
 
 
-def test_pm_vol_target_scalar_is_inert_at_hourly_vol_scale() -> None:
-    """DIAGNOSTIC (known limitation flagged for the handoff, NOT the loss cause).
+def test_pm_vol_target_scalar_engages_at_hourly_vol_scale() -> None:
+    """FIXED (rewrite of the offsession postmortem's Culprit-3 diagnostic).
 
-    Culprit-3 (sizing): the sleeve sizes off
+    Culprit-3 (sizing) WAS: the sleeve sizes off
     ``realized_volatility(closes, window=vol_window)``, a PER-1h-BAR stdev
     (``annualization=1.0``), while ``target_vol`` defaults to 0.20 (an
-    annualized-scale figure).  Hourly vol (~1e-3..2e-2) sits orders of magnitude
-    below 0.20, so ``scalar = min(1.0, target_vol / portfolio_vol)`` is pinned at
-    1.0 for every realistic hourly vol: the vol-target knob NEVER de-risks.  It
-    also NEVER inflates leverage (it is capped at 1.0), so it cannot manufacture
-    the -63% loss -- a correctly de-risked wrong-signed book still loses.  If this
-    lane is ever revived, fix the ``target_vol`` horizon mismatch first.
+    annualized-scale figure), so ``scalar = min(1.0, target_vol / portfolio_vol)``
+    stayed pinned at 1.0 for every realistic hourly vol -- the throttle NEVER
+    de-risked.  The fix annualizes the per-bar portfolio vol by
+    ``sqrt(bars_per_year)`` (cadence inferred from the median observed bar
+    spacing) BEFORE the comparison.  On the 1h fixture a hurricane per-1h vol now
+    DE-RISKS the book, where the old horizon-mismatched code left the knob inert.
+
+    The postmortem's OTHER revival precondition -- a benchmark hedge leg for the
+    directional exposure -- is OUT of this fix's scope and REMAINS OPEN.
     """
     candidate = _make_candidate()
+    _feed(candidate, _ALL_SYMBOLS)  # seeds distinct 1h decision-bar epochs
+    assert len(candidate._recent_times) >= 3  # cadence is now inferable (~1h spacing)
     targets = {NIGHT: ("SHORT", -1.5, {}), GRIND: ("LONG", 1.5, {})}
-    for hourly_vol in (0.002, 0.005, 0.01, 0.02):
-        vols = {NIGHT: hourly_vol, GRIND: hourly_vol * 1.3}
-        _weights, scalar = candidate._inverse_vol_weights(targets, vols)
-        assert scalar == 1.0, (hourly_vol, scalar)
-    # Control: the scalar DOES de-risk once handed an annualized-scale vol > target,
-    # proving the pin above is a horizon-scale mismatch, not a dead code path.
-    _weights, scalar = candidate._inverse_vol_weights(targets, {NIGHT: 0.60, GRIND: 0.60})
-    assert scalar < 1.0
+    # High per-1h vol annualizes far above the 0.20 target -> throttle ENGAGES.
+    _weights, hot = candidate._inverse_vol_weights(targets, {NIGHT: 0.02, GRIND: 0.02 * 1.3})
+    assert hot < 1.0, hot
+    # Control (calm): a genuinely tiny per-1h vol annualizes below target -> the
+    # throttle stays at 1.0 and does NOT needlessly de-risk.
+    _weights, calm = candidate._inverse_vol_weights(targets, {NIGHT: 0.0002, GRIND: 0.0002 * 1.3})
+    assert calm == 1.0, calm
+    # Control (unknown cadence): a fresh candidate with no observed bars keeps the
+    # conservative unity scalar -- it never inflates leverage on an unknown horizon.
+    fresh = _make_candidate()
+    _weights, unknown = fresh._inverse_vol_weights(targets, {NIGHT: 0.02, GRIND: 0.02 * 1.3})
+    assert unknown == 1.0, unknown
 
 
 def test_run_twice_bit_identical() -> None:

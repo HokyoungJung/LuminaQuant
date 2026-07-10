@@ -366,6 +366,11 @@ class RebalancingPremiumHarvestStrategy(Strategy):
         gets the heaviest weight, spread by ``diversity_temperature``) and
         scales the result to ``target_gross_exposure``.  No return, momentum, or
         directional input enters here.
+
+        vol-target horizon classification: category C (NO vol site).  This sleeve
+        is forecast-free -- sizing is dollar-VOLUME (liquidity) ranked, never
+        realized-VOLATILITY targeted, and there is no ``target_vol`` parameter, so
+        the per-bar-vs-annual horizon bug does not arise.
         """
         symbols = list(dvs.keys())
         n = len(symbols)

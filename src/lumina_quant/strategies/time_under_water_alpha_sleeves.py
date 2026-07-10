@@ -69,6 +69,10 @@ from typing import Any
 
 from lumina_quant.core.plugin_registry import register
 from lumina_quant.indicators.alpha_features import realized_volatility
+from lumina_quant.indicators.annualization import (
+    annualize_per_bar_vol,
+    bars_per_year_from_spacing,
+)
 from lumina_quant.indicators.common import safe_float, time_key
 from lumina_quant.indicators.cross_sectional_residualize import cross_sectional_residualize
 from lumina_quant.indicators.rolling_stats import ts_regression_slope
@@ -80,6 +84,7 @@ from lumina_quant.strategies.external_alpha_sleeves import (
     _EPS,
     _Snapshot,
     _emit,
+    _event_datetime_utc,
     _event_symbols,
     _market_snapshot,
     _safe_non_negative_int,
@@ -292,6 +297,10 @@ class CrossSectionalTimeUnderWaterStrategy(Strategy):
         }
         self._last_eval_time_key = ""
         self._tick = 0
+        # Recent decision-bar epochs (seconds) for deterministic bar-spacing
+        # inference: the vol-target scalar annualizes the per-bar portfolio vol
+        # via sqrt(bars_per_year) derived from the median gap here.
+        self._recent_times: deque[float] = deque(maxlen=16)
 
     # ------------------------------------------------------------------ #
     # state
@@ -300,6 +309,7 @@ class CrossSectionalTimeUnderWaterStrategy(Strategy):
         return {
             "last_eval_time_key": self._last_eval_time_key,
             "tick": int(self._tick),
+            "recent_times": list(self._recent_times),
             "symbol_state": {
                 symbol: {
                     "closes": list(item.closes),
@@ -320,6 +330,11 @@ class CrossSectionalTimeUnderWaterStrategy(Strategy):
             return
         self._last_eval_time_key = str(state.get("last_eval_time_key", ""))
         self._tick = _safe_non_negative_int(state.get("tick"))
+        self._recent_times.clear()
+        for value in _coerce_float_list(state.get("recent_times"))[
+            -int(self._recent_times.maxlen or 0) :
+        ]:
+            self._recent_times.append(value)
         raw = state.get("symbol_state")
         if not isinstance(raw, dict):
             return
@@ -548,10 +563,21 @@ class CrossSectionalTimeUnderWaterStrategy(Strategy):
         total_inv = sum(inv.values())
         if total_inv <= _EPS:
             return {}, 1.0
+        # ``portfolio_vol`` is the inverse-vol-weighted PER-BAR vol; the
+        # ``inv / total_inv`` normalization above is scale-invariant (annualizing
+        # every vol_i cancels), so the risk-parity weights are horizon-free.
+        # The vol-target SCALAR, however, compares ``portfolio_vol`` against an
+        # annual-scale ``target_vol`` (0.20): annualize the per-bar estimate via
+        # sqrt(bars_per_year) inferred from observed bar spacing first, otherwise
+        # the Moreira-Muir clamp is INERT. When spacing is unavailable we pass
+        # through (scalar=1.0) rather than throttle on mismatched horizons.
         portfolio_vol = sum((inv[symbol] / total_inv) * vols[symbol] for symbol in inv)
         scalar = 1.0
         if self.target_vol > 0.0 and portfolio_vol > _EPS:
-            scalar = min(1.0, self.target_vol / portfolio_vol)
+            bars_per_year = bars_per_year_from_spacing(self._recent_times)
+            portfolio_vol_ann = annualize_per_bar_vol(portfolio_vol, bars_per_year)
+            if portfolio_vol_ann is not None and portfolio_vol_ann > _EPS:
+                scalar = min(1.0, self.target_vol / portfolio_vol_ann)
         weights = {
             symbol: (inv[symbol] / total_inv) * self.target_gross_exposure * scalar
             for symbol in inv
@@ -576,6 +602,11 @@ class CrossSectionalTimeUnderWaterStrategy(Strategy):
     def _evaluate(self, event_time: Any) -> None:
         if len(self.symbol_list) < self.min_symbols:
             return
+        # Record the decision-bar epoch so the vol-target scalar can infer bar
+        # spacing (this runs once per new bar, before the rebalance gate).
+        dt = _event_datetime_utc(event_time)
+        if dt is not None:
+            self._recent_times.append(dt.timestamp())
         # Stops / max-hold age EVERY bar so a held name is always protected,
         # independent of the slow weekly rebalance clock.
         self._age(event_time)

@@ -557,3 +557,107 @@ def test_slice_multi_timeframe_keys_and_bounds() -> None:
                 assert cell[clock] == factor * b[clock], (tf, clock)
             # Episode-frequency guard: the stress threshold is raised sub-daily.
             assert cell["z_entry"] > b["z_entry"], (tf, cell["variant"])
+
+
+# --------------------------------------------------------------------------- #
+# vol-target horizon regression (worker-vt2)
+#
+# The entry size scalar is ``min(1, target_vol / vol)`` where ``vol`` is a
+# PER-BAR realized vol; it MUST be annualized via sqrt(bars_per_year) from
+# observed bar spacing first, else the Moreira-Muir clamp is inert.  NOTE the
+# sleeve default is ``target_vol=0.0`` (throttle off), so these tests set it > 0.
+# --------------------------------------------------------------------------- #
+
+_VT_SYM = "A/USDT"
+_HOUR_EPOCHS = [1_700_000_000.0 + i * 3600.0 for i in range(12)]  # 1h spacing
+
+
+def _vt_fill(item: Any, factor_up: float, factor_dn: float) -> None:
+    """Fill a per-symbol state with an oscillating, net-declining close path.
+
+    Net decline (each up/down pair < 1) makes ``fade_return`` negative -> LONG;
+    the oscillation magnitude sets the per-bar realized vol the throttle reads.
+    """
+    price = 100.0
+    for i in range(26):  # >= min_history_bars (25) so _liquid passes
+        price *= factor_up if i % 2 == 0 else factor_dn
+        item.closes.append(price)
+        item.volumes.append(1000.0)
+
+
+def _vt_entry_signal(strat: Any, symbol: str) -> Any:
+    sigs = [s for s in strat.events.items if str(s.signal_type).upper() in {"LONG", "SHORT"}]
+    return sigs[-1] if sigs else None
+
+
+def test_vol_target_throttle_active_on_hourly_high_vol() -> None:
+    strat = _candidate([_VT_SYM], target_vol=0.20)
+    _vt_fill(strat._state[_VT_SYM], 1.04, 0.95)  # large per-bar vol
+    for epoch in _HOUR_EPOCHS:
+        strat._recent_times.append(epoch)
+    strat._maybe_enter(_VT_SYM, strat._state[_VT_SYM], _START, 3.0)
+    sig = _vt_entry_signal(strat, _VT_SYM)
+    assert sig is not None, strat.events.items
+    assert sig.metadata["inverse_vol_scalar"] < 1.0
+    assert sig.metadata["target_allocation"] < strat.base_allocation
+
+
+def test_vol_target_passthrough_without_bar_spacing() -> None:
+    strat = _candidate([_VT_SYM], target_vol=0.20)  # empty _recent_times
+    _vt_fill(strat._state[_VT_SYM], 1.04, 0.95)
+    strat._maybe_enter(_VT_SYM, strat._state[_VT_SYM], _START, 3.0)
+    sig = _vt_entry_signal(strat, _VT_SYM)
+    assert sig is not None, strat.events.items
+    assert sig.metadata["inverse_vol_scalar"] == 1.0  # pass-through, not throttled
+    assert sig.metadata["target_allocation"] == strat.base_allocation
+
+
+def test_vol_target_calm_leaves_size_unthrottled() -> None:
+    strat = _candidate([_VT_SYM], target_vol=0.20)
+    _vt_fill(strat._state[_VT_SYM], 1.001, 0.9985)  # mild vol -> annualized < target
+    for epoch in _HOUR_EPOCHS:
+        strat._recent_times.append(epoch)
+    strat._maybe_enter(_VT_SYM, strat._state[_VT_SYM], _START, 3.0)
+    sig = _vt_entry_signal(strat, _VT_SYM)
+    assert sig is not None, strat.events.items
+    assert sig.metadata["inverse_vol_scalar"] == 1.0
+
+
+def test_vol_target_size_scalar_deterministic() -> None:
+    scalars = []
+    for _ in range(2):
+        strat = _candidate([_VT_SYM], target_vol=0.20)
+        _vt_fill(strat._state[_VT_SYM], 1.04, 0.95)
+        for epoch in _HOUR_EPOCHS:
+            strat._recent_times.append(epoch)
+        strat._maybe_enter(_VT_SYM, strat._state[_VT_SYM], _START, 3.0)
+        scalars.append(_vt_entry_signal(strat, _VT_SYM).metadata["inverse_vol_scalar"])
+    assert scalars[0] == scalars[1]
+
+
+def test_vol_target_epochs_tracked_from_datetime_feed() -> None:
+    strat = _candidate([_VT_SYM])
+    for idx in range(6):
+        epoch = 1_700_000_000.0 + idx * 3600.0  # numeric epoch -> parsed to a datetime
+        row = {"open": 100.0, "high": 101.0, "low": 99.0, "close": 100.0, "volume": 1000.0}
+        strat.calculate_signals_window(
+            SimpleNamespace(
+                type="MARKET_WINDOW",
+                time=epoch,
+                bars_1s={_VT_SYM: [dict(row, time=epoch)]},
+            ),
+            None,
+        )
+    times = list(strat._recent_times)
+    assert len(times) >= 5, times
+    gaps = [round(times[i + 1] - times[i]) for i in range(len(times) - 1)]
+    assert gaps and all(gap == 3600 for gap in gaps), gaps
+
+
+def test_vol_target_recent_times_survive_state_roundtrip() -> None:
+    strat = _candidate([_VT_SYM])
+    for epoch in _HOUR_EPOCHS:
+        strat._recent_times.append(epoch)
+    restored = _candidate([_VT_SYM])
+    restored.set_state(strat.get_state())
+    assert list(restored._recent_times) == list(_HOUR_EPOCHS)
