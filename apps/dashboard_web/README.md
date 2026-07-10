@@ -4,6 +4,29 @@ The primary React/Next.js dashboard runtime for LuminaQuant. Launch it with
 `uv run lq dashboard --run` from the repository root (or `npm run dev` here for
 frontend-only work).
 
+## Setup & usage
+
+- **Data source**: every page reads run state from Postgres. Set
+  `LQ_POSTGRES_DSN` (or `storage.postgres_dsn` in `config.yaml`) before
+  launching; without it every surface renders a "Postgres DSN is not
+  configured" notice instead of silently-empty tables.
+- **Run / symbol selection**: pages backed by run state (`/performance-price`,
+  `/execution-analytics`, `/market-data`, `/raw-data`, `/report-export`) show a
+  Run selector fed by the latest 10 runs; `/market-data` also has a Symbol
+  selector over the run's traded universe. Selection refetches via
+  `?run_id=`/`?symbol=` query params, validated server-side before reaching the
+  Python argv.
+- **Job control (Stop/Kill on `/workflows`)**: the control route fails closed.
+  Set `LQ_DASHBOARD_CONTROL_TOKEN` in the environment that runs the dashboard,
+  then paste the same value into the "Control token" field on the Jobs page
+  (kept in `sessionStorage` for the browser session only — it is never
+  auto-injected by the server). Without the token, Stop/Kill requests are
+  rejected with an explanatory error.
+- **Security model**: the dashboard is intended for localhost only. The
+  middleware rejects non-localhost API access unless a valid
+  `x-lq-control-token` header is present; state-changing POSTs always require
+  the token. Do not expose the port to the internet.
+
 ## What it serves
 
 Thirteen operator pages, each backed by a Python payload service through the

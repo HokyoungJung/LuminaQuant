@@ -248,6 +248,8 @@ Primary driver: `simulate_symbol_fold` Rust kernel replaces the pure-Python per-
 
 The workflows route lists managed backtest, optimize, and live jobs with polling status and two-step stop/kill controls.
 
+Usage: set `LQ_POSTGRES_DSN` (or `storage.postgres_dsn` in `config.yaml`) so the dashboard can read run state — every page shows an actionable notice when it is missing. Stop/Kill on `/workflows` requires `LQ_DASHBOARD_CONTROL_TOKEN` in the dashboard environment plus pasting the same token into the Jobs page control-token field (fail-closed; see `apps/dashboard_web/README.md`).
+
 ---
 
 ## Live Trading Safety Model
