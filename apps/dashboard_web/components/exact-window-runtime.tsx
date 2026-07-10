@@ -1,72 +1,129 @@
 'use client';
 
+import { PageContextBar } from '@/components/page-context-bar';
+import { SurfaceState } from '@/components/surface-state';
 import type { ExactWindowPayload } from '@/lib/dashboard-contracts';
 import { buildExactWindowEmptyState } from '@/lib/exact-window-status';
+import {
+  formatCompactTimestamp,
+  formatNumber,
+  formatPercent,
+  pnlClass,
+} from '@/lib/format';
 import { useBridgeFetch } from '@/lib/use-bridge-fetch';
 
-function formatNumber(value: number | null, digits = 2): string {
-  if (typeof value !== 'number' || Number.isNaN(value)) {
-    return 'n/a';
+/** Drawdown magnitude reads as a loss regardless of sign convention. */
+function drawdownClass(value: number | null): 'pnl-neg' | undefined {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value === 0) {
+    return undefined;
   }
-  return value.toFixed(digits);
+  return 'pnl-neg';
 }
 
-function formatPercent(value: number | null): string {
-  if (typeof value !== 'number' || Number.isNaN(value)) {
-    return 'n/a';
+/** Promoted rows get an ok pill; rejected rows list warn-toned reason chips. */
+function PromotionCell({
+  promoted,
+  rejectReasons,
+}: {
+  promoted: boolean;
+  rejectReasons: string[];
+}) {
+  if (promoted) {
+    return <span className="status-pill status-ok">promoted</span>;
   }
-  return `${(value * 100).toFixed(2)}%`;
+  if (rejectReasons.length === 0) {
+    return <>n/a</>;
+  }
+  return (
+    <span style={{ display: 'inline-flex', flexWrap: 'wrap', gap: '0.3rem' }}>
+      {rejectReasons.map((reason) => (
+        <span key={reason} className="warn-chip">
+          {reason}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+/** Portfolio weight rendered as percent plus an inline proportion bar. */
+function WeightCell({ weight }: { weight: number | null }) {
+  const pct =
+    typeof weight === 'number' && Number.isFinite(weight)
+      ? Math.max(0, Math.min(100, weight * 100))
+      : 0;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+      <span aria-hidden className="inline-bar">
+        <span className="inline-bar-fill" style={{ width: `${pct}%` }} />
+      </span>
+      <span>{formatPercent(weight)}</span>
+    </div>
+  );
 }
 
 export function ExactWindowRuntime() {
-  const { payload, error } = useBridgeFetch<ExactWindowPayload>(
+  const { payload, error, loading, refetch, lastFetchedAt } = useBridgeFetch<ExactWindowPayload>(
     '/api/python/dashboard/exact-window',
-    'exact-window bridge failed',
+    'exact-window research request failed',
   );
 
   if (error) {
-    return <p>{error}</p>;
+    return <SurfaceState error={error} surface="exact-window research" onRetry={refetch} />;
   }
   if (payload === null) {
-    return <p>Loading exact-window parity payload…</p>;
+    return <p>Loading exact-window research summary…</p>;
   }
+
+  const contextBar = (
+    <PageContextBar
+      asOf={payload.as_of}
+      status={payload.status}
+      lastFetchedAt={lastFetchedAt}
+      onRefresh={refetch}
+      loading={loading}
+    />
+  );
+
   if (payload.status !== 'ok') {
     const emptyState = buildExactWindowEmptyState(payload.status, payload.error);
 
     return (
-      <section className="section-card">
-        <div className="section-header">
-          <div>
-            <p className="eyebrow">Exact-window parity</p>
-            <h3>Artifact bundle unavailable</h3>
+      <div className="page-stack">
+        {contextBar}
+        <section className="section-card">
+          <div className="section-header">
+            <div>
+              <p className="eyebrow">Exact-window research</p>
+              <h3>Research bundle unavailable</h3>
+            </div>
+            <div className="metric-badge">{payload.status}</div>
           </div>
-          <div className="metric-badge">{payload.status}</div>
-        </div>
-        <p>{emptyState.message}</p>
-        {emptyState.detail ? <p>{emptyState.detail}</p> : null}
-        {payload.root || payload.run_root ? (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Field</th>
-                  <th>Value</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>Bundle Root</td>
-                  <td>{payload.root || 'n/a'}</td>
-                </tr>
-                <tr>
-                  <td>Run Root</td>
-                  <td>{payload.run_root || 'n/a'}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        ) : null}
-      </section>
+          <p>{emptyState.message}</p>
+          {emptyState.detail ? <p>{emptyState.detail}</p> : null}
+          {payload.root || payload.run_root ? (
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Field</th>
+                    <th>Value</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Bundle Root</td>
+                    <td>{payload.root || 'n/a'}</td>
+                  </tr>
+                  <tr>
+                    <td>Run Root</td>
+                    <td>{payload.run_root || 'n/a'}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+        </section>
+      </div>
     );
   }
 
@@ -74,6 +131,7 @@ export function ExactWindowRuntime() {
 
   return (
     <div className="page-stack">
+      {contextBar}
       <div className="metric-grid">
         <article>
           <span>Candidate Count</span>
@@ -144,10 +202,12 @@ export function ExactWindowRuntime() {
       <section className="section-card">
         <div className="section-header">
           <div>
-            <p className="eyebrow">Artifact provenance</p>
-            <h3>Latest bundle pointers</h3>
+            <p className="eyebrow">Provenance</p>
+            <h3>Latest research bundle</h3>
           </div>
-          <div className="metric-badge">{payload.generated_at ?? 'pending'}</div>
+          <div className="metric-badge">
+            {payload.generated_at ? formatCompactTimestamp(payload.generated_at) : 'pending'}
+          </div>
         </div>
         <div className="table-wrap">
           <table>
@@ -160,7 +220,7 @@ export function ExactWindowRuntime() {
             <tbody>
               <tr>
                 <td>Generated At</td>
-                <td>{payload.generated_at ?? 'n/a'}</td>
+                <td>{formatCompactTimestamp(payload.generated_at)}</td>
               </tr>
               <tr>
                 <td>Bundle Root</td>
@@ -178,7 +238,7 @@ export function ExactWindowRuntime() {
       <section className="section-card">
         <div className="section-header">
           <div>
-            <p className="eyebrow">Timeframe parity</p>
+            <p className="eyebrow">Per-timeframe results</p>
             <h3>Best row per timeframe</h3>
           </div>
           <div className="metric-badge">{payload.timeframes.length} rows</div>
@@ -195,7 +255,7 @@ export function ExactWindowRuntime() {
                   <th>Sharpe</th>
                   <th>Max DD</th>
                   <th>Trades</th>
-                  <th>Reject Reasons</th>
+                  <th>Outcome</th>
                 </tr>
               </thead>
               <tbody>
@@ -204,26 +264,32 @@ export function ExactWindowRuntime() {
                     <td>{row.timeframe || 'n/a'}</td>
                     <td>{row.name || row.candidate_id || 'n/a'}</td>
                     <td>{row.family || 'n/a'}</td>
-                    <td>{formatPercent(row.oos_return)}</td>
-                    <td>{formatNumber(row.oos_sharpe, 3)}</td>
-                    <td>{formatPercent(row.oos_max_drawdown)}</td>
-                    <td>{formatNumber(row.trade_count, 0)}</td>
-                    <td>{row.reject_reasons.join(', ') || (row.promoted ? 'promoted' : 'n/a')}</td>
+                    <td className={pnlClass(row.oos_return) || undefined}>
+                      {formatPercent(row.oos_return)}
+                    </td>
+                    <td>{formatNumber(row.oos_sharpe, { digits: 3 })}</td>
+                    <td className={drawdownClass(row.oos_max_drawdown)}>
+                      {formatPercent(row.oos_max_drawdown)}
+                    </td>
+                    <td>{formatNumber(row.trade_count, { digits: 0 })}</td>
+                    <td>
+                      <PromotionCell promoted={row.promoted} rejectReasons={row.reject_reasons} />
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         ) : (
-          <p>No timeframe-level summary rows were exported in the latest artifact bundle.</p>
+          <p>No timeframe-level summary rows were exported in the latest research bundle.</p>
         )}
       </section>
 
       <section className="section-card">
         <div className="section-header">
           <div>
-            <p className="eyebrow">Candidate parity</p>
-            <h3>Top strategy rows</h3>
+            <p className="eyebrow">Top candidates</p>
+            <h3>Strongest strategy rows</h3>
           </div>
           <div className="metric-badge">{payload.top_candidates.length} rows</div>
         </div>
@@ -238,6 +304,7 @@ export function ExactWindowRuntime() {
                   <th>OOS Return</th>
                   <th>Sharpe</th>
                   <th>Max DD</th>
+                  <th>Outcome</th>
                 </tr>
               </thead>
               <tbody>
@@ -246,9 +313,16 @@ export function ExactWindowRuntime() {
                     <td>{row.name || row.candidate_id || 'n/a'}</td>
                     <td>{row.timeframe || 'n/a'}</td>
                     <td>{row.family || 'n/a'}</td>
-                    <td>{formatPercent(row.oos_return)}</td>
-                    <td>{formatNumber(row.oos_sharpe, 3)}</td>
-                    <td>{formatPercent(row.oos_max_drawdown)}</td>
+                    <td className={pnlClass(row.oos_return) || undefined}>
+                      {formatPercent(row.oos_return)}
+                    </td>
+                    <td>{formatNumber(row.oos_sharpe, { digits: 3 })}</td>
+                    <td className={drawdownClass(row.oos_max_drawdown)}>
+                      {formatPercent(row.oos_max_drawdown)}
+                    </td>
+                    <td>
+                      <PromotionCell promoted={row.promoted} rejectReasons={row.reject_reasons} />
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -262,7 +336,7 @@ export function ExactWindowRuntime() {
       <section className="section-card">
         <div className="section-header">
           <div>
-            <p className="eyebrow">Portfolio parity</p>
+            <p className="eyebrow">Portfolio construction</p>
             <h3>Current fallback construction</h3>
           </div>
           <div className="metric-badge">{payload.portfolio_weights.length} sleeves</div>
@@ -270,15 +344,19 @@ export function ExactWindowRuntime() {
         <div className="metric-grid">
           <article>
             <span>Portfolio OOS Return</span>
-            <strong>{formatPercent(payload.portfolio.oos_return)}</strong>
+            <strong className={pnlClass(payload.portfolio.oos_return) || undefined}>
+              {formatPercent(payload.portfolio.oos_return)}
+            </strong>
           </article>
           <article>
             <span>Portfolio OOS Sharpe</span>
-            <strong>{formatNumber(payload.portfolio.oos_sharpe, 3)}</strong>
+            <strong>{formatNumber(payload.portfolio.oos_sharpe, { digits: 3 })}</strong>
           </article>
           <article>
             <span>Portfolio Max DD</span>
-            <strong>{formatPercent(payload.portfolio.oos_max_drawdown)}</strong>
+            <strong className={drawdownClass(payload.portfolio.oos_max_drawdown)}>
+              {formatPercent(payload.portfolio.oos_max_drawdown)}
+            </strong>
           </article>
           <article>
             <span>Valid Strategy Found</span>
@@ -304,9 +382,13 @@ export function ExactWindowRuntime() {
                     <td>{row.name || 'n/a'}</td>
                     <td>{row.timeframe || 'n/a'}</td>
                     <td>{row.family || 'n/a'}</td>
-                    <td>{formatPercent(row.weight)}</td>
-                    <td>{formatPercent(row.oos_return)}</td>
-                    <td>{formatNumber(row.oos_sharpe, 3)}</td>
+                    <td>
+                      <WeightCell weight={row.weight} />
+                    </td>
+                    <td className={pnlClass(row.oos_return) || undefined}>
+                      {formatPercent(row.oos_return)}
+                    </td>
+                    <td>{formatNumber(row.oos_sharpe, { digits: 3 })}</td>
                   </tr>
                 ))}
               </tbody>
@@ -321,8 +403,8 @@ export function ExactWindowRuntime() {
         <section className="section-card">
           <div className="section-header">
             <div>
-              <p className="eyebrow">Operator notes</p>
-              <h3>Migration-safe context</h3>
+              <p className="eyebrow">Run notes</p>
+              <h3>Context captured with the bundle</h3>
             </div>
           </div>
           <div className="table-wrap">

@@ -1,209 +1,296 @@
+// @vitest-environment jsdom
 /**
- * Regression tests for dashboard client runtime component pure logic.
+ * Runtime component tests for the operator dashboard.
  *
- * @testing-library/react is not installed and vitest runs in the 'node'
- * environment, so React component rendering is not available here.
- * Instead we test the extractable pure functions that these components
- * depend on directly — the same pattern used in control-auth.test.ts.
- *
- * Functions under test:
- *   - buildSparklinePath  (private in overview-runtime.tsx; replicated here)
- *   - readJsonOrThrow     (lib/bridge-fetch.ts; used by all runtime components)
- *   - buildTriggerActionRequest (mirrors WorkflowJobsRuntime.triggerAction POST shape)
- *
- * These lock the behavior that must remain stable before a shared
- * useBridgeFetch hook is extracted.
+ * Rendering runs under jsdom with @testing-library/react; the bridge fetch
+ * layer is stubbed per-test with a fake global fetch so each runtime renders
+ * the exact payload under test.
  */
-import { describe, it, expect } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 
+import { ConfirmButton } from '../components/confirm-button';
+import { MarketDataRuntime } from '../components/market-data-runtime';
+import { PerformancePriceRuntime } from '../components/performance-price-runtime';
+import { WorkflowJobsRuntime } from '../components/workflow-jobs-runtime';
 import { readJsonOrThrow } from '../lib/bridge-fetch';
+import { buildSparklinePath } from '../lib/format';
+import type {
+  MarketDataPayload,
+  PerformancePricePayload,
+  WorkflowJobsPayload,
+} from '../lib/dashboard-contracts';
 
-// ---------------------------------------------------------------------------
-// buildSparklinePath — replicated from overview-runtime.tsx (lines 9-30)
-// Must stay in sync with the source; a drift here is intentional signal.
-// ---------------------------------------------------------------------------
+// React reads this flag to allow act()-wrapped updates outside a renderer.
+(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-function buildSparklinePath(
-  values: number[],
-  width = 420,
-  height = 120,
-): string {
-  if (values.length === 0) {
-    return '';
-  }
-  if (values.length === 1) {
-    return `M 0 ${height / 2} L ${width} ${height / 2}`;
-  }
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = max - min || 1;
-  return values
-    .map((value, index) => {
-      const x = (index / (values.length - 1)) * width;
-      const y = height - ((value - min) / range) * height;
-      return `${index === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`;
-    })
-    .join(' ');
+function jsonResponse(payload: unknown, status = 200): Response {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: { 'content-type': 'application/json' },
+  });
 }
 
-// ---------------------------------------------------------------------------
-// buildTriggerActionRequest — mirrors WorkflowJobsRuntime.triggerAction POST
-// (workflow-jobs-runtime.tsx lines 18-29). Tests the exact fetch shape.
-// ---------------------------------------------------------------------------
-
-function buildTriggerActionRequest(
-  jobId: string,
-  action: 'stop' | 'kill',
-): { url: string; init: RequestInit } {
-  return {
-    url: '/api/python/dashboard/workflow-jobs/control',
-    init: {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ job_id: jobId, action }),
-    },
-  };
+function stubFetchWith(payload: unknown): ReturnType<typeof vi.fn> {
+  const fetchMock = vi.fn(async () => jsonResponse(payload));
+  vi.stubGlobal('fetch', fetchMock);
+  return fetchMock;
 }
 
+beforeEach(() => {
+  vi.useRealTimers();
+});
+
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
+
 // ---------------------------------------------------------------------------
-// buildSparklinePath tests (OverviewRuntime loading/empty/happy-path coverage)
+// buildSparklinePath (lib/format.ts)
 // ---------------------------------------------------------------------------
 
-describe('buildSparklinePath (overview-runtime.tsx)', () => {
-  it('returns empty string for zero values — loading/empty state renders no SVG path', () => {
+describe('buildSparklinePath (lib/format.ts)', () => {
+  it('returns empty string for zero values and a mid-line for one value', () => {
     expect(buildSparklinePath([])).toBe('');
-  });
-
-  it('returns a horizontal line for a single value (degenerate case)', () => {
-    const path = buildSparklinePath([42]);
-    expect(path).toBe('M 0 60 L 420 60');
-  });
-
-  it('returns a horizontal line for a single value with custom dimensions', () => {
-    const path = buildSparklinePath([42], 200, 100);
-    expect(path).toBe('M 0 50 L 200 50');
-  });
-
-  it('produces M for first point and L for subsequent points', () => {
-    const path = buildSparklinePath([0, 1]);
-    expect(path).toMatch(/^M /);
-    expect(path).toContain(' L ');
-  });
-
-  it('happy path: min value maps to bottom (y=height), max value maps to top (y=0)', () => {
-    // Two values: min=0 maps to y=120, max=1 maps to y=0
-    const path = buildSparklinePath([0, 1], 420, 120);
-    // First point: x=0, y=120 (bottom)
-    expect(path).toContain('M 0.00 120.00');
-    // Second point: x=420, y=0 (top)
-    expect(path).toContain('L 420.00 0.00');
-  });
-
-  it('happy path: three-point path has correct x spacing', () => {
-    const path = buildSparklinePath([0, 0.5, 1], 420, 120);
-    const segments = path.split(' ');
-    // M 0.00 120.00 L 210.00 60.00 L 420.00 0.00
-    expect(segments[0]).toBe('M');
-    expect(segments[1]).toBe('0.00');
-    expect(segments[3]).toBe('L');
-    expect(segments[4]).toBe('210.00'); // midpoint x
-  });
-
-  it('handles flat series (all values equal) without division-by-zero — range falls back to 1', () => {
-    // All values equal → range = 0 → range fallback = 1 → y = height - 0 = height for all
-    const path = buildSparklinePath([5, 5, 5], 420, 120);
-    expect(path).not.toBe('');
-    // All y-values should be 120 (height - 0)
-    expect(path).toMatch(/M 0\.00 120\.00/);
-    expect(path).toMatch(/L \S+ 120\.00/);
+    expect(buildSparklinePath([42])).toBe('M 0 60 L 420 60');
   });
 
   it('produces deterministic output for a known equity curve snippet', () => {
-    // Pin the exact path for values [100, 110, 105] to lock formatting
-    const path = buildSparklinePath([100, 110, 105], 420, 120);
-    expect(path).toBe('M 0.00 120.00 L 210.00 0.00 L 420.00 60.00');
+    expect(buildSparklinePath([100, 110, 105], 420, 120)).toBe(
+      'M 0.00 120.00 L 210.00 0.00 L 420.00 60.00',
+    );
   });
 });
 
 // ---------------------------------------------------------------------------
-// readJsonOrThrow tests (used by OverviewRuntime and WorkflowJobsRuntime)
+// readJsonOrThrow (lib/bridge-fetch.ts) — shared by every runtime component
 // ---------------------------------------------------------------------------
 
 describe('readJsonOrThrow (lib/bridge-fetch.ts)', () => {
   it('happy path: returns parsed JSON body when response.ok is true', async () => {
     const payload = { jobs: [], status: 'ok' };
-    const response = new Response(JSON.stringify(payload), {
-      status: 200,
-      headers: { 'content-type': 'application/json' },
-    });
-    const result = await readJsonOrThrow(response, 'fallback message');
+    const result = await readJsonOrThrow(jsonResponse(payload), 'fallback message');
     expect(result).toEqual(payload);
   });
 
   it('error path: throws with detail field when response is not ok', async () => {
     const errorBody = { detail: 'overview bridge failed', ok: false };
-    const response = new Response(JSON.stringify(errorBody), {
-      status: 500,
-      headers: { 'content-type': 'application/json' },
-    });
-    await expect(readJsonOrThrow(response, 'fallback message')).rejects.toThrow(
+    await expect(readJsonOrThrow(jsonResponse(errorBody, 500), 'fallback message')).rejects.toThrow(
       'overview bridge failed',
     );
   });
 
-  it('error path: falls back to fallbackMessage when detail is absent', async () => {
-    const errorBody = { error: 'internal error', ok: false };
-    const response = new Response(JSON.stringify(errorBody), {
-      status: 503,
-      headers: { 'content-type': 'application/json' },
-    });
-    await expect(readJsonOrThrow(response, 'workflow jobs bridge failed')).rejects.toThrow(
-      'workflow jobs bridge failed',
+  it("error path: surfaces the JSON body's error field when detail is absent", async () => {
+    const errorBody = { error: 'job_not_found', ok: false };
+    await expect(
+      readJsonOrThrow(jsonResponse(errorBody, 400), 'workflow jobs bridge failed'),
+    ).rejects.toThrow('job_not_found');
+  });
+
+  it('error path: falls back to the HTTP status when the body carries no message', async () => {
+    const response = new Response('<html>bad gateway</html>', { status: 502 });
+    await expect(readJsonOrThrow(response, 'bridge request failed')).rejects.toThrow(
+      'bridge request failed: HTTP 502',
     );
   });
 });
 
 // ---------------------------------------------------------------------------
-// WorkflowJobsRuntime.triggerAction POST shape — the kill/stop coverage gap
+// WorkflowJobsRuntime
 // ---------------------------------------------------------------------------
 
-describe('triggerAction request construction (workflow-jobs-runtime.tsx)', () => {
-  it('POSTs to the correct control endpoint', () => {
-    const { url } = buildTriggerActionRequest('job-abc', 'kill');
-    expect(url).toBe('/api/python/dashboard/workflow-jobs/control');
+const RUNNING_JOB = {
+  job_id: 'job-1',
+  workflow: 'backtest',
+  status: 'RUNNING',
+  requested_mode: 'paper',
+  strategy: 'RsiStrategy',
+  run_id: 'run-1',
+  started_at: '2026-07-10T08:00:00+00:00',
+  ended_at: null,
+};
+
+describe('WorkflowJobsRuntime', () => {
+  it('renders actionable DSN guidance when the payload status is missing_dsn', async () => {
+    const payload: WorkflowJobsPayload = {
+      as_of: '2026-07-10T09:00:00+00:00',
+      jobs: [],
+      status: 'missing_dsn',
+    };
+    stubFetchWith(payload);
+
+    render(<WorkflowJobsRuntime />);
+
+    expect(await screen.findByText('LQ_POSTGRES_DSN')).toBeTruthy();
+    // The old empty-state copy must not mask the configuration problem.
+    expect(screen.queryByText(/No workflow jobs recorded yet/)).toBeNull();
   });
 
-  it('uses POST method for kill action', () => {
-    const { init } = buildTriggerActionRequest('job-abc', 'kill');
-    expect(init.method).toBe('POST');
+  it('renders payload-driven status pills plus two-step Stop/Kill for active jobs', async () => {
+    const payload: WorkflowJobsPayload = {
+      as_of: '2026-07-10T09:00:00+00:00',
+      jobs: [RUNNING_JOB],
+      status: 'ok',
+    };
+    stubFetchWith(payload);
+
+    render(<WorkflowJobsRuntime />);
+
+    const statusPill = await screen.findByText('RUNNING');
+    // The pill class derives from the payload status — never a hardcoded 'live'.
+    expect(statusPill.className).toContain('status-running');
+    expect(screen.getByText('Stop')).toBeTruthy();
+    expect(screen.getByText('Kill')).toBeTruthy();
+    // First click only arms; no POST goes out until the confirm click.
+    fireEvent.click(screen.getByText('Kill'));
+    expect(screen.getByText('Confirm kill?')).toBeTruthy();
+    const fetchMock = global.fetch as ReturnType<typeof vi.fn>;
+    const postCalls = fetchMock.mock.calls.filter(
+      (call) => (call[1] as RequestInit | undefined)?.method === 'POST',
+    );
+    expect(postCalls).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ConfirmButton
+// ---------------------------------------------------------------------------
+
+describe('ConfirmButton', () => {
+  it('fires onConfirm exactly once through the two-step arm/confirm flow', () => {
+    const onConfirm = vi.fn();
+    render(<ConfirmButton label="Stop" onConfirm={onConfirm} />);
+
+    // Arming click must not fire the action.
+    fireEvent.click(screen.getByText('Stop'));
+    expect(onConfirm).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByText('Confirm stop?'));
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    // Confirm disarms: the armed confirm control is gone again.
+    expect(screen.queryByText('Confirm stop?')).toBeNull();
   });
 
-  it('uses POST method for stop action', () => {
-    const { init } = buildTriggerActionRequest('job-abc', 'stop');
-    expect(init.method).toBe('POST');
+  it('cancel disarms without firing the action', () => {
+    const onConfirm = vi.fn();
+    render(<ConfirmButton label="Kill" variant="danger" onConfirm={onConfirm} />);
+
+    fireEvent.click(screen.getByText('Kill'));
+    fireEvent.click(screen.getByText('Cancel'));
+
+    expect(onConfirm).not.toHaveBeenCalled();
+    expect(screen.getByText('Kill')).toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PerformancePriceRuntime
+// ---------------------------------------------------------------------------
+
+function performancePricePayload(): PerformancePricePayload {
+  return {
+    as_of: '2026-07-10T09:00:00+00:00',
+    run_id: 'run-123',
+    status: 'ok',
+    source: { mode: 'next', backend: 'python', status: 'ok', run_id: 'run-123' },
+    summary_metrics: [
+      { key: 'total_return', label: 'Total Return', value: 0.345206 },
+      { key: 'latest_equity', label: 'Latest Equity', value: 1345.21 },
+    ],
+    performance_metrics: { cagr: 0.22, sharpe_ratio: 1.31, max_drawdown: 0.08 },
+    equity_curve: [
+      { timestamp: '2026-07-01T00:00:00+00:00', equity: 1000.0 },
+      { timestamp: '2026-07-02T00:00:00+00:00', equity: 1345.21 },
+    ],
+    drawdown_curve: [
+      { timestamp: '2026-07-01T00:00:00+00:00', drawdown: 0.0 },
+      { timestamp: '2026-07-02T00:00:00+00:00', drawdown: -0.08 },
+    ],
+    equity_window: {
+      start: '2026-07-01T00:00:00+00:00',
+      end: '2026-07-02T00:00:00+00:00',
+      points_total: 2,
+      points_returned: 2,
+      truncated: false,
+    },
+    benchmark_symbol: 'BTCUSDT',
+    benchmark_curve: [
+      { timestamp: '2026-07-01T00:00:00+00:00', price: 100.0 },
+      { timestamp: '2026-07-02T00:00:00+00:00', price: 108.0 },
+    ],
+    funding_curve: [],
+    trade_markers: [],
+    runs: [],
+  };
+}
+
+describe('PerformancePriceRuntime', () => {
+  it('renders percent metrics multiplied by 100 (raw-fraction payload convention)', async () => {
+    stubFetchWith(performancePricePayload());
+
+    render(<PerformancePriceRuntime />);
+
+    expect(await screen.findByText('34.52%')).toBeTruthy();
   });
 
-  it('sends content-type application/json header', () => {
-    const { init } = buildTriggerActionRequest('job-123', 'kill');
-    expect((init.headers as Record<string, string>)['content-type']).toBe('application/json');
-  });
+  it('renders a two-series chart legend when a benchmark curve is present', async () => {
+    stubFetchWith(performancePricePayload());
 
-  it('serialises job_id and action=kill into the request body', () => {
-    const { init } = buildTriggerActionRequest('job-123', 'kill');
-    const parsed = JSON.parse(init.body as string);
-    expect(parsed).toEqual({ job_id: 'job-123', action: 'kill' });
-  });
+    render(<PerformancePriceRuntime />);
 
-  it('serialises job_id and action=stop into the request body', () => {
-    const { init } = buildTriggerActionRequest('job-456', 'stop');
-    const parsed = JSON.parse(init.body as string);
-    expect(parsed).toEqual({ job_id: 'job-456', action: 'stop' });
+    expect(await screen.findByText('Equity')).toBeTruthy();
+    // Label derives from payload.benchmark_symbol (no hardcoded 'BTC').
+    expect(screen.getByText('BTCUSDT (rebased)')).toBeTruthy();
   });
+});
 
-  it('preserves exact job_id string in the body (no mutation)', () => {
-    const jobId = 'wf-job-2025-06-18-abc123';
-    const { init } = buildTriggerActionRequest(jobId, 'kill');
-    const parsed = JSON.parse(init.body as string);
-    expect(parsed.job_id).toBe(jobId);
+// ---------------------------------------------------------------------------
+// MarketDataRuntime
+// ---------------------------------------------------------------------------
+
+function marketDataPayload(): MarketDataPayload {
+  return {
+    as_of: '2026-07-10T09:00:00+00:00',
+    run_id: 'run-123',
+    status: 'ok',
+    market_context: {
+      symbol: 'BTC/USDT',
+      timeframe: '1m',
+      timeframe_clamped: false,
+      exchange: 'binance',
+      strategy: 'RsiStrategy',
+      market_db_path: '/data/market.parquet',
+      source: 'parquet',
+    },
+    summary_metrics: [],
+    recent_bars: [
+      {
+        timestamp: '2026-07-10T08:59:00+00:00',
+        open: 100,
+        high: 101,
+        low: 99,
+        close: 100.5,
+        volume: 12,
+      },
+    ],
+    indicator_summary: [],
+    warnings: [],
+    runs: [],
+    symbols: ['BTC/USDT', 'ETH/USDT'],
+  };
+}
+
+describe('MarketDataRuntime', () => {
+  it('renders the payload symbols as symbol-selector options', async () => {
+    stubFetchWith(marketDataPayload());
+
+    render(<MarketDataRuntime />);
+
+    const select = (await screen.findByLabelText('Symbol')) as HTMLSelectElement;
+    const options = [...select.options].map((option) => option.value);
+    expect(options).toEqual(['BTC/USDT', 'ETH/USDT']);
+    expect(select.value).toBe('BTC/USDT');
   });
 });

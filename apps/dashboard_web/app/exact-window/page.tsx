@@ -1,23 +1,19 @@
 import { ExactWindowRuntime } from '@/components/exact-window-runtime';
 
+export const metadata = { title: 'Exact Window · LuminaQuant' };
+
 export default function ExactWindowPage() {
   return (
     <div className="page-stack">
       <section className="hero-card">
-        <p className="eyebrow">Exact-window parity</p>
-        <h2>Research bundle snapshot</h2>
+        <p className="eyebrow">Research</p>
+        <h2>Which candidates survived the latest exact-window run?</h2>
         <p>
-          This route keeps the migration SSR-first by reading the existing exact-window artifact bundle instead of re-running the heavy
-          research workflow inside Next.js.
+          Summary of the most recent exact-window research bundle: promoted candidates,
+          per-timeframe winners, and the fallback portfolio construction.
         </p>
       </section>
       <section className="section-card">
-        <div className="section-header">
-          <div>
-            <p className="eyebrow">Python-backed bundle summary</p>
-            <h3>Latest exact-window artifacts</h3>
-          </div>
-        </div>
         <ExactWindowRuntime />
       </section>
     </div>

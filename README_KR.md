@@ -242,11 +242,11 @@ Phase 4 리팩터 트리를 Phase 0 순수 Python 기준선과 비교한 측정 
 
 ## 대시보드
 
-`uv run lq dashboard --run`으로 Next.js 15 프런트엔드를 시작합니다. Python 백엔드는 10개의 Next.js 라우트가 소비하는 `DashboardBridgeContractV2` JSON 계약을 노출합니다:
+`uv run lq dashboard --run`으로 Next.js 15 프런트엔드를 시작합니다. Python 백엔드는 13개의 Next.js 라우트가 소비하는 `DashboardBridgeContractV2` JSON 계약을 노출합니다:
 
-`/`(홈) · `/performance-price` · `/risk-health` · `/optimization-insights` · `/market-data` · `/execution-analytics` · `/exact-window` · `/raw-data` · `/report-export` · `/workflows`
+`/`(홈) · `/performance-price` · `/market-data` · `/optimization-insights` · `/exact-window` · `/factor-insights` · `/alpha-evidence` · `/execution-analytics` · `/risk-health` · `/workflows` · `/raw-data` · `/report-export` · `/system`
 
-workflows 라우트는 비동기 잡 관리와 로그 스트리밍을 갖춘 백테스트·최적화·실거래 세션의 코드 없는 실행 컨트롤을 제공합니다.
+workflows 라우트는 관리형 백테스트·최적화·실거래 잡을 폴링 상태와 2단계 stop/kill 컨트롤과 함께 보여줍니다.
 
 ---
 

@@ -4,9 +4,10 @@ import { loadExecutionAnalyticsFromPython } from '@/lib/execution-analytics-serv
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    return NextResponse.json(await loadExecutionAnalyticsFromPython());
+    const runId = new URL(request.url).searchParams.get('run_id');
+    return NextResponse.json(await loadExecutionAnalyticsFromPython({ runId }));
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     return NextResponse.json(

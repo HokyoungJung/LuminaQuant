@@ -4,9 +4,10 @@ import { loadReportExportFromPython } from '@/lib/report-export-server';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    return NextResponse.json(await loadReportExportFromPython());
+    const runId = new URL(request.url).searchParams.get('run_id');
+    return NextResponse.json(await loadReportExportFromPython({ runId }));
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     return NextResponse.json(

@@ -19,22 +19,24 @@ describe('dashboard bridge contract', () => {
     ]);
   });
 
-  it('marks the migrated routes as available in navigation order', () => {
+  it('marks the migrated routes as available in operator navigation order', () => {
     const availableRoutes = navigationItems.filter((item) => item.status === 'available');
 
-    expect(availableRoutes).toHaveLength(11);
+    expect(availableRoutes).toHaveLength(13);
     expect(availableRoutes.map((item) => item.href)).toEqual([
       '/',
       '/performance-price',
-      '/execution-analytics',
       '/market-data',
       '/optimization-insights',
-      '/workflows',
-      '/risk-health',
       '/exact-window',
-      '/report-export',
-      '/raw-data',
       '/factor-insights',
+      '/alpha-evidence',
+      '/execution-analytics',
+      '/risk-health',
+      '/workflows',
+      '/raw-data',
+      '/report-export',
+      '/system',
     ]);
   });
 
