@@ -81,12 +81,17 @@ from typing import Any
 
 from lumina_quant.core.plugin_registry import register
 from lumina_quant.indicators.alpha_features import realized_volatility, simple_return
+from lumina_quant.indicators.annualization import (
+    annualize_per_bar_vol,
+    bars_per_year_from_spacing,
+)
 from lumina_quant.indicators.common import safe_float, time_key
 from lumina_quant.indicators.hl_spread import corwin_schultz_spread
 from lumina_quant.strategies.external_alpha_sleeves import (
     _EPS,
     _Snapshot,
     _emit,
+    _event_datetime_utc,
     _event_symbols,
     _market_snapshot,
     _safe_non_negative_int,
@@ -257,6 +262,10 @@ class SpreadStressLiquidityReversionStrategy(Strategy):
         }
         self._last_eval_time_key = ""
         self._tick = 0
+        # Recent decision-bar epochs (seconds) for deterministic bar-spacing
+        # inference: the vol-target size scalar annualizes the per-bar realized
+        # vol via sqrt(bars_per_year) so the Moreira-Muir clamp is not left inert.
+        self._recent_times: deque[float] = deque(maxlen=16)
 
     # ------------------------------------------------------------------ #
     # state
@@ -265,6 +274,7 @@ class SpreadStressLiquidityReversionStrategy(Strategy):
         return {
             "last_eval_time_key": self._last_eval_time_key,
             "tick": int(self._tick),
+            "recent_times": list(self._recent_times),
             "symbol_state": {
                 symbol: {
                     "highs": list(item.highs),
@@ -289,6 +299,11 @@ class SpreadStressLiquidityReversionStrategy(Strategy):
             return
         self._last_eval_time_key = str(state.get("last_eval_time_key", ""))
         self._tick = _safe_non_negative_int(state.get("tick"))
+        self._recent_times.clear()
+        for value in _coerce_float_list(state.get("recent_times"))[
+            -int(self._recent_times.maxlen or 0) :
+        ]:
+            self._recent_times.append(value)
         raw = state.get("symbol_state")
         if not isinstance(raw, dict):
             return
@@ -368,6 +383,11 @@ class SpreadStressLiquidityReversionStrategy(Strategy):
     # per-symbol evaluation
     # ------------------------------------------------------------------ #
     def _evaluate(self, event_time: Any) -> None:
+        # Record the decision-bar epoch so the vol-target size scalar can infer
+        # bar spacing (this runs once per new bar, before per-symbol evaluation).
+        dt = _event_datetime_utc(event_time)
+        if dt is not None:
+            self._recent_times.append(dt.timestamp())
         for symbol, item in self._state.items():
             self._evaluate_symbol(symbol, item, event_time)
 
@@ -490,9 +510,17 @@ class SpreadStressLiquidityReversionStrategy(Strategy):
             return
         # Mark the episode consumed even if sizing collapses, so one_entry holds.
         item.episode_entered = True
+        # ``vol`` is a PER-BAR realized vol; annualize it via sqrt(bars_per_year)
+        # (inferred from observed bar spacing) before comparing against the
+        # annual-scale ``target_vol``, otherwise the Moreira-Muir clamp is INERT.
+        # When spacing is unavailable we pass through (size_scalar=1.0) rather
+        # than throttle on mismatched horizons.
         size_scalar = 1.0
         if self.target_vol > 0.0:
-            size_scalar = min(1.0, self.target_vol / max(vol, _EPS))
+            bars_per_year = bars_per_year_from_spacing(self._recent_times)
+            vol_ann = annualize_per_bar_vol(vol, bars_per_year)
+            if vol_ann is not None and vol_ann > _EPS:
+                size_scalar = min(1.0, self.target_vol / vol_ann)
         alloc = max(0.0, self.base_allocation * size_scalar)
         close = closes[-1]
         stop_loss = None

@@ -89,6 +89,10 @@ from typing import Any
 
 from lumina_quant.core.plugin_registry import register
 from lumina_quant.indicators.alpha_features import log_return, realized_volatility
+from lumina_quant.indicators.annualization import (
+    annualize_per_bar_vol,
+    bars_per_year_from_spacing,
+)
 from lumina_quant.indicators.common import safe_float, time_key
 from lumina_quant.strategies.external_alpha_sleeves import (
     _EPS,
@@ -269,12 +273,21 @@ class PriceVolumeCorrContinuationStrategy(Strategy):
             symbol: _State(closes=deque(maxlen=size), volumes=deque(maxlen=size))
             for symbol in self.symbol_list
         }
+        # Recent distinct-bar epochs (seconds) for deterministic bar-spacing
+        # inference: the vol-target allocation annualizes the per-bar realized
+        # vol via sqrt(bars_per_year) so the throttle is not left inert. The
+        # spacing is a GLOBAL bar-clock property, so ``_last_ingest_key`` dedups
+        # one epoch per distinct bar time across all symbols.
+        self._recent_times: deque[float] = deque(maxlen=16)
+        self._last_ingest_key = ""
 
     # ------------------------------------------------------------------ #
     # state
     # ------------------------------------------------------------------ #
     def get_state(self) -> dict[str, Any]:
         return {
+            "recent_times": list(self._recent_times),
+            "last_ingest_key": self._last_ingest_key,
             "symbol_state": {
                 symbol: {
                     "closes": list(item.closes),
@@ -288,10 +301,13 @@ class PriceVolumeCorrContinuationStrategy(Strategy):
                     "score": item.score,
                 }
                 for symbol, item in self._state.items()
-            }
+            },
         }
 
     def set_state(self, state: dict[str, Any]) -> None:
+        if isinstance(state, dict):
+            self._last_ingest_key = str(state.get("last_ingest_key", ""))
+            _restore_deque(self._recent_times, state.get("recent_times"))
         raw = state.get("symbol_state") if isinstance(state, dict) else None
         if not isinstance(raw, dict):
             return
@@ -353,6 +369,13 @@ class PriceVolumeCorrContinuationStrategy(Strategy):
         if key and key == item.last_bar_key:
             return
         item.last_bar_key = key
+        # Record one epoch per distinct bar time (across symbols) so the
+        # vol-target scalar can infer the global bar spacing deterministically.
+        if key and key != self._last_ingest_key:
+            self._last_ingest_key = key
+            dt = _event_datetime_utc(snapshot.time)
+            if dt is not None:
+                self._recent_times.append(dt.timestamp())
         close = safe_float(snapshot.close)
         if close is None or close <= self.min_price:
             return
@@ -386,11 +409,19 @@ class PriceVolumeCorrContinuationStrategy(Strategy):
         return dir_t, pv_corr, float(dir_t) * float(pv_corr)
 
     def _vol_scaled_allocation(self, closes: list[float]) -> float:
+        # ``vol`` is a PER-BAR realized vol; annualize it via sqrt(bars_per_year)
+        # (inferred from observed bar spacing) before dividing an annual-scale
+        # ``target_vol`` by it, otherwise the ratio is pinned at the max clamp and
+        # the throttle is INERT. When spacing is unavailable we pass through at
+        # ``target_allocation`` rather than size on mismatched horizons.
         alloc = self.target_allocation
         if self.target_vol > 0.0:
             vol = realized_volatility(closes, window=self.vol_window)
             if vol is not None and vol > _EPS:
-                alloc = self.target_allocation * (self.target_vol / vol)
+                bars_per_year = bars_per_year_from_spacing(self._recent_times)
+                vol_ann = annualize_per_bar_vol(vol, bars_per_year)
+                if vol_ann is not None and vol_ann > _EPS:
+                    alloc = self.target_allocation * (self.target_vol / vol_ann)
         return max(0.0, min(self.target_allocation * 2.0, alloc))
 
     # ------------------------------------------------------------------ #
