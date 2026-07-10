@@ -54,6 +54,14 @@ research:
   # SPA/PBO axes the reject gate reads). Default OFF/byte-identical; ON here in the
   # honest-research profile. Whole-search-deflated DSR is a data-PC stamp, not this.
   emit_candidate_overfit_stats: true
+  # v5 defect fix (silent generic-fallback substitution): candidates whose
+  # strategy_class has no bespoke dispatcher handler are executed as their REAL
+  # registered event-driven class instead of being silently scored as the shared
+  # 64-bar momentum proxy (84/111 classes incl. every research_only sleeve were
+  # proxy-scored, so their recorded metrics measured the proxy, not the lane).
+  # Default OFF/legacy; ON here so research runs measure the actual strategies.
+  # The generic fallback is always labelled meta.evaluation_mode either way.
+  route_unmapped_registered_strategies: true
   # Portfolio-layer honest gate (performance_lever_measurement 2026-07-08): run
   # DSR / CSCV-PBO / SPA on the weighted-portfolio NET stream, deflating the
   # portfolio DSR by the TOTAL allocation config-grid cells searched (the

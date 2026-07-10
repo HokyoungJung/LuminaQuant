@@ -162,7 +162,7 @@ def _simulate_event_driven_strategy_exposures(
     aligned: Mapping[str, np.ndarray],
     symbols: Sequence[str],
 ) -> np.ndarray:
-    from lumina_quant.core.events import MarketEvent
+    from lumina_quant.core.events import MarketEvent, MarketWindowEvent
 
     canonical_symbols = canonicalize_symbol_list(list(symbols))
     datetimes = np.asarray(aligned.get("datetime"), dtype=object)
@@ -173,6 +173,29 @@ def _simulate_event_driven_strategy_exposures(
     strategy = strategy_cls(bars, events, **dict(params))
     position_state = dict.fromkeys(canonical_symbols, 0.0)
     symbol_index = {symbol: idx for idx, symbol in enumerate(canonical_symbols)}
+
+    # Cross-sectional sleeves evaluate on MARKET_WINDOW snapshots (one coherent
+    # event per bar carrying every symbol), matching the production window feed
+    # and every lane test harness.  Classes that only inherit the BASE
+    # ``Strategy.calculate_signals_window`` default (the legacy Alpha101/pair
+    # simulator consumers) keep the per-symbol MARKET feed byte-identically --
+    # window capability means the class OVERRIDES the window callback.
+    from lumina_quant.strategy import Strategy as _BaseStrategy
+
+    _window_method = getattr(type(strategy), "calculate_signals_window", None)
+    window_capable = callable(_window_method) and _window_method is not (
+        _BaseStrategy.calculate_signals_window
+    )
+    window_seconds = 60
+    if n >= 2:
+        try:
+            first = datetimes[0]
+            second = datetimes[1]
+            spacing = float(second.timestamp() - first.timestamp())
+            if spacing > 0.0:
+                window_seconds = int(spacing)
+        except AttributeError, TypeError, ValueError:
+            window_seconds = 60
 
     for idx in range(n):
         event_time = datetimes[idx]
@@ -187,18 +210,40 @@ def _simulate_event_driven_strategy_exposures(
                 volume=float(aligned[f"{symbol}:volume"][idx]),
             )
 
-        for symbol in canonical_symbols:
+        if window_capable:
+            bars_1s = {
+                symbol: (
+                    {
+                        "time": event_time,
+                        "open": float(aligned[f"{symbol}:open"][idx]),
+                        "high": float(aligned[f"{symbol}:high"][idx]),
+                        "low": float(aligned[f"{symbol}:low"][idx]),
+                        "close": float(aligned[f"{symbol}:close"][idx]),
+                        "volume": float(aligned[f"{symbol}:volume"][idx]),
+                    },
+                )
+                for symbol in canonical_symbols
+            }
             strategy.calculate_signals(
-                MarketEvent(
+                MarketWindowEvent(
                     time=event_time,
-                    symbol=symbol,
-                    open=float(aligned[f"{symbol}:open"][idx]),
-                    high=float(aligned[f"{symbol}:high"][idx]),
-                    low=float(aligned[f"{symbol}:low"][idx]),
-                    close=float(aligned[f"{symbol}:close"][idx]),
-                    volume=float(aligned[f"{symbol}:volume"][idx]),
+                    window_seconds=window_seconds,
+                    bars_1s=bars_1s,
                 )
             )
+        else:
+            for symbol in canonical_symbols:
+                strategy.calculate_signals(
+                    MarketEvent(
+                        time=event_time,
+                        symbol=symbol,
+                        open=float(aligned[f"{symbol}:open"][idx]),
+                        high=float(aligned[f"{symbol}:high"][idx]),
+                        low=float(aligned[f"{symbol}:low"][idx]),
+                        close=float(aligned[f"{symbol}:close"][idx]),
+                        volume=float(aligned[f"{symbol}:volume"][idx]),
+                    )
+                )
 
         while not events.empty():
             signal = events.get()
@@ -6435,13 +6480,59 @@ _STRATEGY_SIGNAL_DISPATCHER = StrategySignalDispatcher(
 )
 
 
+def _registry_simulator_router(
+    strategy_class: str,
+    params: dict[str, Any],
+    aligned: dict[str, np.ndarray],
+    symbols: Sequence[str],
+) -> np.ndarray | None:
+    """Route an unmapped candidate through its REAL registered strategy class.
+
+    Resolves ``strategy_class`` via the plugin registry and simulates it over
+    the aligned panel with the same event-driven harness the Alpha101 handler
+    already uses.  Returns ``None`` (never raises) when the class cannot be
+    resolved or simulated, in which case the dispatcher falls back to the
+    generic proxy WITH an explicit ``generic_fallback_proxy`` meta label.
+    """
+    try:
+        from lumina_quant.strategies.registry import resolve_strategy_class
+
+        strategy_cls = resolve_strategy_class(strategy_class)
+    except Exception:
+        return None
+    try:
+        return _simulate_event_driven_strategy_exposures(
+            strategy_cls,
+            params=params,
+            aligned=aligned,
+            symbols=symbols,
+        )
+    except Exception:
+        return None
+
+
 def _strategy_signal(
     candidate: dict[str, Any],
     *,
     aligned: dict[str, np.ndarray],
     symbols: Sequence[str],
+    scoring_config: Mapping[str, Any] | None = None,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict[str, Any]]:
-    return _STRATEGY_SIGNAL_DISPATCHER.dispatch(candidate, aligned=aligned, symbols=symbols)
+    # Config-gated (default OFF -> legacy routing): when ON, candidates whose
+    # strategy_class has no bespoke handler are executed as their REAL
+    # registered class instead of being silently scored as the shared generic
+    # momentum proxy (the silent-substitution defect: 84/111 classes incl. all
+    # research_only sleeves were proxy-scored).  The generic fallback is now
+    # always labelled in meta either way.
+    route_unmapped = bool(
+        _research_flag(scoring_config, "route_unmapped_registered_strategies", False)
+    )
+    return _STRATEGY_SIGNAL_DISPATCHER.dispatch(
+        candidate,
+        aligned=aligned,
+        symbols=symbols,
+        unmapped_router=_registry_simulator_router if route_unmapped else None,
+    )
 
 
 def _candidate_cost_rate(
@@ -6837,7 +6928,7 @@ def _load_candidate_signal_payload(
         return None
 
     returns_raw, turnover, exposure, meta = _strategy_signal(
-        candidate, aligned=aligned, symbols=symbols
+        candidate, aligned=aligned, symbols=symbols, scoring_config=scoring_config
     )
     cost_rate = _candidate_cost_rate(candidate, scoring_config=scoring_config)
     timestamps = np.asarray(aligned.get("datetime"), dtype="datetime64[ms]")
