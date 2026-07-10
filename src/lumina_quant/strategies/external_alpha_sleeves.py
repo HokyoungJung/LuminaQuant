@@ -872,9 +872,18 @@ class VolManagedMomentumCrashGateStrategy(Strategy):
         if selected_count > 0:
             base_alloc = self.target_gross_exposure * stress_multiplier / float(selected_count)
         for score, symbol, vol, leverage in long_rows:
-            targets[symbol] = ("LONG", score, vol, min(base_alloc * leverage, self.max_leverage))
+            alloc = min(base_alloc * leverage, self.max_leverage)
+            if alloc <= 0.0:
+                # A zero-weight selection must NOT emit an entry: with
+                # ``target_allocation`` omitted from metadata the engine falls
+                # back to its default sizing, silently resizing 0% to ~10%.
+                continue
+            targets[symbol] = ("LONG", score, vol, alloc)
         for score, symbol, vol, leverage in short_rows:
-            targets[symbol] = ("SHORT", score, vol, min(base_alloc * leverage, self.max_leverage))
+            alloc = min(base_alloc * leverage, self.max_leverage)
+            if alloc <= 0.0:
+                continue
+            targets[symbol] = ("SHORT", score, vol, alloc)
         self._apply_targets(event_time, targets, crash_meta)
 
     def _age_and_stop(self, event_time: Any) -> None:

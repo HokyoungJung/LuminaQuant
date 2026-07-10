@@ -60,7 +60,9 @@ from lumina_quant.strategies.diversified_multifactor_ensemble import _zscore_acr
 from lumina_quant.strategies.external_alpha_sleeves import (
     _EPS,
     _Snapshot,
+    _annualize_per_bar_vol,
     _emit,
+    _event_datetime_utc,
     _event_symbols,
     _extract_feature,
     _market_snapshot,
@@ -239,11 +241,16 @@ class CrossSectionalFundingMomentumCarryStrategy(Strategy):
         }
         self._last_eval_time_key = ""
         self._tick = 0
+        # Recent decision-interval epochs (seconds) for deterministic bar-spacing
+        # inference: the vol-target scalar annualizes the per-bar portfolio vol
+        # via sqrt(bars_per_year) derived from the median gap here.
+        self._recent_times: deque[float] = deque(maxlen=16)
 
     def get_state(self) -> dict[str, Any]:
         return {
             "last_eval_time_key": self._last_eval_time_key,
             "tick": int(self._tick),
+            "recent_times": list(self._recent_times),
             "symbol_state": {
                 symbol: {
                     "closes": list(item.closes),
@@ -264,6 +271,11 @@ class CrossSectionalFundingMomentumCarryStrategy(Strategy):
             return
         self._last_eval_time_key = str(state.get("last_eval_time_key", ""))
         self._tick = _safe_non_negative_int(state.get("tick"))
+        self._recent_times.clear()
+        for value in list(state.get("recent_times") or [])[-int(self._recent_times.maxlen or 0) :]:
+            parsed = safe_float(value)
+            if parsed is not None:
+                self._recent_times.append(parsed)
         raw = state.get("symbol_state")
         if not isinstance(raw, dict):
             return
@@ -394,10 +406,20 @@ class CrossSectionalFundingMomentumCarryStrategy(Strategy):
         total_inv = sum(inv.values())
         if total_inv <= _EPS:
             return {}, 1.0
+        # ``portfolio_vol`` is the inverse-vol-weighted PER-BAR vol; the
+        # ``inv / total_inv`` normalization above is scale-invariant (annualizing
+        # every vol_i cancels), so the risk-parity weights are horizon-free. The
+        # vol-target SCALAR, however, compares ``portfolio_vol`` against an
+        # annual-scale ``target_vol`` (~0.20): annualize the per-bar estimate via
+        # sqrt(bars_per_year) inferred from observed interval spacing first,
+        # otherwise the Moreira-Muir clamp is INERT. When spacing is unavailable
+        # we pass through (scalar=1.0) rather than throttle on mismatched horizons.
         portfolio_vol = sum((inv[symbol] / total_inv) * vols[symbol] for symbol in inv)
         scalar = 1.0
         if self.target_vol > 0.0 and portfolio_vol > _EPS:
-            scalar = min(1.0, self.target_vol / portfolio_vol)
+            portfolio_vol_ann = _annualize_per_bar_vol(portfolio_vol, self._recent_times)
+            if portfolio_vol_ann is not None and portfolio_vol_ann > _EPS:
+                scalar = min(1.0, self.target_vol / portfolio_vol_ann)
         weights = {
             symbol: (inv[symbol] / total_inv) * self.target_gross_exposure * scalar
             for symbol in inv
@@ -427,6 +449,13 @@ class CrossSectionalFundingMomentumCarryStrategy(Strategy):
     def _evaluate(self, event_time: Any) -> None:
         if len(self.symbol_list) < self.min_symbols:
             return
+        # Record the decision-interval epoch so the vol-target scalar can infer
+        # bar spacing.  This lane ranks EVERY evaluation (each funding interval)
+        # with no coarser rebalance gate, so this per-interval hook already
+        # reflects the true bar cadence.
+        dt = _event_datetime_utc(event_time)
+        if dt is not None:
+            self._recent_times.append(dt.timestamp())
         # Stops / max-hold run on EVERY evaluation (each funding interval) before
         # the ranker so a held name is always protected.
         self._age(event_time)
@@ -486,6 +515,27 @@ class CrossSectionalFundingMomentumCarryStrategy(Strategy):
             target_mode, score, meta = target
             weight = float(weights.get(symbol, 0.0))
             alloc = max(0.0, self.base_allocation * weight)
+            if alloc <= 0.0:
+                # Zero-alloc entries omit ``target_allocation`` from metadata and
+                # the engine resizes them to its DEFAULT allocation.  Treat a
+                # zero-weight target as removed: flatten if held, never emit an
+                # unsized entry (a held name outside the rebalance band would
+                # otherwise re-emit with alloc=0).
+                if item.mode != "OUT":
+                    _emit(
+                        self.events,
+                        strategy_id=_STRATEGY_ID,
+                        symbol=symbol,
+                        event_time=event_time,
+                        signal_type="EXIT",
+                        price=price,
+                        metadata={"strategy": _STRATEGY_NAME, "reason": "zero_allocation"},
+                    )
+                    item.mode = "OUT"
+                    item.entry_price = None
+                    item.bars_held = 0
+                    item.score = None
+                continue
             if item.mode == target_mode:
                 # Turnover gate: hold without a new order while the score drift
                 # stays inside the band (and the side has not flipped). NOTE: do

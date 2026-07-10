@@ -274,6 +274,10 @@ def test_inverse_vol_weights_and_per_name_cap() -> None:
         high = max(longs[s]["target_allocation"] for s in high_syms)
         assert low > high
     # Portfolio vol-target clamp engaged.
+    # NOTE (v5 vol-target horizon fix): the scalar now clamps against the
+    # ANNUALIZED per-bar portfolio vol (bar spacing inferred from the 60s-spaced
+    # feed), which only makes it SMALLER than the pre-fix per-bar comparison, so
+    # ``< 1.0`` still holds.
     assert any(meta["vol_target_scalar"] < 1.0 for meta in longs.values())
     # Per-name cap clamp applied.
     for meta in longs.values():
@@ -354,3 +358,93 @@ def test_calculate_signals_never_raises_on_garbage() -> None:
     strat.calculate_signals(
         SimpleNamespace(type="MARKET", symbol="AAA/USDT", close=None, time=None)
     )
+
+
+# --------------------------------------------------------------------------- #
+# vol-target HORIZON fix (v5 audit): the inverse-vol ``min(1, target_vol /
+# portfolio_vol)`` scalar must ANNUALIZE the per-bar portfolio vol (via
+# sqrt(bars_per_year) inferred from observed funding-interval spacing) before the
+# clamp; pre-fix it compared an annual-scale ``target_vol`` (~0.20) against a
+# per-bar vol and was pinned at 1.0 (throttle inert).  ``_inverse_vol_weights``
+# is exercised directly with a seeded ``_recent_times`` to isolate the math.
+# --------------------------------------------------------------------------- #
+
+
+def _seed_hourly_times(strategy: CrossSectionalFundingMomentumCarryStrategy, n: int = 12) -> None:
+    """Populate ``_recent_times`` with ``n`` epochs spaced ONE HOUR apart."""
+    base = 1_700_000_000
+    strategy._recent_times.clear()
+    for i in range(n):
+        strategy._recent_times.append(float(base + i * 3600))
+
+
+def test_vol_target_scalar_throttles_high_vol_at_hourly_spacing() -> None:
+    strat = CrossSectionalFundingMomentumCarryStrategy(_Bars(_SYMBOLS), _Queue(), target_vol=0.20)
+    _seed_hourly_times(strat)
+    targets = {"AAA/USDT": ("LONG", 1.0, {}), "BBB/USDT": ("LONG", 1.0, {})}
+    vols = {"AAA/USDT": 0.03, "BBB/USDT": 0.03}  # per-bar; annualized ~2.8 >> 0.20
+    _weights, scalar = strat._inverse_vol_weights(targets, vols)
+    assert scalar < 1.0
+
+
+def test_vol_target_scalar_passthrough_calm_vol_at_hourly_spacing() -> None:
+    strat = CrossSectionalFundingMomentumCarryStrategy(_Bars(_SYMBOLS), _Queue(), target_vol=0.20)
+    _seed_hourly_times(strat)
+    targets = {"AAA/USDT": ("LONG", 1.0, {}), "BBB/USDT": ("LONG", 1.0, {})}
+    vols = {"AAA/USDT": 0.0005, "BBB/USDT": 0.0005}  # annualized ~0.047 < 0.20
+    _weights, scalar = strat._inverse_vol_weights(targets, vols)
+    assert scalar == 1.0
+
+
+def test_vol_target_scalar_passthrough_when_spacing_unavailable() -> None:
+    strat = CrossSectionalFundingMomentumCarryStrategy(_Bars(_SYMBOLS), _Queue(), target_vol=0.20)
+    strat._recent_times.clear()  # no inferable interval spacing
+    targets = {"AAA/USDT": ("LONG", 1.0, {}), "BBB/USDT": ("LONG", 1.0, {})}
+    vols = {"AAA/USDT": 0.03, "BBB/USDT": 0.03}
+    _weights, scalar = strat._inverse_vol_weights(targets, vols)
+    assert scalar == 1.0
+
+
+def test_vol_target_state_roundtrip_carries_recent_times() -> None:
+    """The per-interval recording hook populates ``_recent_times`` in the live
+    feed path, and get_state/set_state carries it losslessly."""
+    strat = CrossSectionalFundingMomentumCarryStrategy(_Bars(_SYMBOLS), _Queue(), min_symbols=4)
+    n = 30
+    series = {
+        s: _series(n, start=100.0 + i, drift=0.003, noise=0.01) for i, s in enumerate(_SYMBOLS)
+    }
+    funding = {s: [0.0001 * (i + 1) * j for j in range(n)] for i, s in enumerate(_SYMBOLS)}
+    _feed(strat, series, funding)  # type: ignore[arg-type]
+    assert list(strat._recent_times), "expected the per-interval hook to record epochs"
+
+    state = strat.get_state()
+    assert state["recent_times"] == list(strat._recent_times)
+    restored = CrossSectionalFundingMomentumCarryStrategy(_Bars(_SYMBOLS), _Queue())
+    restored.set_state(state)
+    assert list(restored._recent_times) == list(strat._recent_times)
+
+
+def test_zero_weight_target_never_emits_default_sized_entry() -> None:
+    """v5 fix: alloc=0 omits ``target_allocation`` from metadata and the
+    engine resizes the entry to its DEFAULT allocation -- zero-weight targets
+    must not emit entries, and a HELD name whose weight collapses to zero is
+    flattened instead of re-emitted unsized."""
+    strat = CrossSectionalFundingMomentumCarryStrategy(_Bars(_SYMBOLS), _Queue())
+    targets = {"AAA/USDT": ("LONG", 1.0, {}), "BBB/USDT": ("SHORT", -1.0, {})}
+    strat._emit_weighted(targets, {}, 1.0, "2026-01-05T00:00:00Z")
+    assert not [s for s in strat.events.items if s.signal_type in {"LONG", "SHORT"}]
+
+    strat._emit_weighted(targets, {"AAA/USDT": 0.5, "BBB/USDT": 0.5}, 1.0, "2026-01-05T01:00:00Z")
+    entries = [s for s in strat.events.items if s.signal_type in {"LONG", "SHORT"}]
+    assert {s.symbol for s in entries} == {"AAA/USDT", "BBB/USDT"}
+    for sig in entries:
+        assert float(sig.metadata.get("target_allocation", 0.0)) > 0.0
+
+    strat._emit_weighted(targets, {}, 1.0, "2026-01-05T02:00:00Z")
+    exits = [
+        s
+        for s in strat.events.items
+        if s.signal_type == "EXIT" and s.metadata.get("reason") == "zero_allocation"
+    ]
+    assert {s.symbol for s in exits} == {"AAA/USDT", "BBB/USDT"}
+    assert strat._state["AAA/USDT"].mode == "OUT"

@@ -532,3 +532,67 @@ def test_vol_target_scalar_determinism() -> None:
         return round(scalar, 12), tuple(round(weights[s], 12) for s in symbols)
 
     assert _run() == _run()
+
+
+def test_gap_spanning_return_never_booked_into_single_bucket() -> None:
+    """A multi-week data gap must NOT book its whole return as one 'weekly'
+    observation (v5 fix): pre-fix, a 5-week gap with a 2x move booked
+    log(2)~=0.69 into the resumption bucket and polluted that bucket's
+    seasonal estimate for the full K-quarter lookback."""
+    symbol = "GAP/USDT"
+    strat = _strategy([symbol], min_symbols=1)
+    q_start = date(2025, 4, 1)  # Q2 2025 opens the quarter grid at week 0
+    # Weeks 0-2: constant price, clean zero weekly returns.
+    for day in range(21):
+        strat.calculate_signals(_event(symbol, q_start + timedelta(days=day), 100.0))
+    # 5-week outage; the price DOUBLES while no bars arrive.
+    for day in range(56, 77):
+        strat.calculate_signals(_event(symbol, q_start + timedelta(days=day), 200.0))
+
+    item = strat._state[symbol]
+    recorded = [(b, v) for b, dq in item.buckets.items() for v in dq]
+    recorded += [(b, item.pending_sum[b]) for b in item.pending_sum]
+    for bucket, value in recorded:
+        assert abs(value) < 0.5, f"gap return leaked into bucket {bucket}: {value}"
+    # Clean post-gap grid-adjacent weeks must resume recording.
+    assert any(bucket == 9 for bucket, _ in recorded), recorded
+
+
+# --------------------------------------------------------------------------- #
+# v5 zero-alloc gate: a computed alloc of 0 must NOT emit a LONG/SHORT --
+# ``_target_metadata`` omits ``target_allocation`` at alloc 0 and the engine
+# would resize the entry to its DEFAULT allocation (an unsized, un-vol-gated bet).
+# --------------------------------------------------------------------------- #
+
+
+def test_zero_alloc_entry_skipped_not_default_sized() -> None:
+    symbols = ["FLIP/USDT", "FRESH/USDT", "N0/USDT", "N1/USDT", "N2/USDT", "N3/USDT"]
+    strat = _strategy(symbols)
+    flip = strat._state["FLIP/USDT"]
+    flip.mode = "LONG"
+    flip.entry_price = 100.0
+    flip.weeks_held = 10_000  # clear the min-hold so the side flip is live
+    targets = {
+        "FLIP/USDT": ("SHORT", -1.0, {}),
+        "FRESH/USDT": ("LONG", 1.0, {}),
+    }
+    # empty weights -> alloc == 0 for every targeted symbol
+    strat._emit_targets(targets, {}, 1.0, "2026-01-01T00:00:00Z")
+    kinds = [(sig.symbol, str(sig.signal_type).upper()) for sig in strat.events.items]
+    assert not [sym for sym, kind in kinds if kind in {"LONG", "SHORT"}], kinds
+    # the side-flip EXIT still fired and FLIP is now flat (state matches the exit)
+    assert ("FLIP/USDT", "EXIT") in kinds
+    assert strat._state["FLIP/USDT"].mode == "OUT"
+    assert strat._state["FLIP/USDT"].entry_price is None
+
+    # a positive inverse-vol weight DOES emit a sized entry carrying a strictly
+    # positive ``target_allocation``.
+    sized = _strategy(symbols)
+    sized._emit_targets(
+        {"FRESH/USDT": ("LONG", 1.0, {})}, {"FRESH/USDT": 0.5}, 1.0, "2026-01-01T00:00:00Z"
+    )
+    entries = [
+        sig for sig in sized.events.items if str(sig.signal_type).upper() in {"LONG", "SHORT"}
+    ]
+    assert entries, "a positive inverse-vol weight must emit a sized entry"
+    assert all(float((sig.metadata or {}).get("target_allocation", 0.0)) > 0.0 for sig in entries)

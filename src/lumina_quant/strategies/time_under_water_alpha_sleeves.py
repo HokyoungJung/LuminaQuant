@@ -671,6 +671,19 @@ class CrossSectionalTimeUnderWaterStrategy(Strategy):
                 )
             weight = float(weights.get(symbol, 0.0))
             alloc = max(0.0, self.base_allocation * weight)
+            if alloc <= 0.0:
+                # Zero-alloc entries omit ``target_allocation`` from metadata and
+                # the engine resizes them to its DEFAULT allocation -- an unsized,
+                # un-vol-gated position. Skip the entry; if a side-flip EXIT was
+                # just emitted, drop to OUT (mirroring the rank-lapse flat
+                # transition, cooldown included) so state matches it.
+                if item.mode != "OUT":
+                    item.mode = "OUT"
+                    item.entry_price = None
+                    item.bars_held = 0
+                    item.cooldown = self.cooldown_decisions
+                    item.score = None
+                continue
             stop_loss = None
             if price is not None and self.stop_loss_pct > 0.0:
                 stop_loss = price * (

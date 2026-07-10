@@ -316,10 +316,14 @@ def _stress_metrics(
         turnover = _safe_float(turnover_by_split.get(split))
         for cost_bps in STRESS_COST_BPS:
             extra_bps = max(0.0, float(cost_bps) - PRIMARY_COST_BPS)
-            stressed_return = base_return - (extra_bps / 10_000.0) * turnover
+            # ``turnover`` counts ONE-WAY trade events (entry=1, exit=1) while
+            # the cost constants are ROUND-TRIP bps; the base simulator charges
+            # ``round_trip_bps * transition / 2``.  Charging full round-trip
+            # bps per one-way event double-counted the stress.
+            stressed_return = base_return - (extra_bps / 10_000.0) * turnover / 2.0
             out[f"{split}_return_stress_{int(cost_bps)}bps_proxy"] = stressed_return
             out[f"{split}_return_per_turnover_stress_{int(cost_bps)}bps_proxy"] = (
-                base_rpt - extra_bps if math.isfinite(base_rpt) else math.nan
+                base_rpt - extra_bps / 2.0 if math.isfinite(base_rpt) else math.nan
             )
     return out
 

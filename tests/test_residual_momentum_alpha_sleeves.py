@@ -659,3 +659,43 @@ def test_slice_timeframe_expansion_scales_bar_windows() -> None:
             "adf_nonstationarity_min_t",
         ):
             assert h4[key] == d[key] == h1[key], (variant, key)
+
+
+# --------------------------------------------------------------------------- #
+# v5 zero-alloc gate: a computed alloc of 0 must NOT emit a LONG/SHORT --
+# ``_target_metadata`` omits ``target_allocation`` at alloc 0 and the engine
+# would resize the entry to its DEFAULT allocation (an unsized, un-vol-gated bet).
+# The side-flip path already calls ``_flatten`` before sizing, so the skip only
+# has to bail; state is already consistently OUT.
+# --------------------------------------------------------------------------- #
+
+
+def test_zero_alloc_entry_skipped_not_default_sized() -> None:
+    # FLIP/FRESH are non-benchmark members of the fixed ``_SYMS`` universe.
+    sleeve = _new_sleeve()
+    flip = sleeve._state["S1"]
+    flip.mode = "LONG"
+    flip.entry_price = 100.0
+    flip.bars_held = 10_000  # clear the min-hold so the side flip is live
+    targets = {
+        "S1": ("SHORT", -1.0, {}),
+        "S2": ("LONG", 1.0, {}),
+    }
+    # empty weights -> alloc == 0 for every targeted symbol
+    sleeve._emit_targets(targets, {}, "2026-01-01T00:00:00Z")
+    kinds = [(sig.symbol, str(sig.signal_type).upper()) for sig in sleeve.events.items]
+    assert not [sym for sym, kind in kinds if kind in {"LONG", "SHORT"}], kinds
+    # the side-flip EXIT still fired and S1 is now flat (state matches the exit)
+    assert ("S1", "EXIT") in kinds
+    assert sleeve._state["S1"].mode == "OUT"
+    assert sleeve._state["S1"].entry_price is None
+
+    # a positive inverse-vol weight DOES emit a sized entry carrying a strictly
+    # positive ``target_allocation``.
+    sized = _new_sleeve()
+    sized._emit_targets({"S2": ("LONG", 1.0, {})}, {"S2": 0.5}, "2026-01-01T00:00:00Z")
+    entries = [
+        sig for sig in sized.events.items if str(sig.signal_type).upper() in {"LONG", "SHORT"}
+    ]
+    assert entries, "a positive inverse-vol weight must emit a sized entry"
+    assert all(float((sig.metadata or {}).get("target_allocation", 0.0)) > 0.0 for sig in entries)

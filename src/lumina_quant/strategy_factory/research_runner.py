@@ -709,6 +709,29 @@ def _safe_std(values: np.ndarray) -> float:
     return _research_metrics.safe_std(values)
 
 
+def _expanding_std(values: np.ndarray, *, min_periods: int = 32) -> np.ndarray:
+    """Per-bar expanding standard deviation using only data through each bar.
+
+    Bars before ``min_periods`` observations return 0.0 so callers gating on
+    ``sigma > eps`` stay flat through warmup.  This replaces full-sample
+    ``_safe_std`` normalisation in signal paths, where a single whole-history
+    scalar leaks future volatility into every bar's score.
+    """
+    arr = np.nan_to_num(np.asarray(values, dtype=float), nan=0.0)
+    n = arr.size
+    if n == 0:
+        return np.asarray([], dtype=float)
+    counts = np.arange(1, n + 1, dtype=float)
+    csum = np.cumsum(arr)
+    csum2 = np.cumsum(arr * arr)
+    mean = csum / counts
+    var = np.maximum(csum2 / counts - mean * mean, 0.0)
+    std = np.sqrt(var)
+    warmup = min(max(int(min_periods), 1), n)
+    std[: warmup - 1] = 0.0
+    return std
+
+
 def _safe_mean(values: np.ndarray) -> float:
     return _research_metrics.safe_mean(values)
 
@@ -5625,17 +5648,23 @@ def _apply_leadlag_spillover_strategy(
     decay = np.exp(-np.arange(1, lag_order + 1, dtype=float))
     decay /= np.sum(decay)
 
+    pred = np.zeros(n, dtype=float)
+    for lag in range(1, lag_order + 1):
+        # No wrap-around: ``np.roll`` would leak the LAST ``lag`` bars of
+        # leader returns into the window head.  Bars without a full lag of
+        # history contribute zero.
+        shifted = np.zeros(n, dtype=float)
+        if lag < n:
+            shifted[lag:] = leader_mean[:-lag]
+        pred += decay[lag - 1] * shifted
+
     for symbol in laggards:
         s_idx = symbols.index(symbol)
-        pred = np.zeros(n, dtype=float)
-        for lag in range(1, lag_order + 1):
-            shifted = np.roll(leader_mean, lag)
-            pred += decay[lag - 1] * shifted
         follower_ret = _returns_from_close(aligned[f"{symbol}:close"])
-        score = np.zeros(n, dtype=float)
-        sigma = _safe_std(follower_ret)
-        if sigma > 1e-12:
-            score = pred / sigma
+        # Trailing (expanding) sigma per bar — the previous full-sample
+        # ``_safe_std`` normalised every bar's score by FUTURE volatility.
+        sigma = _expanding_std(follower_ret)
+        score = np.divide(pred, sigma, out=np.zeros(n, dtype=float), where=sigma > 1e-12)
         pos = np.where(
             score >= entry_score,
             1.0,
