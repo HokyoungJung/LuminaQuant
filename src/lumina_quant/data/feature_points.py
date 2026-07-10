@@ -41,6 +41,14 @@ FEATURE_COLUMNS: Final[tuple[str, ...]] = (
 FEATURE_POINT_MAX_STALE_MS: Final[int] = 8 * 60 * 60 * 1000
 
 
+@dataclass(frozen=True, slots=True)
+class FeaturePoint:
+    """Latest feature value with provenance timestamp."""
+
+    value: float
+    source_timestamp_ms: int
+
+
 @dataclass(slots=True)
 class _FeatureCache:
     timestamps_ms: list[int]
@@ -75,6 +83,17 @@ class FeaturePointLookup:
         timestamp_ms: int | None,
     ) -> float | None:
         """Return the latest non-null feature value at or before ``timestamp_ms``."""
+        point = self.get_latest_point(symbol, field, timestamp_ms=timestamp_ms)
+        return point.value if point is not None else None
+
+    def get_latest_point(
+        self,
+        symbol: str,
+        field: str,
+        *,
+        timestamp_ms: int | None,
+    ) -> FeaturePoint | None:
+        """Return the latest finite feature point at or before ``timestamp_ms``."""
         token = str(field or "").strip()
         if not self.db_path or not token or int(timestamp_ms or 0) <= 0:
             return None
@@ -101,7 +120,9 @@ class FeaturePointLookup:
             parsed = float(value)
         except Exception:
             return None
-        return parsed if math.isfinite(parsed) else None
+        if not math.isfinite(parsed):
+            return None
+        return FeaturePoint(value=parsed, source_timestamp_ms=int(source_timestamp))
 
     def sum_between(
         self,
@@ -264,4 +285,9 @@ class FeaturePointLookup:
         )
 
 
-__all__ = ["FEATURE_COLUMNS", "FEATURE_POINT_MAX_STALE_MS", "FeaturePointLookup"]
+__all__ = [
+    "FEATURE_COLUMNS",
+    "FEATURE_POINT_MAX_STALE_MS",
+    "FeaturePoint",
+    "FeaturePointLookup",
+]

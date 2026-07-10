@@ -2,16 +2,22 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from collections import deque
 from datetime import UTC, datetime
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from lumina_quant.core.events import SignalEvent
 from lumina_quant.portfolio_split_contract import FOLLOWUP_ROOT
 from lumina_quant.strategy import Strategy
 from lumina_quant.strategies import resolve_strategy_class
+from lumina_quant.utils.artifact_read_receipt import (
+    ArtifactReadReceipt,
+    read_artifact_bytes,
+    read_artifact_json,
+)
 from lumina_quant.utils.numeric import safe_float
 
 GROUP_ROOT = FOLLOWUP_ROOT / "portfolio_incumbent_autoresearch_grouped"
@@ -192,6 +198,7 @@ class PortfolioModeDefinition:
     cash_weight: float
     source_artifacts: dict[str, str]
     watch_symbols: tuple[str, ...] = ()
+    artifact_read_receipts: tuple[ArtifactReadReceipt, ...] = ()
 
     @property
     def symbols(self) -> list[str]:
@@ -261,7 +268,7 @@ def _resolve_manifest_path(raw_path: Any, *, base_dir: Path | None = None) -> Pa
     path = Path(str(raw_path or "")).expanduser()
     if not path.is_absolute():
         path = (base_dir or Path.cwd()) / path
-    return path.resolve()
+    return Path(os.path.abspath(os.fspath(path)))
 
 
 def _selection_inputs_are_train_validation_or_lagged_shadow_only(inputs: Any) -> bool:
@@ -295,44 +302,57 @@ def _manifest_fail_closed_definition(
 
 def _validate_manifest_source_artifacts(
     payload: dict[str, Any], *, manifest_path: Path
-) -> tuple[dict[str, Path], str | None]:
+) -> tuple[dict[str, Path], tuple[ArtifactReadReceipt, ...], str | None]:
     artifacts: dict[str, Path] = {}
+    receipts_by_id: dict[str, ArtifactReadReceipt] = {}
     base_dir = manifest_path.parent
     raw_artifacts = payload.get("source_artifacts")
     if not isinstance(raw_artifacts, list | tuple):
-        return {}, "source_artifacts_not_list"
+        return {}, (), "source_artifacts_not_list"
     for artifact in raw_artifacts:
         if not isinstance(artifact, dict):
-            return {}, "source_artifact_not_object"
+            return {}, (), "source_artifact_not_object"
         artifact_id = str(artifact.get("id") or artifact.get("artifact_id") or "").strip()
         raw_path = artifact.get("path")
         if not artifact_id or not raw_path:
-            return {}, "source_artifact_missing_id_or_path"
+            return {}, (), "source_artifact_missing_id_or_path"
+        if artifact_id in artifacts:
+            return {}, (), f"source_artifact_duplicate:{artifact_id}"
         source_path = _resolve_manifest_path(raw_path, base_dir=base_dir)
-        if not source_path.exists():
-            return {}, f"source_artifact_missing:{artifact_id}"
-        if not source_path.is_file():
-            return {}, f"source_artifact_not_file:{artifact_id}"
         expected_sha = str(artifact.get("sha256") or "").strip()
         if not expected_sha:
-            return {}, f"source_artifact_sha_missing:{artifact_id}"
+            return {}, (), f"source_artifact_sha_missing:{artifact_id}"
         try:
-            actual_sha = _file_sha256(source_path)
+            receipt, _payload = read_artifact_bytes(
+                source_path, artifact_id=f"source:{artifact_id}"
+            )
+        except FileNotFoundError:
+            return {}, (), f"source_artifact_missing:{artifact_id}"
+        except IsADirectoryError:
+            return {}, (), f"source_artifact_not_file:{artifact_id}"
+        except ValueError as exc:
+            reason = str(exc)
+            if reason.startswith("artifact_not_regular:"):
+                return {}, (), f"source_artifact_not_file:{artifact_id}"
+            return {}, (), f"source_artifact_unreadable:{artifact_id}"
         except OSError:
-            return {}, f"source_artifact_unreadable:{artifact_id}"
-        if actual_sha != expected_sha:
-            return {}, f"source_artifact_sha_mismatch:{artifact_id}"
+            return {}, (), f"source_artifact_unreadable:{artifact_id}"
+        if receipt.sha256 != expected_sha:
+            return {}, (), f"source_artifact_sha_mismatch:{artifact_id}"
         max_age_hours = _safe_float(artifact.get("max_age_hours"), 0.0)
         if max_age_hours <= 0.0:
-            return {}, f"source_artifact_freshness_missing:{artifact_id}"
-        mtime = datetime.fromtimestamp(source_path.stat().st_mtime, UTC)
+            return {}, (), f"source_artifact_freshness_missing:{artifact_id}"
+        mtime_ns = receipt.post_fstat_identity[5]
+        mtime = datetime.fromtimestamp(mtime_ns / 1_000_000_000, UTC)
         age_hours = (datetime.now(UTC) - mtime).total_seconds() / 3600.0
         if age_hours > max_age_hours:
-            return {}, f"source_artifact_stale:{artifact_id}"
+            return {}, (), f"source_artifact_stale:{artifact_id}"
         if artifact.get("ready") is not True or artifact.get("portfolio_ready") is not True:
-            return {}, f"source_artifact_not_ready:{artifact_id}"
+            return {}, (), f"source_artifact_not_ready:{artifact_id}"
         artifacts[artifact_id] = source_path
-    return artifacts, None
+        receipts_by_id[artifact_id] = receipt
+    receipts = tuple(receipts_by_id[artifact_id] for artifact_id in sorted(receipts_by_id))
+    return artifacts, receipts, None
 
 
 def _manifest_correlation_ok(provenance: Any) -> bool:
@@ -365,12 +385,32 @@ def _manifest_definition_from_path(
 ) -> PortfolioModeDefinition:
     artifacts = dict(source_artifacts)
     artifacts["artifact_portfolio_manifest_path"] = str(manifest_path)
-    if not manifest_path.exists():
+    try:
+        manifest_receipt, payload = read_artifact_json(
+            manifest_path, artifact_id="artifact_portfolio_manifest"
+        )
+        artifacts["artifact_portfolio_manifest_path"] = manifest_receipt.canonical_path
+    except FileNotFoundError:
         return _manifest_fail_closed_definition(
             token=token, source_artifacts=artifacts, reason="manifest_missing"
         )
-    try:
-        payload = _read_json(manifest_path)
+    except IsADirectoryError:
+        return _manifest_fail_closed_definition(
+            token=token, source_artifacts=artifacts, reason="manifest_unreadable:IsADirectoryError"
+        )
+    except ValueError as exc:
+        reason = str(exc)
+        if reason.startswith("artifact_not_regular:"):
+            return _manifest_fail_closed_definition(
+                token=token,
+                source_artifacts=artifacts,
+                reason="manifest_unreadable:not_regular",
+            )
+        return _manifest_fail_closed_definition(
+            token=token,
+            source_artifacts=artifacts,
+            reason=f"manifest_unreadable:{type(exc).__name__}",
+        )
     except Exception as exc:  # defensive fail-closed boundary for live routing
         return _manifest_fail_closed_definition(
             token=token,
@@ -400,7 +440,7 @@ def _manifest_definition_from_path(
             reason="manifest_correlation_provenance_invalid",
         )
 
-    source_paths, source_error = _validate_manifest_source_artifacts(
+    source_paths, source_receipts, source_error = _validate_manifest_source_artifacts(
         payload, manifest_path=manifest_path
     )
     if source_error is not None:
@@ -499,8 +539,9 @@ def _manifest_definition_from_path(
             return _manifest_fail_closed_definition(
                 token=token, source_artifacts=artifacts, reason=f"child_invalid:{child_id}"
             )
-        if not isinstance(child.get("symbols"), list | tuple) or not [
-            symbol for symbol in child.get("symbols") if str(symbol).strip()
+        child_symbols = child.get("symbols")
+        if not isinstance(child_symbols, list | tuple) or not [
+            symbol for symbol in child_symbols if str(symbol).strip()
         ]:
             return _manifest_fail_closed_definition(
                 token=token, source_artifacts=artifacts, reason=f"child_invalid:{child_id}"
@@ -541,7 +582,11 @@ def _manifest_definition_from_path(
                 weight=weight,
                 source=f"{token}:manifest:{source_id or 'inline'}",
             )
-        except TypeError, ValueError:
+        except TypeError:
+            return _manifest_fail_closed_definition(
+                token=token, source_artifacts=artifacts, reason=f"child_invalid:{child_id}"
+            )
+        except ValueError:
             return _manifest_fail_closed_definition(
                 token=token, source_artifacts=artifacts, reason=f"child_invalid:{child_id}"
             )
@@ -558,6 +603,7 @@ def _manifest_definition_from_path(
         cash_weight=float(max(0.0, min(1.0, cash_weight))),
         source_artifacts=artifacts,
         watch_symbols=(),
+        artifact_read_receipts=(manifest_receipt, *source_receipts),
     )
 
 
@@ -2184,6 +2230,7 @@ def _apply_component_param_overrides(
         cash_weight=float(definition.cash_weight),
         source_artifacts=dict(definition.source_artifacts),
         watch_symbols=tuple(definition.watch_symbols),
+        artifact_read_receipts=definition.artifact_read_receipts,
     )
 
 
@@ -2321,6 +2368,7 @@ def resolve_portfolio_mode_definition(portfolio_mode: str) -> PortfolioModeDefin
         cash_weight=float(max(0.0, min(1.0, cash_weight))),
         source_artifacts=source_artifacts,
         watch_symbols=watch_symbols,
+        artifact_read_receipts=(),
     )
 
 
@@ -2346,6 +2394,38 @@ def _child_uses_timeframe_aggregator(child: Any) -> bool:
     return any(str(token).strip().lower() == "aggregator" for token in tokens)
 
 
+_RESEARCH_CAPSULE_KIND = "artifact_portfolio_mode.research_indicator_state"
+_RESEARCH_CAPSULE_VERSION = 1
+
+
+def _canonical_json_value(value: Any) -> Any:
+    try:
+        encoded = json.dumps(
+            value,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        )
+    except (TypeError, ValueError) as exc:
+        raise ValueError("research indicator capsule must be JSON-canonicalizable") from exc
+    return json.loads(encoded)
+
+
+def _canonical_sha256(value: Any) -> str:
+    encoded = json.dumps(
+        _canonical_json_value(value),
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _capsule_payload_sha256(payload: dict[str, Any]) -> str:
+    payload_without_hash = {key: value for key, value in payload.items() if key != "sha256"}
+    return _canonical_sha256(payload_without_hash)
+
+
 class ArtifactPortfolioModeStrategy(Strategy):
     preferred_contract = "context"
 
@@ -2356,6 +2436,7 @@ class ArtifactPortfolioModeStrategy(Strategy):
         *,
         portfolio_mode: str,
         component_param_overrides: dict[str, Any] | None = None,
+        decision_cadence_seconds: int = 60,
     ):
         self.bars = bars
         self.events = events
@@ -2365,14 +2446,19 @@ class ArtifactPortfolioModeStrategy(Strategy):
             component_param_overrides,
         )
         self.symbol_list = list(self.definition.symbols)
-        self.decision_cadence_seconds = 60
+        self.decision_cadence_seconds = int(decision_cadence_seconds)
+        if self.decision_cadence_seconds < 1:
+            raise ValueError("decision_cadence_seconds must be >= 1")
         self._children: list[tuple[PortfolioModeComponent, Any, _SignalCaptureQueue]] = []
         required_features: set[str] = set()
         required_timeframes: set[str] = set()
         uses_timeframe_aggregator = False
         for component in self.definition.components:
-            strategy_cls = resolve_strategy_class(
-                component.strategy_class, default_name=component.strategy_class
+            strategy_cls = cast(
+                Any,
+                resolve_strategy_class(
+                    component.strategy_class, default_name=component.strategy_class
+                ),
             )
             child_queue = _SignalCaptureQueue()
             child_bars = _BarsSubsetProxy(self.bars, list(component.symbols))
@@ -2414,6 +2500,119 @@ class ArtifactPortfolioModeStrategy(Strategy):
             setter = getattr(child, "set_state", None)
             if callable(setter) and isinstance(child_state, dict):
                 setter(child_state)
+
+    def _child_capsule_handlers(
+        self,
+    ) -> list[tuple[PortfolioModeComponent, Any, Any, Any]]:
+        handlers: list[tuple[PortfolioModeComponent, Any, Any, Any]] = []
+        component_id_counts: dict[str, int] = {}
+        for component, _child, _queue in self._children:
+            component_id_counts[component.component_id] = (
+                component_id_counts.get(component.component_id, 0) + 1
+            )
+        duplicate_ids = sorted(
+            component_id for component_id, count in component_id_counts.items() if count > 1
+        )
+        if duplicate_ids:
+            raise ValueError(f"duplicate research indicator child ids: {duplicate_ids}")
+        for component, child, _queue in self._children:
+            getter = getattr(child, "get_research_indicator_state", None)
+            setter = getattr(child, "set_research_indicator_state", None)
+            if not callable(getter) or not callable(setter):
+                raise ValueError(
+                    f"research indicator capsule child is not capable: {component.component_id}"
+                )
+            handlers.append((component, child, getter, setter))
+        return handlers
+
+    def get_research_indicator_state(self) -> dict[str, Any]:
+        children: list[dict[str, Any]] = []
+        for component, _child, getter, _setter in self._child_capsule_handlers():
+            child_state = _canonical_json_value(getter())
+            children.append(
+                {
+                    "component_id": component.component_id,
+                    "sha256": _canonical_sha256(child_state),
+                    "state": child_state,
+                }
+            )
+        children.sort(key=lambda item: str(item["component_id"]))
+        payload: dict[str, Any] = {
+            "kind": _RESEARCH_CAPSULE_KIND,
+            "schema_version": _RESEARCH_CAPSULE_VERSION,
+            "portfolio_mode": self.portfolio_mode,
+            "children": children,
+        }
+        payload["sha256"] = _capsule_payload_sha256(payload)
+        return payload
+
+    def _validate_research_indicator_state(
+        self, capsule: Any
+    ) -> tuple[list[tuple[PortfolioModeComponent, Any, Any, Any]], dict[str, Any]]:
+        if not isinstance(capsule, dict):
+            raise ValueError("research indicator capsule must be a dict")
+        payload = dict(capsule)
+        if payload.get("kind") != _RESEARCH_CAPSULE_KIND:
+            raise ValueError("research indicator capsule kind mismatch")
+        if payload.get("schema_version") != _RESEARCH_CAPSULE_VERSION:
+            raise ValueError("research indicator capsule schema mismatch")
+        if str(payload.get("portfolio_mode") or "") != self.portfolio_mode:
+            raise ValueError("research indicator capsule portfolio_mode mismatch")
+        expected_sha = str(payload.get("sha256") or "")
+        if not expected_sha or expected_sha != _capsule_payload_sha256(payload):
+            raise ValueError("research indicator capsule sha256 mismatch")
+        raw_children = payload.get("children")
+        if not isinstance(raw_children, list):
+            raise ValueError("research indicator capsule children must be a list")
+
+        child_states: dict[str, Any] = {}
+        seen: set[str] = set()
+        for entry in raw_children:
+            if not isinstance(entry, dict):
+                raise ValueError("research indicator capsule child must be a dict")
+            component_id = str(entry.get("component_id") or "")
+            if not component_id:
+                raise ValueError("research indicator capsule child id is required")
+            if component_id in seen:
+                raise ValueError(f"duplicate research indicator child id: {component_id}")
+            seen.add(component_id)
+            if "state" not in entry:
+                raise ValueError(f"research indicator child state missing: {component_id}")
+            state = _canonical_json_value(entry["state"])
+            if str(entry.get("sha256") or "") != _canonical_sha256(state):
+                raise ValueError(f"research indicator child sha256 mismatch: {component_id}")
+            child_states[component_id] = state
+
+        expected_ids = {component.component_id for component, _child, _queue in self._children}
+        if seen != expected_ids:
+            missing = sorted(expected_ids - seen)
+            extra = sorted(seen - expected_ids)
+            raise ValueError(
+                f"research indicator capsule child id mismatch: missing={missing} extra={extra}"
+            )
+        return self._child_capsule_handlers(), child_states
+
+    def set_research_indicator_state(self, capsule: Any) -> None:
+        handlers, child_states = self._validate_research_indicator_state(capsule)
+        rollback_states: dict[str, Any] = {}
+        for component, _child, getter, _setter in handlers:
+            rollback_states[component.component_id] = _canonical_json_value(getter())
+
+        try:
+            for component, _child, _getter, setter in handlers:
+                setter(child_states[component.component_id])
+        except Exception:
+            for component, _child, _getter, setter in reversed(handlers):
+                setter(rollback_states[component.component_id])
+            raise
+
+    def finalize_completed_native_buckets(self, watermark: Any) -> dict[str, Any]:
+        results: dict[str, Any] = {}
+        for component, child, _queue in self._children:
+            finalizer = getattr(child, "finalize_completed_native_buckets", None)
+            if callable(finalizer):
+                results[component.component_id] = _canonical_json_value(finalizer(watermark))
+        return results
 
     def _component_client_order_id(
         self, *, component: PortfolioModeComponent, signal: SignalEvent

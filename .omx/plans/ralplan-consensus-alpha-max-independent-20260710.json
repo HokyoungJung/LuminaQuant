@@ -1,0 +1,73 @@
+{
+  "schema_version": "ralplan_consensus.v1",
+  "slug": "alpha-max-independent-20260710",
+  "revision": "5.14",
+  "baseline_commit": "252910e54e280cc593365484cbc99d6ca87893f9",
+  "target_branch": "feat/alpha-max-20260710",
+  "target_worktree": "/home/hoky/Quants-agent-alpha-max-20260710",
+  "constraints": {
+    "objective": "return_first",
+    "portfolio_first": true,
+    "normal_mdd_cap_pct": 30.0,
+    "soft_mdd_cap_pct": 35.0,
+    "soft_band_requires_strict_cagr_and_calmar_superiority": true,
+    "local_performance_claims_allowed": false,
+    "external_data_collection_required": false
+  },
+  "normative_artifacts": {
+    "plan": {
+      "path": ".omx/plans/ralplan-alpha-max-independent-20260710.md",
+      "sha256": "3b4601b489e906452f8b25e4e116e973954307caa0f4ada7a98a55f3d033ddf6"
+    },
+    "prd": {
+      "path": ".omx/plans/prd-alpha-max-independent-20260710.md",
+      "sha256": "bbb0f07dc019571081163baf1f672f8ba60bc38d663427e7fadc80bc2221e889"
+    },
+    "test_spec": {
+      "path": ".omx/plans/test-spec-alpha-max-independent-20260710.md",
+      "sha256": "99ee9b9760cf14041afb63f275d0371773b09835e09f8719bb7ccad61e3f8d2f"
+    },
+    "current_trial_nodes": {
+      "path": ".omx/plans/alpha-max-current-trial-nodes-v1.json",
+      "sha256": "cfe3a04620c52cc235d6f1cda1cac617ba30cd7327c753fc2f620d8250d51a4e",
+      "key_set_sha256": "3a4791cf353abcb82f9717ce89ee16b9d73d84f431d5b058135046c2ba8e332b",
+      "count": 21
+    },
+    "incumbent_resolution": {
+      "path": ".omx/plans/alpha-max-incumbent-resolution-v1.json",
+      "sha256": "5133bc40116399fe7af32e75a1ecc52a4f385dc8a0b5d3a4a9585e2437615ed8"
+    }
+  },
+  "trial_family": {
+    "prior_trials": 1466,
+    "current_trials": 21,
+    "dsr_union_trials": 1487,
+    "actual_lf_sha256": "3b078011040f89e8d788b2cef9214c58f687221104381e26a688a7f8cdbddd78"
+  },
+  "validation": {
+    "test_ids": 189,
+    "invariants": 18,
+    "result": "OK"
+  },
+  "review_order": [
+    {
+      "role": "architect",
+      "verdict": "APPROVE",
+      "recorded_at": "2026-07-10T07:45:54.282088249Z",
+      "path": ".omx/plans/architect-review-alpha-max-independent-20260710-revision5.14.md",
+      "sha256": "e21c4800546eae8b5edde336a97c9a32f0dfcbdd75d8c0305dabdd08dd1d3549"
+    },
+    {
+      "role": "critic",
+      "verdict": "OKAY",
+      "recorded_at": "2026-07-10T07:49:23.077727042Z",
+      "path": ".omx/plans/critic-review-alpha-max-independent-20260710-revision5.14.md",
+      "sha256": "e8dd5da4a3299e783d595a8b753484f29b165c86ffc07915d19df44296a46759"
+    }
+  ],
+  "ralplan_consensus_gate": {
+    "complete": true,
+    "completed_at": "2026-07-10T07:49:23Z",
+    "implementation_authorized_only_after_explicit_handoff": true
+  }
+}

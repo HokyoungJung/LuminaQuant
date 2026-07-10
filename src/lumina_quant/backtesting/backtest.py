@@ -147,6 +147,9 @@ class Backtest(TradingEngine):
         record_trades=True,
         strategy_timeframe=None,
         data_handler_kwargs=None,
+        strict_data_handler_construction=False,
+        portfolio_kwargs=None,
+        execution_handler_kwargs=None,
         config=None,
         warmup_bars=0,
     ):
@@ -172,6 +175,9 @@ class Backtest(TradingEngine):
         self.track_metrics = bool(track_metrics)
         self.record_trades = bool(record_trades)
         self.data_handler_kwargs = dict(data_handler_kwargs or {})
+        self.strict_data_handler_construction = bool(strict_data_handler_construction)
+        self.portfolio_kwargs = dict(portfolio_kwargs or {})
+        self.execution_handler_kwargs = dict(execution_handler_kwargs or {})
         raw_strategy_timeframe = str(strategy_timeframe or getattr(self.config, "TIMEFRAME", "1m"))
         try:
             self.strategy_timeframe = normalize_timeframe_token(raw_strategy_timeframe)
@@ -237,7 +243,12 @@ class Backtest(TradingEngine):
         their class types.
         """
         LOGGER.debug("Creating DataHandler, Strategy, Portfolio and ExecutionHandler")
-        try:
+        data_handler_kwargs = dict(self.data_handler_kwargs)
+        if self.strict_data_handler_construction:
+            if not data_handler_kwargs:
+                raise ValueError(
+                    "strict_data_handler_construction requires nonempty data_handler_kwargs"
+                )
             self.data_handler = self.data_handler_cls(
                 self.events,
                 self.csv_dir,
@@ -245,17 +256,28 @@ class Backtest(TradingEngine):
                 self._effective_load_start,
                 self.end_date,
                 self.data_dict,
-                **self.data_handler_kwargs,
+                **data_handler_kwargs,
             )
-        except TypeError:
-            self.data_handler = self.data_handler_cls(
-                self.events,
-                self.csv_dir,
-                self.symbol_list,
-                self._effective_load_start,
-                self.end_date,
-                self.data_dict,
-            )
+        else:
+            try:
+                self.data_handler = self.data_handler_cls(
+                    self.events,
+                    self.csv_dir,
+                    self.symbol_list,
+                    self._effective_load_start,
+                    self.end_date,
+                    self.data_dict,
+                    **data_handler_kwargs,
+                )
+            except TypeError:
+                self.data_handler = self.data_handler_cls(
+                    self.events,
+                    self.csv_dir,
+                    self.symbol_list,
+                    self._effective_load_start,
+                    self.end_date,
+                    self.data_dict,
+                )
         self.strategy = self.strategy_cls(self.bars, self.events, **self.strategy_params)
         configured_cadence = int(getattr(self.config, "DECISION_CADENCE_SECONDS", 20))
         raw_cadence = os.getenv("LQ__BACKTEST__DECISION_CADENCE_SECONDS", "").strip()
@@ -285,18 +307,22 @@ class Backtest(TradingEngine):
                 self.strategy_timeframe,
             )
             self.strategy = TimeframeGatedStrategy(self.strategy, self.strategy_timeframe)
-        try:
+        portfolio_call_kwargs = {
+            "record_history": self.record_history,
+            "track_metrics": self.track_metrics,
+            "record_trades": self.record_trades,
+            "sampling_timeframe": self.strategy_timeframe,
+        }
+        if self.portfolio_kwargs:
             self.portfolio = self.portfolio_cls(
                 self.bars,
                 self.events,
                 self.start_date,
                 self.config,
-                record_history=self.record_history,
-                track_metrics=self.track_metrics,
-                record_trades=self.record_trades,
-                sampling_timeframe=self.strategy_timeframe,
+                **portfolio_call_kwargs,
+                **self.portfolio_kwargs,
             )
-        except TypeError:
+        else:
             try:
                 self.portfolio = self.portfolio_cls(
                     self.bars,
@@ -304,17 +330,37 @@ class Backtest(TradingEngine):
                     self.start_date,
                     self.config,
                     record_history=self.record_history,
+                    track_metrics=self.track_metrics,
                     record_trades=self.record_trades,
+                    sampling_timeframe=self.strategy_timeframe,
                 )
             except TypeError:
-                self.portfolio = self.portfolio_cls(
-                    self.bars,
-                    self.events,
-                    self.start_date,
-                    self.config,
-                )
-        # Pass config to execution handler for slippage/commission
-        self.execution_handler = self.execution_handler_cls(self.events, self.bars, self.config)
+                try:
+                    self.portfolio = self.portfolio_cls(
+                        self.bars,
+                        self.events,
+                        self.start_date,
+                        self.config,
+                        record_history=self.record_history,
+                        record_trades=self.record_trades,
+                    )
+                except TypeError:
+                    self.portfolio = self.portfolio_cls(
+                        self.bars,
+                        self.events,
+                        self.start_date,
+                        self.config,
+                    )
+        if self.execution_handler_kwargs:
+            self.execution_handler = self.execution_handler_cls(
+                self.events,
+                self.bars,
+                self.config,
+                **self.execution_handler_kwargs,
+            )
+        else:
+            # Pass config to execution handler for slippage/commission
+            self.execution_handler = self.execution_handler_cls(self.events, self.bars, self.config)
 
     @property
     def bars(self):

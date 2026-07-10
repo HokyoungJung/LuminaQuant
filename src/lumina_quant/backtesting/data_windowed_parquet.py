@@ -3,12 +3,23 @@
 from __future__ import annotations
 
 import heapq
+import math
 from collections import deque
+from dataclasses import dataclass
 from typing import Any
 
 from lumina_quant.backtesting.data import _ColumnarBarRows, HistoricCSVDataHandler
 from lumina_quant.configuration import get_default_runtime_config
 from lumina_quant.core.market_window_contract import build_market_window_event
+
+
+@dataclass(frozen=True, slots=True)
+class RawPoint:
+    """Already-emitted raw 1s close value with row/close timestamps."""
+
+    value: float
+    row_timestamp_ms: int
+    close_timestamp_ms: int
 
 
 class _EpochMsWindowRows:
@@ -76,7 +87,15 @@ class HistoricParquetWindowedDataHandler(HistoricCSVDataHandler):
         backtest_poll_seconds: int = 20,
         backtest_window_seconds: int = 20,
         market_window_parity_v2_enabled: bool | None = None,
+        feature_db_path: str | None = None,
+        feature_exchange: str | None = None,
+        feature_lookup: Any = None,
     ) -> None:
+        if feature_lookup is not None and str(feature_db_path or "").strip():
+            raise ValueError("feature_lookup cannot be combined with feature_db_path")
+
+        parent_feature_db_path = "" if feature_lookup is not None else feature_db_path
+        parent_feature_exchange = "binance" if feature_lookup is not None else feature_exchange
         super().__init__(
             events,
             csv_dir,
@@ -84,7 +103,11 @@ class HistoricParquetWindowedDataHandler(HistoricCSVDataHandler):
             start_date=start_date,
             end_date=end_date,
             data_dict=data_dict,
+            feature_db_path=parent_feature_db_path,
+            feature_exchange=parent_feature_exchange,
         )
+        if feature_lookup is not None:
+            self._feature_lookup = feature_lookup
         self._freeze_rows_as_epoch_ms()
         self.backtest_poll_seconds = max(1, int(backtest_poll_seconds))
         self.backtest_window_seconds = max(self.backtest_poll_seconds, int(backtest_window_seconds))
@@ -328,3 +351,47 @@ class HistoricParquetWindowedDataHandler(HistoricCSVDataHandler):
 
         self._next_emit_ts_ms = self._align_emit_timestamp(target)
         return moved
+
+    def get_latest_raw_point(
+        self,
+        symbol: str,
+        field: str,
+        *,
+        timestamp_ms: int | None,
+    ) -> RawPoint | None:
+        """Return the latest already-emitted finite positive raw close point."""
+        token = str(field or "").strip().lower()
+        if token != "close" or int(timestamp_ms or 0) <= 0:
+            return None
+        query_ms = int(timestamp_ms)
+        rows = self._window_rows.get(symbol)
+        if not rows:
+            return None
+        timestamp_rows = self._window_row_timestamps_ms.get(symbol)
+        if timestamp_rows is None or len(timestamp_rows) != len(rows):
+            row_timestamps = tuple(self._bar_time_ms(row[0]) for row in rows)
+        else:
+            row_timestamps = tuple(timestamp_rows)
+
+        latest: RawPoint | None = None
+        for row_ts, row in zip(row_timestamps, rows, strict=False):
+            if row_ts is None:
+                continue
+            row_timestamp_ms = int(row_ts)
+            close_timestamp_ms = row_timestamp_ms + 1000
+            if close_timestamp_ms > query_ms:
+                continue
+            try:
+                value = float(row[4])
+            except Exception:
+                continue
+            if not math.isfinite(value) or value <= 0.0:
+                continue
+            candidate = RawPoint(
+                value=value,
+                row_timestamp_ms=row_timestamp_ms,
+                close_timestamp_ms=close_timestamp_ms,
+            )
+            if latest is None or candidate.close_timestamp_ms > latest.close_timestamp_ms:
+                latest = candidate
+        return latest

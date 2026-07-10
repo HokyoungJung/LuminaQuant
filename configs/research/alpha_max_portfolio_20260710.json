@@ -1,0 +1,2363 @@
+{
+  "admission": {
+    "admitted_symbols_artifact": {
+      "immutable": true,
+      "maximum_count": 10,
+      "minimum_count": 5,
+      "order": "lexicographic",
+      "subset_of": "candidate_symbols",
+      "trial_node_mutation_forbidden": true
+    },
+    "coverage": {
+      "causal_funding_required_at_every_completed_4h_decision": true,
+      "complete_train_4h_keys_required": true,
+      "complete_train_daily_keys_required": true,
+      "consecutive_completed_daily_bars_before_train": 366,
+      "maximum_funding_age_hours": 8,
+      "readable_monotone_unique_finite_partitions_required": true,
+      "unresolved_daily_cross_section_forbidden": true
+    },
+    "daily_quote_notional": {
+      "aggregation": "math.fsum(float64(close_i)*float64(volume_i))",
+      "day_count": 517,
+      "day_timezone": "UTC",
+      "genuine_zero_volume_included": true,
+      "missing_any_of_six_completed_4h_buckets": "coverage_failure",
+      "observation_order": "unique_timestamp_ascending",
+      "require_finite_nonnegative_volume": true,
+      "require_finite_positive_close": true,
+      "source_phase": "train"
+    },
+    "forbidden_substitutions": [
+      "aggregated_daily_close_times_volume",
+      "quote_volume",
+      "vwap",
+      "interpolation",
+      "winsorization",
+      "day_deletion",
+      "expected_1s_row_count"
+    ],
+    "input_phases": [
+      "warmup",
+      "train"
+    ],
+    "thresholds": {
+      "median_quote_notional_usdt_minimum": 20000000.0,
+      "p10_quote_notional_usdt_minimum": 2000000.0
+    },
+    "type7_quantile": {
+      "formula": "h=(n-1)*p;j=floor(h);g=h-j;(1-g)*x[j]+g*x[min(j+1,n-1)]",
+      "probabilities": [
+        0.1,
+        0.5
+      ],
+      "uses_all_517_values_including_genuine_zeros": true
+    }
+  },
+  "allocation_and_refit": {
+    "allocation_input": {
+      "calendar_rule": "exact_inner_equality_no_imputation",
+      "component_id_order": "lexicographic",
+      "cost_cell_bps": 20,
+      "minimum_observations": 252,
+      "return_frequency": "1d",
+      "return_kind": "actual_engine_arithmetic_net_equity"
+    },
+    "caps": {
+      "full": 0.5,
+      "loo": 0.7
+    },
+    "equal_risk": {
+      "constructor": "ERCPortfolio",
+      "cov_window": null,
+      "covariance": "ledoit_wolf_shrunk_covariance",
+      "max_iter": 10000,
+      "tol": 1e-10
+    },
+    "final_weight_refit": {
+      "enabled": true,
+      "equal_risk_and_hrp_full_and_loo_only": true,
+      "fit_inputs": [
+        "train",
+        "validation"
+      ],
+      "no_post_refit_validation_rescore": true,
+      "preserve_prelock_champion": true
+    },
+    "gross_scaling": {
+      "clip_max": 2.25,
+      "clip_min": 0.25,
+      "epsilon": 1e-12,
+      "formula": "clip(0.25,2.25,0.27/max(validation_1x_mdd,1e-12))",
+      "requires_positive_exposure_normalized_1x_sibling": true,
+      "target_validation_mdd": 0.27
+    },
+    "rounding": {
+      "cash_residual_lower_inclusive": 0.0,
+      "cash_residual_upper_exclusive": 1e-09,
+      "method": "_round",
+      "ndigits": 10,
+      "reallocation_forbidden": true
+    },
+    "shrunk_hrp": {
+      "corr_threshold": 0.6,
+      "correlation_shrinkage": true,
+      "helper": "quality_gated_allocation._hrp_weights_with_correlation_shrinkage",
+      "linkage": "sorted_id_greedy_first_cluster_absolute_correlation",
+      "variance_divisor": "T"
+    },
+    "zero_variance_floor_exclusive": 1e-12
+  },
+  "candidate_symbols": [
+    "ADAUSDT",
+    "AVAXUSDT",
+    "BNBUSDT",
+    "BTCUSDT",
+    "DOGEUSDT",
+    "ETHUSDT",
+    "SOLUSDT",
+    "TONUSDT",
+    "TRXUSDT",
+    "XRPUSDT"
+  ],
+  "chronology": {
+    "boundary_convention": "half_open_utc",
+    "embargo_days": 7,
+    "historical_evaluation_folds": [
+      {
+        "end_utc": "2025-10-01T00:00:00Z",
+        "fold_id": "historical_2025_09_partial",
+        "start_utc": "2025-09-07T00:00:00Z"
+      },
+      {
+        "end_utc": "2025-11-01T00:00:00Z",
+        "fold_id": "historical_2025_10",
+        "start_utc": "2025-10-01T00:00:00Z"
+      },
+      {
+        "end_utc": "2025-12-01T00:00:00Z",
+        "fold_id": "historical_2025_11",
+        "start_utc": "2025-11-01T00:00:00Z"
+      },
+      {
+        "end_utc": "2026-01-01T00:00:00Z",
+        "fold_id": "historical_2025_12",
+        "start_utc": "2025-12-01T00:00:00Z"
+      },
+      {
+        "end_utc": "2026-02-01T00:00:00Z",
+        "fold_id": "historical_2026_01",
+        "start_utc": "2026-01-01T00:00:00Z"
+      },
+      {
+        "end_utc": "2026-03-01T00:00:00Z",
+        "fold_id": "historical_2026_02",
+        "start_utc": "2026-02-01T00:00:00Z"
+      },
+      {
+        "end_utc": "2026-04-01T00:00:00Z",
+        "fold_id": "historical_2026_03",
+        "start_utc": "2026-03-01T00:00:00Z"
+      },
+      {
+        "end_utc": "2026-05-01T00:00:00Z",
+        "fold_id": "historical_2026_04",
+        "start_utc": "2026-04-01T00:00:00Z"
+      },
+      {
+        "end_utc": "2026-06-01T00:00:00Z",
+        "fold_id": "historical_2026_05",
+        "start_utc": "2026-05-01T00:00:00Z"
+      },
+      {
+        "end_utc": "2026-07-01T00:00:00Z",
+        "fold_id": "historical_2026_06",
+        "start_utc": "2026-06-01T00:00:00Z"
+      }
+    ],
+    "historical_evaluation_regimes": [
+      "historical_2025_09_partial",
+      "historical_2025_10",
+      "historical_2025_11",
+      "historical_2025_12",
+      "historical_2026_01",
+      "historical_2026_02",
+      "historical_2026_03",
+      "historical_2026_04",
+      "historical_2026_05",
+      "historical_2026_06"
+    ],
+    "purge_days": 7,
+    "root_ownership": [
+      {
+        "end_utc": "2024-01-01T00:00:00Z",
+        "feature_root_cli": "--warmup-feature-root",
+        "raw_root_cli": "--warmup-raw-root",
+        "split_id": "warmup",
+        "start_utc": "2022-12-31T00:00:00Z"
+      },
+      {
+        "end_utc": "2025-06-01T00:00:00Z",
+        "feature_root_cli": "--train-feature-root",
+        "raw_root_cli": "--train-raw-root",
+        "split_id": "train",
+        "start_utc": "2024-01-01T00:00:00Z"
+      },
+      {
+        "end_utc": "2025-06-08T00:00:00Z",
+        "feature_root_cli": "--purge-feature-root",
+        "raw_root_cli": "--purge-raw-root",
+        "split_id": "purge",
+        "start_utc": "2025-06-01T00:00:00Z"
+      },
+      {
+        "end_utc": "2025-08-31T00:00:00Z",
+        "feature_root_cli": "--validation-feature-root",
+        "raw_root_cli": "--validation-raw-root",
+        "split_id": "validation",
+        "start_utc": "2025-06-08T00:00:00Z"
+      },
+      {
+        "end_utc": "2025-09-07T00:00:00Z",
+        "feature_root_cli": "--embargo-feature-root",
+        "raw_root_cli": "--embargo-raw-root",
+        "split_id": "embargo",
+        "start_utc": "2025-08-31T00:00:00Z"
+      },
+      {
+        "end_utc": "2026-07-01T00:00:00Z",
+        "feature_root_cli": "--historical-evaluation-feature-root",
+        "raw_root_cli": "--historical-evaluation-raw-root",
+        "split_id": "historical_exposed_evaluation",
+        "start_utc": "2025-09-07T00:00:00Z"
+      }
+    ],
+    "splits": [
+      {
+        "end_utc": "2024-01-01T00:00:00Z",
+        "purpose": "indicator_and_admission_prefix_only",
+        "scored": false,
+        "split_id": "warmup",
+        "start_utc": "2022-12-31T00:00:00Z"
+      },
+      {
+        "end_utc": "2025-06-01T00:00:00Z",
+        "purpose": "train_scoring_admission_and_initial_allocation_fit",
+        "scored": true,
+        "split_id": "train",
+        "start_utc": "2024-01-01T00:00:00Z"
+      },
+      {
+        "end_utc": "2025-06-08T00:00:00Z",
+        "purpose": "causal_indicator_and_funding_warm_only",
+        "scored": false,
+        "split_id": "purge",
+        "start_utc": "2025-06-01T00:00:00Z"
+      },
+      {
+        "end_utc": "2025-08-31T00:00:00Z",
+        "purpose": "validation_only_champion_and_scaled_gross_selection",
+        "scored": true,
+        "split_id": "validation",
+        "start_utc": "2025-06-08T00:00:00Z"
+      },
+      {
+        "end_utc": "2025-09-07T00:00:00Z",
+        "purpose": "causal_historical_boundary_warm_only",
+        "scored": false,
+        "split_id": "embargo",
+        "start_utc": "2025-08-31T00:00:00Z"
+      },
+      {
+        "end_utc": "2026-07-01T00:00:00Z",
+        "purpose": "report_only_exposed_diagnostic_evaluation",
+        "scored": true,
+        "split_id": "historical_exposed_evaluation",
+        "start_utc": "2025-09-07T00:00:00Z"
+      }
+    ],
+    "validation_folds": [
+      {
+        "end_utc": "2025-06-15T00:00:00Z",
+        "fold_id": "validation_w01",
+        "start_utc": "2025-06-08T00:00:00Z"
+      },
+      {
+        "end_utc": "2025-06-22T00:00:00Z",
+        "fold_id": "validation_w02",
+        "start_utc": "2025-06-15T00:00:00Z"
+      },
+      {
+        "end_utc": "2025-06-29T00:00:00Z",
+        "fold_id": "validation_w03",
+        "start_utc": "2025-06-22T00:00:00Z"
+      },
+      {
+        "end_utc": "2025-07-06T00:00:00Z",
+        "fold_id": "validation_w04",
+        "start_utc": "2025-06-29T00:00:00Z"
+      },
+      {
+        "end_utc": "2025-07-13T00:00:00Z",
+        "fold_id": "validation_w05",
+        "start_utc": "2025-07-06T00:00:00Z"
+      },
+      {
+        "end_utc": "2025-07-20T00:00:00Z",
+        "fold_id": "validation_w06",
+        "start_utc": "2025-07-13T00:00:00Z"
+      },
+      {
+        "end_utc": "2025-07-27T00:00:00Z",
+        "fold_id": "validation_w07",
+        "start_utc": "2025-07-20T00:00:00Z"
+      },
+      {
+        "end_utc": "2025-08-03T00:00:00Z",
+        "fold_id": "validation_w08",
+        "start_utc": "2025-07-27T00:00:00Z"
+      },
+      {
+        "end_utc": "2025-08-10T00:00:00Z",
+        "fold_id": "validation_w09",
+        "start_utc": "2025-08-03T00:00:00Z"
+      },
+      {
+        "end_utc": "2025-08-17T00:00:00Z",
+        "fold_id": "validation_w10",
+        "start_utc": "2025-08-10T00:00:00Z"
+      },
+      {
+        "end_utc": "2025-08-24T00:00:00Z",
+        "fold_id": "validation_w11",
+        "start_utc": "2025-08-17T00:00:00Z"
+      },
+      {
+        "end_utc": "2025-08-31T00:00:00Z",
+        "fold_id": "validation_w12",
+        "start_utc": "2025-08-24T00:00:00Z"
+      }
+    ],
+    "validation_regimes": [
+      {
+        "end_utc": "2025-07-06T00:00:00Z",
+        "regime_id": "validation_r01",
+        "start_utc": "2025-06-08T00:00:00Z"
+      },
+      {
+        "end_utc": "2025-08-03T00:00:00Z",
+        "regime_id": "validation_r02",
+        "start_utc": "2025-07-06T00:00:00Z"
+      },
+      {
+        "end_utc": "2025-08-31T00:00:00Z",
+        "regime_id": "validation_r03",
+        "start_utc": "2025-08-03T00:00:00Z"
+      }
+    ]
+  },
+  "contract_manifest_contract": {
+    "exchange": "binance",
+    "records": [
+      {
+        "contract_multiplier": 1.0,
+        "inverse": false,
+        "linear": true,
+        "margin_asset": "USDT",
+        "market_type": "perpetual",
+        "quote_asset": "USDT",
+        "settle_asset": "USDT",
+        "symbol": "ADAUSDT",
+        "volume_unit": "base_asset"
+      },
+      {
+        "contract_multiplier": 1.0,
+        "inverse": false,
+        "linear": true,
+        "margin_asset": "USDT",
+        "market_type": "perpetual",
+        "quote_asset": "USDT",
+        "settle_asset": "USDT",
+        "symbol": "AVAXUSDT",
+        "volume_unit": "base_asset"
+      },
+      {
+        "contract_multiplier": 1.0,
+        "inverse": false,
+        "linear": true,
+        "margin_asset": "USDT",
+        "market_type": "perpetual",
+        "quote_asset": "USDT",
+        "settle_asset": "USDT",
+        "symbol": "BNBUSDT",
+        "volume_unit": "base_asset"
+      },
+      {
+        "contract_multiplier": 1.0,
+        "inverse": false,
+        "linear": true,
+        "margin_asset": "USDT",
+        "market_type": "perpetual",
+        "quote_asset": "USDT",
+        "settle_asset": "USDT",
+        "symbol": "BTCUSDT",
+        "volume_unit": "base_asset"
+      },
+      {
+        "contract_multiplier": 1.0,
+        "inverse": false,
+        "linear": true,
+        "margin_asset": "USDT",
+        "market_type": "perpetual",
+        "quote_asset": "USDT",
+        "settle_asset": "USDT",
+        "symbol": "DOGEUSDT",
+        "volume_unit": "base_asset"
+      },
+      {
+        "contract_multiplier": 1.0,
+        "inverse": false,
+        "linear": true,
+        "margin_asset": "USDT",
+        "market_type": "perpetual",
+        "quote_asset": "USDT",
+        "settle_asset": "USDT",
+        "symbol": "ETHUSDT",
+        "volume_unit": "base_asset"
+      },
+      {
+        "contract_multiplier": 1.0,
+        "inverse": false,
+        "linear": true,
+        "margin_asset": "USDT",
+        "market_type": "perpetual",
+        "quote_asset": "USDT",
+        "settle_asset": "USDT",
+        "symbol": "SOLUSDT",
+        "volume_unit": "base_asset"
+      },
+      {
+        "contract_multiplier": 1.0,
+        "inverse": false,
+        "linear": true,
+        "margin_asset": "USDT",
+        "market_type": "perpetual",
+        "quote_asset": "USDT",
+        "settle_asset": "USDT",
+        "symbol": "TONUSDT",
+        "volume_unit": "base_asset"
+      },
+      {
+        "contract_multiplier": 1.0,
+        "inverse": false,
+        "linear": true,
+        "margin_asset": "USDT",
+        "market_type": "perpetual",
+        "quote_asset": "USDT",
+        "settle_asset": "USDT",
+        "symbol": "TRXUSDT",
+        "volume_unit": "base_asset"
+      },
+      {
+        "contract_multiplier": 1.0,
+        "inverse": false,
+        "linear": true,
+        "margin_asset": "USDT",
+        "market_type": "perpetual",
+        "quote_asset": "USDT",
+        "settle_asset": "USDT",
+        "symbol": "XRPUSDT",
+        "volume_unit": "base_asset"
+      }
+    ],
+    "records_order": "lexicographic_symbol",
+    "required_exact_record_count": 10,
+    "schema_version": "alpha_max_contract_manifest.v1",
+    "sole_contract_metadata_source": true
+  },
+  "cost_cells": [
+    {
+      "additional_modeled_costs": [
+        "sqrt_impact",
+        "funding",
+        "financing",
+        "liquidation"
+      ],
+      "expected_base_slippage_bps": 5,
+      "half_spread_bps": 1,
+      "maker_fee_bps": 2,
+      "nominal_one_way_bps": 10,
+      "selection_reference": false,
+      "slippage_rate": 0.0005,
+      "taker_fee_bps": 4
+    },
+    {
+      "additional_modeled_costs": [
+        "sqrt_impact",
+        "funding",
+        "financing",
+        "liquidation"
+      ],
+      "expected_base_slippage_bps": 10,
+      "half_spread_bps": 1,
+      "maker_fee_bps": 2,
+      "nominal_one_way_bps": 15,
+      "selection_reference": false,
+      "slippage_rate": 0.001,
+      "taker_fee_bps": 4
+    },
+    {
+      "additional_modeled_costs": [
+        "sqrt_impact",
+        "funding",
+        "financing",
+        "liquidation"
+      ],
+      "expected_base_slippage_bps": 15,
+      "half_spread_bps": 1,
+      "maker_fee_bps": 2,
+      "nominal_one_way_bps": 20,
+      "selection_reference": false,
+      "slippage_rate": 0.0015,
+      "taker_fee_bps": 4
+    },
+    {
+      "additional_modeled_costs": [
+        "sqrt_impact",
+        "funding",
+        "financing",
+        "liquidation"
+      ],
+      "expected_base_slippage_bps": 25,
+      "half_spread_bps": 1,
+      "maker_fee_bps": 2,
+      "nominal_one_way_bps": 30,
+      "selection_reference": true,
+      "slippage_rate": 0.0025,
+      "taker_fee_bps": 4
+    }
+  ],
+  "current_trial_registry": {
+    "candidate_symbols": [
+      "ADAUSDT",
+      "AVAXUSDT",
+      "BNBUSDT",
+      "BTCUSDT",
+      "DOGEUSDT",
+      "ETHUSDT",
+      "SOLUSDT",
+      "TONUSDT",
+      "TRXUSDT",
+      "XRPUSDT"
+    ],
+    "canonicalization": "json.dumps(node,sort_keys=True,separators=(\",\",\":\"),ensure_ascii=False,allow_nan=False).encode(\"utf-8\")",
+    "current_key_set_sha256": "3a4791cf353abcb82f9717ce89ee16b9d73d84f431d5b058135046c2ba8e332b",
+    "current_node_count": 21,
+    "nodes": [
+      {
+        "allocation": {
+          "fixed_weights": {
+            "component_carry_1x": 1.0
+          },
+          "method": "single_component",
+          "parameters": {},
+          "per_component_cap": 1.0,
+          "resolved_weight_policy": "fixed",
+          "target_sum": 1.0
+        },
+        "gross": {
+          "method": "fixed",
+          "value": 1.0
+        },
+        "implementation": "ResearchOnlyFourHourFundingHarvestCarryStrategy",
+        "kind": "current_matrix_row",
+        "members": [],
+        "omission": null,
+        "params": {
+          "add_alloc_fraction": 0.5,
+          "add_step_atr": 1.0,
+          "allow_short": true,
+          "atr_period": 14,
+          "entry_funding": 5e-05,
+          "exit_funding": 0.0,
+          "funding_scale": 0.0003,
+          "funding_window": 6,
+          "max_adds": 2,
+          "max_hold_bars": 180,
+          "max_order_value": 5000.0,
+          "min_price": 0.1,
+          "no_fight_roc": 0.06,
+          "no_fight_roc_period": 4,
+          "target_allocation": 0.3,
+          "target_vol": 0.03,
+          "trail_atr_mult": 4.0,
+          "vol_window": 36
+        },
+        "row_id": "component_carry_1x",
+        "schema": "alpha_max_trial_node.v1",
+        "source_id": null,
+        "symbols": [
+          "ADAUSDT",
+          "AVAXUSDT",
+          "BNBUSDT",
+          "BTCUSDT",
+          "DOGEUSDT",
+          "ETHUSDT",
+          "SOLUSDT",
+          "TONUSDT",
+          "TRXUSDT",
+          "XRPUSDT"
+        ],
+        "timeframe": "4h"
+      },
+      {
+        "allocation": {
+          "fixed_weights": {
+            "component_near_high_1x": 1.0
+          },
+          "method": "single_component",
+          "parameters": {},
+          "per_component_cap": 1.0,
+          "resolved_weight_policy": "fixed",
+          "target_sum": 1.0
+        },
+        "gross": {
+          "method": "fixed",
+          "value": 1.0
+        },
+        "implementation": "ResearchOnlyDailyCrossSectionalNearHighAnchoringStrategy",
+        "kind": "current_matrix_row",
+        "members": [],
+        "omission": null,
+        "params": {
+          "allow_short": true,
+          "base_allocation": 0.2,
+          "high_lookback_bars": 364,
+          "max_hold_bars": 0,
+          "max_order_value": 400.0,
+          "max_symbol_exposure_pct": 0.4,
+          "min_history_bars": 60,
+          "min_hold_bars": 7,
+          "min_price": 0.1,
+          "min_symbols": 5,
+          "quantile_pct": 0.25,
+          "rebalance_bars": 7,
+          "stop_loss_pct": 0.1,
+          "target_gross_exposure": 1.0,
+          "target_vol": 0.2,
+          "vol_window": 20
+        },
+        "row_id": "component_near_high_1x",
+        "schema": "alpha_max_trial_node.v1",
+        "source_id": null,
+        "symbols": [
+          "ADAUSDT",
+          "AVAXUSDT",
+          "BNBUSDT",
+          "BTCUSDT",
+          "DOGEUSDT",
+          "ETHUSDT",
+          "SOLUSDT",
+          "TONUSDT",
+          "TRXUSDT",
+          "XRPUSDT"
+        ],
+        "timeframe": "1d"
+      },
+      {
+        "allocation": {
+          "fixed_weights": {
+            "component_trend_1x": 1.0
+          },
+          "method": "single_component",
+          "parameters": {},
+          "per_component_cap": 1.0,
+          "resolved_weight_policy": "fixed",
+          "target_sum": 1.0
+        },
+        "gross": {
+          "method": "fixed",
+          "value": 1.0
+        },
+        "implementation": "ResearchOnlyDailyLowTurnoverTrendPersistenceStrategy",
+        "kind": "current_matrix_row",
+        "members": [],
+        "omission": null,
+        "params": {
+          "adx_min": 20.0,
+          "adx_period": 14,
+          "allow_short": true,
+          "cooldown_bars": 4,
+          "efficiency_period": 20,
+          "max_hold_bars": 2000,
+          "max_order_value": 400.0,
+          "min_efficiency": 0.3,
+          "min_hold_bars": 36,
+          "min_price": 0.1,
+          "target_allocation": 0.2,
+          "target_vol": 0.2,
+          "tsmom_long": 84,
+          "tsmom_mid": 56,
+          "tsmom_short": 28,
+          "vol_persist_fast": 16,
+          "vol_persist_max": 1.5,
+          "vol_persist_slow": 64,
+          "vol_window": 56
+        },
+        "row_id": "component_trend_1x",
+        "schema": "alpha_max_trial_node.v1",
+        "source_id": null,
+        "symbols": [
+          "ADAUSDT",
+          "AVAXUSDT",
+          "BNBUSDT",
+          "BTCUSDT",
+          "DOGEUSDT",
+          "ETHUSDT",
+          "SOLUSDT",
+          "TONUSDT",
+          "TRXUSDT",
+          "XRPUSDT"
+        ],
+        "timeframe": "1d"
+      },
+      {
+        "allocation": {
+          "fixed_weights": null,
+          "method": "source_manifest",
+          "parameters": {},
+          "per_component_cap": null,
+          "resolved_weight_policy": "sealed_source_manifest",
+          "target_sum": 1.0
+        },
+        "gross": {
+          "method": "source_manifest",
+          "value": null
+        },
+        "implementation": "faithful_actual_engine_manifest_replay",
+        "kind": "current_matrix_row",
+        "members": [],
+        "omission": null,
+        "params": {
+          "decision_cadence_seconds": 1,
+          "faithful_actual_engine_manifest_required": true
+        },
+        "row_id": "diagnostic_track_b_codex_lagged_leaf_router_grid",
+        "schema": "alpha_max_trial_node.v1",
+        "source_id": "codex_lagged_leaf_router_grid:h4_avg1_tr-0.02_tmdd0.50_val0.00_vmdd0.25_lagged_plus_val025_exact_unscaled",
+        "symbols": [
+          "ADAUSDT",
+          "AVAXUSDT",
+          "BNBUSDT",
+          "BTCUSDT",
+          "DOGEUSDT",
+          "ETHUSDT",
+          "SOLUSDT",
+          "TONUSDT",
+          "TRXUSDT",
+          "XRPUSDT"
+        ],
+        "timeframe": "source_manifest_native"
+      },
+      {
+        "allocation": {
+          "fixed_weights": null,
+          "method": "equal_risk",
+          "parameters": {
+            "cash_residual_upper_exclusive": 1e-09,
+            "constructor": "ERCPortfolio",
+            "cov_window": null,
+            "covariance": "ledoit_wolf_shrunk_covariance",
+            "fit_cost_bps": 20,
+            "fit_return_frequency": "1d",
+            "max_iter": 10000,
+            "minimum_observations": 252,
+            "round_ndigits": 10,
+            "tol": 1e-10
+          },
+          "per_component_cap": 0.5,
+          "resolved_weight_policy": "train_then_fixed_train_validation_refit",
+          "target_sum": 1.0
+        },
+        "gross": {
+          "method": "fixed",
+          "value": 1.0
+        },
+        "implementation": "ArtifactPortfolioModeStrategy",
+        "kind": "current_matrix_row",
+        "members": [
+          "component_carry_1x",
+          "component_near_high_1x",
+          "component_trend_1x"
+        ],
+        "omission": null,
+        "params": {
+          "decision_cadence_seconds": 1,
+          "final_weight_refit": true,
+          "score_from_flat": true
+        },
+        "row_id": "full_equal_risk_1x",
+        "schema": "alpha_max_trial_node.v1",
+        "source_id": null,
+        "symbols": [
+          "ADAUSDT",
+          "AVAXUSDT",
+          "BNBUSDT",
+          "BTCUSDT",
+          "DOGEUSDT",
+          "ETHUSDT",
+          "SOLUSDT",
+          "TONUSDT",
+          "TRXUSDT",
+          "XRPUSDT"
+        ],
+        "timeframe": "mixed_native_1d_4h"
+      },
+      {
+        "allocation": {
+          "fixed_weights": null,
+          "method": "equal_risk",
+          "parameters": {
+            "cash_residual_upper_exclusive": 1e-09,
+            "constructor": "ERCPortfolio",
+            "cov_window": null,
+            "covariance": "ledoit_wolf_shrunk_covariance",
+            "fit_cost_bps": 20,
+            "fit_return_frequency": "1d",
+            "max_iter": 10000,
+            "minimum_observations": 252,
+            "round_ndigits": 10,
+            "tol": 1e-10
+          },
+          "per_component_cap": 0.5,
+          "resolved_weight_policy": "train_then_fixed_train_validation_refit",
+          "target_sum": 1.0
+        },
+        "gross": {
+          "clip_max": 2.25,
+          "clip_min": 0.25,
+          "epsilon": 1e-12,
+          "method": "validation_mdd_target",
+          "requires_positive_exposure_normalized_1x_sibling": true,
+          "target_mdd": 0.27,
+          "value": null
+        },
+        "implementation": "ArtifactPortfolioModeStrategy",
+        "kind": "current_matrix_row",
+        "members": [
+          "component_carry_1x",
+          "component_near_high_1x",
+          "component_trend_1x"
+        ],
+        "omission": null,
+        "params": {
+          "decision_cadence_seconds": 1,
+          "final_weight_refit": true,
+          "score_from_flat": true
+        },
+        "row_id": "full_equal_risk_scaled",
+        "schema": "alpha_max_trial_node.v1",
+        "source_id": null,
+        "symbols": [
+          "ADAUSDT",
+          "AVAXUSDT",
+          "BNBUSDT",
+          "BTCUSDT",
+          "DOGEUSDT",
+          "ETHUSDT",
+          "SOLUSDT",
+          "TONUSDT",
+          "TRXUSDT",
+          "XRPUSDT"
+        ],
+        "timeframe": "mixed_native_1d_4h"
+      },
+      {
+        "allocation": {
+          "fixed_weights": {
+            "component_carry_1x": 0.3333333333333333,
+            "component_near_high_1x": 0.3333333333333333,
+            "component_trend_1x": 0.3333333333333333
+          },
+          "method": "equal_weight",
+          "parameters": {
+            "bucket_rule": "deterministic_equal_family_weight"
+          },
+          "per_component_cap": 0.5,
+          "resolved_weight_policy": "fixed_by_membership",
+          "target_sum": 1.0
+        },
+        "gross": {
+          "method": "fixed",
+          "value": 1.0
+        },
+        "implementation": "ArtifactPortfolioModeStrategy",
+        "kind": "current_matrix_row",
+        "members": [
+          "component_carry_1x",
+          "component_near_high_1x",
+          "component_trend_1x"
+        ],
+        "omission": null,
+        "params": {
+          "decision_cadence_seconds": 1,
+          "final_weight_refit": true,
+          "score_from_flat": true
+        },
+        "row_id": "full_equal_weight_1x",
+        "schema": "alpha_max_trial_node.v1",
+        "source_id": null,
+        "symbols": [
+          "ADAUSDT",
+          "AVAXUSDT",
+          "BNBUSDT",
+          "BTCUSDT",
+          "DOGEUSDT",
+          "ETHUSDT",
+          "SOLUSDT",
+          "TONUSDT",
+          "TRXUSDT",
+          "XRPUSDT"
+        ],
+        "timeframe": "mixed_native_1d_4h"
+      },
+      {
+        "allocation": {
+          "fixed_weights": null,
+          "method": "shrunk_hrp",
+          "parameters": {
+            "cash_residual_upper_exclusive": 1e-09,
+            "corr_threshold": 0.6,
+            "correlation_shrinkage": true,
+            "fit_cost_bps": 20,
+            "fit_return_frequency": "1d",
+            "helper": "quality_gated_allocation._hrp_weights_with_correlation_shrinkage",
+            "linkage": "sorted_id_greedy_first_cluster_absolute_correlation",
+            "minimum_observations": 252,
+            "round_ndigits": 10,
+            "variance_divisor": "T"
+          },
+          "per_component_cap": 0.5,
+          "resolved_weight_policy": "train_then_fixed_train_validation_refit",
+          "target_sum": 1.0
+        },
+        "gross": {
+          "method": "fixed",
+          "value": 1.0
+        },
+        "implementation": "ArtifactPortfolioModeStrategy",
+        "kind": "current_matrix_row",
+        "members": [
+          "component_carry_1x",
+          "component_near_high_1x",
+          "component_trend_1x"
+        ],
+        "omission": null,
+        "params": {
+          "decision_cadence_seconds": 1,
+          "final_weight_refit": true,
+          "score_from_flat": true
+        },
+        "row_id": "full_shrunk_hrp_1x",
+        "schema": "alpha_max_trial_node.v1",
+        "source_id": null,
+        "symbols": [
+          "ADAUSDT",
+          "AVAXUSDT",
+          "BNBUSDT",
+          "BTCUSDT",
+          "DOGEUSDT",
+          "ETHUSDT",
+          "SOLUSDT",
+          "TONUSDT",
+          "TRXUSDT",
+          "XRPUSDT"
+        ],
+        "timeframe": "mixed_native_1d_4h"
+      },
+      {
+        "allocation": {
+          "fixed_weights": null,
+          "method": "shrunk_hrp",
+          "parameters": {
+            "cash_residual_upper_exclusive": 1e-09,
+            "corr_threshold": 0.6,
+            "correlation_shrinkage": true,
+            "fit_cost_bps": 20,
+            "fit_return_frequency": "1d",
+            "helper": "quality_gated_allocation._hrp_weights_with_correlation_shrinkage",
+            "linkage": "sorted_id_greedy_first_cluster_absolute_correlation",
+            "minimum_observations": 252,
+            "round_ndigits": 10,
+            "variance_divisor": "T"
+          },
+          "per_component_cap": 0.5,
+          "resolved_weight_policy": "train_then_fixed_train_validation_refit",
+          "target_sum": 1.0
+        },
+        "gross": {
+          "clip_max": 2.25,
+          "clip_min": 0.25,
+          "epsilon": 1e-12,
+          "method": "validation_mdd_target",
+          "requires_positive_exposure_normalized_1x_sibling": true,
+          "target_mdd": 0.27,
+          "value": null
+        },
+        "implementation": "ArtifactPortfolioModeStrategy",
+        "kind": "current_matrix_row",
+        "members": [
+          "component_carry_1x",
+          "component_near_high_1x",
+          "component_trend_1x"
+        ],
+        "omission": null,
+        "params": {
+          "decision_cadence_seconds": 1,
+          "final_weight_refit": true,
+          "score_from_flat": true
+        },
+        "row_id": "full_shrunk_hrp_scaled",
+        "schema": "alpha_max_trial_node.v1",
+        "source_id": null,
+        "symbols": [
+          "ADAUSDT",
+          "AVAXUSDT",
+          "BNBUSDT",
+          "BTCUSDT",
+          "DOGEUSDT",
+          "ETHUSDT",
+          "SOLUSDT",
+          "TONUSDT",
+          "TRXUSDT",
+          "XRPUSDT"
+        ],
+        "timeframe": "mixed_native_1d_4h"
+      },
+      {
+        "allocation": {
+          "fixed_weights": null,
+          "method": "source_manifest",
+          "parameters": {},
+          "per_component_cap": null,
+          "resolved_weight_policy": "sealed_source_manifest",
+          "target_sum": 1.0
+        },
+        "gross": {
+          "method": "source_manifest",
+          "value": null
+        },
+        "implementation": "faithful_actual_engine_manifest_replay",
+        "kind": "current_matrix_row",
+        "members": [],
+        "omission": null,
+        "params": {
+          "decision_cadence_seconds": 1,
+          "faithful_actual_engine_manifest_required": true
+        },
+        "row_id": "incumbent_cross_asset_lead_lag_momentum",
+        "schema": "alpha_max_trial_node.v1",
+        "source_id": "cross_asset_lead_lag_momentum",
+        "symbols": [
+          "ADAUSDT",
+          "AVAXUSDT",
+          "BNBUSDT",
+          "BTCUSDT",
+          "DOGEUSDT",
+          "ETHUSDT",
+          "SOLUSDT",
+          "TONUSDT",
+          "TRXUSDT",
+          "XRPUSDT"
+        ],
+        "timeframe": "source_manifest_native"
+      },
+      {
+        "allocation": {
+          "fixed_weights": null,
+          "method": "source_manifest",
+          "parameters": {},
+          "per_component_cap": null,
+          "resolved_weight_policy": "sealed_source_manifest",
+          "target_sum": 1.0
+        },
+        "gross": {
+          "method": "source_manifest",
+          "value": null
+        },
+        "implementation": "faithful_actual_engine_manifest_replay",
+        "kind": "current_matrix_row",
+        "members": [],
+        "omission": null,
+        "params": {
+          "decision_cadence_seconds": 1,
+          "faithful_actual_engine_manifest_required": true
+        },
+        "row_id": "incumbent_cross_candidate_hybrid_v3_5",
+        "schema": "alpha_max_trial_node.v1",
+        "source_id": "cross_candidate_hybrid:hybrid_v3_5",
+        "symbols": [
+          "ADAUSDT",
+          "AVAXUSDT",
+          "BNBUSDT",
+          "BTCUSDT",
+          "DOGEUSDT",
+          "ETHUSDT",
+          "SOLUSDT",
+          "TONUSDT",
+          "TRXUSDT",
+          "XRPUSDT"
+        ],
+        "timeframe": "source_manifest_native"
+      },
+      {
+        "allocation": {
+          "fixed_weights": null,
+          "method": "source_manifest",
+          "parameters": {},
+          "per_component_cap": null,
+          "resolved_weight_policy": "sealed_source_manifest",
+          "target_sum": 1.0
+        },
+        "gross": {
+          "method": "source_manifest",
+          "value": null
+        },
+        "implementation": "faithful_actual_engine_manifest_replay",
+        "kind": "current_matrix_row",
+        "members": [],
+        "omission": null,
+        "params": {
+          "decision_cadence_seconds": 1,
+          "faithful_actual_engine_manifest_required": true
+        },
+        "row_id": "incumbent_track_a_dynamic_conviction_switch",
+        "schema": "alpha_max_trial_node.v1",
+        "source_id": "dynamic_conviction_switch:t0.85_risk_capped_fallback_val_ret02_calmar80_gate_val_mdd20_scaled",
+        "symbols": [
+          "ADAUSDT",
+          "AVAXUSDT",
+          "BNBUSDT",
+          "BTCUSDT",
+          "DOGEUSDT",
+          "ETHUSDT",
+          "SOLUSDT",
+          "TONUSDT",
+          "TRXUSDT",
+          "XRPUSDT"
+        ],
+        "timeframe": "source_manifest_native"
+      },
+      {
+        "allocation": {
+          "fixed_weights": null,
+          "method": "equal_risk",
+          "parameters": {
+            "cash_residual_upper_exclusive": 1e-09,
+            "constructor": "ERCPortfolio",
+            "cov_window": null,
+            "covariance": "ledoit_wolf_shrunk_covariance",
+            "fit_cost_bps": 20,
+            "fit_return_frequency": "1d",
+            "max_iter": 10000,
+            "minimum_observations": 252,
+            "round_ndigits": 10,
+            "tol": 1e-10
+          },
+          "per_component_cap": 0.7,
+          "resolved_weight_policy": "train_then_fixed_train_validation_refit",
+          "target_sum": 1.0
+        },
+        "gross": {
+          "method": "fixed",
+          "value": 1.0
+        },
+        "implementation": "ArtifactPortfolioModeStrategy",
+        "kind": "current_matrix_row",
+        "members": [
+          "component_near_high_1x",
+          "component_trend_1x"
+        ],
+        "omission": "component_carry_1x",
+        "params": {
+          "decision_cadence_seconds": 1,
+          "final_weight_refit": true,
+          "score_from_flat": true
+        },
+        "row_id": "loo_equal_risk_omit_carry_1x",
+        "schema": "alpha_max_trial_node.v1",
+        "source_id": null,
+        "symbols": [
+          "ADAUSDT",
+          "AVAXUSDT",
+          "BNBUSDT",
+          "BTCUSDT",
+          "DOGEUSDT",
+          "ETHUSDT",
+          "SOLUSDT",
+          "TONUSDT",
+          "TRXUSDT",
+          "XRPUSDT"
+        ],
+        "timeframe": "mixed_native_1d_4h"
+      },
+      {
+        "allocation": {
+          "fixed_weights": null,
+          "method": "equal_risk",
+          "parameters": {
+            "cash_residual_upper_exclusive": 1e-09,
+            "constructor": "ERCPortfolio",
+            "cov_window": null,
+            "covariance": "ledoit_wolf_shrunk_covariance",
+            "fit_cost_bps": 20,
+            "fit_return_frequency": "1d",
+            "max_iter": 10000,
+            "minimum_observations": 252,
+            "round_ndigits": 10,
+            "tol": 1e-10
+          },
+          "per_component_cap": 0.7,
+          "resolved_weight_policy": "train_then_fixed_train_validation_refit",
+          "target_sum": 1.0
+        },
+        "gross": {
+          "method": "fixed",
+          "value": 1.0
+        },
+        "implementation": "ArtifactPortfolioModeStrategy",
+        "kind": "current_matrix_row",
+        "members": [
+          "component_carry_1x",
+          "component_trend_1x"
+        ],
+        "omission": "component_near_high_1x",
+        "params": {
+          "decision_cadence_seconds": 1,
+          "final_weight_refit": true,
+          "score_from_flat": true
+        },
+        "row_id": "loo_equal_risk_omit_near_high_1x",
+        "schema": "alpha_max_trial_node.v1",
+        "source_id": null,
+        "symbols": [
+          "ADAUSDT",
+          "AVAXUSDT",
+          "BNBUSDT",
+          "BTCUSDT",
+          "DOGEUSDT",
+          "ETHUSDT",
+          "SOLUSDT",
+          "TONUSDT",
+          "TRXUSDT",
+          "XRPUSDT"
+        ],
+        "timeframe": "mixed_native_1d_4h"
+      },
+      {
+        "allocation": {
+          "fixed_weights": null,
+          "method": "equal_risk",
+          "parameters": {
+            "cash_residual_upper_exclusive": 1e-09,
+            "constructor": "ERCPortfolio",
+            "cov_window": null,
+            "covariance": "ledoit_wolf_shrunk_covariance",
+            "fit_cost_bps": 20,
+            "fit_return_frequency": "1d",
+            "max_iter": 10000,
+            "minimum_observations": 252,
+            "round_ndigits": 10,
+            "tol": 1e-10
+          },
+          "per_component_cap": 0.7,
+          "resolved_weight_policy": "train_then_fixed_train_validation_refit",
+          "target_sum": 1.0
+        },
+        "gross": {
+          "method": "fixed",
+          "value": 1.0
+        },
+        "implementation": "ArtifactPortfolioModeStrategy",
+        "kind": "current_matrix_row",
+        "members": [
+          "component_carry_1x",
+          "component_near_high_1x"
+        ],
+        "omission": "component_trend_1x",
+        "params": {
+          "decision_cadence_seconds": 1,
+          "final_weight_refit": true,
+          "score_from_flat": true
+        },
+        "row_id": "loo_equal_risk_omit_trend_1x",
+        "schema": "alpha_max_trial_node.v1",
+        "source_id": null,
+        "symbols": [
+          "ADAUSDT",
+          "AVAXUSDT",
+          "BNBUSDT",
+          "BTCUSDT",
+          "DOGEUSDT",
+          "ETHUSDT",
+          "SOLUSDT",
+          "TONUSDT",
+          "TRXUSDT",
+          "XRPUSDT"
+        ],
+        "timeframe": "mixed_native_1d_4h"
+      },
+      {
+        "allocation": {
+          "fixed_weights": {
+            "component_near_high_1x": 0.5,
+            "component_trend_1x": 0.5
+          },
+          "method": "equal_weight",
+          "parameters": {
+            "bucket_rule": "deterministic_equal_family_weight"
+          },
+          "per_component_cap": 0.7,
+          "resolved_weight_policy": "fixed_by_membership",
+          "target_sum": 1.0
+        },
+        "gross": {
+          "method": "fixed",
+          "value": 1.0
+        },
+        "implementation": "ArtifactPortfolioModeStrategy",
+        "kind": "current_matrix_row",
+        "members": [
+          "component_near_high_1x",
+          "component_trend_1x"
+        ],
+        "omission": "component_carry_1x",
+        "params": {
+          "decision_cadence_seconds": 1,
+          "final_weight_refit": true,
+          "score_from_flat": true
+        },
+        "row_id": "loo_equal_weight_omit_carry_1x",
+        "schema": "alpha_max_trial_node.v1",
+        "source_id": null,
+        "symbols": [
+          "ADAUSDT",
+          "AVAXUSDT",
+          "BNBUSDT",
+          "BTCUSDT",
+          "DOGEUSDT",
+          "ETHUSDT",
+          "SOLUSDT",
+          "TONUSDT",
+          "TRXUSDT",
+          "XRPUSDT"
+        ],
+        "timeframe": "mixed_native_1d_4h"
+      },
+      {
+        "allocation": {
+          "fixed_weights": {
+            "component_carry_1x": 0.5,
+            "component_trend_1x": 0.5
+          },
+          "method": "equal_weight",
+          "parameters": {
+            "bucket_rule": "deterministic_equal_family_weight"
+          },
+          "per_component_cap": 0.7,
+          "resolved_weight_policy": "fixed_by_membership",
+          "target_sum": 1.0
+        },
+        "gross": {
+          "method": "fixed",
+          "value": 1.0
+        },
+        "implementation": "ArtifactPortfolioModeStrategy",
+        "kind": "current_matrix_row",
+        "members": [
+          "component_carry_1x",
+          "component_trend_1x"
+        ],
+        "omission": "component_near_high_1x",
+        "params": {
+          "decision_cadence_seconds": 1,
+          "final_weight_refit": true,
+          "score_from_flat": true
+        },
+        "row_id": "loo_equal_weight_omit_near_high_1x",
+        "schema": "alpha_max_trial_node.v1",
+        "source_id": null,
+        "symbols": [
+          "ADAUSDT",
+          "AVAXUSDT",
+          "BNBUSDT",
+          "BTCUSDT",
+          "DOGEUSDT",
+          "ETHUSDT",
+          "SOLUSDT",
+          "TONUSDT",
+          "TRXUSDT",
+          "XRPUSDT"
+        ],
+        "timeframe": "mixed_native_1d_4h"
+      },
+      {
+        "allocation": {
+          "fixed_weights": {
+            "component_carry_1x": 0.5,
+            "component_near_high_1x": 0.5
+          },
+          "method": "equal_weight",
+          "parameters": {
+            "bucket_rule": "deterministic_equal_family_weight"
+          },
+          "per_component_cap": 0.7,
+          "resolved_weight_policy": "fixed_by_membership",
+          "target_sum": 1.0
+        },
+        "gross": {
+          "method": "fixed",
+          "value": 1.0
+        },
+        "implementation": "ArtifactPortfolioModeStrategy",
+        "kind": "current_matrix_row",
+        "members": [
+          "component_carry_1x",
+          "component_near_high_1x"
+        ],
+        "omission": "component_trend_1x",
+        "params": {
+          "decision_cadence_seconds": 1,
+          "final_weight_refit": true,
+          "score_from_flat": true
+        },
+        "row_id": "loo_equal_weight_omit_trend_1x",
+        "schema": "alpha_max_trial_node.v1",
+        "source_id": null,
+        "symbols": [
+          "ADAUSDT",
+          "AVAXUSDT",
+          "BNBUSDT",
+          "BTCUSDT",
+          "DOGEUSDT",
+          "ETHUSDT",
+          "SOLUSDT",
+          "TONUSDT",
+          "TRXUSDT",
+          "XRPUSDT"
+        ],
+        "timeframe": "mixed_native_1d_4h"
+      },
+      {
+        "allocation": {
+          "fixed_weights": null,
+          "method": "shrunk_hrp",
+          "parameters": {
+            "cash_residual_upper_exclusive": 1e-09,
+            "corr_threshold": 0.6,
+            "correlation_shrinkage": true,
+            "fit_cost_bps": 20,
+            "fit_return_frequency": "1d",
+            "helper": "quality_gated_allocation._hrp_weights_with_correlation_shrinkage",
+            "linkage": "sorted_id_greedy_first_cluster_absolute_correlation",
+            "minimum_observations": 252,
+            "round_ndigits": 10,
+            "variance_divisor": "T"
+          },
+          "per_component_cap": 0.7,
+          "resolved_weight_policy": "train_then_fixed_train_validation_refit",
+          "target_sum": 1.0
+        },
+        "gross": {
+          "method": "fixed",
+          "value": 1.0
+        },
+        "implementation": "ArtifactPortfolioModeStrategy",
+        "kind": "current_matrix_row",
+        "members": [
+          "component_near_high_1x",
+          "component_trend_1x"
+        ],
+        "omission": "component_carry_1x",
+        "params": {
+          "decision_cadence_seconds": 1,
+          "final_weight_refit": true,
+          "score_from_flat": true
+        },
+        "row_id": "loo_shrunk_hrp_omit_carry_1x",
+        "schema": "alpha_max_trial_node.v1",
+        "source_id": null,
+        "symbols": [
+          "ADAUSDT",
+          "AVAXUSDT",
+          "BNBUSDT",
+          "BTCUSDT",
+          "DOGEUSDT",
+          "ETHUSDT",
+          "SOLUSDT",
+          "TONUSDT",
+          "TRXUSDT",
+          "XRPUSDT"
+        ],
+        "timeframe": "mixed_native_1d_4h"
+      },
+      {
+        "allocation": {
+          "fixed_weights": null,
+          "method": "shrunk_hrp",
+          "parameters": {
+            "cash_residual_upper_exclusive": 1e-09,
+            "corr_threshold": 0.6,
+            "correlation_shrinkage": true,
+            "fit_cost_bps": 20,
+            "fit_return_frequency": "1d",
+            "helper": "quality_gated_allocation._hrp_weights_with_correlation_shrinkage",
+            "linkage": "sorted_id_greedy_first_cluster_absolute_correlation",
+            "minimum_observations": 252,
+            "round_ndigits": 10,
+            "variance_divisor": "T"
+          },
+          "per_component_cap": 0.7,
+          "resolved_weight_policy": "train_then_fixed_train_validation_refit",
+          "target_sum": 1.0
+        },
+        "gross": {
+          "method": "fixed",
+          "value": 1.0
+        },
+        "implementation": "ArtifactPortfolioModeStrategy",
+        "kind": "current_matrix_row",
+        "members": [
+          "component_carry_1x",
+          "component_trend_1x"
+        ],
+        "omission": "component_near_high_1x",
+        "params": {
+          "decision_cadence_seconds": 1,
+          "final_weight_refit": true,
+          "score_from_flat": true
+        },
+        "row_id": "loo_shrunk_hrp_omit_near_high_1x",
+        "schema": "alpha_max_trial_node.v1",
+        "source_id": null,
+        "symbols": [
+          "ADAUSDT",
+          "AVAXUSDT",
+          "BNBUSDT",
+          "BTCUSDT",
+          "DOGEUSDT",
+          "ETHUSDT",
+          "SOLUSDT",
+          "TONUSDT",
+          "TRXUSDT",
+          "XRPUSDT"
+        ],
+        "timeframe": "mixed_native_1d_4h"
+      },
+      {
+        "allocation": {
+          "fixed_weights": null,
+          "method": "shrunk_hrp",
+          "parameters": {
+            "cash_residual_upper_exclusive": 1e-09,
+            "corr_threshold": 0.6,
+            "correlation_shrinkage": true,
+            "fit_cost_bps": 20,
+            "fit_return_frequency": "1d",
+            "helper": "quality_gated_allocation._hrp_weights_with_correlation_shrinkage",
+            "linkage": "sorted_id_greedy_first_cluster_absolute_correlation",
+            "minimum_observations": 252,
+            "round_ndigits": 10,
+            "variance_divisor": "T"
+          },
+          "per_component_cap": 0.7,
+          "resolved_weight_policy": "train_then_fixed_train_validation_refit",
+          "target_sum": 1.0
+        },
+        "gross": {
+          "method": "fixed",
+          "value": 1.0
+        },
+        "implementation": "ArtifactPortfolioModeStrategy",
+        "kind": "current_matrix_row",
+        "members": [
+          "component_carry_1x",
+          "component_near_high_1x"
+        ],
+        "omission": "component_trend_1x",
+        "params": {
+          "decision_cadence_seconds": 1,
+          "final_weight_refit": true,
+          "score_from_flat": true
+        },
+        "row_id": "loo_shrunk_hrp_omit_trend_1x",
+        "schema": "alpha_max_trial_node.v1",
+        "source_id": null,
+        "symbols": [
+          "ADAUSDT",
+          "AVAXUSDT",
+          "BNBUSDT",
+          "BTCUSDT",
+          "DOGEUSDT",
+          "ETHUSDT",
+          "SOLUSDT",
+          "TONUSDT",
+          "TRXUSDT",
+          "XRPUSDT"
+        ],
+        "timeframe": "mixed_native_1d_4h"
+      }
+    ],
+    "schema": "alpha_max_current_trial_registry.v1"
+  },
+  "experiment_id": "alpha_max_portfolio_20260710",
+  "funding_sidecar_and_settlement": {
+    "atomic_validate_all_held_symbols_before_mutation": true,
+    "boundary_interval_milliseconds": 28800000,
+    "boundary_times_utc": [
+      "00:00",
+      "08:00",
+      "16:00"
+    ],
+    "cash_payment_function": "ExecutionModel.compute_funding_payment(periods=1)",
+    "feature_exchange": "binance",
+    "feature_field": "funding_rate",
+    "funding_point_maximum_age_milliseconds": 28800000,
+    "genuine_zero_is_observation": true,
+    "lookup_class": "AlphaMaxOrderedFundingLookup",
+    "missing_is_not_zero": true,
+    "ordered_phase_root_ids": {
+      "embargo": [
+        "validation",
+        "embargo"
+      ],
+      "historical_exposed_evaluation": [
+        "embargo",
+        "historical_exposed_evaluation"
+      ],
+      "purge": [
+        "train",
+        "purge"
+      ],
+      "train": [
+        "warmup",
+        "train"
+      ],
+      "validation": [
+        "purge",
+        "validation"
+      ],
+      "warmup": [
+        "warmup"
+      ]
+    },
+    "raw_close_maximum_age_milliseconds": 1000,
+    "raw_close_rule": "row_timestamp_ms+1000=close_timestamp_ms<=boundary_ms",
+    "resolver_class": "AlphaMaxFundingBoundaryResolver",
+    "resolver_membership_source": "sealed_admission_manifest.admitted_symbols",
+    "source_timestamp_must_be_inside_owned_half_open_root": true
+  },
+  "incumbent_resolution": {
+    "aggregate_resolution": {
+      "all_named_incumbents_unavailable": true,
+      "resolved_count": 0,
+      "unavailable_count": 3
+    },
+    "audit_scope": {
+      "faithful_replay_definition": "one complete actual-engine strategy/portfolio manifest executable on the frozen roots/calendar/universe/cost cells without selecting a nearby row, re-optimizing, or inferring missing timing/weight/gross semantics",
+      "path_policy": "only the exact ordered source/report paths embedded per row; no glob, latest-file discovery, ambient filesystem search, or runtime fallback",
+      "rows": [
+        "incumbent_track_a_dynamic_conviction_switch",
+        "incumbent_cross_asset_lead_lag_momentum",
+        "incumbent_cross_candidate_hybrid_v3_5"
+      ]
+    },
+    "baseline_commit": "252910e54e280cc593365484cbc99d6ca87893f9",
+    "rows": [
+      {
+        "frozen_audit_files": [
+          {
+            "content_sha256": "0f9b110dc2a957cd4272dc7b0998838567ca4e69f8eb7df49504e34add6efe0e",
+            "exact_token": "_dynamic_conviction_switch_candidates",
+            "exact_token_occurrences": 2,
+            "git_blob_oid": "89403977626d25cc6b03e8a41ae4a1601b0c50e6",
+            "path": "scripts/research/run_alpha_zoo_69_asset_monthly_refit_walkforward.py",
+            "representation_evidence": "lines 1604+ construct fold-local CandidateResult selectors over precomputed candidate.returns and validation snapshots; no ArtifactPortfolioModeStrategy or engine manifest is materialized for this label"
+          },
+          {
+            "content_sha256": "3399452e9fb3cb7d9fe0074deed40c266e4f37eeae247b940b5d54eb966b495c",
+            "exact_token": "dynamic_conviction_switch:t0.85_risk_capped_fallback_val_ret02_calmar80_gate_val_mdd20_scaled",
+            "exact_token_occurrences": 15,
+            "git_blob_oid": "bfe48254c9aafb736efc0bb7ffeeba6feaf9c16f",
+            "path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_85_asset_dynamic_scaled_20260605/alpha_zoo_85_asset_dynamic_scaled_full_v2_20260605.json",
+            "representation_evidence": "15 exact label occurrences across aggregate/fold report records; report exposes returns/metrics and selected labels, but no strategy_class, strategy_params, portfolio_mode, or engine_manifest"
+          }
+        ],
+        "mdd_comparator_eligible": false,
+        "missing_actual_engine_fields": [
+          "strategy_class",
+          "strategy_params",
+          "native_timeframe",
+          "portfolio_member_manifests",
+          "allocation_weights",
+          "gross_rule"
+        ],
+        "representation": "fold_local_offline_selector_and_scaled_candidate_return_series",
+        "required_actual_engine_fields": [
+          "strategy_class",
+          "strategy_params",
+          "symbols",
+          "native_timeframe",
+          "portfolio_member_manifests",
+          "allocation_weights",
+          "gross_rule"
+        ],
+        "resolution_reason": "offline_fold_local_selector_has_no_frozen_actual_engine_manifest_and_cannot_be_translated_without inventing member/weight/timing semantics",
+        "resolution_status": "incumbent_replay_unavailable",
+        "row_id": "incumbent_track_a_dynamic_conviction_switch",
+        "selection_eligible": false,
+        "source_id": "dynamic_conviction_switch:t0.85_risk_capped_fallback_val_ret02_calmar80_gate_val_mdd20_scaled"
+      },
+      {
+        "frozen_audit_files": [
+          {
+            "content_sha256": "a1a999cd085ed43f974890b82f73b3acf45ce9056687ea6fb3a37dedf69725d0",
+            "exact_token": "cross_asset_lead_lag_momentum",
+            "exact_token_occurrences": 4,
+            "git_blob_oid": "cb871ec10451111b41ba2b2fbf6e794076329748",
+            "path": "scripts/research/run_alpha_zoo_clean_new_alpha_discovery.py",
+            "representation_evidence": "family expands _lead_lag_rows over leaders, symbols, 3 lookbacks, 2 thresholds, 2 lag fractions, 2 holds, and leverage choices, then vector-simulates each signal; the family id is not one unique candidate manifest"
+          },
+          {
+            "content_sha256": "c4637e6b180154501aa0d914043f191d8b04b3cfa0faec0be6103bba6bf529ba",
+            "exact_token": "cross_asset_lead_lag_momentum",
+            "exact_token_occurrences": 2027,
+            "git_blob_oid": "530c3981ed9d7712c178a1f9b6b3a0e30f48dcee",
+            "path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_new_alpha_discovery_20260607_feature_bounded/clean_new_alpha_discovery_latest.json",
+            "representation_evidence": "2027 family occurrences identify many parameterized fold rows; no unique source candidate id and no strategy_class, strategy_params, portfolio_mode, or engine_manifest"
+          }
+        ],
+        "mdd_comparator_eligible": false,
+        "missing_actual_engine_fields": [
+          "unique_candidate_id",
+          "strategy_class",
+          "strategy_params",
+          "portfolio_member_manifests",
+          "allocation_weights",
+          "gross_rule"
+        ],
+        "representation": "non_unique_family_of_vectorized_parameter_sweep_rows",
+        "required_actual_engine_fields": [
+          "unique_candidate_id",
+          "strategy_class",
+          "strategy_params",
+          "symbols",
+          "native_timeframe",
+          "portfolio_member_manifests",
+          "allocation_weights",
+          "gross_rule"
+        ],
+        "resolution_reason": "family_only_source_id_maps_to_many parameterized rows and choosing one would be an unfrozen proxy rather than faithful replay",
+        "resolution_status": "incumbent_replay_unavailable",
+        "row_id": "incumbent_cross_asset_lead_lag_momentum",
+        "selection_eligible": false,
+        "source_id": "cross_asset_lead_lag_momentum"
+      },
+      {
+        "frozen_audit_files": [
+          {
+            "content_sha256": "0f9b110dc2a957cd4272dc7b0998838567ca4e69f8eb7df49504e34add6efe0e",
+            "exact_token": "cross_candidate_hybrid:hybrid_v3_5",
+            "exact_token_occurrences": 4,
+            "git_blob_oid": "89403977626d25cc6b03e8a41ae4a1601b0c50e6",
+            "path": "scripts/research/run_alpha_zoo_69_asset_monthly_refit_walkforward.py",
+            "representation_evidence": "_cross_candidate_hybrid_candidates lines 1482+ produces a fold-local Optuna blend and _candidate_eval wraps v35.row/v35.returns; the non-leaf portfolio family has no actual-engine manifest"
+          },
+          {
+            "content_sha256": "9f0b40c81b39dadf1d4c87a08372f5064d4a7b95f95a7d7d64ddd33e71d76cbc",
+            "exact_token": "cross_candidate_hybrid:hybrid_v3_5",
+            "exact_token_occurrences": 65,
+            "git_blob_oid": "d54ca8e453b7d158f99aa913827092afb4d047f0",
+            "path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_asset_tf_leverage_20260603/asset_tf_leverage_walkforward_latest.json",
+            "representation_evidence": "65 exact label occurrences record changing fold-local hybrid rows/returns; no strategy_class, strategy_params, portfolio_mode, or engine_manifest"
+          }
+        ],
+        "mdd_comparator_eligible": false,
+        "missing_actual_engine_fields": [
+          "strategy_class",
+          "strategy_params",
+          "native_timeframe",
+          "portfolio_member_manifests",
+          "allocation_weights",
+          "gross_rule"
+        ],
+        "representation": "fold_local_optuna_blend_of_candidate_return_series",
+        "required_actual_engine_fields": [
+          "strategy_class",
+          "strategy_params",
+          "symbols",
+          "native_timeframe",
+          "portfolio_member_manifests",
+          "allocation_weights",
+          "gross_rule"
+        ],
+        "resolution_reason": "offline_fold_local_return_blend_has_no frozen actual-engine member manifest and cannot be replayed without re-optimizing or inventing execution semantics",
+        "resolution_status": "incumbent_replay_unavailable",
+        "row_id": "incumbent_cross_candidate_hybrid_v3_5",
+        "selection_eligible": false,
+        "source_id": "cross_candidate_hybrid:hybrid_v3_5"
+      }
+    ],
+    "runtime_contract": {
+      "all_three_rows_are_attempted_as_explicit_unavailable_rows_on_every_cost_cell": true,
+      "dynamic_incumbent_resolution_forbidden": true,
+      "embed_json_value_identically": true,
+      "incumbent_comparison_status": "unavailable",
+      "later_research_may_create_new_trial_but_may_not_mutate_this_audit": true,
+      "nearby_proxy_forbidden": true,
+      "selection_and_mdd_comparator_membership": "excluded"
+    },
+    "schema": "alpha_max_incumbent_resolution.v1"
+  },
+  "integrity": {
+    "canonicalization": "json.dumps(value,sort_keys=True,separators=(\",\",\":\"),ensure_ascii=False,allow_nan=False).encode(\"utf-8\")",
+    "config_payload_sha256": "b53c2274624fe4bc017ead59975efc805d166038f841773337bb48d55ee9692d",
+    "config_payload_sha256_scope": "entire_document_with_integrity.config_payload_sha256_omitted",
+    "runtime_contract_sha256": "b3859443c842cf8b04d04ed32923e6c6a8207af18e26f68a717ba623b4edfef9"
+  },
+  "metrics_and_statistics": {
+    "gate_mdd": "max(full_event_mdd,reporting_4h_mdd)",
+    "positive_nominal_30_bps_metrics_required": [
+      "cumulative_return",
+      "cagr",
+      "calmar",
+      "net_sharpe"
+    ],
+    "primary_return_stream": {
+      "annual_periods": 2190,
+      "complete_endpoint_required": true,
+      "endpoint_equity_strictly_positive": true,
+      "first_prior_equity": 10000.0,
+      "metric_primitive": "portfolio.optimizer_core.metrics",
+      "return_kind": "arithmetic_net_equity_close_to_close",
+      "timeframe": "4h",
+      "timezone": "UTC"
+    },
+    "ruin_gate": {
+      "bankruptcy_or_wipeout_allowed": false,
+      "liquidations_allowed": 0
+    },
+    "statistical_gates": {
+      "dsr": {
+        "hac_inference": true,
+        "num_trials": 1487,
+        "threshold_minimum": 0.9,
+        "variance_across_trials": "sample_variance_of_finite_pre_gate_nonannualized_sharpes"
+      },
+      "pbo": {
+        "function": "cscv_pbo",
+        "n_splits": 8,
+        "threshold_maximum": 0.5
+      },
+      "spa": {
+        "block_size": "max(1,round(n**(1/3)))",
+        "bootstrap_rounds": 2000,
+        "function": "spa_like_pvalue",
+        "seed": 12345,
+        "threshold_maximum": 0.05
+      }
+    },
+    "turnover_rpt_capacity": {
+      "gate_or_rank": false,
+      "report_only": true
+    }
+  },
+  "native_timeframes_and_warmup": {
+    "base_replay_timeframe": "1s",
+    "indicator_only_capsule": true,
+    "minimum_completed_bars": {
+      "1d": 366,
+      "4h": 64
+    },
+    "native_timeframes": {
+      "ResearchOnlyDailyCrossSectionalNearHighAnchoringStrategy": "1d",
+      "ResearchOnlyDailyLowTurnoverTrendPersistenceStrategy": "1d",
+      "ResearchOnlyFourHourFundingHarvestCarryStrategy": "4h"
+    },
+    "reporting_timeframe": "4h",
+    "score_boundary_alignment": "UTC_00:00",
+    "scoring_engine_starts_flat": true,
+    "transfer_economic_state": false,
+    "two_engine_protocol": true,
+    "warmup_economic_events_allowed": false,
+    "working_bucket_finalization_required": true
+  },
+  "normative_sources": {
+    "architect_review_sha256": "e21c4800546eae8b5edde336a97c9a32f0dfcbdd75d8c0305dabdd08dd1d3549",
+    "baseline_commit": "252910e54e280cc593365484cbc99d6ca87893f9",
+    "consensus_sha256": "3d1f3447d676801b6c73e4805f57d23550ef29f1489604bc95be79ab87951746",
+    "critic_review_sha256": "e8dd5da4a3299e783d595a8b753484f29b165c86ffc07915d19df44296a46759",
+    "current_trial_key_set_sha256": "3a4791cf353abcb82f9717ce89ee16b9d73d84f431d5b058135046c2ba8e332b",
+    "current_trial_registry_sha256": "cfe3a04620c52cc235d6f1cda1cac617ba30cd7327c753fc2f620d8250d51a4e",
+    "incumbent_resolution_audit_sha256": "5133bc40116399fe7af32e75a1ecc52a4f385dc8a0b5d3a4a9585e2437615ed8",
+    "plan_sha256": "3b4601b489e906452f8b25e4e116e973954307caa0f4ada7a98a55f3d033ddf6",
+    "prd_sha256": "bbb0f07dc019571081163baf1f672f8ba60bc38d663427e7fadc80bc2221e889",
+    "prior_trial_key_set_actual_lf_sha256": "3b078011040f89e8d788b2cef9214c58f687221104381e26a688a7f8cdbddd78",
+    "test_spec_sha256": "99ee9b9760cf14041afb63f275d0371773b09835e09f8719bb7ccad61e3f8d2f"
+  },
+  "process_boundaries": {
+    "historical_evaluation_cli_allowed_inputs": [
+      "sealed_prelock_directory",
+      "embargo_feature_root",
+      "historical_evaluation_raw_root",
+      "historical_evaluation_feature_root",
+      "exchange",
+      "output_root"
+    ],
+    "historical_evaluation_process_is_separate": true,
+    "prelock_cli_allowed_inputs": [
+      "config",
+      "contract_manifest",
+      "exchange",
+      "output_root",
+      "warmup_raw_root",
+      "warmup_feature_root",
+      "train_raw_root",
+      "train_feature_root",
+      "purge_raw_root",
+      "purge_feature_root",
+      "validation_raw_root",
+      "validation_feature_root",
+      "embargo_raw_root",
+      "embargo_feature_root"
+    ],
+    "prelock_historical_evaluation_inputs_forbidden": true,
+    "runtime_omx_reads_forbidden": true
+  },
+  "revision": "5.14",
+  "runtime_contract": {
+    "attribute_allowlist": [
+      "ALLOW_MARKET_ORDERS",
+      "ALLOW_METADATA_RISK_OVERRIDE",
+      "ANNUAL_PERIODS",
+      "APPLY_LIQUIDITY_CAP_TO_CONDITIONAL_FILLS",
+      "ATTACH_DEFAULT_PROTECTIVE_STOP",
+      "AUTO_FLATTEN_ON_BREACH",
+      "BACKTEST_DECISION_SECONDS",
+      "BACKTEST_POLL_SECONDS",
+      "BACKTEST_WINDOW_SECONDS",
+      "CHUNK_DAYS",
+      "CHUNK_WARMUP_BARS",
+      "COMMISSION_RATE",
+      "COMPUTE_BACKEND",
+      "CONSECUTIVE_LOSS_HALT_COUNT",
+      "DATA_SOURCE",
+      "DECISION_CADENCE_SECONDS",
+      "DEFAULT_ORDER_TYPE",
+      "DEFAULT_STOP_LOSS_PCT",
+      "EFFECTIVE_POSITION_FRACTION",
+      "END_DATE",
+      "ENFORCE_ORDER_RISK_GATE_IN_BACKTEST",
+      "ENFORCE_REDUCE_ONLY",
+      "FREEZE_NEW_ENTRIES_ON_BREACH",
+      "FUNDING_INTERVAL_HOURS",
+      "FUNDING_ON_UTC_BOUNDARY",
+      "FUNDING_RATE_PER_8H",
+      "GPU_MODE",
+      "GPU_VRAM_GB",
+      "HARD_DRAWDOWN_FLATTEN_PCT",
+      "INITIAL_CAPITAL",
+      "LEVERAGE",
+      "LIMIT_PRICE_MODE",
+      "LIMIT_PRICE_OFFSET_TICKS",
+      "LIMIT_TIME_IN_FORCE",
+      "LIQUIDATION_BUFFER_RATE",
+      "MAINTENANCE_MARGIN_RATE",
+      "MAKER_FEE_RATE",
+      "MARGIN_MODE",
+      "MARKET_WINDOW_PARITY_V2_ENABLED",
+      "MAX_DAILY_LOSS_PCT",
+      "MAX_INTRADAY_DRAWDOWN_PCT",
+      "MAX_LEVERAGE",
+      "MAX_ORDER_NOTIONAL_PCT",
+      "MAX_ORDER_VALUE",
+      "MAX_POSITION_SIZE_PCT",
+      "MAX_ROLLING_LOSS_PCT_1H",
+      "MAX_SYMBOL_EXPOSURE_PCT",
+      "MAX_TOTAL_MARGIN_PCT",
+      "MAX_TOTAL_NOTIONAL_PCT",
+      "MIN_TRADE_QTY",
+      "MODE",
+      "PERSIST_OUTPUT",
+      "POLL_SECONDS",
+      "RANDOM_SEED",
+      "REQUIRE_FUNDING_COVERAGE",
+      "RISK_FREE_ANNUAL",
+      "RISK_FREE_MODE",
+      "RISK_FREE_RATE",
+      "RISK_FREE_SERIES_PATH",
+      "RISK_PER_TRADE",
+      "SIM_LATENCY_MAX_BARS",
+      "SIM_LATENCY_MIN_BARS",
+      "SIM_MAX_BAR_VOLUME_RATIO",
+      "SKIP_AHEAD_ENABLED",
+      "SLIPPAGE_ADV_QUOTE",
+      "SLIPPAGE_IMPACT_COEFFICIENT",
+      "SLIPPAGE_IMPACT_MODEL",
+      "SLIPPAGE_RATE",
+      "SORTINO_TARGET_ANNUAL",
+      "SORTINO_TARGET_MODE",
+      "SPREAD_RATE",
+      "START_DATE",
+      "STRATEGY_QUALITY_ENABLED",
+      "SYMBOLS",
+      "SYMBOL_LIMITS",
+      "TAKER_FEE_RATE",
+      "TARGET_ALLOCATION",
+      "TARGET_ALLOCATION_MODE",
+      "TIMEFRAME",
+      "TIMEFRAMES",
+      "WINDOW_SECONDS"
+    ],
+    "backtest_constructor": {
+      "config": "final_AlphaMaxBacktestConfig",
+      "data_handler_kwargs": {
+        "backtest_poll_seconds": 1,
+        "backtest_window_seconds": 1,
+        "feature_db_path": null,
+        "feature_exchange": "binance",
+        "feature_lookup": "phase_owned_AlphaMaxOrderedFundingLookup_by_identity",
+        "market_window_parity_v2_enabled": true
+      },
+      "execution_handler_kwargs": {
+        "record_cost_attribution": true
+      },
+      "portfolio_kwargs": {
+        "fill_application_attribution_sink": "collector.record_application",
+        "funding_boundary_resolver": "phase_owned_AlphaMaxFundingBoundaryResolver_by_identity"
+      },
+      "record_history": true,
+      "record_trades": true,
+      "strategy_timeframe": "1s",
+      "strict_data_handler_construction": true,
+      "track_metrics": true,
+      "warmup_bars": 0
+    },
+    "class_name": "AlphaMaxBacktestConfig",
+    "construction": {
+      "allow_private_rt_attribute": false,
+      "allow_runtime_config_fallback": false,
+      "allow_unknown_attribute_read": false,
+      "final_after_construction": true,
+      "runtime_field_missing_policy": "reject_unfrozen_runtime_field",
+      "runtime_field_unknown_policy": "reject_unfrozen_runtime_field"
+    },
+    "derived_attributes": {
+      "END_DATE": {
+        "derivation": "exact_current_phase_end_utc",
+        "source": "chronology.splits[split_id].end_utc"
+      },
+      "RANDOM_SEED": {
+        "derivation": "common_random_number_seed_schedule",
+        "row_id_in_payload": false,
+        "zero_result_replacement": 1
+      },
+      "SLIPPAGE_RATE": {
+        "allowed_values": [
+          0.0005,
+          0.001,
+          0.0015,
+          0.0025
+        ],
+        "derivation": "exact_nominal_cost_cell_slippage_rate",
+        "source": "cost_cells[].slippage_rate"
+      },
+      "START_DATE": {
+        "derivation": "exact_current_phase_start_utc",
+        "source": "chronology.splits[split_id].start_utc"
+      },
+      "SYMBOLS": {
+        "derivation": "exact_sealed_train_admission_tuple_by_identity",
+        "maximum_count": 10,
+        "minimum_count": 5,
+        "source": "sealed_admission_manifest.admitted_symbols",
+        "subset_of": "candidate_symbols"
+      }
+    },
+    "override_policy": {
+      "any_environment_key_prefix_rejected": "LQ_",
+      "config_yaml_loaded": false,
+      "default_runtime_config_loaded": false,
+      "environment_values_loaded": false,
+      "merge_layer_count": 0,
+      "profile_loaded": false,
+      "runtime_override_loaded": false,
+      "unknown_cli_arguments_rejected": true
+    },
+    "portfolio_strategy_constructor": {
+      "class_name": "ArtifactPortfolioModeStrategy",
+      "decision_cadence_seconds": 1,
+      "portfolio_mode": "manifest:<immutable_absolute_row_path>",
+      "strategy_params_exact_keys": [
+        "decision_cadence_seconds",
+        "portfolio_mode"
+      ]
+    },
+    "schema_version": "alpha_max_runtime_contract.v1",
+    "seed_schedule": {
+      "algorithm": "sha256_first_8_bytes_big_endian_mod_2147483647",
+      "cost_encoding": "str(nominal_cost_bps).encode(\"ascii\")",
+      "payload_prefix_hex": "616c7068615f6d61785f323032363037313000",
+      "payload_text": "b\"alpha_max_20260710\\0\" + split_or_fold_id.encode(\"utf-8\") + b\"\\0\" + str(nominal_cost_bps).encode(\"ascii\")",
+      "row_id_in_payload": false,
+      "zero_result_replacement": 1
+    },
+    "static_attributes": {
+      "ALLOW_MARKET_ORDERS": true,
+      "ALLOW_METADATA_RISK_OVERRIDE": false,
+      "ANNUAL_PERIODS": 2190,
+      "APPLY_LIQUIDITY_CAP_TO_CONDITIONAL_FILLS": true,
+      "ATTACH_DEFAULT_PROTECTIVE_STOP": false,
+      "AUTO_FLATTEN_ON_BREACH": false,
+      "BACKTEST_DECISION_SECONDS": 1,
+      "BACKTEST_POLL_SECONDS": 1,
+      "BACKTEST_WINDOW_SECONDS": 1,
+      "CHUNK_DAYS": 1,
+      "CHUNK_WARMUP_BARS": 0,
+      "COMMISSION_RATE": 0.0004,
+      "COMPUTE_BACKEND": "cpu",
+      "CONSECUTIVE_LOSS_HALT_COUNT": 0,
+      "DATA_SOURCE": "explicit_raw_parquet_root",
+      "DECISION_CADENCE_SECONDS": 1,
+      "DEFAULT_ORDER_TYPE": "MKT",
+      "DEFAULT_STOP_LOSS_PCT": 0.01,
+      "EFFECTIVE_POSITION_FRACTION": 1.0,
+      "ENFORCE_ORDER_RISK_GATE_IN_BACKTEST": false,
+      "ENFORCE_REDUCE_ONLY": true,
+      "FREEZE_NEW_ENTRIES_ON_BREACH": true,
+      "FUNDING_INTERVAL_HOURS": 8,
+      "FUNDING_ON_UTC_BOUNDARY": true,
+      "FUNDING_RATE_PER_8H": 0.0,
+      "GPU_MODE": "cpu",
+      "GPU_VRAM_GB": 0.0,
+      "HARD_DRAWDOWN_FLATTEN_PCT": 0.0,
+      "INITIAL_CAPITAL": 10000.0,
+      "LEVERAGE": 3,
+      "LIMIT_PRICE_MODE": "one_tick_worse",
+      "LIMIT_PRICE_OFFSET_TICKS": 1,
+      "LIMIT_TIME_IN_FORCE": "GTC",
+      "LIQUIDATION_BUFFER_RATE": 0.0005,
+      "MAINTENANCE_MARGIN_RATE": 0.005,
+      "MAKER_FEE_RATE": 0.0002,
+      "MARGIN_MODE": "isolated",
+      "MARKET_WINDOW_PARITY_V2_ENABLED": true,
+      "MAX_DAILY_LOSS_PCT": 0.03,
+      "MAX_INTRADAY_DRAWDOWN_PCT": 0.03,
+      "MAX_LEVERAGE": 3,
+      "MAX_ORDER_NOTIONAL_PCT": 0.5,
+      "MAX_ORDER_VALUE": 5000.0,
+      "MAX_POSITION_SIZE_PCT": 0.5,
+      "MAX_ROLLING_LOSS_PCT_1H": 0.05,
+      "MAX_SYMBOL_EXPOSURE_PCT": 0.5,
+      "MAX_TOTAL_MARGIN_PCT": 0.75,
+      "MAX_TOTAL_NOTIONAL_PCT": 2.25,
+      "MIN_TRADE_QTY": 0.001,
+      "MODE": "windowed",
+      "PERSIST_OUTPUT": false,
+      "POLL_SECONDS": 1,
+      "REQUIRE_FUNDING_COVERAGE": true,
+      "RISK_FREE_ANNUAL": 0.0,
+      "RISK_FREE_MODE": "zero",
+      "RISK_FREE_RATE": 0.0,
+      "RISK_FREE_SERIES_PATH": "",
+      "RISK_PER_TRADE": 0.005,
+      "SIM_LATENCY_MAX_BARS": 1,
+      "SIM_LATENCY_MIN_BARS": 1,
+      "SIM_MAX_BAR_VOLUME_RATIO": 0.1,
+      "SKIP_AHEAD_ENABLED": false,
+      "SLIPPAGE_ADV_QUOTE": 0.0,
+      "SLIPPAGE_IMPACT_COEFFICIENT": 0.1,
+      "SLIPPAGE_IMPACT_MODEL": "sqrt_impact",
+      "SORTINO_TARGET_ANNUAL": 0.0,
+      "SORTINO_TARGET_MODE": "zero",
+      "SPREAD_RATE": 0.0002,
+      "STRATEGY_QUALITY_ENABLED": false,
+      "SYMBOL_LIMITS": {
+        "ADAUSDT": {
+          "min_notional": 5.0,
+          "min_qty": 0.001,
+          "price_tick_size": 1e-08,
+          "qty_step": 0.001
+        },
+        "AVAXUSDT": {
+          "min_notional": 5.0,
+          "min_qty": 0.001,
+          "price_tick_size": 1e-08,
+          "qty_step": 0.001
+        },
+        "BNBUSDT": {
+          "min_notional": 5.0,
+          "min_qty": 0.001,
+          "price_tick_size": 1e-08,
+          "qty_step": 0.001
+        },
+        "BTCUSDT": {
+          "min_notional": 5.0,
+          "min_qty": 0.001,
+          "price_tick_size": 1e-08,
+          "qty_step": 0.001
+        },
+        "DOGEUSDT": {
+          "min_notional": 5.0,
+          "min_qty": 0.001,
+          "price_tick_size": 1e-08,
+          "qty_step": 0.001
+        },
+        "ETHUSDT": {
+          "min_notional": 5.0,
+          "min_qty": 0.001,
+          "price_tick_size": 1e-08,
+          "qty_step": 0.001
+        },
+        "SOLUSDT": {
+          "min_notional": 5.0,
+          "min_qty": 0.001,
+          "price_tick_size": 1e-08,
+          "qty_step": 0.001
+        },
+        "TONUSDT": {
+          "min_notional": 5.0,
+          "min_qty": 0.001,
+          "price_tick_size": 1e-08,
+          "qty_step": 0.001
+        },
+        "TRXUSDT": {
+          "min_notional": 5.0,
+          "min_qty": 0.001,
+          "price_tick_size": 1e-08,
+          "qty_step": 0.001
+        },
+        "XRPUSDT": {
+          "min_notional": 5.0,
+          "min_qty": 0.001,
+          "price_tick_size": 1e-08,
+          "qty_step": 0.001
+        }
+      },
+      "TAKER_FEE_RATE": 0.0004,
+      "TARGET_ALLOCATION": 0.1,
+      "TARGET_ALLOCATION_MODE": "notional_fraction",
+      "TIMEFRAME": "1s",
+      "TIMEFRAMES": [
+        "1s",
+        "4h",
+        "1d"
+      ],
+      "WINDOW_SECONDS": 1
+    }
+  },
+  "safety_and_claims": {
+    "allow_live_allocation": false,
+    "allow_paper_allocation": false,
+    "allow_promotion": false,
+    "allow_real_allocation": false,
+    "external_data_collection_required_for_local_delivery": false,
+    "historical_period_is_untouched": false,
+    "local_alpha_performance_claim_allowed": false,
+    "requires_fresh_future_or_genuinely_withheld_confirmation": true,
+    "research_only": true
+  },
+  "schema_version": "alpha_max_portfolio_experiment.v1",
+  "selection_and_reporting": {
+    "eligibility_reference_cost_bps": 30,
+    "gate_order": [
+      "dsr",
+      "spa",
+      "pbo",
+      "positive_metrics",
+      "native_data_funding_coverage",
+      "hash_and_manifest_validity",
+      "zero_ruin",
+      "mdd"
+    ],
+    "historical_evaluation": {
+      "confirmation_status": "not_run",
+      "historical_evaluation_leader_is_selection": false,
+      "historical_exposure_status": "committed_period_outcomes_observed",
+      "may_mutate_prelock": false,
+      "requires_fresh_confirmation": true
+    },
+    "mdd_policy": {
+      "hard_reject_above": 0.35,
+      "normal_upper_inclusive": 0.3,
+      "soft_comparator": "deterministic_return_first_best_matched_normal_row",
+      "soft_lower_exclusive": 0.3,
+      "soft_requires_nonempty_normal_set": true,
+      "soft_requires_strict_cagr_superiority": true,
+      "soft_requires_strict_calmar_superiority": true,
+      "soft_upper_inclusive": 0.35
+    },
+    "objective": "return_first_after_eligibility",
+    "prelock_champion_count_maximum": 1,
+    "ranking": [
+      {
+        "direction": "descending",
+        "field": "cumulative_return"
+      },
+      {
+        "direction": "descending",
+        "field": "cagr"
+      },
+      {
+        "direction": "descending",
+        "field": "calmar"
+      },
+      {
+        "direction": "descending",
+        "field": "net_sharpe"
+      },
+      {
+        "direction": "ascending",
+        "field": "mdd"
+      },
+      {
+        "direction": "ascending",
+        "field": "row_id"
+      }
+    ],
+    "terminal_outcome_precedence": [
+      "no_demonstrated_alpha",
+      "historical_evaluation_incomplete",
+      "prelock_champion_historical_robustness_failed",
+      "prelock_champion_historical_robustness_passed"
+    ]
+  },
+  "trial_ledger": {
+    "canonical_node_bytes": "json.dumps(node,sort_keys=True,separators=(\",\",\":\"),ensure_ascii=False,allow_nan=False).encode(\"utf-8\")",
+    "cost_cells_are_trials": false,
+    "current_node_count": 21,
+    "current_registry_sha256": "cfe3a04620c52cc235d6f1cda1cac617ba30cd7327c753fc2f620d8250d51a4e",
+    "current_set_sha256": "3a4791cf353abcb82f9717ce89ee16b9d73d84f431d5b058135046c2ba8e332b",
+    "dsr_num_trials": 1487,
+    "prior_inventory": {
+      "artifact_kind": "g004_frozen_candidate_manifest",
+      "baseline_git_blob_oid": "1bb06b6e9d4ca5a82af4686001b880db9709d9b8",
+      "baseline_path": "var/reports/ultragoal_full_pool_strategy/g004_frozen_candidate_manifest.json",
+      "candidate_count": 1466,
+      "candidate_manifest_sha256": "1292498b3b729038c74932175a12d910fc4351b2feb3bbfc95f827517e423efe",
+      "candidate_set_sha256": "01ca7a5c04b490b5472a62b49d0fcc7d432f0e2045c0e6fae9b1bfcb079a0564",
+      "file_sha256": "f2c86ae7bb9f9719143fa0b11e73c68ad021160aeac03a0aa5c6fa93636d57b6",
+      "prior_key_set_actual_lf_sha256": "3b078011040f89e8d788b2cef9214c58f687221104381e26a688a7f8cdbddd78",
+      "prior_node_count": 1466,
+      "source_commit": "252910e54e280cc593365484cbc99d6ca87893f9"
+    },
+    "set_hash_serialization": {
+      "actual_lf_byte_hex": "0a",
+      "formula": "sha256((\"\\n\".join(sorted(keys))+\"\\n\").encode(\"utf-8\"))",
+      "literal_backslash_n_bytes_forbidden": true,
+      "literal_backslash_n_hex": "5c6e"
+    },
+    "status_or_availability_may_change_trial_count": false,
+    "union_formula": "1466+21=1487"
+  }
+}

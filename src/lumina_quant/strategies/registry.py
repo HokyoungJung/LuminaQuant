@@ -101,6 +101,16 @@ TimeframePairZScoreReversionStrategy = _optional_strategy_class(
     "timeframe_pair_zscore_reversion", "TimeframePairZScoreReversionStrategy"
 )
 
+ResearchOnlyDailyLowTurnoverTrendPersistenceStrategy = _optional_strategy_class(
+    "alpha_max_research_sleeves", "ResearchOnlyDailyLowTurnoverTrendPersistenceStrategy"
+)
+ResearchOnlyDailyCrossSectionalNearHighAnchoringStrategy = _optional_strategy_class(
+    "alpha_max_research_sleeves", "ResearchOnlyDailyCrossSectionalNearHighAnchoringStrategy"
+)
+ResearchOnlyFourHourFundingHarvestCarryStrategy = _optional_strategy_class(
+    "alpha_max_research_sleeves", "ResearchOnlyFourHourFundingHarvestCarryStrategy"
+)
+
 StrategyClass = type[Strategy]
 
 DEFAULT_STRATEGY_NAME = "RsiStrategy" if RsiStrategy is not None else "MeanReversionStdStrategy"
@@ -149,6 +159,18 @@ if TakerFlowExhaustionReversalStrategy is not None:
     _RAW_STRATEGY_MAP["TakerFlowExhaustionReversalStrategy"] = TakerFlowExhaustionReversalStrategy
 if TimeframePairZScoreReversionStrategy is not None:
     _RAW_STRATEGY_MAP["TimeframePairZScoreReversionStrategy"] = TimeframePairZScoreReversionStrategy
+if ResearchOnlyDailyLowTurnoverTrendPersistenceStrategy is not None:
+    _RAW_STRATEGY_MAP["ResearchOnlyDailyLowTurnoverTrendPersistenceStrategy"] = (
+        ResearchOnlyDailyLowTurnoverTrendPersistenceStrategy
+    )
+if ResearchOnlyDailyCrossSectionalNearHighAnchoringStrategy is not None:
+    _RAW_STRATEGY_MAP["ResearchOnlyDailyCrossSectionalNearHighAnchoringStrategy"] = (
+        ResearchOnlyDailyCrossSectionalNearHighAnchoringStrategy
+    )
+if ResearchOnlyFourHourFundingHarvestCarryStrategy is not None:
+    _RAW_STRATEGY_MAP["ResearchOnlyFourHourFundingHarvestCarryStrategy"] = (
+        ResearchOnlyFourHourFundingHarvestCarryStrategy
+    )
 
 _STRATEGY_MAP: dict[str, StrategyClass] = {
     name: cast(StrategyClass, cls) for name, cls in _RAW_STRATEGY_MAP.items() if cls is not None
@@ -226,6 +248,9 @@ _STRATEGY_TIER_HINTS: dict[str, str] = {
     # enforced by tests/test_strategy_tier_guard.py.
     "CrossSectionalNearHighAnchoringStrategy": "research_only",
     "LowTurnoverTrendPersistenceStrategy": "research_only",
+    "ResearchOnlyDailyLowTurnoverTrendPersistenceStrategy": "research_only",
+    "ResearchOnlyDailyCrossSectionalNearHighAnchoringStrategy": "research_only",
+    "ResearchOnlyFourHourFundingHarvestCarryStrategy": "research_only",
     "RebalancingPremiumHarvestStrategy": "research_only",
     "SlowCrossSectionalLeadLagStrategy": "research_only",
     "StationarityGatedResidualReversionStrategy": "research_only",
