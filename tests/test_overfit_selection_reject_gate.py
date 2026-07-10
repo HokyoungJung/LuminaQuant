@@ -616,3 +616,184 @@ def test_e1_strict_research_profile_arms_emission(engine):
     # Reset guard: a plain (no-config) reconfigure disarms emission again.
     engine._configure_selection_gate(_emit_args())
     assert engine._SELECTION_GATE_STATE["emit_candidate_overfit_stats"] is False
+
+
+# --------------------------------------------------------------------------- #
+# E1 family / RPT: config-gated per-candidate return-per-turnover (bps) emission
+# into the SAME validation block under the SAME ``emit_candidate_overfit_stats``
+# switch (``_candidate_rpt_bps`` / ``_evaluate_candidate``). This automates the
+# graveyard gate "RPT >= 10bps per split" -- the exact floor that retired the
+# #13/#14 momentum families -- with ``rpt_bps = sum(returns) / max(sum(turnover),
+# eps) * 10_000`` over the validation window. Turnover is this runner's
+# per-candidate turnover: a per-bar ``pd.Series`` threaded on the row (summed) or a
+# per-split scalar (used directly). Data-free: exact hand-computable fixtures.
+# --------------------------------------------------------------------------- #
+def _flat_window_series(index: pd.DatetimeIndex, positions, value: float) -> pd.Series:
+    """A zero series with ``value`` placed on each ``index`` position in ``positions``
+    (so the window sum over those bars is exactly ``len(positions) * value``)."""
+    series = pd.Series(0.0, index=index)
+    series.iloc[list(positions)] = value
+    return series
+
+
+def _rpt_candidate(engine, returns: pd.Series, turnover: pd.Series | None):
+    row = {"symbols": ["BTC/USDT"], "candidate_id": "synthetic-rpt"}
+    if turnover is not None:
+        row["turnover_series"] = turnover
+    return engine.CandidateResult(
+        family="synthetic",
+        candidate_label="synthetic:rpt",
+        source_profile_id="synthetic",
+        row=row,
+        returns=returns,
+    )
+
+
+def test_rpt_emit_on_exact_scale_is_bit_identical(engine):
+    """Equal return and turnover window sums (0.5 each, power-of-two representable)
+    -> ``rpt_bps == 10_000.0`` exactly (bit-identical, no float tolerance)."""
+    engine._configure_selection_gate(_emit_args(emit_candidate_overfit_stats=True))
+    index = pd.date_range("2025-01-01", periods=200, freq="D")
+    returns = _flat_window_series(index, [150], 0.5)  # validation-window return sum 0.5
+    turnover = _flat_window_series(index, [150], 0.5)  # validation-window turnover sum 0.5
+    fold = _fold(engine, index, val_end_pos=179)
+
+    validation = engine._evaluate_candidate(_rpt_candidate(engine, returns, turnover), fold)[
+        "validation"
+    ]
+
+    assert validation["rpt_bps"] == 10_000.0  # 0.5 / 0.5 * 10_000
+    # Emission only ADDS the field; the base metric keys are preserved.
+    for key in ("start", "end", "bar_count", "total_return", "mdd", "sharpe"):
+        assert key in validation
+
+
+def test_rpt_emit_on_mission_example_200bps(engine):
+    """The mission worked example: returns summing 1% over the window, turnover
+    summing 0.5 -> 200bps, well above the 10bps graveyard floor."""
+    engine._configure_selection_gate(_emit_args(emit_candidate_overfit_stats=True))
+    index = pd.date_range("2025-01-01", periods=200, freq="D")
+    returns = _flat_window_series(index, [120, 160], 0.005)  # sum 0.01 (== 1%)
+    turnover = _flat_window_series(index, [120, 160], 0.25)  # sum 0.5
+    fold = _fold(engine, index, val_end_pos=179)
+
+    validation = engine._evaluate_candidate(_rpt_candidate(engine, returns, turnover), fold)[
+        "validation"
+    ]
+
+    assert validation["rpt_bps"] == pytest.approx(200.0)  # 0.01 / 0.5 * 10_000
+    assert validation["rpt_bps"] > engine.broad69.RETURN_PER_TURNOVER_THRESHOLD_BPS
+
+
+def test_rpt_emit_on_negative_return_yields_negative_rpt(engine):
+    """A losing window -> negative rpt_bps (correct sign; the gate's >= 10bps floor
+    would reject it)."""
+    engine._configure_selection_gate(_emit_args(emit_candidate_overfit_stats=True))
+    index = pd.date_range("2025-01-01", periods=200, freq="D")
+    returns = _flat_window_series(index, [150], -0.02)
+    turnover = _flat_window_series(index, [150], 0.5)
+    fold = _fold(engine, index, val_end_pos=179)
+
+    validation = engine._evaluate_candidate(_rpt_candidate(engine, returns, turnover), fold)[
+        "validation"
+    ]
+
+    assert validation["rpt_bps"] == pytest.approx(-400.0)  # -0.02 / 0.5 * 10_000
+    assert validation["rpt_bps"] < engine.broad69.RETURN_PER_TURNOVER_THRESHOLD_BPS
+
+
+def test_rpt_emit_on_zero_turnover_window_emits_none(engine):
+    """A no-trade (all-zero turnover) window emits ``rpt_bps=None`` rather than
+    dividing by zero -- the field is present but null (never-raise)."""
+    engine._configure_selection_gate(_emit_args(emit_candidate_overfit_stats=True))
+    index = pd.date_range("2025-01-01", periods=200, freq="D")
+    returns = _flat_window_series(index, [150], 0.02)
+    turnover = pd.Series(0.0, index=index)
+    fold = _fold(engine, index, val_end_pos=179)
+
+    validation = engine._evaluate_candidate(_rpt_candidate(engine, returns, turnover), fold)[
+        "validation"
+    ]
+
+    assert "rpt_bps" in validation
+    assert validation["rpt_bps"] is None
+
+
+def test_rpt_emit_on_without_turnover_series_omits_field(engine):
+    """No turnover measure on the row (the current production shape) -> the field is
+    simply absent, independent of the E1 spa/pbo emission which still fires."""
+    engine._configure_selection_gate(_emit_args(emit_candidate_overfit_stats=True))
+    returns = _synthetic_returns()
+    candidate = _synthetic_candidate(engine, returns)  # row carries NO turnover_series
+    fold = _fold(engine, returns.index, val_end_pos=179)
+
+    validation = engine._evaluate_candidate(candidate, fold)["validation"]
+
+    assert "rpt_bps" not in validation
+    assert "spa_pvalue" in validation  # E1 emission is unaffected by rpt omission
+
+
+def test_rpt_emit_off_is_byte_identical_with_turnover_on_row(engine):
+    """OFF (default): even with a turnover series on the row, the validation block is
+    EXACTLY ``_period_metrics`` output -- no ``rpt_bps`` key, byte-identical."""
+    engine._configure_selection_gate(_emit_args())  # explicit OFF
+    index = pd.date_range("2025-01-01", periods=200, freq="D")
+    returns = _flat_window_series(index, [150], 0.02)
+    turnover = _flat_window_series(index, [150], 0.5)
+    candidate = _rpt_candidate(engine, returns, turnover)
+    fold = _fold(engine, index, val_end_pos=179)
+
+    validation = engine._evaluate_candidate(candidate, fold)["validation"]
+    baseline = engine._period_metrics(candidate.returns, fold.validation)
+
+    assert validation == baseline
+    assert "rpt_bps" not in validation
+
+
+def test_rpt_emit_on_is_deterministic_run_twice(engine):
+    """Two INDEPENDENTLY constructed candidates on the same series emit bit-identical
+    rpt_bps."""
+    engine._configure_selection_gate(_emit_args(emit_candidate_overfit_stats=True))
+    index = pd.date_range("2025-01-01", periods=200, freq="D")
+    returns = _flat_window_series(index, [120, 160], 0.003)
+    turnover = _flat_window_series(index, [120, 160], 0.2)
+    fold = _fold(engine, index, val_end_pos=179)
+
+    first = engine._evaluate_candidate(_rpt_candidate(engine, returns, turnover), fold)[
+        "validation"
+    ]
+    second = engine._evaluate_candidate(_rpt_candidate(engine, returns, turnover), fold)[
+        "validation"
+    ]
+
+    assert first["rpt_bps"] == second["rpt_bps"]
+
+
+def test_rpt_scalar_turnover_is_used_directly(engine):
+    """This runner models turnover as a per-split SCALAR (``turnover_by_split``); a
+    scalar turnover is consumed unchanged (not summed) by ``_candidate_rpt_bps``."""
+    engine._configure_selection_gate(_emit_args(emit_candidate_overfit_stats=True))
+    index = pd.date_range("2025-01-01", periods=200, freq="D")
+    returns = _flat_window_series(index, [150], 0.02)  # window return sum 0.02
+    fold = _fold(engine, index, val_end_pos=179)
+
+    out = engine._candidate_rpt_bps(returns, 0.5, fold.validation)
+
+    assert out["rpt_bps"] == pytest.approx(400.0)  # 0.02 / 0.5 * 10_000
+
+
+def test_rpt_emit_on_has_no_min_obs_floor_unlike_e1(engine):
+    """Unlike the E1 bootstrap estimators (>= 64 obs), RPT is a plain ratio and emits
+    on a short validation window whenever turnover is present."""
+    engine._configure_selection_gate(_emit_args(emit_candidate_overfit_stats=True))
+    index = pd.date_range("2025-01-01", periods=200, freq="D")
+    returns = _flat_window_series(index, [120], 0.02)
+    turnover = _flat_window_series(index, [120], 0.5)
+    candidate = _rpt_candidate(engine, returns, turnover)
+    short_fold = _fold(engine, index, val_end_pos=140)  # 41 validation obs < 64
+
+    validation = engine._evaluate_candidate(candidate, short_fold)["validation"]
+
+    assert validation["bar_count"] < 64
+    assert validation.get("spa_pvalue") is None  # E1 omitted below its 64-obs floor
+    assert validation["rpt_bps"] == pytest.approx(400.0)  # RPT still emits

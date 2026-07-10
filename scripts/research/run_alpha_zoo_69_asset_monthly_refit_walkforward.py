@@ -879,6 +879,100 @@ def _candidate_overfit_stats(
     }
 
 
+# Turnover-sum floor below which the return-per-turnover ratio is undefined (an
+# all-zero / no-trade window). Emitted as ``rpt_bps=None`` rather than dividing by
+# zero -- see ``_candidate_rpt_bps``.
+_RPT_TURNOVER_EPS = 1e-12
+
+
+def _window_turnover_sum(
+    turnover: pd.Series | float | int, start_ns: int, end_ns: int
+) -> float | None:
+    """Total turnover over ``[start_ns, end_ns]`` (both edges inclusive, matching
+    :func:`_period_metrics`' window slice) for :func:`_candidate_rpt_bps`.
+
+    Accepts either a per-bar ``pd.Series`` aligned to the return index (summed over
+    the window, tolerating an unsorted index exactly as :func:`_prepared_returns`
+    does) or a single per-window scalar (this runner's native turnover shape --
+    ``turnover_by_split`` is a per-split scalar -- used unchanged). Non-finite or
+    unusable input -> ``None`` (never-raise).
+    """
+    if isinstance(turnover, bool):
+        return None
+    if isinstance(turnover, (float, int)):
+        value = float(turnover)
+        return value if math.isfinite(value) else None
+    if isinstance(turnover, pd.Series):
+        if turnover.empty:
+            return 0.0
+        index = pd.DatetimeIndex(turnover.index)
+        index_ns = index.view("int64")
+        values = turnover.to_numpy(dtype=float, copy=False)
+        if not index.is_monotonic_increasing:
+            order = np.argsort(index_ns, kind="mergesort")
+            index_ns = index_ns[order]
+            values = values[order]
+        lo = int(np.searchsorted(index_ns, start_ns, side="left"))
+        hi = int(np.searchsorted(index_ns, end_ns, side="right"))
+        total = float(np.sum(values[lo:hi]))
+        return total if math.isfinite(total) else None
+    return None
+
+
+def _candidate_rpt_bps(
+    returns: pd.Series,
+    turnover: pd.Series | float | int | None,
+    window: tuple[pd.Timestamp, pd.Timestamp],
+) -> dict[str, float | None]:
+    """Config-gated per-candidate return-per-turnover, in bps, for a metric block.
+
+    Automates the repo's graveyard gate ``RPT >= 10bps per split`` -- the exact
+    floor that retired the #13/#14 momentum families, until now recomputed by hand
+    on the data-PC -- by stamping ``rpt_bps`` into the ``validation`` block alongside
+    the E1 ``spa_pvalue`` / ``approx_pbo``. It belongs to the SAME "candidate overfit
+    stats" family, so it rides the SAME ``emit_candidate_overfit_stats`` switch (no
+    new flag) and the SAME cache-safe seam (:func:`_evaluate_candidate` mutates the
+    fresh ``_period_metrics`` copy). For the ``window`` slice::
+
+        rpt_bps = sum(returns) / max(sum(turnover), eps) * 10_000
+
+    (arithmetic return sum, consistent with the mission's turnover-normalised
+    definition). ``turnover`` is this runner's per-candidate turnover measure --
+    either a per-bar ``pd.Series`` aligned to ``returns.index`` (summed over the
+    window) or a single per-window scalar. This runner models turnover as a per-split
+    SCALAR (``turnover_by_split``); no per-bar turnover series rides a
+    ``CandidateResult`` today, so ``turnover is None`` -> the field is simply absent
+    (never-raise), exactly as the E1 estimators omit below their min-obs floor and as
+    the whole-search DSR is deferred to the data-PC. When a producer threads a
+    turnover series/scalar onto the row the field activates with no further plumbing.
+
+    Cache-safe: reads the shared (cached) ``_prepared_returns`` read-only for the
+    return sum and slices ``turnover`` in a local buffer; the metric cache is never
+    keyed on / poisoned by the flag. Strict no-op when disabled -> ``{}`` so the
+    caller's ``dict.update({})`` leaves the block byte-identical. Degenerate turnover
+    (window sum <= ``_RPT_TURNOVER_EPS``, e.g. a no-trade window) -> ``rpt_bps`` is
+    emitted as ``None`` rather than dividing by zero.
+    """
+    if not _SELECTION_GATE_STATE.get("emit_candidate_overfit_stats"):
+        return {}
+    if turnover is None:
+        return {}
+    start_ns = _timestamp_ns(window[0])
+    end_ns = _timestamp_ns(window[1])
+    prepared = _prepared_returns(returns)
+    lo = int(np.searchsorted(prepared.index_ns, start_ns, side="left"))
+    hi = int(np.searchsorted(prepared.index_ns, end_ns, side="right"))
+    ret_sum = float(np.sum(prepared.values[lo:hi]))
+    if not math.isfinite(ret_sum):
+        return {}
+    turnover_sum = _window_turnover_sum(turnover, start_ns, end_ns)
+    if turnover_sum is None:
+        return {}
+    if turnover_sum <= _RPT_TURNOVER_EPS:
+        return {"rpt_bps": None}
+    return {"rpt_bps": ret_sum / turnover_sum * 10_000.0}
+
+
 def _add_month(ts: pd.Timestamp, months: int) -> pd.Timestamp:
     return _coerce_ts(ts + pd.DateOffset(months=months)).normalize()
 
@@ -6708,6 +6802,14 @@ def _evaluate_candidate(candidate: CandidateResult, fold: MonthlyFold) -> dict[s
     # byte-identical. ``validation`` is a fresh ``_period_metrics`` copy, so this
     # mutation never poisons the metric cache.
     validation.update(_candidate_overfit_stats(candidate.returns, fold.validation))
+    # E1 family (RPT gate automation): config-gated per-candidate return-per-turnover
+    # (bps) into the SAME validation block under the SAME ``emit_candidate_overfit_stats``
+    # switch. OFF -> ``{}`` -> byte-identical. Turnover is threaded off the row (a
+    # per-bar series or this runner's native per-split scalar); absent -> field
+    # omitted. Same fresh-copy seam, so it never poisons the metric cache.
+    validation.update(
+        _candidate_rpt_bps(candidate.returns, candidate.row.get("turnover_series"), fold.validation)
+    )
     locked_oos = _period_metrics(candidate.returns, fold.locked_oos)
     row = dict(candidate.row)
     post_oos_research_variant = bool(row.get("post_oos_research_variant", False))
