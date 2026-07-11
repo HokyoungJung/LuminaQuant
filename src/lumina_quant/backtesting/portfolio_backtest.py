@@ -214,6 +214,7 @@ class Portfolio:
             "_fill_application_attribution_sink",
             "_funding_boundary_resolver",
             "_full_event_equity_sink",
+            "_reporting_sampling_timeframe",
         }
     )
 
@@ -238,6 +239,7 @@ class Portfolio:
         fill_application_attribution_sink=None,
         funding_boundary_resolver=None,
         full_event_equity_sink=None,
+        reporting_sampling_timeframe=None,
     ):
         self.bars = bars
         self.events = events
@@ -255,9 +257,23 @@ class Portfolio:
             )
         if full_event_equity_sink is not None and not callable(full_event_equity_sink):
             raise TypeError("full_event_equity_sink must be callable")
+        normalized_reporting_sampling_timeframe = None
+        if reporting_sampling_timeframe is not None:
+            try:
+                normalized_reporting_sampling_timeframe = normalize_timeframe_token(
+                    reporting_sampling_timeframe
+                )
+                reporting_interval_ms = int(
+                    timeframe_to_milliseconds(normalized_reporting_sampling_timeframe)
+                )
+                if reporting_interval_ms <= 0:
+                    raise ValueError("nonpositive reporting interval")
+            except Exception as exc:
+                raise ValueError("reporting_sampling_timeframe_invalid") from exc
         self._fill_application_attribution_sink = fill_application_attribution_sink
         self._funding_boundary_resolver = funding_boundary_resolver
         self._full_event_equity_sink = full_event_equity_sink
+        self._reporting_sampling_timeframe = normalized_reporting_sampling_timeframe
         self._optional_seams_locked = True
         self.symbol_list = self.bars.symbol_list
         self._single_symbol = len(self.symbol_list) == 1
@@ -273,9 +289,18 @@ class Portfolio:
         self._sampling_interval_ms = None
         if self.sampling_timeframe:
             try:
-                self._sampling_interval_ms = int(timeframe_to_milliseconds(self.sampling_timeframe))
+                effective_sampling_timeframe = (
+                    self._reporting_sampling_timeframe or self.sampling_timeframe
+                )
+                self._sampling_interval_ms = int(
+                    timeframe_to_milliseconds(effective_sampling_timeframe)
+                )
             except Exception:
                 self._sampling_interval_ms = None
+        elif self._reporting_sampling_timeframe:
+            self._sampling_interval_ms = int(
+                timeframe_to_milliseconds(self._reporting_sampling_timeframe)
+            )
         self._last_sample_timestamp_ms = None
         self.start_date = start_date
         self.initial_capital = self.config.INITIAL_CAPITAL
@@ -386,6 +411,10 @@ class Portfolio:
     @property
     def full_event_equity_sink(self):
         return self._full_event_equity_sink
+
+    @property
+    def reporting_sampling_timeframe(self):
+        return self._reporting_sampling_timeframe
 
     def construct_current_holdings(self):
         d = dict.fromkeys(self.symbol_list, 0.0)

@@ -206,6 +206,7 @@ def test_default_optional_seams_are_off_for_legacy_positive_fill():
     assert portfolio.fill_application_attribution_sink is None
     assert portfolio.funding_boundary_resolver is None
     assert portfolio.full_event_equity_sink is None
+    assert portfolio.reporting_sampling_timeframe is None
 
     fill = _fill(qty=1.0, direction="BUY")
     portfolio.update_fill(fill)
@@ -217,37 +218,91 @@ def test_default_optional_seams_are_off_for_legacy_positive_fill():
     assert portfolio.trade_count == 1
 
 
-def test_exact_alpha_config_never_probes_private_runtime_config():
-    private_runtime_reads: list[str] = []
+def test_reporting_sampling_timeframe_bounds_reporting_but_not_full_event_observation():
+    class _Counter:
+        def __init__(self):
+            self.count = 0
 
-    def reject_private_runtime(_self, name):
-        if name == "_rt":
-            private_runtime_reads.append(name)
-            raise RuntimeError("unfrozen_runtime_field:_rt")
-        raise AttributeError(name)
+        def observe(self, _point):
+            self.count += 1
 
-    config_type = type(
-        "AlphaMaxBacktestConfig",
-        (_Config,),
-        {
-            "__module__": "lumina_quant.research.alpha_max_engine_runner",
-            "__getattr__": reject_private_runtime,
-        },
-    )
-    config = config_type()
+    counter = _Counter()
     bars = _Bars()
-
     portfolio = Portfolio(
         bars,
         queue.Queue(),
         datetime(2026, 7, 10, 0, 0, tzinfo=UTC),
-        config,
+        _Config,
+        sampling_timeframe="1s",
+        reporting_sampling_timeframe="4h",
+        full_event_equity_sink=counter.observe,
     )
-    execution = SimulatedExecutionHandler(queue.Queue(), bars, config)
+    start = bars.current_dt
 
-    assert portfolio._audit_flag(config, "MISSING_FLAG", "execution", "missing") is False
-    assert execution._execution_flag(config, "MISSING_FLAG", "missing") is False
-    assert private_runtime_reads == []
+    for minute in range(1, 8 * 60 + 1):
+        bars.current_dt = start + timedelta(minutes=minute)
+        portfolio.update_timeindex(object())
+
+    assert portfolio.reporting_sampling_timeframe == "4h"
+    assert portfolio.sampling_timeframe == "1s"
+    assert counter.count == 8 * 60
+    assert len(portfolio._equity_points) == 8 * 60
+    assert len(portfolio.all_positions) == 3
+    assert len(portfolio.all_holdings) == 3
+    assert len(portfolio._metric_totals) == 3
+    assert len(portfolio._metric_benchmarks) == 3
+
+    with pytest.raises(AttributeError):
+        portfolio.reporting_sampling_timeframe = "1h"
+    with pytest.raises(AttributeError):
+        portfolio._reporting_sampling_timeframe = "1h"
+
+
+def test_none_reporting_sampling_timeframe_preserves_legacy_sampling():
+    bars_legacy = _Bars()
+    bars_explicit = _Bars()
+    start = bars_legacy.current_dt
+    legacy = Portfolio(
+        bars_legacy,
+        queue.Queue(),
+        start,
+        _Config,
+        sampling_timeframe="1h",
+    )
+    explicit = Portfolio(
+        bars_explicit,
+        queue.Queue(),
+        start,
+        _Config,
+        sampling_timeframe="1h",
+        reporting_sampling_timeframe=None,
+    )
+
+    for minute in range(1, 2 * 60 + 1):
+        current = start + timedelta(minutes=minute)
+        bars_legacy.current_dt = current
+        bars_explicit.current_dt = current
+        legacy.update_timeindex(object())
+        explicit.update_timeindex(object())
+
+    assert legacy.reporting_sampling_timeframe is None
+    assert explicit.reporting_sampling_timeframe is None
+    assert legacy.all_positions == explicit.all_positions
+    assert legacy.all_holdings == explicit.all_holdings
+    assert legacy._metric_totals == explicit._metric_totals
+    assert legacy._metric_benchmarks == explicit._metric_benchmarks
+    assert legacy._equity_points == explicit._equity_points
+
+
+def test_reporting_sampling_timeframe_rejects_invalid_value():
+    with pytest.raises(ValueError, match="reporting_sampling_timeframe_invalid"):
+        Portfolio(
+            _Bars(),
+            queue.Queue(),
+            datetime(2026, 7, 10, 0, 0, tzinfo=UTC),
+            _Config,
+            reporting_sampling_timeframe="not-a-timeframe",
+        )
 
 
 def test_full_event_equity_sink_observes_every_point_in_order_and_preserves_identity():
@@ -459,6 +514,67 @@ def test_same_real_pricing_trace_hash_links_unchanged_scaled_and_rejected_applic
     assert all(record.pricing_trace is trace for record in records)
     assert records[0].pricing_trace_hash == trace.sha256
     assert records[0].canonical_json_bytes() != records[1].canonical_json_bytes()
+
+
+def test_independent_pricing_trace_ledger_exposes_a_lost_portfolio_application():
+    events = queue.Queue()
+    handler = SimulatedExecutionHandler(
+        events,
+        _Bars(),
+        _Config,
+        record_cost_attribution=True,
+    )
+    applications = []
+    portfolio, _ = _portfolio(fill_application_attribution_sink=applications.append)
+
+    def execute(order_id, second):
+        handler.active_orders = [
+            {
+                "order_id": order_id,
+                "symbol": "BTC",
+                "type": "MKT",
+                "quantity": 1.0,
+                "direction": "BUY",
+                "status": "PENDING",
+                "position_side": "LONG",
+                "reduce_only": False,
+                "client_order_id": f"client-{order_id}",
+                "stop_loss": None,
+                "take_profit": None,
+                "trailing_percent": None,
+            }
+        ]
+        handler.check_open_orders(
+            MarketEvent(
+                time=datetime(2026, 7, 10, 0, 0, second, tzinfo=UTC),
+                symbol="BTC",
+                open=100.0,
+                high=101.0,
+                low=99.0,
+                close=100.0,
+                volume=100.0,
+            )
+        )
+        return events.get_nowait()
+
+    applied_fill = execute("SIM-APPLIED", 0)
+    portfolio.update_fill(applied_fill)
+
+    assert type(handler.pricing_trace_evidence) is tuple
+    assert handler.pricing_trace_evidence == (applied_fill.metadata["cost_attribution"],)
+    assert [trace.sha256 for trace in handler.pricing_trace_evidence] == [
+        record.pricing_trace_hash for record in applications
+    ]
+
+    dropped_fill = execute("SIM-DROPPED", 1)
+
+    assert len(handler.pricing_trace_evidence) == 2
+    assert len(applications) == 1
+    retained_trace = handler.pricing_trace_evidence[1]
+    assert retained_trace is dropped_fill.metadata["cost_attribution"]
+    dropped_fill.metadata.pop("cost_attribution")
+    assert handler.pricing_trace_evidence[1] is retained_trace
+    assert retained_trace.sha256 not in {record.pricing_trace_hash for record in applications}
 
 
 def test_real_handler_conditional_and_remainder_have_distinct_bijective_applications():

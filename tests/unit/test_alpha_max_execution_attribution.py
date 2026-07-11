@@ -404,6 +404,8 @@ def test_handler_activation_is_exact_constructor_owned_bool():
     assert on.pricing_attribution_sink is not None
     assert on.pricing_attribution_sink.__self__ is on
     assert on.pricing_attribution_sink.__func__ is SimulatedExecutionHandler._capture_pricing_trace
+    assert off.pricing_trace_evidence == ()
+    assert on.pricing_trace_evidence == ()
     assert off.no_fill_attempt_evidence == ()
     with pytest.raises(TypeError, match="exact bool"):
         SimulatedExecutionHandler(queue.Queue(), _Bars(), _Config, record_cost_attribution=1)
@@ -443,6 +445,8 @@ def test_handler_positive_fill_on_off_core_events_orders_and_rng_match():
     assert trace.order_id == "M-1"
     assert trace.order_kind == "MKT"
     assert trace.remainder_of_order_id is None
+    assert off.pricing_trace_evidence == ()
+    assert on.pricing_trace_evidence == (trace,)
     assert off.active_orders == on.active_orders
     assert "no_fill_attempt_evidence" not in off.get_state()
     assert on.get_state()["no_fill_attempt_evidence"] == []
@@ -453,7 +457,14 @@ def test_handler_positive_fill_on_off_core_events_orders_and_rng_match():
     later_market = _market(timestamp=2, volume=100.0)
     off.check_open_orders(later_market)
     on.check_open_orders(later_market)
-    assert _core_fill_values(off_events.get_nowait()) == _core_fill_values(on_events.get_nowait())
+    off_later_fill = off_events.get_nowait()
+    on_later_fill = on_events.get_nowait()
+    assert _core_fill_values(off_later_fill) == _core_fill_values(on_later_fill)
+    assert off.pricing_trace_evidence == ()
+    assert on.pricing_trace_evidence == (
+        trace,
+        on_later_fill.metadata["cost_attribution"],
+    )
     assert _economic_handler_state(off) == _economic_handler_state(on)
 
 
@@ -509,6 +520,8 @@ def test_zero_volume_market_no_fill_attempt_and_on_off_state_are_identical():
     assert off_events.empty() and on_events.empty()
     assert off.active_orders == on.active_orders
     assert _economic_handler_state(off) == _economic_handler_state(on)
+    assert off.pricing_trace_evidence == ()
+    assert on.pricing_trace_evidence == ()
     assert off.no_fill_attempt_evidence == ()
     assert len(on.no_fill_attempt_evidence) == 1
     record = on.no_fill_attempt_evidence[0]

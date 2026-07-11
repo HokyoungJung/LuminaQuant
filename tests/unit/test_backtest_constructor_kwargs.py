@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+import os
 from datetime import datetime
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
-from lumina_quant.backtesting._config_view import BacktestConfigView
+from lumina_quant.backtesting._config_view import (
+    BacktestConfigView,
+    is_exact_alpha_max_backtest_config,
+)
 from lumina_quant.backtesting.backtest import Backtest
 from lumina_quant.configuration.schema import RuntimeConfig
 
@@ -300,6 +305,7 @@ def test_nonempty_portfolio_and_execution_kwargs_use_single_strict_calls():
         portfolio_kwargs={
             "fill_application_attribution_sink": sink,
             "funding_boundary_resolver": resolver,
+            "reporting_sampling_timeframe": "4h",
         },
         execution_handler_kwargs={"record_cost_attribution": True},
     )
@@ -308,6 +314,7 @@ def test_nonempty_portfolio_and_execution_kwargs_use_single_strict_calls():
     assert len(portfolio_calls) == 1
     assert portfolio_calls[0]["fill_application_attribution_sink"] is sink
     assert portfolio_calls[0]["funding_boundary_resolver"] is resolver
+    assert portfolio_calls[0]["reporting_sampling_timeframe"] == "4h"
     assert portfolio_calls[0]["record_history"] is True
     assert portfolio_calls[0]["track_metrics"] is True
     assert portfolio_calls[0]["record_trades"] is True
@@ -316,6 +323,7 @@ def test_nonempty_portfolio_and_execution_kwargs_use_single_strict_calls():
     assert execution_calls[0] == {"record_cost_attribution": True}
     assert backtest.portfolio.kwargs["fill_application_attribution_sink"] is sink
     assert backtest.portfolio.kwargs["funding_boundary_resolver"] is resolver
+    assert backtest.portfolio.kwargs["reporting_sampling_timeframe"] == "4h"
     assert backtest.execution_handler.kwargs == {"record_cost_attribution": True}
 
 
@@ -423,7 +431,49 @@ def test_runtime_config_is_wrapped_before_component_construction():
     assert backtest.execution_handler.config is backtest.config
 
 
-def test_exact_alpha_max_config_bypasses_runtime_config_attribute_probes():
+def test_real_alpha_max_config_bypasses_runtime_config_attribute_probes(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    for key in tuple(os.environ):
+        if key.startswith("LQ_"):
+            monkeypatch.delenv(key, raising=False)
+    from lumina_quant.research.alpha_max_engine_runner import (
+        AlphaMaxBacktestConfig,
+        build_alpha_max_backtest_config,
+        preflight_alpha_max_runtime_contract,
+    )
+
+    config_path = (
+        Path(__file__).resolve().parents[2] / "configs/research/alpha_max_portfolio_20260710.json"
+    ).resolve()
+    preflight = preflight_alpha_max_runtime_contract(config_path)
+    config = build_alpha_max_backtest_config(
+        preflight,
+        phase_id="validation",
+        admitted_symbols=preflight.candidate_symbols[:5],
+        nominal_cost_bps=20,
+    )
+    data_handler_cls, _ = _make_data_handler_class()
+    portfolio_cls, _ = _make_portfolio_strict_class()
+    execution_handler_cls, _ = _make_execution_handler_class()
+
+    backtest = _build_backtest(
+        data_handler_cls=data_handler_cls,
+        execution_handler_cls=execution_handler_cls,
+        portfolio_cls=portfolio_cls,
+        strategy_cls=_make_strategy_class(),
+        config=config,
+        strategy_timeframe="1s",
+    )
+
+    assert type(config) is AlphaMaxBacktestConfig
+    assert is_exact_alpha_max_backtest_config(config) is True
+    assert backtest.config is config
+    assert backtest.portfolio.config is config
+    assert backtest.execution_handler.config is config
+
+
+def test_same_name_alpha_max_config_impostor_is_not_trusted():
     unknown_reads: list[str] = []
 
     def reject_unknown_read(_self, name):
@@ -446,16 +496,14 @@ def test_exact_alpha_max_config_bypasses_runtime_config_attribute_probes():
     portfolio_cls, _ = _make_portfolio_strict_class()
     execution_handler_cls, _ = _make_execution_handler_class()
 
-    backtest = _build_backtest(
-        data_handler_cls=data_handler_cls,
-        execution_handler_cls=execution_handler_cls,
-        portfolio_cls=portfolio_cls,
-        strategy_cls=_make_strategy_class(),
-        config=config,
-        strategy_timeframe="1s",
-    )
-
-    assert backtest.config is config
-    assert backtest.portfolio.config is config
-    assert backtest.execution_handler.config is config
-    assert unknown_reads == []
+    assert is_exact_alpha_max_backtest_config(config) is False
+    with pytest.raises(RuntimeError, match="unfrozen_runtime_field:execution"):
+        _build_backtest(
+            data_handler_cls=data_handler_cls,
+            execution_handler_cls=execution_handler_cls,
+            portfolio_cls=portfolio_cls,
+            strategy_cls=_make_strategy_class(),
+            config=config,
+            strategy_timeframe="1s",
+        )
+    assert unknown_reads == ["execution"]

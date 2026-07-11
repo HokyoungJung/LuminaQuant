@@ -204,6 +204,7 @@ class SimulatedExecutionHandler(ExecutionHandler):
         self._attribution_seams_locked = False
         self._record_cost_attribution = record_cost_attribution
         self._pending_pricing_trace: ExecutionPricingTrace | None = None
+        self._pricing_trace_evidence: list[ExecutionPricingTrace] = []
         self._pricing_attribution_sink = (
             self._capture_pricing_trace if record_cost_attribution else None
         )
@@ -247,6 +248,11 @@ class SimulatedExecutionHandler(ExecutionHandler):
         return self._pricing_attribution_sink
 
     @property
+    def pricing_trace_evidence(self) -> tuple[ExecutionPricingTrace, ...]:
+        """Return an immutable snapshot of every positive execution pricing trace."""
+        return tuple(self._pricing_trace_evidence)
+
+    @property
     def no_fill_attempt_evidence(self) -> tuple[NoFillAttempt, ...]:
         """Return an immutable snapshot of zero-execution pricing attempts."""
         return tuple(self._no_fill_attempt_evidence)
@@ -263,6 +269,7 @@ class SimulatedExecutionHandler(ExecutionHandler):
         if self._pending_pricing_trace is not None:
             raise RuntimeError("execution pricing sink received more than one trace")
         self._pending_pricing_trace = trace
+        self._pricing_trace_evidence.append(trace)
 
     @staticmethod
     def _remainder_parent_order_id(order: dict[str, Any]) -> str | None:
