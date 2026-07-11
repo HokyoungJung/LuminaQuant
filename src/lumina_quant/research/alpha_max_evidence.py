@@ -431,7 +431,11 @@ _ALPHA_MAX_DOMAIN_ENGINE_RUN_COUNT: Final[dict[str, int]] = {
     domain: _ALPHA_MAX_LOGICAL_ACTUAL_ENGINE_CELL_COUNT * len(fold_ids)
     for domain, fold_ids in _ALPHA_MAX_DOMAIN_FOLD_IDS.items()
 }
-_ALPHA_MAX_DOMAIN_ROOT_IDS: Final[dict[str, tuple[str, str]]] = {
+_ALPHA_MAX_DOMAIN_RAW_ROOT_IDS: Final[dict[str, tuple[str, ...]]] = {
+    "validation": ("validation",),
+    "historical_exposed_evaluation": ("historical_exposed_evaluation",),
+}
+_ALPHA_MAX_DOMAIN_FEATURE_ROOT_IDS: Final[dict[str, tuple[str, ...]]] = {
     "validation": ("purge", "validation"),
     "historical_exposed_evaluation": ("embargo", "historical_exposed_evaluation"),
 }
@@ -2916,8 +2920,7 @@ def _alpha_max_validate_root_inventory_coverage(
             raise ValueError("alpha_max_root_symbol_scope_mismatch")
         if (
             root_kind == "feature"
-            and entry.maximum_gap_ms
-            > _FUNDING_INTERVAL_MS + _FEATURE_CAUSAL_EDGE_MS
+            and entry.maximum_gap_ms > _FUNDING_INTERVAL_MS + _FEATURE_CAUSAL_EDGE_MS
         ):
             raise ValueError("alpha_max_feature_root_timestamp_cadence_invalid")
         observed[symbol].append((partition_start, entry))
@@ -2934,10 +2937,8 @@ def _alpha_max_validate_root_inventory_coverage(
             if actual != expected_partitions:
                 raise ValueError("alpha_max_feature_root_interval_coverage_incomplete")
             if (
-                ordered[0][1].minimum_timestamp_ms
-                > _epoch_ms(start) + _FUNDING_INTERVAL_MS
-                or ordered[-1][1].maximum_timestamp_ms
-                < _epoch_ms(end) - _FUNDING_INTERVAL_MS
+                ordered[0][1].minimum_timestamp_ms > _epoch_ms(start) + _FUNDING_INTERVAL_MS
+                or ordered[-1][1].maximum_timestamp_ms < _epoch_ms(end) - _FUNDING_INTERVAL_MS
                 or any(
                     right.minimum_timestamp_ms - left.maximum_timestamp_ms
                     > _FUNDING_INTERVAL_MS + _FEATURE_CAUSAL_EDGE_MS
@@ -2960,6 +2961,8 @@ def _alpha_max_validate_root_inventory_coverage(
         ordered = tuple(sorted(values, key=lambda value: value[0]))
         if tuple(partition for partition, _ in ordered) != tuple(expected_months):
             raise ValueError("alpha_max_raw_root_interval_coverage_incomplete")
+
+
 def _alpha_max_parquet_timestamp_bounds(
     descriptor: int,
     *,
@@ -2979,9 +2982,7 @@ def _alpha_max_parquet_timestamp_bounds(
                 if "funding_rate" not in schema:
                     raise ValueError("alpha_max_feature_root_funding_column_missing")
                 columns.append("funding_rate")
-            columns.extend(
-                value for value in ("symbol", "exchange") if value in schema
-            )
+            columns.extend(value for value in ("symbol", "exchange") if value in schema)
             frame = pl.read_parquet(parquet_file, columns=columns)
     except ValueError:
         raise
@@ -2991,8 +2992,7 @@ def _alpha_max_parquet_timestamp_bounds(
         raise ValueError("alpha_max_root_parquet_timestamp_empty")
     if "symbol" in frame.columns and (
         frame.get_column("symbol").null_count()
-        or set(frame.get_column("symbol").cast(pl.String).to_list())
-        != {expected_symbol}
+        or set(frame.get_column("symbol").cast(pl.String).to_list()) != {expected_symbol}
     ):
         raise ValueError("alpha_max_root_content_symbol_mismatch")
     if "exchange" in frame.columns and (
@@ -3031,18 +3031,12 @@ def _alpha_max_parquet_timestamp_bounds(
         raise ValueError("alpha_max_root_timestamp_not_strictly_increasing")
     if root_kind == "raw" and any(int(value) % 1000 != 0 for value in timestamp_series):
         raise ValueError("alpha_max_raw_root_timestamp_alignment_invalid")
-    if (
-        root_kind == "feature"
-        and maximum_gap_ms > _FUNDING_INTERVAL_MS + _FEATURE_CAUSAL_EDGE_MS
-    ):
+    if root_kind == "feature" and maximum_gap_ms > _FUNDING_INTERVAL_MS + _FEATURE_CAUSAL_EDGE_MS:
         raise ValueError("alpha_max_feature_root_timestamp_cadence_invalid")
     if root_kind == "feature":
         funding = frame.get_column("funding_rate")
         rates = funding.to_list()
-        if any(
-            type(rate) not in {int, float} or not math.isfinite(float(rate))
-            for rate in rates
-        ):
+        if any(type(rate) not in {int, float} or not math.isfinite(float(rate)) for rate in rates):
             raise ValueError("alpha_max_feature_root_funding_value_invalid")
     return minimum_ms, maximum_ms, int(timestamp_series.len()), maximum_gap_ms
 
@@ -3324,9 +3318,7 @@ class AlphaMaxRootSeal:
             }
             for entry in self.entries
         ]
-        expected_inventory = _sha256_bytes(
-            _canonical_json_bytes(inventory_payload, newline=True)
-        )
+        expected_inventory = _sha256_bytes(_canonical_json_bytes(inventory_payload, newline=True))
         expected_content = _sha256_bytes(_canonical_json_bytes(content_payload, newline=True))
         if self.inventory_sha256 != expected_inventory or self.content_sha256 != expected_content:
             raise ValueError("alpha_max_root_seal_digest_mismatch")
@@ -3441,13 +3433,13 @@ def seal_alpha_max_root_tree(
             partition_start_ms = _epoch_ms(partition_start)
             partition_end_ms = _epoch_ms(partition_end)
             if not (
-                partition_start_ms <= minimum_timestamp_ms <= maximum_timestamp_ms
+                partition_start_ms
+                <= minimum_timestamp_ms
+                <= maximum_timestamp_ms
                 < partition_end_ms
             ):
                 raise ValueError("alpha_max_root_partition_content_mismatch")
-            if not (
-                root_start_ms <= minimum_timestamp_ms <= maximum_timestamp_ms < root_end_ms
-            ):
+            if not (root_start_ms <= minimum_timestamp_ms <= maximum_timestamp_ms < root_end_ms):
                 raise ValueError("alpha_max_root_content_outside_interval")
             entries.append(
                 AlphaMaxTreeEntry(
@@ -3784,18 +3776,14 @@ class AlphaMaxAdmissionDailyCandidateInput:
         if self.symbol not in ALPHA_MAX_CANDIDATE_SYMBOLS:
             raise ValueError("alpha_max_admission_input_symbol_invalid")
         if type(self.daily_quote_notional) is not tuple or any(
-            type(value) is not AlphaMaxDailyQuoteNotional
-            for value in self.daily_quote_notional
+            type(value) is not AlphaMaxDailyQuoteNotional for value in self.daily_quote_notional
         ):
             raise TypeError("alpha_max_admission_daily_summaries_must_be_exact_tuple")
         days = tuple(value.day for value in self.daily_quote_notional)
         if any(left >= right for left, right in pairwise(days)):
             raise ValueError("alpha_max_admission_daily_summaries_not_strictly_increasing")
         train_start, train_end = _ROOT_INTERVALS["train"]
-        if any(
-            not train_start.date() <= current_day < train_end.date()
-            for current_day in days
-        ):
+        if any(not train_start.date() <= current_day < train_end.date() for current_day in days):
             raise ValueError("alpha_max_admission_observation_outside_train")
         _admission_nonnegative_int(
             self.consecutive_completed_daily_bars_before_train,
@@ -3883,9 +3871,7 @@ def compute_alpha_max_train_admission(
                 candidate.consecutive_completed_daily_bars_before_train
             ),
             causal_funding_coverage_complete=candidate.causal_funding_coverage_complete,
-            unresolved_daily_cross_section_count=(
-                candidate.unresolved_daily_cross_section_count
-            ),
+            unresolved_daily_cross_section_count=(candidate.unresolved_daily_cross_section_count),
             partition_integrity_complete=candidate.partition_integrity_complete,
         )
     return compute_alpha_max_train_admission_from_daily_summaries(
@@ -3955,9 +3941,7 @@ def compute_alpha_max_train_admission_from_daily_summaries(
             "consecutive_completed_daily_bars_before_train": (
                 candidate.consecutive_completed_daily_bars_before_train
             ),
-            "readable_monotone_unique_finite_partitions": (
-                candidate.partition_integrity_complete
-            ),
+            "readable_monotone_unique_finite_partitions": (candidate.partition_integrity_complete),
             "complete_train_daily_keys": complete_daily,
             "complete_train_4h_keys": complete_4h,
             "causal_funding_coverage_complete": candidate.causal_funding_coverage_complete,
@@ -4061,10 +4045,7 @@ def _alpha_max_thaw_json_tree(value: Any, *, field: str) -> Any:
             for key, child in value.items()
         }
     if type(value) in {tuple, list}:
-        return [
-            _alpha_max_thaw_json_tree(child, field=f"{field}_item")
-            for child in value
-        ]
+        return [_alpha_max_thaw_json_tree(child, field=f"{field}_item") for child in value]
     if value is None or type(value) in {str, bool, int}:
         return value
     if type(value) is float and math.isfinite(value):
@@ -4122,10 +4103,8 @@ def _alpha_max_validate_capsule_state_payload(
         raise ValueError("alpha_max_capsule_state_payload_schema_invalid")
     retained_sha256 = capsule.get("sha256")
     capsule_scope = {key: value for key, value in capsule.items() if key != "sha256"}
-    if (
-        retained_sha256 != normalized["capsule_sha256"]
-        or retained_sha256
-        != _sha256_bytes(_canonical_json_bytes(capsule_scope, newline=False))
+    if retained_sha256 != normalized["capsule_sha256"] or retained_sha256 != _sha256_bytes(
+        _canonical_json_bytes(capsule_scope, newline=False)
     ):
         raise ValueError("alpha_max_capsule_inner_state_hash_mismatch")
     count_fields = (
@@ -4138,11 +4117,9 @@ def _alpha_max_validate_capsule_state_payload(
         "windows_processed",
     )
     if any(
-        type(normalized[field]) is not int or normalized[field] < 0
-        for field in count_fields
+        type(normalized[field]) is not int or normalized[field] < 0 for field in count_fields
     ) or any(
-        normalized[field] != 0
-        for field in ("fill_event_count", "order_event_count", "trade_count")
+        normalized[field] != 0 for field in ("fill_event_count", "order_event_count", "trade_count")
     ):
         raise ValueError("alpha_max_capsule_state_count_invalid")
     return normalized
@@ -4205,13 +4182,10 @@ class AlphaMaxCapsuleReceipt:
         if self.phase not in _MANIFEST_PHASES:
             raise ValueError("alpha_max_capsule_manifest_phase_invalid")
         _alpha_max_nonempty_token(self.prefix_id, field="capsule_prefix_id")
-        expected_predecessor, expected_boundary = _alpha_max_capsule_scope(
-            self.prefix_id
-        )
+        expected_predecessor, expected_boundary = _alpha_max_capsule_scope(self.prefix_id)
         if (
             self.capsule_phase_id != expected_predecessor
-            or _utc(self.boundary_utc, field="capsule_boundary_utc")
-            != expected_boundary
+            or _utc(self.boundary_utc, field="capsule_boundary_utc") != expected_boundary
         ):
             raise ValueError("alpha_max_capsule_causal_scope_mismatch")
         object.__setattr__(self, "boundary_utc", expected_boundary)
@@ -4262,9 +4236,8 @@ class AlphaMaxCapsuleReceipt:
             manifest_sha256=self.manifest_sha256,
             state_payload=self.state_payload,
         )
-        if (
-            self.sha256 != _sha256_bytes(expected_envelope)
-            or self.byte_count != len(expected_envelope)
+        if self.sha256 != _sha256_bytes(expected_envelope) or self.byte_count != len(
+            expected_envelope
         ):
             raise ValueError("alpha_max_capsule_envelope_binding_mismatch")
 
@@ -4339,9 +4312,7 @@ class AlphaMaxCapsuleReceipt:
             capsule_phase_id=predecessor,
             manifest_sha256=manifest_hash,
         )
-        state_sha256 = _sha256_bytes(
-            _canonical_json_bytes(normalized_state, newline=False)
-        )
+        state_sha256 = _sha256_bytes(_canonical_json_bytes(normalized_state, newline=False))
         envelope = {
             "artifact_kind": "alpha_max_indicator_capsule_envelope.v1",
             "boundary_utc": _alpha_max_utc_text(boundary),
@@ -4883,8 +4854,7 @@ def _alpha_max_select_gate_inputs(
 ) -> AlphaMaxSelectionResult:
     values = tuple(candidates)
     if any(
-        type(value) not in {AlphaMaxGateInput, AlphaMaxTerminalGateEvidence}
-        for value in values
+        type(value) not in {AlphaMaxGateInput, AlphaMaxTerminalGateEvidence} for value in values
     ):
         raise TypeError("alpha_max_gate_input_identity_invalid")
     if any(value.comparison_role != role for value in values):
@@ -4892,15 +4862,9 @@ def _alpha_max_select_gate_inputs(
     row_ids = tuple(value.row_id for value in values)
     if len(row_ids) != len(set(row_ids)):
         raise ValueError("alpha_max_gate_duplicate_row_id")
-    normal_values = tuple(
-        value
-        for value in values
-        if type(value) is AlphaMaxGateInput
-    )
+    normal_values = tuple(value for value in values if type(value) is AlphaMaxGateInput)
     terminal_values = tuple(
-        value
-        for value in values
-        if type(value) is AlphaMaxTerminalGateEvidence
+        value for value in values if type(value) is AlphaMaxTerminalGateEvidence
     )
     common_domains = tuple(
         (
@@ -5074,12 +5038,18 @@ def _alpha_max_validate_domain_root_seals(
 ) -> tuple[AlphaMaxRootReceipt, ...]:
     if type(seals) is not tuple or any(type(value) is not AlphaMaxRootSeal for value in seals):
         raise TypeError("alpha_max_actual_run_root_seals_invalid")
-    expected_ids = _ALPHA_MAX_DOMAIN_ROOT_IDS.get(domain)
+    expected_ids = (
+        _ALPHA_MAX_DOMAIN_RAW_ROOT_IDS.get(domain)
+        if root_kind == "raw"
+        else _ALPHA_MAX_DOMAIN_FEATURE_ROOT_IDS.get(domain)
+        if root_kind == "feature"
+        else None
+    )
     if expected_ids is None or tuple(value.root_id for value in seals) != expected_ids:
         raise ValueError("alpha_max_cost_cell_root_domain_mismatch")
     if any(value.root_kind != root_kind for value in seals):
         raise ValueError("alpha_max_cost_cell_root_receipt_kind_mismatch")
-    if seals[0].end_utc != seals[1].start_utc:
+    if len(seals) > 1 and any(left.end_utc != right.start_utc for left, right in pairwise(seals)):
         raise ValueError("alpha_max_cost_cell_root_sequence_not_adjacent")
     return tuple(value.to_receipt() for value in seals)
 
@@ -5334,9 +5304,7 @@ def _alpha_max_liquidation_cost_totals(
         nonnegative=True,
     )
     liquidation_cost_total = math.fsum(value.commission for value in liquidations)
-    applied_commission_total = math.fsum(
-        value.applied_commission for value in applications
-    )
+    applied_commission_total = math.fsum(value.applied_commission for value in applications)
     portfolio_liquidation_total = fee_total - applied_commission_total
     if abs(portfolio_liquidation_total) <= 1e-12:
         portfolio_liquidation_total = 0.0
@@ -5408,10 +5376,17 @@ class AlphaMaxActualEngineRunReceipt:
             self.nominal_cost_bps,
         ):
             raise ValueError("alpha_max_actual_run_seed_mismatch")
-        expected_roots = _ALPHA_MAX_DOMAIN_ROOT_IDS[self.domain]
-        for receipts, kind in (
-            (self.raw_root_receipts, "raw"),
-            (self.feature_root_receipts, "feature"),
+        for receipts, kind, expected_roots in (
+            (
+                self.raw_root_receipts,
+                "raw",
+                _ALPHA_MAX_DOMAIN_RAW_ROOT_IDS[self.domain],
+            ),
+            (
+                self.feature_root_receipts,
+                "feature",
+                _ALPHA_MAX_DOMAIN_FEATURE_ROOT_IDS[self.domain],
+            ),
         ):
             if (
                 type(receipts) is not tuple
@@ -5422,14 +5397,10 @@ class AlphaMaxActualEngineRunReceipt:
                 raise ValueError("alpha_max_cost_cell_root_domain_mismatch")
         if self.raw_root_set_sha256 != _alpha_max_root_set_sha256(
             self.raw_root_receipts
-        ) or self.feature_root_set_sha256 != _alpha_max_root_set_sha256(
-            self.feature_root_receipts
-        ):
+        ) or self.feature_root_set_sha256 != _alpha_max_root_set_sha256(self.feature_root_receipts):
             raise ValueError("alpha_max_actual_run_root_hash_mismatch")
         expected_phase = (
-            "validation_train_fit"
-            if self.domain == "validation"
-            else "prelock_final_refit"
+            "validation_train_fit" if self.domain == "validation" else "prelock_final_refit"
         )
         if (
             type(self.capsule_receipt) is not AlphaMaxCapsuleReceipt
@@ -5568,12 +5539,8 @@ class AlphaMaxActualEngineRunReceipt:
         )
         if type(self.funding_ledger_count) is not int or self.funding_ledger_count < 0:
             raise ValueError("alpha_max_actual_run_funding_count_invalid")
-        if (
-            type(self.liquidation_events) is not tuple
-            or any(
-                type(value) is not AlphaMaxLiquidationEventEvidence
-                for value in self.liquidation_events
-            )
+        if type(self.liquidation_events) is not tuple or any(
+            type(value) is not AlphaMaxLiquidationEventEvidence for value in self.liquidation_events
         ):
             raise TypeError("alpha_max_actual_run_liquidation_identity_invalid")
         for field in (
@@ -5599,9 +5566,7 @@ class AlphaMaxActualEngineRunReceipt:
             ),
             (
                 self.no_fill_attempt_set_sha256,
-                _alpha_max_payload_sequence_sha256(
-                    reconciliation_payload["no_fill_attempts"]
-                ),
+                _alpha_max_payload_sequence_sha256(reconciliation_payload["no_fill_attempts"]),
             ),
             (
                 self.funding_ledger_set_sha256,
@@ -5609,10 +5574,9 @@ class AlphaMaxActualEngineRunReceipt:
             ),
             (self.liquidation_event_set_sha256, liquidation_hash),
         )
-        if (
-            any(actual != expected for actual, expected in derived_bindings)
-            or self.funding_ledger_count != len(reconciliation_payload["funding_ledger"])
-        ):
+        if any(
+            actual != expected for actual, expected in derived_bindings
+        ) or self.funding_ledger_count != len(reconciliation_payload["funding_ledger"]):
             raise ValueError("alpha_max_actual_run_attribution_hash_mismatch")
         expected_canonical = _canonical_json_bytes(
             _alpha_max_actual_engine_run_payload(self),
@@ -5836,12 +5800,10 @@ def build_alpha_max_actual_engine_run_receipt(
     ):
         raise TypeError("alpha_max_actual_run_evidence_must_be_tuple")
     normalized_liquidations = _alpha_max_normalize_liquidation_events(liquidation_events)
-    liquidation_cost_total, portfolio_liquidation_total = (
-        _alpha_max_liquidation_cost_totals(
-            normalized_liquidations,
-            fill_applications,
-            portfolio_fee_total,
-        )
+    liquidation_cost_total, portfolio_liquidation_total = _alpha_max_liquidation_cost_totals(
+        normalized_liquidations,
+        fill_applications,
+        portfolio_fee_total,
     )
     reconciliation = reconcile_alpha_max_cost_attribution(
         pricing_traces,
@@ -5874,13 +5836,10 @@ def build_alpha_max_actual_engine_run_receipt(
         type(runtime_read_audit) is not tuple
         or not runtime_read_audit
         or any(
-            type(value) is not str or value not in effective_config
-            for value in runtime_read_audit
+            type(value) is not str or value not in effective_config for value in runtime_read_audit
         )
         or runtime_read_audit_sha256
-        != _sha256_bytes(
-            _canonical_json_bytes(list(runtime_read_audit), newline=False)
-        )
+        != _sha256_bytes(_canonical_json_bytes(list(runtime_read_audit), newline=False))
     ):
         raise ValueError("alpha_max_actual_run_runtime_read_audit_invalid")
     if any(
@@ -5932,9 +5891,7 @@ def build_alpha_max_actual_engine_run_receipt(
         "funding_ledger_count": len(funding_ledger),
         "funding_ledger_set_sha256": _alpha_max_payload_sequence_sha256(funding_payloads),
         "liquidation_event_count": len(normalized_liquidations),
-        "liquidation_event_set_sha256": _alpha_max_payload_sequence_sha256(
-            liquidation_payloads
-        ),
+        "liquidation_event_set_sha256": _alpha_max_payload_sequence_sha256(liquidation_payloads),
         "liquidation_events": normalized_liquidations,
         "reconciliation": reconciliation,
     }
@@ -6037,9 +5994,7 @@ def _alpha_max_normalized_fold_segment_payload(
 ) -> dict[str, Any]:
     return {
         "aggregate_prefix_event_count": value.aggregate_prefix_event_count,
-        "aggregate_prefix_event_stream_sha256": (
-            value.aggregate_prefix_event_stream_sha256
-        ),
+        "aggregate_prefix_event_stream_sha256": (value.aggregate_prefix_event_stream_sha256),
         "artifact_kind": "alpha_max_normalized_fold_segment_evidence.v1",
         "event_count": value.event_count,
         "first_timestamp_ms": value.first_timestamp_ms,
@@ -6047,9 +6002,7 @@ def _alpha_max_normalized_fold_segment_payload(
         "last_timestamp_ms": value.last_timestamp_ms,
         "normalization_scale": value.normalization_scale,
         "normalized_ending_equity": value.normalized_ending_equity,
-        "normalized_segment_event_stream_sha256": (
-            value.normalized_segment_event_stream_sha256
-        ),
+        "normalized_segment_event_stream_sha256": (value.normalized_segment_event_stream_sha256),
         "normalized_starting_equity": value.normalized_starting_equity,
         "source_event_stream_sha256": value.source_event_stream_sha256,
         "source_streaming_equity_sha256": value.source_streaming_equity_sha256,
@@ -6123,8 +6076,7 @@ class AlphaMaxCombinedStreamingEquityEvidence:
             or type(self.normalized_fold_segments) is not tuple
             or len(self.fold_run_sha256s) != len(self.fold_ids)
             or len(self.fold_streaming_equity_sha256s) != len(self.fold_ids)
-            or tuple(value.fold_id for value in self.normalized_fold_segments)
-            != self.fold_ids
+            or tuple(value.fold_id for value in self.normalized_fold_segments) != self.fold_ids
             or any(
                 type(value) is not AlphaMaxNormalizedFoldSegmentEvidence
                 for value in self.normalized_fold_segments
@@ -6415,9 +6367,7 @@ def _build_alpha_max_combined_primary_return_stream(
         current_equity = equities[-1]
     expected_calendar = tuple(
         timestamp
-        for fold_id in _ALPHA_MAX_DOMAIN_FOLD_IDS[
-            fold_runs[0].actual_engine_run.domain
-        ]
+        for fold_id in _ALPHA_MAX_DOMAIN_FOLD_IDS[fold_runs[0].actual_engine_run.domain]
         for timestamp in _alpha_max_fold_reporting_calendar(fold_id)
     )
     if tuple(timestamps) != expected_calendar:
@@ -6537,10 +6487,8 @@ class AlphaMaxCostCellPreGateEvidence:
             )
             if (
                 type(self.combined_primary_return_stream) is not AlphaMaxPrimaryReturnStream
-                or self.combined_primary_return_stream.to_payload()
-                != expected_primary.to_payload()
-                or self.combined_streaming_equity.to_payload()
-                != expected_streaming.to_payload()
+                or self.combined_primary_return_stream.to_payload() != expected_primary.to_payload()
+                or self.combined_streaming_equity.to_payload() != expected_streaming.to_payload()
                 or type(self.metric_statistics) is not AlphaMaxMetricStatistics
             ):
                 raise ValueError("alpha_max_pre_gate_combined_evidence_mismatch")
@@ -6610,11 +6558,12 @@ def _alpha_max_pre_gate_payload(value: AlphaMaxCostCellPreGateEvidence) -> dict[
 def build_alpha_max_cost_cell_pre_gate_evidence(
     fold_runs: tuple[AlphaMaxFoldRunEvidence, ...],
     combined_full_event_equity: AlphaMaxStreamingEquityEvidence | None = None,
-    normalized_fold_segments: tuple[AlphaMaxNormalizedFoldSegmentEvidence, ...]
-    | None = None,
+    normalized_fold_segments: tuple[AlphaMaxNormalizedFoldSegmentEvidence, ...] | None = None,
 ) -> AlphaMaxCostCellPreGateEvidence:
-    if type(fold_runs) is not tuple or not fold_runs or any(
-        type(value) is not AlphaMaxFoldRunEvidence for value in fold_runs
+    if (
+        type(fold_runs) is not tuple
+        or not fold_runs
+        or any(type(value) is not AlphaMaxFoldRunEvidence for value in fold_runs)
     ):
         raise TypeError("alpha_max_pre_gate_fold_runs_must_be_exact_tuple")
     actual_runs = tuple(value.actual_engine_run for value in fold_runs)
@@ -6712,9 +6661,7 @@ class AlphaMaxTerminalGateEvidence:
     seed_schedule_sha256: str
 
     def __post_init__(self) -> None:
-        expected_role = (
-            "prelock_selection" if self.domain == "validation" else "historical_report"
-        )
+        expected_role = "prelock_selection" if self.domain == "validation" else "historical_report"
         if (
             self.comparison_role != expected_role
             or self.nominal_cost_bps != 30
@@ -6784,9 +6731,13 @@ class AlphaMaxCostCellEvidence:
         if type(self.selection_valid) is not bool:
             raise TypeError("alpha_max_cost_cell_selection_valid_invalid")
         if self.pre_gate_evidence is None:
-            if self.selection_valid or any(
-                value is not None for value in (self.gate_input, self.terminal_gate_evidence)
-            ) or self.evidence_tier == "actual_engine":
+            if (
+                self.selection_valid
+                or any(
+                    value is not None for value in (self.gate_input, self.terminal_gate_evidence)
+                )
+                or self.evidence_tier == "actual_engine"
+            ):
                 raise ValueError("alpha_max_cost_cell_selection_evidence_invalid")
             return
         if type(self.pre_gate_evidence) is not AlphaMaxCostCellPreGateEvidence:
@@ -6822,8 +6773,7 @@ class AlphaMaxCostCellEvidence:
                     or terminal.raw_root_set_sha256 != baseline.raw_root_set_sha256
                     or terminal.feature_root_set_sha256 != baseline.feature_root_set_sha256
                     or terminal.universe_sha256 != baseline.universe_sha256
-                    or terminal.seed_schedule_sha256
-                    != alpha_max_seed_schedule_sha256(self.domain)
+                    or terminal.seed_schedule_sha256 != alpha_max_seed_schedule_sha256(self.domain)
                 ):
                     raise ValueError("alpha_max_cost_cell_terminal_binding_mismatch")
             return
@@ -6839,12 +6789,13 @@ class AlphaMaxCostCellEvidence:
             raise ValueError("alpha_max_incomplete_engine_evidence")
         metrics = pre_gate.metric_statistics
         stream = pre_gate.combined_primary_return_stream
-        if type(metrics) is not AlphaMaxMetricStatistics or type(stream) is not AlphaMaxPrimaryReturnStream:
+        if (
+            type(metrics) is not AlphaMaxMetricStatistics
+            or type(stream) is not AlphaMaxPrimaryReturnStream
+        ):
             raise ValueError("alpha_max_incomplete_engine_evidence")
         baseline = pre_gate.fold_runs[0].actual_engine_run
-        expected_role = (
-            "prelock_selection" if self.domain == "validation" else "historical_report"
-        )
+        expected_role = "prelock_selection" if self.domain == "validation" else "historical_report"
         required_true = (
             self.gate_input.comparison_valid,
             self.gate_input.native_data_coverage_complete,
@@ -6863,8 +6814,7 @@ class AlphaMaxCostCellEvidence:
             or self.gate_input.raw_root_set_sha256 != baseline.raw_root_set_sha256
             or self.gate_input.feature_root_set_sha256 != baseline.feature_root_set_sha256
             or self.gate_input.universe_sha256 != baseline.universe_sha256
-            or self.gate_input.seed_schedule_sha256
-            != alpha_max_seed_schedule_sha256(self.domain)
+            or self.gate_input.seed_schedule_sha256 != alpha_max_seed_schedule_sha256(self.domain)
             or not math.isclose(
                 self.gate_input.gate_mdd,
                 metrics.gate_mdd,
@@ -6897,9 +6847,7 @@ class AlphaMaxCostCellEvidence:
     @property
     def feature_root_receipts(self) -> tuple[AlphaMaxRootReceipt, ...]:
         return (
-            ()
-            if self.pre_gate_evidence is None
-            else self.pre_gate_evidence.feature_root_receipts
+            () if self.pre_gate_evidence is None else self.pre_gate_evidence.feature_root_receipts
         )
 
     @property
@@ -6930,8 +6878,7 @@ class AlphaMaxCostCellEvidence:
             ()
             if self.pre_gate_evidence is None
             else tuple(
-                value.actual_engine_run.reconciliation
-                for value in self.pre_gate_evidence.fold_runs
+                value.actual_engine_run.reconciliation for value in self.pre_gate_evidence.fold_runs
             )
         )
 
@@ -7049,9 +6996,7 @@ def build_alpha_max_cost_cell_evidence(
                 raw_root_set_sha256=baseline.raw_root_set_sha256,
                 feature_root_set_sha256=baseline.feature_root_set_sha256,
                 universe_sha256=baseline.universe_sha256,
-                seed_schedule_sha256=alpha_max_seed_schedule_sha256(
-                    pre_gate_evidence.domain
-                ),
+                seed_schedule_sha256=alpha_max_seed_schedule_sha256(pre_gate_evidence.domain),
             )
         return AlphaMaxCostCellEvidence(
             row_id=pre_gate_evidence.row_id,
@@ -7069,7 +7014,10 @@ def build_alpha_max_cost_cell_evidence(
             raise TypeError("alpha_max_statistical_evidence_identity_invalid")
         metrics = pre_gate_evidence.metric_statistics
         stream = pre_gate_evidence.combined_primary_return_stream
-        if type(metrics) is not AlphaMaxMetricStatistics or type(stream) is not AlphaMaxPrimaryReturnStream:
+        if (
+            type(metrics) is not AlphaMaxMetricStatistics
+            or type(stream) is not AlphaMaxPrimaryReturnStream
+        ):
             raise ValueError("alpha_max_incomplete_engine_evidence")
         if (
             statistical_evidence.nominal_cost_bps != 30
@@ -7096,9 +7044,7 @@ def build_alpha_max_cost_cell_evidence(
             full_event_mdd=metrics.full_event_mdd,
             reporting_4h_mdd=metrics.reporting_4h_mdd,
             dsr=statistical_evidence.dsr_by_candidate[pre_gate_evidence.row_id],
-            spa_pvalue=statistical_evidence.spa_pvalue_by_candidate[
-                pre_gate_evidence.row_id
-            ],
+            spa_pvalue=statistical_evidence.spa_pvalue_by_candidate[pre_gate_evidence.row_id],
             pbo=statistical_evidence.pbo,
             native_data_coverage_complete=True,
             funding_coverage_complete=True,
@@ -7110,9 +7056,7 @@ def build_alpha_max_cost_cell_evidence(
             feature_root_set_sha256=baseline.feature_root_set_sha256,
             universe_sha256=baseline.universe_sha256,
             calendar_sha256=stream.calendar_sha256,
-            seed_schedule_sha256=alpha_max_seed_schedule_sha256(
-                pre_gate_evidence.domain
-            ),
+            seed_schedule_sha256=alpha_max_seed_schedule_sha256(pre_gate_evidence.domain),
         )
     elif statistical_evidence is not None:
         raise ValueError("alpha_max_statistics_only_nominal_30_bps")
@@ -7165,9 +7109,7 @@ class AlphaMaxRowEvidence:
             raise ValueError("alpha_max_row_cost_cell_identity_mismatch")
         if len({value.domain for value in ordered}) != 1:
             raise ValueError("alpha_max_row_cost_cell_domain_mismatch")
-        actual_cells = tuple(
-            value for value in ordered if value.pre_gate_evidence is not None
-        )
+        actual_cells = tuple(value for value in ordered if value.pre_gate_evidence is not None)
         if actual_cells:
             if len(actual_cells) != 4 or self.evidence_tier != "actual_engine":
                 raise ValueError("alpha_max_row_cost_cell_evidence_mismatch")
@@ -7176,8 +7118,7 @@ class AlphaMaxRowEvidence:
             if any(
                 value.raw_root_receipts != baseline.raw_root_receipts
                 or value.feature_root_receipts != baseline.feature_root_receipts
-                or tuple(receipt.prefix_id for receipt in value.capsule_receipts)
-                != expected_folds
+                or tuple(receipt.prefix_id for receipt in value.capsule_receipts) != expected_folds
                 or len(value.manifest_receipts) != len(expected_folds)
                 for value in actual_cells
             ):
@@ -7214,8 +7155,7 @@ class AlphaMaxRowEvidence:
                 self.status != "ruin_detected"
                 or self.evidence_tier != "actual_engine"
                 or ordered[-1].status != "ruin_detected"
-                or type(ordered[-1].terminal_gate_evidence)
-                is not AlphaMaxTerminalGateEvidence
+                or type(ordered[-1].terminal_gate_evidence) is not AlphaMaxTerminalGateEvidence
             ):
                 raise ValueError("alpha_max_row_terminal_evidence_invalid")
         elif any(value.selection_valid for value in ordered):
@@ -7248,9 +7188,7 @@ def canonical_alpha_max_row_bytes(row: AlphaMaxRowEvidence) -> bytes:
 
 
 def _alpha_max_selection_inputs(
-    rows: Sequence[
-        AlphaMaxRowEvidence | AlphaMaxGateInput | AlphaMaxTerminalGateEvidence
-    ],
+    rows: Sequence[AlphaMaxRowEvidence | AlphaMaxGateInput | AlphaMaxTerminalGateEvidence],
 ) -> tuple[AlphaMaxGateInput | AlphaMaxTerminalGateEvidence, ...]:
     values = tuple(rows)
     row_ids: list[str] = []
@@ -7279,9 +7217,7 @@ def _alpha_max_selection_inputs(
 
 
 def select_alpha_max_prelock_champion(
-    rows: Sequence[
-        AlphaMaxRowEvidence | AlphaMaxGateInput | AlphaMaxTerminalGateEvidence
-    ],
+    rows: Sequence[AlphaMaxRowEvidence | AlphaMaxGateInput | AlphaMaxTerminalGateEvidence],
 ) -> AlphaMaxSelectionResult:
     """Apply frozen validation gates and fix at most one selection identity."""
     return _alpha_max_select_gate_inputs(
@@ -7291,9 +7227,7 @@ def select_alpha_max_prelock_champion(
 
 
 def rank_alpha_max_historical_report(
-    rows: Sequence[
-        AlphaMaxRowEvidence | AlphaMaxGateInput | AlphaMaxTerminalGateEvidence
-    ],
+    rows: Sequence[AlphaMaxRowEvidence | AlphaMaxGateInput | AlphaMaxTerminalGateEvidence],
 ) -> AlphaMaxSelectionResult:
     """Apply identical gates in the exposed report domain without selecting."""
     return _alpha_max_select_gate_inputs(
@@ -7870,8 +7804,7 @@ def build_alpha_max_terminal_state(
                 historical_passed = decision.eligible
             elif cell.status == "ruin_detected":
                 if (
-                    type(cell.terminal_gate_evidence)
-                    is not AlphaMaxTerminalGateEvidence
+                    type(cell.terminal_gate_evidence) is not AlphaMaxTerminalGateEvidence
                     or decision.eligible
                     or decision.rejection_reasons != ("ruin_detected",)
                     or decision.gate_mdd is not None

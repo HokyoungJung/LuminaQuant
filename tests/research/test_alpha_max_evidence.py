@@ -113,8 +113,7 @@ def _write_feature_root(root: Path, root_id: str) -> None:
             )
             directory.mkdir(parents=True, exist_ok=True)
             timestamps = [
-                int((day + timedelta(hours=hour)).timestamp() * 1000)
-                for hour in (0, 8, 16)
+                int((day + timedelta(hours=hour)).timestamp() * 1000) for hour in (0, 8, 16)
             ]
             pl.DataFrame(
                 {
@@ -193,6 +192,67 @@ def test_root_tree_seal_is_canonical_streaming_and_rejects_unsafe_entries(tmp_pa
         seal_alpha_max_root_tree("purge", "raw", root)
     with pytest.raises(ValueError, match="must_be_absolute"):
         seal_alpha_max_root_tree("train", "raw", Path("relative"))
+
+
+def test_actual_run_domain_seals_bind_current_raw_and_adjacent_features(
+    tmp_path: Path,
+) -> None:
+    def seal_stub(root_id: str, root_kind: str):
+        path = (tmp_path / f"{root_id}-{root_kind}").resolve()
+        path.mkdir()
+        start, end = evidence._ROOT_INTERVALS[root_id]
+        value = object.__new__(evidence.AlphaMaxRootSeal)
+        fields = {
+            "root_id": root_id,
+            "root_kind": root_kind,
+            "path": str(path),
+            "exchange": "binance",
+            "symbols": ALPHA_MAX_CANDIDATE_SYMBOLS,
+            "start_utc": start,
+            "end_utc": end,
+            "entries": (object(),),
+            "inventory_sha256": _HASH_A,
+            "content_sha256": _HASH_B,
+            "canonical_bytes": b"unused-in-domain-seal-test\n",
+            "sha256": "c" * 64,
+        }
+        for name, field_value in fields.items():
+            object.__setattr__(value, name, field_value)
+        return value
+
+    purge_raw = seal_stub("purge", "raw")
+    validation_raw = seal_stub("validation", "raw")
+    purge_feature = seal_stub("purge", "feature")
+    validation_feature = seal_stub("validation", "feature")
+
+    raw_receipts = evidence._alpha_max_validate_domain_root_seals(
+        (validation_raw,),
+        domain="validation",
+        root_kind="raw",
+    )
+    feature_receipts = evidence._alpha_max_validate_domain_root_seals(
+        (purge_feature, validation_feature),
+        domain="validation",
+        root_kind="feature",
+    )
+
+    assert tuple(receipt.root_id for receipt in raw_receipts) == ("validation",)
+    assert tuple(receipt.root_id for receipt in feature_receipts) == (
+        "purge",
+        "validation",
+    )
+    with pytest.raises(ValueError, match="root_domain_mismatch"):
+        evidence._alpha_max_validate_domain_root_seals(
+            (purge_raw, validation_raw),
+            domain="validation",
+            root_kind="raw",
+        )
+    with pytest.raises(ValueError, match="root_domain_mismatch"):
+        evidence._alpha_max_validate_domain_root_seals(
+            (validation_feature,),
+            domain="validation",
+            root_kind="feature",
+        )
 
 
 @pytest.mark.parametrize(
@@ -289,9 +349,7 @@ def test_feature_root_accepts_causal_as_of_points_before_funding_boundaries(
     seal = seal_alpha_max_root_tree("purge", "feature", root)
 
     entry = next(
-        row
-        for row in seal.entries
-        if "symbol=BTCUSDT/date=2025-06-01" in row.relative_path
+        row for row in seal.entries if "symbol=BTCUSDT/date=2025-06-01" in row.relative_path
     )
     assert entry.maximum_gap_ms == evidence._FUNDING_INTERVAL_MS
 
@@ -546,10 +604,7 @@ def test_historical_ranking_is_report_only_and_terminal_precedence_is_singular()
     assert report_only_terminal.selected_candidate_id is None
     assert report_only_terminal.historical_evaluation_leader == "other"
     assert report_only_terminal.terminal_outcome == "no_demonstrated_alpha"
-    assert (
-        report_only_terminal.historical_exposure_status
-        == "committed_period_outcomes_observed"
-    )
+    assert report_only_terminal.historical_exposure_status == "committed_period_outcomes_observed"
 
 
 def test_unavailable_row_cost_cells_and_prelock_inventory_are_immutable_canonical() -> None:
@@ -712,14 +767,17 @@ def test_effective_runtime_config_binds_all_attributes_and_rejects_seed_forge() 
         "attribute_allowlist": sorted(payload),
         "static_attributes": static,
     }
-    assert evidence._alpha_max_validate_effective_config_bytes(
-        raw,
-        hashlib.sha256(raw).hexdigest(),
-        split_or_fold_id=fold_id,
-        nominal_cost_bps=30,
-        admitted_symbols=admitted,
-        runtime_contract_payload=runtime,
-    ) == payload
+    assert (
+        evidence._alpha_max_validate_effective_config_bytes(
+            raw,
+            hashlib.sha256(raw).hexdigest(),
+            split_or_fold_id=fold_id,
+            nominal_cost_bps=30,
+            admitted_symbols=admitted,
+            runtime_contract_payload=runtime,
+        )
+        == payload
+    )
     poisoned = {**payload, "RANDOM_SEED": payload["RANDOM_SEED"] + 1}
     poisoned_raw = json.dumps(poisoned, sort_keys=True, separators=(",", ":")).encode()
     with pytest.raises(ValueError, match="runtime_binding_mismatch"):
