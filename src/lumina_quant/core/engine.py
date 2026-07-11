@@ -502,6 +502,7 @@ class TradingEngine(ABC):
     def get_engine_state(self) -> dict[str, Any]:
         """Capture engine-level state for chunk boundaries."""
         state: dict[str, Any] = {
+            "event_sequencer": self._event_sequencer.get_state(),
             "window_decision_last_bucket": self._window_decision_last_bucket,
         }
         if self.timeframe_aggregator is None and not self._strategy_uses_timeframe_aggregator():
@@ -528,6 +529,10 @@ class TradingEngine(ABC):
                 self._window_decision_last_bucket = int(raw) if raw is not None else None
             except Exception:
                 self._window_decision_last_bucket = None
+
+        sequencer_state = state.get("event_sequencer")
+        if sequencer_state is not None:
+            self._event_sequencer.set_state(sequencer_state)
 
         aggregator_state = state.get("timeframe_aggregator")
         if isinstance(aggregator_state, dict) and self._strategy_uses_timeframe_aggregator():

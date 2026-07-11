@@ -32,6 +32,19 @@ class EventSequencer:
         self._sequence += 1
         return self._sequence
 
+    def get_state(self) -> dict[str, int]:
+        """Return the exact serializable continuation state."""
+        return {"sequence": self._sequence}
+
+    def set_state(self, state: dict[str, int]) -> None:
+        """Restore a state emitted by :meth:`get_state` without coercion."""
+        if not isinstance(state, dict) or set(state) != {"sequence"}:
+            raise ValueError("invalid_event_sequencer_state")
+        sequence = state["sequence"]
+        if isinstance(sequence, bool) or not isinstance(sequence, int) or sequence < 0:
+            raise ValueError("invalid_event_sequencer_state")
+        self._sequence = sequence
+
 
 def assign_event_identity(event, sequencer: EventSequencer) -> None:
     if event is None:

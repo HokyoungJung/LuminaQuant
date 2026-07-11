@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 from datetime import UTC, datetime, timedelta
 from itertools import permutations
 from pathlib import Path
@@ -10,6 +11,7 @@ from typing import Any
 import pytest
 
 from lumina_quant.core.strategy_input import StrategyInputContext
+from lumina_quant.indicators.common import time_key
 from lumina_quant.strategies.aggressive_return_alpha_sleeves import FundingHarvestCarryStrategy
 from lumina_quant.strategies.alpha_max_research_sleeves import (
     CANONICAL_ALPHA_MAX_COMPONENT_NODES,
@@ -247,6 +249,114 @@ def test_near_high_arrival_permutations_are_byte_identical() -> None:
             strategy.calculate_signals_window(_event_for({symbol: bars[symbol]}))
         states.add(_json_state(strategy))
     assert len(states) == 1
+
+
+def test_near_high_full_state_matches_monolithic_across_partial_barrier_chunk() -> None:
+    symbols = ["ADAUSDT", "BTCUSDT"]
+    params = {
+        "admitted_symbols": symbols,
+        "min_symbols": 2,
+        "min_history_bars": 2,
+        "rebalance_bars": 1,
+        "vol_window": 2,
+    }
+    day_1 = {
+        "ADAUSDT": _bar(_dt(1), 100.0, high=105.0),
+        "BTCUSDT": _bar(_dt(1), 110.0, high=115.0),
+    }
+    day_2 = {
+        "ADAUSDT": _bar(_dt(2), 102.0, high=106.0),
+        "BTCUSDT": _bar(_dt(2), 108.0, high=116.0),
+    }
+
+    monolithic = ResearchOnlyDailyCrossSectionalNearHighAnchoringStrategy(
+        _Bars(symbols), _Queue(), **params
+    )
+    monolithic.calculate_signals_window(_event_for(day_1))
+    monolithic.calculate_signals_window(_event_for({"ADAUSDT": day_2["ADAUSDT"]}))
+    monolithic.calculate_signals_window(_event_for({"ADAUSDT": day_2["ADAUSDT"]}))
+    monolithic.calculate_signals_window(_event_for({"BTCUSDT": day_2["BTCUSDT"]}))
+
+    first_chunk = ResearchOnlyDailyCrossSectionalNearHighAnchoringStrategy(
+        _Bars(symbols), _Queue(), **params
+    )
+    first_chunk.calculate_signals_window(_event_for(day_1))
+    first_chunk.calculate_signals_window(_event_for({"ADAUSDT": day_2["ADAUSDT"]}))
+    first_chunk._alpha_max_bound_aggregator = object()
+    snapshot = first_chunk.get_state()
+    chunk_state = snapshot["_alpha_max_chunk_state"]
+    assert "bound_aggregator" not in chunk_state
+    assert set(chunk_state["barrier_pending"][time_key(_dt(2))]) == {"ADAUSDT"}
+
+    resumed = ResearchOnlyDailyCrossSectionalNearHighAnchoringStrategy(
+        _Bars(symbols), _Queue(), **params
+    )
+    resumed.set_state(snapshot)
+    assert resumed._alpha_max_bound_aggregator is None
+    assert resumed.get_state() == snapshot
+
+    # Replayed overlap is idempotent, then the remaining symbol closes exactly
+    # one cross-section barrier.
+    resumed.calculate_signals_window(_event_for({"ADAUSDT": day_2["ADAUSDT"]}))
+    resumed.calculate_signals_window(_event_for({"BTCUSDT": day_2["BTCUSDT"]}))
+
+    assert resumed.get_state() == monolithic.get_state()
+    assert resumed.get_research_indicator_state() == monolithic.get_research_indicator_state()
+    assert resumed._alpha_max_completed_native_count_by_symbol == {
+        "ADAUSDT": 2,
+        "BTCUSDT": 2,
+    }
+
+
+def test_near_high_full_state_preserves_failed_duplicate_and_partial_error() -> None:
+    symbols = ["ADAUSDT", "BTCUSDT"]
+    params = {
+        "admitted_symbols": symbols,
+        "min_symbols": 2,
+        "min_history_bars": 1,
+    }
+    original = _bar(_dt(1), 100.0)
+    failed = ResearchOnlyDailyCrossSectionalNearHighAnchoringStrategy(
+        _Bars(symbols), _Queue(), **params
+    )
+    failed.calculate_signals_window(_event_for({"ADAUSDT": original}))
+    with pytest.raises(ValueError, match="conflicting_near_high_duplicate"):
+        failed.calculate_signals_window(_event_for({"ADAUSDT": _bar(_dt(1), 101.0)}))
+
+    failed_snapshot = failed.get_state()
+    failed_resumed = ResearchOnlyDailyCrossSectionalNearHighAnchoringStrategy(
+        _Bars(symbols), _Queue(), **params
+    )
+    failed_resumed.set_state(failed_snapshot)
+    assert failed_resumed.get_state() == failed_snapshot
+    with pytest.raises(ValueError, match="conflicting_near_high_duplicate"):
+        failed_resumed.calculate_signals_window(_event_for({"ADAUSDT": original}))
+
+    partial = ResearchOnlyDailyCrossSectionalNearHighAnchoringStrategy(
+        _Bars(symbols), _Queue(), **params
+    )
+    partial_agg = _Agg()
+    partial_agg.set_bars("ADAUSDT", "1d", [_bar(_dt(2), 100.0)])
+    partial_agg.set_bars("BTCUSDT", "1d", [_bar(_dt(2), 100.0)])
+    partial._alpha_max_bound_aggregator = partial_agg
+    assert partial.finalize_completed_native_buckets(_dt(2, 12)) == 0
+    partial_snapshot = partial.get_state()
+
+    partial_resumed = ResearchOnlyDailyCrossSectionalNearHighAnchoringStrategy(
+        _Bars(symbols), _Queue(), **params
+    )
+    partial_resumed.set_state(partial_snapshot)
+    assert partial_resumed._alpha_max_bound_aggregator is None
+    assert partial_resumed.get_state() == partial_snapshot
+    with pytest.raises(ValueError, match="partial_native_bucket"):
+        partial_resumed.get_research_indicator_state()
+
+    invalid = deepcopy(partial_snapshot)
+    invalid["_alpha_max_chunk_state"]["completed_native_count_by_symbol"] = {"ADAUSDT": True}
+    before = partial_resumed.get_state()
+    with pytest.raises(ValueError, match="invalid_alpha_max_near_high_chunk_state"):
+        partial_resumed.set_state(invalid)
+    assert partial_resumed.get_state() == before
 
 
 class _Lookup:

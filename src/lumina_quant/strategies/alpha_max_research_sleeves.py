@@ -520,6 +520,7 @@ class ResearchOnlyDailyCrossSectionalNearHighAnchoringStrategy(
     uses_timeframe_aggregator = True
     preferred_contract = "market_window"
     research_only = True
+    _chunk_state_key = "_alpha_max_chunk_state"
 
     @classmethod
     def canonical_component_params(cls) -> dict[str, Any]:
@@ -570,6 +571,188 @@ class ResearchOnlyDailyCrossSectionalNearHighAnchoringStrategy(
         self._alpha_max_completed_native_keys: set[tuple[str, str]] = set()
         self._alpha_max_completed_native_count_by_symbol: dict[str, int] = {}
         self._alpha_max_last_completed_native_key_by_symbol: dict[str, str] = {}
+
+    def get_state(self) -> dict[str, Any]:
+        """Capture base strategy and barrier state without binding the aggregator."""
+        state = super().get_state()
+        state[self._chunk_state_key] = {
+            "version": 1,
+            "adapter_class": type(self).__name__,
+            "native_timeframe": self.native_timeframe,
+            "admitted_symbols": list(self._alpha_max_admitted_symbols),
+            "barrier_pending": {
+                key: {
+                    symbol: tuple(copy.deepcopy(signature))
+                    for symbol, signature in sorted(pending.items())
+                }
+                for key, pending in sorted(self._alpha_max_barrier_pending.items())
+            },
+            "barrier_closed": sorted(self._alpha_max_barrier_closed),
+            "failed_native_keys": dict(sorted(self._alpha_max_failed_native_keys.items())),
+            "partial_bucket_error": self._alpha_max_partial_bucket_error,
+            "completed_native_keys": sorted(self._alpha_max_completed_native_keys),
+            "completed_native_count_by_symbol": dict(
+                sorted(self._alpha_max_completed_native_count_by_symbol.items())
+            ),
+            "last_completed_native_key_by_symbol": dict(
+                sorted(self._alpha_max_last_completed_native_key_by_symbol.items())
+            ),
+        }
+        return state
+
+    def set_state(self, state: dict[str, Any]) -> None:
+        """Restore a full chunk snapshot while leaving the new aggregator unbound."""
+        if not isinstance(state, dict):
+            super().set_state(state)
+            return
+
+        raw_chunk = state.get(self._chunk_state_key)
+        if raw_chunk is None:
+            # Indicator capsules and legacy snapshots contain only the inherited
+            # strategy state.  Preserve that contract unchanged.
+            super().set_state(state)
+            return
+        required_keys = {
+            "version",
+            "adapter_class",
+            "native_timeframe",
+            "admitted_symbols",
+            "barrier_pending",
+            "barrier_closed",
+            "failed_native_keys",
+            "partial_bucket_error",
+            "completed_native_keys",
+            "completed_native_count_by_symbol",
+            "last_completed_native_key_by_symbol",
+        }
+        if not isinstance(raw_chunk, Mapping) or set(raw_chunk) != required_keys:
+            raise ValueError("invalid_alpha_max_near_high_chunk_state")
+        if (
+            raw_chunk.get("version") != 1
+            or raw_chunk.get("adapter_class") != type(self).__name__
+            or raw_chunk.get("native_timeframe") != self.native_timeframe
+            or tuple(raw_chunk.get("admitted_symbols") or ()) != self._alpha_max_admitted_symbols
+        ):
+            raise ValueError("invalid_alpha_max_near_high_chunk_state")
+
+        raw_pending = raw_chunk.get("barrier_pending")
+        if not isinstance(raw_pending, Mapping):
+            raise ValueError("invalid_alpha_max_near_high_chunk_state")
+        pending_state: dict[str, dict[str, tuple[Any, float, float, float, float, float]]] = {}
+        for raw_key, raw_symbols in sorted(raw_pending.items(), key=lambda item: str(item[0])):
+            if not isinstance(raw_key, str) or not raw_key or not isinstance(raw_symbols, Mapping):
+                raise ValueError("invalid_alpha_max_near_high_chunk_state")
+            symbol_state: dict[str, tuple[Any, float, float, float, float, float]] = {}
+            for raw_symbol, raw_signature in sorted(
+                raw_symbols.items(), key=lambda item: str(item[0])
+            ):
+                if (
+                    not isinstance(raw_symbol, str)
+                    or raw_symbol not in self._alpha_max_admitted_symbols
+                    or not isinstance(raw_signature, (list, tuple))
+                    or len(raw_signature) != 6
+                ):
+                    raise ValueError("invalid_alpha_max_near_high_chunk_state")
+                try:
+                    signature = _bar_signature(raw_signature)
+                except ValueError:
+                    raise ValueError("invalid_alpha_max_near_high_chunk_state") from None
+                if _bucket_key(signature) != raw_key:
+                    raise ValueError("invalid_alpha_max_near_high_chunk_state")
+                symbol_state[raw_symbol] = signature
+            if not symbol_state:
+                raise ValueError("invalid_alpha_max_near_high_chunk_state")
+            pending_state[raw_key] = symbol_state
+
+        raw_closed = raw_chunk.get("barrier_closed")
+        if not isinstance(raw_closed, (list, tuple)) or any(
+            not isinstance(key, str) or not key for key in raw_closed
+        ):
+            raise ValueError("invalid_alpha_max_near_high_chunk_state")
+        closed_state = set(raw_closed)
+        if len(closed_state) != len(raw_closed) or any(
+            key not in pending_state
+            or set(pending_state[key]) != set(self._alpha_max_admitted_symbols)
+            for key in closed_state
+        ):
+            raise ValueError("invalid_alpha_max_near_high_chunk_state")
+
+        raw_failed = raw_chunk.get("failed_native_keys")
+        if not isinstance(raw_failed, Mapping) or any(
+            not isinstance(key, str) or not key or not isinstance(reason, str) or not reason
+            for key, reason in raw_failed.items()
+        ):
+            raise ValueError("invalid_alpha_max_near_high_chunk_state")
+        failed_state = {str(key): str(reason) for key, reason in sorted(raw_failed.items())}
+
+        partial_error = raw_chunk.get("partial_bucket_error")
+        if partial_error is not None and (not isinstance(partial_error, str) or not partial_error):
+            raise ValueError("invalid_alpha_max_near_high_chunk_state")
+
+        raw_completed = raw_chunk.get("completed_native_keys")
+        if not isinstance(raw_completed, (list, tuple)):
+            raise ValueError("invalid_alpha_max_near_high_chunk_state")
+        completed_state: set[tuple[str, str]] = set()
+        for item in raw_completed:
+            if (
+                not isinstance(item, (list, tuple))
+                or len(item) != 2
+                or not isinstance(item[0], str)
+                or item[0] not in self._alpha_max_admitted_symbols
+                or not isinstance(item[1], str)
+                or item[1] not in closed_state
+            ):
+                raise ValueError("invalid_alpha_max_near_high_chunk_state")
+            completed_state.add((item[0], item[1]))
+        if len(completed_state) != len(raw_completed) or completed_state != {
+            (symbol, key) for key in closed_state for symbol in self._alpha_max_admitted_symbols
+        }:
+            raise ValueError("invalid_alpha_max_near_high_chunk_state")
+
+        raw_counts = raw_chunk.get("completed_native_count_by_symbol")
+        if not isinstance(raw_counts, Mapping):
+            raise ValueError("invalid_alpha_max_near_high_chunk_state")
+        count_state: dict[str, int] = {}
+        for symbol, count in raw_counts.items():
+            if (
+                not isinstance(symbol, str)
+                or symbol not in self._alpha_max_admitted_symbols
+                or isinstance(count, bool)
+                or not isinstance(count, int)
+                or count < 0
+            ):
+                raise ValueError("invalid_alpha_max_near_high_chunk_state")
+            count_state[symbol] = count
+        expected_counts = {
+            symbol: sum(1 for completed_symbol, _ in completed_state if completed_symbol == symbol)
+            for symbol in self._alpha_max_admitted_symbols
+        }
+        expected_counts = {symbol: count for symbol, count in expected_counts.items() if count}
+        if count_state != expected_counts:
+            raise ValueError("invalid_alpha_max_near_high_chunk_state")
+
+        raw_last = raw_chunk.get("last_completed_native_key_by_symbol")
+        if not isinstance(raw_last, Mapping) or any(
+            not isinstance(symbol, str)
+            or symbol not in self._alpha_max_admitted_symbols
+            or not isinstance(key, str)
+            or (symbol, key) not in completed_state
+            for symbol, key in raw_last.items()
+        ):
+            raise ValueError("invalid_alpha_max_near_high_chunk_state")
+        last_state = {str(symbol): str(key) for symbol, key in sorted(raw_last.items())}
+        if set(last_state) != set(expected_counts):
+            raise ValueError("invalid_alpha_max_near_high_chunk_state")
+
+        super().set_state(state)
+        self._alpha_max_barrier_pending = pending_state
+        self._alpha_max_barrier_closed = closed_state
+        self._alpha_max_failed_native_keys = failed_state
+        self._alpha_max_partial_bucket_error = partial_error
+        self._alpha_max_completed_native_keys = completed_state
+        self._alpha_max_completed_native_count_by_symbol = count_state
+        self._alpha_max_last_completed_native_key_by_symbol = last_state
+        self._alpha_max_bound_aggregator = None
 
     def _completed_enough(self, bar: Any, watermark_ms: int | None) -> bool:
         start_ms = _timestamp_ms(_bar_time(bar))
