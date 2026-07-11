@@ -14,11 +14,12 @@ import math
 import os
 import stat
 import subprocess
+from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from itertools import pairwise
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from types import MappingProxyType
 from typing import Any, Final
 
@@ -28,7 +29,13 @@ from lumina_quant.backtesting.data_windowed_parquet import (
     HistoricParquetWindowedDataHandler,
     RawPoint,
 )
-from lumina_quant.backtesting.execution_model import ExecutionModel
+from lumina_quant.backtesting.execution_model import (
+    ExecutionModel,
+    ExecutionPricingTrace,
+    execution_pricing_trace_sha256,
+)
+from lumina_quant.backtesting.execution_sim import NoFillAttempt
+from lumina_quant.backtesting.portfolio_backtest import FillApplicationAttribution
 from lumina_quant.data.feature_points import (
     FEATURE_POINT_MAX_STALE_MS,
     FeaturePoint,
@@ -51,17 +58,39 @@ __all__ = [
     "ALPHA_MAX_MANIFEST_TOP_LEVEL_KEYS",
     "ALPHA_MAX_PERIODS_PER_YEAR",
     "AlphaMaxAdmissionArtifact",
+    "AlphaMaxAdmissionCandidateInput",
+    "AlphaMaxAdmissionComputation",
     "AlphaMaxCapacityDiagnostics",
+    "AlphaMaxCapsuleReceipt",
+    "AlphaMaxContractManifestSeal",
+    "AlphaMaxContractRecord",
+    "AlphaMaxCostCellEvidence",
+    "AlphaMaxDailyQuoteNotional",
     "AlphaMaxEquityEndpoint",
     "AlphaMaxFundingBoundaryLedgerRow",
     "AlphaMaxFundingBoundaryRequest",
     "AlphaMaxFundingBoundaryResolver",
+    "AlphaMaxGateDecision",
+    "AlphaMaxGateInput",
     "AlphaMaxManifestMaterialization",
+    "AlphaMaxManifestReceipt",
     "AlphaMaxMetricStatistics",
     "AlphaMaxOrderedFundingLookup",
     "AlphaMaxPreGateSharpeEvidence",
+    "AlphaMaxPrelockArtifact",
+    "AlphaMaxPrelockSeal",
     "AlphaMaxPrimaryReturnStream",
+    "AlphaMaxRawObservation",
+    "AlphaMaxReconciliationEvidence",
+    "AlphaMaxRootReceipt",
+    "AlphaMaxRootSeal",
+    "AlphaMaxRowEvidence",
+    "AlphaMaxSelectionResult",
     "AlphaMaxStatisticalEvidence",
+    "AlphaMaxStreamingEquityEvidence",
+    "AlphaMaxStreamingEquityTracker",
+    "AlphaMaxTerminalState",
+    "AlphaMaxTreeEntry",
     "AlphaMaxTrialLedger",
     "AlphaMaxTurnoverRPTDiagnostics",
     "FeatureRootSpec",
@@ -76,18 +105,29 @@ __all__ = [
     "alpha_max_full_event_mdd",
     "alpha_max_pre_gate_sharpe_variance",
     "alpha_max_shrunk_hrp_weights",
+    "alpha_max_terminal_outcome",
     "alpha_max_trial_key",
     "alpha_max_trial_key_set_lf_bytes",
     "alpha_max_type7_quantile",
+    "build_alpha_max_prelock_seal",
     "build_alpha_max_primary_return_stream",
     "build_alpha_max_statistical_evidence",
+    "build_alpha_max_terminal_state",
     "build_alpha_max_trial_ledger",
+    "canonical_alpha_max_cost_cell_bytes",
+    "canonical_alpha_max_row_bytes",
     "compute_alpha_max_capacity_diagnostics",
     "compute_alpha_max_metric_statistics",
+    "compute_alpha_max_train_admission",
     "compute_alpha_max_turnover_rpt",
     "materialize_alpha_max_manifest",
     "normalize_alpha_max_prior_trial_node",
+    "rank_alpha_max_historical_report",
     "read_alpha_max_prior_trial_blob",
+    "reconcile_alpha_max_cost_attribution",
+    "seal_alpha_max_contract_manifest",
+    "seal_alpha_max_root_tree",
+    "select_alpha_max_prelock_champion",
     "validate_alpha_max_admission_artifact",
     "validate_alpha_max_admitted_symbols",
 ]
@@ -415,6 +455,11 @@ class AlphaMaxOrderedFundingLookup:
     @property
     def current_root(self) -> FeatureRootSpec:
         return self._root_specs[-1]
+
+    @property
+    def db_path(self) -> str:
+        """Expose the exact current root as the engine's immutable capability token."""
+        return self.current_root.path
 
     def get_latest_point(
         self,
@@ -2585,4 +2630,2037 @@ def build_alpha_max_statistical_evidence(
         pbo_n_splits=8,
         prior_trial_key_set_sha256=trial_ledger.prior_key_set_sha256,
         current_trial_key_set_sha256=trial_ledger.current_key_set_sha256,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Revision 5.14 pure data, evidence, selection, and sealing contracts.
+# These helpers intentionally remain below the canonical statistical primitives
+# so orchestration code has one deterministic evidence module and no parallel
+# implementation of admission, selection, reconciliation, or serialization.
+
+
+def _alpha_max_safe_relative_path(value: str, *, field: str) -> str:
+    if type(value) is not str or not value or "\0" in value or "\\" in value:
+        raise ValueError(f"alpha_max_{field}_invalid")
+    path = PurePosixPath(value)
+    if (
+        path.is_absolute()
+        or value != path.as_posix()
+        or any(part in {"", ".", ".."} for part in path.parts)
+    ):
+        raise ValueError(f"alpha_max_{field}_invalid")
+    return value
+
+
+def _alpha_max_file_identity(value: os.stat_result) -> tuple[int, ...]:
+    return (
+        int(value.st_dev),
+        int(value.st_ino),
+        int(stat.S_IFMT(value.st_mode)),
+        int(value.st_nlink),
+        int(value.st_size),
+        int(value.st_mtime_ns),
+        int(value.st_ctime_ns),
+    )
+
+
+def _alpha_max_stream_regular_file(path: Path) -> tuple[str, os.stat_result]:
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(path, flags)
+    except OSError as exc:
+        raise ValueError("alpha_max_root_file_open_failed") from exc
+    try:
+        before = os.fstat(descriptor)
+        if not stat.S_ISREG(before.st_mode):
+            raise ValueError("alpha_max_root_entry_not_regular")
+        if int(before.st_nlink) != 1:
+            raise ValueError("alpha_max_root_hardlink_rejected")
+        digest = hashlib.sha256()
+        while True:
+            chunk = os.read(descriptor, 1024 * 1024)
+            if not chunk:
+                break
+            digest.update(chunk)
+        after = os.fstat(descriptor)
+        if _alpha_max_file_identity(before) != _alpha_max_file_identity(after):
+            raise ValueError("alpha_max_root_file_changed_during_seal")
+        return digest.hexdigest(), before
+    finally:
+        os.close(descriptor)
+
+
+@dataclass(frozen=True, slots=True)
+class AlphaMaxTreeEntry:
+    """One safe regular file in a canonical raw/feature root inventory."""
+
+    relative_path: str
+    byte_count: int
+    mode: int
+    mtime_ns: int
+    sha256: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "relative_path",
+            _alpha_max_safe_relative_path(self.relative_path, field="tree_relative_path"),
+        )
+        if type(self.byte_count) is not int or self.byte_count < 0:
+            raise ValueError("alpha_max_tree_byte_count_invalid")
+        if type(self.mode) is not int or not 0 <= self.mode <= 0o7777:
+            raise ValueError("alpha_max_tree_mode_invalid")
+        if type(self.mtime_ns) is not int or self.mtime_ns < 0:
+            raise ValueError("alpha_max_tree_mtime_invalid")
+        object.__setattr__(
+            self,
+            "sha256",
+            _require_sha256(self.sha256, field="alpha_max_tree_entry_sha256"),
+        )
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "byte_count": self.byte_count,
+            "mode": self.mode,
+            "mtime_ns": self.mtime_ns,
+            "relative_path": self.relative_path,
+            "sha256": self.sha256,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class AlphaMaxRootReceipt:
+    """Immutable root identity carried by every row/cost-cell bundle."""
+
+    root_id: str
+    root_kind: str
+    path: str
+    exchange: str
+    start_utc: datetime
+    end_utc: datetime
+    inventory_sha256: str
+    content_sha256: str
+    file_count: int
+
+    def __post_init__(self) -> None:
+        if self.root_id not in _ROOT_INTERVALS:
+            raise ValueError("alpha_max_root_receipt_id_invalid")
+        if self.root_kind not in {"raw", "feature"}:
+            raise ValueError("alpha_max_root_receipt_kind_invalid")
+        if self.exchange != "binance":
+            raise ValueError("alpha_max_root_receipt_exchange_invalid")
+        expected_start, expected_end = _ROOT_INTERVALS[self.root_id]
+        start = _utc(self.start_utc, field="root_receipt_start")
+        end = _utc(self.end_utc, field="root_receipt_end")
+        if start != expected_start or end != expected_end:
+            raise ValueError("alpha_max_root_receipt_bounds_invalid")
+        object.__setattr__(self, "start_utc", start)
+        object.__setattr__(self, "end_utc", end)
+        object.__setattr__(
+            self,
+            "path",
+            _require_explicit_canonical_path(self.path, field="alpha_max_root_receipt_path"),
+        )
+        object.__setattr__(
+            self,
+            "inventory_sha256",
+            _require_sha256(
+                self.inventory_sha256,
+                field="alpha_max_root_receipt_inventory_sha256",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "content_sha256",
+            _require_sha256(
+                self.content_sha256,
+                field="alpha_max_root_receipt_content_sha256",
+            ),
+        )
+        if type(self.file_count) is not int or self.file_count <= 0:
+            raise ValueError("alpha_max_root_receipt_file_count_invalid")
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "content_sha256": self.content_sha256,
+            "end_utc": self.end_utc.isoformat().replace("+00:00", "Z"),
+            "exchange": self.exchange,
+            "file_count": self.file_count,
+            "inventory_sha256": self.inventory_sha256,
+            "path": self.path,
+            "root_id": self.root_id,
+            "root_kind": self.root_kind,
+            "start_utc": self.start_utc.isoformat().replace("+00:00", "Z"),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class AlphaMaxRootSeal:
+    """Canonical metadata inventory and path-independent file-content seal."""
+
+    root_id: str
+    root_kind: str
+    path: str
+    exchange: str
+    start_utc: datetime
+    end_utc: datetime
+    entries: tuple[AlphaMaxTreeEntry, ...]
+    inventory_sha256: str
+    content_sha256: str
+    canonical_bytes: bytes
+    sha256: str
+
+    def to_payload(self) -> dict[str, Any]:
+        return json.loads(self.canonical_bytes)
+
+    def to_receipt(self) -> AlphaMaxRootReceipt:
+        return AlphaMaxRootReceipt(
+            root_id=self.root_id,
+            root_kind=self.root_kind,
+            path=self.path,
+            exchange=self.exchange,
+            start_utc=self.start_utc,
+            end_utc=self.end_utc,
+            inventory_sha256=self.inventory_sha256,
+            content_sha256=self.content_sha256,
+            file_count=len(self.entries),
+        )
+
+
+def seal_alpha_max_root_tree(
+    root_id: str,
+    root_kind: str,
+    root_path: str | os.PathLike[str],
+    *,
+    exchange: str = "binance",
+) -> AlphaMaxRootSeal:
+    """Stream-hash one explicit root without following links or retaining file bytes."""
+    if root_id not in _ROOT_INTERVALS:
+        raise ValueError("alpha_max_root_id_invalid")
+    if root_kind not in {"raw", "feature"}:
+        raise ValueError("alpha_max_root_kind_invalid")
+    if exchange != "binance":
+        raise ValueError("alpha_max_root_exchange_invalid")
+    canonical = _require_explicit_canonical_path(root_path, field="alpha_max_root_path")
+    root = Path(canonical)
+    if not root.is_dir():
+        raise ValueError("alpha_max_root_not_directory")
+
+    entries: list[AlphaMaxTreeEntry] = []
+    for directory, directory_names, file_names in os.walk(root, followlinks=False):
+        current = Path(directory)
+        for name in sorted(directory_names):
+            child = current / name
+            child_stat = child.lstat()
+            if stat.S_ISLNK(child_stat.st_mode):
+                raise ValueError("alpha_max_root_symlink_rejected")
+            if not stat.S_ISDIR(child_stat.st_mode):
+                raise ValueError("alpha_max_root_entry_type_rejected")
+            resolved = child.resolve(strict=True)
+            if root not in resolved.parents:
+                raise ValueError("alpha_max_root_path_escape")
+        for name in sorted(file_names):
+            child = current / name
+            child_stat = child.lstat()
+            if stat.S_ISLNK(child_stat.st_mode):
+                raise ValueError("alpha_max_root_symlink_rejected")
+            if not stat.S_ISREG(child_stat.st_mode):
+                raise ValueError("alpha_max_root_entry_type_rejected")
+            relative = child.relative_to(root).as_posix()
+            file_sha256, sealed_stat = _alpha_max_stream_regular_file(child)
+            entries.append(
+                AlphaMaxTreeEntry(
+                    relative_path=relative,
+                    byte_count=int(sealed_stat.st_size),
+                    mode=stat.S_IMODE(sealed_stat.st_mode),
+                    mtime_ns=int(sealed_stat.st_mtime_ns),
+                    sha256=file_sha256,
+                )
+            )
+    ordered = tuple(sorted(entries, key=lambda entry: entry.relative_path))
+    if not ordered:
+        raise ValueError("alpha_max_root_inventory_empty")
+    inventory_payload = [
+        {
+            "byte_count": entry.byte_count,
+            "mode": entry.mode,
+            "mtime_ns": entry.mtime_ns,
+            "relative_path": entry.relative_path,
+        }
+        for entry in ordered
+    ]
+    content_payload = [
+        {
+            "byte_count": entry.byte_count,
+            "relative_path": entry.relative_path,
+            "sha256": entry.sha256,
+        }
+        for entry in ordered
+    ]
+    inventory_sha256 = _sha256_bytes(_canonical_json_bytes(inventory_payload, newline=True))
+    content_sha256 = _sha256_bytes(_canonical_json_bytes(content_payload, newline=True))
+    start, end = _ROOT_INTERVALS[root_id]
+    payload = {
+        "artifact_kind": "alpha_max_root_seal.v1",
+        "content_sha256": content_sha256,
+        "end_utc": end.isoformat().replace("+00:00", "Z"),
+        "entries": [entry.to_payload() for entry in ordered],
+        "exchange": exchange,
+        "file_count": len(ordered),
+        "inventory_sha256": inventory_sha256,
+        "path": canonical,
+        "root_id": root_id,
+        "root_kind": root_kind,
+        "start_utc": start.isoformat().replace("+00:00", "Z"),
+    }
+    canonical_bytes = _canonical_json_bytes(payload, newline=True)
+    return AlphaMaxRootSeal(
+        root_id=root_id,
+        root_kind=root_kind,
+        path=canonical,
+        exchange=exchange,
+        start_utc=start,
+        end_utc=end,
+        entries=ordered,
+        inventory_sha256=inventory_sha256,
+        content_sha256=content_sha256,
+        canonical_bytes=canonical_bytes,
+        sha256=_sha256_bytes(canonical_bytes),
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class AlphaMaxContractRecord:
+    symbol: str
+    market_type: str
+    linear: bool
+    inverse: bool
+    quote_asset: str
+    margin_asset: str
+    settle_asset: str
+    volume_unit: str
+    contract_multiplier: float
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "contract_multiplier": self.contract_multiplier,
+            "inverse": self.inverse,
+            "linear": self.linear,
+            "margin_asset": self.margin_asset,
+            "market_type": self.market_type,
+            "quote_asset": self.quote_asset,
+            "settle_asset": self.settle_asset,
+            "symbol": self.symbol,
+            "volume_unit": self.volume_unit,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class AlphaMaxContractManifestSeal:
+    path: str
+    records: tuple[AlphaMaxContractRecord, ...]
+    byte_count: int
+    canonical_bytes: bytes
+    sha256: str
+
+    def to_payload(self) -> dict[str, Any]:
+        return json.loads(self.canonical_bytes)
+
+
+def _alpha_max_expected_contract_record(symbol: str) -> AlphaMaxContractRecord:
+    return AlphaMaxContractRecord(
+        symbol=symbol,
+        market_type="perpetual",
+        linear=True,
+        inverse=False,
+        quote_asset="USDT",
+        margin_asset="USDT",
+        settle_asset="USDT",
+        volume_unit="base_asset",
+        contract_multiplier=1.0,
+    )
+
+
+def seal_alpha_max_contract_manifest(
+    path: str | os.PathLike[str],
+    *,
+    expected_sha256: str | None = None,
+) -> AlphaMaxContractManifestSeal:
+    """Read once and validate the sole exact ten-contract metadata assertion."""
+    receipt, raw = read_artifact_bytes(path, artifact_id="alpha_max_contract_manifest")
+    payload = _alpha_max_strict_json_object(raw, field="contract_manifest")
+    canonical = _canonical_json_bytes(payload, newline=True)
+    if raw != canonical:
+        raise ValueError("alpha_max_contract_manifest_not_canonical")
+    expected_records = tuple(
+        _alpha_max_expected_contract_record(symbol) for symbol in ALPHA_MAX_CANDIDATE_SYMBOLS
+    )
+    expected = {
+        "exchange": "binance",
+        "records": [record.to_payload() for record in expected_records],
+        "schema_version": "alpha_max_contract_manifest.v1",
+    }
+    if payload != expected:
+        raise ValueError("alpha_max_contract_manifest_mismatch")
+    if expected_sha256 is not None and receipt.sha256 != _require_sha256(
+        expected_sha256,
+        field="alpha_max_contract_manifest_expected_sha256",
+    ):
+        raise ValueError("alpha_max_contract_manifest_sha256_mismatch")
+    return AlphaMaxContractManifestSeal(
+        path=receipt.canonical_path,
+        records=expected_records,
+        byte_count=receipt.byte_count,
+        canonical_bytes=canonical,
+        sha256=receipt.sha256,
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class AlphaMaxRawObservation:
+    """One exact train-owned raw observation used by the admission computation."""
+
+    timestamp: datetime
+    close: float
+    volume: float
+
+    def __post_init__(self) -> None:
+        timestamp = _utc(self.timestamp, field="admission_observation_timestamp")
+        train_start, train_end = _ROOT_INTERVALS["train"]
+        if not train_start <= timestamp < train_end:
+            raise ValueError("alpha_max_admission_observation_outside_train")
+        close = _alpha_max_finite_number(
+            self.close,
+            field="admission_observation_close",
+            positive=True,
+        )
+        volume = _alpha_max_finite_number(
+            self.volume,
+            field="admission_observation_volume",
+            nonnegative=True,
+        )
+        object.__setattr__(self, "timestamp", timestamp)
+        object.__setattr__(self, "close", close)
+        object.__setattr__(self, "volume", volume)
+
+
+@dataclass(frozen=True, slots=True)
+class AlphaMaxAdmissionCandidateInput:
+    symbol: str
+    train_observations: tuple[AlphaMaxRawObservation, ...]
+    consecutive_completed_daily_bars_before_train: int
+    causal_funding_coverage_complete: bool
+    unresolved_daily_cross_section_count: int
+    partition_integrity_complete: bool = True
+
+    def __post_init__(self) -> None:
+        if self.symbol not in ALPHA_MAX_CANDIDATE_SYMBOLS:
+            raise ValueError("alpha_max_admission_input_symbol_invalid")
+        if type(self.train_observations) is not tuple or any(
+            type(value) is not AlphaMaxRawObservation for value in self.train_observations
+        ):
+            raise TypeError("alpha_max_admission_observations_must_be_exact_tuple")
+        _admission_nonnegative_int(
+            self.consecutive_completed_daily_bars_before_train,
+            field="consecutive_completed_daily_bars_before_train",
+        )
+        _admission_nonnegative_int(
+            self.unresolved_daily_cross_section_count,
+            field="unresolved_daily_cross_section_count",
+        )
+        if (
+            type(self.causal_funding_coverage_complete) is not bool
+            or type(self.partition_integrity_complete) is not bool
+        ):
+            raise TypeError("alpha_max_admission_input_coverage_must_be_bool")
+
+
+@dataclass(frozen=True, slots=True)
+class AlphaMaxDailyQuoteNotional:
+    day: date
+    quote_notional_usdt: float
+    completed_4h_bucket_hours: tuple[int, ...]
+
+    def __post_init__(self) -> None:
+        if type(self.day) is not date:
+            raise TypeError("alpha_max_daily_quote_notional_day_invalid")
+        value = _alpha_max_finite_number(
+            self.quote_notional_usdt,
+            field="daily_quote_notional_usdt",
+            nonnegative=True,
+        )
+        object.__setattr__(self, "quote_notional_usdt", value)
+        if type(self.completed_4h_bucket_hours) is not tuple or any(
+            type(hour) is not int for hour in self.completed_4h_bucket_hours
+        ):
+            raise TypeError("alpha_max_daily_quote_notional_buckets_invalid")
+        if self.completed_4h_bucket_hours != tuple(sorted(set(self.completed_4h_bucket_hours))):
+            raise ValueError("alpha_max_daily_quote_notional_buckets_invalid")
+        if any(hour not in {0, 4, 8, 12, 16, 20} for hour in self.completed_4h_bucket_hours):
+            raise ValueError("alpha_max_daily_quote_notional_buckets_invalid")
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "completed_4h_bucket_hours": list(self.completed_4h_bucket_hours),
+            "day": self.day.isoformat(),
+            "quote_notional_usdt": self.quote_notional_usdt,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class AlphaMaxAdmissionComputation:
+    artifact: AlphaMaxAdmissionArtifact
+    daily_quote_notional_by_symbol: Mapping[str, tuple[AlphaMaxDailyQuoteNotional, ...]]
+    daily_quote_notional_sha256_by_symbol: Mapping[str, str]
+    canonical_bytes: bytes
+    sha256: str
+
+    def to_payload(self) -> dict[str, Any]:
+        return json.loads(self.canonical_bytes)
+
+
+def compute_alpha_max_train_admission(
+    inputs: Mapping[str, AlphaMaxAdmissionCandidateInput],
+    *,
+    input_root_hashes: Mapping[str, str],
+    candidate_symbols: Sequence[str] = ALPHA_MAX_CANDIDATE_SYMBOLS,
+) -> AlphaMaxAdmissionComputation:
+    """Compute the actual 517-day base-volume quote-notional admission evidence."""
+    if tuple(candidate_symbols) != ALPHA_MAX_CANDIDATE_SYMBOLS:
+        raise ValueError("alpha_max_candidate_symbols_mismatch")
+    if type(inputs) is not dict or tuple(sorted(inputs)) != ALPHA_MAX_CANDIDATE_SYMBOLS:
+        raise ValueError("alpha_max_admission_input_coverage_mismatch")
+    if type(input_root_hashes) is not dict or set(input_root_hashes) != set(
+        _ADMISSION_INPUT_ROOT_IDS
+    ):
+        raise ValueError("alpha_max_admission_input_roots_not_warmup_train")
+    normalized_root_hashes = {
+        root_id: _require_sha256(
+            input_root_hashes[root_id],
+            field=f"alpha_max_admission_{root_id}_root_sha256",
+        )
+        for root_id in _ADMISSION_INPUT_ROOT_IDS
+    }
+    expected_days = tuple(
+        (_ROOT_INTERVALS["train"][0] + timedelta(days=index)).date()
+        for index in range(_ADMISSION_DAILY_QUOTE_NOTIONAL_DAYS)
+    )
+    expected_day_set = set(expected_days)
+    expected_buckets = frozenset({0, 4, 8, 12, 16, 20})
+    vectors: dict[str, tuple[AlphaMaxDailyQuoteNotional, ...]] = {}
+    vector_hashes: dict[str, str] = {}
+    per_candidate: dict[str, Any] = {}
+    admitted: list[str] = []
+
+    for symbol in ALPHA_MAX_CANDIDATE_SYMBOLS:
+        candidate = inputs[symbol]
+        if type(candidate) is not AlphaMaxAdmissionCandidateInput or candidate.symbol != symbol:
+            raise ValueError("alpha_max_admission_input_identity_mismatch")
+        observations = candidate.train_observations
+        timestamps = tuple(value.timestamp for value in observations)
+        monotone_unique = all(left < right for left, right in pairwise(timestamps))
+        if observations and not monotone_unique:
+            raise ValueError("alpha_max_admission_observations_not_strictly_increasing")
+        day_products: dict[date, list[float]] = {}
+        day_buckets: dict[date, set[int]] = {}
+        for observation in observations:
+            current_day = observation.timestamp.date()
+            product = float(np.float64(observation.close) * np.float64(observation.volume))
+            if not math.isfinite(product) or product < 0.0:
+                raise ValueError("alpha_max_admission_quote_notional_nonfinite")
+            day_products.setdefault(current_day, []).append(product)
+            day_buckets.setdefault(current_day, set()).add((observation.timestamp.hour // 4) * 4)
+        if any(current_day not in expected_day_set for current_day in day_products):
+            raise ValueError("alpha_max_admission_observation_outside_train")
+        daily_rows = tuple(
+            AlphaMaxDailyQuoteNotional(
+                day=current_day,
+                quote_notional_usdt=math.fsum(day_products[current_day]),
+                completed_4h_bucket_hours=tuple(sorted(day_buckets[current_day])),
+            )
+            for current_day in sorted(day_products)
+        )
+        vectors[symbol] = daily_rows
+        vector_payload = [value.to_payload() for value in daily_rows]
+        vector_hashes[symbol] = _sha256_bytes(_canonical_json_bytes(vector_payload, newline=True))
+        quote_values = tuple(value.quote_notional_usdt for value in daily_rows)
+        median = alpha_max_type7_quantile(quote_values, 0.50) if quote_values else 0.0
+        p10 = alpha_max_type7_quantile(quote_values, 0.10) if quote_values else 0.0
+        complete_daily = tuple(value.day for value in daily_rows) == expected_days
+        complete_4h = complete_daily and all(
+            set(value.completed_4h_bucket_hours) == expected_buckets for value in daily_rows
+        )
+        statistics = {
+            "daily_quote_notional_day_count": len(daily_rows),
+            "median_quote_notional_usdt": median,
+            "p10_quote_notional_usdt": p10,
+            "consecutive_completed_daily_bars_before_train": (
+                candidate.consecutive_completed_daily_bars_before_train
+            ),
+            "readable_monotone_unique_finite_partitions": (
+                candidate.partition_integrity_complete and (not observations or monotone_unique)
+            ),
+            "complete_train_daily_keys": complete_daily,
+            "complete_train_4h_keys": complete_4h,
+            "causal_funding_coverage_complete": candidate.causal_funding_coverage_complete,
+            "unresolved_daily_cross_section_count": (
+                candidate.unresolved_daily_cross_section_count
+            ),
+        }
+        reasons = _expected_admission_reasons(statistics)
+        is_admitted = not reasons
+        if is_admitted:
+            admitted.append(symbol)
+        per_candidate[symbol] = {
+            "admitted": is_admitted,
+            "reasons": list(reasons),
+            "statistics": statistics,
+        }
+
+    if len(admitted) < 5:
+        raise ValueError("alpha_max_insufficient_train_universe")
+    admitted_tuple = tuple(admitted)
+    payload = {
+        "artifact_kind": "alpha_max_train_admission.v1",
+        "phase": "train_admission",
+        "selection_inputs": ["warmup", "train"],
+        "input_root_hashes": normalized_root_hashes,
+        "candidate_symbols": list(ALPHA_MAX_CANDIDATE_SYMBOLS),
+        "candidate_symbols_sha256": _symbol_sequence_sha256(ALPHA_MAX_CANDIDATE_SYMBOLS),
+        "admitted_symbols": list(admitted_tuple),
+        "admitted_symbols_sha256": _symbol_sequence_sha256(admitted_tuple),
+        "per_candidate": per_candidate,
+    }
+    artifact = validate_alpha_max_admission_artifact(payload)
+    computation_payload = {
+        "artifact_kind": "alpha_max_train_admission_computation.v1",
+        "admission_artifact_sha256": artifact.sha256,
+        "daily_quote_notional_by_symbol": {
+            symbol: [value.to_payload() for value in vectors[symbol]]
+            for symbol in ALPHA_MAX_CANDIDATE_SYMBOLS
+        },
+        "daily_quote_notional_sha256_by_symbol": vector_hashes,
+        "input_root_hashes": normalized_root_hashes,
+    }
+    canonical = _canonical_json_bytes(computation_payload, newline=True)
+    return AlphaMaxAdmissionComputation(
+        artifact=artifact,
+        daily_quote_notional_by_symbol=MappingProxyType(vectors),
+        daily_quote_notional_sha256_by_symbol=MappingProxyType(vector_hashes),
+        canonical_bytes=canonical,
+        sha256=_sha256_bytes(canonical),
+    )
+
+
+def _alpha_max_nonempty_token(value: Any, *, field: str) -> str:
+    if type(value) is not str or not value or value != value.strip() or "\0" in value:
+        raise ValueError(f"alpha_max_{field}_invalid")
+    return value
+
+
+@dataclass(frozen=True, slots=True)
+class AlphaMaxCapsuleReceipt:
+    row_id: str
+    phase: str
+    prefix_id: str
+    path: str
+    sha256: str
+    byte_count: int
+
+    def __post_init__(self) -> None:
+        _alpha_max_nonempty_token(self.row_id, field="capsule_row_id")
+        _alpha_max_nonempty_token(self.phase, field="capsule_phase")
+        _alpha_max_nonempty_token(self.prefix_id, field="capsule_prefix_id")
+        object.__setattr__(
+            self,
+            "path",
+            _require_explicit_canonical_path(self.path, field="alpha_max_capsule_path"),
+        )
+        object.__setattr__(
+            self,
+            "sha256",
+            _require_sha256(self.sha256, field="alpha_max_capsule_sha256"),
+        )
+        if type(self.byte_count) is not int or self.byte_count <= 0:
+            raise ValueError("alpha_max_capsule_byte_count_invalid")
+
+    @classmethod
+    def from_path(
+        cls,
+        path: str | os.PathLike[str],
+        *,
+        row_id: str,
+        phase: str,
+        prefix_id: str,
+    ) -> AlphaMaxCapsuleReceipt:
+        receipt, _ = read_artifact_bytes(path, artifact_id="alpha_max_indicator_capsule")
+        return cls(
+            row_id=row_id,
+            phase=phase,
+            prefix_id=prefix_id,
+            path=receipt.canonical_path,
+            sha256=receipt.sha256,
+            byte_count=receipt.byte_count,
+        )
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "byte_count": self.byte_count,
+            "path": self.path,
+            "phase": self.phase,
+            "prefix_id": self.prefix_id,
+            "row_id": self.row_id,
+            "sha256": self.sha256,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class AlphaMaxManifestReceipt:
+    row_id: str
+    phase: str
+    path: str
+    sha256: str
+    byte_count: int
+
+    def __post_init__(self) -> None:
+        _alpha_max_nonempty_token(self.row_id, field="manifest_receipt_row_id")
+        if self.phase not in _MANIFEST_PHASES:
+            raise ValueError("alpha_max_manifest_receipt_phase_invalid")
+        object.__setattr__(
+            self,
+            "path",
+            _require_explicit_canonical_path(
+                self.path,
+                field="alpha_max_manifest_receipt_path",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "sha256",
+            _require_sha256(self.sha256, field="alpha_max_manifest_receipt_sha256"),
+        )
+        if type(self.byte_count) is not int or self.byte_count <= 0:
+            raise ValueError("alpha_max_manifest_receipt_byte_count_invalid")
+
+    @classmethod
+    def from_materialization(
+        cls,
+        materialization: AlphaMaxManifestMaterialization,
+        *,
+        phase: str,
+    ) -> AlphaMaxManifestReceipt:
+        if type(materialization) is not AlphaMaxManifestMaterialization:
+            raise TypeError("alpha_max_manifest_materialization_identity_invalid")
+        payload = materialization.payload
+        children = payload.get("children")
+        if type(children) is not list or not children:
+            raise ValueError("alpha_max_manifest_receipt_children_invalid")
+        row_ids = {str(child.get("candidate_id") or "") for child in children}
+        row_id = Path(materialization.path).stem
+        if not row_id or any(not value for value in row_ids):
+            raise ValueError("alpha_max_manifest_receipt_row_id_invalid")
+        receipt, _ = read_artifact_bytes(
+            materialization.path,
+            artifact_id="alpha_max_engine_portfolio_manifest",
+        )
+        if receipt.sha256 != materialization.sha256:
+            raise ValueError("alpha_max_manifest_receipt_sha256_mismatch")
+        return cls(
+            row_id=row_id,
+            phase=phase,
+            path=receipt.canonical_path,
+            sha256=receipt.sha256,
+            byte_count=receipt.byte_count,
+        )
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "byte_count": self.byte_count,
+            "path": self.path,
+            "phase": self.phase,
+            "row_id": self.row_id,
+            "sha256": self.sha256,
+        }
+
+
+def _alpha_max_funding_row_payload(row: AlphaMaxFundingBoundaryLedgerRow) -> dict[str, Any]:
+    if type(row) is not AlphaMaxFundingBoundaryLedgerRow or row.payment is None:
+        raise ValueError("alpha_max_funding_reconciliation_row_invalid")
+    numeric = (
+        row.qty,
+        row.rate,
+        row.price,
+        row.payment,
+    )
+    if any(type(value) is not float or not math.isfinite(value) for value in numeric):
+        raise ValueError("alpha_max_funding_reconciliation_row_invalid")
+    return {
+        "boundary_ms": row.boundary_ms,
+        "payment": row.payment,
+        "price": row.price,
+        "price_close_timestamp_ms": row.price_close_timestamp_ms,
+        "price_row_timestamp_ms": row.price_row_timestamp_ms,
+        "qty": row.qty,
+        "rate": row.rate,
+        "rate_source_timestamp_ms": row.rate_source_timestamp_ms,
+        "symbol": row.symbol,
+    }
+
+
+@dataclass(frozen=True, slots=True)
+class AlphaMaxReconciliationEvidence:
+    pricing_trace_count: int
+    application_count: int
+    no_fill_attempt_count: int
+    zero_applied_application_count: int
+    pricing_trace_hashes: tuple[str, ...]
+    application_trace_hashes: tuple[str, ...]
+    model_commission_total: float
+    applied_commission_total: float
+    portfolio_fee_total: float
+    funding_payment_total: float
+    portfolio_funding_total: float
+    liquidation_cost_total: float
+    portfolio_liquidation_total: float
+    pricing_application_bijection: bool
+    no_fill_excluded_from_bijection: bool
+    fee_reconciled: bool
+    funding_reconciled: bool
+    liquidation_reconciled: bool
+    complete: bool
+    canonical_bytes: bytes
+    sha256: str
+
+    def to_payload(self) -> dict[str, Any]:
+        return json.loads(self.canonical_bytes)
+
+
+def reconcile_alpha_max_cost_attribution(
+    pricing_traces: Sequence[ExecutionPricingTrace],
+    applications: Sequence[FillApplicationAttribution],
+    no_fill_attempts: Sequence[NoFillAttempt],
+    funding_ledger: Sequence[AlphaMaxFundingBoundaryLedgerRow],
+    *,
+    portfolio_fee_total: float,
+    portfolio_funding_total: float,
+    liquidation_cost_total: float = 0.0,
+    portfolio_liquidation_total: float = 0.0,
+) -> AlphaMaxReconciliationEvidence:
+    """Prove the positive-trace/application bijection and each separate cost layer."""
+    traces = tuple(pricing_traces)
+    application_rows = tuple(applications)
+    no_fills = tuple(no_fill_attempts)
+    funding_rows = tuple(funding_ledger)
+    if any(type(value) is not ExecutionPricingTrace for value in traces):
+        raise TypeError("alpha_max_pricing_trace_identity_invalid")
+    if any(type(value) is not FillApplicationAttribution for value in application_rows):
+        raise TypeError("alpha_max_application_identity_invalid")
+    if any(type(value) is not NoFillAttempt for value in no_fills):
+        raise TypeError("alpha_max_no_fill_identity_invalid")
+    trace_payloads = tuple(value.to_payload() for value in traces)
+    application_payloads = tuple(value.to_payload() for value in application_rows)
+    no_fill_payloads = tuple(value.to_payload() for value in no_fills)
+    funding_payloads = tuple(_alpha_max_funding_row_payload(value) for value in funding_rows)
+    funding_keys = tuple((value.boundary_ms, value.symbol) for value in funding_rows)
+    if len(funding_keys) != len(set(funding_keys)) or funding_keys != tuple(sorted(funding_keys)):
+        raise ValueError("alpha_max_funding_reconciliation_ledger_order")
+    trace_id_counts = Counter(id(value) for value in traces)
+    application_trace_id_counts = Counter(id(value.pricing_trace) for value in application_rows)
+    if (
+        any(count != 1 for count in trace_id_counts.values())
+        or any(count != 1 for count in application_trace_id_counts.values())
+        or trace_id_counts != application_trace_id_counts
+    ):
+        raise ValueError("alpha_max_pricing_application_bijection")
+    trace_hashes = tuple(execution_pricing_trace_sha256(value) for value in traces)
+    application_hashes = tuple(value.pricing_trace_hash for value in application_rows)
+    if Counter(trace_hashes) != Counter(application_hashes):
+        raise ValueError("alpha_max_pricing_application_bijection")
+    if any(value.executed_qty != 0.0 for value in no_fills):
+        raise ValueError("alpha_max_no_fill_exclusion_invalid")
+
+    model_commission_total = math.fsum(value.commission for value in traces)
+    applied_commission_total = math.fsum(value.applied_commission for value in application_rows)
+    fee_total = _alpha_max_finite_number(
+        portfolio_fee_total,
+        field="portfolio_fee_total",
+        nonnegative=True,
+    )
+    funding_total = _alpha_max_finite_number(
+        portfolio_funding_total,
+        field="portfolio_funding_total",
+    )
+    liquidation_total = _alpha_max_finite_number(
+        liquidation_cost_total,
+        field="liquidation_cost_total",
+        nonnegative=True,
+    )
+    portfolio_liquidation = _alpha_max_finite_number(
+        portfolio_liquidation_total,
+        field="portfolio_liquidation_total",
+        nonnegative=True,
+    )
+    funding_payment_total = math.fsum(float(value.payment) for value in funding_rows)
+    fee_reconciled = math.isclose(
+        applied_commission_total,
+        fee_total,
+        rel_tol=0.0,
+        abs_tol=1e-12,
+    )
+    funding_reconciled = math.isclose(
+        funding_payment_total,
+        funding_total,
+        rel_tol=0.0,
+        abs_tol=1e-12,
+    )
+    liquidation_reconciled = math.isclose(
+        liquidation_total,
+        portfolio_liquidation,
+        rel_tol=0.0,
+        abs_tol=1e-12,
+    )
+    if not fee_reconciled:
+        raise ValueError("alpha_max_fee_reconciliation")
+    if not funding_reconciled:
+        raise ValueError("alpha_max_funding_reconciliation")
+    if not liquidation_reconciled:
+        raise ValueError("alpha_max_liquidation_reconciliation")
+    payload = {
+        "application_count": len(application_rows),
+        "application_trace_hashes": list(application_hashes),
+        "applications": list(application_payloads),
+        "applied_commission_total": applied_commission_total,
+        "artifact_kind": "alpha_max_cost_reconciliation.v1",
+        "complete": True,
+        "fee_reconciled": fee_reconciled,
+        "funding_ledger": list(funding_payloads),
+        "funding_payment_total": funding_payment_total,
+        "funding_reconciled": funding_reconciled,
+        "liquidation_cost_total": liquidation_total,
+        "liquidation_reconciled": liquidation_reconciled,
+        "model_commission_total": model_commission_total,
+        "no_fill_attempt_count": len(no_fills),
+        "no_fill_attempts": list(no_fill_payloads),
+        "no_fill_excluded_from_bijection": True,
+        "portfolio_fee_total": fee_total,
+        "portfolio_funding_total": funding_total,
+        "portfolio_liquidation_total": portfolio_liquidation,
+        "pricing_application_bijection": True,
+        "pricing_trace_count": len(traces),
+        "pricing_trace_hashes": list(trace_hashes),
+        "pricing_traces": list(trace_payloads),
+        "zero_applied_application_count": sum(
+            value.application_status == "rejected" for value in application_rows
+        ),
+    }
+    canonical = _canonical_json_bytes(payload, newline=True)
+    return AlphaMaxReconciliationEvidence(
+        pricing_trace_count=len(traces),
+        application_count=len(application_rows),
+        no_fill_attempt_count=len(no_fills),
+        zero_applied_application_count=payload["zero_applied_application_count"],
+        pricing_trace_hashes=trace_hashes,
+        application_trace_hashes=application_hashes,
+        model_commission_total=model_commission_total,
+        applied_commission_total=applied_commission_total,
+        portfolio_fee_total=fee_total,
+        funding_payment_total=funding_payment_total,
+        portfolio_funding_total=funding_total,
+        liquidation_cost_total=liquidation_total,
+        portfolio_liquidation_total=portfolio_liquidation,
+        pricing_application_bijection=True,
+        no_fill_excluded_from_bijection=True,
+        fee_reconciled=True,
+        funding_reconciled=True,
+        liquidation_reconciled=True,
+        complete=True,
+        canonical_bytes=canonical,
+        sha256=_sha256_bytes(canonical),
+    )
+
+
+_ALPHA_MAX_COMPARISON_ROLES: Final[frozenset[str]] = frozenset(
+    {"prelock_selection", "historical_report"}
+)
+_ALPHA_MAX_EARLY_GATE_ORDER: Final[tuple[str, ...]] = (
+    "dsr",
+    "spa",
+    "pbo",
+    "positive_metrics",
+    "native_data_coverage",
+    "hash_validity",
+    "funding_coverage",
+    "manifest_validity",
+    "reconciliation",
+    "ruin",
+)
+
+
+@dataclass(frozen=True, slots=True)
+class AlphaMaxGateInput:
+    """Nominal-30-bps matched-domain input to the sole fixed gate pipeline."""
+
+    row_id: str
+    comparison_role: str
+    evidence_tier: str
+    comparison_valid: bool
+    nominal_cost_bps: int
+    cumulative_return: float
+    cagr: float
+    calmar: float
+    net_sharpe: float
+    full_event_mdd: float
+    reporting_4h_mdd: float
+    dsr: float
+    spa_pvalue: float
+    pbo: float
+    native_data_coverage_complete: bool
+    funding_coverage_complete: bool
+    hash_valid: bool
+    manifest_valid: bool
+    reconciliation_complete: bool
+    ruin: bool
+    raw_root_set_sha256: str
+    feature_root_set_sha256: str
+    universe_sha256: str
+    calendar_sha256: str
+    seed_schedule_sha256: str
+
+    def __post_init__(self) -> None:
+        _alpha_max_nonempty_token(self.row_id, field="gate_row_id")
+        if self.comparison_role not in _ALPHA_MAX_COMPARISON_ROLES:
+            raise ValueError("alpha_max_gate_comparison_role_invalid")
+        if self.evidence_tier not in {"actual_engine", "diagnostic", "identity"}:
+            raise ValueError("alpha_max_gate_evidence_tier_invalid")
+        boolean_fields = (
+            "comparison_valid",
+            "native_data_coverage_complete",
+            "funding_coverage_complete",
+            "hash_valid",
+            "manifest_valid",
+            "reconciliation_complete",
+            "ruin",
+        )
+        if any(type(getattr(self, field)) is not bool for field in boolean_fields):
+            raise TypeError("alpha_max_gate_boolean_invalid")
+        if self.comparison_valid and self.evidence_tier != "actual_engine":
+            raise ValueError("alpha_max_gate_nonengine_selection_forbidden")
+        if type(self.nominal_cost_bps) is not int or self.nominal_cost_bps != 30:
+            raise ValueError("alpha_max_gate_not_nominal_30_bps")
+        for field in (
+            "cumulative_return",
+            "cagr",
+            "calmar",
+            "net_sharpe",
+            "full_event_mdd",
+            "reporting_4h_mdd",
+            "dsr",
+            "spa_pvalue",
+            "pbo",
+        ):
+            value = _alpha_max_finite_number(getattr(self, field), field=f"gate_{field}")
+            if field in {"full_event_mdd", "reporting_4h_mdd"} and not 0.0 <= value <= 1.0:
+                raise ValueError(f"alpha_max_gate_{field}_invalid")
+            object.__setattr__(self, field, value)
+        for field in ("dsr", "spa_pvalue", "pbo"):
+            if not 0.0 <= getattr(self, field) <= 1.0:
+                raise ValueError(f"alpha_max_gate_{field}_invalid")
+        for field in (
+            "raw_root_set_sha256",
+            "feature_root_set_sha256",
+            "universe_sha256",
+            "calendar_sha256",
+            "seed_schedule_sha256",
+        ):
+            object.__setattr__(
+                self,
+                field,
+                _require_sha256(getattr(self, field), field=f"alpha_max_gate_{field}"),
+            )
+
+    @property
+    def gate_mdd(self) -> float:
+        return max(self.full_event_mdd, self.reporting_4h_mdd)
+
+    @property
+    def rank_key(self) -> tuple[float, float, float, float, float, str]:
+        return (
+            -self.cumulative_return,
+            -self.cagr,
+            -self.calmar,
+            -self.net_sharpe,
+            self.gate_mdd,
+            self.row_id,
+        )
+
+    @property
+    def comparison_domain(self) -> tuple[Any, ...]:
+        return (
+            self.comparison_role,
+            self.nominal_cost_bps,
+            self.raw_root_set_sha256,
+            self.feature_root_set_sha256,
+            self.universe_sha256,
+            self.calendar_sha256,
+            self.seed_schedule_sha256,
+        )
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "calendar_sha256": self.calendar_sha256,
+            "cagr": self.cagr,
+            "calmar": self.calmar,
+            "comparison_role": self.comparison_role,
+            "comparison_valid": self.comparison_valid,
+            "cumulative_return": self.cumulative_return,
+            "dsr": self.dsr,
+            "evidence_tier": self.evidence_tier,
+            "feature_root_set_sha256": self.feature_root_set_sha256,
+            "full_event_mdd": self.full_event_mdd,
+            "funding_coverage_complete": self.funding_coverage_complete,
+            "gate_mdd": self.gate_mdd,
+            "hash_valid": self.hash_valid,
+            "manifest_valid": self.manifest_valid,
+            "native_data_coverage_complete": self.native_data_coverage_complete,
+            "net_sharpe": self.net_sharpe,
+            "nominal_cost_bps": self.nominal_cost_bps,
+            "pbo": self.pbo,
+            "raw_root_set_sha256": self.raw_root_set_sha256,
+            "reconciliation_complete": self.reconciliation_complete,
+            "reporting_4h_mdd": self.reporting_4h_mdd,
+            "row_id": self.row_id,
+            "ruin": self.ruin,
+            "seed_schedule_sha256": self.seed_schedule_sha256,
+            "spa_pvalue": self.spa_pvalue,
+            "universe_sha256": self.universe_sha256,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class AlphaMaxGateDecision:
+    row_id: str
+    eligible: bool
+    evaluated_gates: tuple[str, ...]
+    rejection_reasons: tuple[str, ...]
+    gate_mdd: float
+    mdd_band: str
+    comparator_row_id: str | None
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "comparator_row_id": self.comparator_row_id,
+            "eligible": self.eligible,
+            "evaluated_gates": list(self.evaluated_gates),
+            "gate_mdd": self.gate_mdd,
+            "mdd_band": self.mdd_band,
+            "rejection_reasons": list(self.rejection_reasons),
+            "row_id": self.row_id,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class AlphaMaxSelectionResult:
+    role: str
+    decisions: tuple[AlphaMaxGateDecision, ...]
+    ranked_candidate_ids: tuple[str, ...]
+    prelock_champion: str | None
+    selected_candidate_id: str | None
+    historical_evaluation_leader: str | None
+    canonical_bytes: bytes
+    sha256: str
+
+    def to_payload(self) -> dict[str, Any]:
+        return json.loads(self.canonical_bytes)
+
+
+def _alpha_max_early_gate_failure(candidate: AlphaMaxGateInput) -> tuple[str, str] | None:
+    if candidate.dsr < 0.90:
+        return "dsr", "dsr_below_threshold"
+    if candidate.spa_pvalue > 0.05:
+        return "spa", "spa_above_threshold"
+    if candidate.pbo > 0.50:
+        return "pbo", "pbo_above_threshold"
+    for field in ("cumulative_return", "cagr", "calmar", "net_sharpe"):
+        if getattr(candidate, field) <= 0.0:
+            return "positive_metrics", f"nonpositive_{field}"
+    if not candidate.native_data_coverage_complete:
+        return "native_data_coverage", "native_data_coverage_incomplete"
+    if not candidate.hash_valid:
+        return "hash_validity", "hash_validity_failed"
+    if not candidate.funding_coverage_complete:
+        return "funding_coverage", "funding_coverage_incomplete"
+    if not candidate.manifest_valid:
+        return "manifest_validity", "manifest_validity_failed"
+    if not candidate.reconciliation_complete:
+        return "reconciliation", "reconciliation_incomplete"
+    if candidate.ruin:
+        return "ruin", "ruin_detected"
+    return None
+
+
+def _alpha_max_gate_prefix(failed_gate: str | None) -> tuple[str, ...]:
+    if failed_gate is None:
+        return _ALPHA_MAX_EARLY_GATE_ORDER
+    index = _ALPHA_MAX_EARLY_GATE_ORDER.index(failed_gate)
+    return _ALPHA_MAX_EARLY_GATE_ORDER[: index + 1]
+
+
+def _alpha_max_select_gate_inputs(
+    candidates: Sequence[AlphaMaxGateInput],
+    *,
+    role: str,
+) -> AlphaMaxSelectionResult:
+    values = tuple(candidates)
+    if any(type(value) is not AlphaMaxGateInput for value in values):
+        raise TypeError("alpha_max_gate_input_identity_invalid")
+    if any(value.comparison_role != role for value in values):
+        raise ValueError("alpha_max_gate_role_mismatch")
+    row_ids = tuple(value.row_id for value in values)
+    if len(row_ids) != len(set(row_ids)):
+        raise ValueError("alpha_max_gate_duplicate_row_id")
+    valid = tuple(
+        value
+        for value in values
+        if value.comparison_valid and value.evidence_tier == "actual_engine"
+    )
+    if valid and any(value.comparison_domain != valid[0].comparison_domain for value in valid[1:]):
+        raise ValueError("alpha_max_comparison_domain_mismatch")
+
+    decisions: dict[str, AlphaMaxGateDecision] = {}
+    early_pass: list[AlphaMaxGateInput] = []
+    for candidate in sorted(values, key=lambda value: value.row_id):
+        if not candidate.comparison_valid or candidate.evidence_tier != "actual_engine":
+            decisions[candidate.row_id] = AlphaMaxGateDecision(
+                row_id=candidate.row_id,
+                eligible=False,
+                evaluated_gates=("evidence",),
+                rejection_reasons=("incomplete_engine_evidence",),
+                gate_mdd=candidate.gate_mdd,
+                mdd_band="not_evaluated",
+                comparator_row_id=None,
+            )
+            continue
+        failure = _alpha_max_early_gate_failure(candidate)
+        if failure is not None:
+            failed_gate, reason = failure
+            decisions[candidate.row_id] = AlphaMaxGateDecision(
+                row_id=candidate.row_id,
+                eligible=False,
+                evaluated_gates=_alpha_max_gate_prefix(failed_gate),
+                rejection_reasons=(reason,),
+                gate_mdd=candidate.gate_mdd,
+                mdd_band="not_evaluated",
+                comparator_row_id=None,
+            )
+            continue
+        early_pass.append(candidate)
+
+    normal = tuple(value for value in early_pass if value.gate_mdd <= 0.30)
+    best_normal = min(normal, key=lambda value: value.rank_key) if normal else None
+    eligible: list[AlphaMaxGateInput] = []
+    for candidate in early_pass:
+        evaluated = (*_ALPHA_MAX_EARLY_GATE_ORDER, "mdd")
+        if candidate.gate_mdd <= 0.30:
+            decision = AlphaMaxGateDecision(
+                row_id=candidate.row_id,
+                eligible=True,
+                evaluated_gates=evaluated,
+                rejection_reasons=(),
+                gate_mdd=candidate.gate_mdd,
+                mdd_band="normal",
+                comparator_row_id=None,
+            )
+            eligible.append(candidate)
+        elif candidate.gate_mdd > 0.35:
+            decision = AlphaMaxGateDecision(
+                row_id=candidate.row_id,
+                eligible=False,
+                evaluated_gates=evaluated,
+                rejection_reasons=("mdd_above_hard_limit",),
+                gate_mdd=candidate.gate_mdd,
+                mdd_band="hard_reject",
+                comparator_row_id=None,
+            )
+        elif best_normal is None:
+            decision = AlphaMaxGateDecision(
+                row_id=candidate.row_id,
+                eligible=False,
+                evaluated_gates=evaluated,
+                rejection_reasons=("soft_mdd_requires_normal_comparator",),
+                gate_mdd=candidate.gate_mdd,
+                mdd_band="soft",
+                comparator_row_id=None,
+            )
+        elif candidate.cagr > best_normal.cagr and candidate.calmar > best_normal.calmar:
+            decision = AlphaMaxGateDecision(
+                row_id=candidate.row_id,
+                eligible=True,
+                evaluated_gates=evaluated,
+                rejection_reasons=(),
+                gate_mdd=candidate.gate_mdd,
+                mdd_band="soft",
+                comparator_row_id=best_normal.row_id,
+            )
+            eligible.append(candidate)
+        else:
+            decision = AlphaMaxGateDecision(
+                row_id=candidate.row_id,
+                eligible=False,
+                evaluated_gates=evaluated,
+                rejection_reasons=("soft_mdd_not_strictly_superior_to_best_normal",),
+                gate_mdd=candidate.gate_mdd,
+                mdd_band="soft",
+                comparator_row_id=best_normal.row_id,
+            )
+        decisions[candidate.row_id] = decision
+
+    ranked = tuple(value.row_id for value in sorted(eligible, key=lambda value: value.rank_key))
+    leader = ranked[0] if ranked else None
+    prelock = leader if role == "prelock_selection" else None
+    historical = leader if role == "historical_report" else None
+    payload = {
+        "artifact_kind": (
+            "alpha_max_prelock_selection.v1"
+            if role == "prelock_selection"
+            else "alpha_max_historical_report_ranking.v1"
+        ),
+        "decisions": [decisions[key].to_payload() for key in sorted(decisions)],
+        "historical_evaluation_leader": historical,
+        "prelock_champion": prelock,
+        "ranked_candidate_ids": list(ranked),
+        "role": role,
+        "selected_candidate_id": prelock,
+    }
+    canonical = _canonical_json_bytes(payload, newline=True)
+    return AlphaMaxSelectionResult(
+        role=role,
+        decisions=tuple(decisions[key] for key in sorted(decisions)),
+        ranked_candidate_ids=ranked,
+        prelock_champion=prelock,
+        selected_candidate_id=prelock,
+        historical_evaluation_leader=historical,
+        canonical_bytes=canonical,
+        sha256=_sha256_bytes(canonical),
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class AlphaMaxCostCellEvidence:
+    """Immutable complete-engine or explicit unavailable status for one cost cell."""
+
+    row_id: str
+    domain: str
+    split_or_fold_id: str
+    nominal_cost_bps: int
+    status: str
+    evidence_tier: str
+    selection_valid: bool
+    seed: int
+    raw_root_receipts: tuple[AlphaMaxRootReceipt, ...] = ()
+    feature_root_receipts: tuple[AlphaMaxRootReceipt, ...] = ()
+    capsule_receipt: AlphaMaxCapsuleReceipt | None = None
+    manifest_receipt: AlphaMaxManifestReceipt | None = None
+    primary_return_stream: AlphaMaxPrimaryReturnStream | None = None
+    metric_statistics: AlphaMaxMetricStatistics | None = None
+    reconciliation: AlphaMaxReconciliationEvidence | None = None
+    gate_input: AlphaMaxGateInput | None = None
+    runtime_contract_sha256: str | None = None
+    config_sha256: str | None = None
+    coverage_sha256: str | None = None
+    exposure_sha256: str | None = None
+    ruin: bool | None = None
+
+    def __post_init__(self) -> None:
+        _alpha_max_nonempty_token(self.row_id, field="cost_cell_row_id")
+        _alpha_max_nonempty_token(self.split_or_fold_id, field="cost_cell_split_id")
+        _alpha_max_nonempty_token(self.status, field="cost_cell_status")
+        if self.domain not in {"validation", "historical_exposed_evaluation"}:
+            raise ValueError("alpha_max_cost_cell_domain_invalid")
+        if self.nominal_cost_bps not in _ALPHA_MAX_COST_CELLS:
+            raise ValueError("alpha_max_cost_cell_nominal_bps_invalid")
+        if self.evidence_tier not in {"actual_engine", "diagnostic", "identity"}:
+            raise ValueError("alpha_max_cost_cell_evidence_tier_invalid")
+        if type(self.selection_valid) is not bool:
+            raise TypeError("alpha_max_cost_cell_selection_valid_invalid")
+        expected_seed = alpha_max_common_rng_seed(self.split_or_fold_id, self.nominal_cost_bps)
+        if type(self.seed) is not int or self.seed != expected_seed:
+            raise ValueError("alpha_max_cost_cell_seed_mismatch")
+        if type(self.raw_root_receipts) is not tuple or any(
+            type(value) is not AlphaMaxRootReceipt for value in self.raw_root_receipts
+        ):
+            raise TypeError("alpha_max_cost_cell_raw_receipt_identity_invalid")
+        if type(self.feature_root_receipts) is not tuple or any(
+            type(value) is not AlphaMaxRootReceipt for value in self.feature_root_receipts
+        ):
+            raise TypeError("alpha_max_cost_cell_feature_receipt_identity_invalid")
+        if any(value.root_kind != "raw" for value in self.raw_root_receipts) or any(
+            value.root_kind != "feature" for value in self.feature_root_receipts
+        ):
+            raise ValueError("alpha_max_cost_cell_root_receipt_kind_mismatch")
+        complete = self.status == "complete"
+        if self.selection_valid and (not complete or self.evidence_tier != "actual_engine"):
+            raise ValueError("alpha_max_cost_cell_selection_evidence_invalid")
+        if complete and not self.selection_valid:
+            raise ValueError("alpha_max_cost_cell_selection_evidence_invalid")
+        required_objects = (
+            self.raw_root_receipts,
+            self.feature_root_receipts,
+            self.capsule_receipt,
+            self.manifest_receipt,
+            self.primary_return_stream,
+            self.metric_statistics,
+            self.reconciliation,
+        )
+        required_hashes = (
+            self.runtime_contract_sha256,
+            self.config_sha256,
+            self.coverage_sha256,
+            self.exposure_sha256,
+        )
+        if complete:
+            if self.evidence_tier != "actual_engine" or not all(required_objects):
+                raise ValueError("alpha_max_incomplete_engine_evidence")
+            if (
+                type(self.capsule_receipt) is not AlphaMaxCapsuleReceipt
+                or type(self.manifest_receipt) is not AlphaMaxManifestReceipt
+            ):
+                raise ValueError("alpha_max_incomplete_engine_evidence")
+            for field, value in zip(
+                (
+                    "runtime_contract_sha256",
+                    "config_sha256",
+                    "coverage_sha256",
+                    "exposure_sha256",
+                ),
+                required_hashes,
+                strict=True,
+            ):
+                _require_sha256(value, field=f"alpha_max_cost_cell_{field}")
+            if type(self.ruin) is not bool:
+                raise ValueError("alpha_max_incomplete_engine_evidence")
+            raw_ids = tuple(value.root_id for value in self.raw_root_receipts)
+            feature_ids = tuple(value.root_id for value in self.feature_root_receipts)
+            if raw_ids != feature_ids or len(raw_ids) != len(set(raw_ids)):
+                raise ValueError("alpha_max_cost_cell_root_domain_mismatch")
+            if (
+                self.capsule_receipt.row_id != self.row_id
+                or self.manifest_receipt.row_id != self.row_id
+            ):
+                raise ValueError("alpha_max_cost_cell_receipt_row_mismatch")
+            if type(self.reconciliation) is not AlphaMaxReconciliationEvidence or not (
+                self.reconciliation.complete
+            ):
+                raise ValueError("alpha_max_incomplete_engine_evidence")
+            if type(self.primary_return_stream) is not AlphaMaxPrimaryReturnStream:
+                raise ValueError("alpha_max_incomplete_engine_evidence")
+            _validate_alpha_max_primary_stream(self.primary_return_stream)
+            if type(self.metric_statistics) is not AlphaMaxMetricStatistics:
+                raise ValueError("alpha_max_incomplete_engine_evidence")
+            if self.nominal_cost_bps == 30:
+                if type(self.gate_input) is not AlphaMaxGateInput:
+                    raise ValueError("alpha_max_incomplete_engine_evidence")
+                expected_role = (
+                    "prelock_selection" if self.domain == "validation" else "historical_report"
+                )
+                if (
+                    self.gate_input.row_id != self.row_id
+                    or self.gate_input.comparison_role != expected_role
+                    or self.gate_input.comparison_valid is not self.selection_valid
+                    or self.gate_input.calendar_sha256 != self.primary_return_stream.calendar_sha256
+                    or self.gate_input.ruin is not self.ruin
+                    or self.gate_input.reconciliation_complete is not self.reconciliation.complete
+                    or not math.isclose(
+                        self.gate_input.gate_mdd,
+                        self.metric_statistics.gate_mdd,
+                        rel_tol=0.0,
+                        abs_tol=1e-12,
+                    )
+                ):
+                    raise ValueError("alpha_max_cost_cell_gate_binding_mismatch")
+                metric_bindings = (
+                    ("total_return", self.gate_input.cumulative_return),
+                    ("cagr", self.gate_input.cagr),
+                    ("calmar", self.gate_input.calmar),
+                    ("sharpe", self.gate_input.net_sharpe),
+                )
+                if any(
+                    not math.isclose(
+                        self.metric_statistics.canonical_metrics[name],
+                        value,
+                        rel_tol=0.0,
+                        abs_tol=1e-12,
+                    )
+                    for name, value in metric_bindings
+                ):
+                    raise ValueError("alpha_max_cost_cell_gate_binding_mismatch")
+            elif self.gate_input is not None:
+                raise ValueError("alpha_max_cost_cell_gate_only_nominal_30_bps")
+        elif self.selection_valid:
+            raise ValueError("alpha_max_cost_cell_selection_evidence_invalid")
+
+    @classmethod
+    def unavailable(
+        cls,
+        *,
+        row_id: str,
+        domain: str,
+        split_or_fold_id: str,
+        nominal_cost_bps: int,
+        status: str,
+        evidence_tier: str = "identity",
+    ) -> AlphaMaxCostCellEvidence:
+        return cls(
+            row_id=row_id,
+            domain=domain,
+            split_or_fold_id=split_or_fold_id,
+            nominal_cost_bps=nominal_cost_bps,
+            status=status,
+            evidence_tier=evidence_tier,
+            selection_valid=False,
+            seed=alpha_max_common_rng_seed(split_or_fold_id, nominal_cost_bps),
+        )
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "artifact_kind": "alpha_max_cost_cell_evidence.v1",
+            "capsule_receipt": (
+                None if self.capsule_receipt is None else self.capsule_receipt.to_payload()
+            ),
+            "config_sha256": self.config_sha256,
+            "coverage_sha256": self.coverage_sha256,
+            "domain": self.domain,
+            "evidence_tier": self.evidence_tier,
+            "exposure_sha256": self.exposure_sha256,
+            "feature_root_receipts": [value.to_payload() for value in self.feature_root_receipts],
+            "gate_input": None if self.gate_input is None else self.gate_input.to_payload(),
+            "manifest_receipt": (
+                None if self.manifest_receipt is None else self.manifest_receipt.to_payload()
+            ),
+            "metric_statistics": (
+                None if self.metric_statistics is None else self.metric_statistics.to_payload()
+            ),
+            "nominal_cost_bps": self.nominal_cost_bps,
+            "primary_return_stream": (
+                None
+                if self.primary_return_stream is None
+                else self.primary_return_stream.to_payload()
+            ),
+            "raw_root_receipts": [value.to_payload() for value in self.raw_root_receipts],
+            "reconciliation": (
+                None if self.reconciliation is None else self.reconciliation.to_payload()
+            ),
+            "row_id": self.row_id,
+            "ruin": self.ruin,
+            "runtime_contract_sha256": self.runtime_contract_sha256,
+            "seed": self.seed,
+            "selection_valid": self.selection_valid,
+            "split_or_fold_id": self.split_or_fold_id,
+            "status": self.status,
+        }
+
+
+def canonical_alpha_max_cost_cell_bytes(cell: AlphaMaxCostCellEvidence) -> bytes:
+    if type(cell) is not AlphaMaxCostCellEvidence:
+        raise TypeError("alpha_max_cost_cell_identity_invalid")
+    return _canonical_json_bytes(cell.to_payload(), newline=True)
+
+
+@dataclass(frozen=True, slots=True)
+class AlphaMaxRowEvidence:
+    """One frozen matrix row containing exactly four explicit cost-cell statuses."""
+
+    row_id: str
+    matrix_role: str
+    status: str
+    evidence_tier: str
+    selection_valid: bool
+    cost_cells: tuple[AlphaMaxCostCellEvidence, ...]
+
+    def __post_init__(self) -> None:
+        _alpha_max_nonempty_token(self.row_id, field="row_evidence_id")
+        _alpha_max_nonempty_token(self.matrix_role, field="row_evidence_matrix_role")
+        _alpha_max_nonempty_token(self.status, field="row_evidence_status")
+        if self.evidence_tier not in {"actual_engine", "diagnostic", "identity"}:
+            raise ValueError("alpha_max_row_evidence_tier_invalid")
+        if type(self.selection_valid) is not bool:
+            raise TypeError("alpha_max_row_selection_valid_invalid")
+        if type(self.cost_cells) is not tuple or any(
+            type(value) is not AlphaMaxCostCellEvidence for value in self.cost_cells
+        ):
+            raise TypeError("alpha_max_row_cost_cells_must_be_exact_tuple")
+        ordered = tuple(sorted(self.cost_cells, key=lambda value: value.nominal_cost_bps))
+        object.__setattr__(self, "cost_cells", ordered)
+        if tuple(value.nominal_cost_bps for value in ordered) != (10, 15, 20, 30):
+            raise ValueError("alpha_max_row_cost_cell_matrix_incomplete")
+        if any(value.row_id != self.row_id for value in ordered):
+            raise ValueError("alpha_max_row_cost_cell_identity_mismatch")
+        if len({value.domain for value in ordered}) != 1:
+            raise ValueError("alpha_max_row_cost_cell_domain_mismatch")
+        if len({value.split_or_fold_id for value in ordered}) != 1:
+            raise ValueError("alpha_max_row_cost_cell_split_mismatch")
+        if self.selection_valid:
+            if (
+                self.status != "complete"
+                or self.evidence_tier != "actual_engine"
+                or not all(value.selection_valid for value in ordered)
+            ):
+                raise ValueError("alpha_max_row_selection_evidence_invalid")
+            baseline = ordered[0]
+            if any(
+                value.raw_root_receipts != baseline.raw_root_receipts
+                or value.feature_root_receipts != baseline.feature_root_receipts
+                or value.capsule_receipt is None
+                or baseline.capsule_receipt is None
+                or value.capsule_receipt.sha256 != baseline.capsule_receipt.sha256
+                or value.manifest_receipt is None
+                or baseline.manifest_receipt is None
+                or value.manifest_receipt.sha256 != baseline.manifest_receipt.sha256
+                for value in ordered[1:]
+            ):
+                raise ValueError("alpha_max_row_cost_cell_evidence_mismatch")
+        elif any(value.selection_valid for value in ordered):
+            raise ValueError("alpha_max_row_selection_evidence_invalid")
+
+    @property
+    def gate_input(self) -> AlphaMaxGateInput | None:
+        return self.cost_cells[-1].gate_input
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "artifact_kind": "alpha_max_row_evidence.v1",
+            "cost_cells": [value.to_payload() for value in self.cost_cells],
+            "evidence_tier": self.evidence_tier,
+            "matrix_role": self.matrix_role,
+            "row_id": self.row_id,
+            "selection_valid": self.selection_valid,
+            "status": self.status,
+        }
+
+
+def canonical_alpha_max_row_bytes(row: AlphaMaxRowEvidence) -> bytes:
+    if type(row) is not AlphaMaxRowEvidence:
+        raise TypeError("alpha_max_row_evidence_identity_invalid")
+    return _canonical_json_bytes(row.to_payload(), newline=True)
+
+
+def _alpha_max_selection_inputs(
+    rows: Sequence[AlphaMaxRowEvidence | AlphaMaxGateInput],
+) -> tuple[AlphaMaxGateInput, ...]:
+    values = tuple(rows)
+    row_ids: list[str] = []
+    gate_inputs: list[AlphaMaxGateInput] = []
+    for value in values:
+        if type(value) is AlphaMaxGateInput:
+            row_ids.append(value.row_id)
+            gate_inputs.append(value)
+        elif type(value) is AlphaMaxRowEvidence:
+            row_ids.append(value.row_id)
+            if value.selection_valid:
+                gate = value.gate_input
+                if type(gate) is not AlphaMaxGateInput:
+                    raise ValueError("alpha_max_incomplete_engine_evidence")
+                gate_inputs.append(gate)
+        else:
+            raise TypeError("alpha_max_selection_row_identity_invalid")
+    if len(row_ids) != len(set(row_ids)):
+        raise ValueError("alpha_max_gate_duplicate_row_id")
+    return tuple(gate_inputs)
+
+
+def select_alpha_max_prelock_champion(
+    rows: Sequence[AlphaMaxRowEvidence | AlphaMaxGateInput],
+) -> AlphaMaxSelectionResult:
+    """Apply frozen validation gates and fix at most one selection identity."""
+    return _alpha_max_select_gate_inputs(
+        _alpha_max_selection_inputs(rows),
+        role="prelock_selection",
+    )
+
+
+def rank_alpha_max_historical_report(
+    rows: Sequence[AlphaMaxRowEvidence | AlphaMaxGateInput],
+) -> AlphaMaxSelectionResult:
+    """Apply identical gates in the exposed report domain without selecting."""
+    return _alpha_max_select_gate_inputs(
+        _alpha_max_selection_inputs(rows),
+        role="historical_report",
+    )
+
+
+def _alpha_max_stream_timestamp_ms(value: Any) -> int:
+    if type(value) is int and value >= 0:
+        return value
+    if type(value) is datetime:
+        normalized = _utc(value, field="streaming_equity_timestamp")
+        return _epoch_ms(normalized)
+    raise ValueError("alpha_max_streaming_equity_timestamp_invalid")
+
+
+@dataclass(frozen=True, slots=True)
+class AlphaMaxStreamingEquityEvidence:
+    event_count: int
+    initial_capital: float
+    ending_equity: float
+    peak_equity: float
+    full_event_mdd: float
+    max_drawdown_duration_events: int
+    max_drawdown_duration_ms: int | None
+    first_timestamp_ms: int | None
+    last_timestamp_ms: int | None
+    event_stream_sha256: str
+    canonical_bytes: bytes
+    sha256: str
+
+    def to_payload(self) -> dict[str, Any]:
+        return json.loads(self.canonical_bytes)
+
+
+class AlphaMaxStreamingEquityTracker:
+    """Constant-memory exact full-event equity/MDD/drawdown-duration tracker."""
+
+    __slots__ = (
+        "_current_duration",
+        "_digest",
+        "_ending_equity",
+        "_event_count",
+        "_first_timestamp_ms",
+        "_initial_capital",
+        "_last_peak_timestamp_ms",
+        "_last_timestamp_ms",
+        "_max_drawdown_duration_events",
+        "_max_drawdown_duration_ms",
+        "_maximum_drawdown",
+        "_peak_equity",
+        "_timestamp_mode",
+    )
+
+    def __init__(self, *, initial_capital: float = _ALPHA_MAX_INITIAL_CAPITAL) -> None:
+        capital = _alpha_max_finite_number(
+            initial_capital,
+            field="streaming_equity_initial_capital",
+            positive=True,
+        )
+        if capital != _ALPHA_MAX_INITIAL_CAPITAL:
+            raise ValueError("alpha_max_full_event_initial_capital_mismatch")
+        self._initial_capital = capital
+        self._peak_equity = capital
+        self._ending_equity = capital
+        self._maximum_drawdown = 0.0
+        self._current_duration = 0
+        self._max_drawdown_duration_events = 0
+        self._max_drawdown_duration_ms = 0
+        self._event_count = 0
+        self._first_timestamp_ms = None
+        self._last_timestamp_ms = None
+        self._last_peak_timestamp_ms = None
+        self._timestamp_mode = None
+        self._digest = hashlib.sha256()
+
+    @property
+    def retained_point_count(self) -> int:
+        return 0
+
+    @property
+    def state_size_bytes(self) -> int:
+        return object.__sizeof__(self) + self._digest.__sizeof__()
+
+    def observe(self, point: tuple[float, float]) -> None:
+        """Consume the Portfolio full-event sink's ``(unix_seconds, equity)`` tuple."""
+        if type(point) is not tuple or len(point) != 2:
+            raise TypeError("alpha_max_streaming_equity_point_invalid")
+        unix_seconds = _alpha_max_finite_number(
+            point[0],
+            field="streaming_equity_unix_seconds",
+            nonnegative=True,
+        )
+        milliseconds = unix_seconds * 1000.0
+        if not math.isfinite(milliseconds):
+            raise ValueError("alpha_max_streaming_equity_unix_seconds_invalid")
+        timestamp_ms = int(milliseconds)
+        self.update(point[1], timestamp_ms)
+
+    def update(self, equity: float, timestamp: datetime | int | None = None) -> None:
+        parsed = _alpha_max_finite_number(
+            equity,
+            field="streaming_full_event_equity",
+            positive=True,
+        )
+        mode = timestamp is not None
+        if self._timestamp_mode is None:
+            self._timestamp_mode = mode
+        elif self._timestamp_mode is not mode:
+            raise ValueError("alpha_max_streaming_timestamp_mode_changed")
+        timestamp_ms = None if timestamp is None else _alpha_max_stream_timestamp_ms(timestamp)
+        if (
+            timestamp_ms is not None
+            and self._last_timestamp_ms is not None
+            and timestamp_ms < self._last_timestamp_ms
+        ):
+            raise ValueError("alpha_max_streaming_timestamp_not_monotone")
+        event_index = self._event_count
+        self._digest.update(
+            _canonical_json_bytes(
+                {
+                    "equity": parsed,
+                    "event_index": event_index,
+                    "timestamp_ms": timestamp_ms,
+                },
+                newline=True,
+            )
+        )
+        self._event_count += 1
+        self._ending_equity = parsed
+        if self._first_timestamp_ms is None:
+            self._first_timestamp_ms = timestamp_ms
+        self._last_timestamp_ms = timestamp_ms
+        if parsed >= self._peak_equity:
+            self._peak_equity = parsed
+            self._current_duration = 0
+            self._last_peak_timestamp_ms = timestamp_ms
+        else:
+            self._current_duration += 1
+            self._max_drawdown_duration_events = max(
+                self._max_drawdown_duration_events,
+                self._current_duration,
+            )
+            if timestamp_ms is not None and self._last_peak_timestamp_ms is not None:
+                self._max_drawdown_duration_ms = max(
+                    self._max_drawdown_duration_ms,
+                    timestamp_ms - self._last_peak_timestamp_ms,
+                )
+        self._maximum_drawdown = max(
+            self._maximum_drawdown,
+            1.0 - (parsed / self._peak_equity),
+        )
+
+    def finalize(self) -> AlphaMaxStreamingEquityEvidence:
+        if self._event_count == 0:
+            raise ValueError("alpha_max_full_event_equities_empty")
+        payload = {
+            "artifact_kind": "alpha_max_streaming_full_event_equity.v1",
+            "ending_equity": self._ending_equity,
+            "event_count": self._event_count,
+            "event_stream_sha256": self._digest.copy().hexdigest(),
+            "first_timestamp_ms": self._first_timestamp_ms,
+            "full_event_mdd": self._maximum_drawdown,
+            "initial_capital": self._initial_capital,
+            "last_timestamp_ms": self._last_timestamp_ms,
+            "max_drawdown_duration_events": self._max_drawdown_duration_events,
+            "max_drawdown_duration_ms": (
+                self._max_drawdown_duration_ms if self._timestamp_mode else None
+            ),
+            "peak_equity": self._peak_equity,
+        }
+        canonical = _canonical_json_bytes(payload, newline=True)
+        return AlphaMaxStreamingEquityEvidence(
+            event_count=self._event_count,
+            initial_capital=self._initial_capital,
+            ending_equity=self._ending_equity,
+            peak_equity=self._peak_equity,
+            full_event_mdd=self._maximum_drawdown,
+            max_drawdown_duration_events=self._max_drawdown_duration_events,
+            max_drawdown_duration_ms=(
+                self._max_drawdown_duration_ms if self._timestamp_mode else None
+            ),
+            first_timestamp_ms=self._first_timestamp_ms,
+            last_timestamp_ms=self._last_timestamp_ms,
+            event_stream_sha256=payload["event_stream_sha256"],
+            canonical_bytes=canonical,
+            sha256=_sha256_bytes(canonical),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class AlphaMaxPrelockArtifact:
+    relative_path: str
+    byte_count: int
+    sha256: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "relative_path",
+            _alpha_max_safe_relative_path(
+                self.relative_path,
+                field="prelock_artifact_path",
+            ),
+        )
+        if type(self.byte_count) is not int or self.byte_count < 0:
+            raise ValueError("alpha_max_prelock_artifact_byte_count_invalid")
+        object.__setattr__(
+            self,
+            "sha256",
+            _require_sha256(self.sha256, field="alpha_max_prelock_artifact_sha256"),
+        )
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "byte_count": self.byte_count,
+            "relative_path": self.relative_path,
+            "sha256": self.sha256,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class AlphaMaxPrelockSeal:
+    artifacts: tuple[AlphaMaxPrelockArtifact, ...]
+    inventory_sha256: str
+    prelock_champion: str | None
+    selected_candidate_id: str | None
+    canonical_bytes: bytes
+    sha256: str
+
+    def to_payload(self) -> dict[str, Any]:
+        return json.loads(self.canonical_bytes)
+
+
+def build_alpha_max_prelock_seal(
+    stable_artifacts: Mapping[str, bytes],
+    *,
+    prelock_champion: str | None,
+    selected_candidate_id: str | None,
+) -> AlphaMaxPrelockSeal:
+    """Seal immutable pre-historical artifact bytes without opening later roots."""
+    if not isinstance(stable_artifacts, Mapping) or not stable_artifacts:
+        raise ValueError("alpha_max_prelock_inventory_empty")
+    if prelock_champion is not None:
+        _alpha_max_nonempty_token(prelock_champion, field="prelock_champion")
+    if selected_candidate_id is not None:
+        _alpha_max_nonempty_token(selected_candidate_id, field="selected_candidate_id")
+    if prelock_champion != selected_candidate_id:
+        raise ValueError("alpha_max_prelock_selection_identity_mismatch")
+    artifacts: list[AlphaMaxPrelockArtifact] = []
+    for raw_path, raw_bytes in stable_artifacts.items():
+        relative_path = _alpha_max_safe_relative_path(
+            raw_path,
+            field="prelock_artifact_path",
+        )
+        if any(
+            marker in part and "boundary" not in part
+            for part in PurePosixPath(relative_path).parts
+            for marker in ("historical_evaluation", "historical_exposed_evaluation")
+        ):
+            raise ValueError("alpha_max_prelock_historical_input_forbidden")
+        if type(raw_bytes) is not bytes:
+            raise TypeError("alpha_max_prelock_artifact_bytes_required")
+        artifacts.append(
+            AlphaMaxPrelockArtifact(
+                relative_path=relative_path,
+                byte_count=len(raw_bytes),
+                sha256=_sha256_bytes(raw_bytes),
+            )
+        )
+    ordered = tuple(sorted(artifacts, key=lambda value: value.relative_path))
+    if len({value.relative_path for value in ordered}) != len(ordered):
+        raise ValueError("alpha_max_prelock_artifact_path_duplicate")
+    inventory_payload = [value.to_payload() for value in ordered]
+    inventory_sha256 = _sha256_bytes(_canonical_json_bytes(inventory_payload, newline=True))
+    payload = {
+        "artifact_count": len(ordered),
+        "artifact_kind": "alpha_max_immutable_prelock_seal.v1",
+        "artifacts": inventory_payload,
+        "historical_evaluation_inputs_included": False,
+        "immutable": True,
+        "inventory_sha256": inventory_sha256,
+        "prelock_champion": prelock_champion,
+        "selected_candidate_id": selected_candidate_id,
+    }
+    canonical = _canonical_json_bytes(payload, newline=True)
+    return AlphaMaxPrelockSeal(
+        artifacts=ordered,
+        inventory_sha256=inventory_sha256,
+        prelock_champion=prelock_champion,
+        selected_candidate_id=selected_candidate_id,
+        canonical_bytes=canonical,
+        sha256=_sha256_bytes(canonical),
+    )
+
+
+def alpha_max_terminal_outcome(
+    prelock_champion: str | None,
+    *,
+    champion_historical_complete: bool | None,
+    champion_historical_passed: bool | None,
+) -> str:
+    """Return the singular first-match Revision 5.14 terminal outcome."""
+    if prelock_champion is None:
+        return "no_demonstrated_alpha"
+    _alpha_max_nonempty_token(prelock_champion, field="terminal_prelock_champion")
+    if champion_historical_complete is not True:
+        return "historical_evaluation_incomplete"
+    if type(champion_historical_passed) is not bool:
+        return "historical_evaluation_incomplete"
+    if not champion_historical_passed:
+        return "prelock_champion_historical_robustness_failed"
+    return "prelock_champion_historical_robustness_passed"
+
+
+@dataclass(frozen=True, slots=True)
+class AlphaMaxTerminalState:
+    terminal_outcome: str
+    prelock_champion: str | None
+    selected_candidate_id: str | None
+    historical_evaluation_leader: str | None
+    leader_differs_from_prelock_champion: bool
+    incumbent_comparison_status: str
+    historical_exposure_status: str
+    requires_fresh_confirmation: bool
+    confirmation_status: str
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "confirmation_status": self.confirmation_status,
+            "historical_evaluation_leader": self.historical_evaluation_leader,
+            "historical_exposure_status": self.historical_exposure_status,
+            "incumbent_comparison_status": self.incumbent_comparison_status,
+            "leader_differs_from_prelock_champion": (self.leader_differs_from_prelock_champion),
+            "prelock_champion": self.prelock_champion,
+            "requires_fresh_confirmation": self.requires_fresh_confirmation,
+            "selected_candidate_id": self.selected_candidate_id,
+            "terminal_outcome": self.terminal_outcome,
+        }
+
+
+def build_alpha_max_terminal_state(
+    *,
+    prelock_champion: str | None,
+    champion_historical_complete: bool | None,
+    champion_historical_passed: bool | None,
+    historical_evaluation_leader: str | None,
+    incumbent_comparison_status: str,
+) -> AlphaMaxTerminalState:
+    """Build immutable orthogonal report fields without changing selection."""
+    if prelock_champion is not None:
+        _alpha_max_nonempty_token(prelock_champion, field="terminal_prelock_champion")
+    if historical_evaluation_leader is not None:
+        _alpha_max_nonempty_token(
+            historical_evaluation_leader,
+            field="historical_evaluation_leader",
+        )
+    if incumbent_comparison_status not in {
+        "matched_outperformed",
+        "matched_not_outperformed",
+        "unavailable",
+        "not_applicable",
+    }:
+        raise ValueError("alpha_max_incumbent_comparison_status_invalid")
+    outcome = alpha_max_terminal_outcome(
+        prelock_champion,
+        champion_historical_complete=champion_historical_complete,
+        champion_historical_passed=champion_historical_passed,
+    )
+    return AlphaMaxTerminalState(
+        terminal_outcome=outcome,
+        prelock_champion=prelock_champion,
+        selected_candidate_id=prelock_champion,
+        historical_evaluation_leader=historical_evaluation_leader,
+        leader_differs_from_prelock_champion=(
+            historical_evaluation_leader is not None
+            and historical_evaluation_leader != prelock_champion
+        ),
+        incumbent_comparison_status=incumbent_comparison_status,
+        historical_exposure_status="committed_period_outcomes_observed",
+        requires_fresh_confirmation=True,
+        confirmation_status="not_run",
     )
