@@ -212,6 +212,7 @@ class Portfolio:
         {
             "_fill_application_attribution_sink",
             "_funding_boundary_resolver",
+            "_full_event_equity_sink",
         }
     )
 
@@ -235,6 +236,7 @@ class Portfolio:
         *,
         fill_application_attribution_sink=None,
         funding_boundary_resolver=None,
+        full_event_equity_sink=None,
     ):
         self.bars = bars
         self.events = events
@@ -250,8 +252,11 @@ class Portfolio:
             raise TypeError(
                 "funding_boundary_resolver must expose callable resolve_batch or resolve"
             )
+        if full_event_equity_sink is not None and not callable(full_event_equity_sink):
+            raise TypeError("full_event_equity_sink must be callable")
         self._fill_application_attribution_sink = fill_application_attribution_sink
         self._funding_boundary_resolver = funding_boundary_resolver
+        self._full_event_equity_sink = full_event_equity_sink
         self._optional_seams_locked = True
         self.symbol_list = self.bars.symbol_list
         self._single_symbol = len(self.symbol_list) == 1
@@ -376,6 +381,10 @@ class Portfolio:
     @property
     def funding_boundary_resolver(self):
         return self._funding_boundary_resolver
+
+    @property
+    def full_event_equity_sink(self):
+        return self._full_event_equity_sink
 
     def construct_current_holdings(self):
         d = dict.fromkeys(self.symbol_list, 0.0)
@@ -1722,7 +1731,10 @@ class Portfolio:
         ts = self._to_unix_seconds(latest_datetime)
         if ts is None:
             return
-        self._equity_points.append((float(ts), float(total)))
+        point = (float(ts), float(total))
+        self._equity_points.append(point)
+        if self._full_event_equity_sink is not None:
+            self._full_event_equity_sink(point)
 
     def get_rolling_loss_pct(self, window_seconds=3600):
         if window_seconds <= 0 or len(self._equity_points) < 2:

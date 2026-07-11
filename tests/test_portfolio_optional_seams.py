@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import queue
 from dataclasses import FrozenInstanceError
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -58,7 +58,12 @@ class _Bars:
         return None
 
 
-def _portfolio(*, fill_application_attribution_sink=None, funding_boundary_resolver=None):
+def _portfolio(
+    *,
+    fill_application_attribution_sink=None,
+    funding_boundary_resolver=None,
+    full_event_equity_sink=None,
+):
     bars = _Bars()
     portfolio = Portfolio(
         bars,
@@ -67,6 +72,7 @@ def _portfolio(*, fill_application_attribution_sink=None, funding_boundary_resol
         _Config,
         fill_application_attribution_sink=fill_application_attribution_sink,
         funding_boundary_resolver=funding_boundary_resolver,
+        full_event_equity_sink=full_event_equity_sink,
     )
     return portfolio, bars
 
@@ -199,6 +205,7 @@ def test_default_optional_seams_are_off_for_legacy_positive_fill():
 
     assert portfolio.fill_application_attribution_sink is None
     assert portfolio.funding_boundary_resolver is None
+    assert portfolio.full_event_equity_sink is None
 
     fill = _fill(qty=1.0, direction="BUY")
     portfolio.update_fill(fill)
@@ -208,6 +215,111 @@ def test_default_optional_seams_are_off_for_legacy_positive_fill():
         1000.0 - fill.fill_cost - fill.commission
     )
     assert portfolio.trade_count == 1
+
+
+def test_full_event_equity_sink_observes_every_point_in_order_and_preserves_identity():
+    class _Collector:
+        def __init__(self):
+            self.points = []
+
+        def observe(self, point):
+            self.points.append(point)
+
+    collector = _Collector()
+    portfolio, bars = _portfolio(full_event_equity_sink=collector.observe)
+
+    sink = portfolio.full_event_equity_sink
+    assert sink.__self__ is collector
+    assert sink.__func__ is collector.observe.__func__
+
+    start = datetime(2026, 7, 10, 0, 0, tzinfo=UTC)
+    expected = []
+    for offset, equity in enumerate((1000.0, 980.0, 1025.0)):
+        bars.current_dt = start + timedelta(seconds=offset)
+        portfolio.current_holdings["cash"] = equity
+        portfolio.update_timeindex(object())
+        expected.append((bars.current_dt.timestamp(), equity))
+
+    assert collector.points == expected
+    assert list(portfolio._equity_points) == expected
+
+
+def test_full_event_equity_sink_failure_is_loud():
+    def fail(point):
+        raise RuntimeError(f"equity sink failed: {point[1]}")
+
+    portfolio, _ = _portfolio(full_event_equity_sink=fail)
+
+    with pytest.raises(RuntimeError, match=r"equity sink failed: 1000\.0"):
+        portfolio.update_timeindex(object())
+
+
+def test_none_full_event_equity_sink_preserves_legacy_history_and_rolling_points():
+    implicit, implicit_bars = _portfolio()
+    explicit, explicit_bars = _portfolio(full_event_equity_sink=None)
+    start = datetime(2026, 7, 10, 0, 0, tzinfo=UTC)
+
+    for offset, equity in enumerate((1000.0, 995.0, 1010.0)):
+        current = start + timedelta(seconds=offset)
+        implicit_bars.current_dt = current
+        explicit_bars.current_dt = current
+        implicit.current_holdings["cash"] = equity
+        explicit.current_holdings["cash"] = equity
+        implicit.update_timeindex(object())
+        explicit.update_timeindex(object())
+
+    assert implicit.all_positions == explicit.all_positions
+    assert implicit.all_holdings == explicit.all_holdings
+    assert implicit._metric_totals == explicit._metric_totals
+    assert implicit._metric_benchmarks == explicit._metric_benchmarks
+    assert implicit._equity_points == explicit._equity_points
+
+
+def test_full_event_equity_sink_is_callable_locked_and_does_not_add_owned_history():
+    with pytest.raises(TypeError, match="full_event_equity_sink must be callable"):
+        _portfolio(full_event_equity_sink=object())
+
+    class _Counter:
+        def __init__(self):
+            self.count = 0
+            self.last = None
+
+        def observe(self, point):
+            self.count += 1
+            self.last = point
+
+    counter = _Counter()
+    bars = _Bars()
+    portfolio = Portfolio(
+        bars,
+        queue.Queue(),
+        datetime(2026, 7, 10, 0, 0, tzinfo=UTC),
+        _Config,
+        record_history=False,
+        track_metrics=False,
+        record_trades=False,
+        full_event_equity_sink=counter.observe,
+    )
+    initial_positions = tuple(portfolio.all_positions)
+    initial_holdings = tuple(portfolio.all_holdings)
+
+    with pytest.raises(AttributeError):
+        portfolio.full_event_equity_sink = lambda point: None
+    with pytest.raises(AttributeError):
+        portfolio._full_event_equity_sink = lambda point: None
+
+    start = datetime(2026, 7, 10, 0, 0, tzinfo=UTC)
+    point_count = 25_000
+    for offset in range(point_count):
+        portfolio._record_equity_point(start + timedelta(seconds=offset), 1000.0 + offset)
+
+    assert counter.count == point_count
+    assert counter.last == ((start + timedelta(seconds=point_count - 1)).timestamp(), 25_999.0)
+    assert len(portfolio._equity_points) == portfolio._equity_points.maxlen == 20_000
+    assert tuple(portfolio.all_positions) == initial_positions
+    assert tuple(portfolio.all_holdings) == initial_holdings
+    assert portfolio._metric_totals == []
+    assert portfolio._metric_benchmarks == []
 
 
 @pytest.mark.parametrize(
