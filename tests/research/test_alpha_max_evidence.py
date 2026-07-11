@@ -20,6 +20,7 @@ from lumina_quant.research.alpha_max_evidence import (
     AlphaMaxGateInput,
     AlphaMaxManifestMaterialization,
     AlphaMaxManifestReceipt,
+    AlphaMaxTerminalGateEvidence,
     AlphaMaxOrderedFundingLookup,
     AlphaMaxRawObservation,
     AlphaMaxRootReceipt,
@@ -30,6 +31,7 @@ from lumina_quant.research.alpha_max_evidence import (
     alpha_max_full_event_mdd,
     alpha_max_terminal_outcome,
     build_alpha_max_prelock_seal,
+    build_alpha_max_normalized_fold_segment_evidence,
     build_alpha_max_primary_return_stream,
     build_alpha_max_terminal_state,
     canonical_alpha_max_cost_cell_bytes,
@@ -41,6 +43,7 @@ from lumina_quant.research.alpha_max_evidence import (
     seal_alpha_max_contract_manifest,
     seal_alpha_max_root_tree,
     select_alpha_max_prelock_champion,
+    validate_alpha_max_admitted_symbols,
 )
 
 
@@ -58,6 +61,70 @@ def _feature_spec(tmp_path: Path, root_id: str) -> FeatureRootSpec:
     path.mkdir()
     start, end = evidence._ROOT_INTERVALS[root_id]
     return FeatureRootSpec(root_id, str(path), "binance", start, end, _HASH_A, _HASH_B)
+
+
+def _write_sparse_raw_root(root: Path, root_id: str) -> None:
+    start, end = evidence._ROOT_INTERVALS[root_id]
+    month = start.replace(day=1)
+    months: list[datetime] = []
+    while month < end:
+        months.append(month)
+        month = (
+            month.replace(year=month.year + 1, month=1)
+            if month.month == 12
+            else month.replace(month=month.month + 1)
+        )
+    for symbol in ALPHA_MAX_CANDIDATE_SYMBOLS:
+        directory = root / "market_ohlcv_1s" / "binance" / symbol
+        directory.mkdir(parents=True, exist_ok=True)
+        for partition_start in months:
+            partition_end = (
+                partition_start.replace(year=partition_start.year + 1, month=1)
+                if partition_start.month == 12
+                else partition_start.replace(month=partition_start.month + 1)
+            )
+            owned_start = max(start, partition_start)
+            owned_end = min(end, partition_end)
+            timestamps = [owned_start + timedelta(seconds=7), owned_end - timedelta(seconds=11)]
+            pl = pytest.importorskip("polars")
+            pl.DataFrame(
+                {
+                    "datetime": timestamps,
+                    "symbol": [symbol, symbol],
+                    "exchange": ["binance", "binance"],
+                    "close": [100.0, 101.0],
+                    "volume": [1.0, 2.0],
+                }
+            ).write_parquet(directory / f"{partition_start:%Y-%m}.parquet")
+
+
+def _write_feature_root(root: Path, root_id: str) -> None:
+    pl = pytest.importorskip("polars")
+    start, end = evidence._ROOT_INTERVALS[root_id]
+    day = start
+    while day < end:
+        for symbol in ALPHA_MAX_CANDIDATE_SYMBOLS:
+            directory = (
+                root
+                / "feature_points"
+                / "exchange=binance"
+                / f"symbol={symbol}"
+                / f"date={day:%Y-%m-%d}"
+            )
+            directory.mkdir(parents=True, exist_ok=True)
+            timestamps = [
+                int((day + timedelta(hours=hour)).timestamp() * 1000)
+                for hour in (0, 8, 16)
+            ]
+            pl.DataFrame(
+                {
+                    "timestamp_ms": timestamps,
+                    "funding_rate": [0.0001, -0.0002, 0.0003],
+                    "symbol": [symbol] * 3,
+                    "exchange": ["binance"] * 3,
+                }
+            ).write_parquet(directory / "part-0.parquet")
+        day += timedelta(days=1)
 
 
 def test_b2_ordered_lookup_exposes_immutable_current_root_capability_to_real_engine_gate(
@@ -87,33 +154,113 @@ def test_b2_ordered_lookup_exposes_immutable_current_root_capability_to_real_eng
 
 def test_root_tree_seal_is_canonical_streaming_and_rejects_unsafe_entries(tmp_path: Path) -> None:
     root = tmp_path / "raw"
-    (root / "BTCUSDT").mkdir(parents=True)
-    (root / "ETHUSDT").mkdir()
-    (root / "BTCUSDT" / "b.parquet").write_bytes(b"b")
-    (root / "ETHUSDT" / "a.parquet").write_bytes(b"a")
+    _write_sparse_raw_root(root, "purge")
 
-    first = seal_alpha_max_root_tree("train", "raw", root)
-    second = seal_alpha_max_root_tree("train", "raw", root)
+    first = seal_alpha_max_root_tree("purge", "raw", root)
+    second = seal_alpha_max_root_tree("purge", "raw", root)
     assert first == second
-    assert [entry.relative_path for entry in first.entries] == [
-        "BTCUSDT/b.parquet",
-        "ETHUSDT/a.parquet",
-    ]
+    assert first.symbols == ALPHA_MAX_CANDIDATE_SYMBOLS
+    assert len(first.entries) == len(ALPHA_MAX_CANDIDATE_SYMBOLS)
+    start, end = evidence._ROOT_INTERVALS["purge"]
+    assert min(entry.minimum_timestamp_ms for entry in first.entries) > int(
+        start.timestamp() * 1000
+    )
+    assert max(entry.maximum_timestamp_ms for entry in first.entries) < int(
+        (end - timedelta(seconds=1)).timestamp() * 1000
+    )
     assert first.inventory_sha256 == second.inventory_sha256
     assert first.content_sha256 == second.content_sha256
     assert first.canonical_bytes == second.canonical_bytes
     assert first.to_receipt().content_sha256 == first.content_sha256
 
-    (root / "BTCUSDT" / "b.parquet").write_bytes(b"mutated")
-    mutated = seal_alpha_max_root_tree("train", "raw", root)
+    target = root / "market_ohlcv_1s" / "binance" / "BTCUSDT" / "2025-06.parquet"
+    pl = pytest.importorskip("polars")
+    pl.DataFrame(
+        {
+            "datetime": [start + timedelta(seconds=9), end - timedelta(seconds=13)],
+            "symbol": ["BTCUSDT", "BTCUSDT"],
+            "exchange": ["binance", "binance"],
+            "close": [100.0, 105.0],
+            "volume": [1.0, 2.0],
+        }
+    ).write_parquet(target)
+    mutated = seal_alpha_max_root_tree("purge", "raw", root)
     assert mutated.content_sha256 != first.content_sha256
     assert mutated.inventory_sha256 != first.inventory_sha256
 
     (root / "escape").symlink_to(tmp_path / "outside")
     with pytest.raises(ValueError, match="symlink"):
-        seal_alpha_max_root_tree("train", "raw", root)
+        seal_alpha_max_root_tree("purge", "raw", root)
     with pytest.raises(ValueError, match="must_be_absolute"):
         seal_alpha_max_root_tree("train", "raw", Path("relative"))
+
+
+@pytest.mark.parametrize(
+    "timestamps,match",
+    [
+        (
+            lambda start, end: [start + timedelta(seconds=7)] * 2,
+            "duplicate_or_null",
+        ),
+        (
+            lambda start, end: [end - timedelta(seconds=11), start + timedelta(seconds=7)],
+            "not_strictly_increasing",
+        ),
+        (
+            lambda start, end: [start - timedelta(seconds=1), end - timedelta(seconds=11)],
+            "outside_interval|partition_content",
+        ),
+    ],
+)
+def test_raw_root_rejects_duplicate_nonmonotone_and_out_of_range_rows(
+    tmp_path: Path,
+    timestamps,
+    match: str,
+) -> None:
+    root = tmp_path / "raw"
+    _write_sparse_raw_root(root, "purge")
+    start, end = evidence._ROOT_INTERVALS["purge"]
+    target = root / "market_ohlcv_1s" / "binance" / "BTCUSDT" / "2025-06.parquet"
+    pl = pytest.importorskip("polars")
+    pl.DataFrame(
+        {
+            "datetime": timestamps(start, end),
+            "symbol": ["BTCUSDT", "BTCUSDT"],
+            "exchange": ["binance", "binance"],
+            "close": [100.0, 101.0],
+            "volume": [1.0, 2.0],
+        }
+    ).write_parquet(target)
+    with pytest.raises(ValueError, match=match):
+        seal_alpha_max_root_tree("purge", "raw", root)
+
+
+def test_feature_root_binds_content_ownership_and_every_funding_boundary(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "features"
+    _write_feature_root(root, "purge")
+    seal = seal_alpha_max_root_tree("purge", "feature", root)
+    assert seal.symbols == ALPHA_MAX_CANDIDATE_SYMBOLS
+    assert len(seal.entries) == 7 * len(ALPHA_MAX_CANDIDATE_SYMBOLS)
+
+    target = (
+        root
+        / "feature_points"
+        / "exchange=binance"
+        / "symbol=BTCUSDT"
+        / "date=2025-06-01"
+        / "part-0.parquet"
+    )
+    pl = pytest.importorskip("polars")
+    frame = pl.read_parquet(target)
+    frame.with_columns(pl.lit("ETHUSDT").alias("symbol")).write_parquet(target)
+    with pytest.raises(ValueError, match="content_symbol_mismatch"):
+        seal_alpha_max_root_tree("purge", "feature", root)
+
+    frame.filter(pl.col("timestamp_ms") != frame["timestamp_ms"][1]).write_parquet(target)
+    with pytest.raises(ValueError, match=r"funding_boundary_missing|timestamp_cadence"):
+        seal_alpha_max_root_tree("purge", "feature", root)
 
 
 def _contract_manifest() -> dict[str, object]:
@@ -337,16 +484,19 @@ def test_historical_ranking_is_report_only_and_terminal_precedence_is_singular()
         )
         == "prelock_champion_historical_robustness_passed"
     )
+    prelock = select_alpha_max_prelock_champion(
+        [_gate("champion", role="prelock_selection", total=0.2)]
+    )
     terminal = build_alpha_max_terminal_state(
-        prelock_champion="champion",
-        champion_historical_complete=True,
-        champion_historical_passed=True,
-        historical_evaluation_leader="other",
+        prelock_selection=prelock,
+        champion_historical_nominal_30_cell=None,
+        historical_ranking=result,
         incumbent_comparison_status="unavailable",
     )
     assert terminal.selected_candidate_id == "champion"
     assert terminal.leader_differs_from_prelock_champion is True
-    assert terminal.historical_exposure_status == "committed_period_outcomes_observed"
+    assert terminal.terminal_outcome == "historical_evaluation_incomplete"
+    assert terminal.historical_exposure_status == "historical_evaluation_incomplete"
     assert terminal.requires_fresh_confirmation is True
     assert terminal.confirmation_status == "not_run"
 
@@ -356,7 +506,6 @@ def test_unavailable_row_cost_cells_and_prelock_inventory_are_immutable_canonica
         AlphaMaxCostCellEvidence.unavailable(
             row_id="incumbent",
             domain="validation",
-            split_or_fold_id="validation_w01",
             nominal_cost_bps=cost,
             status="incumbent_replay_unavailable",
         )
@@ -412,140 +561,57 @@ def test_unavailable_row_cost_cells_and_prelock_inventory_are_immutable_canonica
         )
 
 
-def test_complete_row_cost_cells_bind_real_receipts_metrics_and_nominal_gate(
+def test_capsule_receipt_parses_causal_envelope_and_rejects_fold_relabel(
     tmp_path: Path,
 ) -> None:
-    raw_root = tmp_path / "raw-validation"
-    feature_root = tmp_path / "feature-validation"
-    raw_root.mkdir()
-    feature_root.mkdir()
-    start, end = evidence._ROOT_INTERVALS["validation"]
-    raw_receipt = AlphaMaxRootReceipt(
-        root_id="validation",
-        root_kind="raw",
-        path=str(raw_root),
-        exchange="binance",
-        start_utc=start,
-        end_utc=end,
-        inventory_sha256=_HASH_A,
-        content_sha256=_HASH_B,
-        file_count=1,
-    )
-    feature_receipt = AlphaMaxRootReceipt(
-        root_id="validation",
-        root_kind="feature",
-        path=str(feature_root),
-        exchange="binance",
-        start_utc=start,
-        end_utc=end,
-        inventory_sha256="c" * 64,
-        content_sha256="d" * 64,
-        file_count=1,
-    )
-    capsule_path = tmp_path / "row-a.capsule.json"
-    manifest_path = tmp_path / "row-a.json"
-    capsule_bytes = b'{"capsule":true}\n'
-    manifest_bytes = b'{"manifest":true}\n'
-    capsule_path.write_bytes(capsule_bytes)
-    manifest_path.write_bytes(manifest_bytes)
-    capsule_receipt = AlphaMaxCapsuleReceipt(
+    manifest_sha256 = "c" * 64
+    capsule_scope = {"ready": True}
+    capsule_sha256 = hashlib.sha256(
+        json.dumps(capsule_scope, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    state_payload = {
+        "capsule": {**capsule_scope, "sha256": capsule_sha256},
+        "capsule_sha256": capsule_sha256,
+        "discarded_signal_count": 3,
+        "fill_event_count": 0,
+        "finalized_children": {"component": {"ready": True}},
+        "funding_event_count": 0,
+        "manifest_sha256": manifest_sha256,
+        "market_event_count": 0,
+        "order_event_count": 0,
+        "phase_id": "purge",
+        "portfolio_mode": "manifest:/stable/row-a.json",
+        "trade_count": 0,
+        "windows_processed": 10,
+    }
+    raw = AlphaMaxCapsuleReceipt.canonical_envelope_bytes(
         row_id="row-a",
         phase="validation_train_fit",
         prefix_id="validation_w01",
-        path=str(capsule_path),
-        sha256=hashlib.sha256(capsule_bytes).hexdigest(),
-        byte_count=len(capsule_bytes),
+        manifest_sha256=manifest_sha256,
+        state_payload=state_payload,
     )
-    manifest_receipt = AlphaMaxManifestReceipt(
+    path = tmp_path / "capsule.json"
+    path.write_bytes(raw)
+    receipt = AlphaMaxCapsuleReceipt.from_path(
+        path,
         row_id="row-a",
         phase="validation_train_fit",
-        path=str(manifest_path),
-        sha256=hashlib.sha256(manifest_bytes).hexdigest(),
-        byte_count=len(manifest_bytes),
+        prefix_id="validation_w01",
+        manifest_sha256=manifest_sha256,
+        relative_path="capsules/row-a/validation_w01.json",
     )
-    calendar = tuple(start + timedelta(hours=4 * index) for index in range(6))
-    equities = (10_100.0, 10_000.0, 10_200.0, 10_150.0, 10_300.0, 10_400.0)
-    stream = build_alpha_max_primary_return_stream(
-        tuple(
-            AlphaMaxEquityEndpoint(timestamp=timestamp, equity=equity)
-            for timestamp, equity in zip(calendar, equities, strict=True)
-        ),
-        calendar,
-    )
-    metrics = compute_alpha_max_metric_statistics(stream, equities)
-    reconciliation = reconcile_alpha_max_cost_attribution(
-        (),
-        (),
-        (),
-        (),
-        portfolio_fee_total=0.0,
-        portfolio_funding_total=0.0,
-    )
-    gate = AlphaMaxGateInput(
-        row_id="row-a",
-        comparison_role="prelock_selection",
-        evidence_tier="actual_engine",
-        comparison_valid=True,
-        nominal_cost_bps=30,
-        cumulative_return=metrics.canonical_metrics["total_return"],
-        cagr=metrics.canonical_metrics["cagr"],
-        calmar=metrics.canonical_metrics["calmar"],
-        net_sharpe=metrics.canonical_metrics["sharpe"],
-        full_event_mdd=metrics.full_event_mdd,
-        reporting_4h_mdd=metrics.reporting_4h_mdd,
-        dsr=0.95,
-        spa_pvalue=0.01,
-        pbo=0.10,
-        native_data_coverage_complete=True,
-        funding_coverage_complete=True,
-        hash_valid=True,
-        manifest_valid=True,
-        reconciliation_complete=True,
-        ruin=False,
-        raw_root_set_sha256=_HASH_A,
-        feature_root_set_sha256=_HASH_B,
-        universe_sha256="c" * 64,
-        calendar_sha256=stream.calendar_sha256,
-        seed_schedule_sha256="e" * 64,
-    )
-    cells = tuple(
-        AlphaMaxCostCellEvidence(
+    assert receipt.capsule_phase_id == "purge"
+    assert receipt.boundary_utc == evidence._ALPHA_MAX_FOLD_INTERVALS["validation_w01"][0]
+    with pytest.raises(ValueError, match="envelope_scope_mismatch"):
+        AlphaMaxCapsuleReceipt.from_path(
+            path,
             row_id="row-a",
-            domain="validation",
-            split_or_fold_id="validation_w01",
-            nominal_cost_bps=cost,
-            status="complete",
-            evidence_tier="actual_engine",
-            selection_valid=True,
-            seed=alpha_max_common_rng_seed("validation_w01", cost),
-            raw_root_receipts=(raw_receipt,),
-            feature_root_receipts=(feature_receipt,),
-            capsule_receipt=capsule_receipt,
-            manifest_receipt=manifest_receipt,
-            primary_return_stream=stream,
-            metric_statistics=metrics,
-            reconciliation=reconciliation,
-            gate_input=gate if cost == 30 else None,
-            runtime_contract_sha256="1" * 64,
-            config_sha256="2" * 64,
-            coverage_sha256="3" * 64,
-            exposure_sha256="4" * 64,
-            ruin=False,
+            phase="validation_train_fit",
+            prefix_id="validation_w02",
+            manifest_sha256=manifest_sha256,
+            relative_path="capsules/row-a/validation_w02.json",
         )
-        for cost in (10, 15, 20, 30)
-    )
-    row = AlphaMaxRowEvidence(
-        row_id="row-a",
-        matrix_role="component",
-        status="complete",
-        evidence_tier="actual_engine",
-        selection_valid=True,
-        cost_cells=cells,
-    )
-
-    assert row.gate_input is gate
-    assert canonical_alpha_max_cost_cell_bytes(cells[-1]).endswith(b"\n")
-    assert json.loads(canonical_alpha_max_row_bytes(row))["row_id"] == "row-a"
 
 
 def test_manifest_receipt_binds_materialized_file_stem_and_exact_bytes(tmp_path: Path) -> None:
@@ -562,11 +628,165 @@ def test_manifest_receipt_binds_materialized_file_stem_and_exact_bytes(tmp_path:
     receipt = AlphaMaxManifestReceipt.from_materialization(
         materialization,
         phase="validation_train_fit",
+        relative_path="manifests/validation_train_fit/row-a.json",
     )
 
     assert receipt.row_id == "row-a"
     assert receipt.sha256 == materialization.sha256
     assert receipt.byte_count == len(raw)
+
+
+def test_effective_runtime_config_binds_all_attributes_and_rejects_seed_forge() -> None:
+    admitted = validate_alpha_max_admitted_symbols(
+        ALPHA_MAX_CANDIDATE_SYMBOLS,
+        ALPHA_MAX_CANDIDATE_SYMBOLS[:5],
+    )
+    fold_id = "validation_w01"
+    start, end = evidence._ALPHA_MAX_FOLD_INTERVALS[fold_id]
+    static = {
+        "DECISION_CADENCE_SECONDS": 1,
+        "INITIAL_CAPITAL": 10_000.0,
+        "STATIC_SENTINEL": "sealed",
+    }
+    payload = {
+        **static,
+        "END_DATE": end.isoformat().replace("+00:00", "Z"),
+        "RANDOM_SEED": alpha_max_common_rng_seed(fold_id, 30),
+        "SLIPPAGE_RATE": 0.0025,
+        "START_DATE": start.isoformat().replace("+00:00", "Z"),
+        "SYMBOLS": list(admitted),
+    }
+    raw = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    runtime = {
+        "attribute_allowlist": sorted(payload),
+        "static_attributes": static,
+    }
+    assert evidence._alpha_max_validate_effective_config_bytes(
+        raw,
+        hashlib.sha256(raw).hexdigest(),
+        split_or_fold_id=fold_id,
+        nominal_cost_bps=30,
+        admitted_symbols=admitted,
+        runtime_contract_payload=runtime,
+    ) == payload
+    poisoned = {**payload, "RANDOM_SEED": payload["RANDOM_SEED"] + 1}
+    poisoned_raw = json.dumps(poisoned, sort_keys=True, separators=(",", ":")).encode()
+    with pytest.raises(ValueError, match="runtime_binding_mismatch"):
+        evidence._alpha_max_validate_effective_config_bytes(
+            poisoned_raw,
+            hashlib.sha256(poisoned_raw).hexdigest(),
+            split_or_fold_id=fold_id,
+            nominal_cost_bps=30,
+            admitted_symbols=admitted,
+            runtime_contract_payload=runtime,
+        )
+
+
+def _fake_fold_runs_and_live_segments(domain: str):
+    fold_runs = []
+    segment_inputs = []
+    aggregate = AlphaMaxStreamingEquityTracker()
+    current = 10_000.0
+    for index, fold_id in enumerate(evidence._ALPHA_MAX_DOMAIN_FOLD_IDS[domain]):
+        start, _ = evidence._ALPHA_MAX_FOLD_INTERVALS[fold_id]
+        timestamps = (
+            int((start + timedelta(seconds=1)).timestamp() * 1000),
+            int((start + timedelta(seconds=2)).timestamp() * 1000),
+        )
+        source_values = (8_000.0, 20_000.0) if index == 0 else (10_000.0, 10_000.0)
+        source_tracker = AlphaMaxStreamingEquityTracker()
+        for timestamp, value in zip(timestamps, source_values, strict=True):
+            source_tracker.update(value, timestamp)
+        source = source_tracker.finalize()
+        run = object.__new__(evidence.AlphaMaxActualEngineRunReceipt)
+        object.__setattr__(run, "domain", domain)
+        object.__setattr__(run, "split_or_fold_id", fold_id)
+        object.__setattr__(run, "full_event_equity", source)
+        object.__setattr__(run, "liquidation_event_count", 0)
+        object.__setattr__(run, "sha256", hashlib.sha256(f"run:{fold_id}".encode()).hexdigest())
+        fold = object.__new__(evidence.AlphaMaxFoldRunEvidence)
+        object.__setattr__(fold, "actual_engine_run", run)
+        object.__setattr__(fold, "status", "complete")
+        object.__setattr__(fold, "sha256", hashlib.sha256(f"fold:{fold_id}".encode()).hexdigest())
+        fold_runs.append(fold)
+
+        scale = current / 10_000.0
+        normalized_values = tuple(scale * value for value in source_values)
+        for timestamp, value in zip(timestamps, normalized_values, strict=True):
+            aggregate.update(value, timestamp)
+        normalized_end = normalized_values[-1]
+        segment_inputs.append(
+            build_alpha_max_normalized_fold_segment_evidence(
+                fold_id=fold_id,
+                source_streaming_equity_sha256=source.sha256,
+                source_event_stream_sha256=source.event_stream_sha256,
+                normalization_scale=scale,
+                normalized_starting_equity=current,
+                normalized_ending_equity=normalized_end,
+                normalized_segment_event_stream_sha256=hashlib.sha256(
+                    f"normalized:{fold_id}".encode()
+                ).hexdigest(),
+                event_count=source.event_count,
+                first_timestamp_ms=source.first_timestamp_ms,
+                last_timestamp_ms=source.last_timestamp_ms,
+                aggregate_prefix_event_count=aggregate.event_count,
+                aggregate_prefix_event_stream_sha256=aggregate.event_stream_sha256,
+            )
+        )
+        current = normalized_end
+    return tuple(fold_runs), aggregate.finalize(), tuple(segment_inputs)
+
+
+def test_live_combined_stream_preserves_peak_after_min_chronology_and_hash_binding() -> None:
+    fold_runs, live, segments = _fake_fold_runs_and_live_segments("validation")
+    combined = evidence._build_alpha_max_combined_streaming_equity(
+        fold_runs,
+        live,
+        segments,
+    )
+    assert len(combined.fold_ids) == 12
+    assert combined.full_event_mdd == pytest.approx(0.20)
+    assert evidence._ALPHA_MAX_DOMAIN_ENGINE_RUN_COUNT == {
+        "validation": 816,
+        "historical_exposed_evaluation": 680,
+    }
+    assert len(evidence._ALPHA_MAX_DOMAIN_FOLD_IDS["historical_exposed_evaluation"]) == 10
+
+    fake = AlphaMaxStreamingEquityTracker()
+    for index, segment in enumerate(segments):
+        fake.update(5_000.0 if index == 0 else 20_000.0, segment.first_timestamp_ms)
+        fake.update(20_000.0, segment.last_timestamp_ms)
+    forged = fake.finalize()
+    assert forged.event_count == live.event_count
+    assert forged.ending_equity == live.ending_equity
+    with pytest.raises(ValueError, match="live_binding_mismatch"):
+        evidence._build_alpha_max_combined_streaming_equity(
+            fold_runs,
+            forged,
+            segments,
+        )
+
+
+def test_typed_ruin_gate_is_rejected_without_fabricated_metrics() -> None:
+    terminal = AlphaMaxTerminalGateEvidence(
+        row_id="ruined",
+        comparison_role="prelock_selection",
+        domain="validation",
+        nominal_cost_bps=30,
+        pre_gate_evidence_sha256="1" * 64,
+        fold_run_set_sha256="2" * 64,
+        ruined_fold_ids=("validation_w01", "validation_w02"),
+        streaming_ruin_fold_ids=("validation_w01",),
+        liquidation_fold_ids=("validation_w02",),
+        raw_root_set_sha256="3" * 64,
+        feature_root_set_sha256="4" * 64,
+        universe_sha256="5" * 64,
+        seed_schedule_sha256="6" * 64,
+    )
+    result = select_alpha_max_prelock_champion((terminal,))
+    assert result.prelock_champion is None
+    assert result.decisions[0].rejection_reasons == ("ruin_detected",)
+    assert result.decisions[0].gate_mdd is None
 
 
 def test_streaming_full_event_tracker_is_exact_and_constant_memory_for_large_stream() -> None:
@@ -610,3 +830,17 @@ def test_streaming_full_event_tracker_rejects_malformed_portfolio_sink_points() 
         tracker.observe((-1.0, 10_000.0))
     with pytest.raises(ValueError, match="streaming_equity_unix_seconds_invalid"):
         tracker.observe((1e308, 10_000.0))
+
+
+def test_streaming_full_event_tracker_records_zero_and_negative_equity_as_ruin() -> None:
+    tracker = AlphaMaxStreamingEquityTracker()
+    tracker.observe((1.0, 10_000.0))
+    tracker.observe((2.0, 0.0))
+    tracker.observe((3.0, -25.0))
+
+    snapshot = tracker.finalize()
+
+    assert snapshot.ruin is True
+    assert snapshot.ending_equity == -25.0
+    assert snapshot.full_event_mdd == 1.0
+    assert snapshot.uncapped_full_event_drawdown == pytest.approx(1.0025)
