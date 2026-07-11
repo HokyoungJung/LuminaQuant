@@ -8,6 +8,7 @@ from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime
 
 import polars as pl
+from lumina_quant.backtesting._config_view import wrapped_runtime_config
 from lumina_quant.backtesting.execution_model import (
     ExecutionModel,
     ExecutionModelConfig,
@@ -337,7 +338,7 @@ class Portfolio:
         # Phase 4 unified cost model — funding and liquidation delegate to this.
         # BacktestConfigView carries ._rt (RuntimeConfig); use from_runtime for production.
         # Plain class configs (unit tests) use _config_from_attrs.
-        _rt = getattr(config, "_rt", None)
+        _rt = wrapped_runtime_config(config)
         self.execution_model = ExecutionModel(
             ExecutionModelConfig.from_runtime(_rt)
             if _rt is not None
@@ -498,7 +499,7 @@ class Portfolio:
         value = getattr(config, upper_attr, sentinel)
         if value is not sentinel:
             return bool(value)
-        runtime = getattr(config, "_rt", None)
+        runtime = wrapped_runtime_config(config)
         if runtime is not None:
             section_obj = getattr(runtime, section, None)
             if section_obj is not None:

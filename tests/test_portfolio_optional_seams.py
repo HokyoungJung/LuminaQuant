@@ -217,6 +217,39 @@ def test_default_optional_seams_are_off_for_legacy_positive_fill():
     assert portfolio.trade_count == 1
 
 
+def test_exact_alpha_config_never_probes_private_runtime_config():
+    private_runtime_reads: list[str] = []
+
+    def reject_private_runtime(_self, name):
+        if name == "_rt":
+            private_runtime_reads.append(name)
+            raise RuntimeError("unfrozen_runtime_field:_rt")
+        raise AttributeError(name)
+
+    config_type = type(
+        "AlphaMaxBacktestConfig",
+        (_Config,),
+        {
+            "__module__": "lumina_quant.research.alpha_max_engine_runner",
+            "__getattr__": reject_private_runtime,
+        },
+    )
+    config = config_type()
+    bars = _Bars()
+
+    portfolio = Portfolio(
+        bars,
+        queue.Queue(),
+        datetime(2026, 7, 10, 0, 0, tzinfo=UTC),
+        config,
+    )
+    execution = SimulatedExecutionHandler(queue.Queue(), bars, config)
+
+    assert portfolio._audit_flag(config, "MISSING_FLAG", "execution", "missing") is False
+    assert execution._execution_flag(config, "MISSING_FLAG", "missing") is False
+    assert private_runtime_reads == []
+
+
 def test_full_event_equity_sink_observes_every_point_in_order_and_preserves_identity():
     class _Collector:
         def __init__(self):

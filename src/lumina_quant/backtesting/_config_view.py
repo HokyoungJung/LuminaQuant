@@ -23,6 +23,25 @@ if TYPE_CHECKING:
     from lumina_quant.configuration.schema import RuntimeConfig
 
 
+_ALPHA_MAX_BACKTEST_CONFIG_TYPE_ID = (
+    "lumina_quant.research.alpha_max_engine_runner",
+    "AlphaMaxBacktestConfig",
+)
+
+
+def is_exact_alpha_max_backtest_config(config: object) -> bool:
+    """Recognize the frozen research config without probing runtime fields."""
+    config_type = type(config)
+    return (config_type.__module__, config_type.__qualname__) == _ALPHA_MAX_BACKTEST_CONFIG_TYPE_ID
+
+
+def wrapped_runtime_config(config: object) -> object | None:
+    """Return ``BacktestConfigView._rt`` without probing the frozen alpha config."""
+    if is_exact_alpha_max_backtest_config(config):
+        return None
+    return getattr(config, "_rt", None)
+
+
 class BacktestConfigView:
     """Typed config bag for backtest engine — uppercase attrs from RuntimeConfig.
 

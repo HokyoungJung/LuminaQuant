@@ -26,7 +26,10 @@ from datetime import UTC, timedelta
 from pprint import pprint
 from typing import Any
 
-from lumina_quant.backtesting._config_view import BacktestConfigView
+from lumina_quant.backtesting._config_view import (
+    BacktestConfigView,
+    is_exact_alpha_max_backtest_config,
+)
 from lumina_quant.compute.ohlcv_loader import OHLCVFrameLoader
 from lumina_quant.configuration import get_default_runtime_config
 from lumina_quant.core.engine import TradingEngine, _event_time_to_ms
@@ -160,6 +163,10 @@ class Backtest(TradingEngine):
         if config is None:
             self.config: Any = BacktestConfigView(get_default_runtime_config())
         elif isinstance(config, BacktestConfigView):
+            self.config = config
+        elif is_exact_alpha_max_backtest_config(config):
+            # AlphaMaxBacktestConfig intentionally raises on unknown runtime reads,
+            # so probing ``execution``/``backtest`` with hasattr would fail closed.
             self.config = config
         elif hasattr(config, "execution") and hasattr(config, "backtest"):
             # Looks like a RuntimeConfig — wrap it.

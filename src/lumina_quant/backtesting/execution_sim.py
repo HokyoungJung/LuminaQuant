@@ -8,6 +8,7 @@ from dataclasses import dataclass, fields
 from datetime import date, datetime
 from typing import Any
 
+from lumina_quant.backtesting._config_view import wrapped_runtime_config
 from lumina_quant.backtesting.execution_model import (
     ExecutionModel,
     ExecutionModelConfig,
@@ -223,7 +224,7 @@ class SimulatedExecutionHandler(ExecutionHandler):
         # Phase 4 unified cost model — replaces FillModel + LiquidityModel for fills.
         # BacktestConfigView carries ._rt (RuntimeConfig); production path uses from_runtime.
         # Plain mock configs (unit tests) fall back to _config_from_attrs.
-        _rt = getattr(config, "_rt", None)
+        _rt = wrapped_runtime_config(config)
         self.execution_model = ExecutionModel(
             ExecutionModelConfig.from_runtime(_rt)
             if _rt is not None
@@ -690,7 +691,7 @@ class SimulatedExecutionHandler(ExecutionHandler):
         value = getattr(config, upper_attr, None)
         if value is not None:
             return bool(value)
-        runtime = getattr(config, "_rt", None)
+        runtime = wrapped_runtime_config(config)
         execution = getattr(runtime, "execution", None) if runtime is not None else None
         if execution is not None:
             return bool(getattr(execution, runtime_field, False))

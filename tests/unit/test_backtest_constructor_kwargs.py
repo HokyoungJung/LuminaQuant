@@ -421,3 +421,41 @@ def test_runtime_config_is_wrapped_before_component_construction():
     assert backtest.config._rt is runtime
     assert backtest.portfolio.config is backtest.config
     assert backtest.execution_handler.config is backtest.config
+
+
+def test_exact_alpha_max_config_bypasses_runtime_config_attribute_probes():
+    unknown_reads: list[str] = []
+
+    def reject_unknown_read(_self, name):
+        unknown_reads.append(name)
+        raise RuntimeError(f"unfrozen_runtime_field:{name}")
+
+    config_type = type(
+        "AlphaMaxBacktestConfig",
+        (),
+        {
+            "__module__": "lumina_quant.research.alpha_max_engine_runner",
+            "TIMEFRAME": "1s",
+            "DECISION_CADENCE_SECONDS": 1,
+            "SKIP_AHEAD_ENABLED": True,
+            "__getattr__": reject_unknown_read,
+        },
+    )
+    config = config_type()
+    data_handler_cls, _ = _make_data_handler_class()
+    portfolio_cls, _ = _make_portfolio_strict_class()
+    execution_handler_cls, _ = _make_execution_handler_class()
+
+    backtest = _build_backtest(
+        data_handler_cls=data_handler_cls,
+        execution_handler_cls=execution_handler_cls,
+        portfolio_cls=portfolio_cls,
+        strategy_cls=_make_strategy_class(),
+        config=config,
+        strategy_timeframe="1s",
+    )
+
+    assert backtest.config is config
+    assert backtest.portfolio.config is config
+    assert backtest.execution_handler.config is config
+    assert unknown_reads == []
