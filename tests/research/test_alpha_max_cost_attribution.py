@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from datetime import UTC, datetime
 
 import pytest
 
@@ -13,6 +14,9 @@ from lumina_quant.backtesting.execution_sim import NoFillAttempt
 from lumina_quant.backtesting.portfolio_backtest import FillApplicationAttribution
 from lumina_quant.research.alpha_max_evidence import (
     AlphaMaxFundingBoundaryLedgerRow,
+    _alpha_max_liquidation_cost_totals,
+    _alpha_max_normalize_liquidation_events,
+    _validate_alpha_max_engine_event_counts,
     reconcile_alpha_max_cost_attribution,
 )
 
@@ -120,7 +124,7 @@ def test_pricing_application_bijection_excludes_no_fill_and_reconciles_all_cost_
         [application],
         [_no_fill()],
         [funding],
-        portfolio_fee_total=application.applied_commission,
+        portfolio_fee_total=application.applied_commission + 3.0,
         portfolio_funding_total=-0.02,
         liquidation_cost_total=3.0,
         portfolio_liquidation_total=3.0,
@@ -132,6 +136,64 @@ def test_pricing_application_bijection_excludes_no_fill_and_reconciles_all_cost_
     assert result.funding_reconciled is True
     assert result.liquidation_reconciled is True
     assert result.complete is True
+
+
+def test_engine_event_counts_keep_synthetic_liquidation_outside_pricing_bijection() -> None:
+    _validate_alpha_max_engine_event_counts(
+        fill_event_count=2,
+        pricing_trace_count=1,
+        application_count=1,
+        liquidation_event_count=1,
+        trade_count=2,
+    )
+    with pytest.raises(ValueError, match="engine_count_mismatch"):
+        _validate_alpha_max_engine_event_counts(
+            fill_event_count=1,
+            pricing_trace_count=1,
+            application_count=1,
+            liquidation_event_count=1,
+            trade_count=1,
+        )
+    with pytest.raises(ValueError, match="engine_count_mismatch"):
+        _validate_alpha_max_engine_event_counts(
+            fill_event_count=2,
+            pricing_trace_count=1,
+            application_count=2,
+            liquidation_event_count=1,
+            trade_count=2,
+        )
+
+
+def test_liquidation_commission_is_sealed_and_reconciled_as_portfolio_fee_residual() -> None:
+    trace = _trace()
+    application = _application(trace)
+    normalized = _alpha_max_normalize_liquidation_events(
+        (
+            {
+                "time": datetime(2026, 7, 10, 8, 0, tzinfo=UTC),
+                "symbol": "BTCUSDT",
+                "position_qty": 1.0,
+                "entry_price": 100.0,
+                "liquidation_price": 75.0,
+                "close_price": 74.0,
+                "fill_cost": 75.0,
+                "commission": 0.03,
+                "configured_margin_mode": "isolated",
+                "modeled_margin_mode": "isolated",
+            },
+        )
+    )
+
+    liquidation_cost, portfolio_liquidation = _alpha_max_liquidation_cost_totals(
+        normalized,
+        (application,),
+        application.applied_commission + 0.03,
+    )
+
+    assert normalized[0].fill_cost == pytest.approx(75.0)
+    assert normalized[0].commission == pytest.approx(0.03)
+    assert liquidation_cost == pytest.approx(0.03)
+    assert portfolio_liquidation == pytest.approx(0.03)
 
 
 def test_reconciliation_rejects_missing_duplicate_or_wrong_trace_and_totals() -> None:

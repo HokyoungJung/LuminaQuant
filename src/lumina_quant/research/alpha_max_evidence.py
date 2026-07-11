@@ -4573,7 +4573,7 @@ def reconcile_alpha_max_cost_attribution(
     )
     funding_payment_total = math.fsum(float(value.payment) for value in funding_rows)
     fee_reconciled = math.isclose(
-        applied_commission_total,
+        applied_commission_total + portfolio_liquidation,
         fee_total,
         rel_tol=0.0,
         abs_tol=1e-12,
@@ -5203,6 +5203,8 @@ class AlphaMaxLiquidationEventEvidence:
     entry_price: float
     liquidation_price: float
     close_price: float
+    fill_cost: float
+    commission: float
     configured_margin_mode: str
     modeled_margin_mode: str
 
@@ -5217,12 +5219,17 @@ class AlphaMaxLiquidationEventEvidence:
         )
         if position_qty == 0.0:
             raise ValueError("alpha_max_liquidation_position_qty_invalid")
-        for field in ("entry_price", "liquidation_price", "close_price"):
+        for field in ("entry_price", "liquidation_price", "close_price", "fill_cost"):
             _alpha_max_finite_number(
                 getattr(self, field),
                 field=f"liquidation_{field}",
                 positive=True,
             )
+        _alpha_max_finite_number(
+            self.commission,
+            field="liquidation_commission",
+            nonnegative=True,
+        )
         _alpha_max_nonempty_token(
             self.configured_margin_mode,
             field="liquidation_configured_margin_mode",
@@ -5236,7 +5243,9 @@ class AlphaMaxLiquidationEventEvidence:
         return {
             "close_price": self.close_price,
             "configured_margin_mode": self.configured_margin_mode,
+            "commission": self.commission,
             "entry_price": self.entry_price,
+            "fill_cost": self.fill_cost,
             "liquidation_price": self.liquidation_price,
             "modeled_margin_mode": self.modeled_margin_mode,
             "position_qty": self.position_qty,
@@ -5255,6 +5264,8 @@ def _alpha_max_normalize_liquidation_events(
         "entry_price",
         "liquidation_price",
         "close_price",
+        "fill_cost",
+        "commission",
         "configured_margin_mode",
         "modeled_margin_mode",
     }
@@ -5286,6 +5297,16 @@ def _alpha_max_normalize_liquidation_events(
                     field="liquidation_close_price",
                     positive=True,
                 ),
+                fill_cost=_alpha_max_finite_number(
+                    raw["fill_cost"],
+                    field="liquidation_fill_cost",
+                    positive=True,
+                ),
+                commission=_alpha_max_finite_number(
+                    raw["commission"],
+                    field="liquidation_commission",
+                    nonnegative=True,
+                ),
                 configured_margin_mode=str(raw["configured_margin_mode"]),
                 modeled_margin_mode=str(raw["modeled_margin_mode"]),
             )
@@ -5295,6 +5316,35 @@ def _alpha_max_normalize_liquidation_events(
     if order != tuple(sorted(order)) or len(order) != len(set(order)):
         raise ValueError("alpha_max_liquidation_event_order_invalid")
     return result
+
+
+def _alpha_max_liquidation_cost_totals(
+    liquidations: tuple[AlphaMaxLiquidationEventEvidence, ...],
+    applications: tuple[FillApplicationAttribution, ...],
+    portfolio_fee_total: float,
+) -> tuple[float, float]:
+    """Separate event-sealed liquidation commission from attributed fill fees."""
+    if any(type(value) is not AlphaMaxLiquidationEventEvidence for value in liquidations):
+        raise TypeError("alpha_max_liquidation_identity_invalid")
+    if any(type(value) is not FillApplicationAttribution for value in applications):
+        raise TypeError("alpha_max_application_identity_invalid")
+    fee_total = _alpha_max_finite_number(
+        portfolio_fee_total,
+        field="portfolio_fee_total",
+        nonnegative=True,
+    )
+    liquidation_cost_total = math.fsum(value.commission for value in liquidations)
+    applied_commission_total = math.fsum(
+        value.applied_commission for value in applications
+    )
+    portfolio_liquidation_total = fee_total - applied_commission_total
+    if abs(portfolio_liquidation_total) <= 1e-12:
+        portfolio_liquidation_total = 0.0
+    return liquidation_cost_total, _alpha_max_finite_number(
+        portfolio_liquidation_total,
+        field="portfolio_liquidation_total",
+        nonnegative=True,
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -5509,12 +5559,13 @@ class AlphaMaxActualEngineRunReceipt:
             for actual, expected in count_bindings
         ):
             raise ValueError("alpha_max_actual_run_attribution_count_mismatch")
-        if not (
-            self.fill_event_count
-            == self.pricing_trace_count
-            == self.application_count
-        ) or self.trade_count > self.fill_event_count:
-            raise ValueError("alpha_max_actual_run_engine_count_mismatch")
+        _validate_alpha_max_engine_event_counts(
+            fill_event_count=self.fill_event_count,
+            pricing_trace_count=self.pricing_trace_count,
+            application_count=self.application_count,
+            liquidation_event_count=self.liquidation_event_count,
+            trade_count=self.trade_count,
+        )
         if type(self.funding_ledger_count) is not int or self.funding_ledger_count < 0:
             raise ValueError("alpha_max_actual_run_funding_count_invalid")
         if (
@@ -5643,6 +5694,31 @@ def _alpha_max_actual_engine_run_payload(
     }
 
 
+def _validate_alpha_max_engine_event_counts(
+    *,
+    fill_event_count: int,
+    pricing_trace_count: int,
+    application_count: int,
+    liquidation_event_count: int,
+    trade_count: int,
+) -> None:
+    """Bind ordinary attributed fills and synthetic liquidation fills separately."""
+    counts = (
+        fill_event_count,
+        pricing_trace_count,
+        application_count,
+        liquidation_event_count,
+        trade_count,
+    )
+    if any(type(value) is not int or value < 0 for value in counts) or (
+        pricing_trace_count != application_count
+        or fill_event_count != pricing_trace_count + liquidation_event_count
+        or trade_count > fill_event_count
+        or trade_count < liquidation_event_count
+    ):
+        raise ValueError("alpha_max_actual_run_engine_count_mismatch")
+
+
 def _alpha_max_verify_file_receipt(
     *,
     activation_receipt: ArtifactReadReceipt,
@@ -5702,8 +5778,6 @@ def build_alpha_max_actual_engine_run_receipt(
     liquidation_events: tuple[Mapping[str, object], ...],
     portfolio_fee_total: float,
     portfolio_funding_total: float,
-    liquidation_cost_total: float = 0.0,
-    portfolio_liquidation_total: float = 0.0,
 ) -> AlphaMaxActualEngineRunReceipt:
     """Build the sole typed complete-engine receipt from observed replay evidence."""
     _alpha_max_validate_domain_fold(domain, split_or_fold_id)
@@ -5761,6 +5835,14 @@ def build_alpha_max_actual_engine_run_receipt(
         or type(liquidation_events) is not tuple
     ):
         raise TypeError("alpha_max_actual_run_evidence_must_be_tuple")
+    normalized_liquidations = _alpha_max_normalize_liquidation_events(liquidation_events)
+    liquidation_cost_total, portfolio_liquidation_total = (
+        _alpha_max_liquidation_cost_totals(
+            normalized_liquidations,
+            fill_applications,
+            portfolio_fee_total,
+        )
+    )
     reconciliation = reconcile_alpha_max_cost_attribution(
         pricing_traces,
         fill_applications,
@@ -5775,7 +5857,6 @@ def build_alpha_max_actual_engine_run_receipt(
     application_payloads = tuple(value.to_payload() for value in fill_applications)
     no_fill_payloads = tuple(value.to_payload() for value in no_fill_attempts)
     funding_payloads = tuple(_alpha_max_funding_row_payload(value) for value in funding_ledger)
-    normalized_liquidations = _alpha_max_normalize_liquidation_events(liquidation_events)
     liquidation_payloads = tuple(value.to_payload() for value in normalized_liquidations)
     admitted = validate_alpha_max_admitted_symbols(
         ALPHA_MAX_CANDIDATE_SYMBOLS,

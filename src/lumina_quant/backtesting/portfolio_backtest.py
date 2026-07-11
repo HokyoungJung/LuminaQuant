@@ -1743,6 +1743,8 @@ class Portfolio:
                     "entry_price": entry_price,
                     "liquidation_price": liq_price,
                     "close_price": close_price,
+                    "fill_cost": fill_cost,
+                    "commission": commission,
                     "configured_margin_mode": configured_margin_mode,
                     "modeled_margin_mode": modeled_margin_mode,
                 }

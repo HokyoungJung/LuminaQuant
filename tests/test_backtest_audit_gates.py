@@ -606,6 +606,8 @@ class TestLiveLiquidationGate(unittest.TestCase):
         self.assertEqual(fill.status, "LIQUIDATED")
         self.assertEqual(fill.exchange, "SIM_LIQUIDATION")
         self.assertEqual(len(p.liquidation_events), 1)
+        self.assertAlmostEqual(p.liquidation_events[0]["fill_cost"], fill.fill_cost)
+        self.assertAlmostEqual(p.liquidation_events[0]["commission"], fill.commission)
         self.assertEqual(p._modeled_liquidation_warnings, [])
         self.assertIn("BTC/USDT", p._pending_liquidation)
 
