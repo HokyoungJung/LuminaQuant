@@ -19,6 +19,8 @@ from lumina_quant.research.alpha_max_evidence import (
     ALPHA_MAX_PERIODS_PER_YEAR,
     AlphaMaxEquityEndpoint,
     AlphaMaxPrimaryReturnStream,
+    AlphaMaxStreamingEquityEvidence,
+    AlphaMaxStreamingEquityTracker,
     AlphaMaxTrialLedger,
     alpha_max_common_rng_seed,
     alpha_max_common_rng_seed_payload,
@@ -63,6 +65,13 @@ def _stream(
         equity *= 1.0 + value
         endpoints.append(AlphaMaxEquityEndpoint(timestamp=timestamp, equity=equity))
     return build_alpha_max_primary_return_stream(endpoints, calendar)
+
+
+def _streaming_equity(values: list[float] | tuple[float, ...]) -> AlphaMaxStreamingEquityEvidence:
+    tracker = AlphaMaxStreamingEquityTracker()
+    for timestamp_ms, value in enumerate(values, start=1):
+        tracker.observe((timestamp_ms, value))
+    return tracker.finalize()
 
 
 @pytest.fixture(scope="module")
@@ -203,7 +212,10 @@ def test_u44_metrics_wrapper_calls_only_canonical_optimizer_primitive(
         return original(values, periods_per_year=periods_per_year)
 
     monkeypatch.setattr(evidence.optimizer_core, "metrics", _spy)
-    result = compute_alpha_max_metric_statistics(stream, [10_500.0, 9_000.0, 9_500.0])
+    result = compute_alpha_max_metric_statistics(
+        stream,
+        _streaming_equity([10_500.0, 9_000.0, stream.endpoint_equities[-1]]),
+    )
     expected = original(np.asarray(stream.returns), periods_per_year=2190)
     assert len(calls) == 1
     np.testing.assert_array_equal(calls[0][0], np.asarray(stream.returns))
@@ -221,7 +233,10 @@ def test_u44_poisoned_primary_stream_and_nonfinite_canonical_output_fail(
     original = optimizer_core.metrics
     poisoned = replace(stream, returns=(*stream.returns[:-1], math.nan))
     with pytest.raises(ValueError, match="return_identity_mismatch"):
-        compute_alpha_max_metric_statistics(poisoned, stream.endpoint_equities)
+        compute_alpha_max_metric_statistics(
+            poisoned,
+            _streaming_equity(stream.endpoint_equities),
+        )
 
     def _bad(_: np.ndarray, *, periods_per_year: int) -> dict[str, float]:
         assert periods_per_year == 2190
@@ -231,7 +246,10 @@ def test_u44_poisoned_primary_stream_and_nonfinite_canonical_output_fail(
 
     monkeypatch.setattr(evidence.optimizer_core, "metrics", _bad)
     with pytest.raises(ValueError, match="canonical_metric_sharpe_invalid"):
-        compute_alpha_max_metric_statistics(stream, stream.endpoint_equities)
+        compute_alpha_max_metric_statistics(
+            stream,
+            _streaming_equity(stream.endpoint_equities),
+        )
 
 
 def test_u46_drawdown_duration_type7_var_and_worst_ceiling_es() -> None:
@@ -246,7 +264,10 @@ def test_u46_drawdown_duration_type7_var_and_worst_ceiling_es() -> None:
     assert alpha_max_full_event_mdd([10_500.0, 8_400.0, 9_000.0]) == pytest.approx(0.20)
 
     tail_stream = _stream([float(index) / 1_000.0 for index in range(-10, 10)])
-    result = compute_alpha_max_metric_statistics(tail_stream, tail_stream.endpoint_equities)
+    result = compute_alpha_max_metric_statistics(
+        tail_stream,
+        _streaming_equity(tail_stream.endpoint_equities),
+    )
     assert result.value_at_risk_5pct_type7 == pytest.approx(-0.00905)
     assert result.expected_shortfall_5pct == pytest.approx(-0.01)
     assert result.drawdown_duration_hours == 4 * result.drawdown_duration_endpoints
