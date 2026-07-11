@@ -6,10 +6,7 @@ from __future__ import annotations
 import argparse
 from collections.abc import Sequence
 
-from lumina_quant.research.alpha_max_engine_runner import (
-    reject_ambient_lq_environment,
-    run_alpha_max_prelock_process,
-)
+from lumina_quant.alpha_max_process_boundary import reject_ambient_lq_environment
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -35,6 +32,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _execute(args: argparse.Namespace) -> int:
+    from lumina_quant.research.alpha_max_engine_runner import run_alpha_max_prelock_process
+
     result = run_alpha_max_prelock_process(
         config=args.config,
         contract_manifest=args.contract_manifest,
@@ -55,8 +54,8 @@ def _execute(args: argparse.Namespace) -> int:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    # This gate precedes parser construction/argument-file access and every
-    # user-controlled filesystem operation.
+    # This dependency-free gate runs before importing the runtime/configuration
+    # graph, parser construction, or any user-controlled filesystem operation.
     reject_ambient_lq_environment()
     args = build_parser().parse_args(argv)
     return _execute(args)

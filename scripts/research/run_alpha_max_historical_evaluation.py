@@ -6,10 +6,7 @@ from __future__ import annotations
 import argparse
 from collections.abc import Sequence
 
-from lumina_quant.research.alpha_max_engine_runner import (
-    reject_ambient_lq_environment,
-    run_alpha_max_historical_process,
-)
+from lumina_quant.alpha_max_process_boundary import reject_ambient_lq_environment
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -27,6 +24,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _execute(args: argparse.Namespace) -> int:
+    from lumina_quant.research.alpha_max_engine_runner import run_alpha_max_historical_process
+
     result = run_alpha_max_historical_process(
         sealed_prelock_directory=args.sealed_prelock_directory,
         embargo_feature_root=args.embargo_feature_root,

@@ -1072,13 +1072,19 @@ class Portfolio:
         alpha_funding_anchor = None
         if self.funding_boundary_resolver is not None:
             fill_time = getattr(fill, "timeindex", None)
-            if (
-                not isinstance(fill_time, datetime)
-                or fill_time.tzinfo is None
-                or fill_time.utcoffset() != timedelta(0)
+            if type(fill_time) is int and fill_time >= 100_000_000_000:
+                # MarketWindowEvent canonicalizes its event clock to exact
+                # epoch milliseconds.  Preserve that exact anchor instead of
+                # forcing the Alpha-Max engine through a datetime-only seam.
+                alpha_funding_anchor = fill_time / 1000.0
+            elif (
+                isinstance(fill_time, datetime)
+                and fill_time.tzinfo is not None
+                and fill_time.utcoffset() == timedelta(0)
             ):
+                alpha_funding_anchor = float(fill_time.timestamp())
+            else:
                 raise ValueError("funding_boundary_fill_timestamp_invalid")
-            alpha_funding_anchor = float(fill_time.timestamp())
 
         fill_dir = 0
         if fill.direction == "BUY":
@@ -1742,9 +1748,14 @@ class Portfolio:
                     "position_qty": qty,
                     "entry_price": entry_price,
                     "liquidation_price": liq_price,
+                    "trigger_price": trigger_price,
+                    "bar_high": bar_high,
+                    "bar_low": bar_low,
                     "close_price": close_price,
                     "fill_cost": fill_cost,
                     "commission": commission,
+                    "leverage": leverage,
+                    "reason": "maintenance_margin_breach",
                     "configured_margin_mode": configured_margin_mode,
                     "modeled_margin_mode": modeled_margin_mode,
                 }

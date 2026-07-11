@@ -23,17 +23,34 @@ if TYPE_CHECKING:
     from lumina_quant.configuration.schema import RuntimeConfig
 
 
+_ALPHA_MAX_BACKTEST_CONFIG_TYPE_ID = (
+    "lumina_quant.research.alpha_max_engine_runner",
+    "AlphaMaxBacktestConfig",
+)
+_ALPHA_MAX_BACKTEST_CONFIG_TYPE: type[object] | None = None
+
+
+def register_alpha_max_backtest_config_type(config_type: type[object]) -> None:
+    """Register the exact frozen type without importing research from backtesting."""
+    global _ALPHA_MAX_BACKTEST_CONFIG_TYPE
+    if (
+        type(config_type) is not type
+        or (config_type.__module__, config_type.__qualname__) != _ALPHA_MAX_BACKTEST_CONFIG_TYPE_ID
+        or (
+            _ALPHA_MAX_BACKTEST_CONFIG_TYPE is not None
+            and _ALPHA_MAX_BACKTEST_CONFIG_TYPE is not config_type
+        )
+    ):
+        raise RuntimeError("alpha_max_backtest_config_type_registration_invalid")
+    _ALPHA_MAX_BACKTEST_CONFIG_TYPE = config_type
+
+
 def is_exact_alpha_max_backtest_config(config: object) -> bool:
     """Recognize the frozen research config without probing runtime fields."""
-    config_type = type(config)
-    if (
-        config_type.__module__ != "lumina_quant.research.alpha_max_engine_runner"
-        or config_type.__qualname__ != "AlphaMaxBacktestConfig"
-    ):
-        return False
-    from lumina_quant.research.alpha_max_engine_runner import AlphaMaxBacktestConfig
-
-    return config_type is AlphaMaxBacktestConfig
+    return (
+        _ALPHA_MAX_BACKTEST_CONFIG_TYPE is not None
+        and type(config) is _ALPHA_MAX_BACKTEST_CONFIG_TYPE
+    )
 
 
 def wrapped_runtime_config(config: object) -> object | None:

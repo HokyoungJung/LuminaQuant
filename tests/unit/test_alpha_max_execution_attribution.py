@@ -6,6 +6,7 @@ import random
 from copy import deepcopy
 from dataclasses import FrozenInstanceError, fields, replace
 from datetime import UTC, datetime
+from types import SimpleNamespace
 
 import pytest
 
@@ -21,6 +22,7 @@ from lumina_quant.backtesting.execution_sim import (
     SimulatedExecutionHandler,
 )
 from lumina_quant.core.events import MarketEvent
+from lumina_quant.core.engine import TradingEngine
 
 
 def _model_config(**overrides) -> ExecutionModelConfig:
@@ -114,6 +116,20 @@ def _handler(*, enabled: bool) -> tuple[SimulatedExecutionHandler, queue.Queue]:
     )
 
 
+def _check_open_orders(
+    handler: SimulatedExecutionHandler,
+    market: MarketEvent,
+    *,
+    equity_before: float = 100_000.0,
+) -> None:
+    """Mirror the engine's one-sweep capacity context boundary in unit tests."""
+    handler.set_capacity_equity_context(equity_before)
+    try:
+        handler.check_open_orders(market)
+    finally:
+        handler.clear_capacity_equity_context()
+
+
 def _mkt_order(*, order_id: str = "M-1", quantity: float = 2.0) -> dict[str, object]:
     return {
         "order_id": order_id,
@@ -194,6 +210,7 @@ def _core_fill_values(fill) -> tuple[object, ...]:
 def _economic_handler_state(handler) -> dict[str, object]:
     state = handler.get_state()
     state.pop("no_fill_attempt_evidence", None)
+    state.pop("capacity_observation_evidence", None)
     return state
 
 
@@ -426,8 +443,8 @@ def test_handler_positive_fill_on_off_core_events_orders_and_rng_match():
     on.active_orders = deepcopy(off.active_orders)
 
     market = _market(volume=100.0)
-    off.check_open_orders(market)
-    on.check_open_orders(market)
+    _check_open_orders(off, market)
+    _check_open_orders(on, market)
 
     off_fill = off_events.get_nowait()
     on_fill = on_events.get_nowait()
@@ -450,13 +467,23 @@ def test_handler_positive_fill_on_off_core_events_orders_and_rng_match():
     assert off.active_orders == on.active_orders
     assert "no_fill_attempt_evidence" not in off.get_state()
     assert on.get_state()["no_fill_attempt_evidence"] == []
+    assert "capacity_observation_evidence" not in off.get_state()
+    assert on.get_state()["capacity_observation_evidence"][0] == {
+        "bar_volume": 100.0,
+        "equity_before": 100_000.0,
+        "raw_price": 100.0,
+        "record_type": "capacity_observation",
+        "requested_qty": 2.0,
+        "symbol": "BTC/USDT",
+        "timeindex": market.time.isoformat(),
+    }
     assert _economic_handler_state(off) == _economic_handler_state(on)
 
     off.active_orders = [_mkt_order(order_id="M-2")]
     on.active_orders = deepcopy(off.active_orders)
     later_market = _market(timestamp=2, volume=100.0)
-    off.check_open_orders(later_market)
-    on.check_open_orders(later_market)
+    _check_open_orders(off, later_market)
+    _check_open_orders(on, later_market)
     off_later_fill = off_events.get_nowait()
     on_later_fill = on_events.get_nowait()
     assert _core_fill_values(off_later_fill) == _core_fill_values(on_later_fill)
@@ -468,12 +495,65 @@ def test_handler_positive_fill_on_off_core_events_orders_and_rng_match():
     assert _economic_handler_state(off) == _economic_handler_state(on)
 
 
+def test_capacity_context_is_required_and_shared_by_every_order_in_one_sweep() -> None:
+    handler, events = _handler(enabled=True)
+    handler.active_orders = [
+        _mkt_order(order_id="M-1", quantity=2.0),
+        _mkt_order(order_id="M-2", quantity=3.0),
+    ]
+    market = _market(volume=100.0)
+
+    with pytest.raises(RuntimeError, match="capacity equity context missing"):
+        handler.check_open_orders(market)
+    assert handler.capacity_observation_evidence == ()
+
+    _check_open_orders(handler, market, equity_before=123_456.0)
+
+    observations = handler.capacity_observation_evidence
+    assert tuple(value.equity_before for value in observations) == (123_456.0, 123_456.0)
+    assert tuple(value.requested_qty for value in observations) == (2.0, 3.0)
+    assert events.qsize() == 2
+
+
+def test_engine_capacity_context_preserves_off_parity_and_skips_post_ruin_sweep() -> None:
+    class _Execution:
+        def __init__(self, *, enabled: bool) -> None:
+            self.record_cost_attribution = enabled
+            self.calls: list[object] = []
+
+        def set_capacity_equity_context(self, value: object) -> None:
+            self.calls.append(("set", value))
+
+        def check_open_orders(self, event: object) -> None:
+            self.calls.append(("check", event))
+
+        def clear_capacity_equity_context(self) -> None:
+            self.calls.append(("clear", None))
+
+    market = _market()
+    off_engine = object.__new__(TradingEngine)
+    off_engine.execution_handler = _Execution(enabled=False)
+    off_engine.portfolio = SimpleNamespace(current_holdings={"total": 0.0})
+    off_engine._check_open_orders_with_equity_context(market)
+    assert off_engine.execution_handler.calls == [
+        ("set", 0.0),
+        ("check", market),
+        ("clear", None),
+    ]
+
+    ruined_engine = object.__new__(TradingEngine)
+    ruined_engine.execution_handler = _Execution(enabled=True)
+    ruined_engine.portfolio = SimpleNamespace(current_holdings={"total": 0.0})
+    ruined_engine._check_open_orders_with_equity_context(market)
+    assert ruined_engine.execution_handler.calls == []
+
+
 @pytest.mark.parametrize("order_kind", ["STOP", "TAKE_PROFIT", "TRAIL_STOP"])
 def test_positive_conditional_trace_preserves_kind_trigger_and_parent(order_kind):
     handler, events = _handler(enabled=True)
     handler.active_orders = [_conditional_order(order_kind)]
 
-    handler.check_open_orders(_market(open_price=100.0, high=101.0, low=99.0, volume=100.0))
+    _check_open_orders(handler, _market(open_price=100.0, high=101.0, low=99.0, volume=100.0))
 
     fill = events.get_nowait()
     trace = fill.metadata["cost_attribution"]
@@ -489,7 +569,7 @@ def test_partial_remainder_trace_links_to_immediate_order_without_state_changes(
     handler, events = _handler(enabled=True)
     handler.active_orders = [_mkt_order(quantity=15.0)]
 
-    handler.check_open_orders(_market(volume=100.0))
+    _check_open_orders(handler, _market(volume=100.0))
     first = events.get_nowait()
     first_trace = first.metadata["cost_attribution"]
     assert first_trace.requested_qty == 15.0
@@ -498,7 +578,7 @@ def test_partial_remainder_trace_links_to_immediate_order_without_state_changes(
     assert first_trace.remainder_of_order_id is None
     assert handler.active_orders[0]["order_id"] == "M-1-R"
 
-    handler.check_open_orders(_market(timestamp=2, volume=100.0))
+    _check_open_orders(handler, _market(timestamp=2, volume=100.0))
     second = events.get_nowait()
     second_trace = second.metadata["cost_attribution"]
     assert second_trace.order_id == "M-1-R"
@@ -514,8 +594,8 @@ def test_zero_volume_market_no_fill_attempt_and_on_off_state_are_identical():
     on.active_orders = deepcopy(off.active_orders)
 
     market = _market(volume=0.0)
-    off.check_open_orders(market)
-    on.check_open_orders(market)
+    _check_open_orders(off, market)
+    _check_open_orders(on, market)
 
     assert off_events.empty() and on_events.empty()
     assert off.active_orders == on.active_orders
@@ -524,6 +604,8 @@ def test_zero_volume_market_no_fill_attempt_and_on_off_state_are_identical():
     assert on.pricing_trace_evidence == ()
     assert off.no_fill_attempt_evidence == ()
     assert len(on.no_fill_attempt_evidence) == 1
+    assert len(on.capacity_observation_evidence) == 1
+    assert on.capacity_observation_evidence[0].bar_volume == 0.0
     record = on.no_fill_attempt_evidence[0]
     assert isinstance(record, NoFillAttempt)
     assert record.reason == "liquidity_cap_zero_market"
@@ -548,8 +630,8 @@ def test_zero_volume_crossed_limit_records_attempt_but_non_crossed_does_not():
     crossed_off.active_orders = deepcopy(crossed.active_orders)
     before_rng = crossed.execution_model._rng.getstate()
 
-    crossed.check_open_orders(market)
-    crossed_off.check_open_orders(market)
+    _check_open_orders(crossed, market)
+    _check_open_orders(crossed_off, market)
 
     assert crossed_events.empty() and crossed_off_events.empty()
     assert len(crossed.no_fill_attempt_evidence) == 1
@@ -568,7 +650,7 @@ def test_zero_volume_crossed_limit_records_attempt_but_non_crossed_does_not():
     non_crossed_order, non_crossed_market = _limit_order(crossed=False)
     non_crossed.active_orders = [non_crossed_order]
     before_order = deepcopy(non_crossed.active_orders)
-    non_crossed.check_open_orders(non_crossed_market)
+    _check_open_orders(non_crossed, non_crossed_market)
     assert non_crossed_events.empty()
     assert non_crossed.no_fill_attempt_evidence == ()
     assert non_crossed.active_orders == before_order
@@ -583,8 +665,8 @@ def test_zero_volume_triggered_conditional_records_one_attempt_and_keeps_lineage
     handler.active_orders = [_conditional_order(order_kind)]
     off.active_orders = deepcopy(handler.active_orders)
 
-    handler.check_open_orders(_market(open_price=100.0, high=101.0, low=99.0, volume=0.0))
-    off.check_open_orders(_market(open_price=100.0, high=101.0, low=99.0, volume=0.0))
+    _check_open_orders(handler, _market(open_price=100.0, high=101.0, low=99.0, volume=0.0))
+    _check_open_orders(off, _market(open_price=100.0, high=101.0, low=99.0, volume=0.0))
 
     assert events.empty() and off_events.empty()
     assert len(handler.no_fill_attempt_evidence) == 1
@@ -607,7 +689,7 @@ def test_untriggered_conditional_emits_no_attempt():
     order["stop_price"] = 50.0
     handler.active_orders = [order]
 
-    handler.check_open_orders(_market(open_price=100.0, high=101.0, low=99.0, volume=0.0))
+    _check_open_orders(handler, _market(open_price=100.0, high=101.0, low=99.0, volume=0.0))
 
     assert events.empty()
     assert handler.no_fill_attempt_evidence == ()
@@ -625,7 +707,7 @@ def test_no_fill_evidence_failure_is_loud_before_remainder_or_order_mutation(mon
 
     monkeypatch.setattr(handler, "_emit_no_fill_attempt", fail)
     with pytest.raises(RuntimeError, match="no-fill evidence failed"):
-        handler.check_open_orders(market)
+        _check_open_orders(handler, market)
 
     assert events.empty()
     assert handler.active_orders == before_orders
@@ -644,7 +726,7 @@ def test_handler_pricing_sink_failure_is_loud_before_fill_or_order_mutation(monk
     before_orders = deepcopy(handler.active_orders)
 
     with pytest.raises(RuntimeError, match="handler pricing sink failed"):
-        handler.check_open_orders(market)
+        _check_open_orders(handler, market)
 
     assert events.empty()
     assert handler.active_orders == before_orders
@@ -682,7 +764,7 @@ def test_trace_canonical_hash_is_structural_strict_and_immutable():
 def test_no_fill_state_restore_is_exact_nonduplicating_and_rng_neutral():
     full, full_events = _handler(enabled=True)
     full.active_orders = [_mkt_order(quantity=2.0)]
-    full.check_open_orders(_market(volume=0.0))
+    _check_open_orders(full, _market(volume=0.0))
     checkpoint = deepcopy(full.get_state())
 
     restored, restored_events = _handler(enabled=True)
@@ -693,8 +775,8 @@ def test_no_fill_state_restore_is_exact_nonduplicating_and_rng_neutral():
     assert restored.get_state() == checkpoint
 
     later = _market(timestamp=2, volume=100.0)
-    full.check_open_orders(later)
-    restored.check_open_orders(later)
+    _check_open_orders(full, later)
+    _check_open_orders(restored, later)
     full_fill = full_events.get_nowait()
     restored_fill = restored_events.get_nowait()
     assert _core_fill_values(full_fill) == _core_fill_values(restored_fill)
@@ -704,6 +786,10 @@ def test_no_fill_state_restore_is_exact_nonduplicating_and_rng_neutral():
     )
     assert full.execution_model._rng.getstate() == restored.execution_model._rng.getstate()
     assert full.get_state() == restored.get_state()
+    assert len(restored.capacity_observation_evidence) == 2
+    assert len(restored.capacity_observation_evidence) == (
+        len(restored.pricing_trace_evidence) + len(restored.no_fill_attempt_evidence)
+    )
 
     drained = restored.drain_no_fill_attempt_evidence()
     assert drained == full.no_fill_attempt_evidence
@@ -714,7 +800,7 @@ def test_no_fill_state_restore_is_exact_nonduplicating_and_rng_neutral():
 def test_no_fill_state_validation_is_atomic_and_disabled_handler_rejects_it():
     handler, _ = _handler(enabled=True)
     handler.active_orders = [_mkt_order(quantity=2.0)]
-    handler.check_open_orders(_market(volume=0.0))
+    _check_open_orders(handler, _market(volume=0.0))
     before = deepcopy(handler.get_state())
     corrupt = deepcopy(before)
     corrupt["no_fill_attempt_evidence"][0]["raw_price"] = float("nan")

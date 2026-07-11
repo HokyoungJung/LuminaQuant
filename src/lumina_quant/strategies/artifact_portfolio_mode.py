@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import os
@@ -90,6 +91,13 @@ DEFAULT_ARTIFACT_PORTFOLIO_MANIFEST_PATH = (
 )
 MANIFEST_PORTFOLIO_MODE_PREFIX = "manifest:"
 MANIFEST_PORTFOLIO_GROSS_CAP = 2.25
+_ALPHA_MAX_STATIC_STRATEGY_CLASSES = frozenset(
+    {
+        "ResearchOnlyDailyCrossSectionalNearHighAnchoringStrategy",
+        "ResearchOnlyDailyLowTurnoverTrendPersistenceStrategy",
+        "ResearchOnlyFourHourFundingHarvestCarryStrategy",
+    }
+)
 _MANIFEST_FORBIDDEN_OOS_KEYS = (
     "uses_current_fold_oos",
     "uses_locked_oos_for_selection",
@@ -234,6 +242,13 @@ class _SignalCaptureQueue:
         out = list(self._items)
         self._items.clear()
         return out
+
+    def snapshot(self) -> list[Any]:
+        return list(self._items)
+
+    def restore(self, items: list[Any]) -> None:
+        self._items.clear()
+        self._items.extend(items)
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -597,9 +612,10 @@ def _manifest_definition_from_path(
             token=token, source_artifacts=artifacts, reason="manifest_no_positive_children"
         )
     cash_weight = _safe_float(payload.get("cash_weight"), max(0.0, 1.0 - gross))
+    sort_by_weight = payload.get("artifact_kind") != "alpha_max_engine_portfolio_manifest.v1"
     return PortfolioModeDefinition(
         portfolio_mode=token,
-        components=tuple(_merge_components(components)),
+        components=tuple(_merge_components(components, sort_by_weight=sort_by_weight)),
         cash_weight=float(max(0.0, min(1.0, cash_weight))),
         source_artifacts=artifacts,
         watch_symbols=(),
@@ -2153,7 +2169,11 @@ def _expand_reference(
     return components, cash_weight
 
 
-def _merge_components(components: list[PortfolioModeComponent]) -> list[PortfolioModeComponent]:
+def _merge_components(
+    components: list[PortfolioModeComponent],
+    *,
+    sort_by_weight: bool = True,
+) -> list[PortfolioModeComponent]:
     merged: dict[str, PortfolioModeComponent] = {}
     for component in components:
         existing = merged.get(component.component_id)
@@ -2169,7 +2189,10 @@ def _merge_components(components: list[PortfolioModeComponent]) -> list[Portfoli
             weight=float(existing.weight + component.weight),
             source=f"{existing.source}+{component.source}",
         )
-    return sorted(merged.values(), key=lambda item: item.weight, reverse=True)
+    values = list(merged.values())
+    if not sort_by_weight:
+        return values
+    return sorted(values, key=lambda item: item.weight, reverse=True)
 
 
 def _component_param_override(
@@ -2445,6 +2468,12 @@ class ArtifactPortfolioModeStrategy(Strategy):
             resolve_portfolio_mode_definition(self.portfolio_mode),
             component_param_overrides,
         )
+        alpha_static_registry = tuple(
+            receipt.artifact_id for receipt in self.definition.artifact_read_receipts
+        ) == ("artifact_portfolio_manifest", "source:alpha_max_config") and all(
+            component.strategy_class in _ALPHA_MAX_STATIC_STRATEGY_CLASSES
+            for component in self.definition.components
+        )
         self.symbol_list = list(self.definition.symbols)
         self.decision_cadence_seconds = int(decision_cadence_seconds)
         if self.decision_cadence_seconds < 1:
@@ -2454,11 +2483,20 @@ class ArtifactPortfolioModeStrategy(Strategy):
         required_timeframes: set[str] = set()
         uses_timeframe_aggregator = False
         for component in self.definition.components:
+            if alpha_static_registry:
+                strategy_cls = resolve_strategy_class(
+                    component.strategy_class,
+                    default_name=component.strategy_class,
+                    discover_plugins=False,
+                )
+            else:
+                strategy_cls = resolve_strategy_class(
+                    component.strategy_class,
+                    default_name=component.strategy_class,
+                )
             strategy_cls = cast(
                 Any,
-                resolve_strategy_class(
-                    component.strategy_class, default_name=component.strategy_class
-                ),
+                strategy_cls,
             )
             child_queue = _SignalCaptureQueue()
             child_bars = _BarsSubsetProxy(self.bars, list(component.symbols))
@@ -2638,14 +2676,54 @@ class ArtifactPortfolioModeStrategy(Strategy):
             validator()
 
     def finalize_completed_native_buckets(self, watermark: Any) -> dict[str, Any]:
-        handlers = self._checked_child_methods(
+        finalizers = self._checked_child_methods(
             method_name="finalize_completed_native_buckets",
             capability_name="completed native bucket",
         )
-        return {
-            component_id: _canonical_json_value(finalizer(watermark))
-            for component_id, finalizer in handlers.items()
-        }
+        rollback_getters = self._checked_child_methods(
+            method_name="get_native_finalization_rollback_state",
+            capability_name="native finalization rollback getter",
+        )
+        rollback_setters = self._checked_child_methods(
+            method_name="set_native_finalization_rollback_state",
+            capability_name="native finalization rollback setter",
+        )
+        expected_ids = tuple(component.component_id for component, _child, _queue in self._children)
+        if (
+            tuple(finalizers) != expected_ids
+            or tuple(rollback_getters) != expected_ids
+            or tuple(rollback_setters) != expected_ids
+        ):
+            raise ValueError("completed native bucket child ordering mismatch")
+
+        rollback_states: dict[str, Any] = {}
+        rollback_queues: dict[str, list[Any]] = {}
+        queues: dict[str, _SignalCaptureQueue] = {}
+        for component, _child, child_queue in self._children:
+            component_id = component.component_id
+            rollback_states[component_id] = copy.deepcopy(rollback_getters[component_id]())
+            queues[component_id] = child_queue
+            rollback_queues[component_id] = copy.deepcopy(child_queue.snapshot())
+
+        results: dict[str, Any] = {}
+        try:
+            for component, _child, _queue in self._children:
+                component_id = component.component_id
+                results[component_id] = _canonical_json_value(finalizers[component_id](watermark))
+        except Exception as exc:
+            rollback_errors: list[Exception] = []
+            for component, _child, _queue in reversed(self._children):
+                component_id = component.component_id
+                try:
+                    rollback_setters[component_id](copy.deepcopy(rollback_states[component_id]))
+                except Exception as rollback_exc:  # pragma: no cover - defensive fail-closed path
+                    rollback_errors.append(rollback_exc)
+                finally:
+                    queues[component_id].restore(copy.deepcopy(rollback_queues[component_id]))
+            if rollback_errors:
+                raise RuntimeError("completed native bucket rollback failed") from exc
+            raise
+        return results
 
     def _component_client_order_id(
         self, *, component: PortfolioModeComponent, signal: SignalEvent

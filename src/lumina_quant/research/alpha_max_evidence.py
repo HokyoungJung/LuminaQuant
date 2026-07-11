@@ -41,6 +41,7 @@ from lumina_quant.data.feature_points import (
     FEATURE_POINT_MAX_STALE_MS,
     FeaturePoint,
     FeaturePointLookup,
+    SealedFeatureFile,
 )
 from lumina_quant.portfolio.optimizer_core import project_simplex_with_upper_bounds
 from lumina_quant.portfolio import optimizer_core
@@ -82,6 +83,7 @@ __all__ = [
     "AlphaMaxManifestMaterialization",
     "AlphaMaxManifestReceipt",
     "AlphaMaxMetricStatistics",
+    "AlphaMaxNativeFinalizationReceipt",
     "AlphaMaxNormalizedFoldSegmentEvidence",
     "AlphaMaxOrderedFundingLookup",
     "AlphaMaxPreGateSharpeEvidence",
@@ -93,13 +95,17 @@ __all__ = [
     "AlphaMaxRootReceipt",
     "AlphaMaxRootSeal",
     "AlphaMaxRowEvidence",
+    "AlphaMaxRunReportOnlyDiagnostics",
+    "AlphaMaxScalingAttribution",
     "AlphaMaxSelectionResult",
     "AlphaMaxStatisticalEvidence",
     "AlphaMaxStreamingEquityEvidence",
     "AlphaMaxStreamingEquityTracker",
     "AlphaMaxTerminalGateEvidence",
     "AlphaMaxTerminalState",
+    "AlphaMaxTrainLiquidityBuckets",
     "AlphaMaxTreeEntry",
+    "AlphaMaxTrendLiquidityFalsifier",
     "AlphaMaxTrialLedger",
     "AlphaMaxTurnoverRPTDiagnostics",
     "FeatureRootSpec",
@@ -124,11 +130,15 @@ __all__ = [
     "build_alpha_max_cost_cell_pre_gate_evidence",
     "build_alpha_max_daily_quote_notional",
     "build_alpha_max_fold_run_evidence",
+    "build_alpha_max_native_finalization_receipt",
     "build_alpha_max_normalized_fold_segment_evidence",
     "build_alpha_max_prelock_seal",
     "build_alpha_max_primary_return_stream",
+    "build_alpha_max_run_report_only_diagnostics",
     "build_alpha_max_statistical_evidence",
     "build_alpha_max_terminal_state",
+    "build_alpha_max_train_liquidity_buckets",
+    "build_alpha_max_trend_liquidity_falsifier",
     "build_alpha_max_trial_ledger",
     "canonical_alpha_max_cost_cell_bytes",
     "canonical_alpha_max_row_bytes",
@@ -147,6 +157,7 @@ __all__ = [
     "select_alpha_max_prelock_champion",
     "validate_alpha_max_admission_artifact",
     "validate_alpha_max_admitted_symbols",
+    "validate_alpha_max_train_liquidity_buckets",
 ]
 
 
@@ -494,9 +505,14 @@ class FeatureRootSpec:
 class AlphaMaxOrderedFundingLookup:
     """Strict newest-point composite over one frozen adjacent root sequence."""
 
-    __slots__ = ("_locked", "_lookups", "_root_specs")
+    __slots__ = ("_locked", "_lookups", "_root_seals", "_root_specs")
 
-    def __init__(self, root_specs: Sequence[FeatureRootSpec]) -> None:
+    def __init__(
+        self,
+        root_specs: Sequence[FeatureRootSpec],
+        *,
+        root_seals: tuple[AlphaMaxRootSeal, ...] | None = None,
+    ) -> None:
         specs = tuple(root_specs)
         if not specs or any(type(spec) is not FeatureRootSpec for spec in specs):
             raise TypeError("feature_root_specs_must_be_exact")
@@ -508,14 +524,52 @@ class AlphaMaxOrderedFundingLookup:
         if len(specs) == 2 and specs[0].end_utc != specs[1].start_utc:
             raise ValueError("feature_root_gap_or_overlap")
 
+        seals: tuple[AlphaMaxRootSeal, ...] = ()
+        sealed_files_by_root: tuple[tuple[SealedFeatureFile, ...] | None, ...] = tuple(
+            None for _ in specs
+        )
+        if root_seals is not None:
+            if type(root_seals) is not tuple or len(root_seals) != len(specs):
+                raise TypeError("feature_root_seals_must_match_exact_tuple")
+            if any(type(seal) is not AlphaMaxRootSeal for seal in root_seals):
+                raise TypeError("feature_root_seals_must_be_exact")
+            for spec, seal in zip(specs, root_seals, strict=True):
+                seal.__post_init__()
+                if (
+                    seal.root_kind != "feature"
+                    or seal.root_id != spec.root_id
+                    or seal.path != spec.path
+                    or seal.exchange != spec.exchange
+                    or seal.start_utc != spec.start_utc
+                    or seal.end_utc != spec.end_utc
+                    or seal.inventory_sha256 != spec.inventory_sha256
+                    or seal.content_sha256 != spec.content_sha256
+                ):
+                    raise ValueError("feature_root_seal_spec_mismatch")
+            seals = root_seals
+            sealed_files_by_root = tuple(
+                tuple(
+                    SealedFeatureFile(
+                        relative_path=entry.relative_path,
+                        byte_count=entry.byte_count,
+                        mode=entry.mode,
+                        mtime_ns=entry.mtime_ns,
+                        sha256=entry.sha256,
+                    )
+                    for entry in seal.entries
+                )
+                for seal in seals
+            )
+
         lookups = tuple(
             FeaturePointLookup(
                 db_path=spec.path,
                 exchange=spec.exchange,
                 start_date=spec.start_utc,
                 end_date=spec.end_utc,
+                **({} if sealed_files is None else {"sealed_files": sealed_files}),
             )
-            for spec in specs
+            for spec, sealed_files in zip(specs, sealed_files_by_root, strict=True)
         )
         for spec, lookup in zip(specs, lookups, strict=True):
             if getattr(lookup, "db_path", spec.path) != spec.path:
@@ -523,6 +577,7 @@ class AlphaMaxOrderedFundingLookup:
             if getattr(lookup, "exchange", spec.exchange) != spec.exchange:
                 raise ValueError("feature_lookup_exchange_identity_mismatch")
         object.__setattr__(self, "_root_specs", specs)
+        object.__setattr__(self, "_root_seals", seals)
         object.__setattr__(self, "_lookups", lookups)
         object.__setattr__(self, "_locked", True)
 
@@ -534,6 +589,10 @@ class AlphaMaxOrderedFundingLookup:
     @property
     def root_specs(self) -> tuple[FeatureRootSpec, ...]:
         return self._root_specs
+
+    @property
+    def root_seals(self) -> tuple[AlphaMaxRootSeal, ...]:
+        return self._root_seals
 
     @property
     def ordered_root_ids(self) -> tuple[str, ...]:
@@ -964,6 +1023,13 @@ class AlphaMaxFundingBoundaryResolver:
         bound_owner = self._bound_raw_accessor_owner
         if bound_owner is not None and owner is not bound_owner:
             raise ValueError("funding_boundary_raw_accessor_replaced")
+        return owner
+
+    def bind_raw_accessor(self, raw_point_accessor: Any) -> object:
+        """Bind the exact production handler capability before replay starts."""
+        owner = self._validate_raw_accessor(raw_point_accessor)
+        if self._bound_raw_accessor_owner is None:
+            object.__setattr__(self, "_bound_raw_accessor_owner", owner)
         return owner
 
     @staticmethod
@@ -1475,6 +1541,15 @@ def _validate_run_owned_phase(output_root: str | os.PathLike[str], phase: str) -
 
 
 def _write_new_manifest(path: Path, payload: bytes) -> None:
+    if not path.is_absolute() or type(payload) is not bytes:
+        raise ValueError("alpha_max_manifest_target_invalid")
+    directory_flags = (
+        os.O_RDONLY
+        | getattr(os, "O_DIRECTORY", 0)
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+    )
+    opened_directories: list[int] = []
     flags = (
         os.O_WRONLY
         | os.O_CREAT
@@ -1484,7 +1559,24 @@ def _write_new_manifest(path: Path, payload: bytes) -> None:
     )
     created = False
     try:
-        fd = os.open(path, flags, 0o600)
+        parent_fd = os.open(Path(path.anchor), directory_flags)
+        opened_directories.append(parent_fd)
+        for part in path.parent.parts[1:]:
+            observed = os.stat(part, dir_fd=parent_fd, follow_symlinks=False)
+            if not stat.S_ISDIR(observed.st_mode) or stat.S_ISLNK(observed.st_mode):
+                raise ValueError("alpha_max_manifest_parent_not_owned_directory")
+            child_fd = os.open(part, directory_flags, dir_fd=parent_fd)
+            opened = os.fstat(child_fd)
+            if (
+                int(opened.st_dev) != int(observed.st_dev)
+                or int(opened.st_ino) != int(observed.st_ino)
+                or not stat.S_ISDIR(opened.st_mode)
+            ):
+                os.close(child_fd)
+                raise ValueError("alpha_max_manifest_parent_not_owned_directory")
+            opened_directories.append(child_fd)
+            parent_fd = child_fd
+        fd = os.open(path.name, flags, 0o600, dir_fd=parent_fd)
         created = True
         try:
             view = memoryview(payload)
@@ -1494,12 +1586,19 @@ def _write_new_manifest(path: Path, payload: bytes) -> None:
             os.fsync(fd)
         finally:
             os.close(fd)
+        os.fsync(parent_fd)
     except FileExistsError as exc:
         raise ValueError("alpha_max_manifest_target_exists") from exc
     except Exception:
         if created:
-            path.unlink(missing_ok=True)
+            try:
+                os.unlink(path.name, dir_fd=parent_fd)
+            except FileNotFoundError:
+                pass
         raise
+    finally:
+        for directory_fd in reversed(opened_directories):
+            os.close(directory_fd)
 
 
 def materialize_alpha_max_manifest(
@@ -2216,7 +2315,7 @@ def compute_alpha_max_capacity_diagnostics(
     observations: list[float] = []
     required_keys = {"bar_volume", "raw_price", "equity_before", "requested_qty"}
     for record in requested_orders:
-        if type(record) is not dict or set(record) != required_keys:
+        if not isinstance(record, Mapping) or set(record) != required_keys:
             raise ValueError("alpha_max_capacity_record_schema_mismatch")
         quantity = _alpha_max_finite_number(
             record["requested_qty"],
@@ -2261,6 +2360,253 @@ def compute_alpha_max_capacity_diagnostics(
         observation_count=len(observations),
         capacity_proxy_equity_usdt=summary,
         undefined_reason=None,
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class AlphaMaxRunReportOnlyDiagnostics:
+    """Per-fold diagnostics that are sealed but never consulted by selection."""
+
+    turnover_rpt: AlphaMaxTurnoverRPTDiagnostics
+    capacity: AlphaMaxCapacityDiagnostics
+    target_gross_exposure: float
+    ending_realized_gross_exposure: float | None
+    ending_realized_gross_undefined_reason: str | None
+    liquidity_clip_count: int
+    reduce_only_clip_count: int
+    no_fill_attempt_count: int
+    capacity_observations: tuple[Mapping[str, float], ...]
+    capacity_observation_set_sha256: str
+    ending_market_value_usdt: Mapping[str, float]
+    symbol_contribution_usdt: Mapping[str, float]
+    contribution_total_usdt: float
+    fold_pnl_usdt: float
+    reconciliation_residual_usdt: float
+
+    def __post_init__(self) -> None:
+        if type(self.turnover_rpt) is not AlphaMaxTurnoverRPTDiagnostics:
+            raise TypeError("alpha_max_run_turnover_diagnostics_identity_invalid")
+        if type(self.capacity) is not AlphaMaxCapacityDiagnostics:
+            raise TypeError("alpha_max_run_capacity_diagnostics_identity_invalid")
+        _alpha_max_finite_number(
+            self.target_gross_exposure,
+            field="run_target_gross_exposure",
+            positive=True,
+        )
+        if self.ending_realized_gross_exposure is None:
+            if self.ending_realized_gross_undefined_reason != (
+                "undefined_nonpositive_ending_equity"
+            ):
+                raise ValueError("alpha_max_run_realized_gross_undefined_reason_invalid")
+        else:
+            _alpha_max_finite_number(
+                self.ending_realized_gross_exposure,
+                field="run_ending_realized_gross_exposure",
+                nonnegative=True,
+            )
+            if self.ending_realized_gross_undefined_reason is not None:
+                raise ValueError("alpha_max_run_realized_gross_unexpected_reason")
+        for field in (
+            "liquidity_clip_count",
+            "reduce_only_clip_count",
+            "no_fill_attempt_count",
+        ):
+            value = getattr(self, field)
+            if type(value) is not int or value < 0:
+                raise ValueError(f"alpha_max_run_{field}_invalid")
+        if type(self.capacity_observations) is not tuple or any(
+            type(value) is not MappingProxyType
+            or set(value) != {"bar_volume", "equity_before", "raw_price", "requested_qty"}
+            for value in self.capacity_observations
+        ):
+            raise TypeError("alpha_max_run_capacity_observations_invalid")
+        if len(self.capacity_observations) != self.capacity.observation_count:
+            raise ValueError("alpha_max_run_capacity_observation_count_mismatch")
+        capacity_payload = [dict(value) for value in self.capacity_observations]
+        if self.capacity_observation_set_sha256 != _sha256_bytes(
+            _canonical_json_bytes(capacity_payload, newline=True)
+        ):
+            raise ValueError("alpha_max_run_capacity_observation_hash_mismatch")
+        for field in ("ending_market_value_usdt", "symbol_contribution_usdt"):
+            values = getattr(self, field)
+            if type(values) is not MappingProxyType or tuple(values) != ALPHA_MAX_CANDIDATE_SYMBOLS:
+                raise TypeError(f"alpha_max_run_{field}_invalid")
+            for symbol, value in values.items():
+                if symbol not in ALPHA_MAX_CANDIDATE_SYMBOLS:
+                    raise ValueError(f"alpha_max_run_{field}_symbol_invalid")
+                _alpha_max_finite_number(value, field=f"run_{field}_{symbol}")
+        total = _alpha_max_finite_number(
+            self.contribution_total_usdt,
+            field="run_contribution_total_usdt",
+        )
+        pnl = _alpha_max_finite_number(self.fold_pnl_usdt, field="run_fold_pnl_usdt")
+        residual = _alpha_max_finite_number(
+            self.reconciliation_residual_usdt,
+            field="run_reconciliation_residual_usdt",
+        )
+        if not math.isclose(
+            total,
+            math.fsum(self.symbol_contribution_usdt.values()),
+            rel_tol=0.0,
+            abs_tol=1e-12,
+        ):
+            raise ValueError("alpha_max_run_contribution_total_mismatch")
+        if not math.isclose(pnl - total, residual, rel_tol=0.0, abs_tol=1e-12):
+            raise ValueError("alpha_max_run_contribution_residual_mismatch")
+        if not math.isclose(residual, 0.0, rel_tol=0.0, abs_tol=1e-8):
+            raise ValueError("alpha_max_run_contribution_reconciliation_failed")
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "artifact_kind": "alpha_max_run_report_only_diagnostics.v1",
+            "capacity": self.capacity.to_payload(),
+            "capacity_observation_set_sha256": self.capacity_observation_set_sha256,
+            "capacity_observations": [dict(value) for value in self.capacity_observations],
+            "contribution_total_usdt": self.contribution_total_usdt,
+            "ending_market_value_usdt": dict(self.ending_market_value_usdt),
+            "ending_realized_gross_exposure": self.ending_realized_gross_exposure,
+            "ending_realized_gross_undefined_reason": (self.ending_realized_gross_undefined_reason),
+            "fold_pnl_usdt": self.fold_pnl_usdt,
+            "liquidity_clip_count": self.liquidity_clip_count,
+            "no_fill_attempt_count": self.no_fill_attempt_count,
+            "reconciliation_residual_usdt": self.reconciliation_residual_usdt,
+            "reduce_only_clip_count": self.reduce_only_clip_count,
+            "report_only": True,
+            "selection_influence": False,
+            "symbol_contribution_usdt": dict(self.symbol_contribution_usdt),
+            "target_gross_exposure": self.target_gross_exposure,
+            "turnover_rpt": self.turnover_rpt.to_payload(),
+        }
+
+
+def build_alpha_max_run_report_only_diagnostics(
+    *,
+    pricing_traces: tuple[ExecutionPricingTrace, ...],
+    fill_applications: tuple[FillApplicationAttribution, ...],
+    no_fill_attempts: tuple[NoFillAttempt, ...],
+    funding_ledger: tuple[AlphaMaxFundingBoundaryLedgerRow, ...],
+    liquidation_events: tuple[AlphaMaxLiquidationEventEvidence, ...],
+    capacity_observations: tuple[Mapping[str, Any], ...],
+    ending_market_values: Mapping[str, Any],
+    starting_equity: float,
+    ending_equity: float,
+    target_gross_exposure: float,
+) -> AlphaMaxRunReportOnlyDiagnostics:
+    """Build exact per-fold observational diagnostics from already-applied economics."""
+    if any(type(value) is not ExecutionPricingTrace for value in pricing_traces):
+        raise TypeError("alpha_max_run_pricing_trace_identity_invalid")
+    if any(type(value) is not FillApplicationAttribution for value in fill_applications):
+        raise TypeError("alpha_max_run_application_identity_invalid")
+    if any(type(value) is not NoFillAttempt for value in no_fill_attempts):
+        raise TypeError("alpha_max_run_no_fill_identity_invalid")
+    if any(type(value) is not AlphaMaxFundingBoundaryLedgerRow for value in funding_ledger):
+        raise TypeError("alpha_max_run_funding_identity_invalid")
+    if any(type(value) is not AlphaMaxLiquidationEventEvidence for value in liquidation_events):
+        raise TypeError("alpha_max_run_liquidation_identity_invalid")
+    if type(capacity_observations) is not tuple:
+        raise TypeError("alpha_max_run_capacity_observations_invalid")
+    frozen_capacity_observations = tuple(
+        MappingProxyType(dict(value)) for value in capacity_observations
+    )
+    if len(frozen_capacity_observations) != len(pricing_traces) + len(no_fill_attempts):
+        raise ValueError("alpha_max_run_capacity_observation_coverage_mismatch")
+    capital = _alpha_max_finite_number(
+        starting_equity,
+        field="run_starting_equity",
+        positive=True,
+    )
+    ending = _alpha_max_finite_number(ending_equity, field="run_ending_equity")
+    target_gross = _alpha_max_finite_number(
+        target_gross_exposure,
+        field="run_target_gross_exposure",
+        positive=True,
+    )
+    if not isinstance(ending_market_values, Mapping) or set(ending_market_values).difference(
+        ALPHA_MAX_CANDIDATE_SYMBOLS
+    ):
+        raise ValueError("alpha_max_run_ending_market_values_invalid")
+    normalized_market_values = {
+        symbol: _alpha_max_finite_number(
+            ending_market_values.get(symbol, 0.0),
+            field=f"run_ending_market_value_{symbol}",
+        )
+        for symbol in ALPHA_MAX_CANDIDATE_SYMBOLS
+    }
+    contributions = dict.fromkeys(ALPHA_MAX_CANDIDATE_SYMBOLS, 0.0)
+    for application in fill_applications:
+        signed_cashflow = (
+            -application.applied_fill_cost
+            if application.direction == "BUY"
+            else application.applied_fill_cost
+        )
+        contributions[application.symbol] += signed_cashflow - application.applied_commission
+    for row in funding_ledger:
+        if row.payment is None:
+            raise ValueError("alpha_max_run_funding_payment_missing")
+        contributions[row.symbol] -= _alpha_max_finite_number(
+            row.payment,
+            field="run_funding_payment",
+        )
+    for event in liquidation_events:
+        signed_cashflow = event.fill_cost if event.position_qty > 0.0 else -event.fill_cost
+        contributions[event.symbol] += signed_cashflow - event.commission
+    for symbol, market_value in normalized_market_values.items():
+        contributions[symbol] += market_value
+
+    frozen_market_values = MappingProxyType(normalized_market_values)
+    frozen_contributions = MappingProxyType(contributions)
+    contribution_total = math.fsum(frozen_contributions.values())
+    fold_pnl = ending - capital
+    residual = fold_pnl - contribution_total
+    if not math.isclose(residual, 0.0, rel_tol=0.0, abs_tol=1e-8):
+        raise ValueError("alpha_max_run_contribution_reconciliation_failed")
+    applied_records = tuple(
+        {
+            "applied_qty": application.applied_quantity,
+            "fill_price": application.pricing_trace.fill_price,
+        }
+        for application in fill_applications
+    )
+    turnover = compute_alpha_max_turnover_rpt(
+        applied_records,
+        initial_capital=capital,
+        ending_equity=ending,
+    )
+    capacity = compute_alpha_max_capacity_diagnostics(frozen_capacity_observations)
+    realized_gross = (
+        math.fsum(abs(value) for value in frozen_market_values.values()) / ending
+        if ending > 0.0
+        else None
+    )
+    return AlphaMaxRunReportOnlyDiagnostics(
+        turnover_rpt=turnover,
+        capacity=capacity,
+        target_gross_exposure=target_gross,
+        ending_realized_gross_exposure=realized_gross,
+        ending_realized_gross_undefined_reason=(
+            None if realized_gross is not None else "undefined_nonpositive_ending_equity"
+        ),
+        liquidity_clip_count=sum(
+            trace.apply_liquidity_cap and trace.unfilled_qty > 0.0 for trace in pricing_traces
+        ),
+        reduce_only_clip_count=sum(
+            application.reduce_only
+            and application.application_status in {"applied_scaled", "rejected"}
+            for application in fill_applications
+        ),
+        no_fill_attempt_count=len(no_fill_attempts),
+        capacity_observations=frozen_capacity_observations,
+        capacity_observation_set_sha256=_sha256_bytes(
+            _canonical_json_bytes(
+                [dict(value) for value in frozen_capacity_observations],
+                newline=True,
+            )
+        ),
+        ending_market_value_usdt=frozen_market_values,
+        symbol_contribution_usdt=frozen_contributions,
+        contribution_total_usdt=contribution_total,
+        fold_pnl_usdt=fold_pnl,
+        reconciliation_residual_usdt=residual,
     )
 
 
@@ -3041,59 +3387,103 @@ def _alpha_max_parquet_timestamp_bounds(
     return minimum_ms, maximum_ms, int(timestamp_series.len()), maximum_gap_ms
 
 
-def _alpha_max_stream_regular_file(
-    path: Path,
+def _alpha_max_stream_regular_descriptor(
+    descriptor: int,
     *,
+    observed: os.stat_result,
     root_kind: str,
     expected_symbol: str,
     expected_exchange: str,
     owned_start_ms: int,
     owned_end_ms: int,
 ) -> tuple[str, os.stat_result, int, int, int, int]:
-    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    before = os.fstat(descriptor)
+    if not stat.S_ISREG(before.st_mode):
+        raise ValueError("alpha_max_root_entry_not_regular")
+    if _alpha_max_file_identity(observed) != _alpha_max_file_identity(before):
+        raise ValueError("alpha_max_root_file_changed_during_seal")
+    if int(before.st_nlink) != 1:
+        raise ValueError("alpha_max_root_hardlink_rejected")
+    digest = hashlib.sha256()
+    while True:
+        chunk = os.read(descriptor, 1024 * 1024)
+        if not chunk:
+            break
+        digest.update(chunk)
+    os.lseek(descriptor, 0, os.SEEK_SET)
+    (
+        minimum_timestamp_ms,
+        maximum_timestamp_ms,
+        row_count,
+        maximum_gap_ms,
+    ) = _alpha_max_parquet_timestamp_bounds(
+        descriptor,
+        root_kind=root_kind,
+        expected_symbol=expected_symbol,
+        expected_exchange=expected_exchange,
+        owned_start_ms=owned_start_ms,
+        owned_end_ms=owned_end_ms,
+    )
+    after = os.fstat(descriptor)
+    if _alpha_max_file_identity(before) != _alpha_max_file_identity(after):
+        raise ValueError("alpha_max_root_file_changed_during_seal")
+    return (
+        digest.hexdigest(),
+        before,
+        minimum_timestamp_ms,
+        maximum_timestamp_ms,
+        row_count,
+        maximum_gap_ms,
+    )
+
+
+def _alpha_max_open_directory_chain(path: str) -> list[int]:
+    directory_flags = (
+        os.O_RDONLY
+        | getattr(os, "O_DIRECTORY", 0)
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+    )
+    opened: list[int] = []
     try:
-        descriptor = os.open(path, flags)
-    except OSError as exc:
-        raise ValueError("alpha_max_root_file_open_failed") from exc
-    try:
-        before = os.fstat(descriptor)
-        if not stat.S_ISREG(before.st_mode):
-            raise ValueError("alpha_max_root_entry_not_regular")
-        if int(before.st_nlink) != 1:
-            raise ValueError("alpha_max_root_hardlink_rejected")
-        digest = hashlib.sha256()
-        while True:
-            chunk = os.read(descriptor, 1024 * 1024)
-            if not chunk:
-                break
-            digest.update(chunk)
-        os.lseek(descriptor, 0, os.SEEK_SET)
-        (
-            minimum_timestamp_ms,
-            maximum_timestamp_ms,
-            row_count,
-            maximum_gap_ms,
-        ) = _alpha_max_parquet_timestamp_bounds(
-            descriptor,
-            root_kind=root_kind,
-            expected_symbol=expected_symbol,
-            expected_exchange=expected_exchange,
-            owned_start_ms=owned_start_ms,
-            owned_end_ms=owned_end_ms,
-        )
-        after = os.fstat(descriptor)
-        if _alpha_max_file_identity(before) != _alpha_max_file_identity(after):
-            raise ValueError("alpha_max_root_file_changed_during_seal")
-        return (
-            digest.hexdigest(),
-            before,
-            minimum_timestamp_ms,
-            maximum_timestamp_ms,
-            row_count,
-            maximum_gap_ms,
-        )
-    finally:
-        os.close(descriptor)
+        parent_fd = os.open(os.path.sep, directory_flags)
+        opened.append(parent_fd)
+        for part in Path(path).parts[1:]:
+            try:
+                observed = os.stat(part, dir_fd=parent_fd, follow_symlinks=False)
+            except OSError as exc:
+                raise ValueError("alpha_max_root_directory_stat_failed") from exc
+            if stat.S_ISLNK(observed.st_mode):
+                raise ValueError("alpha_max_root_symlink_rejected")
+            if not stat.S_ISDIR(observed.st_mode):
+                raise ValueError("alpha_max_root_entry_type_rejected")
+            try:
+                child_fd = os.open(part, directory_flags, dir_fd=parent_fd)
+            except OSError as exc:
+                raise ValueError("alpha_max_root_directory_open_failed") from exc
+            try:
+                opened_stat = os.fstat(child_fd)
+            except OSError as exc:
+                os.close(child_fd)
+                raise ValueError("alpha_max_root_directory_open_failed") from exc
+            if _alpha_max_file_identity(observed) != _alpha_max_file_identity(opened_stat):
+                os.close(child_fd)
+                raise ValueError("alpha_max_root_directory_changed_during_seal")
+            opened.append(child_fd)
+            parent_fd = child_fd
+        return opened
+    except Exception:
+        for descriptor in reversed(opened):
+            os.close(descriptor)
+        raise
+
+
+def _alpha_max_directory_path_identity(value: os.stat_result) -> tuple[int, int, int]:
+    return (
+        int(value.st_dev),
+        int(value.st_ino),
+        int(stat.S_IFMT(value.st_mode)),
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -3370,7 +3760,7 @@ def seal_alpha_max_root_tree(
     exchange: str = "binance",
     expected_symbols: tuple[str, ...] = ALPHA_MAX_CANDIDATE_SYMBOLS,
 ) -> AlphaMaxRootSeal:
-    """Stream-hash one explicit root without following links or retaining file bytes."""
+    """Stream-hash one explicit root through an immutable opened-directory capability."""
     if root_id not in _ROOT_INTERVALS:
         raise ValueError("alpha_max_root_id_invalid")
     if root_kind not in {"raw", "feature"}:
@@ -3380,34 +3770,53 @@ def seal_alpha_max_root_tree(
     if expected_symbols != ALPHA_MAX_CANDIDATE_SYMBOLS:
         raise ValueError("alpha_max_root_expected_symbols_invalid")
     canonical = _require_explicit_canonical_path(root_path, field="alpha_max_root_path")
-    root = Path(canonical)
-    if not root.is_dir():
-        raise ValueError("alpha_max_root_not_directory")
     start, end = _ROOT_INTERVALS[root_id]
     root_start_ms = _epoch_ms(start)
     root_end_ms = _epoch_ms(end)
 
     entries: list[AlphaMaxTreeEntry] = []
-    for directory, directory_names, file_names in os.walk(root, followlinks=False):
-        current = Path(directory)
-        for name in sorted(directory_names):
-            child = current / name
-            child_stat = child.lstat()
-            if stat.S_ISLNK(child_stat.st_mode):
+    opened_chain = _alpha_max_open_directory_chain(canonical)
+    root_fd = opened_chain[-1]
+    root_opened_stat = os.fstat(root_fd)
+    file_flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    directory_flags = file_flags | getattr(os, "O_DIRECTORY", 0)
+
+    def walk_open_directory(directory_fd: int, relative_parts: tuple[str, ...]) -> None:
+        directory_before = os.fstat(directory_fd)
+        if not stat.S_ISDIR(directory_before.st_mode):
+            raise ValueError("alpha_max_root_entry_type_rejected")
+        try:
+            with os.scandir(directory_fd) as iterator:
+                names = sorted(entry.name for entry in iterator)
+        except OSError as exc:
+            raise ValueError("alpha_max_root_directory_scan_failed") from exc
+        if len(names) != len(set(names)):
+            raise ValueError("alpha_max_root_directory_changed_during_seal")
+        for name in names:
+            try:
+                observed = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+            except OSError as exc:
+                raise ValueError("alpha_max_root_entry_stat_failed") from exc
+            if stat.S_ISLNK(observed.st_mode):
                 raise ValueError("alpha_max_root_symlink_rejected")
-            if not stat.S_ISDIR(child_stat.st_mode):
+            if stat.S_ISDIR(observed.st_mode):
+                try:
+                    child_fd = os.open(name, directory_flags, dir_fd=directory_fd)
+                except OSError as exc:
+                    raise ValueError("alpha_max_root_directory_open_failed") from exc
+                try:
+                    opened = os.fstat(child_fd)
+                    if _alpha_max_file_identity(observed) != _alpha_max_file_identity(opened):
+                        raise ValueError("alpha_max_root_directory_changed_during_seal")
+                    walk_open_directory(child_fd, (*relative_parts, name))
+                finally:
+                    os.close(child_fd)
+                continue
+            if not stat.S_ISREG(observed.st_mode):
                 raise ValueError("alpha_max_root_entry_type_rejected")
-            resolved = child.resolve(strict=True)
-            if root not in resolved.parents:
-                raise ValueError("alpha_max_root_path_escape")
-        for name in sorted(file_names):
-            child = current / name
-            child_stat = child.lstat()
-            if stat.S_ISLNK(child_stat.st_mode):
-                raise ValueError("alpha_max_root_symlink_rejected")
-            if not stat.S_ISREG(child_stat.st_mode):
-                raise ValueError("alpha_max_root_entry_type_rejected")
-            relative = child.relative_to(root).as_posix()
+            if int(observed.st_nlink) != 1:
+                raise ValueError("alpha_max_root_hardlink_rejected")
+            relative = PurePosixPath(*relative_parts, name).as_posix()
             symbol, partition_start, partition_end = _alpha_max_partition_contract(
                 relative,
                 root_kind=root_kind,
@@ -3415,21 +3824,29 @@ def seal_alpha_max_root_tree(
             )
             owned_partition_start = max(start, partition_start)
             owned_partition_end = min(end, partition_end)
-            (
-                file_sha256,
-                sealed_stat,
-                minimum_timestamp_ms,
-                maximum_timestamp_ms,
-                row_count,
-                maximum_gap_ms,
-            ) = _alpha_max_stream_regular_file(
-                child,
-                root_kind=root_kind,
-                expected_symbol=symbol,
-                expected_exchange=exchange,
-                owned_start_ms=_epoch_ms(owned_partition_start),
-                owned_end_ms=_epoch_ms(owned_partition_end),
-            )
+            try:
+                file_fd = os.open(name, file_flags, dir_fd=directory_fd)
+            except OSError as exc:
+                raise ValueError("alpha_max_root_file_open_failed") from exc
+            try:
+                (
+                    file_sha256,
+                    sealed_stat,
+                    minimum_timestamp_ms,
+                    maximum_timestamp_ms,
+                    row_count,
+                    maximum_gap_ms,
+                ) = _alpha_max_stream_regular_descriptor(
+                    file_fd,
+                    observed=observed,
+                    root_kind=root_kind,
+                    expected_symbol=symbol,
+                    expected_exchange=exchange,
+                    owned_start_ms=_epoch_ms(owned_partition_start),
+                    owned_end_ms=_epoch_ms(owned_partition_end),
+                )
+            finally:
+                os.close(file_fd)
             partition_start_ms = _epoch_ms(partition_start)
             partition_end_ms = _epoch_ms(partition_end)
             if not (
@@ -3454,6 +3871,29 @@ def seal_alpha_max_root_tree(
                     sha256=file_sha256,
                 )
             )
+        directory_after = os.fstat(directory_fd)
+        if _alpha_max_file_identity(directory_before) != _alpha_max_file_identity(directory_after):
+            raise ValueError("alpha_max_root_directory_changed_during_seal")
+
+    try:
+        walk_open_directory(root_fd, ())
+        root_after = os.fstat(root_fd)
+        if _alpha_max_file_identity(root_opened_stat) != _alpha_max_file_identity(root_after):
+            raise ValueError("alpha_max_root_directory_changed_during_seal")
+        rebound_chain = _alpha_max_open_directory_chain(canonical)
+        try:
+            if len(rebound_chain) != len(opened_chain) or any(
+                _alpha_max_directory_path_identity(os.fstat(before_fd))
+                != _alpha_max_directory_path_identity(os.fstat(after_fd))
+                for before_fd, after_fd in zip(opened_chain, rebound_chain, strict=True)
+            ):
+                raise ValueError("alpha_max_root_path_changed_during_seal")
+        finally:
+            for descriptor in reversed(rebound_chain):
+                os.close(descriptor)
+    finally:
+        for descriptor in reversed(opened_chain):
+            os.close(descriptor)
     ordered = tuple(sorted(entries, key=lambda entry: entry.relative_path))
     if not ordered:
         raise ValueError("alpha_max_root_inventory_empty")
@@ -3994,6 +4434,415 @@ def compute_alpha_max_train_admission_from_daily_summaries(
     )
 
 
+_ALPHA_MAX_LIQUIDITY_BUCKETS: Final[tuple[str, ...]] = ("weakest", "middle", "liquid")
+
+
+@dataclass(frozen=True, slots=True)
+class AlphaMaxTrainLiquidityBuckets:
+    """Train-frozen deterministic liquidity ranks used only for mechanism reporting."""
+
+    admitted_symbols: tuple[str, ...]
+    median_quote_notional_usdt: Mapping[str, float]
+    bucket_by_symbol: Mapping[str, str]
+    symbols_by_bucket: Mapping[str, tuple[str, ...]]
+    admission_computation_sha256: str
+    canonical_bytes: bytes
+    sha256: str
+
+    def __post_init__(self) -> None:
+        admitted = validate_alpha_max_admitted_symbols(
+            ALPHA_MAX_CANDIDATE_SYMBOLS,
+            self.admitted_symbols,
+        )
+        if admitted != self.admitted_symbols:
+            raise ValueError("alpha_max_liquidity_bucket_admitted_symbols_invalid")
+        if (
+            type(self.median_quote_notional_usdt) is not MappingProxyType
+            or tuple(self.median_quote_notional_usdt) != admitted
+            or type(self.bucket_by_symbol) is not MappingProxyType
+            or tuple(self.bucket_by_symbol) != admitted
+            or type(self.symbols_by_bucket) is not MappingProxyType
+            or tuple(self.symbols_by_bucket) != _ALPHA_MAX_LIQUIDITY_BUCKETS
+        ):
+            raise TypeError("alpha_max_liquidity_bucket_mapping_invalid")
+        medians = {
+            symbol: _alpha_max_finite_number(
+                self.median_quote_notional_usdt[symbol],
+                field=f"liquidity_bucket_median_{symbol}",
+                positive=True,
+            )
+            for symbol in admitted
+        }
+        ordered = tuple(sorted(admitted, key=lambda symbol: (medians[symbol], symbol)))
+        expected_by_symbol = {
+            symbol: _ALPHA_MAX_LIQUIDITY_BUCKETS[(3 * index) // len(ordered)]
+            for index, symbol in enumerate(ordered)
+        }
+        expected_by_bucket = {
+            bucket: tuple(symbol for symbol in ordered if expected_by_symbol[symbol] == bucket)
+            for bucket in _ALPHA_MAX_LIQUIDITY_BUCKETS
+        }
+        if (
+            dict(self.bucket_by_symbol) != expected_by_symbol
+            or dict(self.symbols_by_bucket) != expected_by_bucket
+        ):
+            raise ValueError("alpha_max_liquidity_bucket_assignment_mismatch")
+        computation_sha = _require_sha256(
+            self.admission_computation_sha256,
+            field="alpha_max_liquidity_bucket_admission_computation_sha256",
+        )
+        payload = {
+            "admission_computation_sha256": computation_sha,
+            "admitted_symbols": list(admitted),
+            "artifact_kind": "alpha_max_train_liquidity_buckets.v1",
+            "bucket_by_symbol": dict(self.bucket_by_symbol),
+            "bucket_order": list(_ALPHA_MAX_LIQUIDITY_BUCKETS),
+            "bucket_rule": "floor(3*ascending_rank_index/admitted_symbol_count)",
+            "median_quote_notional_usdt": medians,
+            "phase": "train_frozen_report_only",
+            "report_only": True,
+            "selection_influence": False,
+            "symbols_by_bucket": {
+                bucket: list(self.symbols_by_bucket[bucket])
+                for bucket in _ALPHA_MAX_LIQUIDITY_BUCKETS
+            },
+            "tie_break": "median_quote_notional_usdt_ascending_then_symbol_ascending",
+        }
+        canonical = _canonical_json_bytes(payload, newline=True)
+        if (
+            type(self.canonical_bytes) is not bytes
+            or self.canonical_bytes != canonical
+            or self.sha256 != _sha256_bytes(canonical)
+        ):
+            raise ValueError("alpha_max_liquidity_bucket_canonical_mismatch")
+
+    def to_payload(self) -> dict[str, Any]:
+        return json.loads(self.canonical_bytes)
+
+
+def build_alpha_max_train_liquidity_buckets(
+    admission: AlphaMaxAdmissionComputation,
+) -> AlphaMaxTrainLiquidityBuckets:
+    if type(admission) is not AlphaMaxAdmissionComputation:
+        raise TypeError("alpha_max_admission_computation_identity_invalid")
+    admitted = admission.artifact.admitted_symbols
+    medians: dict[str, float] = {}
+    for symbol in admitted:
+        values = tuple(
+            value.quote_notional_usdt for value in admission.daily_quote_notional_by_symbol[symbol]
+        )
+        if not values:
+            raise ValueError("alpha_max_liquidity_bucket_train_vector_empty")
+        medians[symbol] = alpha_max_type7_quantile(values, 0.50)
+    ordered = tuple(sorted(admitted, key=lambda symbol: (medians[symbol], symbol)))
+    bucket_by_symbol = {
+        symbol: _ALPHA_MAX_LIQUIDITY_BUCKETS[(3 * index) // len(ordered)]
+        for index, symbol in enumerate(ordered)
+    }
+    symbols_by_bucket = {
+        bucket: tuple(symbol for symbol in ordered if bucket_by_symbol[symbol] == bucket)
+        for bucket in _ALPHA_MAX_LIQUIDITY_BUCKETS
+    }
+    values = {
+        "admitted_symbols": admitted,
+        "median_quote_notional_usdt": MappingProxyType(medians),
+        "bucket_by_symbol": MappingProxyType(
+            {symbol: bucket_by_symbol[symbol] for symbol in admitted}
+        ),
+        "symbols_by_bucket": MappingProxyType(symbols_by_bucket),
+        "admission_computation_sha256": admission.sha256,
+    }
+    temporary = object.__new__(AlphaMaxTrainLiquidityBuckets)
+    for field, value in values.items():
+        object.__setattr__(temporary, field, value)
+    payload = {
+        "admission_computation_sha256": admission.sha256,
+        "admitted_symbols": list(admitted),
+        "artifact_kind": "alpha_max_train_liquidity_buckets.v1",
+        "bucket_by_symbol": dict(values["bucket_by_symbol"]),
+        "bucket_order": list(_ALPHA_MAX_LIQUIDITY_BUCKETS),
+        "bucket_rule": "floor(3*ascending_rank_index/admitted_symbol_count)",
+        "median_quote_notional_usdt": dict(values["median_quote_notional_usdt"]),
+        "phase": "train_frozen_report_only",
+        "report_only": True,
+        "selection_influence": False,
+        "symbols_by_bucket": {
+            bucket: list(symbols_by_bucket[bucket]) for bucket in _ALPHA_MAX_LIQUIDITY_BUCKETS
+        },
+        "tie_break": "median_quote_notional_usdt_ascending_then_symbol_ascending",
+    }
+    canonical = _canonical_json_bytes(payload, newline=True)
+    return AlphaMaxTrainLiquidityBuckets(
+        **values,
+        canonical_bytes=canonical,
+        sha256=_sha256_bytes(canonical),
+    )
+
+
+def validate_alpha_max_train_liquidity_buckets(
+    payload: bytes | Mapping[str, Any],
+) -> AlphaMaxTrainLiquidityBuckets:
+    if type(payload) is bytes:
+        try:
+            parsed = json.loads(
+                payload,
+                object_pairs_hook=_alpha_max_duplicate_rejecting_object,
+                parse_constant=_alpha_max_nonfinite_json_constant,
+            )
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise ValueError("alpha_max_liquidity_bucket_json_invalid") from exc
+        canonical_input = payload
+    elif isinstance(payload, Mapping):
+        parsed = dict(payload)
+        canonical_input = _canonical_json_bytes(parsed, newline=True)
+    else:
+        raise TypeError("alpha_max_liquidity_bucket_payload_invalid")
+    required = {
+        "admission_computation_sha256",
+        "admitted_symbols",
+        "artifact_kind",
+        "bucket_by_symbol",
+        "bucket_order",
+        "bucket_rule",
+        "median_quote_notional_usdt",
+        "phase",
+        "report_only",
+        "selection_influence",
+        "symbols_by_bucket",
+        "tie_break",
+    }
+    if (
+        type(parsed) is not dict
+        or set(parsed) != required
+        or parsed["artifact_kind"] != "alpha_max_train_liquidity_buckets.v1"
+        or parsed["phase"] != "train_frozen_report_only"
+        or parsed["report_only"] is not True
+        or parsed["selection_influence"] is not False
+        or parsed["bucket_order"] != list(_ALPHA_MAX_LIQUIDITY_BUCKETS)
+        or parsed["bucket_rule"] != "floor(3*ascending_rank_index/admitted_symbol_count)"
+        or parsed["tie_break"] != "median_quote_notional_usdt_ascending_then_symbol_ascending"
+        or type(parsed["admitted_symbols"]) is not list
+        or type(parsed["median_quote_notional_usdt"]) is not dict
+        or type(parsed["bucket_by_symbol"]) is not dict
+        or type(parsed["symbols_by_bucket"]) is not dict
+    ):
+        raise ValueError("alpha_max_liquidity_bucket_schema_invalid")
+    admitted = tuple(parsed["admitted_symbols"])
+    value = AlphaMaxTrainLiquidityBuckets(
+        admitted_symbols=admitted,
+        median_quote_notional_usdt=MappingProxyType(
+            {symbol: parsed["median_quote_notional_usdt"][symbol] for symbol in admitted}
+        ),
+        bucket_by_symbol=MappingProxyType(
+            {symbol: parsed["bucket_by_symbol"][symbol] for symbol in admitted}
+        ),
+        symbols_by_bucket=MappingProxyType(
+            {
+                bucket: tuple(parsed["symbols_by_bucket"][bucket])
+                for bucket in _ALPHA_MAX_LIQUIDITY_BUCKETS
+            }
+        ),
+        admission_computation_sha256=parsed["admission_computation_sha256"],
+        canonical_bytes=canonical_input,
+        sha256=_sha256_bytes(canonical_input),
+    )
+    return value
+
+
+@dataclass(frozen=True, slots=True)
+class AlphaMaxTrendLiquidityFalsifier:
+    """Nominal-30 trend contribution by train-frozen liquidity bucket."""
+
+    domain: str
+    train_liquidity_buckets: AlphaMaxTrainLiquidityBuckets
+    fold_run_sha256s: tuple[str, ...]
+    symbol_contribution_usdt: Mapping[str, float]
+    bucket_contribution_usdt: Mapping[str, float]
+    total_contribution_usdt: float
+    status: str
+    rejection_reasons: tuple[str, ...]
+    canonical_bytes: bytes
+    sha256: str
+
+    def __post_init__(self) -> None:
+        expected_folds = _ALPHA_MAX_DOMAIN_FOLD_IDS.get(self.domain)
+        buckets = self.train_liquidity_buckets
+        if expected_folds is None or type(buckets) is not AlphaMaxTrainLiquidityBuckets:
+            raise ValueError("alpha_max_trend_falsifier_domain_invalid")
+        if type(self.fold_run_sha256s) is not tuple or len(self.fold_run_sha256s) != len(
+            expected_folds
+        ):
+            raise ValueError("alpha_max_trend_falsifier_fold_hashes_invalid")
+        for value in self.fold_run_sha256s:
+            _require_sha256(value, field="alpha_max_trend_falsifier_fold_run_sha256")
+        admitted = buckets.admitted_symbols
+        if (
+            type(self.symbol_contribution_usdt) is not MappingProxyType
+            or tuple(self.symbol_contribution_usdt) != admitted
+            or type(self.bucket_contribution_usdt) is not MappingProxyType
+            or tuple(self.bucket_contribution_usdt) != _ALPHA_MAX_LIQUIDITY_BUCKETS
+        ):
+            raise TypeError("alpha_max_trend_falsifier_contribution_mapping_invalid")
+        symbol_values = {
+            symbol: _alpha_max_finite_number(
+                self.symbol_contribution_usdt[symbol],
+                field=f"trend_falsifier_symbol_{symbol}",
+            )
+            for symbol in admitted
+        }
+        expected_bucket_values = {
+            bucket: math.fsum(symbol_values[symbol] for symbol in buckets.symbols_by_bucket[bucket])
+            for bucket in _ALPHA_MAX_LIQUIDITY_BUCKETS
+        }
+        if any(
+            not math.isclose(
+                self.bucket_contribution_usdt[bucket],
+                expected_bucket_values[bucket],
+                rel_tol=0.0,
+                abs_tol=1e-12,
+            )
+            for bucket in _ALPHA_MAX_LIQUIDITY_BUCKETS
+        ):
+            raise ValueError("alpha_max_trend_falsifier_bucket_sum_mismatch")
+        total = math.fsum(symbol_values.values())
+        if not math.isclose(
+            self.total_contribution_usdt,
+            total,
+            rel_tol=0.0,
+            abs_tol=1e-12,
+        ):
+            raise ValueError("alpha_max_trend_falsifier_total_mismatch")
+        expected_reasons: list[str] = []
+        if expected_bucket_values["liquid"] <= 0.0:
+            expected_reasons.append("liquid_bucket_nonpositive")
+        if (
+            total > 0.0
+            and expected_bucket_values["weakest"] > 0.0
+            and expected_bucket_values["middle"] <= 0.0
+            and expected_bucket_values["liquid"] <= 0.0
+        ):
+            expected_reasons.append("positive_edge_confined_to_weakest")
+        reasons = tuple(expected_reasons)
+        expected_status = (
+            "trend_mechanism_not_supported" if reasons else "liquidity_falsifier_not_triggered"
+        )
+        if self.rejection_reasons != reasons or self.status != expected_status:
+            raise ValueError("alpha_max_trend_falsifier_status_mismatch")
+        payload = {
+            "artifact_kind": "alpha_max_trend_liquidity_falsifier.v1",
+            "bucket_contribution_usdt": expected_bucket_values,
+            "domain": self.domain,
+            "fold_run_sha256s": list(self.fold_run_sha256s),
+            "nominal_cost_bps": 30,
+            "rejection_reasons": list(reasons),
+            "report_only": True,
+            "row_id": "component_trend_1x",
+            "selection_influence": False,
+            "status": expected_status,
+            "symbol_contribution_usdt": symbol_values,
+            "total_contribution_usdt": total,
+            "train_liquidity_buckets": buckets.to_payload(),
+            "train_liquidity_buckets_sha256": buckets.sha256,
+        }
+        canonical = _canonical_json_bytes(payload, newline=True)
+        if (
+            type(self.canonical_bytes) is not bytes
+            or self.canonical_bytes != canonical
+            or self.sha256 != _sha256_bytes(canonical)
+        ):
+            raise ValueError("alpha_max_trend_falsifier_canonical_mismatch")
+
+    def to_payload(self) -> dict[str, Any]:
+        return json.loads(self.canonical_bytes)
+
+
+def build_alpha_max_trend_liquidity_falsifier(
+    *,
+    domain: str,
+    train_liquidity_buckets: AlphaMaxTrainLiquidityBuckets,
+    fold_run_sha256s: tuple[str, ...],
+    symbol_contribution_usdt_by_fold: tuple[Mapping[str, Any], ...],
+) -> AlphaMaxTrendLiquidityFalsifier:
+    buckets = train_liquidity_buckets
+    if type(buckets) is not AlphaMaxTrainLiquidityBuckets:
+        raise TypeError("alpha_max_train_liquidity_buckets_identity_invalid")
+    expected_folds = _ALPHA_MAX_DOMAIN_FOLD_IDS.get(domain)
+    if (
+        expected_folds is None
+        or type(fold_run_sha256s) is not tuple
+        or type(symbol_contribution_usdt_by_fold) is not tuple
+        or len(fold_run_sha256s) != len(expected_folds)
+        or len(symbol_contribution_usdt_by_fold) != len(expected_folds)
+    ):
+        raise ValueError("alpha_max_trend_falsifier_fold_input_invalid")
+    admitted = buckets.admitted_symbols
+    for values in symbol_contribution_usdt_by_fold:
+        if not isinstance(values, Mapping) or set(values) != set(admitted):
+            raise ValueError("alpha_max_trend_falsifier_symbol_coverage_invalid")
+    symbol_values = {
+        symbol: math.fsum(
+            _alpha_max_finite_number(
+                values[symbol],
+                field=f"trend_falsifier_fold_symbol_{symbol}",
+            )
+            for values in symbol_contribution_usdt_by_fold
+        )
+        for symbol in admitted
+    }
+    bucket_values = {
+        bucket: math.fsum(symbol_values[symbol] for symbol in buckets.symbols_by_bucket[bucket])
+        for bucket in _ALPHA_MAX_LIQUIDITY_BUCKETS
+    }
+    total = math.fsum(symbol_values.values())
+    reasons: list[str] = []
+    if bucket_values["liquid"] <= 0.0:
+        reasons.append("liquid_bucket_nonpositive")
+    if (
+        total > 0.0
+        and bucket_values["weakest"] > 0.0
+        and bucket_values["middle"] <= 0.0
+        and bucket_values["liquid"] <= 0.0
+    ):
+        reasons.append("positive_edge_confined_to_weakest")
+    values = {
+        "domain": domain,
+        "train_liquidity_buckets": buckets,
+        "fold_run_sha256s": fold_run_sha256s,
+        "symbol_contribution_usdt": MappingProxyType(symbol_values),
+        "bucket_contribution_usdt": MappingProxyType(bucket_values),
+        "total_contribution_usdt": total,
+        "status": (
+            "trend_mechanism_not_supported" if reasons else "liquidity_falsifier_not_triggered"
+        ),
+        "rejection_reasons": tuple(reasons),
+    }
+    temporary = object.__new__(AlphaMaxTrendLiquidityFalsifier)
+    for field, value in values.items():
+        object.__setattr__(temporary, field, value)
+    payload = {
+        "artifact_kind": "alpha_max_trend_liquidity_falsifier.v1",
+        "bucket_contribution_usdt": bucket_values,
+        "domain": domain,
+        "fold_run_sha256s": list(fold_run_sha256s),
+        "nominal_cost_bps": 30,
+        "rejection_reasons": reasons,
+        "report_only": True,
+        "row_id": "component_trend_1x",
+        "selection_influence": False,
+        "status": values["status"],
+        "symbol_contribution_usdt": symbol_values,
+        "total_contribution_usdt": total,
+        "train_liquidity_buckets": buckets.to_payload(),
+        "train_liquidity_buckets_sha256": buckets.sha256,
+    }
+    canonical = _canonical_json_bytes(payload, newline=True)
+    return AlphaMaxTrendLiquidityFalsifier(
+        **values,
+        canonical_bytes=canonical,
+        sha256=_sha256_bytes(canonical),
+    )
+
+
 def _alpha_max_nonempty_token(value: Any, *, field: str) -> str:
     if type(value) is not str or not value or value != value.strip() or "\0" in value:
         raise ValueError(f"alpha_max_{field}_invalid")
@@ -4063,6 +4912,7 @@ _ALPHA_MAX_CAPSULE_STATE_KEYS: Final[frozenset[str]] = frozenset(
         "funding_event_count",
         "manifest_sha256",
         "market_event_count",
+        "native_finalization_sha256",
         "order_event_count",
         "phase_id",
         "portfolio_mode",
@@ -4096,6 +4946,10 @@ def _alpha_max_validate_capsule_state_payload(
     _require_sha256(
         normalized["capsule_sha256"],
         field="alpha_max_capsule_state_capsule_sha256",
+    )
+    _require_sha256(
+        normalized["native_finalization_sha256"],
+        field="alpha_max_capsule_state_native_finalization_sha256",
     )
     capsule = normalized["capsule"]
     finalized = normalized["finalized_children"]
@@ -4801,6 +5655,104 @@ class AlphaMaxGateDecision:
 
 
 @dataclass(frozen=True, slots=True)
+class AlphaMaxScalingAttribution:
+    """Matched nominal-30 evidence separating leverage effects from signal alpha."""
+
+    scaled_row_id: str
+    sibling_row_id: str
+    comparison_role: str
+    nominal_cost_bps: int
+    matched_domain_sha256: str
+    sibling_gate_eligible: bool
+    sibling_gross_exposure: float
+    exposure_normalization: str
+    sibling_exposure_normalized_return: float | None
+    sibling_positive_exposure_normalized: bool
+    sibling_dependency_satisfied: bool
+    dependency_rejection_reason: str | None
+    scaled_minus_sibling_total_return: float | None
+    scaled_minus_sibling_cagr: float | None
+    scaled_minus_sibling_calmar: float | None
+    scaled_minus_sibling_net_sharpe: float | None
+    attribution_label: str = "risk_transform_not_alpha"
+    passive_scaled_counterfactual: str = "absent"
+
+    def __post_init__(self) -> None:
+        expected_sibling = {
+            "full_equal_risk_scaled": "full_equal_risk_1x",
+            "full_shrunk_hrp_scaled": "full_shrunk_hrp_1x",
+        }.get(self.scaled_row_id)
+        if (
+            expected_sibling != self.sibling_row_id
+            or self.comparison_role not in _ALPHA_MAX_COMPARISON_ROLES
+            or self.nominal_cost_bps != 30
+            or type(self.sibling_gate_eligible) is not bool
+            or self.sibling_gross_exposure != 1.0
+            or self.exposure_normalization != "total_return / frozen_1x_gross"
+            or type(self.sibling_positive_exposure_normalized) is not bool
+            or type(self.sibling_dependency_satisfied) is not bool
+            or self.attribution_label != "risk_transform_not_alpha"
+            or self.passive_scaled_counterfactual != "absent"
+        ):
+            raise ValueError("alpha_max_scaling_attribution_invalid")
+        _require_sha256(
+            self.matched_domain_sha256,
+            field="alpha_max_scaling_attribution_matched_domain_sha256",
+        )
+        numeric = (
+            self.sibling_exposure_normalized_return,
+            self.scaled_minus_sibling_total_return,
+            self.scaled_minus_sibling_cagr,
+            self.scaled_minus_sibling_calmar,
+            self.scaled_minus_sibling_net_sharpe,
+        )
+        if any(value is not None and not math.isfinite(value) for value in numeric):
+            raise ValueError("alpha_max_scaling_attribution_invalid")
+        expected_dependency = (
+            self.sibling_gate_eligible and self.sibling_positive_exposure_normalized
+        )
+        expected_reason = (
+            None
+            if expected_dependency
+            else "scaled_1x_exposure_normalized_nonpositive"
+            if not self.sibling_positive_exposure_normalized
+            else "scaled_1x_sibling_not_eligible"
+        )
+        if (
+            self.sibling_dependency_satisfied is not expected_dependency
+            or self.dependency_rejection_reason != expected_reason
+            or self.sibling_positive_exposure_normalized
+            is not (
+                self.sibling_exposure_normalized_return is not None
+                and self.sibling_exposure_normalized_return > 0.0
+            )
+        ):
+            raise ValueError("alpha_max_scaling_attribution_invalid")
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "attribution_label": self.attribution_label,
+            "comparison_role": self.comparison_role,
+            "dependency_rejection_reason": self.dependency_rejection_reason,
+            "exposure_normalization": self.exposure_normalization,
+            "matched_domain_sha256": self.matched_domain_sha256,
+            "nominal_cost_bps": self.nominal_cost_bps,
+            "passive_scaled_counterfactual": self.passive_scaled_counterfactual,
+            "scaled_minus_sibling_cagr": self.scaled_minus_sibling_cagr,
+            "scaled_minus_sibling_calmar": self.scaled_minus_sibling_calmar,
+            "scaled_minus_sibling_net_sharpe": self.scaled_minus_sibling_net_sharpe,
+            "scaled_minus_sibling_total_return": self.scaled_minus_sibling_total_return,
+            "scaled_row_id": self.scaled_row_id,
+            "sibling_dependency_satisfied": self.sibling_dependency_satisfied,
+            "sibling_exposure_normalized_return": self.sibling_exposure_normalized_return,
+            "sibling_gate_eligible": self.sibling_gate_eligible,
+            "sibling_gross_exposure": self.sibling_gross_exposure,
+            "sibling_positive_exposure_normalized": (self.sibling_positive_exposure_normalized),
+            "sibling_row_id": self.sibling_row_id,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class AlphaMaxSelectionResult:
     role: str
     decisions: tuple[AlphaMaxGateDecision, ...]
@@ -4808,6 +5760,7 @@ class AlphaMaxSelectionResult:
     prelock_champion: str | None
     selected_candidate_id: str | None
     historical_evaluation_leader: str | None
+    scaling_attributions: tuple[AlphaMaxScalingAttribution, ...]
     canonical_bytes: bytes
     sha256: str
 
@@ -4862,6 +5815,14 @@ def _alpha_max_select_gate_inputs(
     row_ids = tuple(value.row_id for value in values)
     if len(row_ids) != len(set(row_ids)):
         raise ValueError("alpha_max_gate_duplicate_row_id")
+    scaled_siblings = {
+        "full_equal_risk_scaled": "full_equal_risk_1x",
+        "full_shrunk_hrp_scaled": "full_shrunk_hrp_1x",
+    }
+    present_scaled = tuple(row_id for row_id in scaled_siblings if row_id in row_ids)
+    by_id = {value.row_id: value for value in values}
+    if any(scaled_siblings[row_id] not in by_id for row_id in present_scaled):
+        raise ValueError("alpha_max_scaled_sibling_missing")
     normal_values = tuple(value for value in values if type(value) is AlphaMaxGateInput)
     terminal_values = tuple(
         value for value in values if type(value) is AlphaMaxTerminalGateEvidence
@@ -4927,80 +5888,234 @@ def _alpha_max_select_gate_inputs(
             continue
         early_pass.append(candidate)
 
-    normal = tuple(value for value in early_pass if value.gate_mdd <= 0.30)
-    best_normal = min(normal, key=lambda value: value.rank_key) if normal else None
-    eligible: list[AlphaMaxGateInput] = []
-    for candidate in early_pass:
-        evaluated = (*_ALPHA_MAX_EARLY_GATE_ORDER, "mdd")
-        if candidate.gate_mdd <= 0.30:
-            decision = AlphaMaxGateDecision(
-                row_id=candidate.row_id,
-                eligible=True,
-                evaluated_gates=evaluated,
-                rejection_reasons=(),
-                gate_mdd=candidate.gate_mdd,
-                mdd_band="normal",
-                comparator_row_id=None,
-            )
-            eligible.append(candidate)
-        elif candidate.gate_mdd > 0.35:
-            decision = AlphaMaxGateDecision(
+    evaluated_mdd = (*_ALPHA_MAX_EARLY_GATE_ORDER, "mdd")
+    scaled_row_ids = set(present_scaled)
+    sibling_row_ids = {scaled_siblings[row_id] for row_id in present_scaled}
+
+    def decide_soft_mdd(
+        candidate: AlphaMaxGateInput,
+        comparator: AlphaMaxGateInput | None,
+    ) -> AlphaMaxGateDecision:
+        if comparator is None:
+            return AlphaMaxGateDecision(
                 row_id=candidate.row_id,
                 eligible=False,
-                evaluated_gates=evaluated,
-                rejection_reasons=("mdd_above_hard_limit",),
-                gate_mdd=candidate.gate_mdd,
-                mdd_band="hard_reject",
-                comparator_row_id=None,
-            )
-        elif best_normal is None:
-            decision = AlphaMaxGateDecision(
-                row_id=candidate.row_id,
-                eligible=False,
-                evaluated_gates=evaluated,
+                evaluated_gates=evaluated_mdd,
                 rejection_reasons=("soft_mdd_requires_normal_comparator",),
                 gate_mdd=candidate.gate_mdd,
                 mdd_band="soft",
                 comparator_row_id=None,
             )
-        elif candidate.cagr > best_normal.cagr and candidate.calmar > best_normal.calmar:
-            decision = AlphaMaxGateDecision(
-                row_id=candidate.row_id,
-                eligible=True,
-                evaluated_gates=evaluated,
-                rejection_reasons=(),
-                gate_mdd=candidate.gate_mdd,
-                mdd_band="soft",
-                comparator_row_id=best_normal.row_id,
-            )
-            eligible.append(candidate)
-        else:
-            decision = AlphaMaxGateDecision(
+        eligible = candidate.cagr > comparator.cagr and candidate.calmar > comparator.calmar
+        return AlphaMaxGateDecision(
+            row_id=candidate.row_id,
+            eligible=eligible,
+            evaluated_gates=evaluated_mdd,
+            rejection_reasons=(
+                () if eligible else ("soft_mdd_not_strictly_superior_to_best_normal",)
+            ),
+            gate_mdd=candidate.gate_mdd,
+            mdd_band="soft",
+            comparator_row_id=comparator.row_id,
+        )
+
+    # Resolve every dependency-free 1x row before allowing a scaled row into
+    # the comparator universe.  A soft-MDD 1x sibling is therefore compared
+    # only against already-eligible unscaled normal rows, which makes the
+    # sibling -> scaled dependency acyclic.
+    unscaled_normal = tuple(
+        value
+        for value in early_pass
+        if value.row_id not in scaled_row_ids and value.gate_mdd <= 0.30
+    )
+    for candidate in unscaled_normal:
+        decisions[candidate.row_id] = AlphaMaxGateDecision(
+            row_id=candidate.row_id,
+            eligible=True,
+            evaluated_gates=evaluated_mdd,
+            rejection_reasons=(),
+            gate_mdd=candidate.gate_mdd,
+            mdd_band="normal",
+            comparator_row_id=None,
+        )
+    base_normal = (
+        min(unscaled_normal, key=lambda value: value.rank_key) if unscaled_normal else None
+    )
+    for candidate in early_pass:
+        if candidate.row_id in decisions or candidate.row_id in scaled_row_ids:
+            continue
+        if candidate.gate_mdd > 0.35:
+            decisions[candidate.row_id] = AlphaMaxGateDecision(
                 row_id=candidate.row_id,
                 eligible=False,
-                evaluated_gates=evaluated,
-                rejection_reasons=("soft_mdd_not_strictly_superior_to_best_normal",),
+                evaluated_gates=evaluated_mdd,
+                rejection_reasons=("mdd_above_hard_limit",),
                 gate_mdd=candidate.gate_mdd,
-                mdd_band="soft",
-                comparator_row_id=best_normal.row_id,
+                mdd_band="hard_reject",
+                comparator_row_id=None,
             )
-        decisions[candidate.row_id] = decision
+        elif candidate.row_id in sibling_row_ids:
+            decisions[candidate.row_id] = decide_soft_mdd(candidate, base_normal)
 
-    ranked = tuple(value.row_id for value in sorted(eligible, key=lambda value: value.rank_key))
+    scaled_dependencies: dict[str, tuple[bool, bool, str | None]] = {}
+    for scaled_row_id in present_scaled:
+        sibling = by_id[scaled_siblings[scaled_row_id]]
+        sibling_return = (
+            sibling.cumulative_return / 1.0 if type(sibling) is AlphaMaxGateInput else None
+        )
+        positive = sibling_return is not None and sibling_return > 0.0
+        sibling_decision = decisions[scaled_siblings[scaled_row_id]]
+        satisfied = sibling_decision.eligible and positive
+        reason = (
+            None
+            if satisfied
+            else "scaled_1x_exposure_normalized_nonpositive"
+            if not positive
+            else "scaled_1x_sibling_not_eligible"
+        )
+        scaled_dependencies[scaled_row_id] = (satisfied, positive, reason)
+
+    for candidate in early_pass:
+        if candidate.row_id not in scaled_row_ids or candidate.row_id in decisions:
+            continue
+        dependency_satisfied, _positive, reason = scaled_dependencies[candidate.row_id]
+        if candidate.gate_mdd > 0.35:
+            decisions[candidate.row_id] = AlphaMaxGateDecision(
+                row_id=candidate.row_id,
+                eligible=False,
+                evaluated_gates=evaluated_mdd,
+                rejection_reasons=("mdd_above_hard_limit",),
+                gate_mdd=candidate.gate_mdd,
+                mdd_band="hard_reject",
+                comparator_row_id=None,
+            )
+        elif candidate.gate_mdd <= 0.30:
+            decisions[candidate.row_id] = AlphaMaxGateDecision(
+                row_id=candidate.row_id,
+                eligible=dependency_satisfied,
+                evaluated_gates=(
+                    evaluated_mdd if dependency_satisfied else (*evaluated_mdd, "scaled_1x_sibling")
+                ),
+                rejection_reasons=(() if dependency_satisfied else (str(reason),)),
+                gate_mdd=candidate.gate_mdd,
+                mdd_band="normal",
+                comparator_row_id=None,
+            )
+
+    normal = tuple(
+        value for value in early_pass if value.gate_mdd <= 0.30 and decisions[value.row_id].eligible
+    )
+    best_normal = min(normal, key=lambda value: value.rank_key) if normal else None
+    for candidate in early_pass:
+        if candidate.row_id in decisions:
+            continue
+        if candidate.row_id in scaled_row_ids:
+            dependency_satisfied, _positive, reason = scaled_dependencies[candidate.row_id]
+            if not dependency_satisfied:
+                decisions[candidate.row_id] = AlphaMaxGateDecision(
+                    row_id=candidate.row_id,
+                    eligible=False,
+                    evaluated_gates=(*evaluated_mdd, "scaled_1x_sibling"),
+                    rejection_reasons=(str(reason),),
+                    gate_mdd=candidate.gate_mdd,
+                    mdd_band="soft",
+                    comparator_row_id=None,
+                )
+                continue
+        decisions[candidate.row_id] = decide_soft_mdd(candidate, best_normal)
+
+    attributions: list[AlphaMaxScalingAttribution] = []
+    for scaled_row_id in present_scaled:
+        sibling_row_id = scaled_siblings[scaled_row_id]
+        scaled = by_id[scaled_row_id]
+        sibling = by_id[sibling_row_id]
+        sibling_decision = decisions[sibling_row_id]
+        sibling_return = (
+            sibling.cumulative_return / 1.0 if type(sibling) is AlphaMaxGateInput else None
+        )
+        positive = sibling_return is not None and sibling_return > 0.0
+        dependency_satisfied = sibling_decision.eligible and positive
+        reason = (
+            None
+            if dependency_satisfied
+            else "scaled_1x_exposure_normalized_nonpositive"
+            if not positive
+            else "scaled_1x_sibling_not_eligible"
+        )
+        matched_payload = {
+            "calendar_sha256": (
+                sibling.calendar_sha256 if type(sibling) is AlphaMaxGateInput else None
+            ),
+            "comparison_role": sibling.comparison_role,
+            "feature_root_set_sha256": sibling.feature_root_set_sha256,
+            "nominal_cost_bps": sibling.nominal_cost_bps,
+            "raw_root_set_sha256": sibling.raw_root_set_sha256,
+            "seed_schedule_sha256": sibling.seed_schedule_sha256,
+            "universe_sha256": sibling.universe_sha256,
+        }
+        paired_normal = type(scaled) is AlphaMaxGateInput and type(sibling) is AlphaMaxGateInput
+        attributions.append(
+            AlphaMaxScalingAttribution(
+                scaled_row_id=scaled_row_id,
+                sibling_row_id=sibling_row_id,
+                comparison_role=role,
+                nominal_cost_bps=30,
+                matched_domain_sha256=_sha256_bytes(
+                    _canonical_json_bytes(matched_payload, newline=False)
+                ),
+                sibling_gate_eligible=sibling_decision.eligible,
+                sibling_gross_exposure=1.0,
+                exposure_normalization="total_return / frozen_1x_gross",
+                sibling_exposure_normalized_return=sibling_return,
+                sibling_positive_exposure_normalized=positive,
+                sibling_dependency_satisfied=dependency_satisfied,
+                dependency_rejection_reason=reason,
+                scaled_minus_sibling_total_return=(
+                    scaled.cumulative_return - sibling.cumulative_return if paired_normal else None
+                ),
+                scaled_minus_sibling_cagr=(scaled.cagr - sibling.cagr if paired_normal else None),
+                scaled_minus_sibling_calmar=(
+                    scaled.calmar - sibling.calmar if paired_normal else None
+                ),
+                scaled_minus_sibling_net_sharpe=(
+                    scaled.net_sharpe - sibling.net_sharpe if paired_normal else None
+                ),
+            )
+        )
+        scaled_decision = decisions[scaled_row_id]
+        if reason is not None and scaled_decision.eligible:
+            decisions[scaled_row_id] = AlphaMaxGateDecision(
+                row_id=scaled_decision.row_id,
+                eligible=False,
+                evaluated_gates=(*scaled_decision.evaluated_gates, "scaled_1x_sibling"),
+                rejection_reasons=(reason,),
+                gate_mdd=scaled_decision.gate_mdd,
+                mdd_band=scaled_decision.mdd_band,
+                comparator_row_id=scaled_decision.comparator_row_id,
+            )
+
+    eligible_by_id = {
+        value.row_id: value for value in normal_values if decisions[value.row_id].eligible
+    }
+    ranked = tuple(
+        value.row_id for value in sorted(eligible_by_id.values(), key=lambda value: value.rank_key)
+    )
+    scaling_attributions = tuple(attributions)
     leader = ranked[0] if ranked else None
     prelock = leader if role == "prelock_selection" else None
     historical = leader if role == "historical_report" else None
     payload = {
         "artifact_kind": (
-            "alpha_max_prelock_selection.v1"
+            "alpha_max_prelock_selection.v2"
             if role == "prelock_selection"
-            else "alpha_max_historical_report_ranking.v1"
+            else "alpha_max_historical_report_ranking.v2"
         ),
         "decisions": [decisions[key].to_payload() for key in sorted(decisions)],
         "historical_evaluation_leader": historical,
         "prelock_champion": prelock,
         "ranked_candidate_ids": list(ranked),
         "role": role,
+        "scaling_attributions": [value.to_payload() for value in scaling_attributions],
         "selected_candidate_id": prelock,
     }
     canonical = _canonical_json_bytes(payload, newline=True)
@@ -5011,6 +6126,7 @@ def _alpha_max_select_gate_inputs(
         prelock_champion=prelock,
         selected_candidate_id=prelock,
         historical_evaluation_leader=historical,
+        scaling_attributions=scaling_attributions,
         canonical_bytes=canonical,
         sha256=_sha256_bytes(canonical),
     )
@@ -5172,9 +6288,14 @@ class AlphaMaxLiquidationEventEvidence:
     position_qty: float
     entry_price: float
     liquidation_price: float
+    trigger_price: float
+    bar_high: float
+    bar_low: float
     close_price: float
     fill_cost: float
     commission: float
+    leverage: float
+    reason: str
     configured_margin_mode: str
     modeled_margin_mode: str
 
@@ -5189,7 +6310,15 @@ class AlphaMaxLiquidationEventEvidence:
         )
         if position_qty == 0.0:
             raise ValueError("alpha_max_liquidation_position_qty_invalid")
-        for field in ("entry_price", "liquidation_price", "close_price", "fill_cost"):
+        for field in (
+            "entry_price",
+            "liquidation_price",
+            "trigger_price",
+            "bar_high",
+            "bar_low",
+            "close_price",
+            "fill_cost",
+        ):
             _alpha_max_finite_number(
                 getattr(self, field),
                 field=f"liquidation_{field}",
@@ -5200,6 +6329,15 @@ class AlphaMaxLiquidationEventEvidence:
             field="liquidation_commission",
             nonnegative=True,
         )
+        leverage = _alpha_max_finite_number(
+            self.leverage,
+            field="liquidation_leverage",
+            positive=True,
+        )
+        if leverage <= 1.0:
+            raise ValueError("alpha_max_liquidation_leverage_invalid")
+        if self.reason != "maintenance_margin_breach":
+            raise ValueError("alpha_max_liquidation_reason_invalid")
         _alpha_max_nonempty_token(
             self.configured_margin_mode,
             field="liquidation_configured_margin_mode",
@@ -5211,16 +6349,21 @@ class AlphaMaxLiquidationEventEvidence:
 
     def to_payload(self) -> dict[str, Any]:
         return {
+            "bar_high": self.bar_high,
+            "bar_low": self.bar_low,
             "close_price": self.close_price,
             "configured_margin_mode": self.configured_margin_mode,
             "commission": self.commission,
             "entry_price": self.entry_price,
             "fill_cost": self.fill_cost,
+            "leverage": self.leverage,
             "liquidation_price": self.liquidation_price,
             "modeled_margin_mode": self.modeled_margin_mode,
             "position_qty": self.position_qty,
+            "reason": self.reason,
             "symbol": self.symbol,
             "timestamp_ms": self.timestamp_ms,
+            "trigger_price": self.trigger_price,
         }
 
 
@@ -5233,9 +6376,14 @@ def _alpha_max_normalize_liquidation_events(
         "position_qty",
         "entry_price",
         "liquidation_price",
+        "trigger_price",
+        "bar_high",
+        "bar_low",
         "close_price",
         "fill_cost",
         "commission",
+        "leverage",
+        "reason",
         "configured_margin_mode",
         "modeled_margin_mode",
     }
@@ -5243,10 +6391,17 @@ def _alpha_max_normalize_liquidation_events(
     for raw in values:
         if type(raw) is not dict or set(raw) != expected_keys:
             raise ValueError("alpha_max_liquidation_event_schema_invalid")
-        timestamp = _utc(raw["time"], field="liquidation_event_time")  # type: ignore[arg-type]
+        raw_time = raw["time"]
+        if type(raw_time) is int:
+            if raw_time < 100_000_000_000:
+                raise ValueError("liquidation_event_time_invalid")
+            timestamp_ms = raw_time
+        else:
+            timestamp = _utc(raw_time, field="liquidation_event_time")  # type: ignore[arg-type]
+            timestamp_ms = _epoch_ms(timestamp)
         events.append(
             AlphaMaxLiquidationEventEvidence(
-                timestamp_ms=_epoch_ms(timestamp),
+                timestamp_ms=timestamp_ms,
                 symbol=str(raw["symbol"]),
                 position_qty=_alpha_max_finite_number(
                     raw["position_qty"],
@@ -5260,6 +6415,21 @@ def _alpha_max_normalize_liquidation_events(
                 liquidation_price=_alpha_max_finite_number(
                     raw["liquidation_price"],
                     field="liquidation_liquidation_price",
+                    positive=True,
+                ),
+                trigger_price=_alpha_max_finite_number(
+                    raw["trigger_price"],
+                    field="liquidation_trigger_price",
+                    positive=True,
+                ),
+                bar_high=_alpha_max_finite_number(
+                    raw["bar_high"],
+                    field="liquidation_bar_high",
+                    positive=True,
+                ),
+                bar_low=_alpha_max_finite_number(
+                    raw["bar_low"],
+                    field="liquidation_bar_low",
                     positive=True,
                 ),
                 close_price=_alpha_max_finite_number(
@@ -5277,6 +6447,12 @@ def _alpha_max_normalize_liquidation_events(
                     field="liquidation_commission",
                     nonnegative=True,
                 ),
+                leverage=_alpha_max_finite_number(
+                    raw["leverage"],
+                    field="liquidation_leverage",
+                    positive=True,
+                ),
+                reason=str(raw["reason"]),
                 configured_margin_mode=str(raw["configured_margin_mode"]),
                 modeled_margin_mode=str(raw["modeled_margin_mode"]),
             )
@@ -5312,6 +6488,362 @@ def _alpha_max_liquidation_cost_totals(
         portfolio_liquidation_total,
         field="portfolio_liquidation_total",
         nonnegative=True,
+    )
+
+
+_ALPHA_MAX_NATIVE_COVERAGE_KEYS: Final[frozenset[str]] = frozenset(
+    {
+        "adapter_class",
+        "native_timeframe",
+        "barrier_mode",
+        "completed_native_keys",
+        "completed_native_count_by_symbol",
+        "last_completed_native_key_by_symbol",
+        "barrier_pending_keys",
+        "barrier_closed_keys",
+        "barrier_symbol_coverage",
+        "failed_native_keys",
+        "partial_bucket_error",
+        "finalization_completed_native_keys",
+        "finalization_barrier_keys",
+    }
+)
+
+
+def _alpha_max_native_string_tuple(value: Any, *, field: str) -> tuple[str, ...]:
+    if not isinstance(value, (list, tuple)):
+        raise TypeError(f"alpha_max_native_{field}_invalid")
+    normalized = tuple(value)
+    if (
+        any(type(item) is not str or not item for item in normalized)
+        or normalized != tuple(sorted(normalized))
+        or len(normalized) != len(set(normalized))
+    ):
+        raise ValueError(f"alpha_max_native_{field}_invalid")
+    return normalized
+
+
+def _alpha_max_native_key_tuple(
+    value: Any,
+    *,
+    field: str,
+) -> tuple[tuple[str, str], ...]:
+    if not isinstance(value, (list, tuple)):
+        raise TypeError(f"alpha_max_native_{field}_invalid")
+    normalized: list[tuple[str, str]] = []
+    for item in value:
+        if (
+            not isinstance(item, (list, tuple))
+            or len(item) != 2
+            or type(item[0]) is not str
+            or not item[0]
+            or type(item[1]) is not str
+            or not item[1]
+        ):
+            raise ValueError(f"alpha_max_native_{field}_invalid")
+        normalized.append((item[0], item[1]))
+    result = tuple(normalized)
+    if result != tuple(sorted(result)) or len(result) != len(set(result)):
+        raise ValueError(f"alpha_max_native_{field}_invalid")
+    return result
+
+
+def _freeze_alpha_max_native_coverage(
+    value: Mapping[str, Mapping[str, Any]],
+    *,
+    finalized_children: Mapping[str, int],
+) -> Mapping[str, Mapping[str, Any]]:
+    if not isinstance(value, Mapping):
+        raise TypeError("alpha_max_native_finalization_coverage_invalid")
+    child_ids = tuple(finalized_children)
+    if set(value) != set(child_ids) or any(
+        type(child_id) is not str or not child_id for child_id in value
+    ):
+        raise ValueError("alpha_max_native_finalization_coverage_invalid")
+    frozen: dict[str, Mapping[str, Any]] = {}
+    for child_id in child_ids:
+        raw = value[child_id]
+        if not isinstance(raw, Mapping) or set(raw) != _ALPHA_MAX_NATIVE_COVERAGE_KEYS:
+            raise ValueError("alpha_max_native_finalization_coverage_invalid")
+        adapter_class = raw["adapter_class"]
+        native_timeframe = raw["native_timeframe"]
+        barrier_mode = raw["barrier_mode"]
+        if (
+            type(adapter_class) is not str
+            or not adapter_class
+            or type(native_timeframe) is not str
+            or not native_timeframe
+            or barrier_mode not in {"none", "atomic_cross_section"}
+        ):
+            raise ValueError("alpha_max_native_finalization_coverage_invalid")
+        completed = _alpha_max_native_key_tuple(
+            raw["completed_native_keys"], field="completed_keys"
+        )
+        finalized_completed = _alpha_max_native_key_tuple(
+            raw["finalization_completed_native_keys"],
+            field="finalization_completed_keys",
+        )
+        completed_set = set(completed)
+        if not set(finalized_completed).issubset(completed_set):
+            raise ValueError("alpha_max_native_finalization_coverage_invalid")
+
+        raw_counts = raw["completed_native_count_by_symbol"]
+        if not isinstance(raw_counts, Mapping) or any(
+            type(symbol) is not str or not symbol or type(count) is not int or count <= 0
+            for symbol, count in raw_counts.items()
+        ):
+            raise ValueError("alpha_max_native_finalization_coverage_invalid")
+        counts = dict(sorted(raw_counts.items()))
+        expected_counts = dict(sorted(Counter(symbol for symbol, _key in completed).items()))
+        if counts != expected_counts:
+            raise ValueError("alpha_max_native_finalization_coverage_invalid")
+
+        raw_last = raw["last_completed_native_key_by_symbol"]
+        if not isinstance(raw_last, Mapping) or any(
+            type(symbol) is not str or not symbol or type(key) is not str or not key
+            for symbol, key in raw_last.items()
+        ):
+            raise ValueError("alpha_max_native_finalization_coverage_invalid")
+        last = dict(sorted(raw_last.items()))
+        expected_last = {
+            symbol: max(key for completed_symbol, key in completed if completed_symbol == symbol)
+            for symbol in counts
+        }
+        if last != expected_last:
+            raise ValueError("alpha_max_native_finalization_coverage_invalid")
+
+        pending = _alpha_max_native_string_tuple(
+            raw["barrier_pending_keys"], field="barrier_pending_keys"
+        )
+        closed = _alpha_max_native_string_tuple(
+            raw["barrier_closed_keys"], field="barrier_closed_keys"
+        )
+        finalized_barriers = _alpha_max_native_string_tuple(
+            raw["finalization_barrier_keys"], field="finalization_barrier_keys"
+        )
+        raw_barrier_coverage = raw["barrier_symbol_coverage"]
+        if not isinstance(raw_barrier_coverage, Mapping) or set(raw_barrier_coverage) != set(
+            pending
+        ):
+            raise ValueError("alpha_max_native_finalization_coverage_invalid")
+        barrier_coverage = {
+            key: _alpha_max_native_string_tuple(
+                raw_barrier_coverage[key], field="barrier_symbol_coverage"
+            )
+            for key in pending
+        }
+        if any(not symbols for symbols in barrier_coverage.values()):
+            raise ValueError("alpha_max_native_finalization_coverage_invalid")
+        raw_failed = raw["failed_native_keys"]
+        if not isinstance(raw_failed, Mapping) or any(
+            type(key) is not str or not key or type(reason) is not str or not reason
+            for key, reason in raw_failed.items()
+        ):
+            raise ValueError("alpha_max_native_finalization_coverage_invalid")
+        failed = dict(sorted(raw_failed.items()))
+        if (
+            raw["partial_bucket_error"] is not None
+            or failed
+            or not set(finalized_barriers).issubset(closed)
+        ):
+            raise ValueError("alpha_max_native_finalization_coverage_invalid")
+
+        finalized_count = finalized_children[child_id]
+        if barrier_mode == "none":
+            if (
+                pending
+                or closed
+                or barrier_coverage
+                or failed
+                or finalized_barriers
+                or len(finalized_completed) != finalized_count
+            ):
+                raise ValueError("alpha_max_native_finalization_coverage_invalid")
+        else:
+            expected_completed = {
+                (symbol, key) for key in closed for symbol in barrier_coverage[key]
+            }
+            expected_finalized = {
+                (symbol, key) for key in finalized_barriers for symbol in barrier_coverage[key]
+            }
+            if (
+                pending != closed
+                or completed_set != expected_completed
+                or set(finalized_completed) != expected_finalized
+                or len(finalized_barriers) != finalized_count
+            ):
+                raise ValueError("alpha_max_native_finalization_coverage_invalid")
+
+        frozen[child_id] = MappingProxyType(
+            {
+                "adapter_class": adapter_class,
+                "native_timeframe": native_timeframe,
+                "barrier_mode": barrier_mode,
+                "completed_native_keys": completed,
+                "completed_native_count_by_symbol": MappingProxyType(counts),
+                "last_completed_native_key_by_symbol": MappingProxyType(last),
+                "barrier_pending_keys": pending,
+                "barrier_closed_keys": closed,
+                "barrier_symbol_coverage": MappingProxyType(
+                    {key: tuple(symbols) for key, symbols in barrier_coverage.items()}
+                ),
+                "failed_native_keys": MappingProxyType(failed),
+                "partial_bucket_error": None,
+                "finalization_completed_native_keys": finalized_completed,
+                "finalization_barrier_keys": finalized_barriers,
+            }
+        )
+    return MappingProxyType(frozen)
+
+
+def _alpha_max_native_coverage_payload(
+    value: Mapping[str, Mapping[str, Any]],
+    *,
+    finalized_children: Mapping[str, int],
+) -> dict[str, dict[str, Any]]:
+    if type(value) is not MappingProxyType:
+        raise TypeError("alpha_max_native_finalization_coverage_invalid")
+    payload: dict[str, dict[str, Any]] = {}
+    for child_id, raw in value.items():
+        if (
+            type(raw) is not MappingProxyType
+            or type(raw["completed_native_keys"]) is not tuple
+            or type(raw["completed_native_count_by_symbol"]) is not MappingProxyType
+            or type(raw["last_completed_native_key_by_symbol"]) is not MappingProxyType
+            or type(raw["barrier_pending_keys"]) is not tuple
+            or type(raw["barrier_closed_keys"]) is not tuple
+            or type(raw["barrier_symbol_coverage"]) is not MappingProxyType
+            or type(raw["failed_native_keys"]) is not MappingProxyType
+            or type(raw["finalization_completed_native_keys"]) is not tuple
+            or type(raw["finalization_barrier_keys"]) is not tuple
+        ):
+            raise TypeError("alpha_max_native_finalization_coverage_invalid")
+        payload[child_id] = {
+            "adapter_class": raw["adapter_class"],
+            "native_timeframe": raw["native_timeframe"],
+            "barrier_mode": raw["barrier_mode"],
+            "completed_native_keys": [list(item) for item in raw["completed_native_keys"]],
+            "completed_native_count_by_symbol": dict(raw["completed_native_count_by_symbol"]),
+            "last_completed_native_key_by_symbol": dict(raw["last_completed_native_key_by_symbol"]),
+            "barrier_pending_keys": list(raw["barrier_pending_keys"]),
+            "barrier_closed_keys": list(raw["barrier_closed_keys"]),
+            "barrier_symbol_coverage": {
+                key: list(symbols) for key, symbols in raw["barrier_symbol_coverage"].items()
+            },
+            "failed_native_keys": dict(raw["failed_native_keys"]),
+            "partial_bucket_error": raw["partial_bucket_error"],
+            "finalization_completed_native_keys": [
+                list(item) for item in raw["finalization_completed_native_keys"]
+            ],
+            "finalization_barrier_keys": list(raw["finalization_barrier_keys"]),
+        }
+    normalized = _freeze_alpha_max_native_coverage(
+        payload,
+        finalized_children=finalized_children,
+    )
+    if normalized != value:
+        raise ValueError("alpha_max_native_finalization_coverage_invalid")
+    return payload
+
+
+@dataclass(frozen=True, slots=True)
+class AlphaMaxNativeFinalizationReceipt:
+    """Canonical proof that every final working native bucket was consumed once."""
+
+    boundary_utc: datetime
+    finalized_children: Mapping[str, int]
+    native_coverage_by_child: Mapping[str, Mapping[str, Any]]
+    discarded_signal_count: int
+    discarded_signal_sha256: str
+    canonical_bytes: bytes
+    sha256: str
+
+    def __post_init__(self) -> None:
+        boundary = _utc(self.boundary_utc, field="native_finalization_boundary")
+        if type(self.finalized_children) is not MappingProxyType:
+            raise TypeError("alpha_max_native_finalization_children_invalid")
+        children = dict(self.finalized_children)
+        if (
+            not children
+            or any(type(key) is not str or not key for key in children)
+            or any(type(value) is not int or value <= 0 for value in children.values())
+        ):
+            raise ValueError("alpha_max_native_finalization_children_invalid")
+        coverage_payload = _alpha_max_native_coverage_payload(
+            self.native_coverage_by_child,
+            finalized_children=children,
+        )
+        if type(self.discarded_signal_count) is not int or self.discarded_signal_count < 0:
+            raise ValueError("alpha_max_native_finalization_signal_count_invalid")
+        signal_sha = _require_sha256(
+            self.discarded_signal_sha256,
+            field="alpha_max_native_finalization_signal_sha256",
+        )
+        payload = {
+            "artifact_kind": "alpha_max_native_finalization_receipt.v1",
+            "boundary_utc": _alpha_max_utc_text(boundary),
+            "discarded_signal_count": self.discarded_signal_count,
+            "discarded_signal_sha256": signal_sha,
+            "finalized_children": children,
+            "native_coverage_by_child": coverage_payload,
+        }
+        canonical = _canonical_json_bytes(payload, newline=True)
+        if (
+            type(self.canonical_bytes) is not bytes
+            or self.canonical_bytes != canonical
+            or self.sha256 != _sha256_bytes(canonical)
+        ):
+            raise ValueError("alpha_max_native_finalization_canonical_mismatch")
+
+    def to_payload(self) -> dict[str, Any]:
+        return json.loads(self.canonical_bytes)
+
+
+def build_alpha_max_native_finalization_receipt(
+    *,
+    boundary_utc: datetime,
+    finalized_children: Mapping[str, int],
+    native_coverage_by_child: Mapping[str, Mapping[str, Any]],
+    discarded_signal_count: int,
+    discarded_signal_sha256: str,
+) -> AlphaMaxNativeFinalizationReceipt:
+    if not isinstance(finalized_children, Mapping):
+        raise TypeError("alpha_max_native_finalization_children_invalid")
+    frozen_children = MappingProxyType(dict(finalized_children))
+    frozen_coverage = _freeze_alpha_max_native_coverage(
+        native_coverage_by_child,
+        finalized_children=frozen_children,
+    )
+    temporary = object.__new__(AlphaMaxNativeFinalizationReceipt)
+    values = {
+        "boundary_utc": boundary_utc,
+        "finalized_children": frozen_children,
+        "native_coverage_by_child": frozen_coverage,
+        "discarded_signal_count": discarded_signal_count,
+        "discarded_signal_sha256": discarded_signal_sha256,
+    }
+    for field, value in values.items():
+        object.__setattr__(temporary, field, value)
+    canonical = _canonical_json_bytes(
+        {
+            "artifact_kind": "alpha_max_native_finalization_receipt.v1",
+            "boundary_utc": _alpha_max_utc_text(
+                _utc(boundary_utc, field="native_finalization_boundary")
+            ),
+            "discarded_signal_count": discarded_signal_count,
+            "discarded_signal_sha256": discarded_signal_sha256,
+            "finalized_children": dict(frozen_children),
+            "native_coverage_by_child": _alpha_max_native_coverage_payload(
+                frozen_coverage,
+                finalized_children=frozen_children,
+            ),
+        },
+        newline=True,
+    )
+    return AlphaMaxNativeFinalizationReceipt(
+        **values,
+        canonical_bytes=canonical,
+        sha256=_sha256_bytes(canonical),
     )
 
 
@@ -5351,6 +6883,7 @@ class AlphaMaxActualEngineRunReceipt:
     ending_cash: float
     ending_equity: float
     full_event_equity: AlphaMaxStreamingEquityEvidence
+    native_finalization: AlphaMaxNativeFinalizationReceipt
     pricing_trace_count: int
     pricing_trace_set_sha256: str
     application_count: int
@@ -5363,6 +6896,7 @@ class AlphaMaxActualEngineRunReceipt:
     liquidation_event_set_sha256: str
     liquidation_events: tuple[AlphaMaxLiquidationEventEvidence, ...]
     reconciliation: AlphaMaxReconciliationEvidence
+    report_only_diagnostics: AlphaMaxRunReportOnlyDiagnostics
     canonical_bytes: bytes
     sha256: str
 
@@ -5508,6 +7042,12 @@ class AlphaMaxActualEngineRunReceipt:
             raise ValueError("alpha_max_actual_run_streaming_fold_bounds_invalid")
         if self.equity_observation_count != self.full_event_equity.event_count:
             raise ValueError("alpha_max_actual_run_equity_observation_count_mismatch")
+        fold_end = _ALPHA_MAX_FOLD_INTERVALS[self.split_or_fold_id][1]
+        if (
+            type(self.native_finalization) is not AlphaMaxNativeFinalizationReceipt
+            or self.native_finalization.boundary_utc != fold_end
+        ):
+            raise ValueError("alpha_max_actual_run_native_finalization_mismatch")
         if not math.isclose(
             ending_equity,
             self.full_event_equity.ending_equity,
@@ -5519,6 +7059,10 @@ class AlphaMaxActualEngineRunReceipt:
             self.reconciliation.complete
         ):
             raise ValueError("alpha_max_actual_run_reconciliation_incomplete")
+        if type(self.report_only_diagnostics) is not AlphaMaxRunReportOnlyDiagnostics:
+            raise TypeError("alpha_max_actual_run_diagnostics_identity_invalid")
+        if self.report_only_diagnostics.no_fill_attempt_count != self.no_fill_attempt_count:
+            raise ValueError("alpha_max_actual_run_diagnostics_count_mismatch")
         count_bindings = (
             (self.pricing_trace_count, self.reconciliation.pricing_trace_count),
             (self.application_count, self.reconciliation.application_count),
@@ -5604,7 +7148,7 @@ def _alpha_max_actual_engine_run_payload(
         "admitted_symbols": list(receipt.admitted_symbols),
         "application_count": receipt.application_count,
         "application_set_sha256": receipt.application_set_sha256,
-        "artifact_kind": "alpha_max_actual_engine_run_receipt.v1",
+        "artifact_kind": "alpha_max_actual_engine_run_receipt.v3",
         "capsule_receipt": receipt.capsule_receipt.to_payload(),
         "config_receipt": _alpha_max_artifact_receipt_payload(receipt.config_receipt),
         "config_sha256": receipt.config_sha256,
@@ -5631,6 +7175,7 @@ def _alpha_max_actual_engine_run_payload(
         "liquidation_events": [value.to_payload() for value in receipt.liquidation_events],
         "manifest_receipt": receipt.manifest_receipt.to_payload(),
         "market_event_count": receipt.market_event_count,
+        "native_finalization": receipt.native_finalization.to_payload(),
         "no_fill_attempt_count": receipt.no_fill_attempt_count,
         "no_fill_attempt_set_sha256": receipt.no_fill_attempt_set_sha256,
         "nominal_cost_bps": receipt.nominal_cost_bps,
@@ -5640,6 +7185,7 @@ def _alpha_max_actual_engine_run_payload(
         "raw_root_receipts": [value.to_payload() for value in receipt.raw_root_receipts],
         "raw_root_set_sha256": receipt.raw_root_set_sha256,
         "reconciliation": receipt.reconciliation.to_payload(),
+        "report_only_diagnostics": receipt.report_only_diagnostics.to_payload(),
         "row_id": receipt.row_id,
         "ruin_detected": receipt.ruin_detected,
         "runtime_contract_sha256": receipt.runtime_contract_sha256,
@@ -5735,6 +7281,7 @@ def build_alpha_max_actual_engine_run_receipt(
     ending_cash: float,
     ending_equity: float,
     full_event_equity: AlphaMaxStreamingEquityEvidence,
+    native_finalization: AlphaMaxNativeFinalizationReceipt,
     pricing_traces: tuple[ExecutionPricingTrace, ...],
     fill_applications: tuple[FillApplicationAttribution, ...],
     no_fill_attempts: tuple[NoFillAttempt, ...],
@@ -5742,6 +7289,9 @@ def build_alpha_max_actual_engine_run_receipt(
     liquidation_events: tuple[Mapping[str, object], ...],
     portfolio_fee_total: float,
     portfolio_funding_total: float,
+    capacity_observations: tuple[Mapping[str, Any], ...],
+    ending_market_values: Mapping[str, Any],
+    target_gross_exposure: float,
 ) -> AlphaMaxActualEngineRunReceipt:
     """Build the sole typed complete-engine receipt from observed replay evidence."""
     _alpha_max_validate_domain_fold(domain, split_or_fold_id)
@@ -5815,6 +7365,18 @@ def build_alpha_max_actual_engine_run_receipt(
         liquidation_cost_total=liquidation_cost_total,
         portfolio_liquidation_total=portfolio_liquidation_total,
     )
+    report_only_diagnostics = build_alpha_max_run_report_only_diagnostics(
+        pricing_traces=pricing_traces,
+        fill_applications=fill_applications,
+        no_fill_attempts=no_fill_attempts,
+        funding_ledger=funding_ledger,
+        liquidation_events=normalized_liquidations,
+        capacity_observations=capacity_observations,
+        ending_market_values=ending_market_values,
+        starting_equity=starting_equity,
+        ending_equity=ending_equity,
+        target_gross_exposure=target_gross_exposure,
+    )
     trace_payloads = tuple(value.to_payload() for value in pricing_traces)
     application_payloads = tuple(value.to_payload() for value in fill_applications)
     no_fill_payloads = tuple(value.to_payload() for value in no_fill_attempts)
@@ -5882,6 +7444,7 @@ def build_alpha_max_actual_engine_run_receipt(
         "ending_cash": ending_cash,
         "ending_equity": ending_equity,
         "full_event_equity": full_event_equity,
+        "native_finalization": native_finalization,
         "pricing_trace_count": len(pricing_traces),
         "pricing_trace_set_sha256": _alpha_max_payload_sequence_sha256(trace_payloads),
         "application_count": len(fill_applications),
@@ -5894,6 +7457,7 @@ def build_alpha_max_actual_engine_run_receipt(
         "liquidation_event_set_sha256": _alpha_max_payload_sequence_sha256(liquidation_payloads),
         "liquidation_events": normalized_liquidations,
         "reconciliation": reconciliation,
+        "report_only_diagnostics": report_only_diagnostics,
     }
     temporary = object.__new__(AlphaMaxActualEngineRunReceipt)
     for field, value in values.items():

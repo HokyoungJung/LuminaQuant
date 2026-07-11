@@ -173,6 +173,10 @@ def test_daily_trend_adapter_matches_original_and_excludes_forming_duplicate_tic
     )
     assert first_state["symbol_state"][symbol]["closes"] == [100.0]
     assert first_state["completed_native_count_by_symbol"] == {symbol: 1}
+    native_evidence = adapter.get_native_finalization_evidence()
+    assert native_evidence["barrier_mode"] == "none"
+    assert native_evidence["completed_native_keys"] == [(symbol, time_key(_dt(1)))]
+    assert native_evidence["barrier_symbol_coverage"] == {}
 
 
 def test_near_high_atomic_barrier_sorted_batch_duplicate_and_missing_fail_closed() -> None:
@@ -192,6 +196,13 @@ def test_near_high_atomic_barrier_sorted_batch_duplicate_and_missing_fail_closed
     assert adapter._tick == 1
     assert tuple(adapter.symbol_list) == tuple(sorted(symbols))
     state_after = adapter.get_research_indicator_state()
+    native_evidence = adapter.get_native_finalization_evidence()
+    key = time_key(_dt(1))
+    assert native_evidence["barrier_mode"] == "atomic_cross_section"
+    assert native_evidence["barrier_pending_keys"] == [key]
+    assert native_evidence["barrier_closed_keys"] == [key]
+    assert native_evidence["barrier_symbol_coverage"] == {key: sorted(symbols)}
+    assert native_evidence["failed_native_keys"] == {}
     adapter.calculate_signals_window(_event_for({symbols[0]: bars[symbols[0]]}))
     assert adapter.get_research_indicator_state() == state_after
 
@@ -231,6 +242,45 @@ def test_near_high_atomic_barrier_sorted_batch_duplicate_and_missing_fail_closed
     missing.calculate_signals_window(_event_for({"ADAUSDT": _bar(_dt(3), 100.0)}))
     with pytest.raises(ValueError, match="incomplete_near_high_cross_section"):
         missing.finalize_completed_native_buckets(_dt(4))
+
+
+def test_near_high_aggregator_collects_full_cross_section_before_expiry_check() -> None:
+    symbols = ["ADAUSDT", "BTCUSDT"]
+    adapter = ResearchOnlyDailyCrossSectionalNearHighAnchoringStrategy(
+        _Bars(symbols),
+        _Queue(),
+        admitted_symbols=symbols,
+        min_symbols=2,
+        min_history_bars=1,
+        rebalance_bars=1,
+    )
+    aggregator = _Agg()
+    for index, symbol in enumerate(symbols):
+        aggregator.set_bars(
+            symbol,
+            "1d",
+            [
+                _bar(_dt(1), 100.0 + index, high=110.0 + index),
+                _bar(_dt(2), 200.0 + index, high=210.0 + index),
+            ],
+        )
+
+    adapter.calculate_signals_window(
+        SimpleNamespace(
+            type="MARKET_WINDOW",
+            time=_dt(2),
+            event_time_watermark_ms=int(_dt(2).timestamp() * 1000),
+        ),
+        aggregator,
+    )
+
+    key = time_key(_dt(1))
+    evidence = adapter.get_native_finalization_evidence()
+    assert evidence["barrier_pending_keys"] == [key]
+    assert evidence["barrier_closed_keys"] == [key]
+    assert evidence["barrier_symbol_coverage"] == {key: symbols}
+    assert evidence["completed_native_count_by_symbol"] == dict.fromkeys(symbols, 1)
+    assert adapter._tick == 1
 
 
 def test_near_high_arrival_permutations_are_byte_identical() -> None:
@@ -434,6 +484,54 @@ def test_four_hour_carry_uses_bar_close_asof_funding_and_rejects_poison() -> Non
                 feature_lookup=None,
             )
         )
+
+
+@pytest.mark.parametrize(
+    "cls",
+    [
+        ResearchOnlyDailyLowTurnoverTrendPersistenceStrategy,
+        ResearchOnlyFourHourFundingHarvestCarryStrategy,
+    ],
+)
+def test_native_finalization_rollback_state_restores_base_adapter_and_auxiliary_state(
+    cls: Any,
+) -> None:
+    symbol = "BTCUSDT"
+    strategy = cls(_Bars([symbol]), _Queue())
+    first_key = time_key(_dt(1))
+    strategy._state[symbol].closes.append(100.0)
+    strategy._alpha_max_completed_native_keys = {(symbol, first_key)}
+    strategy._alpha_max_completed_native_count_by_symbol = {symbol: 1}
+    strategy._alpha_max_last_completed_native_key_by_symbol = {symbol: first_key}
+    strategy._alpha_max_partial_bucket_error = "sentinel-partial"
+    if isinstance(strategy, ResearchOnlyFourHourFundingHarvestCarryStrategy):
+        strategy._alpha_max_last_funding_error = "sentinel-funding"
+
+    snapshot = strategy.get_native_finalization_rollback_state()
+    snapshot_bytes = json.dumps(snapshot, sort_keys=True, default=str).encode()
+
+    second_key = time_key(_dt(2))
+    strategy._state[symbol].closes.append(200.0)
+    strategy._alpha_max_completed_native_keys = {(symbol, second_key)}
+    strategy._alpha_max_completed_native_count_by_symbol = {symbol: 1}
+    strategy._alpha_max_last_completed_native_key_by_symbol = {symbol: second_key}
+    strategy._alpha_max_partial_bucket_error = "mutated-partial"
+    if isinstance(strategy, ResearchOnlyFourHourFundingHarvestCarryStrategy):
+        strategy._alpha_max_active_funding_lookup = object()
+        strategy._alpha_max_current_bar_close_ms = 123
+        strategy._alpha_max_last_funding_error = "mutated-funding"
+
+    strategy.set_native_finalization_rollback_state(snapshot)
+
+    assert (
+        json.dumps(
+            strategy.get_native_finalization_rollback_state(), sort_keys=True, default=str
+        ).encode()
+        == snapshot_bytes
+    )
+    if isinstance(strategy, ResearchOnlyFourHourFundingHarvestCarryStrategy):
+        assert strategy._alpha_max_active_funding_lookup is None
+        assert strategy._alpha_max_current_bar_close_ms is None
 
 
 @pytest.mark.parametrize(

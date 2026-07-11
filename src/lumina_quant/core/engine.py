@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from abc import ABC
 from datetime import UTC, datetime
 from typing import Any
@@ -165,6 +166,29 @@ class TradingEngine(ABC):
             elif event.type == "FILL":
                 self.handle_fill_event(event)
 
+    def _check_open_orders_with_equity_context(self, event: Any) -> None:
+        """Run one order sweep with the exact pre-queued-fill portfolio equity."""
+        check = getattr(self.execution_handler, "check_open_orders", None)
+        if not callable(check):
+            return
+        equity_before = float(self.portfolio.current_holdings["total"])
+        if bool(getattr(self.execution_handler, "record_cost_attribution", False)) and (
+            not math.isfinite(equity_before) or equity_before <= 0.0
+        ):
+            # A terminal/wiped-out alpha run must remain evidence-producing.  No
+            # finite-positive capacity proxy exists after ruin, and executing
+            # another open-order sweep would create an invalid observation.
+            return
+        set_context = getattr(self.execution_handler, "set_capacity_equity_context", None)
+        clear_context = getattr(self.execution_handler, "clear_capacity_equity_context", None)
+        if callable(set_context):
+            set_context(equity_before)
+        try:
+            check(event)
+        finally:
+            if callable(clear_context):
+                clear_context()
+
     def handle_market_event(self, event):
         self.market_events += 1
         warmup = self._update_warmup_state(getattr(event, "time", None))
@@ -193,7 +217,7 @@ class TradingEngine(ABC):
         self.portfolio.update_timeindex(event)
         # Optional: Simulated execution handler might need to check open orders
         if hasattr(self.execution_handler, "check_open_orders"):
-            self.execution_handler.check_open_orders(event)
+            self._check_open_orders_with_equity_context(event)
 
     def handle_market_batch_event(self, event):
         batch_events = tuple(getattr(event, "bars", ()) or ())
@@ -236,7 +260,7 @@ class TradingEngine(ABC):
             for market_event in batch_events:
                 if self._is_warmup_time(getattr(market_event, "time", None)):
                     continue
-                self.execution_handler.check_open_orders(market_event)
+                self._check_open_orders_with_equity_context(market_event)
 
     def _resolve_required_timeframes(self) -> list[str]:
         default_timeframes = ["20s", "1m", "5m", "15m", "1h", "4h", "1d"]
@@ -477,7 +501,7 @@ class TradingEngine(ABC):
                     # stop/limit evaluation.
                     if self._is_warmup_time(getattr(market_event, "time", None)):
                         continue
-                    self.execution_handler.check_open_orders(market_event)
+                    self._check_open_orders_with_equity_context(market_event)
 
     def handle_signal_event(self, event):
         if self._warmup_active:

@@ -3,6 +3,8 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import os
+import subprocess
 from dataclasses import FrozenInstanceError
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -34,6 +36,8 @@ from lumina_quant.research.alpha_max_evidence import (
     build_alpha_max_normalized_fold_segment_evidence,
     build_alpha_max_primary_return_stream,
     build_alpha_max_terminal_state,
+    build_alpha_max_train_liquidity_buckets,
+    build_alpha_max_trend_liquidity_falsifier,
     canonical_alpha_max_cost_cell_bytes,
     canonical_alpha_max_row_bytes,
     compute_alpha_max_metric_statistics,
@@ -44,6 +48,7 @@ from lumina_quant.research.alpha_max_evidence import (
     seal_alpha_max_root_tree,
     select_alpha_max_prelock_champion,
     validate_alpha_max_admitted_symbols,
+    validate_alpha_max_train_liquidity_buckets,
 )
 
 
@@ -151,6 +156,93 @@ def test_b2_ordered_lookup_exposes_immutable_current_root_capability_to_real_eng
         lookup.db_path = warmup.path
 
 
+def test_prior_trial_inventory_reads_the_frozen_git_blob_not_mutable_worktree(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = (tmp_path / "repo").resolve()
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    subprocess.run(
+        ["git", "-C", str(repo), "config", "user.email", "alpha-max@example.invalid"],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(repo), "config", "user.name", "Alpha Max Test"],
+        check=True,
+    )
+    relative = Path("frozen/prior.json")
+    path = repo / relative
+    path.parent.mkdir(parents=True)
+    frozen = b'{"frozen":true}\n'
+    path.write_bytes(frozen)
+    subprocess.run(["git", "-C", str(repo), "add", str(relative)], check=True)
+    subprocess.run(
+        ["git", "-C", str(repo), "commit", "-q", "-m", "freeze prior"],
+        check=True,
+    )
+    commit = subprocess.run(
+        ["git", "-C", str(repo), "rev-parse", "HEAD"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    blob_oid = subprocess.run(
+        ["git", "-C", str(repo), "rev-parse", f"HEAD:{relative.as_posix()}"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    monkeypatch.setattr(evidence, "_ALPHA_MAX_PRIOR_COMMIT", commit)
+    monkeypatch.setattr(evidence, "_ALPHA_MAX_PRIOR_PATH", relative.as_posix())
+    monkeypatch.setattr(evidence, "_ALPHA_MAX_PRIOR_BLOB_OID", blob_oid)
+    monkeypatch.setattr(
+        evidence,
+        "_ALPHA_MAX_PRIOR_FILE_SHA256",
+        hashlib.sha256(frozen).hexdigest(),
+    )
+
+    path.write_bytes(b'{"poisoned_worktree":true}\n')
+    assert evidence.read_alpha_max_prior_trial_blob(repo) == frozen
+
+    monkeypatch.setattr(evidence, "_ALPHA_MAX_PRIOR_BLOB_OID", "0" * 40)
+    with pytest.raises(ValueError, match="prior_trial_inventory_mismatch"):
+        evidence.read_alpha_max_prior_trial_blob(repo)
+
+
+def test_manifest_write_is_bound_to_opened_phase_when_ancestor_is_swapped(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = (tmp_path / "owned").resolve()
+    manifests = root / "manifests"
+    validation = manifests / "validation_train_fit"
+    prelock = manifests / "prelock_final_refit"
+    validation.mkdir(parents=True)
+    prelock.mkdir()
+    validated = evidence._validate_run_owned_phase(root, "validation_train_fit")
+    moved = manifests / "validation-opened"
+    external = (tmp_path / "external").resolve()
+    external.mkdir()
+    original_open = os.open
+    swapped = False
+
+    def hostile_open(path, flags, mode=0o777, *, dir_fd=None):
+        nonlocal swapped
+        if path == "row.json" and dir_fd is not None and not swapped:
+            swapped = True
+            validation.rename(moved)
+            validation.symlink_to(external, target_is_directory=True)
+        return original_open(path, flags, mode, dir_fd=dir_fd)
+
+    monkeypatch.setattr(os, "open", hostile_open)
+    evidence._write_new_manifest(validated / "row.json", b'{"owned":true}\n')
+
+    assert swapped is True
+    assert not (external / "row.json").exists()
+    assert (moved / "row.json").read_bytes() == b'{"owned":true}\n'
+
+
 def test_root_tree_seal_is_canonical_streaming_and_rejects_unsafe_entries(tmp_path: Path) -> None:
     root = tmp_path / "raw"
     _write_sparse_raw_root(root, "purge")
@@ -192,6 +284,115 @@ def test_root_tree_seal_is_canonical_streaming_and_rejects_unsafe_entries(tmp_pa
         seal_alpha_max_root_tree("purge", "raw", root)
     with pytest.raises(ValueError, match="must_be_absolute"):
         seal_alpha_max_root_tree("train", "raw", Path("relative"))
+
+
+def test_root_tree_seal_rejects_hardlinked_partition(tmp_path: Path) -> None:
+    root = tmp_path / "raw"
+    _write_sparse_raw_root(root, "purge")
+    target = root / "market_ohlcv_1s" / "binance" / "BTCUSDT" / "2025-06.parquet"
+    os.link(target, tmp_path / "outside-alias.parquet")
+
+    with pytest.raises(ValueError, match="hardlink"):
+        seal_alpha_max_root_tree("purge", "raw", root)
+
+
+def test_root_tree_seal_stays_on_opened_ancestor_when_path_is_swapped(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = (tmp_path / "raw").resolve()
+    outside_root = (tmp_path / "outside-raw").resolve()
+    _write_sparse_raw_root(root, "purge")
+    _write_sparse_raw_root(outside_root, "purge")
+    owned_binance = root / "market_ohlcv_1s" / "binance"
+    opened_binance = tmp_path / "opened-binance"
+    outside_binance = outside_root / "market_ohlcv_1s" / "binance"
+    outside_file_identities = {
+        (int(value.stat().st_dev), int(value.stat().st_ino))
+        for value in outside_binance.rglob("*.parquet")
+    }
+    streamed_identities: list[tuple[int, int]] = []
+    original_stream = evidence._alpha_max_stream_regular_descriptor
+    original_open = os.open
+    swapped = False
+    opened_ancestor_identity: tuple[int, int] | None = None
+
+    def capture_stream(descriptor: int, **kwargs):
+        opened = os.fstat(descriptor)
+        streamed_identities.append((int(opened.st_dev), int(opened.st_ino)))
+        return original_stream(descriptor, **kwargs)
+
+    def hostile_open(path, flags, mode=0o777, *, dir_fd=None):
+        nonlocal opened_ancestor_identity, swapped
+        descriptor = original_open(path, flags, mode, dir_fd=dir_fd)
+        if (
+            path == "binance"
+            and dir_fd is not None
+            and flags & getattr(os, "O_DIRECTORY", 0)
+            and not swapped
+        ):
+            swapped = True
+            opened = os.fstat(descriptor)
+            opened_ancestor_identity = (int(opened.st_dev), int(opened.st_ino))
+            owned_binance.rename(opened_binance)
+            owned_binance.symlink_to(outside_binance, target_is_directory=True)
+        return descriptor
+
+    monkeypatch.setattr(evidence, "_alpha_max_stream_regular_descriptor", capture_stream)
+    monkeypatch.setattr(os, "open", hostile_open)
+
+    with pytest.raises(ValueError, match=r"directory_changed|path_changed"):
+        seal_alpha_max_root_tree("purge", "raw", root)
+
+    assert swapped is True
+    assert opened_ancestor_identity == (
+        int(opened_binance.stat().st_dev),
+        int(opened_binance.stat().st_ino),
+    )
+    assert opened_ancestor_identity != (
+        int(outside_binance.stat().st_dev),
+        int(outside_binance.stat().st_ino),
+    )
+    assert outside_file_identities.isdisjoint(streamed_identities)
+
+
+def test_root_tree_seal_hash_and_parquet_metadata_share_one_open_file(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = (tmp_path / "raw").resolve()
+    _write_sparse_raw_root(root, "purge")
+    target = root / "market_ohlcv_1s" / "binance" / "BTCUSDT" / "2025-06.parquet"
+    opened_target = tmp_path / "opened-target.parquet"
+    replacement = tmp_path / "replacement.parquet"
+    replacement.write_bytes(target.read_bytes())
+    original_identity = (int(target.stat().st_dev), int(target.stat().st_ino))
+    parsed_identity: tuple[int, int] | None = None
+    original_bounds = evidence._alpha_max_parquet_timestamp_bounds
+    swapped = False
+
+    def hostile_bounds(descriptor: int, **kwargs):
+        nonlocal parsed_identity, swapped
+        opened = os.fstat(descriptor)
+        identity = (int(opened.st_dev), int(opened.st_ino))
+        if identity == original_identity and not swapped:
+            swapped = True
+            target.rename(opened_target)
+            replacement.rename(target)
+        parsed_identity = (
+            int(os.fstat(descriptor).st_dev),
+            int(os.fstat(descriptor).st_ino),
+        )
+        return original_bounds(descriptor, **kwargs)
+
+    monkeypatch.setattr(evidence, "_alpha_max_parquet_timestamp_bounds", hostile_bounds)
+
+    with pytest.raises(ValueError, match=r"file_changed|directory_changed"):
+        seal_alpha_max_root_tree("purge", "raw", root)
+
+    assert swapped is True
+    assert parsed_identity == original_identity
+    assert (int(target.stat().st_dev), int(target.stat().st_ino)) != original_identity
 
 
 def test_actual_run_domain_seals_bind_current_raw_and_adjacent_features(
@@ -470,6 +671,89 @@ def test_train_admission_missing_bucket_is_not_synthetic_zero_and_fails_membersh
         )
 
 
+def _train_liquidity_bucket_fixture():
+    admission = compute_alpha_max_train_admission(
+        {
+            symbol: _candidate_input(symbol, passes=index < 5)
+            for index, symbol in enumerate(ALPHA_MAX_CANDIDATE_SYMBOLS)
+        },
+        input_root_hashes={"warmup": _HASH_A, "train": _HASH_B},
+    )
+    return build_alpha_max_train_liquidity_buckets(admission)
+
+
+def test_e20_train_liquidity_buckets_are_tie_deterministic_and_canonical() -> None:
+    buckets = _train_liquidity_bucket_fixture()
+
+    assert buckets.admitted_symbols == ALPHA_MAX_CANDIDATE_SYMBOLS[:5]
+    assert dict(buckets.symbols_by_bucket) == {
+        "weakest": ("ADAUSDT", "AVAXUSDT"),
+        "middle": ("BNBUSDT", "BTCUSDT"),
+        "liquid": ("DOGEUSDT",),
+    }
+    assert validate_alpha_max_train_liquidity_buckets(buckets.canonical_bytes) == buckets
+    payload = buckets.to_payload()
+    payload["bucket_by_symbol"]["ADAUSDT"] = "liquid"
+    with pytest.raises(ValueError, match="assignment_mismatch"):
+        validate_alpha_max_train_liquidity_buckets(payload)
+
+
+def _build_e20_falsifier(per_symbol: dict[str, float]):
+    buckets = _train_liquidity_bucket_fixture()
+    fold_count = 12
+    return build_alpha_max_trend_liquidity_falsifier(
+        domain="validation",
+        train_liquidity_buckets=buckets,
+        fold_run_sha256s=tuple(
+            hashlib.sha256(f"validation-fold-{index}".encode()).hexdigest()
+            for index in range(fold_count)
+        ),
+        symbol_contribution_usdt_by_fold=tuple(dict(per_symbol) for _ in range(fold_count)),
+    )
+
+
+def test_e20_falsifier_is_report_only_and_never_makes_a_positive_causal_claim() -> None:
+    falsifier = _build_e20_falsifier(dict.fromkeys(ALPHA_MAX_CANDIDATE_SYMBOLS[:5], 1.0))
+
+    assert falsifier.status == "liquidity_falsifier_not_triggered"
+    assert falsifier.rejection_reasons == ()
+    assert falsifier.to_payload()["selection_influence"] is False
+    assert falsifier.to_payload()["report_only"] is True
+
+
+def test_e20_offsetting_positive_middle_bucket_is_not_mislabeled_weakest_only() -> None:
+    falsifier = _build_e20_falsifier(
+        {
+            "ADAUSDT": 2.0,
+            "AVAXUSDT": 2.0,
+            "BNBUSDT": 0.5,
+            "BTCUSDT": 0.5,
+            "DOGEUSDT": -2.0,
+        }
+    )
+
+    assert falsifier.status == "trend_mechanism_not_supported"
+    assert falsifier.rejection_reasons == ("liquid_bucket_nonpositive",)
+
+
+def test_e20_rejects_edge_confined_to_weakest_train_liquidity_bucket() -> None:
+    falsifier = _build_e20_falsifier(
+        {
+            "ADAUSDT": 3.0,
+            "AVAXUSDT": 3.0,
+            "BNBUSDT": -0.5,
+            "BTCUSDT": -0.5,
+            "DOGEUSDT": -1.0,
+        }
+    )
+
+    assert falsifier.status == "trend_mechanism_not_supported"
+    assert falsifier.rejection_reasons == (
+        "liquid_bucket_nonpositive",
+        "positive_edge_confined_to_weakest",
+    )
+
+
 def _gate(
     row_id: str,
     *,
@@ -531,6 +815,157 @@ def test_gate_order_soft_mdd_comparator_and_return_first_selection_are_exact() -
     assert by_id["hard"].rejection_reasons == ("mdd_above_hard_limit",)
     assert by_id["early"].evaluated_gates == ("dsr",)
     assert by_id["early"].rejection_reasons == ("dsr_below_threshold",)
+
+
+def test_scaled_selection_requires_passing_positive_frozen_1x_sibling() -> None:
+    baseline = _gate("baseline", total=0.30)
+    failing_sibling = _gate("full_equal_risk_1x", total=0.40, dsr=0.89)
+    scaled = _gate("full_equal_risk_scaled", total=2.0, cagr=0.9, calmar=3.0)
+
+    result = select_alpha_max_prelock_champion((scaled, failing_sibling, baseline))
+
+    assert result.prelock_champion == "baseline"
+    decisions = {value.row_id: value for value in result.decisions}
+    assert decisions["full_equal_risk_1x"].rejection_reasons == ("dsr_below_threshold",)
+    assert decisions["full_equal_risk_scaled"].rejection_reasons == (
+        "scaled_1x_sibling_not_eligible",
+    )
+    attribution = result.scaling_attributions[0]
+    assert attribution.scaled_row_id == "full_equal_risk_scaled"
+    assert attribution.sibling_row_id == "full_equal_risk_1x"
+    assert attribution.sibling_gross_exposure == 1.0
+    assert attribution.exposure_normalization == "total_return / frozen_1x_gross"
+    assert attribution.sibling_exposure_normalized_return == pytest.approx(0.40)
+    assert attribution.sibling_dependency_satisfied is False
+    assert attribution.attribution_label == "risk_transform_not_alpha"
+    assert attribution.passive_scaled_counterfactual == "absent"
+    assert attribution.scaled_minus_sibling_total_return == pytest.approx(1.60)
+    assert len(attribution.matched_domain_sha256) == 64
+    assert result.to_payload()["artifact_kind"] == "alpha_max_prelock_selection.v2"
+
+
+def test_scaled_selection_rejects_nonpositive_1x_and_preserves_own_earlier_gate() -> None:
+    nonpositive = _gate("full_shrunk_hrp_1x", total=-0.01)
+    scaled = _gate("full_shrunk_hrp_scaled", total=1.0)
+    result = select_alpha_max_prelock_champion((nonpositive, scaled))
+    decisions = {value.row_id: value for value in result.decisions}
+    assert decisions["full_shrunk_hrp_scaled"].rejection_reasons == (
+        "scaled_1x_exposure_normalized_nonpositive",
+    )
+    assert result.scaling_attributions[0].sibling_positive_exposure_normalized is False
+
+    both_fail = select_alpha_max_prelock_champion(
+        (
+            _gate("full_equal_risk_1x", dsr=0.80),
+            _gate("full_equal_risk_scaled", dsr=0.70, total=9.0),
+        )
+    )
+    both_decisions = {value.row_id: value for value in both_fail.decisions}
+    assert both_decisions["full_equal_risk_scaled"].evaluated_gates == ("dsr",)
+    assert both_decisions["full_equal_risk_scaled"].rejection_reasons == ("dsr_below_threshold",)
+
+
+def test_passing_1x_allows_scaled_ranking_and_missing_sibling_rejects() -> None:
+    sibling = _gate("full_equal_risk_1x", total=0.30)
+    scaled = _gate("full_equal_risk_scaled", total=0.70, cagr=0.50, calmar=1.0)
+    result = select_alpha_max_prelock_champion((sibling, scaled))
+    assert result.prelock_champion == "full_equal_risk_scaled"
+    assert result.scaling_attributions[0].sibling_dependency_satisfied is True
+    assert result.scaling_attributions[0].dependency_rejection_reason is None
+
+    with pytest.raises(ValueError, match="scaled_sibling_missing"):
+        select_alpha_max_prelock_champion((scaled,))
+
+
+def test_scaled_dependency_is_resolved_before_scaled_row_enters_comparator_universe() -> None:
+    baseline = _gate("baseline", total=0.20, cagr=0.15, calmar=0.50, full_mdd=0.20)
+    sibling = _gate(
+        "full_equal_risk_1x",
+        total=0.40,
+        cagr=0.16,
+        calmar=0.51,
+        full_mdd=0.32,
+    )
+    scaled = _gate(
+        "full_equal_risk_scaled",
+        total=2.00,
+        cagr=0.90,
+        calmar=3.00,
+        full_mdd=0.25,
+    )
+
+    result = select_alpha_max_prelock_champion((scaled, sibling, baseline))
+    decisions = {value.row_id: value for value in result.decisions}
+    attribution = result.scaling_attributions[0]
+
+    assert decisions["full_equal_risk_1x"].eligible is True
+    assert decisions["full_equal_risk_1x"].mdd_band == "soft"
+    assert decisions["full_equal_risk_1x"].comparator_row_id == "baseline"
+    assert attribution.sibling_gate_eligible is decisions["full_equal_risk_1x"].eligible
+    assert attribution.sibling_dependency_satisfied is True
+    assert attribution.dependency_rejection_reason is None
+    assert decisions["full_equal_risk_scaled"].eligible is True
+    assert decisions["full_equal_risk_scaled"].rejection_reasons == ()
+    assert result.prelock_champion == "full_equal_risk_scaled"
+
+
+def test_failed_1x_cannot_make_scaled_row_a_soft_mdd_comparator() -> None:
+    baseline = _gate("baseline", total=0.20, cagr=0.15, calmar=0.50, full_mdd=0.20)
+    sibling = _gate("full_equal_risk_1x", total=0.40, dsr=0.89)
+    scaled = _gate(
+        "full_equal_risk_scaled",
+        total=2.00,
+        cagr=0.90,
+        calmar=3.00,
+        full_mdd=0.25,
+    )
+    unrelated_soft = _gate(
+        "unrelated_soft",
+        total=0.80,
+        cagr=0.50,
+        calmar=2.00,
+        full_mdd=0.32,
+    )
+
+    result = select_alpha_max_prelock_champion((unrelated_soft, scaled, sibling, baseline))
+    decisions = {value.row_id: value for value in result.decisions}
+
+    assert decisions["full_equal_risk_scaled"].eligible is False
+    assert decisions["full_equal_risk_scaled"].rejection_reasons == (
+        "scaled_1x_sibling_not_eligible",
+    )
+    assert decisions["unrelated_soft"].eligible is True
+    assert decisions["unrelated_soft"].comparator_row_id == "baseline"
+
+
+def test_authorized_scaled_normal_constrains_unrelated_soft_mdd_candidate() -> None:
+    baseline = _gate("baseline", total=0.20, cagr=0.15, calmar=0.50, full_mdd=0.20)
+    sibling = _gate("full_equal_risk_1x", total=0.30, cagr=0.18, calmar=0.60)
+    scaled = _gate(
+        "full_equal_risk_scaled",
+        total=2.00,
+        cagr=0.90,
+        calmar=3.00,
+        full_mdd=0.25,
+    )
+    unrelated_soft = _gate(
+        "unrelated_soft",
+        total=0.80,
+        cagr=0.50,
+        calmar=2.00,
+        full_mdd=0.32,
+    )
+
+    result = select_alpha_max_prelock_champion((unrelated_soft, scaled, sibling, baseline))
+    decisions = {value.row_id: value for value in result.decisions}
+
+    assert decisions["full_equal_risk_1x"].eligible is True
+    assert decisions["full_equal_risk_scaled"].eligible is True
+    assert decisions["unrelated_soft"].eligible is False
+    assert decisions["unrelated_soft"].comparator_row_id == "full_equal_risk_scaled"
+    assert decisions["unrelated_soft"].rejection_reasons == (
+        "soft_mdd_not_strictly_superior_to_best_normal",
+    )
 
 
 def test_historical_ranking_is_report_only_and_terminal_precedence_is_singular() -> None:
@@ -684,6 +1119,7 @@ def test_capsule_receipt_parses_causal_envelope_and_rejects_fold_relabel(
         "funding_event_count": 0,
         "manifest_sha256": manifest_sha256,
         "market_event_count": 0,
+        "native_finalization_sha256": "d" * 64,
         "order_event_count": 0,
         "phase_id": "purge",
         "portfolio_mode": "manifest:/stable/row-a.json",
@@ -708,6 +1144,7 @@ def test_capsule_receipt_parses_causal_envelope_and_rejects_fold_relabel(
         relative_path="capsules/row-a/validation_w01.json",
     )
     assert receipt.capsule_phase_id == "purge"
+    assert receipt.state_payload["native_finalization_sha256"] == "d" * 64
     assert receipt.boundary_utc == evidence._ALPHA_MAX_FOLD_INTERVALS["validation_w01"][0]
     with pytest.raises(ValueError, match="envelope_scope_mismatch"):
         AlphaMaxCapsuleReceipt.from_path(

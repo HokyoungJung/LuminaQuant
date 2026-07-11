@@ -1,5 +1,13 @@
 # Alpha-Max Independent Research Checkpoint — 2026-07-11
 
+> **Historical checkpoint:** this document preserves the earlier continuation
+> state and must not be used as the current implementation-status authority.
+> The completed local implementation, verification evidence, remaining
+> data-PC-only execution boundary, and normative source manifest are recorded in
+> `alpha_max_final_delivery_20260711.md`,
+> `alpha_max_data_pc_runbook_20260711.md`, and
+> `alpha_max_final_sha256_20260711.txt`.
+
 ## 1. Checkpoint purpose
 
 This is a portable **implementation checkpoint**, not a completed alpha-performance claim. It preserves every normative plan, goal, audit artifact, current implementation slice, known gap, and verification result needed to continue on a data-bearing PC.

@@ -132,6 +132,60 @@ class NoFillAttempt:
         return record
 
 
+@dataclass(frozen=True, slots=True)
+class CapacityObservation:
+    """Immutable positive-request capacity inputs captured at engine queue time."""
+
+    record_type: str
+    timeindex: Any
+    symbol: str
+    requested_qty: float
+    raw_price: float
+    bar_volume: float
+    equity_before: float
+
+    def to_payload(self) -> dict[str, object]:
+        if type(self) is not CapacityObservation:
+            raise TypeError("capacity_observation must be an exact CapacityObservation")
+        if self.record_type != "capacity_observation":
+            raise ValueError("capacity_observation_record_type")
+        if not self.symbol:
+            raise ValueError("capacity_observation_symbol")
+        for name in ("requested_qty", "raw_price", "bar_volume", "equity_before"):
+            value = getattr(self, name)
+            if type(value) is not float or not math.isfinite(value):
+                raise ValueError(f"capacity_observation_invalid:{name}")
+        if self.requested_qty <= 0.0 or self.raw_price <= 0.0 or self.equity_before <= 0.0:
+            raise ValueError("capacity_observation_nonpositive")
+        if self.bar_volume < 0.0:
+            raise ValueError("capacity_observation_negative_volume")
+        return {
+            "bar_volume": self.bar_volume,
+            "equity_before": self.equity_before,
+            "raw_price": self.raw_price,
+            "record_type": self.record_type,
+            "requested_qty": self.requested_qty,
+            "symbol": self.symbol,
+            "timeindex": _canonical_evidence_timeindex(self.timeindex),
+        }
+
+    @classmethod
+    def from_payload(cls, payload: object) -> CapacityObservation:
+        if type(payload) is not dict or set(payload) != {
+            "bar_volume",
+            "equity_before",
+            "raw_price",
+            "record_type",
+            "requested_qty",
+            "symbol",
+            "timeindex",
+        }:
+            raise ValueError("capacity_observation_state_schema")
+        record = cls(**payload)
+        record.to_payload()
+        return record
+
+
 def _canonical_evidence_timeindex(value: object) -> str | int | float | None:
     """Normalize event time without repr/default-string serializer fallbacks."""
     if isinstance(value, datetime):
@@ -209,6 +263,8 @@ class SimulatedExecutionHandler(ExecutionHandler):
             self._capture_pricing_trace if record_cost_attribution else None
         )
         self._no_fill_attempt_evidence: list[NoFillAttempt] = []
+        self._capacity_observation_evidence: list[CapacityObservation] = []
+        self._capacity_equity_context: float | None = None
         self._attribution_seams_locked = True
         self.events = events
         self.bars = bars
@@ -256,6 +312,25 @@ class SimulatedExecutionHandler(ExecutionHandler):
     def no_fill_attempt_evidence(self) -> tuple[NoFillAttempt, ...]:
         """Return an immutable snapshot of zero-execution pricing attempts."""
         return tuple(self._no_fill_attempt_evidence)
+
+    @property
+    def capacity_observation_evidence(self) -> tuple[CapacityObservation, ...]:
+        """Return all positive-request inputs captured before queued fills apply."""
+        return tuple(self._capacity_observation_evidence)
+
+    def set_capacity_equity_context(self, equity_before: object) -> None:
+        """Set the current engine-queue equity for one open-order sweep."""
+        if not self.record_cost_attribution:
+            return
+        if type(equity_before) not in {int, float}:
+            raise TypeError("capacity_equity_context_invalid")
+        parsed = float(equity_before)
+        if not math.isfinite(parsed) or parsed <= 0.0:
+            raise ValueError("capacity_equity_context_invalid")
+        self._capacity_equity_context = parsed
+
+    def clear_capacity_equity_context(self) -> None:
+        self._capacity_equity_context = None
 
     def drain_no_fill_attempt_evidence(self) -> tuple[NoFillAttempt, ...]:
         """Atomically return and clear pending zero-execution evidence."""
@@ -361,6 +436,20 @@ class SimulatedExecutionHandler(ExecutionHandler):
     ) -> tuple[FillResult, ExecutionPricingTrace | None]:
         if self._pending_pricing_trace is not None:
             raise RuntimeError("unconsumed execution pricing trace")
+        if qty > 0.0 and self.record_cost_attribution:
+            if self._capacity_equity_context is None:
+                raise RuntimeError("capacity equity context missing")
+            observation = CapacityObservation(
+                record_type="capacity_observation",
+                timeindex=_canonical_evidence_timeindex(event.time),
+                symbol=str(order.get("symbol") or ""),
+                requested_qty=float(qty),
+                raw_price=float(raw_price),
+                bar_volume=float(bar_volume),
+                equity_before=self._capacity_equity_context,
+            )
+            observation.to_payload()
+            self._capacity_observation_evidence.append(observation)
         result = self.execution_model.compute_fill(
             raw_price=float(raw_price),
             qty=float(qty),
@@ -420,13 +509,17 @@ class SimulatedExecutionHandler(ExecutionHandler):
             state["no_fill_attempt_evidence"] = [
                 record.to_payload() for record in self._no_fill_attempt_evidence
             ]
+            state["capacity_observation_evidence"] = [
+                record.to_payload() for record in self._capacity_observation_evidence
+            ]
         return state
 
     def set_state(self, state: dict[str, Any] | None) -> None:
         if not isinstance(state, dict):
             return
         evidence_key = "no_fill_attempt_evidence"
-        if not self.record_cost_attribution and evidence_key in state:
+        capacity_key = "capacity_observation_evidence"
+        if not self.record_cost_attribution and (evidence_key in state or capacity_key in state):
             raise ValueError("no_fill_attempt_state_requires_attribution")
         restored_evidence: list[NoFillAttempt] = []
         if self.record_cost_attribution and evidence_key in state:
@@ -435,6 +528,12 @@ class SimulatedExecutionHandler(ExecutionHandler):
                 raise TypeError("no_fill_attempt_state_must_be_an_exact_list")
             # Validate the complete evidence batch before mutating handler state.
             restored_evidence = [NoFillAttempt.from_payload(item) for item in raw_evidence]
+        restored_capacity: list[CapacityObservation] = []
+        if self.record_cost_attribution and capacity_key in state:
+            raw_capacity = state[capacity_key]
+            if type(raw_capacity) is not list:
+                raise TypeError("capacity_observation_state_must_be_an_exact_list")
+            restored_capacity = [CapacityObservation.from_payload(item) for item in raw_capacity]
 
         active_orders = state.get("active_orders")
         if isinstance(active_orders, list):
@@ -458,6 +557,8 @@ class SimulatedExecutionHandler(ExecutionHandler):
         if self.record_cost_attribution:
             # Replacement, not extension, prevents replay duplication on repeated restore.
             self._no_fill_attempt_evidence = restored_evidence
+            self._capacity_observation_evidence = restored_capacity
+            self._capacity_equity_context = None
 
     def _next_order_id(self) -> str:
         self._order_seq += 1

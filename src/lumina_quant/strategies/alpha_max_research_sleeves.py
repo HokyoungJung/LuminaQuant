@@ -123,6 +123,7 @@ _ONE_DAY_MS = int(timeframe_to_milliseconds("1d"))
 _FOUR_HOUR_MS = int(timeframe_to_milliseconds("4h"))
 _FUNDING_MAX_AGE_MS = 8 * 60 * 60 * 1000
 _COOLDOWN_SATISFIED = 1 << 30
+_NATIVE_FINALIZATION_ROLLBACK_KIND = "alpha_max.native_finalization_rollback.v1"
 
 
 def _canonical_params(class_name: str) -> dict[str, Any]:
@@ -437,6 +438,148 @@ class _NativeCompletedAdapterMixin:
         self._alpha_max_last_completed_native_key_by_symbol = (
             {str(k): str(v) for k, v in raw_last.items()} if isinstance(raw_last, Mapping) else {}
         )
+
+    def _native_finalization_auxiliary_state(self) -> dict[str, Any]:
+        return {}
+
+    def get_native_finalization_evidence(self) -> dict[str, Any]:
+        """Expose the exact completed-native coverage sealed at a score boundary."""
+        if self._alpha_max_partial_bucket_error:
+            raise ValueError(self._alpha_max_partial_bucket_error)
+        return copy.deepcopy(
+            {
+                "adapter_class": type(self).__name__,
+                "native_timeframe": self.native_timeframe,
+                "barrier_mode": "none",
+                "completed_native_keys": sorted(self._alpha_max_completed_native_keys),
+                "completed_native_count_by_symbol": dict(
+                    sorted(self._alpha_max_completed_native_count_by_symbol.items())
+                ),
+                "last_completed_native_key_by_symbol": dict(
+                    sorted(self._alpha_max_last_completed_native_key_by_symbol.items())
+                ),
+                "barrier_pending_keys": [],
+                "barrier_closed_keys": [],
+                "barrier_symbol_coverage": {},
+                "failed_native_keys": {},
+                "partial_bucket_error": None,
+            }
+        )
+
+    def _restore_native_finalization_auxiliary_state(self, state: Mapping[str, Any]) -> None:
+        if dict(state):
+            raise ValueError("invalid_native_finalization_rollback_state")
+
+    def get_native_finalization_rollback_state(self) -> dict[str, Any]:
+        """Return a deep, deterministic snapshot of every finalizer-owned mutation."""
+        return copy.deepcopy(
+            {
+                "kind": _NATIVE_FINALIZATION_ROLLBACK_KIND,
+                "adapter_class": type(self).__name__,
+                "native_timeframe": self.native_timeframe,
+                "base_state": self.get_state(),
+                "completed_native_keys": sorted(self._alpha_max_completed_native_keys),
+                "completed_native_count_by_symbol": dict(
+                    sorted(self._alpha_max_completed_native_count_by_symbol.items())
+                ),
+                "last_completed_native_key_by_symbol": dict(
+                    sorted(self._alpha_max_last_completed_native_key_by_symbol.items())
+                ),
+                "partial_bucket_error": self._alpha_max_partial_bucket_error,
+                "auxiliary_state": self._native_finalization_auxiliary_state(),
+            }
+        )
+
+    def set_native_finalization_rollback_state(self, snapshot: Mapping[str, Any]) -> None:
+        required_keys = {
+            "kind",
+            "adapter_class",
+            "native_timeframe",
+            "base_state",
+            "completed_native_keys",
+            "completed_native_count_by_symbol",
+            "last_completed_native_key_by_symbol",
+            "partial_bucket_error",
+            "auxiliary_state",
+        }
+        if not isinstance(snapshot, Mapping) or set(snapshot) != required_keys:
+            raise ValueError("invalid_native_finalization_rollback_state")
+        if (
+            snapshot.get("kind") != _NATIVE_FINALIZATION_ROLLBACK_KIND
+            or snapshot.get("adapter_class") != type(self).__name__
+            or snapshot.get("native_timeframe") != self.native_timeframe
+        ):
+            raise ValueError("invalid_native_finalization_rollback_state")
+        base_state = snapshot.get("base_state")
+        raw_keys = snapshot.get("completed_native_keys")
+        raw_counts = snapshot.get("completed_native_count_by_symbol")
+        raw_last = snapshot.get("last_completed_native_key_by_symbol")
+        partial_error = snapshot.get("partial_bucket_error")
+        auxiliary_state = snapshot.get("auxiliary_state")
+        if (
+            not isinstance(base_state, Mapping)
+            or not isinstance(raw_keys, (list, tuple))
+            or not isinstance(raw_counts, Mapping)
+            or not isinstance(raw_last, Mapping)
+            or (
+                partial_error is not None
+                and (not isinstance(partial_error, str) or not partial_error)
+            )
+            or not isinstance(auxiliary_state, Mapping)
+        ):
+            raise ValueError("invalid_native_finalization_rollback_state")
+        admitted_symbols = {str(symbol) for symbol in (getattr(self, "symbol_list", []) or [])}
+        completed: set[tuple[str, str]] = set()
+        for item in raw_keys:
+            if (
+                not isinstance(item, (list, tuple))
+                or len(item) != 2
+                or not isinstance(item[0], str)
+                or item[0] not in admitted_symbols
+                or not isinstance(item[1], str)
+                or not item[1]
+            ):
+                raise ValueError("invalid_native_finalization_rollback_state")
+            completed.add((item[0], item[1]))
+        if len(completed) != len(raw_keys):
+            raise ValueError("invalid_native_finalization_rollback_state")
+        counts: dict[str, int] = {}
+        for symbol, count in raw_counts.items():
+            if (
+                not isinstance(symbol, str)
+                or symbol not in admitted_symbols
+                or isinstance(count, bool)
+                or not isinstance(count, int)
+                or count <= 0
+            ):
+                raise ValueError("invalid_native_finalization_rollback_state")
+            counts[symbol] = count
+        expected_counts = {
+            symbol: sum(1 for completed_symbol, _key in completed if completed_symbol == symbol)
+            for symbol in admitted_symbols
+        }
+        expected_counts = {symbol: count for symbol, count in expected_counts.items() if count}
+        if counts != expected_counts:
+            raise ValueError("invalid_native_finalization_rollback_state")
+        last: dict[str, str] = {}
+        for symbol, key in raw_last.items():
+            if (
+                not isinstance(symbol, str)
+                or symbol not in counts
+                or not isinstance(key, str)
+                or (symbol, key) not in completed
+            ):
+                raise ValueError("invalid_native_finalization_rollback_state")
+            last[symbol] = key
+        if set(last) != set(counts):
+            raise ValueError("invalid_native_finalization_rollback_state")
+
+        self.set_state(copy.deepcopy(dict(base_state)))
+        self._alpha_max_completed_native_keys = completed
+        self._alpha_max_completed_native_count_by_symbol = counts
+        self._alpha_max_last_completed_native_key_by_symbol = last
+        self._alpha_max_partial_bucket_error = partial_error
+        self._restore_native_finalization_auxiliary_state(copy.deepcopy(dict(auxiliary_state)))
 
 
 @register(
@@ -754,6 +897,56 @@ class ResearchOnlyDailyCrossSectionalNearHighAnchoringStrategy(
         self._alpha_max_last_completed_native_key_by_symbol = last_state
         self._alpha_max_bound_aggregator = None
 
+    def get_native_finalization_rollback_state(self) -> dict[str, Any]:
+        """Capture base, barrier, failure, partial, and completed-native state."""
+        return {
+            "kind": _NATIVE_FINALIZATION_ROLLBACK_KIND,
+            "adapter_class": type(self).__name__,
+            "native_timeframe": self.native_timeframe,
+            "state": copy.deepcopy(self.get_state()),
+        }
+
+    def get_native_finalization_evidence(self) -> dict[str, Any]:
+        """Expose exact atomic-barrier and completed-native score-boundary coverage."""
+        if self._alpha_max_partial_bucket_error:
+            raise ValueError(self._alpha_max_partial_bucket_error)
+        pending_keys = sorted(self._alpha_max_barrier_pending)
+        return copy.deepcopy(
+            {
+                "adapter_class": type(self).__name__,
+                "native_timeframe": self.native_timeframe,
+                "barrier_mode": "atomic_cross_section",
+                "completed_native_keys": sorted(self._alpha_max_completed_native_keys),
+                "completed_native_count_by_symbol": dict(
+                    sorted(self._alpha_max_completed_native_count_by_symbol.items())
+                ),
+                "last_completed_native_key_by_symbol": dict(
+                    sorted(self._alpha_max_last_completed_native_key_by_symbol.items())
+                ),
+                "barrier_pending_keys": pending_keys,
+                "barrier_closed_keys": sorted(self._alpha_max_barrier_closed),
+                "barrier_symbol_coverage": {
+                    key: sorted(self._alpha_max_barrier_pending[key]) for key in pending_keys
+                },
+                "failed_native_keys": dict(sorted(self._alpha_max_failed_native_keys.items())),
+                "partial_bucket_error": None,
+            }
+        )
+
+    def set_native_finalization_rollback_state(self, snapshot: Mapping[str, Any]) -> None:
+        if (
+            not isinstance(snapshot, Mapping)
+            or set(snapshot) != {"kind", "adapter_class", "native_timeframe", "state"}
+            or snapshot.get("kind") != _NATIVE_FINALIZATION_ROLLBACK_KIND
+            or snapshot.get("adapter_class") != type(self).__name__
+            or snapshot.get("native_timeframe") != self.native_timeframe
+            or not isinstance(snapshot.get("state"), Mapping)
+        ):
+            raise ValueError("invalid_native_finalization_rollback_state")
+        bound_aggregator = self._alpha_max_bound_aggregator
+        self.set_state(copy.deepcopy(dict(snapshot["state"])))
+        self._alpha_max_bound_aggregator = bound_aggregator
+
     def _completed_enough(self, bar: Any, watermark_ms: int | None) -> bool:
         start_ms = _timestamp_ms(_bar_time(bar))
         return (
@@ -815,6 +1008,7 @@ class ResearchOnlyDailyCrossSectionalNearHighAnchoringStrategy(
         watermark_ms = _event_watermark_ms(event)
         if aggregator is not None:
             self._alpha_max_bound_aggregator = aggregator
+            accepted_keys: set[str] = set()
             for symbol in self._alpha_max_admitted_symbols:
                 for bar in _get_completed_bars(
                     aggregator, symbol, self.native_timeframe, include_final=False
@@ -822,11 +1016,19 @@ class ResearchOnlyDailyCrossSectionalNearHighAnchoringStrategy(
                     if self._completed_enough(bar, watermark_ms) and self._barrier_accept(
                         symbol, bar
                     ):
-                        key = _bucket_key(bar)
-                        if not self._barrier_flush_if_complete(key):
-                            self._fail_missing_if_past(key)
+                        accepted_keys.add(_bucket_key(bar))
+            for key in sorted(accepted_keys):
+                self._barrier_flush_if_complete(key)
+            for key, pending in sorted(self._alpha_max_barrier_pending.items()):
+                if key in self._alpha_max_barrier_closed:
+                    continue
+                first = next(iter(pending.values()), None)
+                start_ms = _timestamp_ms(first[0]) if first else _timestamp_ms(key)
+                if start_ms is not None and start_ms + self.native_timeframe_ms <= watermark_ms:
+                    self._fail_missing_if_past(key)
             return
         explicit_completed = bool(getattr(event, "completed_native_bars", False))
+        accepted_keys = set()
         for symbol, rows in dict(getattr(event, "bars_1s", {}) or {}).items():
             if symbol not in self._alpha_max_admitted_symbols:
                 continue
@@ -835,16 +1037,21 @@ class ResearchOnlyDailyCrossSectionalNearHighAnchoringStrategy(
                 explicit_completed or self._completed_enough(row_list[-1], watermark_ms)
             ):
                 key = _bucket_key(row_list[-1])
-                if self._barrier_accept(
-                    str(symbol), row_list[-1]
-                ) and not self._barrier_flush_if_complete(key):
-                    start_ms = _timestamp_ms(_bar_time(row_list[-1]))
-                    if (
-                        watermark_ms is not None
-                        and start_ms is not None
-                        and start_ms + self.native_timeframe_ms <= watermark_ms
-                    ):
-                        self._fail_missing_if_past(key)
+                if self._barrier_accept(str(symbol), row_list[-1]):
+                    accepted_keys.add(key)
+        for key in sorted(accepted_keys):
+            self._barrier_flush_if_complete(key)
+        for key, pending in sorted(self._alpha_max_barrier_pending.items()):
+            if key in self._alpha_max_barrier_closed:
+                continue
+            first = next(iter(pending.values()), None)
+            start_ms = _timestamp_ms(first[0]) if first else _timestamp_ms(key)
+            if (
+                watermark_ms is not None
+                and start_ms is not None
+                and start_ms + self.native_timeframe_ms <= watermark_ms
+            ):
+                self._fail_missing_if_past(key)
 
     def calculate_signals(self, event: Any) -> None:
         if str(getattr(event, "type", "")).upper() == "MARKET_WINDOW":
@@ -1044,6 +1251,24 @@ class ResearchOnlyFourHourFundingHarvestCarryStrategy(
                 raise ValueError(self._alpha_max_last_funding_error)
         finally:
             self._alpha_max_active_funding_lookup = None
+
+    def _native_finalization_auxiliary_state(self) -> dict[str, Any]:
+        if (
+            self._alpha_max_active_funding_lookup is not None
+            or self._alpha_max_current_bar_close_ms is not None
+        ):
+            raise ValueError("native_finalization_rollback_snapshot_not_quiescent")
+        return {"last_funding_error": self._alpha_max_last_funding_error}
+
+    def _restore_native_finalization_auxiliary_state(self, state: Mapping[str, Any]) -> None:
+        if set(state) != {"last_funding_error"}:
+            raise ValueError("invalid_native_finalization_rollback_state")
+        last_error = state.get("last_funding_error")
+        if last_error is not None and (not isinstance(last_error, str) or not last_error):
+            raise ValueError("invalid_native_finalization_rollback_state")
+        self._alpha_max_active_funding_lookup = None
+        self._alpha_max_current_bar_close_ms = None
+        self._alpha_max_last_funding_error = last_error
 
     def get_research_indicator_state(self) -> dict[str, Any]:
         state = self.get_state()

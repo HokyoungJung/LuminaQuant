@@ -17,6 +17,7 @@ from lumina_quant.research.alpha_max_evidence import (
     _alpha_max_liquidation_cost_totals,
     _alpha_max_normalize_liquidation_events,
     _validate_alpha_max_engine_event_counts,
+    build_alpha_max_run_report_only_diagnostics,
     reconcile_alpha_max_cost_attribution,
 )
 
@@ -138,6 +139,63 @@ def test_pricing_application_bijection_excludes_no_fill_and_reconciles_all_cost_
     assert result.complete is True
 
 
+def test_per_fold_report_only_diagnostics_bind_capacity_turnover_and_symbol_pnl() -> None:
+    trace = _trace()
+    application = _application(trace)
+    starting_equity = 10_000.0
+    ending_equity = starting_equity - application.applied_commission
+    ending_market_values = dict.fromkeys(
+        (
+            "ADAUSDT",
+            "AVAXUSDT",
+            "BNBUSDT",
+            "BTCUSDT",
+            "DOGEUSDT",
+            "ETHUSDT",
+            "SOLUSDT",
+            "TONUSDT",
+            "TRXUSDT",
+            "XRPUSDT",
+        ),
+        0.0,
+    )
+    ending_market_values["BTCUSDT"] = application.applied_fill_cost
+
+    diagnostics = build_alpha_max_run_report_only_diagnostics(
+        pricing_traces=(trace,),
+        fill_applications=(application,),
+        no_fill_attempts=(),
+        funding_ledger=(),
+        liquidation_events=(),
+        capacity_observations=(
+            {
+                "bar_volume": 100.0,
+                "equity_before": starting_equity,
+                "raw_price": 100.0,
+                "requested_qty": 2.0,
+            },
+        ),
+        ending_market_values=ending_market_values,
+        starting_equity=starting_equity,
+        ending_equity=ending_equity,
+        target_gross_exposure=1.0,
+    )
+
+    assert diagnostics.turnover_rpt.turnover_notional == application.applied_fill_cost
+    assert diagnostics.capacity.observation_count == 1
+    assert diagnostics.capacity.capacity_proxy_equity_usdt == {
+        "minimum": 50_000.0,
+        "p10_type7": 50_000.0,
+        "median_type7": 50_000.0,
+    }
+    assert diagnostics.symbol_contribution_usdt["BTCUSDT"] == pytest.approx(
+        -application.applied_commission
+    )
+    assert diagnostics.contribution_total_usdt == pytest.approx(ending_equity - starting_equity)
+    assert diagnostics.reconciliation_residual_usdt == pytest.approx(0.0, abs=1e-8)
+    assert diagnostics.to_payload()["selection_influence"] is False
+
+
 def test_engine_event_counts_keep_synthetic_liquidation_outside_pricing_bijection() -> None:
     _validate_alpha_max_engine_event_counts(
         fill_event_count=2,
@@ -175,9 +233,14 @@ def test_liquidation_commission_is_sealed_and_reconciled_as_portfolio_fee_residu
                 "position_qty": 1.0,
                 "entry_price": 100.0,
                 "liquidation_price": 75.0,
+                "trigger_price": 74.5,
+                "bar_high": 101.0,
+                "bar_low": 74.0,
                 "close_price": 74.0,
                 "fill_cost": 75.0,
                 "commission": 0.03,
+                "leverage": 5.0,
+                "reason": "maintenance_margin_breach",
                 "configured_margin_mode": "isolated",
                 "modeled_margin_mode": "isolated",
             },
@@ -194,6 +257,33 @@ def test_liquidation_commission_is_sealed_and_reconciled_as_portfolio_fee_residu
     assert normalized[0].commission == pytest.approx(0.03)
     assert liquidation_cost == pytest.approx(0.03)
     assert portfolio_liquidation == pytest.approx(0.03)
+
+
+def test_liquidation_evidence_accepts_exact_epoch_milliseconds_only() -> None:
+    base = {
+        "time": 1_783_670_400_123,
+        "symbol": "BTCUSDT",
+        "position_qty": 1.0,
+        "entry_price": 100.0,
+        "liquidation_price": 75.0,
+        "trigger_price": 74.5,
+        "bar_high": 101.0,
+        "bar_low": 74.0,
+        "close_price": 74.0,
+        "fill_cost": 75.0,
+        "commission": 0.03,
+        "leverage": 5.0,
+        "reason": "maintenance_margin_breach",
+        "configured_margin_mode": "isolated",
+        "modeled_margin_mode": "isolated",
+    }
+
+    normalized = _alpha_max_normalize_liquidation_events((base,))
+    assert normalized[0].timestamp_ms == base["time"]
+
+    for invalid in (1_783_670_400, 1_783_670_400_123.0, True):
+        with pytest.raises((TypeError, ValueError), match="liquidation_event_time"):
+            _alpha_max_normalize_liquidation_events(({**base, "time": invalid},))
 
 
 def test_reconciliation_rejects_missing_duplicate_or_wrong_trace_and_totals() -> None:

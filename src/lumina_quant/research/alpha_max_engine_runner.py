@@ -17,11 +17,11 @@ import copy
 import ctypes
 import errno
 import hashlib
+import io
 import json
 import math
 import os
 import queue
-import shutil
 import stat
 import tempfile
 from collections.abc import Mapping, Sequence
@@ -32,6 +32,12 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Final, Protocol
 
+from lumina_quant.alpha_max_process_boundary import (
+    AlphaMaxRuntimeContractError,
+    AmbientLQEnvironmentError,
+    reject_ambient_lq_environment,
+)
+from lumina_quant.backtesting._config_view import register_alpha_max_backtest_config_type
 from lumina_quant.backtesting.backtest import Backtest, FastQueue
 from lumina_quant.backtesting.data_windowed_parquet import HistoricParquetWindowedDataHandler
 from lumina_quant.backtesting.execution_model import (
@@ -40,7 +46,9 @@ from lumina_quant.backtesting.execution_model import (
 )
 from lumina_quant.backtesting.execution_sim import SimulatedExecutionHandler
 from lumina_quant.backtesting.portfolio_backtest import FillApplicationAttribution, Portfolio
+from lumina_quant.core.events import SignalEvent
 from lumina_quant.core.strategy_input import StrategyInputContext
+from lumina_quant.portfolio.quality_gated_allocation import _round
 from lumina_quant.research.alpha_max_evidence import (
     ALPHA_MAX_MANIFEST_CHILD_KEYS,
     ALPHA_MAX_MANIFEST_TOP_LEVEL_KEYS,
@@ -57,15 +65,19 @@ from lumina_quant.research.alpha_max_evidence import (
     AlphaMaxFundingBoundaryResolver,
     AlphaMaxGateDecision,
     AlphaMaxManifestReceipt,
+    AlphaMaxNativeFinalizationReceipt,
     AlphaMaxNormalizedFoldSegmentEvidence,
     AlphaMaxOrderedFundingLookup,
     AlphaMaxPrimaryReturnStream,
     AlphaMaxRowEvidence,
     AlphaMaxRootSeal,
     AlphaMaxSelectionResult,
+    AlphaMaxScalingAttribution,
     AlphaMaxStatisticalEvidence,
     AlphaMaxTrialLedger,
     AlphaMaxStreamingEquityTracker,
+    AlphaMaxTrainLiquidityBuckets,
+    AlphaMaxTreeEntry,
     FeatureRootSpec,
     build_alpha_max_actual_engine_run_receipt,
     build_alpha_max_cost_cell_evidence,
@@ -73,17 +85,22 @@ from lumina_quant.research.alpha_max_evidence import (
     build_alpha_max_daily_quote_notional,
     build_alpha_max_fold_run_evidence,
     build_alpha_max_normalized_fold_segment_evidence,
+    build_alpha_max_native_finalization_receipt,
     build_alpha_max_primary_return_stream,
     build_alpha_max_statistical_evidence,
     build_alpha_max_terminal_state,
+    build_alpha_max_train_liquidity_buckets,
+    build_alpha_max_trend_liquidity_falsifier,
     build_alpha_max_trial_ledger,
     canonical_alpha_max_cost_cell_bytes,
     canonical_alpha_max_row_bytes,
     compute_alpha_max_train_admission_from_daily_summaries,
     rank_alpha_max_historical_report,
+    read_alpha_max_prior_trial_blob,
     seal_alpha_max_contract_manifest,
     seal_alpha_max_root_tree,
     select_alpha_max_prelock_champion,
+    validate_alpha_max_train_liquidity_buckets,
 )
 from lumina_quant.strategies.artifact_portfolio_mode import (
     ArtifactPortfolioModeStrategy,
@@ -101,6 +118,7 @@ __all__ = [
     "ALPHA_MAX_CONFIG_FILE_SHA256",
     "ALPHA_MAX_CONFIG_PAYLOAD_SHA256",
     "ALPHA_MAX_COST_CELL_BPS",
+    "ALPHA_MAX_INCUMBENT_RESOLUTION_AUDIT_SHA256",
     "ALPHA_MAX_RUNTIME_CONTRACT_SHA256",
     "AlphaMaxAllocatorFitEvidence",
     "AlphaMaxAncestorIdentity",
@@ -157,6 +175,12 @@ ALPHA_MAX_CONFIG_CANONICAL_SHA256: Final[str] = (
 )
 ALPHA_MAX_CONFIG_FILE_SHA256: Final[str] = (
     "34f1ea894b0af984d4f76348f52fbca09fab45b9e3d5d963f257ec9d128ee356"
+)
+ALPHA_MAX_INCUMBENT_RESOLUTION_AUDIT_SHA256: Final[str] = (
+    "5133bc40116399fe7af32e75a1ecc52a4f385dc8a0b5d3a4a9585e2437615ed8"
+)
+_ALPHA_MAX_INCUMBENT_RESOLUTION_CANONICAL_SHA256: Final[str] = (
+    "c8419138ba62bf504e87202a17dc977dc97f90a39930d241b446b7756f88417d"
 )
 ALPHA_MAX_CANDIDATE_SYMBOLS: Final[tuple[str, ...]] = (
     "ADAUSDT",
@@ -458,14 +482,6 @@ _EXPECTED_COST_CELLS: Final[tuple[dict[str, object], ...]] = (
 )
 
 
-class AlphaMaxRuntimeContractError(ValueError):
-    """The sealed runtime contract or one of its construction inputs is invalid."""
-
-
-class AmbientLQEnvironmentError(AlphaMaxRuntimeContractError):
-    """An ambient ``LQ_*`` environment key would make the replay non-hermetic."""
-
-
 class UnfrozenRuntimeFieldError(RuntimeError):
     """The engine attempted to read a field absent from the versioned allowlist."""
 
@@ -510,6 +526,8 @@ class AlphaMaxRuntimePreflight:
     candidate_symbols: tuple[str, ...]
     backtest_constructor: Mapping[str, object]
     portfolio_strategy_constructor: Mapping[str, object]
+    incumbent_resolution_bytes: bytes
+    incumbent_resolution_audit_sha256: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -797,6 +815,316 @@ class _AlphaMaxFoldEquityFanout(AlphaMaxStreamingEquityTracker):
         return self._normalized_segment_tracker
 
 
+def _alpha_max_signal_time(value: object) -> object:
+    if isinstance(value, datetime):
+        normalized = value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+        return normalized.isoformat().replace("+00:00", "Z")
+    if value is None or type(value) in {str, int, float}:
+        return value
+    raise AlphaMaxRuntimeContractError("alpha_max_boundary_signal_time_invalid")
+
+
+def _alpha_max_boundary_signal_payload(
+    component_id: str,
+    signal: SignalEvent,
+) -> dict[str, object]:
+    if type(signal) is not SignalEvent:
+        raise AlphaMaxRuntimeContractError("alpha_max_boundary_event_invalid")
+    payload: dict[str, object] = {
+        "client_order_id": signal.client_order_id,
+        "component_id": component_id,
+        "datetime": _alpha_max_signal_time(signal.datetime),
+        "metadata": signal.metadata,
+        "position_side": signal.position_side,
+        "price": signal.price,
+        "sequence": signal.sequence,
+        "signal_type": signal.signal_type,
+        "stop_loss": signal.stop_loss,
+        "strategy_id": signal.strategy_id,
+        "strength": signal.strength,
+        "symbol": signal.symbol,
+        "take_profit": signal.take_profit,
+        "time_in_force": signal.time_in_force,
+        "timestamp_ns": signal.timestamp_ns,
+        "trailing_percent": signal.trailing_percent,
+        "type": signal.type,
+    }
+    try:
+        _canonical_bytes(payload)
+    except (TypeError, ValueError) as exc:
+        raise AlphaMaxRuntimeContractError("alpha_max_boundary_signal_payload_invalid") from exc
+    return payload
+
+
+def _alpha_max_assert_parent_queue_empty(events: FastQueue) -> None:
+    if type(events) is not FastQueue:
+        raise AlphaMaxRuntimeContractError("alpha_max_boundary_parent_queue_invalid")
+    try:
+        event = events.get(False)
+    except queue.Empty:
+        return
+    raise AlphaMaxRuntimeContractError(
+        f"alpha_max_boundary_parent_queue_not_empty:{getattr(event, 'type', 'UNKNOWN')!s}"
+    )
+
+
+_ALPHA_MAX_NATIVE_SNAPSHOT_KEYS: Final[frozenset[str]] = frozenset(
+    {
+        "adapter_class",
+        "native_timeframe",
+        "barrier_mode",
+        "completed_native_keys",
+        "completed_native_count_by_symbol",
+        "last_completed_native_key_by_symbol",
+        "barrier_pending_keys",
+        "barrier_closed_keys",
+        "barrier_symbol_coverage",
+        "failed_native_keys",
+        "partial_bucket_error",
+    }
+)
+
+
+def _alpha_max_native_coverage_snapshot(child: object) -> dict[str, Any]:
+    getter = getattr(child, "get_native_finalization_evidence", None)
+    if not callable(getter):
+        raise AlphaMaxRuntimeContractError("alpha_max_scoring_native_finalization_coverage_missing")
+    try:
+        raw = getter()
+    except Exception as exc:
+        raise AlphaMaxRuntimeContractError(
+            "alpha_max_scoring_native_finalization_coverage_invalid"
+        ) from exc
+    if type(raw) is not dict or set(raw) != _ALPHA_MAX_NATIVE_SNAPSHOT_KEYS:
+        raise AlphaMaxRuntimeContractError("alpha_max_scoring_native_finalization_coverage_invalid")
+    try:
+        snapshot = copy.deepcopy(raw)
+        _canonical_bytes(snapshot)
+    except (TypeError, ValueError) as exc:
+        raise AlphaMaxRuntimeContractError(
+            "alpha_max_scoring_native_finalization_coverage_invalid"
+        ) from exc
+    return snapshot
+
+
+def _alpha_max_native_completed_key_set(snapshot: Mapping[str, Any]) -> set[tuple[str, str]]:
+    raw = snapshot.get("completed_native_keys")
+    if not isinstance(raw, (list, tuple)):
+        raise AlphaMaxRuntimeContractError("alpha_max_scoring_native_finalization_coverage_invalid")
+    result: set[tuple[str, str]] = set()
+    for item in raw:
+        if (
+            not isinstance(item, (list, tuple))
+            or len(item) != 2
+            or type(item[0]) is not str
+            or not item[0]
+            or type(item[1]) is not str
+            or not item[1]
+        ):
+            raise AlphaMaxRuntimeContractError(
+                "alpha_max_scoring_native_finalization_coverage_invalid"
+            )
+        result.add((item[0], item[1]))
+    if len(result) != len(raw):
+        raise AlphaMaxRuntimeContractError("alpha_max_scoring_native_finalization_coverage_invalid")
+    return result
+
+
+def _alpha_max_native_barrier_key_set(
+    snapshot: Mapping[str, Any],
+    *,
+    field: str,
+) -> set[str]:
+    raw = snapshot.get(field)
+    if not isinstance(raw, (list, tuple)) or any(type(item) is not str or not item for item in raw):
+        raise AlphaMaxRuntimeContractError("alpha_max_scoring_native_finalization_coverage_invalid")
+    result = set(raw)
+    if len(result) != len(raw):
+        raise AlphaMaxRuntimeContractError("alpha_max_scoring_native_finalization_coverage_invalid")
+    return result
+
+
+def _alpha_max_assert_native_coverage_binding(
+    snapshot: Mapping[str, Any],
+    *,
+    component: AlphaMaxExpectedComponent,
+    admitted_symbols: tuple[str, ...],
+) -> None:
+    expected_timeframe = _ALPHA_MAX_NATIVE_TIMEFRAME_BY_CLASS.get(component.strategy_class)
+    expected_barrier_mode = (
+        "atomic_cross_section"
+        if component.strategy_class == "ResearchOnlyDailyCrossSectionalNearHighAnchoringStrategy"
+        else "none"
+    )
+    completed_symbols = {symbol for symbol, _key in _alpha_max_native_completed_key_set(snapshot)}
+    raw_counts = snapshot.get("completed_native_count_by_symbol")
+    raw_last = snapshot.get("last_completed_native_key_by_symbol")
+    raw_barrier_coverage = snapshot.get("barrier_symbol_coverage")
+    admitted_set = set(admitted_symbols)
+    if (
+        expected_timeframe is None
+        or tuple(component.symbols) != admitted_symbols
+        or snapshot.get("adapter_class") != component.strategy_class
+        or snapshot.get("native_timeframe") != expected_timeframe
+        or snapshot.get("barrier_mode") != expected_barrier_mode
+        or completed_symbols != admitted_set
+        or not isinstance(raw_counts, Mapping)
+        or set(raw_counts) != admitted_set
+        or not isinstance(raw_last, Mapping)
+        or set(raw_last) != admitted_set
+        or not isinstance(raw_barrier_coverage, Mapping)
+        or (
+            expected_barrier_mode == "atomic_cross_section"
+            and any(set(symbols) != admitted_set for symbols in raw_barrier_coverage.values())
+        )
+        or (expected_barrier_mode == "none" and bool(raw_barrier_coverage))
+    ):
+        raise AlphaMaxRuntimeContractError(
+            "alpha_max_scoring_native_finalization_coverage_binding_mismatch"
+        )
+
+
+def _finalize_alpha_max_native_boundary(
+    strategy: ArtifactPortfolioModeStrategy,
+    expected_definition: AlphaMaxExpectedDefinition,
+    boundary: datetime,
+    *,
+    admitted_symbol_count: int,
+    require_exact_counts: bool,
+) -> AlphaMaxNativeFinalizationReceipt:
+    """Finalize each child once and seal the deliberately discarded boundary signals."""
+    if type(strategy) is not ArtifactPortfolioModeStrategy:
+        raise AlphaMaxRuntimeContractError("alpha_max_scoring_strategy_identity_invalid")
+    if type(expected_definition) is not AlphaMaxExpectedDefinition:
+        raise TypeError("alpha_max_expected_definition_identity_invalid")
+    if type(admitted_symbol_count) is not int or admitted_symbol_count <= 0:
+        raise ValueError("alpha_max_admitted_symbol_count_invalid")
+    expected_components = expected_definition.components
+    expected_ids = tuple(component.component_id for component in expected_components)
+    children = getattr(strategy, "_children", None)
+    if (
+        type(children) is not list
+        or tuple(component.component_id for component, _child, _child_queue in children)
+        != expected_ids
+    ):
+        raise AlphaMaxRuntimeContractError("alpha_max_scoring_child_queue_coverage_invalid")
+    _alpha_max_assert_parent_queue_empty(strategy.events)
+    before_coverage: dict[str, dict[str, Any]] = {}
+    for component, child, _child_queue in children:
+        snapshot = _alpha_max_native_coverage_snapshot(child)
+        _alpha_max_assert_native_coverage_binding(
+            snapshot,
+            component=component,
+            admitted_symbols=expected_definition.admitted_symbols,
+        )
+        before_coverage[component.component_id] = snapshot
+    finalized = strategy.finalize_completed_native_buckets(boundary)
+    if type(finalized) is not dict or tuple(finalized) != expected_ids:
+        raise AlphaMaxRuntimeContractError("alpha_max_scoring_native_finalization_invalid")
+    normalized: dict[str, int] = {}
+    native_coverage: dict[str, dict[str, Any]] = {}
+    signal_payloads: list[dict[str, object]] = []
+    expected_by_id = {component.component_id: component for component in expected_components}
+    for component_id, value in finalized.items():
+        if type(value) is not int or value <= 0:
+            raise AlphaMaxRuntimeContractError("alpha_max_scoring_native_finalization_invalid")
+        component = expected_by_id[component_id]
+        if require_exact_counts:
+            expected_count = (
+                1
+                if component.strategy_class
+                == "ResearchOnlyDailyCrossSectionalNearHighAnchoringStrategy"
+                else admitted_symbol_count
+            )
+            if value != expected_count:
+                raise AlphaMaxRuntimeContractError(
+                    "alpha_max_scoring_native_finalization_count_mismatch"
+                )
+        normalized[component_id] = value
+    for component, child, _child_queue in children:
+        component_id = component.component_id
+        before = before_coverage[component_id]
+        after = _alpha_max_native_coverage_snapshot(child)
+        _alpha_max_assert_native_coverage_binding(
+            after,
+            component=component,
+            admitted_symbols=expected_definition.admitted_symbols,
+        )
+        if any(
+            after[field] != before[field]
+            for field in ("adapter_class", "native_timeframe", "barrier_mode")
+        ):
+            raise AlphaMaxRuntimeContractError(
+                "alpha_max_scoring_native_finalization_coverage_invalid"
+            )
+        before_completed = _alpha_max_native_completed_key_set(before)
+        after_completed = _alpha_max_native_completed_key_set(after)
+        before_pending = _alpha_max_native_barrier_key_set(before, field="barrier_pending_keys")
+        after_pending = _alpha_max_native_barrier_key_set(after, field="barrier_pending_keys")
+        before_closed = _alpha_max_native_barrier_key_set(before, field="barrier_closed_keys")
+        after_closed = _alpha_max_native_barrier_key_set(after, field="barrier_closed_keys")
+        if (
+            not before_completed.issubset(after_completed)
+            or not before_pending.issubset(after_pending)
+            or not before_closed.issubset(after_closed)
+        ):
+            raise AlphaMaxRuntimeContractError(
+                "alpha_max_scoring_native_finalization_coverage_regressed"
+            )
+        coverage = copy.deepcopy(after)
+        coverage["finalization_completed_native_keys"] = sorted(after_completed - before_completed)
+        coverage["finalization_barrier_keys"] = sorted(after_closed - before_closed)
+        native_coverage[component_id] = coverage
+    for component, _child, child_queue in children:
+        drain = getattr(child_queue, "drain", None)
+        if not callable(drain):
+            raise AlphaMaxRuntimeContractError("alpha_max_scoring_child_queue_invalid")
+        drained = drain()
+        if type(drained) is not list:
+            raise AlphaMaxRuntimeContractError("alpha_max_scoring_child_queue_invalid")
+        signal_payloads.extend(
+            _alpha_max_boundary_signal_payload(component.component_id, event) for event in drained
+        )
+    _alpha_max_assert_parent_queue_empty(strategy.events)
+    signal_bytes = b"".join(_canonical_bytes(payload) + b"\n" for payload in signal_payloads)
+    try:
+        return build_alpha_max_native_finalization_receipt(
+            boundary_utc=boundary,
+            finalized_children=normalized,
+            native_coverage_by_child=native_coverage,
+            discarded_signal_count=len(signal_payloads),
+            discarded_signal_sha256=_sha256(signal_bytes),
+        )
+    except (TypeError, ValueError) as exc:
+        raise AlphaMaxRuntimeContractError(
+            "alpha_max_scoring_native_finalization_coverage_invalid"
+        ) from exc
+
+
+def _settle_alpha_max_day_boundary(
+    activation: AlphaMaxEngineActivation,
+    tracker: _AlphaMaxFoldEquityFanout,
+    boundary: datetime,
+    *,
+    scoring_boundary: bool,
+) -> AlphaMaxNativeFinalizationReceipt | None:
+    """Settle causal economics, then finalize native state at a score handoff."""
+    if type(activation) is not AlphaMaxEngineActivation:
+        raise TypeError("alpha_max_engine_activation_required")
+    if type(tracker) is not _AlphaMaxFoldEquityFanout:
+        raise TypeError("alpha_max_fold_equity_tracker_required")
+    tracker.settle_day_end(boundary, settle_funding=True)
+    if not scoring_boundary:
+        return None
+    return _finalize_alpha_max_native_boundary(
+        activation.backtest.strategy,
+        activation.artifact_seal.expected_definition,
+        boundary,
+        admitted_symbol_count=len(activation.admitted_symbols),
+        require_exact_counts=True,
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class AlphaMaxEngineActivation:
     """A constructed real engine that has passed the first activation assertion."""
@@ -886,6 +1214,7 @@ class AlphaMaxIndicatorCapsule:
     capsule_sha256: str
     capsule: Mapping[str, object]
     finalized_children: Mapping[str, object]
+    native_finalization_sha256: str
     windows_processed: int
     discarded_signal_count: int
     market_event_count: int = 0
@@ -905,6 +1234,7 @@ def _alpha_max_capsule_state_payload(capsule: AlphaMaxIndicatorCapsule) -> dict[
         "capsule_sha256": capsule.capsule_sha256,
         "capsule": _thaw_json(capsule.capsule),
         "finalized_children": _thaw_json(capsule.finalized_children),
+        "native_finalization_sha256": capsule.native_finalization_sha256,
         "windows_processed": capsule.windows_processed,
         "discarded_signal_count": capsule.discarded_signal_count,
         "market_event_count": capsule.market_event_count,
@@ -1172,14 +1502,6 @@ def _thaw_json(value: object) -> object:
     return value
 
 
-def reject_ambient_lq_environment() -> None:
-    """Reject every ambient key beginning with ``LQ_`` without reading its value."""
-    offending = tuple(sorted(key for key in os.environ if key.startswith("LQ_")))
-    if offending:
-        joined = ",".join(offending)
-        raise AmbientLQEnvironmentError(f"ambient_lq_environment:{joined}")
-
-
 def _require_exact_explicit_path(path: str | os.PathLike[str]) -> str:
     raw = os.fspath(path)
     if not raw or not os.path.isabs(raw) or os.path.abspath(raw) != raw:
@@ -1196,6 +1518,24 @@ def _require_mapping(value: object, *, field: str) -> dict[str, Any]:
 def _require_exact(value: object, expected: object, *, field: str) -> None:
     if value != expected:
         raise AlphaMaxRuntimeContractError(f"alpha_max_runtime_contract_mismatch:{field}")
+
+
+def _validate_incumbent_resolution_contract(config: Mapping[str, object]) -> bytes:
+    """Validate the embedded audit without consulting planning/worktree files."""
+    incumbent = _require_mapping(
+        config.get("incumbent_resolution"),
+        field="incumbent_resolution",
+    )
+    canonical = _canonical_bytes(incumbent)
+    if _sha256(canonical) != _ALPHA_MAX_INCUMBENT_RESOLUTION_CANONICAL_SHA256:
+        raise AlphaMaxRuntimeContractError("alpha_max_incumbent_resolution_mismatch")
+    normative = _require_mapping(config.get("normative_sources"), field="normative_sources")
+    if (
+        normative.get("incumbent_resolution_audit_sha256")
+        != ALPHA_MAX_INCUMBENT_RESOLUTION_AUDIT_SHA256
+    ):
+        raise AlphaMaxRuntimeContractError("alpha_max_incumbent_resolution_audit_hash_mismatch")
+    return canonical
 
 
 def _validate_runtime_contract(config: dict[str, Any]) -> dict[str, Any]:
@@ -1246,6 +1586,7 @@ def _validate_runtime_contract(config: dict[str, Any]) -> dict[str, Any]:
         field="static_attributes",
     )
     _require_exact(config.get("cost_cells"), list(_EXPECTED_COST_CELLS), field="cost_cells")
+    _validate_incumbent_resolution_contract(config)
 
     integrity = _require_mapping(config.get("integrity"), field="integrity")
     if set(integrity) != {
@@ -1408,6 +1749,8 @@ def preflight_alpha_max_runtime_contract(
         candidate_symbols=ALPHA_MAX_CANDIDATE_SYMBOLS,
         backtest_constructor=backtest_constructor,
         portfolio_strategy_constructor=portfolio_constructor,
+        incumbent_resolution_bytes=_validate_incumbent_resolution_contract(config),
+        incumbent_resolution_audit_sha256=ALPHA_MAX_INCUMBENT_RESOLUTION_AUDIT_SHA256,
     )
 
 
@@ -1496,6 +1839,9 @@ class AlphaMaxBacktestConfig:
         return _canonical_bytes({name: _thaw_json(value) for name, value in snapshot.items()})
 
 
+register_alpha_max_backtest_config_type(AlphaMaxBacktestConfig)
+
+
 def alpha_max_common_rng_seed_payload(split_or_fold_id: str, nominal_cost_bps: int) -> bytes:
     """Build the exact Revision 5.14 common-random-number seed payload."""
     if type(split_or_fold_id) is not str or not split_or_fold_id:
@@ -1526,6 +1872,19 @@ def _validate_preflight(preflight: AlphaMaxRuntimePreflight) -> None:
         or preflight.common_runtime_bytes != _canonical_bytes(_EXPECTED_STATIC_ATTRIBUTES)
         or _sha256(preflight.config_bytes) != ALPHA_MAX_CONFIG_FILE_SHA256
         or len(preflight.config_bytes) != preflight.config_receipt.byte_count
+        or preflight.config_receipt.artifact_id != "alpha_max_config"
+        or preflight.config_receipt.requested_path != preflight.config_receipt.canonical_path
+        or preflight.config_receipt.sha256 != ALPHA_MAX_CONFIG_FILE_SHA256
+        or preflight.config_receipt.pre_fstat_identity
+        != preflight.config_receipt.post_fstat_identity
+        or _sha256(preflight.incumbent_resolution_bytes)
+        != _ALPHA_MAX_INCUMBENT_RESOLUTION_CANONICAL_SHA256
+        or preflight.incumbent_resolution_audit_sha256
+        != ALPHA_MAX_INCUMBENT_RESOLUTION_AUDIT_SHA256
+        or preflight.candidate_symbols != ALPHA_MAX_CANDIDATE_SYMBOLS
+        or preflight.backtest_constructor != _freeze_json(_EXPECTED_BACKTEST_CONSTRUCTOR)
+        or preflight.portfolio_strategy_constructor
+        != _freeze_json(_EXPECTED_PORTFOLIO_STRATEGY_CONSTRUCTOR)
     ):
         raise AlphaMaxRuntimeContractError("alpha_max_runtime_preflight_invalid")
 
@@ -2031,7 +2390,10 @@ def _validate_manifest_bytes(
         if type(fixed_weights) is not dict or set(fixed_weights) != set(expected_members):
             raise AlphaMaxRuntimeContractError("portfolio_manifest_activation_mismatch")
         for component in expected_components:
-            if component.weight != float(fixed_weights[component.component_id]) * gross_cap:
+            expected_weight = (
+                _round(float(fixed_weights[component.component_id]), ndigits=10) * gross_cap
+            )
+            if component.weight != expected_weight:
                 raise AlphaMaxRuntimeContractError("portfolio_manifest_activation_mismatch")
     return AlphaMaxExpectedDefinition(
         portfolio_mode=f"manifest:{manifest_path}",
@@ -2243,6 +2605,7 @@ def _validate_alpha_max_root_seals(
         or raw_root_seals[-1].path != raw_path
         or len(feature_root_seals) != len(ordered_lookup.root_specs)
         or tuple(value.root_id for value in feature_root_seals) != expected_feature_root_ids
+        or ordered_lookup.root_seals != feature_root_seals
     ):
         raise AlphaMaxRuntimeContractError("alpha_max_root_seal_scope_mismatch")
     for retained, spec in zip(feature_root_seals, ordered_lookup.root_specs, strict=True):
@@ -2473,6 +2836,13 @@ def validate_alpha_max_engine_activation(
             or activation.chunk_start_utc.tzinfo != UTC
             or activation.chunk_end_utc.tzinfo != UTC
             or activation.chunk_end_utc - activation.chunk_start_utc != timedelta(days=1)
+            or plan.strategy_timeframe != "1s"
+            or plan.warmup_bars != 0
+            or plan.record_history is not True
+            or plan.track_metrics is not True
+            or plan.record_trades is not True
+            or plan.strict_data_handler_construction is not True
+            or lookup.ordered_root_ids != _alpha_max_expected_root_sequence(activation.phase_id)
         ):
             raise _activation_mismatch()
 
@@ -2534,7 +2904,8 @@ def validate_alpha_max_engine_activation(
                 else backtest.data_handler_kwargs[key] != value
                 for key, value in plan.data_handler_kwargs.items()
             )
-            or backtest.execution_handler_kwargs != {"record_cost_attribution": True}
+            or set(backtest.execution_handler_kwargs) != {"record_cost_attribution"}
+            or backtest.execution_handler_kwargs.get("record_cost_attribution") is not True
             or set(backtest.portfolio_kwargs)
             != {
                 "fill_application_attribution_sink",
@@ -2593,9 +2964,9 @@ def validate_alpha_max_engine_activation(
             )
         ):
             raise _activation_mismatch()
-        # Exercise only the resolver's identity validator.  It performs no data
-        # lookup and binds no ledger row.
-        owner = resolver._validate_raw_accessor(raw_accessor)
+        # Bind the exact raw-accessor capability before the first replay event.
+        # This performs no data lookup and binds no ledger row.
+        owner = resolver.bind_raw_accessor(raw_accessor)
         if owner is not backtest.data_handler:
             raise _activation_mismatch()
 
@@ -3069,13 +3440,15 @@ def build_alpha_max_indicator_capsule(
                 discarded_signals += _drain_indicator_events(events)
         day_start += timedelta(days=1)
 
-    finalized = strategy.finalize_completed_native_buckets(watermark)
-    discarded_signals += _drain_indicator_events(events)
-    expected_ids = tuple(
-        component.component_id for component in seal.expected_definition.components
+    finalization = _finalize_alpha_max_native_boundary(
+        strategy,
+        seal.expected_definition,
+        watermark,
+        admitted_symbol_count=len(admitted_symbols),
+        require_exact_counts=True,
     )
-    if tuple(sorted(finalized)) != expected_ids:
-        raise AlphaMaxRuntimeContractError("alpha_max_warmup_child_coverage_mismatch")
+    finalized = dict(finalization.finalized_children)
+    discarded_signals += finalization.discarded_signal_count
     strategy.validate_research_warmup_ready()
     discarded_signals += _drain_indicator_events(events)
     raw_capsule = strategy.get_research_indicator_state()
@@ -3096,6 +3469,7 @@ def build_alpha_max_indicator_capsule(
         capsule_sha256=capsule_sha,
         capsule=frozen_capsule,
         finalized_children=frozen_finalized,
+        native_finalization_sha256=finalization.sha256,
         windows_processed=(
             windows_processed
             + (0 if prior_indicator_capsule is None else prior_indicator_capsule.windows_processed)
@@ -3199,6 +3573,8 @@ def _replay_alpha_max_fold(
     effective_config_sha256: str | None = None
     runtime_read_audit: tuple[str, ...] | None = None
     runtime_read_audit_sha256: str | None = None
+    native_finalization: AlphaMaxNativeFinalizationReceipt | None = None
+    target_gross_exposure: float | None = None
 
     day_start = fold_start
     while day_start < fold_end:
@@ -3228,6 +3604,16 @@ def _replay_alpha_max_fold(
             _chunk_end_utc=day_end,
         )
         config = activation.constructor_plan.config
+        current_target_gross = float(activation.artifact_seal.expected_definition.gross_cap)
+        if target_gross_exposure is None:
+            target_gross_exposure = current_target_gross
+        elif not math.isclose(
+            target_gross_exposure,
+            current_target_gross,
+            rel_tol=0.0,
+            abs_tol=0.0,
+        ):
+            raise AlphaMaxRuntimeContractError("alpha_max_fold_target_gross_changed")
         current_effective_bytes = config.runtime_attribute_bytes()
         current_effective_sha = config.runtime_instance_sha256
         if effective_config_bytes is None:
@@ -3268,10 +3654,16 @@ def _replay_alpha_max_fold(
         ):
             raise AlphaMaxRuntimeContractError("alpha_max_pricing_trace_identity_invalid")
         pricing_traces.extend(daily_pricing)
-        fold_tracker.settle_day_end(
+        day_finalization = _settle_alpha_max_day_boundary(
+            activation,
+            fold_tracker,
             day_end,
-            settle_funding=True,
+            scoring_boundary=day_end == fold_end,
         )
+        if day_finalization is not None:
+            if native_finalization is not None:
+                raise AlphaMaxRuntimeContractError("alpha_max_fold_native_finalization_duplicate")
+            native_finalization = day_finalization
         # Bind the receipt to every attribute the fully validated engine and
         # explicit causal day-boundary settlement actually read.  Different
         # days may take different order/fill paths, so concatenate the post-run
@@ -3296,6 +3688,8 @@ def _replay_alpha_max_fold(
         or effective_config_sha256 is None
         or runtime_read_audit is None
         or runtime_read_audit_sha256 is None
+        or native_finalization is None
+        or target_gross_exposure is None
     ):
         raise AlphaMaxRuntimeContractError("alpha_max_fold_replay_empty")
     applications = collector.applications
@@ -3350,6 +3744,7 @@ def _replay_alpha_max_fold(
         ending_cash=ending_cash,
         ending_equity=ending_equity,
         full_event_equity=full_event_equity,
+        native_finalization=native_finalization,
         pricing_traces=pricing_tuple,
         fill_applications=applications,
         no_fill_attempts=final_execution.no_fill_attempt_evidence,
@@ -3357,6 +3752,17 @@ def _replay_alpha_max_fold(
         liquidation_events=tuple(final_portfolio.liquidation_events),
         portfolio_fee_total=float(holdings.get("commission", 0.0)),
         portfolio_funding_total=float(holdings.get("funding", 0.0)),
+        capacity_observations=tuple(
+            {
+                "bar_volume": value.bar_volume,
+                "equity_before": value.equity_before,
+                "raw_price": value.raw_price,
+                "requested_qty": value.requested_qty,
+            }
+            for value in final_execution.capacity_observation_evidence
+        ),
+        ending_market_values={symbol: float(holdings[symbol]) for symbol in admitted_symbols},
+        target_gross_exposure=target_gross_exposure,
     )
     primary_stream = (
         None
@@ -3786,7 +4192,7 @@ def _alpha_max_fit_weights(
         fixed = allocation.get("fixed_weights")
         if type(fixed) is dict:
             weights_by_row[row_id] = MappingProxyType(
-                {member: float(fixed[member]) for member in members}
+                {member: _round(float(fixed[member]), ndigits=10) for member in members}
             )
             continue
         method = str(allocation.get("method") or "")
@@ -3818,12 +4224,11 @@ def _alpha_max_ordered_lookup(
     root_ids: tuple[str, ...],
 ) -> AlphaMaxOrderedFundingLookup:
     try:
-        specs = tuple(
-            _alpha_max_feature_spec(root_seals[(root_id, "feature")]) for root_id in root_ids
-        )
+        feature_seals = tuple(root_seals[(root_id, "feature")] for root_id in root_ids)
     except KeyError as exc:
         raise AlphaMaxRuntimeContractError("alpha_max_feature_root_sequence_incomplete") from exc
-    return AlphaMaxOrderedFundingLookup(specs)
+    specs = tuple(_alpha_max_feature_spec(seal) for seal in feature_seals)
+    return AlphaMaxOrderedFundingLookup(specs, root_seals=feature_seals)
 
 
 def _alpha_max_phase_lookup(
@@ -4051,7 +4456,11 @@ def _alpha_max_replay_training_component_returns(
     manifest_receipt: AlphaMaxManifestReceipt,
     admitted_symbols: tuple[str, ...],
     root_seals: Mapping[tuple[str, str], AlphaMaxRootSeal],
-) -> tuple[tuple[str, ...], tuple[float, ...]]:
+) -> tuple[
+    tuple[str, ...],
+    tuple[float, ...],
+    AlphaMaxNativeFinalizationReceipt,
+]:
     """Replay one component at nominal 20 bps over train with fresh daily engines."""
     warmup_capsule = _alpha_max_build_indicator_prefix(
         preflight,
@@ -4084,6 +4493,7 @@ def _alpha_max_replay_training_component_returns(
     )
     carry: _AlphaMaxDailyCarry | None = None
     traces: list[ExecutionPricingTrace] = []
+    native_finalization: AlphaMaxNativeFinalizationReceipt | None = None
     day_start = train_start
     while day_start < train_end:
         day_end = day_start + timedelta(days=1)
@@ -4117,10 +4527,19 @@ def _alpha_max_replay_training_component_returns(
         validate_alpha_max_engine_activation(activation, _expected_daily_carry=carry)
         activation.backtest._run_backtest()
         traces.extend(activation.backtest.execution_handler.pricing_trace_evidence)
-        tracker.settle_day_end(day_end, settle_funding=True)
+        day_finalization = _settle_alpha_max_day_boundary(
+            activation,
+            tracker,
+            day_end,
+            scoring_boundary=day_end == train_end,
+        )
+        if day_finalization is not None:
+            if native_finalization is not None:
+                raise AlphaMaxRuntimeContractError("alpha_max_train_native_finalization_duplicate")
+            native_finalization = day_finalization
         carry = _capture_alpha_max_daily_carry(activation)
         day_start = day_end
-    if carry is None:
+    if carry is None or native_finalization is None:
         raise AlphaMaxRuntimeContractError("alpha_max_train_component_replay_empty")
     applications = collector.applications
     if len(traces) != len(applications) or any(
@@ -4153,7 +4572,7 @@ def _alpha_max_replay_training_component_returns(
         prior_equity = endpoint.equity
     if len(calendar) < 252 or len(calendar) != len(set(calendar)):
         raise AlphaMaxRuntimeContractError("alpha_max_train_component_calendar_invalid")
-    return tuple(calendar), tuple(returns)
+    return tuple(calendar), tuple(returns), native_finalization
 
 
 def _alpha_max_scaled_gross(
@@ -4576,6 +4995,168 @@ def _validate_alpha_max_adjacent_feature_roots(
             )
 
 
+def _alpha_max_raw_directory_identity(value: os.stat_result) -> tuple[int, int, int]:
+    return (int(value.st_dev), int(value.st_ino), int(stat.S_IFMT(value.st_mode)))
+
+
+def _alpha_max_raw_file_identity(value: os.stat_result) -> tuple[int, ...]:
+    return (
+        int(value.st_dev),
+        int(value.st_ino),
+        int(stat.S_IFMT(value.st_mode)),
+        int(value.st_nlink),
+        int(value.st_size),
+        int(value.st_mtime_ns),
+        int(value.st_ctime_ns),
+    )
+
+
+class _AlphaMaxSealedRawReader:
+    """Read exact sealed raw partitions through one retained root capability."""
+
+    __slots__ = ("_entry_ids", "_root_fd", "_root_identity", "_seal")
+
+    def __init__(self, seal: AlphaMaxRootSeal) -> None:
+        if type(seal) is not AlphaMaxRootSeal or seal.root_kind != "raw":
+            raise TypeError("alpha_max_sealed_raw_root_required")
+        root = Path(seal.path)
+        try:
+            observed = root.lstat()
+        except OSError as exc:
+            raise AlphaMaxRuntimeContractError("alpha_max_sealed_raw_root_invalid") from exc
+        if stat.S_ISLNK(observed.st_mode) or not stat.S_ISDIR(observed.st_mode):
+            raise AlphaMaxRuntimeContractError("alpha_max_sealed_raw_root_invalid")
+        root_fd: int | None = None
+        try:
+            root_fd = _alpha_max_open_directory_at(root)
+            opened = os.fstat(root_fd)
+        except OSError as exc:
+            if root_fd is not None:
+                os.close(root_fd)
+            raise AlphaMaxRuntimeContractError("alpha_max_sealed_raw_root_invalid") from exc
+        root_identity = _alpha_max_raw_directory_identity(opened)
+        if root_identity != _alpha_max_raw_directory_identity(observed):
+            os.close(root_fd)
+            raise AlphaMaxRuntimeContractError("alpha_max_sealed_raw_root_changed_during_open")
+        self._seal = seal
+        self._entry_ids = frozenset(id(entry) for entry in seal.entries)
+        self._root_fd: int | None = root_fd
+        self._root_identity = root_identity
+
+    def __del__(self) -> None:
+        self.close()
+
+    def __enter__(self) -> _AlphaMaxSealedRawReader:
+        return self
+
+    def __exit__(self, _exc_type: object, _exc: object, _traceback: object) -> None:
+        self.close()
+
+    def close(self) -> None:
+        descriptor = getattr(self, "_root_fd", None)
+        if descriptor is None:
+            return
+        self._root_fd = None
+        try:
+            os.close(descriptor)
+        except OSError:
+            pass
+
+    def read_entry(self, entry: AlphaMaxTreeEntry) -> Any:
+        if type(entry) is not AlphaMaxTreeEntry or id(entry) not in self._entry_ids:
+            raise TypeError("alpha_max_sealed_raw_entry_not_owned")
+        root_fd = self._root_fd
+        if root_fd is None:
+            raise AlphaMaxRuntimeContractError("alpha_max_sealed_raw_reader_closed")
+        try:
+            if _alpha_max_raw_directory_identity(os.fstat(root_fd)) != self._root_identity:
+                raise AlphaMaxRuntimeContractError("alpha_max_sealed_raw_root_identity_changed")
+        except OSError as exc:
+            raise AlphaMaxRuntimeContractError(
+                "alpha_max_sealed_raw_root_identity_changed"
+            ) from exc
+
+        relative = Path(entry.relative_path)
+        opened_directories: list[int] = []
+        descriptor: int | None = None
+        try:
+            parent_fd = root_fd
+            for part in relative.parts[:-1]:
+                observed_directory = os.stat(part, dir_fd=parent_fd, follow_symlinks=False)
+                if stat.S_ISLNK(observed_directory.st_mode) or not stat.S_ISDIR(
+                    observed_directory.st_mode
+                ):
+                    raise AlphaMaxRuntimeContractError("alpha_max_sealed_raw_identity_invalid")
+                child_fd = _alpha_max_open_directory_at(part, dir_fd=parent_fd)
+                try:
+                    opened_directory = os.fstat(child_fd)
+                except OSError:
+                    os.close(child_fd)
+                    raise
+                if _alpha_max_raw_directory_identity(
+                    opened_directory
+                ) != _alpha_max_raw_directory_identity(observed_directory):
+                    os.close(child_fd)
+                    raise AlphaMaxRuntimeContractError(
+                        "alpha_max_sealed_raw_path_changed_during_open"
+                    )
+                opened_directories.append(child_fd)
+                parent_fd = child_fd
+
+            observed_file = os.stat(
+                relative.name,
+                dir_fd=parent_fd,
+                follow_symlinks=False,
+            )
+            if (
+                stat.S_ISLNK(observed_file.st_mode)
+                or not stat.S_ISREG(observed_file.st_mode)
+                or int(observed_file.st_nlink) != 1
+            ):
+                raise AlphaMaxRuntimeContractError("alpha_max_sealed_raw_identity_invalid")
+            flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+            descriptor = os.open(relative.name, flags, dir_fd=parent_fd)
+            opened_file = os.fstat(descriptor)
+            if (
+                _alpha_max_raw_file_identity(opened_file)
+                != _alpha_max_raw_file_identity(observed_file)
+                or int(opened_file.st_size) != entry.byte_count
+                or stat.S_IMODE(opened_file.st_mode) != entry.mode
+                or int(opened_file.st_mtime_ns) != entry.mtime_ns
+            ):
+                raise AlphaMaxRuntimeContractError("alpha_max_sealed_raw_identity_invalid")
+
+            digest = hashlib.sha256()
+            payload = bytearray()
+            while True:
+                chunk = os.read(descriptor, 1024 * 1024)
+                if not chunk:
+                    break
+                payload.extend(chunk)
+                digest.update(chunk)
+                if len(payload) > entry.byte_count:
+                    raise AlphaMaxRuntimeContractError("alpha_max_sealed_raw_size_mismatch")
+            after = os.fstat(descriptor)
+            if _alpha_max_raw_file_identity(after) != _alpha_max_raw_file_identity(opened_file):
+                raise AlphaMaxRuntimeContractError("alpha_max_sealed_raw_changed_during_read")
+            if len(payload) != entry.byte_count or digest.hexdigest() != entry.sha256:
+                raise AlphaMaxRuntimeContractError("alpha_max_sealed_raw_hash_mismatch")
+        except OSError as exc:
+            raise AlphaMaxRuntimeContractError("alpha_max_sealed_raw_read_failed") from exc
+        finally:
+            if descriptor is not None:
+                os.close(descriptor)
+            for directory_fd in reversed(opened_directories):
+                os.close(directory_fd)
+
+        try:
+            import polars as pl
+
+            return pl.read_parquet(io.BytesIO(payload))
+        except Exception as exc:
+            raise AlphaMaxRuntimeContractError("alpha_max_sealed_raw_parquet_invalid") from exc
+
+
 def _alpha_max_load_raw_admission_summary(
     seal: AlphaMaxRootSeal,
     *,
@@ -4594,7 +5175,6 @@ def _alpha_max_load_raw_admission_summary(
 
     import polars as pl
 
-    root = Path(seal.path)
     entries = tuple(
         entry
         for entry in seal.entries
@@ -4625,60 +5205,67 @@ def _alpha_max_load_raw_admission_summary(
         current_closes.clear()
         current_volumes.clear()
 
-    for entry in sorted(entries, key=lambda value: value.minimum_timestamp_ms):
-        path = root / entry.relative_path
-        try:
-            frame = (
-                pl.scan_parquet(str(path))
-                .select(
-                    [
-                        pl.col("datetime").dt.epoch("ms").alias("timestamp_ms"),
-                        pl.col("close").cast(pl.Float64),
-                        pl.col("volume").cast(pl.Float64),
-                    ]
+    try:
+        reader = _AlphaMaxSealedRawReader(seal)
+    except AlphaMaxRuntimeContractError as exc:
+        raise AlphaMaxRuntimeContractError("alpha_max_admission_raw_partition_read_failed") from exc
+    try:
+        for entry in sorted(entries, key=lambda value: value.minimum_timestamp_ms):
+            try:
+                frame = (
+                    reader.read_entry(entry)
+                    .lazy()
+                    .select(
+                        [
+                            pl.col("datetime").dt.epoch("ms").alias("timestamp_ms"),
+                            pl.col("close").cast(pl.Float64),
+                            pl.col("volume").cast(pl.Float64),
+                        ]
+                    )
+                    .collect(engine="streaming")
+                    .sort("timestamp_ms")
                 )
-                .collect(engine="streaming")
-                .sort("timestamp_ms")
-            )
-        except Exception as exc:
-            raise AlphaMaxRuntimeContractError(
-                "alpha_max_admission_raw_partition_read_failed"
-            ) from exc
-        if frame.is_empty():
-            raise AlphaMaxRuntimeContractError("alpha_max_admission_raw_partition_empty")
-        if frame.null_count().row(0) != (0, 0, 0):
-            raise AlphaMaxRuntimeContractError("alpha_max_admission_raw_partition_null")
-        timestamps = frame.get_column("timestamp_ms")
-        if timestamps.n_unique() != frame.height:
-            raise AlphaMaxRuntimeContractError("alpha_max_admission_raw_timestamp_duplicate")
-        first_timestamp_ms = int(timestamps[0])
-        if previous_timestamp_ms is not None and first_timestamp_ms <= previous_timestamp_ms:
-            raise AlphaMaxRuntimeContractError("alpha_max_admission_raw_timestamp_order")
+            except Exception as exc:
+                raise AlphaMaxRuntimeContractError(
+                    "alpha_max_admission_raw_partition_read_failed"
+                ) from exc
+            if frame.is_empty():
+                raise AlphaMaxRuntimeContractError("alpha_max_admission_raw_partition_empty")
+            if frame.null_count().row(0) != (0, 0, 0):
+                raise AlphaMaxRuntimeContractError("alpha_max_admission_raw_partition_null")
+            timestamps = frame.get_column("timestamp_ms")
+            if timestamps.n_unique() != frame.height:
+                raise AlphaMaxRuntimeContractError("alpha_max_admission_raw_timestamp_duplicate")
+            first_timestamp_ms = int(timestamps[0])
+            if previous_timestamp_ms is not None and first_timestamp_ms <= previous_timestamp_ms:
+                raise AlphaMaxRuntimeContractError("alpha_max_admission_raw_timestamp_order")
 
-        for timestamp_ms, close, volume in frame.iter_rows(named=False):
-            parsed_timestamp_ms = int(timestamp_ms)
-            parsed_close = float(close)
-            parsed_volume = float(volume)
-            if (
-                not math.isfinite(parsed_close)
-                or parsed_close <= 0.0
-                or not math.isfinite(parsed_volume)
-                or parsed_volume < 0.0
-            ):
-                raise AlphaMaxRuntimeContractError("alpha_max_admission_raw_value_invalid")
-            timestamp = datetime.fromtimestamp(parsed_timestamp_ms / 1000.0, tz=UTC)
-            bucket_hour = (timestamp.hour // 4) * 4
-            day_start = timestamp.replace(hour=0, minute=0, second=0, microsecond=0)
-            key = (day_start, bucket_hour)
-            completed_keys.add(key)
-            if include_quote_notional:
-                if current_day is not None and timestamp.date() != current_day:
-                    flush_day()
-                current_day = timestamp.date()
-                current_timestamps.append(timestamp)
-                current_closes.append(parsed_close)
-                current_volumes.append(parsed_volume)
-        previous_timestamp_ms = int(timestamps[-1])
+            for timestamp_ms, close, volume in frame.iter_rows(named=False):
+                parsed_timestamp_ms = int(timestamp_ms)
+                parsed_close = float(close)
+                parsed_volume = float(volume)
+                if (
+                    not math.isfinite(parsed_close)
+                    or parsed_close <= 0.0
+                    or not math.isfinite(parsed_volume)
+                    or parsed_volume < 0.0
+                ):
+                    raise AlphaMaxRuntimeContractError("alpha_max_admission_raw_value_invalid")
+                timestamp = datetime.fromtimestamp(parsed_timestamp_ms / 1000.0, tz=UTC)
+                bucket_hour = (timestamp.hour // 4) * 4
+                day_start = timestamp.replace(hour=0, minute=0, second=0, microsecond=0)
+                key = (day_start, bucket_hour)
+                completed_keys.add(key)
+                if include_quote_notional:
+                    if current_day is not None and timestamp.date() != current_day:
+                        flush_day()
+                    current_day = timestamp.date()
+                    current_timestamps.append(timestamp)
+                    current_closes.append(parsed_close)
+                    current_volumes.append(parsed_volume)
+            previous_timestamp_ms = int(timestamps[-1])
+    finally:
+        reader.close()
 
     if include_quote_notional:
         flush_day()
@@ -4708,7 +5295,8 @@ def _compute_alpha_max_admission_from_seals(
 ) -> AlphaMaxAdmissionComputation:
     """Derive the train-only admission artifact from bounded sealed partitions."""
     ordered_lookup = AlphaMaxOrderedFundingLookup(
-        (_alpha_max_feature_spec(warmup_feature), _alpha_max_feature_spec(train_feature))
+        (_alpha_max_feature_spec(warmup_feature), _alpha_max_feature_spec(train_feature)),
+        root_seals=(warmup_feature, train_feature),
     )
     expected_hours = frozenset({0, 4, 8, 12, 16, 20})
     train_start = train_raw.start_utc
@@ -4786,7 +5374,7 @@ def _compute_alpha_max_admission_from_seals(
 class _AlphaMaxBoundedRawLoader:
     """One-day sealed Parquet repository reader for one logical engine."""
 
-    __slots__ = ("_admitted_symbols", "_repository", "_seal")
+    __slots__ = ("_admitted_symbols", "_entries", "_reader", "_seal")
 
     def __init__(
         self,
@@ -4804,8 +5392,6 @@ class _AlphaMaxBoundedRawLoader:
             != admitted_symbols
         ):
             raise AlphaMaxRuntimeContractError("alpha_max_bounded_raw_universe_mismatch")
-        from lumina_quant.storage.parquet import ParquetMarketDataRepository
-
         sealed_root = Path(seal.path)
         layouts = {len(Path(entry.relative_path).parts) for entry in seal.entries}
         if layouts == {4}:
@@ -4825,7 +5411,7 @@ class _AlphaMaxBoundedRawLoader:
             repository_root = sealed_root.parent.parent
         else:
             raise AlphaMaxRuntimeContractError("alpha_max_raw_repository_layout_mixed")
-        repository = ParquetMarketDataRepository(str(repository_root))
+        entries: dict[tuple[str, str], object] = {}
         for entry in seal.entries:
             symbol = _alpha_max_raw_entry_symbol(
                 entry.relative_path,
@@ -4839,11 +5425,19 @@ class _AlphaMaxBoundedRawLoader:
                 / Path(entry.relative_path).name
             )
             observed = sealed_root / entry.relative_path
-            if expected != observed:
+            key = (symbol, Path(entry.relative_path).name)
+            if expected != observed or key in entries:
                 raise AlphaMaxRuntimeContractError("alpha_max_raw_repository_root_unprovable")
+            entries[key] = entry
         self._seal = seal
         self._admitted_symbols = admitted_symbols
-        self._repository = repository
+        self._entries = MappingProxyType(entries)
+        self._reader = _AlphaMaxSealedRawReader(seal)
+
+    def __del__(self) -> None:
+        reader = getattr(self, "_reader", None)
+        if reader is not None:
+            reader.close()
 
     @property
     def seal(self) -> AlphaMaxRootSeal:
@@ -4860,15 +5454,31 @@ class _AlphaMaxBoundedRawLoader:
         ):
             raise AlphaMaxRuntimeContractError("alpha_max_bounded_raw_day_invalid")
         loaded: dict[str, object] = {}
-        inclusive_end = end - timedelta(milliseconds=1)
         required_columns = ("open", "high", "low", "close", "volume")
+        import polars as pl
+
         for symbol in self._admitted_symbols:
-            frame = self._repository.load_ohlcv(
-                exchange=self._seal.exchange,
-                symbol=symbol,
-                timeframe="1s",
-                start_date=start,
-                end_date=inclusive_end,
+            entry = self._entries.get((symbol, f"{start:%Y-%m}.parquet"))
+            if entry is None:
+                raise AlphaMaxRuntimeContractError(
+                    f"alpha_max_bounded_raw_day_empty:{symbol}:{start.date().isoformat()}"
+                )
+            try:
+                frame = self._reader.read_entry(entry)
+            except AlphaMaxRuntimeContractError as exc:
+                raise AlphaMaxRuntimeContractError("alpha_max_bounded_raw_read_failed") from exc
+            if "datetime" not in frame.columns or any(
+                column not in frame.columns for column in required_columns
+            ):
+                raise AlphaMaxRuntimeContractError("alpha_max_bounded_raw_ohlcv_schema_invalid")
+            frame = (
+                frame.with_columns(pl.col("datetime").dt.epoch("ms").alias("__timestamp_ms"))
+                .filter(
+                    (pl.col("__timestamp_ms") >= int(start.timestamp() * 1000))
+                    & (pl.col("__timestamp_ms") < int(end.timestamp() * 1000))
+                )
+                .sort("__timestamp_ms")
+                .select(("datetime", *required_columns))
             )
             if frame.is_empty():
                 raise AlphaMaxRuntimeContractError(
@@ -4947,66 +5557,164 @@ def _rename_bundle_noreplace(staging: Path, target: Path) -> None:
     raise OSError(error_number, os.strerror(error_number), str(target))
 
 
-def _ensure_bundle_parent(root: Path, relative_path: str) -> Path:
-    current = root
-    for part in Path(relative_path).parts[:-1]:
-        current = current / part
-        try:
-            os.mkdir(current, mode=0o700)
-            _fsync_directory(current.parent)
-        except FileExistsError:
-            status = current.lstat()
-            if not stat.S_ISDIR(status.st_mode) or stat.S_ISLNK(status.st_mode):
-                raise AlphaMaxRuntimeContractError("alpha_max_bundle_parent_invalid")
-    return current
-
-
 def _write_bundle_file(root: Path, relative_path: str, payload: bytes) -> Path:
     if type(payload) is not bytes:
         raise TypeError("alpha_max_bundle_artifact_bytes_required")
-    parent = _ensure_bundle_parent(root, relative_path)
-    target = parent / Path(relative_path).name
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_CLOEXEC", 0)
-    flags |= getattr(os, "O_NOFOLLOW", 0)
-    fd = os.open(target, flags, 0o600)
+    if type(relative_path) is not str or "\\" in relative_path:
+        raise AlphaMaxRuntimeContractError("alpha_max_bundle_relative_path_invalid")
+    relative = Path(relative_path)
+    if relative.is_absolute() or any(part in {"", ".", ".."} for part in relative.parts):
+        raise AlphaMaxRuntimeContractError("alpha_max_bundle_relative_path_invalid")
     try:
-        view = memoryview(payload)
-        while view:
-            written = os.write(fd, view)
-            if written <= 0:
-                raise OSError(errno.EIO, "alpha_max_bundle_short_write")
-            view = view[written:]
-        os.fsync(fd)
-        os.fchmod(fd, 0o444)
-        os.fsync(fd)
+        root_observed = root.lstat()
+    except OSError as exc:
+        raise AlphaMaxRuntimeContractError("alpha_max_bundle_parent_invalid") from exc
+    if not stat.S_ISDIR(root_observed.st_mode) or stat.S_ISLNK(root_observed.st_mode):
+        raise AlphaMaxRuntimeContractError("alpha_max_bundle_parent_invalid")
+    opened_directories: list[int] = []
+    try:
+        root_fd = _alpha_max_open_directory_at(root)
+        opened_directories.append(root_fd)
+        _alpha_max_require_open_identity(root_fd, root_observed, directory=True)
+        parent_fd = root_fd
+        for part in relative.parts[:-1]:
+            try:
+                observed = os.stat(part, dir_fd=parent_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                try:
+                    os.mkdir(part, mode=0o700, dir_fd=parent_fd)
+                    os.fsync(parent_fd)
+                except FileExistsError:
+                    pass
+                observed = os.stat(part, dir_fd=parent_fd, follow_symlinks=False)
+            if not stat.S_ISDIR(observed.st_mode) or stat.S_ISLNK(observed.st_mode):
+                raise AlphaMaxRuntimeContractError("alpha_max_bundle_parent_invalid")
+            child_fd = _alpha_max_open_directory_at(part, dir_fd=parent_fd)
+            opened_directories.append(child_fd)
+            _alpha_max_require_open_identity(child_fd, observed, directory=True)
+            parent_fd = child_fd
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_CLOEXEC", 0)
+        flags |= getattr(os, "O_NOFOLLOW", 0)
+        fd = os.open(relative.name, flags, 0o600, dir_fd=parent_fd)
+        try:
+            view = memoryview(payload)
+            while view:
+                written = os.write(fd, view)
+                if written <= 0:
+                    raise OSError(errno.EIO, "alpha_max_bundle_short_write")
+                view = view[written:]
+            os.fsync(fd)
+            os.fchmod(fd, 0o444)
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+        os.fsync(parent_fd)
     finally:
-        os.close(fd)
-    _fsync_directory(parent)
-    return target
+        for directory_fd in reversed(opened_directories):
+            os.close(directory_fd)
+    return root / relative
+
+
+def _alpha_max_open_directory_at(name: str | Path, *, dir_fd: int | None = None) -> int:
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_CLOEXEC", 0)
+    flags |= getattr(os, "O_NOFOLLOW", 0)
+    return os.open(name, flags, dir_fd=dir_fd)
+
+
+def _alpha_max_require_open_identity(
+    opened_fd: int,
+    observed: os.stat_result,
+    *,
+    directory: bool,
+) -> None:
+    opened = os.fstat(opened_fd)
+    expected_type = stat.S_ISDIR if directory else stat.S_ISREG
+    if (
+        int(opened.st_dev) != int(observed.st_dev)
+        or int(opened.st_ino) != int(observed.st_ino)
+        or not expected_type(opened.st_mode)
+        or (not directory and int(opened.st_nlink) != 1)
+    ):
+        raise AlphaMaxRuntimeContractError("alpha_max_bundle_tree_invalid")
+
+
+def _alpha_max_seal_directory_fd(directory_fd: int) -> None:
+    with os.scandir(directory_fd) as entries:
+        ordered = sorted(entries, key=lambda value: value.name)
+    for entry in ordered:
+        observed = entry.stat(follow_symlinks=False)
+        if stat.S_ISDIR(observed.st_mode):
+            child_fd = _alpha_max_open_directory_at(entry.name, dir_fd=directory_fd)
+            try:
+                _alpha_max_require_open_identity(child_fd, observed, directory=True)
+                _alpha_max_seal_directory_fd(child_fd)
+            finally:
+                os.close(child_fd)
+            continue
+        if not stat.S_ISREG(observed.st_mode) or stat.S_ISLNK(observed.st_mode):
+            raise AlphaMaxRuntimeContractError("alpha_max_bundle_tree_invalid")
+        flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+        file_fd = os.open(entry.name, flags, dir_fd=directory_fd)
+        try:
+            _alpha_max_require_open_identity(file_fd, observed, directory=False)
+            os.fchmod(file_fd, 0o444)
+            os.fsync(file_fd)
+        finally:
+            os.close(file_fd)
+    os.fchmod(directory_fd, 0o555)
+    os.fsync(directory_fd)
 
 
 def _make_bundle_immutable(root: Path) -> None:
-    directories = [path for path in root.rglob("*") if path.is_dir()]
-    for directory in sorted(directories, key=lambda value: len(value.parts), reverse=True):
-        os.chmod(directory, 0o555)
-        _fsync_directory(directory)
-    os.chmod(root, 0o555)
-    _fsync_directory(root)
+    observed = root.lstat()
+    if not stat.S_ISDIR(observed.st_mode) or stat.S_ISLNK(observed.st_mode):
+        raise AlphaMaxRuntimeContractError("alpha_max_bundle_tree_invalid")
+    root_fd = _alpha_max_open_directory_at(root)
+    try:
+        _alpha_max_require_open_identity(root_fd, observed, directory=True)
+        _alpha_max_seal_directory_fd(root_fd)
+    finally:
+        os.close(root_fd)
     _fsync_directory(root.parent)
 
 
+def _alpha_max_cleanup_directory_fd(directory_fd: int) -> None:
+    os.fchmod(directory_fd, 0o700)
+    with os.scandir(directory_fd) as entries:
+        ordered = sorted(entries, key=lambda value: value.name)
+    for entry in ordered:
+        observed = entry.stat(follow_symlinks=False)
+        if stat.S_ISDIR(observed.st_mode):
+            child_fd = _alpha_max_open_directory_at(entry.name, dir_fd=directory_fd)
+            try:
+                _alpha_max_require_open_identity(child_fd, observed, directory=True)
+                _alpha_max_cleanup_directory_fd(child_fd)
+            finally:
+                os.close(child_fd)
+            os.rmdir(entry.name, dir_fd=directory_fd)
+        else:
+            os.unlink(entry.name, dir_fd=directory_fd)
+    os.fsync(directory_fd)
+
+
 def _cleanup_partial_bundle(root: Path) -> None:
-    if not root.exists():
+    try:
+        observed = root.lstat()
+    except FileNotFoundError:
         return
-    for path in (root, *root.rglob("*")):
-        try:
-            if path.is_dir():
-                os.chmod(path, 0o700)
-            else:
-                os.chmod(path, 0o600)
-        except OSError:
-            pass
-    shutil.rmtree(root, ignore_errors=True)
+    try:
+        if not stat.S_ISDIR(observed.st_mode) or stat.S_ISLNK(observed.st_mode):
+            os.unlink(root)
+        else:
+            root_fd = _alpha_max_open_directory_at(root)
+            try:
+                _alpha_max_require_open_identity(root_fd, observed, directory=True)
+                _alpha_max_cleanup_directory_fd(root_fd)
+            finally:
+                os.close(root_fd)
+            os.rmdir(root)
+    except FileNotFoundError, OSError:
+        return
     try:
         _fsync_directory(root.parent)
     except OSError:
@@ -5326,7 +6034,6 @@ def _acquire_historical_completion_claim(
 
 def _release_historical_completion_claim(claim: Path) -> None:
     try:
-        os.chmod(claim, 0o600)
         claim.unlink()
         _fsync_directory(claim.parent)
     except FileNotFoundError:
@@ -5520,6 +6227,38 @@ def _alpha_max_matrix_artifacts(matrix: _AlphaMaxCompletedMatrix) -> dict[str, b
     return artifacts
 
 
+def _alpha_max_trend_liquidity_falsifier_artifact(
+    matrix: _AlphaMaxCompletedMatrix,
+    train_liquidity_buckets: AlphaMaxTrainLiquidityBuckets,
+) -> bytes:
+    """Seal E20 from the exact nominal-30 trend fold receipts, report-only."""
+    try:
+        cell = matrix.cells[("component_trend_1x", 30)]
+    except KeyError as exc:  # pragma: no cover - complete matrix invariant
+        raise AlphaMaxRuntimeContractError("alpha_max_trend_nominal_30_cell_missing") from exc
+    pre_gate = cell.pre_gate_evidence
+    if type(pre_gate) is not AlphaMaxCostCellPreGateEvidence:
+        raise AlphaMaxRuntimeContractError("alpha_max_trend_nominal_30_fold_evidence_missing")
+    admitted = train_liquidity_buckets.admitted_symbols
+    fold_hashes: list[str] = []
+    contributions: list[Mapping[str, float]] = []
+    for fold in pre_gate.fold_runs:
+        diagnostics = fold.actual_engine_run.report_only_diagnostics
+        fold_hashes.append(fold.sha256)
+        contributions.append(
+            MappingProxyType(
+                {symbol: diagnostics.symbol_contribution_usdt[symbol] for symbol in admitted}
+            )
+        )
+    falsifier = build_alpha_max_trend_liquidity_falsifier(
+        domain=matrix.domain,
+        train_liquidity_buckets=train_liquidity_buckets,
+        fold_run_sha256s=tuple(fold_hashes),
+        symbol_contribution_usdt_by_fold=tuple(contributions),
+    )
+    return falsifier.canonical_bytes
+
+
 def run_alpha_max_prelock_process(
     *,
     config: str | os.PathLike[str],
@@ -5618,15 +6357,9 @@ def run_alpha_max_prelock_process(
         preflight,
         admission.artifact.admitted_symbols,
     )
-    prior_path = (
-        Path(__file__).resolve().parents[3]
-        / "var/reports/ultragoal_full_pool_strategy/g004_frozen_candidate_manifest.json"
-    ).resolve()
+    train_liquidity_buckets = build_alpha_max_train_liquidity_buckets(admission)
     try:
-        _prior_receipt, prior_bytes = read_artifact_bytes(
-            prior_path,
-            artifact_id="alpha_max_prior_trial_inventory",
-        )
+        prior_bytes = read_alpha_max_prior_trial_blob(Path(__file__).resolve().parents[3])
         trial_ledger = build_alpha_max_trial_ledger(
             prior_bytes,
             _strict_json_object(preflight.config_bytes),
@@ -5651,6 +6384,7 @@ def run_alpha_max_prelock_process(
         component_manifests: dict[str, AlphaMaxManifestReceipt] = {}
         train_calendar: tuple[str, ...] | None = None
         train_returns: dict[str, tuple[float, ...]] = {}
+        train_native_finalizations: dict[str, AlphaMaxNativeFinalizationReceipt] = {}
         for component_id in component_ids:
             row = rows_by_id[component_id]
             manifest = _alpha_max_materialize_manifest_receipt(
@@ -5664,7 +6398,7 @@ def run_alpha_max_prelock_process(
                 admission_sha256=admission.artifact.sha256,
             )
             component_manifests[component_id] = manifest
-            calendar, values = _alpha_max_replay_training_component_returns(
+            calendar, values, native_finalization = _alpha_max_replay_training_component_returns(
                 run_preflight,
                 output_root=root,
                 manifest_receipt=manifest,
@@ -5676,6 +6410,7 @@ def run_alpha_max_prelock_process(
             elif calendar != train_calendar:
                 raise AlphaMaxRuntimeContractError("alpha_max_train_component_calendar_mismatch")
             train_returns[component_id] = values
+            train_native_finalizations[component_id] = native_finalization
         if train_calendar is None:
             raise AlphaMaxRuntimeContractError("alpha_max_train_component_replay_empty")
         train_fit = _alpha_max_fit_weights(
@@ -5732,6 +6467,10 @@ def run_alpha_max_prelock_process(
             trial_ledger=trial_ledger,
             prepared_rows=prepared,
             scaled_row_factory=prepare_scaled,
+        )
+        validation_trend_liquidity_falsifier = _alpha_max_trend_liquidity_falsifier_artifact(
+            validation_matrix,
+            train_liquidity_buckets,
         )
         prelock_selection = select_alpha_max_prelock_champion(validation_matrix.rows)
 
@@ -5829,7 +6568,13 @@ def run_alpha_max_prelock_process(
             **_alpha_max_collect_existing_artifacts(root),
             **_alpha_max_root_artifacts(root_seals),
             **_alpha_max_matrix_artifacts(validation_matrix),
-            "admission/train.json": admission.canonical_bytes,
+            **{
+                f"native_finalization/train/{component_id}.json": receipt.canonical_bytes
+                for component_id, receipt in sorted(train_native_finalizations.items())
+            },
+            "admission/train.json": admission.artifact.canonical_bytes,
+            "admission/train_computation.json": admission.canonical_bytes,
+            "admission/train_liquidity_buckets.json": (train_liquidity_buckets.canonical_bytes),
             "allocation/train_fit.json": _canonical_bytes(train_fit.to_payload()) + b"\n",
             "allocation/train_validation_refit.json": (
                 _canonical_bytes(refit.to_payload()) + b"\n"
@@ -5838,6 +6583,9 @@ def run_alpha_max_prelock_process(
             "inputs/prior_trial_inventory.json": prior_bytes,
             "run/prelock_result.json": _canonical_bytes(run_payload) + b"\n",
             "selection/prelock.json": prelock_selection.canonical_bytes,
+            "diagnostics/validation/trend_liquidity_falsifier.json": (
+                validation_trend_liquidity_falsifier
+            ),
             "terminal/prelock.json": _canonical_bytes(terminal.to_payload()) + b"\n",
             "trial/ledger.json": _canonical_bytes(trial_ledger.to_payload()) + b"\n",
         }
@@ -5885,22 +6633,61 @@ def _validate_complete_alpha_max_prelock_matrix(
     prelock_payload: Mapping[str, object],
 ) -> None:
     """Reject historical access unless all 68 selectable cells completed."""
-    matrix = _strict_json_object(_read_alpha_max_prelock_artifact(snapshot, "status/matrix.json"))
+    matrix_bytes = _read_alpha_max_prelock_artifact(snapshot, "status/matrix.json")
+    matrix = _strict_json_object(matrix_bytes)
     statuses = matrix.get("statuses")
+    top_level_keys = {
+        "artifact_kind",
+        "domain",
+        "engine_cell_count",
+        "physical_fold_run_count",
+        "status_count",
+        "statuses",
+    }
     if (
-        matrix.get("artifact_kind") != "alpha_max_matrix_statuses.v1"
+        matrix_bytes != _canonical_bytes(matrix) + b"\n"
+        or set(matrix) != top_level_keys
+        or matrix.get("artifact_kind") != "alpha_max_matrix_statuses.v1"
         or matrix.get("domain") != "validation"
+        or type(matrix.get("status_count")) is not int
         or matrix.get("status_count") != 84
+        or type(matrix.get("engine_cell_count")) is not int
         or matrix.get("engine_cell_count") != 68
+        or type(matrix.get("physical_fold_run_count")) is not int
         or matrix.get("physical_fold_run_count") != 816
+        or type(prelock_payload.get("engine_cell_count")) is not int
         or prelock_payload.get("engine_cell_count") != 68
+        or type(prelock_payload.get("physical_fold_run_count")) is not int
         or prelock_payload.get("physical_fold_run_count") != 816
         or type(statuses) is not list
         or len(statuses) != 84
     ):
         raise AlphaMaxRuntimeContractError("alpha_max_prelock_matrix_incomplete")
+    common_keys = {
+        "capsule_sha256",
+        "engine_constructed",
+        "manifest_sha256",
+        "nominal_cost_bps",
+        "row_id",
+        "row_role",
+        "selection_eligible",
+        "status",
+    }
+
+    def valid_sha256(value: object) -> bool:
+        return (
+            type(value) is str
+            and len(value) == 64
+            and all(character in "0123456789abcdef" for character in value)
+        )
+
     observed: set[tuple[str, int]] = set()
-    for raw in statuses:
+    expected_order = tuple(
+        (row_id, nominal)
+        for row_id in _ALPHA_MAX_CURRENT_ROW_IDS
+        for nominal in ALPHA_MAX_COST_CELL_BPS
+    )
+    for index, raw in enumerate(statuses):
         if type(raw) is not dict:
             raise AlphaMaxRuntimeContractError("alpha_max_prelock_matrix_incomplete")
         row_id = raw.get("row_id")
@@ -5910,27 +6697,48 @@ def _validate_complete_alpha_max_prelock_matrix(
             or type(nominal) is not int
             or nominal not in ALPHA_MAX_COST_CELL_BPS
             or (row_id, nominal) in observed
+            or (row_id, nominal) != expected_order[index]
         ):
             raise AlphaMaxRuntimeContractError("alpha_max_prelock_matrix_incomplete")
         observed.add((row_id, nominal))
         resolvable = row_id in _ALPHA_MAX_RESOLVABLE_ROWS
         if resolvable:
             if (
-                raw.get("engine_constructed") is not True
+                set(raw) != common_keys | {"cell_sha256"}
+                or raw.get("engine_constructed") is not True
                 or raw.get("status") != "resolved_engine_cell_complete"
+                or raw.get("row_role") != "resolvable_candidate"
+                or type(raw.get("selection_eligible")) is not bool
+                or not valid_sha256(raw.get("capsule_sha256"))
+                or not valid_sha256(raw.get("cell_sha256"))
+                or not valid_sha256(raw.get("manifest_sha256"))
             ):
                 raise AlphaMaxRuntimeContractError("alpha_max_prelock_matrix_incomplete")
-        elif row_id in {*_ALPHA_MAX_UNAVAILABLE_ROWS, *_ALPHA_MAX_DIAGNOSTIC_ROWS}:
-            if raw.get("engine_constructed") is not False:
+        elif row_id in _ALPHA_MAX_UNAVAILABLE_ROWS:
+            if (
+                set(raw) != common_keys
+                or raw.get("engine_constructed") is not False
+                or raw.get("status") != "incumbent_replay_unavailable"
+                or raw.get("row_role") != "incumbent_unavailable"
+                or raw.get("selection_eligible") is not False
+                or raw.get("capsule_sha256") is not None
+                or raw.get("manifest_sha256") is not None
+            ):
+                raise AlphaMaxRuntimeContractError("alpha_max_prelock_matrix_incomplete")
+        elif row_id in _ALPHA_MAX_DIAGNOSTIC_ROWS:
+            if (
+                set(raw) != common_keys
+                or raw.get("engine_constructed") is not False
+                or raw.get("status") != "diagnostic_report_only"
+                or raw.get("row_role") != "track_b_diagnostic"
+                or raw.get("selection_eligible") is not False
+                or raw.get("capsule_sha256") is not None
+                or raw.get("manifest_sha256") is not None
+            ):
                 raise AlphaMaxRuntimeContractError("alpha_max_prelock_matrix_incomplete")
         else:
             raise AlphaMaxRuntimeContractError("alpha_max_prelock_matrix_incomplete")
-    expected = {
-        (row_id, nominal)
-        for row_id in _ALPHA_MAX_CURRENT_ROW_IDS
-        for nominal in ALPHA_MAX_COST_CELL_BPS
-    }
-    if observed != expected:
+    if observed != set(expected_order):
         raise AlphaMaxRuntimeContractError("alpha_max_prelock_matrix_incomplete")
 
 
@@ -5940,20 +6748,52 @@ def _alpha_max_selection_from_bytes(
     role: str,
 ) -> AlphaMaxSelectionResult:
     payload = _strict_json_object(raw)
+    if role not in {"prelock_selection", "historical_report"}:
+        raise AlphaMaxRuntimeContractError("alpha_max_selection_artifact_invalid")
     expected_kind = (
-        "alpha_max_prelock_selection.v1"
+        "alpha_max_prelock_selection.v2"
         if role == "prelock_selection"
-        else "alpha_max_historical_report_ranking.v1"
+        else "alpha_max_historical_report_ranking.v2"
     )
+    top_level_keys = {
+        "artifact_kind",
+        "decisions",
+        "historical_evaluation_leader",
+        "prelock_champion",
+        "ranked_candidate_ids",
+        "role",
+        "scaling_attributions",
+        "selected_candidate_id",
+    }
     if (
         raw != _canonical_bytes(payload) + b"\n"
+        or set(payload) != top_level_keys
         or payload.get("artifact_kind") != expected_kind
         or payload.get("role") != role
         or type(payload.get("decisions")) is not list
         or type(payload.get("ranked_candidate_ids")) is not list
+        or type(payload.get("scaling_attributions")) is not list
     ):
         raise AlphaMaxRuntimeContractError("alpha_max_selection_artifact_invalid")
+    allowed_gates = {
+        "dsr",
+        "evidence",
+        "funding_coverage",
+        "hash_validity",
+        "manifest_validity",
+        "mdd",
+        "native_data_coverage",
+        "pbo",
+        "positive_metrics",
+        "reconciliation",
+        "ruin",
+        "scaled_1x_sibling",
+        "spa",
+    }
+    allowed_bands = {"hard_reject", "normal", "not_evaluated", "soft", "terminal"}
+    expected_decision_ids = tuple(sorted(_ALPHA_MAX_RESOLVABLE_ROWS))
     decisions: list[AlphaMaxGateDecision] = []
+    observed_decision_ids: list[str] = []
     for value in payload["decisions"]:
         if type(value) is not dict or set(value) != {
             "comparator_row_id",
@@ -5965,32 +6805,236 @@ def _alpha_max_selection_from_bytes(
             "row_id",
         }:
             raise AlphaMaxRuntimeContractError("alpha_max_selection_artifact_invalid")
+        row_id = value["row_id"]
+        eligible = value["eligible"]
+        evaluated = value["evaluated_gates"]
+        reasons = value["rejection_reasons"]
+        gate_mdd = value["gate_mdd"]
+        mdd_band = value["mdd_band"]
+        comparator = value["comparator_row_id"]
+        if (
+            type(row_id) is not str
+            or row_id not in _ALPHA_MAX_RESOLVABLE_ROWS
+            or type(eligible) is not bool
+            or type(evaluated) is not list
+            or not evaluated
+            or any(type(item) is not str or item not in allowed_gates for item in evaluated)
+            or len(evaluated) != len(set(evaluated))
+            or type(reasons) is not list
+            or any(type(item) is not str or not item for item in reasons)
+            or (eligible and reasons)
+            or (not eligible and not reasons)
+            or type(mdd_band) is not str
+            or mdd_band not in allowed_bands
+            or (
+                gate_mdd is not None
+                and (
+                    type(gate_mdd) not in {int, float}
+                    or not math.isfinite(gate_mdd)
+                    or not 0.0 <= gate_mdd <= 1.0
+                )
+            )
+            or (
+                comparator is not None
+                and (
+                    type(comparator) is not str
+                    or comparator not in _ALPHA_MAX_RESOLVABLE_ROWS
+                    or comparator == row_id
+                )
+            )
+            or (eligible and (gate_mdd is None or mdd_band not in {"normal", "soft"}))
+            or (mdd_band == "normal" and comparator is not None)
+            or (mdd_band == "hard_reject" and reasons != ["mdd_above_hard_limit"])
+            or (
+                mdd_band == "terminal"
+                and (
+                    eligible
+                    or gate_mdd is not None
+                    or evaluated != ["ruin"]
+                    or reasons != ["ruin_detected"]
+                    or comparator is not None
+                )
+            )
+            or (mdd_band == "not_evaluated" and comparator is not None)
+            or (
+                mdd_band == "soft"
+                and comparator is None
+                and reasons != ["soft_mdd_requires_normal_comparator"]
+            )
+        ):
+            raise AlphaMaxRuntimeContractError("alpha_max_selection_artifact_invalid")
+        observed_decision_ids.append(row_id)
         decisions.append(
             AlphaMaxGateDecision(
-                row_id=str(value["row_id"]),
-                eligible=bool(value["eligible"]),
-                evaluated_gates=tuple(value["evaluated_gates"]),
-                rejection_reasons=tuple(value["rejection_reasons"]),
-                gate_mdd=(None if value["gate_mdd"] is None else float(value["gate_mdd"])),
-                mdd_band=str(value["mdd_band"]),
-                comparator_row_id=(
-                    None if value["comparator_row_id"] is None else str(value["comparator_row_id"])
-                ),
+                row_id=row_id,
+                eligible=eligible,
+                evaluated_gates=tuple(evaluated),
+                rejection_reasons=tuple(reasons),
+                gate_mdd=(None if gate_mdd is None else float(gate_mdd)),
+                mdd_band=mdd_band,
+                comparator_row_id=comparator,
             )
         )
-    ranked = tuple(str(value) for value in payload["ranked_candidate_ids"])
+    if tuple(observed_decision_ids) != expected_decision_ids:
+        raise AlphaMaxRuntimeContractError("alpha_max_selection_artifact_invalid")
+    ranked_values = payload["ranked_candidate_ids"]
+    if (
+        any(type(value) is not str for value in ranked_values)
+        or len(ranked_values) != len(set(ranked_values))
+        or any(value not in _ALPHA_MAX_RESOLVABLE_ROWS for value in ranked_values)
+    ):
+        raise AlphaMaxRuntimeContractError("alpha_max_selection_artifact_invalid")
+    ranked = tuple(ranked_values)
+    decisions_by_id = {value.row_id: value for value in decisions}
+    eligible_ids = {value.row_id for value in decisions if value.eligible}
+    if set(ranked) != eligible_ids:
+        raise AlphaMaxRuntimeContractError("alpha_max_selection_artifact_invalid")
+    scaling_attributions: list[AlphaMaxScalingAttribution] = []
+    scaling_keys = {
+        "attribution_label",
+        "comparison_role",
+        "dependency_rejection_reason",
+        "exposure_normalization",
+        "matched_domain_sha256",
+        "nominal_cost_bps",
+        "passive_scaled_counterfactual",
+        "scaled_minus_sibling_cagr",
+        "scaled_minus_sibling_calmar",
+        "scaled_minus_sibling_net_sharpe",
+        "scaled_minus_sibling_total_return",
+        "scaled_row_id",
+        "sibling_dependency_satisfied",
+        "sibling_exposure_normalized_return",
+        "sibling_gate_eligible",
+        "sibling_gross_exposure",
+        "sibling_positive_exposure_normalized",
+        "sibling_row_id",
+    }
+    expected_scaled_ids = ("full_equal_risk_scaled", "full_shrunk_hrp_scaled")
+    observed_scaled_ids: list[str] = []
+
+    def optional_finite_number(value: object) -> float | None:
+        if value is None:
+            return None
+        if type(value) not in {int, float} or not math.isfinite(value):
+            raise AlphaMaxRuntimeContractError("alpha_max_selection_artifact_invalid")
+        return float(value)
+
+    for value in payload["scaling_attributions"]:
+        if type(value) is not dict or set(value) != scaling_keys:
+            raise AlphaMaxRuntimeContractError("alpha_max_selection_artifact_invalid")
+        scaled_row_id = value["scaled_row_id"]
+        sibling_row_id = value["sibling_row_id"]
+        dependency_reason = value["dependency_rejection_reason"]
+        if (
+            type(scaled_row_id) is not str
+            or type(sibling_row_id) is not str
+            or type(value["comparison_role"]) is not str
+            or value["comparison_role"] != role
+            or type(value["nominal_cost_bps"]) is not int
+            or value["nominal_cost_bps"] != 30
+            or type(value["matched_domain_sha256"]) is not str
+            or type(value["sibling_gate_eligible"]) is not bool
+            or type(value["sibling_gross_exposure"]) not in {int, float}
+            or value["sibling_gross_exposure"] != 1.0
+            or type(value["exposure_normalization"]) is not str
+            or type(value["sibling_positive_exposure_normalized"]) is not bool
+            or type(value["sibling_dependency_satisfied"]) is not bool
+            or (
+                dependency_reason is not None
+                and (
+                    type(dependency_reason) is not str
+                    or dependency_reason
+                    not in {
+                        "scaled_1x_exposure_normalized_nonpositive",
+                        "scaled_1x_sibling_not_eligible",
+                    }
+                )
+            )
+            or type(value["attribution_label"]) is not str
+            or type(value["passive_scaled_counterfactual"]) is not str
+        ):
+            raise AlphaMaxRuntimeContractError("alpha_max_selection_artifact_invalid")
+        try:
+            attribution = AlphaMaxScalingAttribution(
+                scaled_row_id=scaled_row_id,
+                sibling_row_id=sibling_row_id,
+                comparison_role=value["comparison_role"],
+                nominal_cost_bps=value["nominal_cost_bps"],
+                matched_domain_sha256=value["matched_domain_sha256"],
+                sibling_gate_eligible=value["sibling_gate_eligible"],
+                sibling_gross_exposure=float(value["sibling_gross_exposure"]),
+                exposure_normalization=value["exposure_normalization"],
+                sibling_exposure_normalized_return=optional_finite_number(
+                    value["sibling_exposure_normalized_return"]
+                ),
+                sibling_positive_exposure_normalized=value["sibling_positive_exposure_normalized"],
+                sibling_dependency_satisfied=value["sibling_dependency_satisfied"],
+                dependency_rejection_reason=dependency_reason,
+                scaled_minus_sibling_total_return=optional_finite_number(
+                    value["scaled_minus_sibling_total_return"]
+                ),
+                scaled_minus_sibling_cagr=optional_finite_number(
+                    value["scaled_minus_sibling_cagr"]
+                ),
+                scaled_minus_sibling_calmar=optional_finite_number(
+                    value["scaled_minus_sibling_calmar"]
+                ),
+                scaled_minus_sibling_net_sharpe=optional_finite_number(
+                    value["scaled_minus_sibling_net_sharpe"]
+                ),
+                attribution_label=value["attribution_label"],
+                passive_scaled_counterfactual=value["passive_scaled_counterfactual"],
+            )
+        except (TypeError, ValueError) as exc:
+            raise AlphaMaxRuntimeContractError("alpha_max_selection_artifact_invalid") from exc
+        observed_scaled_ids.append(scaled_row_id)
+        scaling_attributions.append(attribution)
+    if tuple(observed_scaled_ids) != expected_scaled_ids:
+        raise AlphaMaxRuntimeContractError("alpha_max_selection_artifact_invalid")
     prelock_champion = payload.get("prelock_champion")
     selected_candidate_id = payload.get("selected_candidate_id")
     historical_leader = payload.get("historical_evaluation_leader")
-    if any(
-        value is not None and (type(value) is not str or not value)
-        for value in (
-            prelock_champion,
-            selected_candidate_id,
-            historical_leader,
+    leader = ranked[0] if ranked else None
+    if (
+        any(
+            value is not None and (type(value) is not str or not value)
+            for value in (
+                prelock_champion,
+                selected_candidate_id,
+                historical_leader,
+            )
+        )
+        or (
+            role == "prelock_selection"
+            and (
+                prelock_champion != leader
+                or selected_candidate_id != leader
+                or historical_leader is not None
+            )
+        )
+        or (
+            role == "historical_report"
+            and (
+                prelock_champion is not None
+                or selected_candidate_id is not None
+                or historical_leader != leader
+            )
         )
     ):
         raise AlphaMaxRuntimeContractError("alpha_max_selection_artifact_invalid")
+    for attribution in scaling_attributions:
+        sibling_decision = decisions_by_id[attribution.sibling_row_id]
+        scaled_decision = decisions_by_id[attribution.scaled_row_id]
+        if (
+            attribution.sibling_gate_eligible is not sibling_decision.eligible
+            or (scaled_decision.eligible and not attribution.sibling_dependency_satisfied)
+            or (
+                "scaled_1x_sibling" in scaled_decision.evaluated_gates
+                and scaled_decision.rejection_reasons != (attribution.dependency_rejection_reason,)
+            )
+        ):
+            raise AlphaMaxRuntimeContractError("alpha_max_selection_artifact_invalid")
     return AlphaMaxSelectionResult(
         role=role,
         decisions=tuple(decisions),
@@ -5998,6 +7042,7 @@ def _alpha_max_selection_from_bytes(
         prelock_champion=prelock_champion,
         selected_candidate_id=selected_candidate_id,
         historical_evaluation_leader=historical_leader,
+        scaling_attributions=tuple(scaling_attributions),
         canonical_bytes=raw,
         sha256=_sha256(raw),
     )
@@ -6016,6 +7061,7 @@ def _alpha_max_capsule_from_receipt(
         "funding_event_count",
         "manifest_sha256",
         "market_event_count",
+        "native_finalization_sha256",
         "order_event_count",
         "phase_id",
         "portfolio_mode",
@@ -6035,6 +7081,7 @@ def _alpha_max_capsule_from_receipt(
         capsule_sha256=str(state["capsule_sha256"]),
         capsule=capsule,
         finalized_children=finalized,
+        native_finalization_sha256=str(state["native_finalization_sha256"]),
         windows_processed=int(state["windows_processed"]),
         discarded_signal_count=int(state["discarded_signal_count"]),
         market_event_count=int(state["market_event_count"]),
@@ -6178,6 +7225,28 @@ def run_alpha_max_historical_process(
             preflight,
             admission.admitted_symbols,
         )
+        admission_computation_bytes = _read_alpha_max_prelock_artifact(
+            before,
+            "admission/train_computation.json",
+        )
+        admission_computation_payload = _strict_json_object(admission_computation_bytes)
+        train_liquidity_buckets = validate_alpha_max_train_liquidity_buckets(
+            _read_alpha_max_prelock_artifact(
+                before,
+                "admission/train_liquidity_buckets.json",
+            )
+        )
+        if (
+            admission_computation_payload.get("artifact_kind")
+            != "alpha_max_train_admission_computation.v1"
+            or admission_computation_payload.get("admission_artifact_sha256") != admission.sha256
+            or train_liquidity_buckets.admitted_symbols != admitted_symbols
+            or train_liquidity_buckets.admission_computation_sha256
+            != _sha256(admission_computation_bytes)
+        ):
+            raise AlphaMaxRuntimeContractError(
+                "alpha_max_train_liquidity_bucket_prelock_binding_mismatch"
+            )
         prelock_selection = _alpha_max_selection_from_bytes(
             _read_alpha_max_prelock_artifact(before, "selection/prelock.json"),
             role="prelock_selection",
@@ -6253,6 +7322,10 @@ def run_alpha_max_historical_process(
             trial_ledger=trial_ledger,
             prepared_rows=prepared,
         )
+        historical_trend_liquidity_falsifier = _alpha_max_trend_liquidity_falsifier_artifact(
+            historical_matrix,
+            train_liquidity_buckets,
+        )
         historical_ranking = rank_alpha_max_historical_report(historical_matrix.rows)
         champion_cell = None if champion is None else historical_matrix.cells[(champion, 30)]
         terminal = build_alpha_max_terminal_state(
@@ -6279,7 +7352,11 @@ def run_alpha_max_historical_process(
             **_alpha_max_collect_existing_artifacts(root),
             **_alpha_max_root_artifacts(root_seals),
             **_alpha_max_matrix_artifacts(historical_matrix),
+            "admission/train_liquidity_buckets.json": (train_liquidity_buckets.canonical_bytes),
             "binding/prelock_seal.json": prelock_seal_bytes,
+            "diagnostics/historical_exposed_evaluation/trend_liquidity_falsifier.json": (
+                historical_trend_liquidity_falsifier
+            ),
             "report/historical_result.json": _canonical_bytes(report_payload) + b"\n",
             "selection/historical_ranking.json": historical_ranking.canonical_bytes,
             "terminal/historical.json": _canonical_bytes(terminal.to_payload()) + b"\n",

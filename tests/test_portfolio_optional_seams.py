@@ -77,6 +77,19 @@ def _portfolio(
     return portfolio, bars
 
 
+def _check_orders_with_equity(
+    handler: SimulatedExecutionHandler,
+    event: MarketEvent,
+    *,
+    equity_before: float = 1000.0,
+) -> None:
+    handler.set_capacity_equity_context(equity_before)
+    try:
+        handler.check_open_orders(event)
+    finally:
+        handler.clear_capacity_equity_context()
+
+
 def _handler_fill(*, qty, direction, reduce_only=False, order_id="SIM-1"):
     events = queue.Queue()
     handler = SimulatedExecutionHandler(
@@ -101,7 +114,8 @@ def _handler_fill(*, qty, direction, reduce_only=False, order_id="SIM-1"):
             "trailing_percent": None,
         }
     ]
-    handler.check_open_orders(
+    _check_orders_with_equity(
+        handler,
         MarketEvent(
             time=datetime(2026, 7, 10, 0, 0, tzinfo=UTC),
             symbol="BTC",
@@ -110,7 +124,7 @@ def _handler_fill(*, qty, direction, reduce_only=False, order_id="SIM-1"):
             low=99.0,
             close=100.0,
             volume=max(100.0, qty * 10.0),
-        )
+        ),
     )
     return events.get_nowait()
 
@@ -544,7 +558,8 @@ def test_independent_pricing_trace_ledger_exposes_a_lost_portfolio_application()
                 "trailing_percent": None,
             }
         ]
-        handler.check_open_orders(
+        _check_orders_with_equity(
+            handler,
             MarketEvent(
                 time=datetime(2026, 7, 10, 0, 0, second, tzinfo=UTC),
                 symbol="BTC",
@@ -553,7 +568,7 @@ def test_independent_pricing_trace_ledger_exposes_a_lost_portfolio_application()
                 low=99.0,
                 close=100.0,
                 volume=100.0,
-            )
+            ),
         )
         return events.get_nowait()
 
@@ -607,7 +622,8 @@ def test_real_handler_conditional_and_remainder_have_distinct_bijective_applicat
     portfolio.enforce_reduce_only = True
     portfolio.current_positions["BTC"] = 3.0
 
-    handler.check_open_orders(
+    _check_orders_with_equity(
+        handler,
         MarketEvent(
             time=datetime(2026, 7, 10, 0, 0, tzinfo=UTC),
             symbol="BTC",
@@ -616,13 +632,14 @@ def test_real_handler_conditional_and_remainder_have_distinct_bijective_applicat
             low=99.0,
             close=100.0,
             volume=10.0,
-        )
+        ),
     )
     first = events.get_nowait()
     portfolio.update_fill(first)
     assert handler.active_orders[0]["order_id"] == "STOP-1-R"
 
-    handler.check_open_orders(
+    _check_orders_with_equity(
+        handler,
         MarketEvent(
             time=datetime(2026, 7, 10, 0, 0, 1, tzinfo=UTC),
             symbol="BTC",
@@ -631,7 +648,7 @@ def test_real_handler_conditional_and_remainder_have_distinct_bijective_applicat
             low=99.0,
             close=100.0,
             volume=100.0,
-        )
+        ),
     )
     second = events.get_nowait()
     portfolio.update_fill(second)
@@ -776,6 +793,33 @@ def test_funding_boundary_fill_anchor_tracks_exact_entry_and_flip_timestamps():
     portfolio.update_positions_from_fill(fill(flat_time, quantity=1.0, direction="BUY"))
     assert portfolio.current_positions["BTC"] == pytest.approx(0.0)
     assert portfolio._last_funding_ts["BTC"] is None
+
+
+def test_funding_boundary_fill_anchor_accepts_only_exact_epoch_milliseconds_or_utc():
+    class _Resolver:
+        def resolve(self, **kwargs):
+            return {"payment": 0.0}
+
+    def fill(at) -> FillEvent:
+        return FillEvent(
+            timeindex=at,
+            symbol="BTC",
+            exchange="TEST",
+            quantity=1.0,
+            direction="BUY",
+            fill_cost=100.0,
+            commission=0.0,
+        )
+
+    portfolio, _ = _portfolio(funding_boundary_resolver=_Resolver())
+    timestamp_ms = 1_783_667_999_123
+    portfolio.update_positions_from_fill(fill(timestamp_ms))
+    assert portfolio._last_funding_ts["BTC"] == pytest.approx(timestamp_ms / 1000.0)
+
+    for invalid in (1_783_667_999, 1_783_667_999_123.0, True, "2026-07-10T07:59:59Z"):
+        fresh, _ = _portfolio(funding_boundary_resolver=_Resolver())
+        with pytest.raises(ValueError, match="funding_boundary_fill_timestamp_invalid"):
+            fresh.update_positions_from_fill(fill(invalid))
 
 
 def test_funding_boundary_resolver_settles_each_crossed_boundary_independently():

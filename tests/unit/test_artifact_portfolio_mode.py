@@ -1308,6 +1308,79 @@ def test_manifest_portfolio_mode_resolves_valid_manifest(tmp_path: Path) -> None
     assert definition.artifact_read_receipts[0].byte_count == manifest_path.stat().st_size
 
 
+def test_manifest_portfolio_mode_preserves_manifest_child_order(tmp_path: Path) -> None:
+    manifest_path = _write_manifest(tmp_path)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    lighter = json.loads(json.dumps(manifest["children"][0]))
+    lighter.update(
+        {
+            "candidate_id": "lighter-first",
+            "name": "Lighter First",
+            "weight": 0.25,
+            "leaf_gross": 0.25,
+            "netting_group": "lighter-first",
+        }
+    )
+    heavier = json.loads(json.dumps(manifest["children"][0]))
+    heavier.update(
+        {
+            "candidate_id": "heavier-second",
+            "name": "Heavier Second",
+            "weight": 0.75,
+            "leaf_gross": 0.75,
+            "netting_group": "heavier-second",
+        }
+    )
+    manifest["children"] = [lighter, heavier]
+    manifest["artifact_kind"] = "alpha_max_engine_portfolio_manifest.v1"
+    manifest["cash_weight"] = 0.0
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    definition = MODULE.resolve_portfolio_mode_definition(f"manifest:{manifest_path}")
+
+    assert [component.component_id for component in definition.components] == [
+        "lighter-first",
+        "heavier-second",
+    ]
+    assert [component.weight for component in definition.components] == [0.25, 0.75]
+
+
+def test_generic_manifest_portfolio_mode_keeps_weight_descending_order(tmp_path: Path) -> None:
+    manifest_path = _write_manifest(tmp_path)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    lighter = json.loads(json.dumps(manifest["children"][0]))
+    lighter.update(
+        {
+            "candidate_id": "lighter-first",
+            "name": "Lighter First",
+            "weight": 0.25,
+            "leaf_gross": 0.25,
+            "netting_group": "lighter-first",
+        }
+    )
+    heavier = json.loads(json.dumps(manifest["children"][0]))
+    heavier.update(
+        {
+            "candidate_id": "heavier-second",
+            "name": "Heavier Second",
+            "weight": 0.75,
+            "leaf_gross": 0.75,
+            "netting_group": "heavier-second",
+        }
+    )
+    manifest["children"] = [lighter, heavier]
+    manifest["cash_weight"] = 0.0
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    definition = MODULE.resolve_portfolio_mode_definition(f"manifest:{manifest_path}")
+
+    assert [component.component_id for component in definition.components] == [
+        "heavier-second",
+        "lighter-first",
+    ]
+    assert [component.weight for component in definition.components] == [0.75, 0.25]
+
+
 def test_manifest_portfolio_mode_exposes_generic_sorted_source_receipts(
     tmp_path: Path,
 ) -> None:
