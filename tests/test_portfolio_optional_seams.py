@@ -742,6 +742,42 @@ def test_funding_boundary_resolver_uses_raw_point_accessor():
     assert portfolio.current_holdings["cash"] == pytest.approx(998.0)
 
 
+def test_funding_boundary_fill_anchor_tracks_exact_entry_and_flip_timestamps():
+    class _Resolver:
+        def resolve(self, **kwargs):
+            return {"payment": 0.0}
+
+    def fill(at: datetime, *, quantity: float, direction: str) -> FillEvent:
+        return FillEvent(
+            timeindex=at,
+            symbol="BTC",
+            exchange="TEST",
+            quantity=quantity,
+            direction=direction,
+            fill_cost=100.0 * quantity,
+            commission=0.0,
+        )
+
+    portfolio, _ = _portfolio(funding_boundary_resolver=_Resolver())
+    entry_time = datetime(2026, 7, 10, 7, 59, 59, tzinfo=UTC)
+    portfolio.update_positions_from_fill(fill(entry_time, quantity=1.0, direction="BUY"))
+    assert portfolio._last_funding_ts["BTC"] == pytest.approx(entry_time.timestamp())
+
+    addition_time = entry_time + timedelta(seconds=1)
+    portfolio.update_positions_from_fill(fill(addition_time, quantity=1.0, direction="BUY"))
+    assert portfolio._last_funding_ts["BTC"] == pytest.approx(entry_time.timestamp())
+
+    flip_time = entry_time + timedelta(seconds=2)
+    portfolio.update_positions_from_fill(fill(flip_time, quantity=3.0, direction="SELL"))
+    assert portfolio.current_positions["BTC"] == pytest.approx(-1.0)
+    assert portfolio._last_funding_ts["BTC"] == pytest.approx(flip_time.timestamp())
+
+    flat_time = entry_time + timedelta(seconds=3)
+    portfolio.update_positions_from_fill(fill(flat_time, quantity=1.0, direction="BUY"))
+    assert portfolio.current_positions["BTC"] == pytest.approx(0.0)
+    assert portfolio._last_funding_ts["BTC"] is None
+
+
 def test_funding_boundary_resolver_settles_each_crossed_boundary_independently():
     class _Resolver:
         def __init__(self):

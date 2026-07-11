@@ -263,6 +263,39 @@ def test_feature_root_binds_content_ownership_and_every_funding_boundary(
         seal_alpha_max_root_tree("purge", "feature", root)
 
 
+def test_feature_root_accepts_causal_as_of_points_before_funding_boundaries(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "features"
+    _write_feature_root(root, "purge")
+    target = (
+        root
+        / "feature_points"
+        / "exchange=binance"
+        / "symbol=BTCUSDT"
+        / "date=2025-06-01"
+        / "part-0.parquet"
+    )
+    pl = pytest.importorskip("polars")
+    frame = pl.read_parquet(target)
+    timestamps = frame.get_column("timestamp_ms").to_list()
+    frame.with_columns(
+        pl.Series(
+            "timestamp_ms",
+            [timestamps[0], timestamps[1] - 1000, timestamps[2] - 1000],
+        )
+    ).write_parquet(target)
+
+    seal = seal_alpha_max_root_tree("purge", "feature", root)
+
+    entry = next(
+        row
+        for row in seal.entries
+        if "symbol=BTCUSDT/date=2025-06-01" in row.relative_path
+    )
+    assert entry.maximum_gap_ms == evidence._FUNDING_INTERVAL_MS
+
+
 def _contract_manifest() -> dict[str, object]:
     return {
         "schema_version": "alpha_max_contract_manifest.v1",
@@ -499,6 +532,24 @@ def test_historical_ranking_is_report_only_and_terminal_precedence_is_singular()
     assert terminal.historical_exposure_status == "historical_evaluation_incomplete"
     assert terminal.requires_fresh_confirmation is True
     assert terminal.confirmation_status == "not_run"
+
+    no_champion = select_alpha_max_prelock_champion(
+        [_gate("rejected", role="prelock_selection", dsr=0.10)]
+    )
+    report_only_terminal = build_alpha_max_terminal_state(
+        prelock_selection=no_champion,
+        champion_historical_nominal_30_cell=None,
+        historical_ranking=result,
+        incumbent_comparison_status="unavailable",
+    )
+    assert report_only_terminal.prelock_champion is None
+    assert report_only_terminal.selected_candidate_id is None
+    assert report_only_terminal.historical_evaluation_leader == "other"
+    assert report_only_terminal.terminal_outcome == "no_demonstrated_alpha"
+    assert (
+        report_only_terminal.historical_exposure_status
+        == "committed_period_outcomes_observed"
+    )
 
 
 def test_unavailable_row_cost_cells_and_prelock_inventory_are_immutable_canonical() -> None:

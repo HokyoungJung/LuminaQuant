@@ -5,7 +5,7 @@ import os
 from collections import deque
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, replace
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 import polars as pl
 from lumina_quant.backtesting._config_view import wrapped_runtime_config
@@ -1069,6 +1069,17 @@ class Portfolio:
         # the cache entry so the next bar recomputes it against fresh inputs.
         self._liq_price_cache.pop(fill.symbol, None)
 
+        alpha_funding_anchor = None
+        if self.funding_boundary_resolver is not None:
+            fill_time = getattr(fill, "timeindex", None)
+            if (
+                not isinstance(fill_time, datetime)
+                or fill_time.tzinfo is None
+                or fill_time.utcoffset() != timedelta(0)
+            ):
+                raise ValueError("funding_boundary_fill_timestamp_invalid")
+            alpha_funding_anchor = float(fill_time.timestamp())
+
         fill_dir = 0
         if fill.direction == "BUY":
             fill_dir = 1
@@ -1118,6 +1129,8 @@ class Portfolio:
         if old_qty == 0 or (old_qty > 0 > new_qty) or (old_qty < 0 < new_qty):
             self.entry_prices[fill.symbol] = fill_price
             self._pending_liquidation.discard(fill.symbol)
+            if alpha_funding_anchor is not None:
+                self._last_funding_ts[fill.symbol] = alpha_funding_anchor
             return
 
         # Adding to existing direction updates VWAP entry.

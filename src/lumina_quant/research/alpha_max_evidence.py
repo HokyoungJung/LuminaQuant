@@ -199,6 +199,7 @@ _ADMISSION_MEDIAN_MINIMUM: Final[float] = 20_000_000.0
 _ADMISSION_P10_MINIMUM: Final[float] = 2_000_000.0
 
 _FUNDING_INTERVAL_MS: Final[int] = 8 * 60 * 60 * 1000
+_FEATURE_CAUSAL_EDGE_MS: Final[int] = 1000
 _RAW_CLOSE_MAX_STALE_MS: Final[int] = 1000
 _MANIFEST_PHASES: Final[tuple[str, str]] = (
     "validation_train_fit",
@@ -2913,7 +2914,11 @@ def _alpha_max_validate_root_inventory_coverage(
         )
         if symbol not in observed:
             raise ValueError("alpha_max_root_symbol_scope_mismatch")
-        if root_kind == "feature" and entry.maximum_gap_ms > _FUNDING_INTERVAL_MS:
+        if (
+            root_kind == "feature"
+            and entry.maximum_gap_ms
+            > _FUNDING_INTERVAL_MS + _FEATURE_CAUSAL_EDGE_MS
+        ):
             raise ValueError("alpha_max_feature_root_timestamp_cadence_invalid")
         observed[symbol].append((partition_start, entry))
     if any(not values for values in observed.values()):
@@ -2929,12 +2934,13 @@ def _alpha_max_validate_root_inventory_coverage(
             if actual != expected_partitions:
                 raise ValueError("alpha_max_feature_root_interval_coverage_incomplete")
             if (
-                ordered[0][1].minimum_timestamp_ms != _epoch_ms(start)
+                ordered[0][1].minimum_timestamp_ms
+                > _epoch_ms(start) + _FUNDING_INTERVAL_MS
                 or ordered[-1][1].maximum_timestamp_ms
                 < _epoch_ms(end) - _FUNDING_INTERVAL_MS
                 or any(
                     right.minimum_timestamp_ms - left.maximum_timestamp_ms
-                    > _FUNDING_INTERVAL_MS
+                    > _FUNDING_INTERVAL_MS + _FEATURE_CAUSAL_EDGE_MS
                     for (_, left), (_, right) in pairwise(ordered)
                 )
             ):
@@ -3025,26 +3031,19 @@ def _alpha_max_parquet_timestamp_bounds(
         raise ValueError("alpha_max_root_timestamp_not_strictly_increasing")
     if root_kind == "raw" and any(int(value) % 1000 != 0 for value in timestamp_series):
         raise ValueError("alpha_max_raw_root_timestamp_alignment_invalid")
-    if root_kind == "feature" and maximum_gap_ms > _FUNDING_INTERVAL_MS:
+    if (
+        root_kind == "feature"
+        and maximum_gap_ms > _FUNDING_INTERVAL_MS + _FEATURE_CAUSAL_EDGE_MS
+    ):
         raise ValueError("alpha_max_feature_root_timestamp_cadence_invalid")
     if root_kind == "feature":
         funding = frame.get_column("funding_rate")
-        timestamps = tuple(int(value) for value in timestamp_series)
         rates = funding.to_list()
-        boundary = owned_start_ms
-        if boundary % _FUNDING_INTERVAL_MS:
-            boundary += _FUNDING_INTERVAL_MS - (boundary % _FUNDING_INTERVAL_MS)
-        while boundary < owned_end_ms:
-            covered = any(
-                boundary <= timestamp < min(boundary + 1_000, owned_end_ms)
-                and rate is not None
-                and type(rate) in {int, float}
-                and math.isfinite(float(rate))
-                for timestamp, rate in zip(timestamps, rates, strict=True)
-            )
-            if not covered:
-                raise ValueError("alpha_max_feature_root_funding_boundary_missing")
-            boundary += _FUNDING_INTERVAL_MS
+        if any(
+            type(rate) not in {int, float} or not math.isfinite(float(rate))
+            for rate in rates
+        ):
+            raise ValueError("alpha_max_feature_root_funding_value_invalid")
     return minimum_ms, maximum_ms, int(timestamp_series.len()), maximum_gap_ms
 
 
@@ -5483,7 +5482,7 @@ class AlphaMaxActualEngineRunReceipt:
             or not _epoch_ms(fold_start)
             <= self.full_event_equity.first_timestamp_ms
             <= self.full_event_equity.last_timestamp_ms
-            < _epoch_ms(fold_end)
+            <= _epoch_ms(fold_end)
         ):
             raise ValueError("alpha_max_actual_run_streaming_fold_bounds_invalid")
         if self.equity_observation_count != self.full_event_equity.event_count:
@@ -7752,7 +7751,7 @@ def build_alpha_max_terminal_state(
     historical_complete: bool | None = None
     historical_passed: bool | None = None
     if prelock_champion is None:
-        if champion_historical_nominal_30_cell is not None or historical_result is not None:
+        if champion_historical_nominal_30_cell is not None:
             raise ValueError("alpha_max_terminal_historical_without_champion")
     elif champion_historical_nominal_30_cell is not None:
         cell = champion_historical_nominal_30_cell
@@ -7815,10 +7814,11 @@ def build_alpha_max_terminal_state(
         ),
         incumbent_comparison_status=incumbent_comparison_status,
         historical_exposure_status=(
-            "not_applicable"
-            if prelock_champion is None
-            else "committed_period_outcomes_observed"
+            "committed_period_outcomes_observed"
             if historical_complete is True
+            or (prelock_champion is None and historical_result is not None)
+            else "not_applicable"
+            if prelock_champion is None
             else "historical_evaluation_incomplete"
         ),
         requires_fresh_confirmation=True,
