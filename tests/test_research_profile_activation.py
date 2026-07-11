@@ -57,10 +57,12 @@ from __future__ import annotations
 
 import importlib
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
 
 import numpy as np
 
+from lumina_quant.configuration import load_runtime_config
 from lumina_quant.configuration.schema import ResearchConfig, RuntimeConfig
 from lumina_quant.strategy_factory import research_entrypoints, research_run_support
 
@@ -176,6 +178,7 @@ def test_overrides_shape_for_fully_enabled_research_config():
         single_correlation_discount=True,
         hac_inference=True,
         cscv_pbo=True,
+        route_unmapped_registered_strategies=True,
     )
     overrides = research_run_support.research_config_to_overrides(cfg)
     assert overrides["split"] == {"use_lockbox_split": True, "purge_embargo_bars": 5}
@@ -190,6 +193,7 @@ def test_overrides_shape_for_fully_enabled_research_config():
         "max_cross_trial_pbo": 1.0,
         "cost_rate_multiplier": 1.0,
         "cost_rate_bps_override": None,
+        "route_unmapped_registered_strategies": True,
     }
     assert overrides["deflation_kwargs"] == {
         "single_correlation_discount": True,
@@ -227,6 +231,7 @@ def test_overrides_all_flags_off_still_reports_false_not_empty():
         "max_cross_trial_pbo": 1.0,
         "cost_rate_multiplier": 1.0,
         "cost_rate_bps_override": None,
+        "route_unmapped_registered_strategies": False,
     }
     assert overrides["deflation_kwargs"] == {
         "single_correlation_discount": False,
@@ -240,6 +245,15 @@ def test_overrides_all_flags_off_still_reports_false_not_empty():
         "spa_gate_ceiling": 1.0,
         "pbo_gate_ceiling": 1.0,
     }
+
+
+def test_research_profiles_enable_registered_strategy_routing_and_default_is_off():
+    root = Path(__file__).resolve().parents[1]
+
+    assert RuntimeConfig().research.route_unmapped_registered_strategies is False
+    for profile_name in ("research.yaml", "backtest_cost_realistic.yaml"):
+        runtime = load_runtime_config(str(root / "configs" / "profiles" / profile_name))
+        assert runtime.research.route_unmapped_registered_strategies is True
 
 
 # ---------------------------------------------------------------------------

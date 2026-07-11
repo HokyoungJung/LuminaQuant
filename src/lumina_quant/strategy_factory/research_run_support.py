@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import itertools
 import json
+import math
 import os
 from collections import defaultdict
 from collections.abc import Iterable, Mapping, Sequence
@@ -497,9 +498,8 @@ def research_config_to_overrides(research_config: Any) -> dict[str, Any]:
       ``run_candidate_research``.
     * ``score_config_research``: the nested ``research`` section of
       ``score_config`` consumed defensively by ``research_runner._research_flag``
-      -- ``strict_selection_gate`` plus ``dsr_gate_floor`` / ``spa_gate_ceiling``
-      when the config object happens to carry them (neither is a
-      ``ResearchConfig`` field today, so they are normally omitted).
+      -- strict selection, cost, HAC, and registered-strategy routing flags,
+      including ``route_unmapped_registered_strategies``.
     * ``deflation_kwargs``: ``single_correlation_discount`` / ``hac_inference`` /
       ``cscv_pbo`` -- the function kwargs of the same name consumed by
       ``research.survivorship.evaluate_survivorship_gate`` /
@@ -556,11 +556,30 @@ def research_config_to_overrides(research_config: Any) -> dict[str, Any]:
     # ``research_runner._candidate_cost_rate`` via ``_research_flag``. Both stay
     # no-ops at their shipped defaults (``multiplier == 1.0`` / ``override is None``).
     if hasattr(cfg, "cost_rate_multiplier"):
-        score_config_research["cost_rate_multiplier"] = float(cfg.cost_rate_multiplier)
+        try:
+            multiplier = float(cfg.cost_rate_multiplier)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                "research cost_rate_multiplier must be finite and non-negative"
+            ) from exc
+        if not math.isfinite(multiplier) or multiplier < 0.0:
+            raise ValueError("research cost_rate_multiplier must be finite and non-negative")
+        score_config_research["cost_rate_multiplier"] = multiplier
     if hasattr(cfg, "cost_rate_bps_override"):
         override = cfg.cost_rate_bps_override
-        score_config_research["cost_rate_bps_override"] = (
-            None if override is None else float(override)
+        if override is not None:
+            try:
+                override = float(override)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(
+                    "research cost_rate_bps_override must be finite and non-negative"
+                ) from exc
+            if not math.isfinite(override) or override < 0.0:
+                raise ValueError("research cost_rate_bps_override must be finite and non-negative")
+        score_config_research["cost_rate_bps_override"] = override
+    if hasattr(cfg, "route_unmapped_registered_strategies"):
+        score_config_research["route_unmapped_registered_strategies"] = bool(
+            cfg.route_unmapped_registered_strategies
         )
 
     deflation_kwargs: dict[str, Any] = {}

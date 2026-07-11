@@ -1165,3 +1165,265 @@ def test_run_research_candidates_writes_stage_progress_artifacts(monkeypatch, tm
     assert "resource_feature_partition_scan_completed" in progress_log
     assert "resource_bundle_item_loaded" in progress_log
     assert "candidate_evaluated" in progress_log
+
+
+def test_config_parser_and_cost_override_validation(monkeypatch):
+    args = MODULE._build_parser().parse_args(
+        ["--config", "profile.yaml", "--cost-rate-bps-override", "20"]
+    )
+    loaded = SimpleNamespace(research=SimpleNamespace(cost_rate_bps_override=None))
+    monkeypatch.setattr(MODULE, "load_runtime_config", lambda path: loaded)
+
+    runtime, config_path = MODULE._load_runtime_config_for_args(args)
+
+    assert runtime is loaded
+    assert config_path is not None and config_path.endswith("profile.yaml")
+    assert runtime.research.cost_rate_bps_override == 20.0
+    env_args = MODULE._build_parser().parse_args([])
+    monkeypatch.setenv("LQ_CONFIG_PATH", "env-profile.yaml")
+    env_runtime, env_config_path = MODULE._load_runtime_config_for_args(env_args)
+    assert env_runtime is loaded
+    assert env_config_path is not None and env_config_path.endswith("env-profile.yaml")
+
+    monkeypatch.delenv("LQ_CONFIG_PATH")
+    no_config_runtime, no_config_path = MODULE._load_runtime_config_for_args(env_args)
+    assert no_config_runtime is None
+    assert no_config_path is None
+
+    missing_config = MODULE._build_parser().parse_args(["--cost-rate-bps-override", "20"])
+    negative = MODULE._build_parser().parse_args(
+        ["--config", "profile.yaml", "--cost-rate-bps-override", "-1"]
+    )
+    nonfinite = MODULE._build_parser().parse_args(
+        ["--config", "profile.yaml", "--cost-rate-bps-override", "nan"]
+    )
+    for invalid in (missing_config, negative, nonfinite):
+        try:
+            MODULE._load_runtime_config_for_args(invalid)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("invalid cost override was accepted")
+
+
+def test_run_candidate_research_threads_config_and_keeps_no_config_compatibility():
+    captured: dict[str, Any] = {}
+
+    def _stub_run_candidate_research(**kwargs):
+        captured.update(kwargs)
+        return {"candidates": []}
+
+    original = MODULE.run_candidate_research
+    try:
+        MODULE.run_candidate_research = _stub_run_candidate_research
+        runtime = SimpleNamespace(research=SimpleNamespace())
+        MODULE._run_candidate_research_with_optional_split(
+            candidates=[],
+            base_timeframe="1s",
+            strategy_timeframes=["1h"],
+            symbol_universe=["BTC/USDT"],
+            stage1_keep_ratio=0.35,
+            max_candidates=1,
+            score_config=None,
+            exact_split=None,
+            research_config=runtime,
+        )
+        assert captured["research_config"] is runtime
+
+        captured.clear()
+        MODULE._run_candidate_research_with_optional_split(
+            candidates=[],
+            base_timeframe="1s",
+            strategy_timeframes=["1h"],
+            symbol_universe=["BTC/USDT"],
+            stage1_keep_ratio=0.35,
+            max_candidates=1,
+            score_config=None,
+            exact_split=None,
+        )
+    finally:
+        MODULE.run_candidate_research = original
+
+    assert "research_config" not in captured
+
+
+def test_shortlist_mode_keeps_legacy_oos_default():
+    assert MODULE._strict_shortlist_mode(None) == "oos"
+    runtime = SimpleNamespace(
+        research=SimpleNamespace(
+            strict_selection_gate=True,
+            enforce_selection_reject_gate=False,
+            use_lockbox_split=False,
+        )
+    )
+    assert MODULE._strict_shortlist_mode(runtime) == "oos"
+
+
+def test_strict_profile_gates_only_shortlist_and_records_audit(monkeypatch, tmp_path: Path):
+    root = Path(__file__).resolve().parents[1]
+    runtime = SimpleNamespace(
+        research=SimpleNamespace(
+            strict_selection_gate=True,
+            enforce_selection_reject_gate=True,
+            use_lockbox_split=True,
+            route_unmapped_registered_strategies=True,
+            dsr_gate_floor=0.9,
+            spa_gate_ceiling=0.05,
+            pbo_gate_ceiling=0.5,
+            max_per_symbol_basket=2,
+            max_per_lineage=1,
+            max_per_family_basket=1,
+            cost_rate_bps_override=20.0,
+            cost_rate_multiplier=2.0,
+        )
+    )
+    rows = [
+        {
+            "candidate_id": "survivor",
+            "name": "survivor",
+            "strategy_class": "DemoStrategy",
+            "family": "trend",
+            "strategy_timeframe": "1h",
+            "symbols": ["BTC/USDT"],
+            "oos": {"return": 0.1, "sharpe": 1.0, "mdd": 0.1, "trades": 8},
+            "val": {"return": 0.08, "sharpe": 0.9, "mdd": 0.08, "trades": 8},
+        },
+        {
+            "candidate_id": "rejected",
+            "name": "rejected",
+            "strategy_class": "DemoStrategy",
+            "family": "trend",
+            "strategy_timeframe": "1h",
+            "symbols": ["ETH/USDT"],
+            "metadata": {"evaluation_mode": "generic_fallback_proxy"},
+            "val": {"return": 0.07, "sharpe": 0.8, "mdd": 0.09, "trades": 8},
+        },
+        {
+            "candidate_id": "missing_validation",
+            "name": "missing_validation",
+            "strategy_class": "DemoStrategy",
+            "family": "trend",
+            "strategy_timeframe": "1h",
+            "symbols": ["SOL/USDT"],
+            "oos": {"return": 0.2, "sharpe": 2.0, "mdd": 0.05, "trades": 8},
+        },
+    ]
+    captured: dict[str, Any] = {}
+
+    monkeypatch.setattr(
+        MODULE, "_load_runtime_config_for_args", lambda args: (runtime, "/profile.yaml")
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "_run_candidate_research_with_optional_split",
+        lambda **kwargs: {
+            "schema_version": "v2",
+            "base_timeframe": "1s",
+            "strategy_timeframes": ["1h"],
+            "split": {},
+            "candidates": list(rows),
+            "stage1": {},
+            "scoring_config": {},
+            "data_sources": {},
+        },
+    )
+
+    def _gate(input_rows, **kwargs):
+        captured.update(kwargs)
+        return list(input_rows[:1])
+
+    monkeypatch.setattr(MODULE, "apply_selection_reject_and_dedup", _gate)
+
+    def _select(input_rows, **kwargs):
+        captured["select_mode"] = kwargs["mode"]
+        captured["include_weights"] = kwargs["include_weights"]
+        return list(input_rows)
+
+    monkeypatch.setattr(MODULE, "select_diversified_shortlist", _select)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            str(root / "scripts" / "run_research_candidates.py"),
+            "--config",
+            "profile.yaml",
+            "--output-dir",
+            str(tmp_path),
+            "--max-candidates",
+            "1",
+        ],
+    )
+
+    assert MODULE.main() == 0
+    report = json.loads((tmp_path / "candidate_research_latest.json").read_text(encoding="utf-8"))
+
+    assert len(report["candidates"]) == 3
+    assert report["research_profile_audit"]["shortlist_input_count"] == 3
+    assert report["research_profile_audit"]["shortlist_gated_count"] == 1
+    assert report["research_profile_audit"]["shortlist_rejected_count"] == 2
+    assert captured["enabled"] is True
+    assert captured["max_per_symbol_basket"] == 2
+    assert captured["mode"] == "val"
+    assert captured["select_mode"] == "val"
+    assert captured["include_weights"] is False
+    assert report["research_profile_audit"]["shortlist_selection_mode"] == "val"
+    assert report["research_profile_audit"]["generic_fallback_proxy_rejected_count"] == 1
+    assert report["research_profile_audit"]["missing_validation_rejected_count"] == 1
+    assert report["research_profile_audit"]["portfolio_weights_enabled"] is False
+    assert report["research_profile_audit"]["resolved_cost"] == {
+        "cost_rate_multiplier": 2.0,
+        "cost_rate_bps_override": 20.0,
+        "effective_cost_rate_bps": [],
+    }
+
+
+def test_effective_score_config_controls_strict_routing_and_requires_validation():
+    score_config = {
+        "research": {
+            "strict_selection_gate": True,
+            "route_unmapped_registered_strategies": True,
+        }
+    }
+
+    assert MODULE._profile_strict_selection_enabled(None, score_config) is True
+    assert MODULE._strict_shortlist_mode(None, score_config) == "oos"
+    assert MODULE._registered_routing_requested(None, score_config) is True
+    assert MODULE._has_actual_validation_metrics({"val": {"return": 0.01}}) is True
+    assert (
+        MODULE._has_actual_validation_metrics({"locked_oos_report_only": {"return": 1.0}}) is False
+    )
+
+    runtime = SimpleNamespace(
+        research=SimpleNamespace(
+            strict_selection_gate=True,
+            enforce_selection_reject_gate=True,
+            use_lockbox_split=True,
+            route_unmapped_registered_strategies=True,
+        )
+    )
+    caller_disables = {
+        "research": {
+            "strict_selection_gate": False,
+            "enforce_selection_reject_gate": False,
+            "route_unmapped_registered_strategies": False,
+        }
+    }
+    assert MODULE._profile_strict_selection_enabled(runtime, caller_disables) is False
+    assert MODULE._strict_shortlist_mode(runtime, caller_disables) == "oos"
+    assert MODULE._registered_routing_requested(runtime, caller_disables) is False
+    disabled_gate_params = MODULE._effective_shortlist_robust_score_params(runtime, caller_disables)
+    assert disabled_gate_params is not None
+    assert disabled_gate_params["strict_selection_gate"] is False
+    assert disabled_gate_params["enforce_selection_reject_gate"] is False
+
+    caller_enables = {
+        "research": {
+            "strict_selection_gate": True,
+            "enforce_selection_reject_gate": True,
+            "dsr_gate_floor": 0.91,
+            "spa_gate_ceiling": 0.04,
+            "pbo_gate_ceiling": 0.45,
+        }
+    }
+    enabled_gate_params = MODULE._effective_shortlist_robust_score_params(None, caller_enables)
+    assert enabled_gate_params == caller_enables["research"]

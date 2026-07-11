@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -232,6 +233,39 @@ def test_report_rows_include_cost_mdd_concentration_and_readiness_schema() -> No
     assert aggregate["concentration_summary"]["max_top_symbol_weight"] == pytest.approx(0.60)
     assert aggregate["selected_symbol_count"] == 2
     assert aggregate["readiness_labels"] == ["clean_shadow_candidate"]
+    assert row["clean_promotion_eligible"] is True
+    assert row["ready_for_paper"] is True
+
+
+def test_post_oos_provenance_forces_all_readiness_false() -> None:
+    index = pd.date_range("2025-01-01", "2025-03-31", freq="1D")
+    fold = module.MonthlyFold(
+        fold_id="2025-03",
+        refit_at=pd.Timestamp("2025-03-01"),
+        train=(pd.Timestamp("2025-01-01"), pd.Timestamp("2025-01-31")),
+        validation=(pd.Timestamp("2025-02-01"), pd.Timestamp("2025-02-28")),
+        locked_oos=(pd.Timestamp("2025-03-01"), pd.Timestamp("2025-03-31")),
+    )
+    candidate = module.CandidateResult(
+        family="probe",
+        candidate_label="probe:post_oos",
+        source_profile_id="probe:post_oos",
+        row={
+            "post_oos_research_variant": True,
+            "ready_for_paper": True,
+            "paper_testnet_candidate": True,
+            "ready_for_real": True,
+            "real_money_execution": True,
+        },
+        returns=pd.Series(0.001, index=index, dtype=float),
+    )
+
+    row = module._evaluate_candidate(candidate, fold)
+
+    assert row["clean_promotion_eligible"] is False
+    assert row["ready_for_paper"] is False
+    assert row["ready_for_real"] is False
+    assert row["real_money_execution"] is False
 
 
 def test_tradfi_external_alpha_default_family_budget_is_bounded() -> None:
@@ -811,6 +845,10 @@ def test_preregistered_lagged_leaf_router_replay_uses_prior_leaf_history() -> No
     assert router_rows[-1]["uses_locked_oos_for_selection"] is False
     assert router_rows[-1]["post_oos_research_variant"] is True
     assert router_rows[-1]["requires_fresh_forward_shadow"] is True
+    assert router_rows[-1]["ready_for_paper"] is False
+    assert router_rows[-1]["paper_testnet_candidate"] is False
+    assert router_rows[-1]["allow_real_money"] is False
+    assert router_rows[-1]["real_execution_allowed"] is False
     risk_trimmed_rows = [
         item
         for item in replayed
@@ -820,6 +858,8 @@ def test_preregistered_lagged_leaf_router_replay_uses_prior_leaf_history() -> No
     assert risk_trimmed_rows[-1]["selected_candidate_label"] == relaxed_label
     assert risk_trimmed_rows[-1]["locked_oos"]["total_return"] == pytest.approx(0.42)
     assert risk_trimmed_rows[-1]["strict_core_fallback_max_scale"] == pytest.approx(2.0)
+    assert risk_trimmed_rows[-1]["ready_for_paper"] is False
+    assert risk_trimmed_rows[-1]["paper_testnet_candidate"] is False
     assert router_rows[-1]["nested_hybrid_dependency"] is False
 
 
@@ -2091,6 +2131,10 @@ def test_row_level_leaf_selectors_are_oos_clean_non_nested_shadow_rows() -> None
     assert all(row["nested_hybrid_dependency"] is False for row in selector_rows)
     assert all(row["clean_promotion_eligible"] is False for row in selector_rows)
     assert all(row["locked_oos"]["total_return"] == pytest.approx(0.07) for row in selector_rows)
+    assert all(row["ready_for_paper"] is False for row in selector_rows)
+    assert all(row["paper_testnet_candidate"] is False for row in selector_rows)
+    assert all(row["allow_real_money"] is False for row in selector_rows)
+    assert all(row["real_execution_allowed"] is False for row in selector_rows)
     assert augmented["metric_reconciliation"]["metrics_reconciled"] is True
     assert any(
         row["candidate_label"] == "row_level_leaf_selector:validation_calmar_mdd20"
@@ -2239,3 +2283,297 @@ def test_markdown_renders_clean_and_demoted_sections() -> None:
     assert "not an input to fold selection, weighting, sizing, or live routing" in markdown
     assert "## Demoted nested/historical ranking" in markdown
     assert "Best clean candidate monthly OOS detail" in markdown
+
+
+def test_eqflow_evaluation_serializes_decisions_and_target_f1_daily_streams(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fold = module.MonthlyFold(
+        fold_id="2025-03",
+        refit_at=pd.Timestamp("2025-03-01"),
+        train=(pd.Timestamp("2025-01-01"), pd.Timestamp("2025-01-31")),
+        validation=(pd.Timestamp("2025-02-01"), pd.Timestamp("2025-02-28")),
+        locked_oos=(pd.Timestamp("2025-03-01"), pd.Timestamp("2025-03-02 23:59:59")),
+    )
+    index = pd.DatetimeIndex(
+        [
+            "2025-01-01",
+            "2025-02-01",
+            "2025-03-01 00:30:00",
+            "2025-03-01 18:00:00",
+            "2025-03-02 00:30:00",
+        ]
+    )
+    candidate = module.CandidateResult(
+        family="probe",
+        candidate_label="tradfi_intraday_session_v1:open_impulse_close_top10_mdd15",
+        source_profile_id="probe",
+        row={
+            "corr_guard_engaged": True,
+            "corr_guard_rho": None,
+            "corr_guard_z": 1.75,
+            "corr_guard_window": 96,
+            "corr_guard_z_enter": 1.5,
+            "corr_guard_abs_floor": 0.35,
+            "corr_guard_derisk_scale": 0.35,
+            "corr_guard_min_symbols": 4,
+            "corr_guard_decimation": 8,
+            "dm_crash_mu": 0.5,
+            "dm_crash_bear": 1,
+            "dm_crash_rebound": 0,
+            "val_saturation_ceiling": 0.8,
+            "val_saturation_applied": False,
+            "regime_gate_passed": True,
+            "regime_gate_validation_return": 0.1,
+            "regime_gate_validation_mdd": 0.05,
+        },
+        returns=pd.Series([0.0, 0.0, 0.10, 0.20, -0.10], index=index, dtype=float),
+    )
+
+    for key in module._EQFLOW_VARIANT_STATE:
+        monkeypatch.setitem(module._EQFLOW_VARIANT_STATE, key, False)
+    default_row = module._evaluate_candidate(candidate, fold)
+    assert "locked_oos_daily_net_returns" not in default_row
+    assert default_row["corr_guard_rho"] is None
+    assert default_row["dm_crash_bear"] == 1
+    assert default_row["val_saturation_applied"] is False
+    assert default_row["regime_gate_passed"] is True
+
+    monkeypatch.setitem(module._EQFLOW_VARIANT_STATE, "corr_guard_router_variant", True)
+    row = module._evaluate_candidate(candidate, fold)
+
+    assert row["locked_oos_daily_net_returns"] == [
+        {
+            "timestamp": "2025-03-01T00:00:00Z",
+            "date": "2025-03-01",
+            "net_return": pytest.approx(0.32),
+        },
+        {
+            "timestamp": "2025-03-02T00:00:00Z",
+            "date": "2025-03-02",
+            "net_return": pytest.approx(-0.10),
+        },
+    ]
+    assert row["locked_oos_daily_net_returns_provenance"] == {
+        "locked_oos": True,
+        "net_under_runner_cost_model": True,
+        "not_for_same_fold_selection": True,
+    }
+    assert row["locked_oos_turnover_evidence"] == {"status": "unknown", "value": None}
+
+    non_target = module.CandidateResult(
+        family="probe",
+        candidate_label="probe:not_f1",
+        source_profile_id="probe",
+        row={},
+        returns=candidate.returns,
+    )
+    assert "locked_oos_daily_net_returns" not in module._evaluate_candidate(non_target, fold)
+
+
+def test_selection_gate_persists_all_evaluated_rows_without_changing_admitted_rows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    rows = [
+        {
+            "candidate_label": "survives",
+            "train": {"total_return": 0.01, "mdd": 0.01},
+            "validation": {"total_return": 0.01, "mdd": 0.01},
+            "locked_oos": {"total_return": 0.01, "mdd": 0.01},
+        },
+        {
+            "candidate_label": "deduped",
+            "train": {"total_return": 0.02, "mdd": 0.01},
+            "validation": {"total_return": 0.02, "mdd": 0.01},
+            "locked_oos": {"total_return": 0.02, "mdd": 0.01},
+        },
+    ]
+    monkeypatch.setitem(module._SELECTION_GATE_STATE, "enabled", True)
+    monkeypatch.setattr(module, "_apply_selection_gate_rows", lambda rows, mode: [dict(rows[0])])
+    payload = {
+        "fold_candidate_rows": [],
+        "all_evaluated_fold_candidate_rows": [],
+        "aggregate_rankings": [],
+        "clean_promotion_rankings": [],
+        "demoted_nested_or_historical_rankings": [],
+    }
+
+    module._record_fold_evaluations(payload, rows)
+    module._refresh_payload_derived_reports(payload)
+
+    assert [row["candidate_label"] for row in payload["fold_candidate_rows"]] == ["survives"]
+    assert [row["candidate_label"] for row in payload["all_evaluated_fold_candidate_rows"]] == [
+        "survives",
+        "deduped",
+    ]
+    assert [row["candidate_label"] for row in payload["all_evaluated_aggregate_rankings"]] == [
+        "deduped",
+        "survives",
+    ]
+
+    monkeypatch.setitem(module._SELECTION_GATE_STATE, "enabled", False)
+    default_payload = {"fold_candidate_rows": []}
+    module._record_fold_evaluations(default_payload, rows)
+    assert "all_evaluated_fold_candidate_rows" not in default_payload
+
+
+def test_strict_selection_gate_fails_closed_on_missing_whole_search_evidence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setitem(module._SELECTION_GATE_STATE, "enabled", True)
+    monkeypatch.setitem(module._SELECTION_GATE_STATE, "reject_ready", True)
+    monkeypatch.setitem(
+        module._SELECTION_GATE_STATE,
+        "robust_score_params",
+        {
+            "enforce_selection_reject_gate": True,
+            "dsr_gate_floor": 0.90,
+            "spa_gate_ceiling": 0.05,
+            "pbo_gate_ceiling": 0.50,
+        },
+    )
+    rows = [
+        {
+            "candidate_label": "missing_dsr",
+            "validation": {"spa_pvalue": 0.01, "pbo": 0.10},
+        },
+        {
+            "candidate_label": "survives",
+            "validation": {"deflated_sharpe": 0.91, "spa_pvalue": 0.05, "pbo": 0.50},
+        },
+    ]
+
+    admitted = module._apply_selection_gate_rows(rows, mode="val")
+
+    assert [row["candidate_label"] for row in admitted] == ["survives"]
+
+
+def test_recompute_uses_raw_rows_per_fold_and_upgrades_eqflow_provenance(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setitem(module._SELECTION_GATE_STATE, "enabled", True)
+    calls: list[list[str]] = []
+
+    def admit(rows: list[dict[str, object]], *, mode: str) -> list[dict[str, object]]:
+        assert mode == "val"
+        calls.append([str(row["candidate_label"]) for row in rows])
+        return list(rows)
+
+    monkeypatch.setattr(module, "_apply_selection_gate_rows", admit)
+    raw_rows = [
+        {
+            "fold_id": "one",
+            "candidate_label": "dynamic_conviction_switch:x_scaled_dm_crash_scaled",
+            "family": "probe",
+            "train": {"total_return": 0.01, "mdd": 0.01},
+            "validation": {"total_return": 0.01, "mdd": 0.01},
+            "locked_oos": {"total_return": 0.01, "mdd": 0.01, "bar_count": 10},
+        },
+        {
+            "fold_id": "two",
+            "candidate_label": "clean",
+            "family": "probe",
+            "train": {"total_return": 0.01, "mdd": 0.01},
+            "validation": {"total_return": 0.01, "mdd": 0.01},
+            "locked_oos": {"total_return": 0.01, "mdd": 0.01, "bar_count": 10},
+        },
+    ]
+
+    recomputed = module._recompute_payload_from_existing(
+        {"fold_candidate_rows": [], "all_evaluated_fold_candidate_rows": raw_rows}
+    )
+
+    assert calls == [
+        ["dynamic_conviction_switch:x_scaled_dm_crash_scaled"],
+        ["clean"],
+    ]
+    twin = recomputed["all_evaluated_fold_candidate_rows"][0]
+    assert twin["post_oos_research_variant"] is True
+    assert twin["requires_fresh_forward_shadow"] is True
+    assert twin["ready_for_paper"] is False
+    assert twin["ready_for_real"] is False
+    assert twin["real_money_execution"] is False
+    assert twin["paper_testnet_candidate"] is False
+    assert twin["allow_real_money"] is False
+    assert twin["real_execution_allowed"] is False
+    assert twin["clean_promotion_eligible"] is False
+
+
+def test_a3b_ordering_ignores_raw_partial_fold_return_and_mdd(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setitem(module._EQFLOW_VARIANT_STATE, "partial_fold_bar_count_weighting", True)
+
+    def row(label: str, oos_return: float, oos_mdd: float, bars: int) -> dict[str, object]:
+        return {
+            "candidate_label": label,
+            "family": "probe",
+            "train": {"total_return": 0.01, "mdd": 0.01},
+            "validation": {"total_return": 0.01, "mdd": 0.01},
+            "locked_oos": {"total_return": oos_return, "mdd": oos_mdd, "bar_count": bars},
+        }
+
+    rankings = module._aggregate_rows(
+        [
+            row("alpha", 0.10, 0.05, 100),
+            row("alpha", -0.99, 0.99, 0),
+            row("beta", 0.10, 0.05, 100),
+            row("beta", 0.99, 0.00, 0),
+        ]
+    )
+
+    assert [row["candidate_label"] for row in rankings] == ["alpha", "beta"]
+    assert rankings[0]["min_oos_return"] == pytest.approx(-0.99)
+    assert rankings[0]["min_full_fold_oos_return"] == pytest.approx(0.10)
+
+
+def test_a3a_emits_per_cell_saturation_evidence(monkeypatch: pytest.MonkeyPatch) -> None:
+    fold = module.MonthlyFold(
+        fold_id="2025-03",
+        refit_at=pd.Timestamp("2025-03-01"),
+        train=(pd.Timestamp("2025-01-01"), pd.Timestamp("2025-01-01")),
+        validation=(pd.Timestamp("2025-02-01"), pd.Timestamp("2025-02-01")),
+        locked_oos=(pd.Timestamp("2025-03-01"), pd.Timestamp("2025-03-01")),
+    )
+    aggressive_label = "profile_optuna:balanced_mdd12_gross5_69_asset_profile_optuna"
+    fallback_label = "strict_efficiency:balanced_mdd12_gross5_69_asset_efficiency_repair_optuna"
+    index = pd.DatetimeIndex(["2025-01-01", "2025-02-01", "2025-03-01"])
+    aggressive = module.CandidateResult(
+        family="profile_optuna",
+        candidate_label=aggressive_label,
+        source_profile_id=aggressive_label,
+        row={},
+        returns=pd.Series([1.00, 0.90, 0.01], index=index, dtype=float),
+    )
+    fallback = module.CandidateResult(
+        family="strict_efficiency",
+        candidate_label=fallback_label,
+        source_profile_id=fallback_label,
+        row={},
+        returns=pd.Series([0.01, 0.01, 0.01], index=index, dtype=float),
+    )
+    monkeypatch.setattr(module, "_clean_downstream_candidate", lambda candidate: True)
+    monkeypatch.setattr(module, "_leaf_strategy_material_candidate", lambda candidate: True)
+    monkeypatch.setitem(module._EQFLOW_VARIANT_STATE, "val_saturation_conviction_variant", True)
+
+    rows = module._dynamic_conviction_switch_candidates([aggressive, fallback], fold)
+    saturated = [row.row for row in rows if row.candidate_label.endswith("_scaled_val_sat80")]
+
+    assert saturated
+    assert any(row["raw_selected_validation_return"] == pytest.approx(0.90) for row in saturated)
+    for row in saturated:
+        raw_selected = row["raw_selected_validation_return"]
+        effective_selected = row["effective_saturated_validation_return"]
+        raw_scaled = row["raw_scaled_validation_return"]
+        effective_scaled = row["effective_saturated_scaled_validation_return"]
+        assert effective_selected == pytest.approx(module._saturate_validation_return(raw_selected))
+        assert effective_scaled == pytest.approx(module._saturate_validation_return(raw_scaled))
+        expected_applied = (
+            not math.isclose(raw_selected, effective_selected)
+            or not math.isclose(raw_scaled, effective_scaled)
+            or row["val_saturation_selection_changed"]
+            or row["val_saturation_scale_changed"]
+        )
+        assert row["val_saturation_applied"] is expected_applied
+        assert row["post_oos_research_variant"] is True
+        assert row["ready_for_paper"] is False

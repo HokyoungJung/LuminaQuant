@@ -231,8 +231,9 @@ def _merge_score_config_with_research_overrides(
     """Fold ``research_config``-derived flags into ``score_config['research']``.
 
     Caller-provided keys in the caller's own ``score_config['research']`` section
-    always win; the config only fills gaps. ``deflation_kwargs`` is merged in
-    too because ``hac_inference`` is read back out of this same
+    win except ``cost_rate_multiplier`` and ``cost_rate_bps_override``: those
+    research-profile values are authoritative cost controls. ``deflation_kwargs``
+    is merged in too because ``hac_inference`` is read back out of this same
     ``score_config['research']`` section by ``research_runner``'s per-candidate
     DSR computation (see ``_evaluate_candidate_metric_payload``); the other
     deflation keys (``single_correlation_discount`` / ``cscv_pbo``) have no
@@ -248,6 +249,9 @@ def _merge_score_config_with_research_overrides(
     merged_research: dict[str, Any] = dict(section_overrides)
     if isinstance(caller_research, Mapping):
         merged_research.update(caller_research)
+    for key in ("cost_rate_multiplier", "cost_rate_bps_override"):
+        if key in score_config_research_overrides:
+            merged_research[key] = score_config_research_overrides[key]
     merged["research"] = merged_research
     return merged
 
@@ -280,9 +284,11 @@ def run_candidate_research(
     lockbox split, purge/embargo bars, and HAC-corrected DSR studentization
     actually activate end-to-end instead of sitting inert on the config object.
     Any key the caller already set explicitly on ``split`` / ``score_config``
-    wins over the config-derived value. The default ``None`` is a strict no-op:
-    ``split`` / ``score_config`` are forwarded unchanged, so behavior is
-    byte-identical to calling this function before ``research_config`` existed.
+    wins over the config-derived value, except profile cost controls
+    ``cost_rate_multiplier`` and ``cost_rate_bps_override``. The default
+    ``None`` is a strict no-op: ``split`` / ``score_config`` are forwarded
+    unchanged, so behavior is byte-identical to calling this function before
+    ``research_config`` existed.
     """
     runner = _runner_module()
     base_tf = runner._normalize_candidate_research_base_timeframe(base_timeframe)

@@ -741,6 +741,10 @@ class ResearchConfig:
     # the search-global num_trials the per-fold call site cannot know) -- that stays
     # a data-PC aggregation-layer stamp.
     emit_candidate_overfit_stats: bool = False
+    # v5 research routing: execute registered strategies without bespoke vectorized
+    # handlers through the registry simulator rather than the generic proxy.
+    # Default false preserves legacy research scoring byte-for-byte.
+    route_unmapped_registered_strategies: bool = False
     # Honest cost/portfolio MEASUREMENT foundation (performance_lever_measurement
     # 2026-07-08). EVERY field below defaults to a strict no-op so the shipped
     # ``config.yaml`` / ``RuntimeConfig()`` load is byte-identical; they are turned

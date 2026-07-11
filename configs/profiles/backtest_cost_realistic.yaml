@@ -387,6 +387,9 @@ research:
   max_per_symbol_basket: 2
   max_per_lineage: 1
   max_per_family_basket: 1
+  # v5 defect fix: evaluate registered research strategies through their registry
+  # simulator instead of the shared generic fallback proxy.
+  route_unmapped_registered_strategies: true
   # Honest realistic cost floor for the VECTORIZED research scorer
   # (performance_lever_measurement 2026-07-08). The scorer charges a LINEAR
   # per-turnover cost (net = returns - turnover * cost_rate); its shipped base map
