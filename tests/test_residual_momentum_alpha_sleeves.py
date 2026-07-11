@@ -31,6 +31,7 @@ from typing import Any
 from lumina_quant.strategies.adaptive_crypto_alpha_sleeves import ResidualMomentumRotationStrategy
 from lumina_quant.strategies.equity_xs_factor_alpha_sleeves import ResidualEquityMomentumStrategy
 from lumina_quant.strategies.residual_momentum_alpha_sleeves import (
+    _RESIDUAL_MOMENTUM_SLICE,
     TrendGatedResidualMomentumStrategy,
 )
 from lumina_quant.strategies.residual_reversion_alpha_sleeves import (
@@ -628,3 +629,73 @@ def test_schema_keys_snake_case_and_hyperparam() -> None:
 
 def test_decision_cadence_at_least_30m() -> None:
     assert TrendGatedResidualMomentumStrategy.decision_cadence_seconds >= 1800
+
+
+def test_slice_timeframe_expansion_scales_bar_windows() -> None:
+    """4h/1h cells mirror the 1d variants: bar windows scale x6/x24, weekly-decision
+    clock + week-denominated formation + z-thresholds stay timeframe-invariant."""
+    slice_ = _RESIDUAL_MOMENTUM_SLICE
+    assert set(slice_) == {"4h", "1h", "1d"}
+    variants = {tf: tuple(cell["variant"] for cell in cells) for tf, cells in slice_.items()}
+    assert variants["4h"] == variants["1h"] == variants["1d"]
+    by = {tf: {cell["variant"]: cell for cell in cells} for tf, cells in slice_.items()}
+    for variant in variants["1d"]:
+        d, h4, h1 = by["1d"][variant], by["4h"][variant], by["1h"][variant]
+        for key in (
+            "beta_window_bars",
+            "adf_window_bars",
+            "residual_vol_window_bars",
+            "min_history_bars",
+        ):
+            assert h4[key] == d[key] * 6, (variant, key)
+            assert h1[key] == d[key] * 24, (variant, key)
+        assert (d["bars_per_week"], h4["bars_per_week"], h1["bars_per_week"]) == (7, 42, 168)
+        for key in (
+            "formation_weeks",
+            "skip_weeks",
+            "min_hold_decisions",
+            "cooldown_decisions",
+            "quantile_pct",
+            "adf_nonstationarity_min_t",
+        ):
+            assert h4[key] == d[key] == h1[key], (variant, key)
+
+
+# --------------------------------------------------------------------------- #
+# v5 zero-alloc gate: a computed alloc of 0 must NOT emit a LONG/SHORT --
+# ``_target_metadata`` omits ``target_allocation`` at alloc 0 and the engine
+# would resize the entry to its DEFAULT allocation (an unsized, un-vol-gated bet).
+# The side-flip path already calls ``_flatten`` before sizing, so the skip only
+# has to bail; state is already consistently OUT.
+# --------------------------------------------------------------------------- #
+
+
+def test_zero_alloc_entry_skipped_not_default_sized() -> None:
+    # FLIP/FRESH are non-benchmark members of the fixed ``_SYMS`` universe.
+    sleeve = _new_sleeve()
+    flip = sleeve._state["S1"]
+    flip.mode = "LONG"
+    flip.entry_price = 100.0
+    flip.bars_held = 10_000  # clear the min-hold so the side flip is live
+    targets = {
+        "S1": ("SHORT", -1.0, {}),
+        "S2": ("LONG", 1.0, {}),
+    }
+    # empty weights -> alloc == 0 for every targeted symbol
+    sleeve._emit_targets(targets, {}, "2026-01-01T00:00:00Z")
+    kinds = [(sig.symbol, str(sig.signal_type).upper()) for sig in sleeve.events.items]
+    assert not [sym for sym, kind in kinds if kind in {"LONG", "SHORT"}], kinds
+    # the side-flip EXIT still fired and S1 is now flat (state matches the exit)
+    assert ("S1", "EXIT") in kinds
+    assert sleeve._state["S1"].mode == "OUT"
+    assert sleeve._state["S1"].entry_price is None
+
+    # a positive inverse-vol weight DOES emit a sized entry carrying a strictly
+    # positive ``target_allocation``.
+    sized = _new_sleeve()
+    sized._emit_targets({"S2": ("LONG", 1.0, {})}, {"S2": 0.5}, "2026-01-01T00:00:00Z")
+    entries = [
+        sig for sig in sized.events.items if str(sig.signal_type).upper() in {"LONG", "SHORT"}
+    ]
+    assert entries, "a positive inverse-vol weight must emit a sized entry"
+    assert all(float((sig.metadata or {}).get("target_allocation", 0.0)) > 0.0 for sig in entries)

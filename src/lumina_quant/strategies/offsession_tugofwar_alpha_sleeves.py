@@ -6,9 +6,11 @@ component (log-return accrued over the core US cash-session hours, UTC
 ``[cash_start_hour_utc, cash_end_hour_utc)`` = ``[14, 20)``, Mon-Fri) and an
 UNANCHORED OFF-SESSION component (all remaining hours -- nights, weekends -- when
 the underlying cash market is closed and the perp price is set purely by 24/7
-crypto-native flow with no price-discovery anchor).  The two DST-ambiguous
-boundary hours (``cash_start-1`` and ``cash_end`` = ``{13, 20}``) are dropped from
-BOTH components.
+crypto-native flow with no price-discovery anchor).  The DST-ambiguous boundary
+hours (``cash_start-1``, ``cash_start`` and ``cash_end`` = ``{13, 14, 20}``) are
+dropped from BOTH components: the NYSE open sits at :30, so the open-straddling
+hour is ``13`` under EDT but ``14`` under EST -- both must go (accepting the
+symmetric loss of one fully-cash hour in each regime).
 
 The characteristic is ``TOW = mean(N_d) - mean(D_d)`` over a trailing formation of
 ``formation_days`` UTC days, where ``N_d`` / ``D_d`` are the day's summed
@@ -63,6 +65,10 @@ from typing import Any
 
 from lumina_quant.core.plugin_registry import register
 from lumina_quant.indicators.alpha_features import realized_volatility
+from lumina_quant.indicators.annualization import (
+    annualize_per_bar_vol,
+    bars_per_year_from_spacing,
+)
 from lumina_quant.indicators.common import safe_float, time_key
 from lumina_quant.indicators.cross_sectional_residualize import cross_sectional_residualize
 from lumina_quant.research_universe import (
@@ -263,9 +269,16 @@ class CrossSectionalOffSessionTugOfWarStrategy(Strategy):
         self.max_symbol_exposure_pct = max(0.0, float(resolved["max_symbol_exposure_pct"]))
         self.max_order_value = max(0.0, float(resolved["max_order_value"]))
         self.min_price = max(0.0, float(resolved["min_price"]))
-        # Ambiguous (DST) hours dropped from both classes: {start-1, end}.
+        # Ambiguous (DST) hours dropped from both classes: {start-1, start, end}.
+        # The cash OPEN sits at :30, so the open-straddling hour is ``start-1``
+        # under EDT but ``start`` under EST; classifying the EST winter pre-open
+        # half-hour as CASH would leak unanchored drift into the D_d component.
         self._ambiguous_hours = frozenset(
-            {(self.cash_start_hour_utc - 1) % 24, self.cash_end_hour_utc % 24}
+            {
+                (self.cash_start_hour_utc - 1) % 24,
+                self.cash_start_hour_utc % 24,
+                self.cash_end_hour_utc % 24,
+            }
         )
         closes_size = max(8, self.vol_window + 8)
         days_size = max(8, self.formation_days + 8)
@@ -277,6 +290,10 @@ class CrossSectionalOffSessionTugOfWarStrategy(Strategy):
             for symbol in self.symbol_list
         }
         self._last_eval_week: tuple[int, int] | None = None
+        # Recent decision-bar epochs (seconds) for deterministic bar-spacing
+        # inference: the vol-target scalar annualizes the per-bar portfolio vol
+        # via sqrt(bars_per_year) derived from the median gap here.
+        self._recent_times: deque[float] = deque(maxlen=16)
 
     # ------------------------------------------------------------------ #
     # session classification
@@ -300,6 +317,7 @@ class CrossSectionalOffSessionTugOfWarStrategy(Strategy):
             "last_eval_week": (
                 list(self._last_eval_week) if self._last_eval_week is not None else None
             ),
+            "recent_times": list(self._recent_times),
             "symbol_state": {
                 symbol: {
                     "closes": list(item.closes),
@@ -321,6 +339,11 @@ class CrossSectionalOffSessionTugOfWarStrategy(Strategy):
     def set_state(self, state: dict[str, Any]) -> None:
         if not isinstance(state, dict):
             return
+        self._recent_times.clear()
+        for value in _coerce_float_list(state.get("recent_times"))[
+            -int(self._recent_times.maxlen or 0) :
+        ]:
+            self._recent_times.append(value)
         week = state.get("last_eval_week")
         if isinstance(week, (list, tuple)) and len(week) == 2:
             try:
@@ -425,6 +448,12 @@ class CrossSectionalOffSessionTugOfWarStrategy(Strategy):
         dt = _event_datetime_utc(event_time)
         if dt is None:
             return
+        # Record the decision-bar epoch so the vol-target scalar can infer bar
+        # spacing.  This hook fires once per updated symbol, so a monotonic guard
+        # keeps ``_recent_times`` to one entry per distinct bar.
+        epoch = dt.timestamp()
+        if not self._recent_times or epoch > self._recent_times[-1]:
+            self._recent_times.append(epoch)
         iso = dt.isocalendar()
         week = (int(iso[0]), int(iso[1]))
         if self._last_eval_week is None:
@@ -546,10 +575,21 @@ class CrossSectionalOffSessionTugOfWarStrategy(Strategy):
         total_inv = sum(inv.values())
         if total_inv <= _EPS:
             return {}, 1.0
+        # ``portfolio_vol`` is the inverse-vol-weighted PER-BAR vol; the
+        # ``inv / total_inv`` normalization above is scale-invariant (annualizing
+        # every vol_i cancels), so the risk-parity weights are horizon-free.
+        # The vol-target SCALAR, however, compares ``portfolio_vol`` against an
+        # annual-scale ``target_vol`` (0.20): annualize the per-bar estimate via
+        # sqrt(bars_per_year) inferred from observed bar spacing first, otherwise
+        # the Moreira-Muir clamp is INERT. When spacing is unavailable we pass
+        # through (scalar=1.0) rather than throttle on mismatched horizons.
         portfolio_vol = sum((inv[symbol] / total_inv) * vols[symbol] for symbol in inv)
         scalar = 1.0
         if self.target_vol > 0.0 and portfolio_vol > _EPS:
-            scalar = min(1.0, self.target_vol / portfolio_vol)
+            bars_per_year = bars_per_year_from_spacing(self._recent_times)
+            portfolio_vol_ann = annualize_per_bar_vol(portfolio_vol, bars_per_year)
+            if portfolio_vol_ann is not None and portfolio_vol_ann > _EPS:
+                scalar = min(1.0, self.target_vol / portfolio_vol_ann)
         weights = {
             symbol: (inv[symbol] / total_inv) * self.target_gross_exposure * scalar
             for symbol in inv
@@ -619,6 +659,17 @@ class CrossSectionalOffSessionTugOfWarStrategy(Strategy):
                 )
             weight = float(weights.get(symbol, 0.0))
             alloc = max(0.0, self.base_allocation * weight)
+            if alloc <= 0.0:
+                # Zero-alloc entries omit ``target_allocation`` from metadata and
+                # the engine resizes them to its DEFAULT allocation -- an unsized,
+                # un-vol-gated position. Skip the entry; if a side-flip EXIT was
+                # just emitted, drop to OUT so state matches it.
+                if item.mode != "OUT":
+                    item.mode = "OUT"
+                    item.entry_price = None
+                    item.decisions_held = 0
+                    item.score = None
+                continue
             metadata = _target_metadata(
                 strategy=_STRATEGY_NAME,
                 target_allocation=alloc,

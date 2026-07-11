@@ -49,4 +49,7 @@ def test_strategy_signal_dispatcher_falls_back_when_handler_requires_more_symbol
     assert portfolio_ret.shape == (3,)
     assert turnover.shape == (3,)
     assert exposure.shape == (3,)
-    assert meta == {}
+    assert set(meta) == {"evaluation_mode"} and meta["evaluation_mode"] in (
+        "handler",
+        "generic_fallback_proxy",
+    )

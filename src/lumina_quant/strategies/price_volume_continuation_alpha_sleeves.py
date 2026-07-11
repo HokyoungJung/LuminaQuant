@@ -89,6 +89,10 @@ from typing import Any
 
 from lumina_quant.core.plugin_registry import register
 from lumina_quant.indicators.alpha_features import log_return, realized_volatility
+from lumina_quant.indicators.annualization import (
+    annualize_per_bar_vol,
+    bars_per_year_from_spacing,
+)
 from lumina_quant.indicators.common import safe_float, time_key
 from lumina_quant.strategies.external_alpha_sleeves import (
     _EPS,
@@ -269,12 +273,21 @@ class PriceVolumeCorrContinuationStrategy(Strategy):
             symbol: _State(closes=deque(maxlen=size), volumes=deque(maxlen=size))
             for symbol in self.symbol_list
         }
+        # Recent distinct-bar epochs (seconds) for deterministic bar-spacing
+        # inference: the vol-target allocation annualizes the per-bar realized
+        # vol via sqrt(bars_per_year) so the throttle is not left inert. The
+        # spacing is a GLOBAL bar-clock property, so ``_last_ingest_key`` dedups
+        # one epoch per distinct bar time across all symbols.
+        self._recent_times: deque[float] = deque(maxlen=16)
+        self._last_ingest_key = ""
 
     # ------------------------------------------------------------------ #
     # state
     # ------------------------------------------------------------------ #
     def get_state(self) -> dict[str, Any]:
         return {
+            "recent_times": list(self._recent_times),
+            "last_ingest_key": self._last_ingest_key,
             "symbol_state": {
                 symbol: {
                     "closes": list(item.closes),
@@ -288,10 +301,13 @@ class PriceVolumeCorrContinuationStrategy(Strategy):
                     "score": item.score,
                 }
                 for symbol, item in self._state.items()
-            }
+            },
         }
 
     def set_state(self, state: dict[str, Any]) -> None:
+        if isinstance(state, dict):
+            self._last_ingest_key = str(state.get("last_ingest_key", ""))
+            _restore_deque(self._recent_times, state.get("recent_times"))
         raw = state.get("symbol_state") if isinstance(state, dict) else None
         if not isinstance(raw, dict):
             return
@@ -353,6 +369,13 @@ class PriceVolumeCorrContinuationStrategy(Strategy):
         if key and key == item.last_bar_key:
             return
         item.last_bar_key = key
+        # Record one epoch per distinct bar time (across symbols) so the
+        # vol-target scalar can infer the global bar spacing deterministically.
+        if key and key != self._last_ingest_key:
+            self._last_ingest_key = key
+            dt = _event_datetime_utc(snapshot.time)
+            if dt is not None:
+                self._recent_times.append(dt.timestamp())
         close = safe_float(snapshot.close)
         if close is None or close <= self.min_price:
             return
@@ -386,11 +409,19 @@ class PriceVolumeCorrContinuationStrategy(Strategy):
         return dir_t, pv_corr, float(dir_t) * float(pv_corr)
 
     def _vol_scaled_allocation(self, closes: list[float]) -> float:
+        # ``vol`` is a PER-BAR realized vol; annualize it via sqrt(bars_per_year)
+        # (inferred from observed bar spacing) before dividing an annual-scale
+        # ``target_vol`` by it, otherwise the ratio is pinned at the max clamp and
+        # the throttle is INERT. When spacing is unavailable we pass through at
+        # ``target_allocation`` rather than size on mismatched horizons.
         alloc = self.target_allocation
         if self.target_vol > 0.0:
             vol = realized_volatility(closes, window=self.vol_window)
             if vol is not None and vol > _EPS:
-                alloc = self.target_allocation * (self.target_vol / vol)
+                bars_per_year = bars_per_year_from_spacing(self._recent_times)
+                vol_ann = annualize_per_bar_vol(vol, bars_per_year)
+                if vol_ann is not None and vol_ann > _EPS:
+                    alloc = self.target_allocation * (self.target_vol / vol_ann)
         return max(0.0, min(self.target_allocation * 2.0, alloc))
 
     # ------------------------------------------------------------------ #
@@ -494,10 +525,22 @@ _SUGGESTED_CANDIDATE_TAGS: tuple[str, ...] = (
     "crypto",
 )
 
-# Candidate slice (DAILY bars only: the multi-week trend + volume-confirmation
-# thesis is only honest at the 1d cadence).  Per-symbol single-asset
-# (``candidate_mix_type == "single"``).  ``min_hold_decisions`` /
-# ``cooldown_decisions`` are WEEKLY decision bars -- the proven min-hold rescue.
+# Candidate slice, per-symbol single-asset (``candidate_mix_type == "single"``).
+# MULTI-TIMEFRAME (1d / 4h / 1h): the decision clock is TIMESTAMP-based (ISO-week
+# bucketing in ``_week_key``), so it stays WEEKLY at every bar tf -- the sleeve
+# ingests finer bars but still decides once per calendar week.  Scaling rule
+# (mirrors ``residual_reversion``'s multi-tf precedent):
+#   * DECISION-denominated + timestamp-based UNCHANGED: ``mom_window_weeks`` (in
+#     weeks), ``min_hold_decisions`` / ``cooldown_decisions`` (in WEEKLY
+#     decisions) are identical across tf -- 4 weekly decisions is 4 weekly
+#     decisions regardless of bar size (the proven min-hold rescue).
+#   * BAR-denominated windows scale x6 (4h) / x24 (1h) to hold the wall-clock
+#     span: ``corr_window`` (trend-health horizon), ``vol_window`` (sizing), and
+#     ``bars_per_week`` (the weeks->bars conversion feeding ``mom_window_bars``;
+#     7 daily = 42 four-hour = 168 hourly bars per week -- 168 is the schema max).
+#   * Thresholds / ratios / bools UNCHANGED (``corr_entry`` / ``corr_exit`` /
+#     ``target_vol`` / ``allow_short``).
+# No window here reaches the ~9000-bar cap (corr_window tops out at 1680 @ 1h).
 _PRICE_VOLUME_CONTINUATION_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
     "1d": (
         {
@@ -523,6 +566,62 @@ _PRICE_VOLUME_CONTINUATION_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
             "min_hold_decisions": 4,
             "cooldown_decisions": 2,
             "vol_window": 30,
+            "target_vol": 0.20,
+            "allow_short": True,
+        },
+    ),
+    "4h": (
+        {
+            "variant": "corr70_mom8wk",
+            "corr_window": 420,
+            "mom_window_weeks": 8,
+            "bars_per_week": 42,
+            "corr_entry": 0.25,
+            "corr_exit": 0.0,
+            "min_hold_decisions": 4,
+            "cooldown_decisions": 2,
+            "vol_window": 180,
+            "target_vol": 0.20,
+            "allow_short": True,
+        },
+        {
+            "variant": "corr56_mom4wk",
+            "corr_window": 336,
+            "mom_window_weeks": 4,
+            "bars_per_week": 42,
+            "corr_entry": 0.30,
+            "corr_exit": 0.0,
+            "min_hold_decisions": 4,
+            "cooldown_decisions": 2,
+            "vol_window": 180,
+            "target_vol": 0.20,
+            "allow_short": True,
+        },
+    ),
+    "1h": (
+        {
+            "variant": "corr70_mom8wk",
+            "corr_window": 1680,
+            "mom_window_weeks": 8,
+            "bars_per_week": 168,
+            "corr_entry": 0.25,
+            "corr_exit": 0.0,
+            "min_hold_decisions": 4,
+            "cooldown_decisions": 2,
+            "vol_window": 720,
+            "target_vol": 0.20,
+            "allow_short": True,
+        },
+        {
+            "variant": "corr56_mom4wk",
+            "corr_window": 1344,
+            "mom_window_weeks": 4,
+            "bars_per_week": 168,
+            "corr_entry": 0.30,
+            "corr_exit": 0.0,
+            "min_hold_decisions": 4,
+            "cooldown_decisions": 2,
+            "vol_window": 720,
             "target_vol": 0.20,
             "allow_short": True,
         },

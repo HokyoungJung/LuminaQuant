@@ -424,6 +424,87 @@ def test_leg5_self_skips_below_min_symbols() -> None:
     assert not [s for s in candidate.events.items if s.signal_type in {"LONG", "SHORT"}]
 
 
+# --------------------------------------------------------------------------- #
+# (pm) POSTMORTEM of the measured 1h cell `offsession_tugofwar_1h_tow_42d_fade`
+# (research_note 2026-07-09: OOS Sharpe -33.95, return -63.19%, MDD 63.85%).  A
+# Sharpe that negative implicates a SIGN INVERSION or an every-bar TURNOVER
+# churn; these pin both as absent, so the loss is a DIRECTIONAL (wrong-signed /
+# absent) fade edge on this universe -- the docstring's declared wrong-sign
+# alternative (off-session moves are genuine Asia/Europe information ->
+# continuation), i.e. the pre-registered EXPECTED-NULL, not a code defect.
+# --------------------------------------------------------------------------- #
+
+
+def test_pm_fade_sign_shorts_high_tow_longs_low_tow() -> None:
+    """THEORY (Akbas-Boehmer-Jiang-Koch): persistent off-session strength
+    predicts NEGATIVELY -> FADE.  The high-TOW leg (NIGHTPUMP) must be SHORT and
+    the low-TOW leg (SESSIONGRIND) LONG.  Culprit-1 (sign) regression lock:
+    a silent flip masquerading as a fix for the OOS loss breaks here.
+    """
+    candidate = _make_candidate()
+    _feed(candidate, _ALL_SYMBOLS)
+    sides = _final_sides(candidate.events.items)
+    assert sides.get(NIGHT) == "SHORT"
+    assert sides.get(GRIND) == "LONG"
+
+
+def test_pm_decision_clock_is_weekly_iso_not_every_bar() -> None:
+    """The 1h cell decides on an ISO-week clock: ``_evaluate`` fires once per NEW
+    ISO week (the first week only seeds ``_last_eval_week``), NOT once per 1h bar.
+
+    Culprit-2 (turnover-churn) lock: at a weekly decision cadence over 1512 fed
+    bars the round-trip count -- and the 20bps cost bleed -- is far too small to
+    explain the measured -63% OOS return, so the loss is directional.
+    """
+    candidate = _make_candidate()
+    calls = {"n": 0}
+    original = candidate._evaluate
+
+    def _counting(event_time: Any) -> None:
+        calls["n"] += 1
+        original(event_time)
+
+    candidate._evaluate = _counting  # type: ignore[method-assign]
+    _feed(candidate, _ALL_SYMBOLS)
+    weeks = len({moment.isocalendar()[:2] for moment in _TIMES})
+    assert calls["n"] == weeks - 1  # one decision per new ISO week, seed week excluded
+    assert calls["n"] <= 12  # far below the 1512 one-hour bars fed
+
+
+def test_pm_vol_target_scalar_engages_at_hourly_vol_scale() -> None:
+    """FIXED (rewrite of the offsession postmortem's Culprit-3 diagnostic).
+
+    Culprit-3 (sizing) WAS: the sleeve sizes off
+    ``realized_volatility(closes, window=vol_window)``, a PER-1h-BAR stdev
+    (``annualization=1.0``), while ``target_vol`` defaults to 0.20 (an
+    annualized-scale figure), so ``scalar = min(1.0, target_vol / portfolio_vol)``
+    stayed pinned at 1.0 for every realistic hourly vol -- the throttle NEVER
+    de-risked.  The fix annualizes the per-bar portfolio vol by
+    ``sqrt(bars_per_year)`` (cadence inferred from the median observed bar
+    spacing) BEFORE the comparison.  On the 1h fixture a hurricane per-1h vol now
+    DE-RISKS the book, where the old horizon-mismatched code left the knob inert.
+
+    The postmortem's OTHER revival precondition -- a benchmark hedge leg for the
+    directional exposure -- is OUT of this fix's scope and REMAINS OPEN.
+    """
+    candidate = _make_candidate()
+    _feed(candidate, _ALL_SYMBOLS)  # seeds distinct 1h decision-bar epochs
+    assert len(candidate._recent_times) >= 3  # cadence is now inferable (~1h spacing)
+    targets = {NIGHT: ("SHORT", -1.5, {}), GRIND: ("LONG", 1.5, {})}
+    # High per-1h vol annualizes far above the 0.20 target -> throttle ENGAGES.
+    _weights, hot = candidate._inverse_vol_weights(targets, {NIGHT: 0.02, GRIND: 0.02 * 1.3})
+    assert hot < 1.0, hot
+    # Control (calm): a genuinely tiny per-1h vol annualizes below target -> the
+    # throttle stays at 1.0 and does NOT needlessly de-risk.
+    _weights, calm = candidate._inverse_vol_weights(targets, {NIGHT: 0.0002, GRIND: 0.0002 * 1.3})
+    assert calm == 1.0, calm
+    # Control (unknown cadence): a fresh candidate with no observed bars keeps the
+    # conservative unity scalar -- it never inflates leverage on an unknown horizon.
+    fresh = _make_candidate()
+    _weights, unknown = fresh._inverse_vol_weights(targets, {NIGHT: 0.02, GRIND: 0.02 * 1.3})
+    assert unknown == 1.0, unknown
+
+
 def test_run_twice_bit_identical() -> None:
     first = _make_candidate()
     _feed(first, _ALL_SYMBOLS)
@@ -432,3 +513,58 @@ def test_run_twice_bit_identical() -> None:
     a = [(s.symbol, s.signal_type, round(float(s.strength), 12)) for s in first.events.items]
     b = [(s.symbol, s.signal_type, round(float(s.strength), 12)) for s in second.events.items]
     assert a == b
+
+
+def test_ambiguous_hours_cover_both_dst_open_straddles() -> None:
+    """The NYSE open sits at :30, so the open-straddling hour is 13 under EDT
+    but 14 under EST -- both must be dropped from BOTH components (v5 fix:
+    the EST winter pre-open half-hour used to be classified as CASH)."""
+    strat = _make_candidate()
+    assert strat._ambiguous_hours == frozenset({13, 14, 20})
+    est_winter_weekday = datetime(2026, 1, 7, 14, 0, tzinfo=UTC)  # Wednesday
+    assert strat._classify_hour(est_winter_weekday) == "AMBIGUOUS"
+    fully_cash = datetime(2026, 1, 7, 15, 0, tzinfo=UTC)
+    assert strat._classify_hour(fully_cash) == "CASH"
+
+
+# --------------------------------------------------------------------------- #
+# v5 zero-alloc gate: a computed alloc of 0 must NOT emit a LONG/SHORT --
+# ``_target_metadata`` omits ``target_allocation`` at alloc 0 and the engine
+# would resize the entry to its DEFAULT allocation (an unsized, un-vol-gated bet).
+# --------------------------------------------------------------------------- #
+
+
+def test_zero_alloc_entry_skipped_not_default_sized() -> None:
+    # This lane admits only its fixed TradFi-ETF universe, so FLIP/FRESH must be
+    # real members of ``_TRADFI_EQUITY_ETF_UNIVERSE``.
+    symbols = list(_ALL_SYMBOLS)[:6]
+    flip_sym, fresh_sym = symbols[0], symbols[1]
+    strat = _make_candidate(symbols)
+    flip = strat._state[flip_sym]
+    flip.mode = "LONG"
+    flip.entry_price = 100.0
+    flip.decisions_held = 10_000  # clear the min-hold so the side flip is live
+    targets = {
+        flip_sym: ("SHORT", -1.0, {}),
+        fresh_sym: ("LONG", 1.0, {}),
+    }
+    # empty weights -> alloc == 0 for every targeted symbol
+    strat._emit_targets(targets, {}, 1.0, "2026-01-01T00:00:00Z")
+    kinds = [(sig.symbol, str(sig.signal_type).upper()) for sig in strat.events.items]
+    assert not [sym for sym, kind in kinds if kind in {"LONG", "SHORT"}], kinds
+    # the side-flip EXIT still fired and FLIP is now flat (state matches the exit)
+    assert (flip_sym, "EXIT") in kinds
+    assert strat._state[flip_sym].mode == "OUT"
+    assert strat._state[flip_sym].entry_price is None
+
+    # a positive inverse-vol weight DOES emit a sized entry carrying a strictly
+    # positive ``target_allocation``.
+    sized = _make_candidate(symbols)
+    sized._emit_targets(
+        {fresh_sym: ("LONG", 1.0, {})}, {fresh_sym: 0.5}, 1.0, "2026-01-01T00:00:00Z"
+    )
+    entries = [
+        sig for sig in sized.events.items if str(sig.signal_type).upper() in {"LONG", "SHORT"}
+    ]
+    assert entries, "a positive inverse-vol weight must emit a sized entry"
+    assert all(float((sig.metadata or {}).get("target_allocation", 0.0)) > 0.0 for sig in entries)

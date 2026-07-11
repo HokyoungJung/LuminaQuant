@@ -83,7 +83,9 @@ from lumina_quant.strategies.adaptive_crypto_alpha_sleeves import (
 from lumina_quant.strategies.external_alpha_sleeves import (
     _EPS,
     _Snapshot,
+    _annualize_per_bar_vol,
     _emit,
+    _event_datetime_utc,
     _event_symbols,
     _market_snapshot,
     _safe_non_negative_int,
@@ -207,6 +209,10 @@ class CrossSectionalNearHighAnchoringStrategy(Strategy):
         }
         self._last_eval_time_key = ""
         self._tick = 0
+        # Recent decision-bar epochs (seconds) for deterministic bar-spacing
+        # inference: the vol-target scalar annualizes the per-bar portfolio vol
+        # via sqrt(bars_per_year) derived from the median gap here.
+        self._recent_times: deque[float] = deque(maxlen=16)
 
     # ------------------------------------------------------------------ #
     # state
@@ -215,6 +221,7 @@ class CrossSectionalNearHighAnchoringStrategy(Strategy):
         return {
             "last_eval_time_key": self._last_eval_time_key,
             "tick": int(self._tick),
+            "recent_times": list(self._recent_times),
             "symbol_state": {
                 symbol: {
                     "closes": list(item.closes),
@@ -234,6 +241,11 @@ class CrossSectionalNearHighAnchoringStrategy(Strategy):
             return
         self._last_eval_time_key = str(state.get("last_eval_time_key", ""))
         self._tick = _safe_non_negative_int(state.get("tick"))
+        self._recent_times.clear()
+        for value in _coerce_float_list(state.get("recent_times"))[
+            -int(self._recent_times.maxlen or 0) :
+        ]:
+            self._recent_times.append(value)
         raw = state.get("symbol_state")
         if not isinstance(raw, dict):
             return
@@ -393,10 +405,20 @@ class CrossSectionalNearHighAnchoringStrategy(Strategy):
         total_inv = sum(inv.values())
         if total_inv <= _EPS:
             return {}, 1.0
+        # ``portfolio_vol`` is the inverse-vol-weighted PER-BAR vol; the
+        # ``inv / total_inv`` normalization above is scale-invariant (annualizing
+        # every vol_i cancels), so the risk-parity weights are horizon-free.
+        # The vol-target SCALAR, however, compares ``portfolio_vol`` against an
+        # annual-scale ``target_vol`` (0.20): annualize the per-bar estimate via
+        # sqrt(bars_per_year) inferred from observed bar spacing first, otherwise
+        # the Moreira-Muir clamp is INERT. When spacing is unavailable we pass
+        # through (scalar=1.0) rather than throttle on mismatched horizons.
         portfolio_vol = sum((inv[symbol] / total_inv) * vols[symbol] for symbol in inv)
         scalar = 1.0
         if self.target_vol > 0.0 and portfolio_vol > _EPS:
-            scalar = min(1.0, self.target_vol / portfolio_vol)
+            portfolio_vol_ann = _annualize_per_bar_vol(portfolio_vol, self._recent_times)
+            if portfolio_vol_ann is not None and portfolio_vol_ann > _EPS:
+                scalar = min(1.0, self.target_vol / portfolio_vol_ann)
         weights = {
             symbol: (inv[symbol] / total_inv) * self.target_gross_exposure * scalar
             for symbol in inv
@@ -421,6 +443,11 @@ class CrossSectionalNearHighAnchoringStrategy(Strategy):
     def _evaluate(self, event_time: Any) -> None:
         if len(self.symbol_list) < self.min_symbols:
             return
+        # Record the decision-bar epoch so the vol-target scalar can infer bar
+        # spacing (this runs once per new bar, before the rebalance gate).
+        dt = _event_datetime_utc(event_time)
+        if dt is not None:
+            self._recent_times.append(dt.timestamp())
         # Stops / max-hold age EVERY bar so a held name is always protected,
         # independent of the slow rebalance clock.
         self._age(event_time)
@@ -480,6 +507,17 @@ class CrossSectionalNearHighAnchoringStrategy(Strategy):
                 )
             weight = float(weights.get(symbol, 0.0))
             alloc = max(0.0, self.base_allocation * weight)
+            if alloc <= 0.0:
+                # Zero-alloc entries omit ``target_allocation`` from metadata and
+                # the engine resizes them to its DEFAULT allocation -- an unsized,
+                # un-vol-gated position. Skip the entry; if a side-flip EXIT was
+                # just emitted, drop to OUT so state matches it.
+                if item.mode != "OUT":
+                    item.mode = "OUT"
+                    item.entry_price = None
+                    item.bars_held = 0
+                    item.score = None
+                continue
             stop_loss = None
             if price is not None and self.stop_loss_pct > 0.0:
                 stop_loss = price * (
@@ -535,15 +573,84 @@ _SUGGESTED_CANDIDATE_TAGS: tuple[str, ...] = (
     "crypto",
 )
 
-# Candidate slice (daily bars; weekly rebalance via ``rebalance_bars``).  The
-# published effect is a 52-week window; the data-PC owns the 10/20/30/52wk
-# horizon factor_ic sweep, so we seed only two anchoring lookbacks (~30wk and
-# ~52wk of 1d bars) to keep the candidate library thin.  ``min_history_bars``
-# is the per-symbol floor below which a young alt is skipped; between it and
+# Candidate slice (weekly rebalance via ``rebalance_bars``; the ``_evaluate``
+# clock is bar-count driven, so every bar-denominated window scales with the
+# bar size).  The published effect is a 52-week WALL-CLOCK window, so
+# ``high_lookback_bars`` (the trailing-high horizon) and its paired
+# ``min_history_bars`` admission floor scale x6 at 4h / x24 at 1h to preserve
+# the 52wk/30wk anchor (364 * bars_per_day: 1d=364, 4h=2184, 1h=8736); the
+# ``rebalance_bars``/``min_hold_bars`` cadence scales likewise so the weekly
+# rebalance and 1-week min-hold stay fixed in wall-clock terms; the
+# inverse-vol ``vol_window`` sizing estimator scales too so the risk read spans
+# the same wall-clock window.  Quantile/exposure/vol thresholds are
+# scale-invariant and unchanged.  The data-PC owns the 10/20/30/52wk horizon
+# factor_ic sweep; we seed two anchoring lookbacks (~30wk and ~52wk) per
+# timeframe to keep the candidate library thin.  ``min_history_bars`` is the
+# per-symbol floor below which a young alt is skipped; between it and
 # ``high_lookback_bars`` the symbol is admitted via the ``max_available``
 # fallback (the breadth-vs-anointing tradeoff resolved toward a tradeable
 # cross-section).
 _NEAR_HIGH_ANCHORING_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "4h": (
+        {
+            "variant": "wk52",
+            "high_lookback_bars": 2184,
+            "min_history_bars": 360,
+            "vol_window": 120,
+            "quantile_pct": 0.25,
+            "rebalance_bars": 42,
+            "min_hold_bars": 42,
+            "min_symbols": 5,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+            "target_vol": 0.20,
+            "stop_loss_pct": 0.10,
+        },
+        {
+            "variant": "wk30",
+            "high_lookback_bars": 1260,
+            "min_history_bars": 270,
+            "vol_window": 120,
+            "quantile_pct": 0.25,
+            "rebalance_bars": 42,
+            "min_hold_bars": 42,
+            "min_symbols": 5,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+            "target_vol": 0.20,
+            "stop_loss_pct": 0.10,
+        },
+    ),
+    "1h": (
+        {
+            "variant": "wk52",
+            "high_lookback_bars": 8736,
+            "min_history_bars": 1440,
+            "vol_window": 480,
+            "quantile_pct": 0.25,
+            "rebalance_bars": 168,
+            "min_hold_bars": 168,
+            "min_symbols": 5,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+            "target_vol": 0.20,
+            "stop_loss_pct": 0.10,
+        },
+        {
+            "variant": "wk30",
+            "high_lookback_bars": 5040,
+            "min_history_bars": 1080,
+            "vol_window": 480,
+            "quantile_pct": 0.25,
+            "rebalance_bars": 168,
+            "min_hold_bars": 168,
+            "min_symbols": 5,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+            "target_vol": 0.20,
+            "stop_loss_pct": 0.10,
+        },
+    ),
     "1d": (
         {
             "variant": "wk52",

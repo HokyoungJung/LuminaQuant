@@ -67,11 +67,21 @@ from collections import deque
 from typing import Any
 
 from lumina_quant.core.plugin_registry import register
+from lumina_quant.indicators.annualization import (
+    annualize_per_bar_vol,
+    bars_per_year_from_spacing,
+)
+from lumina_quant.indicators.common import safe_float
 from lumina_quant.indicators.rolling_stats import sample_std
 from lumina_quant.strategies.adaptive_crypto_alpha_sleeves import _age_cross_positions
 from lumina_quant.strategies.cross_sectional_anomaly_alpha_sleeves import _CrossUpdateMixin
 from lumina_quant.strategies.equity_xs_factor_alpha_sleeves import _state_size
-from lumina_quant.strategies.external_alpha_sleeves import _EPS, _emit, _target_metadata
+from lumina_quant.strategies.external_alpha_sleeves import (
+    _EPS,
+    _emit,
+    _event_datetime_utc,
+    _target_metadata,
+)
 from lumina_quant.strategies.robust_alpha_sleeves import _CrossSectionalState
 from lumina_quant.strategy import Strategy
 from lumina_quant.tuning import HyperParam, resolve_params_from_schema
@@ -244,6 +254,30 @@ class DownsideTailRiskPremiumStrategy(_CrossUpdateMixin, Strategy):
         }
         self._last_eval_time_key = ""
         self._tick = 0
+        # Recent decision-bar epochs (seconds) for deterministic bar-spacing
+        # inference: the vol-target scalar annualizes the per-bar portfolio vol
+        # via sqrt(bars_per_year) so the Moreira-Muir clamp is not left inert.
+        self._recent_times: deque[float] = deque(maxlen=16)
+
+    # ------------------------------------------------------------------ #
+    # state (extend the mixin serialization with the bar-spacing epochs)
+    # ------------------------------------------------------------------ #
+    def get_state(self) -> dict[str, Any]:
+        state = super().get_state()
+        state["recent_times"] = list(self._recent_times)
+        return state
+
+    def set_state(self, state: dict[str, Any]) -> None:
+        super().set_state(state)
+        if not isinstance(state, dict):
+            return
+        self._recent_times.clear()
+        raw_times = state.get("recent_times")
+        if isinstance(raw_times, (list, tuple)):
+            for value in raw_times[-int(self._recent_times.maxlen or 0) :]:
+                parsed = safe_float(value)
+                if parsed is not None:
+                    self._recent_times.append(parsed)
 
     # ------------------------------------------------------------------ #
     # scoring / selection
@@ -347,10 +381,21 @@ class DownsideTailRiskPremiumStrategy(_CrossUpdateMixin, Strategy):
         total_inv = sum(inv.values())
         if total_inv <= _EPS:
             return {}, 1.0
+        # ``portfolio_vol`` is the inverse-vol-weighted PER-BAR vol; the
+        # ``inv / total_inv`` normalization above is scale-invariant (annualizing
+        # every sigma_i cancels), so the risk-parity weights are horizon-free.
+        # The vol-target SCALAR, however, compares ``portfolio_vol`` against an
+        # annual-scale ``target_vol`` (0.20): annualize the per-bar estimate via
+        # sqrt(bars_per_year) inferred from observed bar spacing first, otherwise
+        # the Moreira-Muir clamp is INERT. When spacing is unavailable we pass
+        # through (scalar=1.0) rather than throttle on mismatched horizons.
         portfolio_vol = sum((inv[symbol] / total_inv) * sigmas[symbol] for symbol in inv)
         scalar = 1.0
         if self.target_vol > 0.0 and portfolio_vol > _EPS:
-            scalar = min(1.0, self.target_vol / portfolio_vol)
+            bars_per_year = bars_per_year_from_spacing(self._recent_times)
+            portfolio_vol_ann = annualize_per_bar_vol(portfolio_vol, bars_per_year)
+            if portfolio_vol_ann is not None and portfolio_vol_ann > _EPS:
+                scalar = min(1.0, self.target_vol / portfolio_vol_ann)
         weights = {
             symbol: (inv[symbol] / total_inv) * self.target_gross_exposure * scalar
             for symbol in inv
@@ -375,6 +420,11 @@ class DownsideTailRiskPremiumStrategy(_CrossUpdateMixin, Strategy):
     def _rebalance(self, event_time: Any) -> None:
         if len(self.symbol_list) < self.min_symbols:
             return
+        # Record the decision-bar epoch so the vol-target scalar can infer bar
+        # spacing (this runs once per new bar, before the rebalance gate).
+        dt = _event_datetime_utc(event_time)
+        if dt is not None:
+            self._recent_times.append(dt.timestamp())
         # Stops / max-hold age every bar (protection + min-hold decision clock).
         self._age(event_time)
         if self._tick % self.rebalance_bars:
@@ -427,6 +477,16 @@ class DownsideTailRiskPremiumStrategy(_CrossUpdateMixin, Strategy):
                 )
             weight = float(weights.get(symbol, 0.0))
             alloc = max(0.0, self.base_allocation * weight)
+            if alloc <= 0.0:
+                # Zero-alloc entries omit ``target_allocation`` from metadata and
+                # the engine resizes them to its DEFAULT allocation -- an unsized,
+                # un-vol-gated position. Skip the entry; if a side-flip EXIT was
+                # just emitted, drop to OUT so state matches it.
+                if item.mode != "OUT":
+                    item.mode = "OUT"
+                    item.entry_price = None
+                    item.bars_held = 0
+                continue
             stop_loss = None
             if price is not None and self.stop_loss_pct > 0.0:
                 stop_loss = price * (
@@ -480,10 +540,51 @@ _SUGGESTED_CANDIDATE_TAGS: tuple[str, ...] = (
     "crypto",
 )
 
-# Candidate slice (daily bars; weekly rebalance).  The data-PC owns the
-# {raw, vol-neutralized} x {90,180,360}d sweep, so we seed only the vol-neutralized
-# 180d pool-admission form here to keep the candidate library thin.
+# Candidate slice.  The data-PC owns the {raw, vol-neutralized} x {90,180,360}d
+# sweep, so we seed only the vol-neutralized 180d pool-admission form per timeframe
+# to keep the candidate library thin.  The bar-denominated ES / min-history windows
+# scale x6 (4h) / x24 (1h) to hold their ~180d wall-clock tail span, and
+# ``rebalance_bars`` -- the bar-count weekly clock -- scales the same way
+# (7 -> 42 -> 168) to keep the weekly rebalance cadence.  The ``min_hold_periods``
+# floor, the ``tail_q`` / ``hysteresis_band`` fractions, the quantile, and the
+# vol-target / exposure fractions are timeframe-invariant and stay fixed.
 _DOWNSIDE_TAIL_RISK_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "4h": (
+        {
+            "variant": "es180_volneutral",
+            "es_window": 1080,
+            "tail_q": 0.05,
+            "vol_neutralize": True,
+            "min_history_bars": 360,
+            "quantile_pct": 0.20,
+            "rebalance_bars": 42,
+            "min_hold_periods": 4,
+            "hysteresis_band": 0.10,
+            "min_symbols": 5,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+            "target_vol": 0.20,
+            "stop_loss_pct": 0.10,
+        },
+    ),
+    "1h": (
+        {
+            "variant": "es180_volneutral",
+            "es_window": 4320,
+            "tail_q": 0.05,
+            "vol_neutralize": True,
+            "min_history_bars": 1440,
+            "quantile_pct": 0.20,
+            "rebalance_bars": 168,
+            "min_hold_periods": 4,
+            "hysteresis_band": 0.10,
+            "min_symbols": 5,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+            "target_vol": 0.20,
+            "stop_loss_pct": 0.10,
+        },
+    ),
     "1d": (
         {
             "variant": "es180_volneutral",

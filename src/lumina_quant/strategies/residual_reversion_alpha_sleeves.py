@@ -408,6 +408,12 @@ class StationarityGatedResidualReversionStrategy(Strategy):
             return None
 
         residual = raw_ret - beta * bench_ret
+        # vol-target horizon classification: category C (SCORE denominator, NOT a
+        # sizing throttle).  ``vol`` normalizes the residual into a risk-adjusted
+        # SIGNAL that is then cross-sectionally ranked; sizing is equal-weight
+        # (``target_gross_exposure / n``, beta-scaled) and never divides by vol.
+        # A global sqrt(bars_per_year) rescale of every ``vol`` cancels under the
+        # cross-sectional ranking, so there is no per-bar-vs-annual mismatch here.
         score = -residual / max(vol, _EPS)
         if not math.isfinite(score):
             return None
@@ -731,6 +737,30 @@ _RESIDUAL_REVERSION_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
             "max_hold_bars": 42,
             "max_longs": 4,
             "max_shorts": 4,
+            "allow_short": True,
+        },
+    ),
+    # 1h mirrors the hand-tuned 4h cell: the ADF/beta/vol ESTIMATOR windows are
+    # sample-count driven (a unit-root test / beta regression needs the same
+    # number of observations regardless of bar size), so they carry the 4h
+    # values verbatim; only the bar-denominated decision cadence and hold
+    # horizons scale x24 from the 1d cell (rebalance/min_hold 7->168,
+    # max_hold 42->1008) so the weekly-ish rebalance and multi-week hold stay
+    # fixed in wall-clock terms.
+    "1h": (
+        {
+            "variant": "strict_adf",
+            "lookback_bars": 6,
+            "beta_window": 90,
+            "vol_window": 24,
+            "adf_window": 120,
+            "adf_reject_threshold": -2.86,
+            "entry_score": 0.50,
+            "rebalance_bars": 168,
+            "min_hold_bars": 168,
+            "max_hold_bars": 1008,
+            "max_longs": 3,
+            "max_shorts": 3,
             "allow_short": True,
         },
     ),

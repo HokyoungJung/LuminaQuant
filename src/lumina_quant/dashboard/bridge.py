@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 from lumina_quant.dashboard.overview_service import (
+    DEFAULT_CURVE_POINT_LIMIT,
     build_overview_payload_from_frames,
     load_overview_payload as _load_overview_payload_impl,
     resolve_dashboard_postgres_dsn,
@@ -134,8 +135,9 @@ def load_overview_payload(
     *,
     launch_mode: str | None = "next",
     dsn: str | None = None,
-    limit: int = 120,
+    limit: int = DEFAULT_CURVE_POINT_LIMIT,
     run_limit: int = 10,
+    run_id: str | None = None,
     compatibility_path: str | None = None,
 ) -> dict[str, Any]:
     repo_root = Path(__file__).resolve().parents[3]
@@ -150,6 +152,7 @@ def load_overview_payload(
         dsn=dsn,
         limit=limit,
         run_limit=run_limit,
+        run_id=run_id,
     )
 
 
@@ -322,6 +325,12 @@ def main(argv: list[str] | None = None) -> int:
         dest="print_contract",
         help="Print DashboardBridgeContractV2 as JSON and exit.",
     )
+    parser.add_argument(
+        "--run-id",
+        dest="run_id",
+        default=None,
+        help="Build the overview payload for this run instead of the latest one.",
+    )
     args = parser.parse_args(argv)
 
     if args.print_contract:
@@ -332,7 +341,7 @@ def main(argv: list[str] | None = None) -> int:
     # Default: emit overview payload (--json or --overview-json or bare invocation)
     print(
         json.dumps(
-            load_overview_payload(launch_mode="next"),
+            load_overview_payload(launch_mode="next", run_id=args.run_id),
             indent=2,
             sort_keys=True,
             default=str,

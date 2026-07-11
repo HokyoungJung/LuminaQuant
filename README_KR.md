@@ -242,11 +242,13 @@ Phase 4 리팩터 트리를 Phase 0 순수 Python 기준선과 비교한 측정 
 
 ## 대시보드
 
-`uv run lq dashboard --run`으로 Next.js 15 프런트엔드를 시작합니다. Python 백엔드는 10개의 Next.js 라우트가 소비하는 `DashboardBridgeContractV2` JSON 계약을 노출합니다:
+`uv run lq dashboard --run`으로 Next.js 15 프런트엔드를 시작합니다. Python 백엔드는 13개의 Next.js 라우트가 소비하는 `DashboardBridgeContractV2` JSON 계약을 노출합니다:
 
-`/`(홈) · `/performance-price` · `/risk-health` · `/optimization-insights` · `/market-data` · `/execution-analytics` · `/exact-window` · `/raw-data` · `/report-export` · `/workflows`
+`/`(홈) · `/performance-price` · `/market-data` · `/optimization-insights` · `/exact-window` · `/factor-insights` · `/alpha-evidence` · `/execution-analytics` · `/risk-health` · `/workflows` · `/raw-data` · `/report-export` · `/system`
 
-workflows 라우트는 비동기 잡 관리와 로그 스트리밍을 갖춘 백테스트·최적화·실거래 세션의 코드 없는 실행 컨트롤을 제공합니다.
+workflows 라우트는 관리형 백테스트·최적화·실거래 잡을 폴링 상태와 2단계 stop/kill 컨트롤과 함께 보여줍니다.
+
+사용법: 대시보드가 런 상태를 읽으려면 `LQ_POSTGRES_DSN`(또는 `config.yaml`의 `storage.postgres_dsn`)을 설정하세요 — 미설정 시 모든 페이지가 설정 안내를 표시합니다. `/workflows`의 Stop/Kill은 대시보드 실행 환경에 `LQ_DASHBOARD_CONTROL_TOKEN`을 설정하고 같은 값을 Jobs 페이지의 컨트롤 토큰 입력란에 붙여넣어야 동작합니다(fail-closed, 상세: `apps/dashboard_web/README.md`).
 
 ---
 

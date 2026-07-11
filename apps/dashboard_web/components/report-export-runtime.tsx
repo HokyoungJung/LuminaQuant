@@ -1,7 +1,22 @@
 'use client';
 
+import { useState } from 'react';
+
+import { PageContextBar } from '@/components/page-context-bar';
+import { RunSelector } from '@/components/run-selector';
+import { SurfaceState } from '@/components/surface-state';
 import type { ReportExportPayload } from '@/lib/dashboard-contracts';
+import {
+  formatCompactTimestamp,
+  formatCurrency,
+  formatMetricValue,
+  pnlClass,
+  statusPillClass,
+} from '@/lib/format';
 import { useBridgeFetch } from '@/lib/use-bridge-fetch';
+
+const ENDPOINT = '/api/python/dashboard/report-export';
+const PREVIEW_MAX_HEIGHT = '26rem';
 
 function downloadTextFile(filename: string | undefined, content: string, mime: string) {
   const blob = new Blob([content], { type: mime });
@@ -14,96 +29,139 @@ function downloadTextFile(filename: string | undefined, content: string, mime: s
 }
 
 export function ReportExportRuntime() {
-  const { payload, error } = useBridgeFetch<ReportExportPayload>(
-    '/api/python/dashboard/report-export',
-    'report export bridge failed',
+  const [selectedRunId, setSelectedRunId] = useState('');
+  const url = selectedRunId ? `${ENDPOINT}?run_id=${encodeURIComponent(selectedRunId)}` : ENDPOINT;
+  const { payload, error, loading, refetch, lastFetchedAt } = useBridgeFetch<ReportExportPayload>(
+    url,
+    'report export request failed',
   );
 
-  if (error) {
-    return <p>{error}</p>;
-  }
-  if (payload === null) {
-    return <p>Loading snapshot export payload…</p>;
-  }
-  if (payload.status !== 'ok') {
-    return <p>No report export payload available yet.</p>;
-  }
+  const runs = payload?.runs ?? [];
+  const report = payload?.json_report;
+  const reportStatusPill = report?.status ? (
+    <span className={statusPillClass(report.status)}>{report.status}</span>
+  ) : null;
+  const totalReturn = report?.total_return;
+  const latestEquity = report?.latest_equity;
 
   return (
     <div className="page-stack">
-      <div className="button-row">
-        <button
-          className="action-button"
-          onClick={() =>
-            downloadTextFile(
-              payload.filenames.json,
-              JSON.stringify(payload.json_report, null, 2),
-              'application/json',
-            )
-          }
-          type="button"
-        >
-          Download JSON Snapshot
-        </button>
-        <button
-          className="action-button"
-          onClick={() => downloadTextFile(payload.filenames.markdown, payload.markdown_report, 'text/markdown')}
-          type="button"
-        >
-          Download Markdown Snapshot
-        </button>
-      </div>
+      <PageContextBar
+        asOf={payload?.as_of}
+        runId={payload?.run_id}
+        status={payload?.status}
+        lastFetchedAt={lastFetchedAt}
+        onRefresh={refetch}
+        loading={loading}
+      />
+      {runs.length > 0 ? (
+        <RunSelector
+          runs={runs}
+          value={selectedRunId || payload?.run_id || ''}
+          onChange={setSelectedRunId}
+        />
+      ) : null}
+      <SurfaceState
+        status={payload?.status}
+        error={error || null}
+        surface="report export"
+        onRetry={refetch}
+      />
+      {payload === null && !error ? <p>Loading report snapshot…</p> : null}
 
-      <div className="metric-grid">
-        <article>
-          <span>Run ID</span>
-          <strong>{payload.json_report.run_id ?? 'n/a'}</strong>
-        </article>
-        <article>
-          <span>Strategy</span>
-          <strong>{payload.json_report.strategy ?? 'unknown'}</strong>
-        </article>
-        <article>
-          <span>Total Return</span>
-          <strong>{String(payload.json_report.total_return ?? 'n/a')}</strong>
-        </article>
-        <article>
-          <span>Realized PnL</span>
-          <strong>{String(payload.json_report.realized_pnl ?? 'n/a')}</strong>
-        </article>
-      </div>
+      {payload !== null && payload.status === 'ok' ? (
+        <>
+          <div className="button-row">
+            <button
+              className="action-button"
+              onClick={() =>
+                downloadTextFile(
+                  payload.filenames.json,
+                  JSON.stringify(payload.json_report, null, 2),
+                  'application/json',
+                )
+              }
+              type="button"
+            >
+              Download JSON snapshot
+            </button>
+            <button
+              className="action-button"
+              onClick={() =>
+                downloadTextFile(payload.filenames.markdown, payload.markdown_report, 'text/markdown')
+              }
+              type="button"
+            >
+              Download Markdown snapshot
+            </button>
+          </div>
 
-      <section className="section-card">
-        <div className="section-header">
-          <div>
-            <p className="eyebrow">Cutover gate</p>
-            <h3>Launcher cutover is complete</h3>
+          <div className="metric-grid">
+            <article>
+              <span>Run</span>
+              <strong>{report?.run_id ?? 'n/a'}</strong>
+            </article>
+            <article>
+              <span>Strategy</span>
+              <strong>{report?.strategy ?? 'unknown'}</strong>
+            </article>
+            <article>
+              <span>Mode</span>
+              <strong>{report?.mode ?? 'n/a'}</strong>
+            </article>
+            <article>
+              <span>Period</span>
+              <strong>
+                {formatCompactTimestamp(report?.period_start)} →{' '}
+                {formatCompactTimestamp(report?.period_end)}
+              </strong>
+            </article>
+            <article>
+              <span>Total return</span>
+              <strong className={typeof totalReturn === 'number' ? pnlClass(totalReturn) || undefined : undefined}>
+                {formatMetricValue(totalReturn, { key: 'total_return' })}
+              </strong>
+            </article>
+            <article>
+              <span>Latest equity</span>
+              <strong>{formatMetricValue(latestEquity, { key: 'latest_equity' })}</strong>
+            </article>
+            <article>
+              <span>Realized PnL</span>
+              <strong className={pnlClass(report?.realized_pnl) || undefined}>
+                {formatCurrency(report?.realized_pnl)}
+              </strong>
+            </article>
+            <article>
+              <span>Closed trades</span>
+              <strong>
+                {formatMetricValue(report?.closed_trade_count, { key: 'closed_trade_count' })}
+              </strong>
+            </article>
           </div>
-          <div className="metric-badge">{payload.cutover_gate.default_launcher}</div>
-        </div>
-        <ul className="guidance-list">
-          {(payload.cutover_gate.evidence ?? []).map((item) => (
-            <li key={item}>{item}</li>
-          ))}
-        </ul>
-      </section>
 
-      <div className="card-grid">
-        <article className="feature-card">
-          <div className="feature-header">
-            <h4>JSON Preview</h4>
-            <span className="status-pill status-available">live</span>
+          <div className="card-grid">
+            <article className="feature-card">
+              <div className="feature-header">
+                <h4>JSON preview</h4>
+                {reportStatusPill}
+              </div>
+              <pre className="code-block" style={{ maxHeight: PREVIEW_MAX_HEIGHT, overflow: 'auto' }}>
+                {JSON.stringify(payload.json_report, null, 2)}
+              </pre>
+            </article>
+            <article className="feature-card">
+              <div className="feature-header">
+                <h4>Markdown preview</h4>
+                {reportStatusPill}
+              </div>
+              <pre className="code-block" style={{ maxHeight: PREVIEW_MAX_HEIGHT, overflow: 'auto' }}>
+                {payload.markdown_report}
+              </pre>
+            </article>
           </div>
-          <pre className="code-block">{JSON.stringify(payload.json_report, null, 2)}</pre>
-        </article>
-        <article className="feature-card">
-          <div className="feature-header">
-            <h4>Markdown Preview</h4>
-            <span className="status-pill status-available">live</span>
-          </div>
-          <pre className="code-block">{payload.markdown_report}</pre>
-        </article>
-      </div>
+        </>
+      ) : null}
     </div>
   );
 }

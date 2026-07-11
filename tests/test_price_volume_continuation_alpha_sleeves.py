@@ -33,6 +33,7 @@ from lumina_quant.strategies.low_turnover_trend_alpha_sleeves import (
     LowTurnoverTrendPersistenceStrategy,
 )
 from lumina_quant.strategies.price_volume_continuation_alpha_sleeves import (
+    _PRICE_VOLUME_CONTINUATION_SLICE,
     PriceVolumeCorrContinuationStrategy,
     _return_volume_change_correlation,
 )
@@ -394,3 +395,125 @@ def test_schema_keys_snake_case_and_hyperparam() -> None:
 
 def test_decision_cadence_at_least_30m() -> None:
     assert PriceVolumeCorrContinuationStrategy.decision_cadence_seconds >= 1800
+
+
+def test_slice_multi_timeframe_keys_and_bounds() -> None:
+    """Pin the 1d/4h/1h slice: mirrored variants + keys, scaled cells in-bounds.
+
+    Guards against a silent schema clamp (out-of-bounds slice value would be
+    coerced by ``resolve_params_from_schema`` so the written value would NOT be
+    the effective one) and pins the weekly DECISION-denominated params as
+    tf-invariant while the bar-denominated windows scale wall-clock.
+    """
+    slice_dict = _PRICE_VOLUME_CONTINUATION_SLICE
+    assert set(slice_dict) == {"1d", "4h", "1h"}
+    counts = {tf: len(cells) for tf, cells in slice_dict.items()}
+    assert len(set(counts.values())) == 1, counts
+    base = {cell["variant"]: cell for cell in slice_dict["1d"]}
+    schema = PriceVolumeCorrContinuationStrategy.get_param_schema()
+    for tf, cells in slice_dict.items():
+        assert tuple(c["variant"] for c in cells) == tuple(base), (tf, counts)
+        for cell in cells:
+            assert set(cell) == set(base[cell["variant"]]), (tf, cell["variant"])
+            for key, value in cell.items():
+                if key == "variant" or isinstance(value, bool):
+                    continue
+                hp = schema[key]
+                if hp.low is not None:
+                    assert value >= hp.low, (tf, key, value)
+                if hp.high is not None:
+                    assert value <= hp.high, (tf, key, value)
+    # Weekly DECISION clock + week horizon are timestamp-based -> tf-invariant.
+    for tf in ("4h", "1h"):
+        for cell in slice_dict[tf]:
+            b = base[cell["variant"]]
+            assert cell["min_hold_decisions"] == b["min_hold_decisions"]
+            assert cell["cooldown_decisions"] == b["cooldown_decisions"]
+            assert cell["mom_window_weeks"] == b["mom_window_weeks"]
+    # ``bars_per_week`` scales x6 (4h) / x24 (1h) so the momentum horizon holds.
+    for cell in slice_dict["4h"]:
+        assert cell["bars_per_week"] == 6 * base[cell["variant"]]["bars_per_week"]
+    for cell in slice_dict["1h"]:
+        assert cell["bars_per_week"] == 24 * base[cell["variant"]]["bars_per_week"]
+
+
+# --------------------------------------------------------------------------- #
+# vol-target horizon regression (worker-vt2)
+#
+# ``_vol_scaled_allocation`` sizes ``target_allocation * (target_vol / vol)``
+# clamped to ``[0, 2 * target_allocation]``.  ``vol`` is a PER-BAR realized vol,
+# so it MUST be annualized via sqrt(bars_per_year) from observed spacing before
+# dividing an annual-scale ``target_vol`` by it.  WITHOUT the fix the per-bar
+# ratio is enormous and the size PINS at the 2x-max clamp (inert).  WITH the fix
+# it is a live vol-target: calm names lever to the 2x cap, hot names throttle
+# below 1x, and an unknown horizon passes through at exactly ``target_allocation``
+# (1x) -- NOT the old 2x pin.
+# --------------------------------------------------------------------------- #
+
+_HOUR_EPOCHS = [1_700_000_000.0 + i * 3600.0 for i in range(12)]  # 1h spacing
+
+
+def _vt_hot_closes() -> list[float]:
+    closes: list[float] = []
+    price = 100.0
+    for i in range(40):  # oscillating path -> large per-bar realized vol
+        price *= 1.03 if i % 2 == 0 else 0.975
+        closes.append(price)
+    return closes
+
+
+def _vt_calm_closes() -> list[float]:
+    return [100.0 + 0.001 * i for i in range(40)]  # ~flat -> tiny per-bar vol
+
+
+def test_vol_target_throttle_active_on_hourly_high_vol() -> None:
+    strat = _new_sleeve()
+    for epoch in _HOUR_EPOCHS:
+        strat._recent_times.append(epoch)
+    alloc = strat._vol_scaled_allocation(_vt_hot_closes())
+    # annualized vol >> target_vol -> sized strictly below 1x target_allocation
+    assert 0.0 < alloc < strat.target_allocation, alloc
+
+
+def test_vol_target_passthrough_without_spacing_is_one_x() -> None:
+    strat = _new_sleeve()  # empty _recent_times -> spacing unknown
+    alloc = strat._vol_scaled_allocation(_vt_hot_closes())
+    # pass-through at exactly target_allocation (1x); the pre-fix bug pinned 2x
+    assert alloc == strat.target_allocation
+
+
+def test_vol_target_calm_levers_to_two_x_clamp() -> None:
+    strat = _new_sleeve()
+    for epoch in _HOUR_EPOCHS:
+        strat._recent_times.append(epoch)
+    alloc = strat._vol_scaled_allocation(_vt_calm_closes())
+    # annualized vol << target_vol -> ratio large -> pinned at the 2x-max clamp
+    assert alloc == 2.0 * strat.target_allocation
+
+
+def test_vol_target_allocation_deterministic() -> None:
+    strat = _new_sleeve()
+    for epoch in _HOUR_EPOCHS:
+        strat._recent_times.append(epoch)
+    hot = _vt_hot_closes()
+    assert strat._vol_scaled_allocation(hot) == strat._vol_scaled_allocation(hot)
+
+
+def test_vol_target_epochs_tracked_from_datetime_feed() -> None:
+    strat = _new_sleeve()
+    _feed_one(strat, _SYM, _CLOSES, _VOL_A)  # daily-spaced ISO timestamps
+    times = list(strat._recent_times)
+    assert len(times) >= 5, times
+    gaps = [round(times[i + 1] - times[i]) for i in range(len(times) - 1)]
+    assert gaps and all(gap == 86400 for gap in gaps), gaps  # 1d spacing tracked
+
+
+def test_vol_target_recent_times_survive_state_roundtrip() -> None:
+    strat = _new_sleeve()
+    for epoch in _HOUR_EPOCHS:
+        strat._recent_times.append(epoch)
+    strat._last_ingest_key = "sentinel-key"
+    restored = _new_sleeve()
+    restored.set_state(strat.get_state())
+    assert list(restored._recent_times) == list(_HOUR_EPOCHS)
+    assert restored._last_ingest_key == "sentinel-key"

@@ -360,6 +360,10 @@ def test_inverse_vol_sizing_lower_vol_gets_larger_alloc_and_book_scales_down() -
         high_vol_alloc = max(longs[s]["target_allocation"] for s in high_vol_syms)
         assert low_vol_alloc > high_vol_alloc
     # Portfolio vol-target clamp engaged (scalar < 1 because target_vol is tiny).
+    # NOTE (v5 vol-target horizon fix): the scalar now clamps against the
+    # ANNUALIZED per-bar portfolio vol (bar spacing inferred from the 60s-spaced
+    # feed), which only makes it SMALLER than the pre-fix per-bar comparison, so
+    # ``< 1.0`` still holds.
     assert any(meta["vol_target_scalar"] < 1.0 for meta in longs.values())
 
 
@@ -469,3 +473,116 @@ def test_tier_is_research_only_and_excluded_from_live() -> None:
     # Must not be selected for live in EITHER mode until backtest-validated.
     assert name not in get_live_strategy_map(include_opt_in=False)
     assert name not in get_live_strategy_map(include_opt_in=True)
+
+
+# --------------------------------------------------------------------------- #
+# vol-target HORIZON fix (v5 audit): the inverse-vol ``min(1, target_vol /
+# portfolio_vol)`` scalar must ANNUALIZE the per-bar portfolio vol (via
+# sqrt(bars_per_year) inferred from observed bar spacing) before the clamp;
+# pre-fix it compared an annual-scale ``target_vol`` (~0.20) against a per-bar
+# vol and was pinned at 1.0 (throttle inert).  ``_inverse_vol_weights`` is
+# exercised directly with a seeded ``_recent_times`` to isolate the math.
+# --------------------------------------------------------------------------- #
+
+
+def _seed_hourly_times(strategy: DiversifiedMultiFactorEnsembleStrategy, n: int = 12) -> None:
+    """Populate ``_recent_times`` with ``n`` epochs spaced ONE HOUR apart."""
+    base = 1_700_000_000
+    strategy._recent_times.clear()
+    for i in range(n):
+        strategy._recent_times.append(float(base + i * 3600))
+
+
+def test_vol_target_scalar_throttles_high_vol_at_hourly_spacing() -> None:
+    strat = DiversifiedMultiFactorEnsembleStrategy(_Bars(_SYMBOLS), _Queue(), target_vol=0.20)
+    _seed_hourly_times(strat)
+    targets = {"AAA/USDT": ("LONG", 1.0, {}), "BBB/USDT": ("LONG", 1.0, {})}
+    vols = {"AAA/USDT": 0.03, "BBB/USDT": 0.03}  # per-bar; annualized ~2.8 >> 0.20
+    _weights, scalar = strat._inverse_vol_weights(targets, vols)
+    assert scalar < 1.0
+
+
+def test_vol_target_scalar_passthrough_calm_vol_at_hourly_spacing() -> None:
+    strat = DiversifiedMultiFactorEnsembleStrategy(_Bars(_SYMBOLS), _Queue(), target_vol=0.20)
+    _seed_hourly_times(strat)
+    targets = {"AAA/USDT": ("LONG", 1.0, {}), "BBB/USDT": ("LONG", 1.0, {})}
+    vols = {"AAA/USDT": 0.0005, "BBB/USDT": 0.0005}  # annualized ~0.047 < 0.20
+    _weights, scalar = strat._inverse_vol_weights(targets, vols)
+    assert scalar == 1.0
+
+
+def test_vol_target_scalar_passthrough_when_spacing_unavailable() -> None:
+    strat = DiversifiedMultiFactorEnsembleStrategy(_Bars(_SYMBOLS), _Queue(), target_vol=0.20)
+    strat._recent_times.clear()  # no inferable bar spacing
+    targets = {"AAA/USDT": ("LONG", 1.0, {}), "BBB/USDT": ("LONG", 1.0, {})}
+    vols = {"AAA/USDT": 0.03, "BBB/USDT": 0.03}
+    _weights, scalar = strat._inverse_vol_weights(targets, vols)
+    assert scalar == 1.0
+
+
+def test_vol_target_scalar_annualizes_shrunk_cov_vol_after_substitution() -> None:
+    """When ``use_shrunk_cov_vol`` is ON the shrunk per-bar portfolio vol REPLACES
+    the naive estimate and the annualization runs AFTER that substitution.  With
+    tiny NAIVE vols (whose annualized value is < ``target_vol`` -> no throttle),
+    a ``scalar < 1`` can only arise if the (volatile) shrunk vol was substituted
+    AND then annualized."""
+    strat = DiversifiedMultiFactorEnsembleStrategy(
+        _Bars(_SYMBOLS), _Queue(), target_vol=0.20, vol_window=10, use_shrunk_cov_vol=True
+    )
+    # Volatile close path for the two targets so the shrunk portfolio vol is large.
+    for symbol in ("AAA/USDT", "BBB/USDT"):
+        item = strat._state[symbol]
+        for i in range(30):
+            item.closes.append(100.0 if i % 2 == 0 else 105.0)
+    _seed_hourly_times(strat)
+    targets = {"AAA/USDT": ("LONG", 1.0, {}), "BBB/USDT": ("LONG", 1.0, {})}
+    vols = {"AAA/USDT": 0.001, "BBB/USDT": 0.001}  # naive annualized ~0.094 < 0.20
+    _weights, scalar = strat._inverse_vol_weights(targets, vols)
+    assert scalar < 1.0
+
+
+def test_vol_target_state_roundtrip_carries_recent_times() -> None:
+    """The per-bar recording hook populates ``_recent_times`` in the live feed
+    path (before the rebalance gate), and get_state/set_state carries it."""
+    bars = _Bars(_SYMBOLS)
+    strat = DiversifiedMultiFactorEnsembleStrategy(
+        bars, _Queue(), trend_lookback=20, vol_window=10, funding_z_window=8
+    )
+    series = {symbol: [100.0 + i for i in range(60)] for symbol in _SYMBOLS}
+    _feed_constant_features(
+        strat, series, {symbol: {"funding_rate": 0.0001} for symbol in _SYMBOLS}
+    )
+    assert list(strat._recent_times), "expected the per-bar hook to record epochs"
+
+    state = strat.get_state()
+    assert state["recent_times"] == list(strat._recent_times)
+    restored = DiversifiedMultiFactorEnsembleStrategy(_Bars(_SYMBOLS), _Queue())
+    restored.set_state(state)
+    assert list(restored._recent_times) == list(strat._recent_times)
+
+
+def test_zero_weight_target_never_emits_default_sized_entry() -> None:
+    """v5 fix: alloc=0 omits ``target_allocation`` from metadata and the
+    engine resizes the entry to its DEFAULT allocation -- zero-weight targets
+    must not emit entries, and a HELD name whose weight collapses to zero is
+    flattened instead of re-emitted unsized."""
+    strat = DiversifiedMultiFactorEnsembleStrategy(_Bars(_SYMBOLS), _Queue())
+    targets = {"AAA/USDT": ("LONG", 1.0, {}), "BBB/USDT": ("SHORT", -1.0, {})}
+    strat._emit_weighted(targets, {}, 1.0, "2026-01-05T00:00:00Z")
+    assert not [s for s in strat.events.items if s.signal_type in {"LONG", "SHORT"}]
+
+    strat._emit_weighted(targets, {"AAA/USDT": 0.5, "BBB/USDT": 0.5}, 1.0, "2026-01-05T01:00:00Z")
+    entries = [s for s in strat.events.items if s.signal_type in {"LONG", "SHORT"}]
+    assert {s.symbol for s in entries} == {"AAA/USDT", "BBB/USDT"}
+    for sig in entries:
+        assert float(sig.metadata.get("target_allocation", 0.0)) > 0.0
+
+    # Held names whose weight collapses to zero flatten with an explicit EXIT.
+    strat._emit_weighted(targets, {}, 1.0, "2026-01-05T02:00:00Z")
+    exits = [
+        s
+        for s in strat.events.items
+        if s.signal_type == "EXIT" and s.metadata.get("reason") == "zero_allocation"
+    ]
+    assert {s.symbol for s in exits} == {"AAA/USDT", "BBB/USDT"}
+    assert strat._state["AAA/USDT"].mode == "OUT"

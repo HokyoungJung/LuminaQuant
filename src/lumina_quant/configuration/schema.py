@@ -765,6 +765,45 @@ class ResearchConfig:
     # accountant), NOT the per-candidate count. ``False`` (default) => the existing
     # ``portfolio_followup_rules.evaluate_weighted_portfolio`` output is unchanged.
     portfolio_honest_gate: bool = False
+    # Equity-flow complements (eq-flow v5 follow-up, 2026-07-10). Five ADDITIVE
+    # walk-forward variants / ranking treatments designed from the fold-by-fold
+    # equity-flow diagnosis of the promising candidates (.omc/research/
+    # equity-flow-analysis-20260710.md). EVERY flag defaults OFF so the shipped
+    # config load stays byte-identical (the monthly-refit count pins -- 72
+    # dynamic-conviction rows, 5 router rows -- hold); the honest-research
+    # profiles turn them ON. Variant parameters are PRE-REGISTERED module
+    # constants in the walk-forward script, not tunable grids.
+    #
+    # C1: append a corr-guarded twin of the preregistered lagged leaf router
+    # risk-trimmed label -- de-scales deployment when the fold-TRAIN-window
+    # average pairwise correlation (Engle-Kelly equicorrelation) of the symbol
+    # panel spikes above its pre-registered band (the 2026-07 common tail is a
+    # high-correlation event; the Jan/Feb/Jun idiosyncratic wins are not).
+    walkforward_corr_guard_router_variant: bool = False
+    # B2: append a momentum-crash-scaled twin of the dynamic-conviction switch
+    # -- throttles deploy scale by a Daniel-Moskowitz bear x rebound state
+    # computed on the PRE-OOS (train+validation) window of the selected
+    # candidate's own stream (targets the pro-cyclical levered entry after a
+    # run-up, e.g. the -16.7% 2026-07 fold).
+    walkforward_crash_scaled_conviction_variant: bool = False
+    # A3a: append a validation-saturation twin of the dynamic-conviction switch
+    # -- beyond a pre-registered monthly validation-return ceiling, extra
+    # validation return REDUCES the deploy scale instead of increasing it
+    # (val +180%/mo -> OOS -16.7% was a sign flip; extreme validation is an
+    # overfit flag, not conviction).
+    walkforward_val_saturation_conviction_variant: bool = False
+    # A3b: bar_count-aware fold weighting in the aggregate ranking layer -- a
+    # partial final OOS fold (e.g. 4 days) is down-weighted by
+    # min(1, bar_count / reference_bar_count) in the compounded/mean/sort
+    # aggregates so it cannot set a candidate's headline MDD / latest-OOS.
+    # OFF => uniform weights => byte-identical rankings.
+    walkforward_partial_fold_bar_count_weighting: bool = False
+    # D4: append a regime-gated twin of strict_efficiency:static_guarded --
+    # the always-on blend sits out when a trailing vol/drawdown regime signal
+    # on its own pre-OOS combined stream says down-chop (the pattern the
+    # dynamic-conviction cash gate already proves works: it deploys
+    # strict_efficiency only in up-vol folds and skips the bleed months).
+    walkforward_regime_gated_strict_efficiency_variant: bool = False
     alpha_search: AlphaSearchConfig = field(default_factory=AlphaSearchConfig)
     sharpe_ci: SharpeConfidenceIntervalConfig = field(
         default_factory=SharpeConfidenceIntervalConfig

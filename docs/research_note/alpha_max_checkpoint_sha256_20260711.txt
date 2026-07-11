@@ -1,7 +1,7 @@
 # Alpha-Max portable checkpoint SHA-256 manifest
 # Generated for the 2026-07-11 KST portable checkpoint.
 # Verify from the repository root with: sha256sum -c docs/research_note/alpha_max_checkpoint_sha256_20260711.txt
-cba057af0d6d3198d18c1f1afe7713293ab223b0d95fd94a95feee78c15a87c6  .github/hardcoded_params_baseline.json
+090d7c10533adc3f92f01f5c1c6dd3b55ed2859396f448416190518fb8e911da  .github/hardcoded_params_baseline.json
 359575cdb2880e63006e2f77d0f5293293945015e34f6e4998dd7863e3ab9515  .github/workflows/ci.yml
 e974500e623f0907e08409d5d5702e4b9d04f34fc2365552b34cac87d3e1cb03  .omx/context/alpha-max-independent-20260710-20260709T231936Z.md
 6b0dfab44f5710c1a63903b6b955a0f6e05768f0e90a4a38d76092b09ee887bf  .omx/notepad.md

@@ -76,15 +76,109 @@ def write_manifest(*, input_path: Path, output_path: Path) -> Path:
     return output_path
 
 
+def validate_cell_spec(payload: dict[str, Any]) -> tuple[bool, str]:
+    """Validate a PRE-REGISTERED allocation cell spec (data, not a runnable input).
+
+    A cell spec declares MEMBERSHIP only: every sleeve carries ``returns`` /
+    ``turnover`` == null (the data-PC fills them after materializing the streams),
+    so the spec deliberately cannot pass through the returns-required manifest
+    builder. This validator checks the pre-registration is well-formed:
+
+    * a non-empty ``sleeves`` object with at least ``allocator.min_sleeves`` entries;
+    * each sleeve declares a string ``family``, an explicit ``returns``: null and
+      ``turnover``: null, and a ``returns_source`` provenance block;
+    * at least ``allocator.min_families`` (default 3) DISTINCT families; and
+    * at least one ``source_artifacts`` provenance row.
+
+    Returns ``(ok, message)``. Never raises on a well-formed-JSON dict -- shape
+    violations are reported as ``(False, reason)``.
+    """
+    if not isinstance(payload, dict):
+        return False, "cell spec must be a JSON object"
+    sleeves = payload.get("sleeves")
+    if not isinstance(sleeves, dict) or not sleeves:
+        return False, "cell spec must declare a non-empty 'sleeves' object"
+    allocator = payload.get("allocator")
+    allocator = allocator if isinstance(allocator, dict) else {}
+    min_families = int(allocator.get("min_families", 3))
+    min_sleeves = int(allocator.get("min_sleeves", 2))
+    if len(sleeves) < max(1, min_sleeves):
+        return (
+            False,
+            f"cell spec declares {len(sleeves)} sleeves; "
+            f"allocator.min_sleeves={min_sleeves} requires at least that many",
+        )
+    families: list[str] = []
+    for sleeve_id, sleeve in sleeves.items():
+        if not isinstance(sleeve, dict):
+            return False, f"sleeve {sleeve_id!r} must be an object"
+        family = sleeve.get("family")
+        if not isinstance(family, str) or not family:
+            return False, f"sleeve {sleeve_id!r} is missing a string 'family'"
+        families.append(family)
+        if "returns" not in sleeve or sleeve.get("returns") is not None:
+            return (
+                False,
+                f"sleeve {sleeve_id!r} must declare 'returns': null "
+                "(membership only; the data-PC fills the stream)",
+            )
+        if "turnover" not in sleeve or sleeve.get("turnover") is not None:
+            return (
+                False,
+                f"sleeve {sleeve_id!r} must declare 'turnover': null "
+                "(the data-PC fills the turnover)",
+            )
+        provenance = sleeve.get("returns_source")
+        if not isinstance(provenance, dict) or not provenance:
+            return (
+                False,
+                f"sleeve {sleeve_id!r} is missing a 'returns_source' provenance block",
+            )
+    distinct = sorted(set(families))
+    if len(distinct) < max(1, min_families):
+        return (
+            False,
+            f"cell spec has {len(distinct)} distinct families {distinct}; "
+            f"allocator.min_families={min_families} requires at least that many",
+        )
+    source_artifacts = payload.get("source_artifacts")
+    if not isinstance(source_artifacts, list) or not source_artifacts:
+        return False, "cell spec must carry at least one 'source_artifacts' provenance row"
+    return (
+        True,
+        f"OK: cell {payload.get('cell_id')!r} declares {len(sleeves)} sleeves across "
+        f"{len(distinct)} distinct families {distinct} with null returns "
+        "(data-PC materialization pending)",
+    )
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--input", type=Path, required=True, help="input sleeves JSON path")
-    parser.add_argument("--output", type=Path, required=True, help="output manifest JSON path")
+    parser.add_argument("--input", type=Path, default=None, help="input sleeves JSON path")
+    parser.add_argument("--output", type=Path, default=None, help="output manifest JSON path")
+    parser.add_argument(
+        "--validate-cell-spec",
+        type=Path,
+        default=None,
+        dest="validate_cell_spec",
+        help=(
+            "validate a pre-registered allocation cell spec (null-returns membership "
+            "declaration) and exit 0 (valid) / 1 (invalid); does not read --input/--output"
+        ),
+    )
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = _build_parser().parse_args(argv)
+    parser = _build_parser()
+    args = parser.parse_args(argv)
+    if args.validate_cell_spec is not None:
+        payload = _load_input(Path(args.validate_cell_spec).resolve())
+        ok, message = validate_cell_spec(payload)
+        print(message)
+        return 0 if ok else 1
+    if args.input is None or args.output is None:
+        parser.error("--input and --output are required unless --validate-cell-spec is given")
     result = write_manifest(
         input_path=Path(args.input).resolve(),
         output_path=Path(args.output).resolve(),

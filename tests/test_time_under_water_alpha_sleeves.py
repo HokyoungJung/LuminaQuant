@@ -806,3 +806,99 @@ def test_schema_keys_snake_case_and_hyperparam() -> None:
         assert required in schema
     for cap in ("base_allocation", "max_symbol_exposure_pct", "max_order_value"):
         assert schema[cap].tunable is False
+
+
+def test_slice_multi_timeframe_cells_pinned() -> None:
+    """4h/1h add the scaled rebalance_bars clock; min_hold_decisions is invariant."""
+    from lumina_quant.strategies.time_under_water_alpha_sleeves import (
+        _TIME_UNDER_WATER_SLICE as sl,
+    )
+
+    assert {"1d", "4h", "1h"} <= set(sl)
+    base = tuple(cell["variant"] for cell in sl["1d"])
+    for tf in ("4h", "1h"):
+        assert tuple(cell["variant"] for cell in sl[tf]) == base
+    # The BAR-count decision clock is defaulted at 1d but pinned at sub-daily.
+    assert "rebalance_bars" not in sl["1d"][0]
+    assert sl["4h"][0]["rebalance_bars"] == 42
+    assert sl["1h"][0]["rebalance_bars"] == 168
+    assert sl["4h"][0]["lookback_bars"] == 2184
+    assert sl["1h"][0]["lookback_bars"] == 8736
+    for tf in ("1d", "4h", "1h"):
+        assert sl[tf][0]["min_hold_decisions"] == 4
+
+
+# --------------------------------------------------------------------------- #
+# vol-target horizon fix (Class-B throttle): regression.
+# --------------------------------------------------------------------------- #
+
+
+def test_vol_target_throttle_annualizes_per_bar_vol() -> None:
+    """The Class-B throttle annualizes the PER-BAR portfolio vol by the median
+    observed bar spacing (canonical ``annualize_per_bar_vol``) before comparing it to
+    ``target_vol``: a hurricane per-1h vol now DE-RISKS, a calm one does not, and
+    an unknown cadence stays at 1.0.
+    """
+    symbols = ["A/USDT", "B/USDT"]
+    strategy = CrossSectionalTimeUnderWaterStrategy(
+        _Bars(symbols), _Queue(), **dict(_CAND_KWARGS, target_vol=0.20)
+    )
+    base = 1_700_000_000.0
+    for i in range(12):
+        strategy._recent_times.append(base + i * 3600.0)  # clean 1h cadence
+    targets = {"A/USDT": ("LONG", 1.0, {}), "B/USDT": ("SHORT", -1.0, {})}
+    # Hurricane per-1h vol -> annualizes far above 0.20 -> throttle engages.
+    _weights, hot = strategy._inverse_vol_weights(targets, {"A/USDT": 0.02, "B/USDT": 0.026})
+    assert hot < 1.0, hot
+    # Calm per-1h vol -> annualizes below 0.20 -> no de-risk.
+    _weights, calm = strategy._inverse_vol_weights(targets, {"A/USDT": 0.0002, "B/USDT": 0.00026})
+    assert calm == 1.0, calm
+    # Determinism: same inputs -> identical scalar.
+    _weights, hot2 = strategy._inverse_vol_weights(targets, {"A/USDT": 0.02, "B/USDT": 0.026})
+    assert hot2 == hot
+    # Unknown cadence (no observed bars) -> conservative unity scalar.
+    fresh = CrossSectionalTimeUnderWaterStrategy(
+        _Bars(symbols), _Queue(), **dict(_CAND_KWARGS, target_vol=0.20)
+    )
+    _weights, unknown = fresh._inverse_vol_weights(targets, {"A/USDT": 0.02, "B/USDT": 0.026})
+    assert unknown == 1.0, unknown
+
+
+# --------------------------------------------------------------------------- #
+# v5 zero-alloc gate: a computed alloc of 0 must NOT emit a LONG/SHORT --
+# ``_target_metadata`` omits ``target_allocation`` at alloc 0 and the engine
+# would resize the entry to its DEFAULT allocation (an unsized, un-vol-gated bet).
+# --------------------------------------------------------------------------- #
+
+
+def test_zero_alloc_entry_skipped_not_default_sized() -> None:
+    symbols = ["FLIP/USDT", "FRESH/USDT", "N0/USDT", "N1/USDT", "N2/USDT", "N3/USDT"]
+    strat = CrossSectionalTimeUnderWaterStrategy(_Bars(symbols), _Queue(), **_CAND_KWARGS)
+    flip = strat._state["FLIP/USDT"]
+    flip.mode = "LONG"
+    flip.entry_price = 100.0
+    flip.bars_held = 10_000  # clear the min-hold so the side flip is live
+    targets = {
+        "FLIP/USDT": ("SHORT", -1.0, {}),
+        "FRESH/USDT": ("LONG", 1.0, {}),
+    }
+    # empty weights -> alloc == 0 for every targeted symbol
+    strat._emit_targets(targets, {}, 1.0, "2026-01-01T00:00:00Z")
+    kinds = [(sig.symbol, str(sig.signal_type).upper()) for sig in strat.events.items]
+    assert not [sym for sym, kind in kinds if kind in {"LONG", "SHORT"}], kinds
+    # the side-flip EXIT still fired and FLIP is now flat (state matches the exit)
+    assert ("FLIP/USDT", "EXIT") in kinds
+    assert strat._state["FLIP/USDT"].mode == "OUT"
+    assert strat._state["FLIP/USDT"].entry_price is None
+
+    # a positive inverse-vol weight DOES emit a sized entry carrying a strictly
+    # positive ``target_allocation``.
+    sized = CrossSectionalTimeUnderWaterStrategy(_Bars(symbols), _Queue(), **_CAND_KWARGS)
+    sized._emit_targets(
+        {"FRESH/USDT": ("LONG", 1.0, {})}, {"FRESH/USDT": 0.5}, 1.0, "2026-01-01T00:00:00Z"
+    )
+    entries = [
+        sig for sig in sized.events.items if str(sig.signal_type).upper() in {"LONG", "SHORT"}
+    ]
+    assert entries, "a positive inverse-vol weight must emit a sized entry"
+    assert all(float((sig.metadata or {}).get("target_allocation", 0.0)) > 0.0 for sig in entries)

@@ -23,9 +23,13 @@ from lumina_quant.dashboard.state_store_service import (
 )
 from lumina_quant.dashboard.workflow_jobs_service import load_recent_workflow_jobs
 from lumina_quant.dashboard.overview_service import (
+    FULL_EQUITY_ROW_CAP,
     build_overview_payload_from_frames,
     coerce_datetime_series,
+    downsample_curve_indices,
+    infer_periods_per_year,
     overview_metric,
+    recent_runs_from_frame,
     resolve_dashboard_postgres_dsn,
 )
 from lumina_quant.market_data import (
@@ -34,6 +38,16 @@ from lumina_quant.market_data import (
     timeframe_to_milliseconds,
 )
 from lumina_quant.postgres_state import _connect_postgres
+
+# Indicator windows for the market-data surface (pure pandas/numpy, no scipy).
+RSI_WINDOW = 14
+ATR_WINDOW = 14
+REALIZED_VOL_WINDOW = 30
+RANGE_WINDOW = 20
+# recent_bars covers the same window the summary metrics use.
+RECENT_BAR_LIMIT = 240
+# Latest runs exposed in every cutover payload for the UI run selector.
+RUN_SELECTOR_LIMIT = 10
 
 
 def _dashboard_contract() -> Any:
@@ -139,15 +153,29 @@ def _frame_preview_payload(label: str, frame: pd.DataFrame) -> dict[str, Any]:
     }
 
 
+def _observed_symbols(fills_frame: pd.DataFrame) -> list[str]:
+    """Sorted distinct symbols observed in the run's fills (fallback: config)."""
+    if "symbol" in fills_frame.columns:
+        values = fills_frame["symbol"].dropna().astype(str)
+        symbols = sorted({value for value in values.tolist() if value})
+        if symbols:
+            return symbols
+    configured = get_default_runtime_config().trading.symbols
+    if isinstance(configured, list):
+        return sorted({str(symbol) for symbol in configured if str(symbol)})
+    return []
+
+
 def _resolve_market_context(
     *,
     run_row: dict[str, Any],
     fills_frame: pd.DataFrame,
+    symbol: str | None = None,
 ) -> dict[str, Any]:
     metadata = _parse_json_dict(run_row.get("metadata"))
     configured_symbols = get_default_runtime_config().trading.symbols
-    symbol = ""
-    if "symbol" in fills_frame.columns:
+    symbol = str(symbol or "").strip()
+    if not symbol and "symbol" in fills_frame.columns:
         symbol_values = fills_frame["symbol"].dropna().astype(str)
         if not symbol_values.empty:
             symbol = str(symbol_values.iloc[-1])
@@ -173,6 +201,28 @@ def _resolve_market_context(
         "market_db_path": market_db_path,
         "source": "parquet" if market_db_path else "unconfigured",
     }
+
+
+def _resolve_benchmark_symbol(run_row: dict[str, Any] | None) -> str | None:
+    """The run's primary/benchmark symbol, or None when unknown.
+
+    Backtests record ``benchmark_price`` as the close of ``symbol_list[0]``
+    (portfolio_backtest), and the run metadata persists that list under
+    ``symbols`` (cli/backtest.py). Config is only a best-effort fallback for
+    runs whose metadata predates the symbols key.
+    """
+    metadata = _parse_json_dict((run_row or {}).get("metadata"))
+    metadata_symbols = metadata.get("symbols")
+    if isinstance(metadata_symbols, list) and metadata_symbols:
+        first = str(metadata_symbols[0] or "").strip()
+        if first:
+            return first
+    configured = get_default_runtime_config().trading.symbols
+    if isinstance(configured, list) and configured:
+        first = str(configured[0] or "").strip()
+        if first:
+            return first
+    return None
 
 
 def _empty_surface_payload(*, run_id: str = "", reason: str) -> dict[str, Any]:
@@ -285,7 +335,9 @@ def compute_trade_analytics(df_trades: pd.DataFrame) -> pd.DataFrame:
         holding_sec.append(hold_seconds)
 
     df["realized_pnl"] = realized_pnl
-    df["realized_return_pct"] = pd.Series(realized_return, dtype="float64") * 100.0
+    # Cross-side convention: percent-like *_pct metrics travel as raw fractions
+    # (0.05 = 5%); the frontend multiplies by 100 at render.
+    df["realized_return_pct"] = pd.Series(realized_return, dtype="float64")
     df["position_after"] = position_after
     df["avg_cost_after"] = avg_cost_after
     df["closed_qty"] = closed_qty
@@ -327,6 +379,63 @@ def _load_runs(dsn: str, *, run_limit: int) -> pd.DataFrame:
         coerce_datetime=coerce_datetime_series,
         limit=run_limit,
     )
+
+
+def _load_run_row_exact(dsn: str, run_id: str) -> dict[str, Any] | None:
+    """Exact parameterized run lookup (mirrors overview_service).
+
+    Runs older than any recency-limited selector window still resolve; only a
+    genuinely missing run_id returns ``None``.
+    """
+    conn = _connect_postgres(dsn)
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT
+                    run_id,
+                    mode,
+                    started_at,
+                    ended_at,
+                    status,
+                    metadata_json AS metadata,
+                    COALESCE(
+                        (metadata_json ->> 'strategy'),
+                        ''
+                    ) AS strategy
+                FROM runs
+                WHERE run_id = %s
+                LIMIT 1
+                """,
+                (run_id,),
+            )
+            rows = cursor.fetchall()
+            columns = [description[0] for description in cursor.description or ()]
+    finally:
+        conn.close()
+    if not rows:
+        return None
+    return dict(zip(columns, rows[0], strict=False))
+
+
+def _select_run_row(
+    dsn: str,
+    runs: pd.DataFrame,
+    run_id: str | None,
+) -> dict[str, Any] | None:
+    """Pick the requested run row (falling back to the latest run).
+
+    Returns ``None`` only when an explicitly requested run_id does not exist
+    in the runs table at all.
+    """
+    requested = str(run_id or "").strip()
+    if not requested:
+        return runs.iloc[0].to_dict() if not runs.empty else None
+    if not runs.empty:
+        matches = runs[runs["run_id"].astype(str) == requested]
+        if not matches.empty:
+            return matches.iloc[0].to_dict()
+    return _load_run_row_exact(dsn, requested)
 
 
 def _load_metrics(dsn: str, run_id: str, *, point_limit: int) -> pd.DataFrame:
@@ -430,6 +539,7 @@ def build_performance_price_payload(
     overview_payload: dict[str, Any],
     metrics_frame: pd.DataFrame,
     fills_frame: pd.DataFrame,
+    run_row: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     payload = {
         **_empty_surface_payload(
@@ -443,6 +553,9 @@ def build_performance_price_payload(
         "drawdown_curve": overview_payload.get("drawdown_curve", []),
         "benchmark_curve": [],
         "funding_curve": [],
+        # Contract: string|null — the symbol whose close was recorded as
+        # benchmark_price (first entry of the run's symbol list).
+        "benchmark_symbol": _resolve_benchmark_symbol(run_row),
         "trade_markers": [],
     }
     if payload["status"] != "ok":
@@ -623,26 +736,105 @@ def build_execution_analytics_payload(
     return payload
 
 
+def _last_finite(series: pd.Series | None) -> float | None:
+    if series is None:
+        return None
+    valid = series.dropna()
+    if valid.empty:
+        return None
+    value = float(valid.iloc[-1])
+    return value if math.isfinite(value) else None
+
+
+def _compute_market_indicators(market_frame: pd.DataFrame) -> dict[str, float | None]:
+    """Deterministic indicator set from the loaded OHLCV window (no scipy).
+
+    Percent-like keys (atr_pct, realized_vol_30, dist_from_20bar_*) are raw
+    fractions per the cross-side convention.
+    """
+    close = pd.to_numeric(market_frame.get("close"), errors="coerce")
+    high = pd.to_numeric(market_frame.get("high"), errors="coerce")
+    low = pd.to_numeric(market_frame.get("low"), errors="coerce")
+    volume = pd.to_numeric(market_frame.get("volume"), errors="coerce")
+    last_close = _last_finite(close)
+
+    delta = close.diff()
+    gain = delta.clip(lower=0.0)
+    loss = (-delta).clip(lower=0.0)
+    # Wilder smoothing == EMA with alpha = 1/window; all-gain windows resolve
+    # to RSI 100 naturally via the inf ratio.
+    avg_gain = gain.ewm(alpha=1.0 / RSI_WINDOW, adjust=False, min_periods=RSI_WINDOW).mean()
+    avg_loss = loss.ewm(alpha=1.0 / RSI_WINDOW, adjust=False, min_periods=RSI_WINDOW).mean()
+    rsi = 100.0 - 100.0 / (1.0 + avg_gain / avg_loss)
+    rsi_last = _last_finite(rsi)
+
+    prev_close = close.shift(1)
+    true_range = pd.concat(
+        [high - low, (high - prev_close).abs(), (low - prev_close).abs()],
+        axis=1,
+    ).max(axis=1)
+    atr = true_range.ewm(alpha=1.0 / ATR_WINDOW, adjust=False, min_periods=ATR_WINDOW).mean()
+    atr_last = _last_finite(atr)
+    atr_pct = None
+    if atr_last is not None and last_close:
+        atr_pct = atr_last / last_close
+
+    realized_vol = None
+    window_returns = close.pct_change().dropna().tail(REALIZED_VOL_WINDOW)
+    if len(window_returns) >= 2:
+        per_bar_vol = float(window_returns.std(ddof=1))
+        if math.isfinite(per_bar_vol):
+            realized_vol = per_bar_vol * math.sqrt(
+                infer_periods_per_year(market_frame.get("datetime"))
+            )
+
+    dist_from_high = None
+    dist_from_low = None
+    window_high = high.dropna().tail(RANGE_WINDOW)
+    window_low = low.dropna().tail(RANGE_WINDOW)
+    if last_close is not None and not window_high.empty and float(window_high.max()):
+        dist_from_high = last_close / float(window_high.max()) - 1.0
+    if last_close is not None and not window_low.empty and float(window_low.min()):
+        dist_from_low = last_close / float(window_low.min()) - 1.0
+
+    window_volume = None
+    if volume.notna().any():
+        window_volume = float(volume.dropna().sum())
+
+    return {
+        "rsi_14": rsi_last,
+        "atr_14": atr_last,
+        "atr_pct": atr_pct,
+        "realized_vol_30": realized_vol,
+        "dist_from_20bar_high": dist_from_high,
+        "dist_from_20bar_low": dist_from_low,
+        "last_close": last_close,
+        "window_volume": window_volume,
+    }
+
+
+def _round_or_none(value: float | None, digits: int = 6) -> float | None:
+    return None if value is None else round(float(value), digits)
+
+
 def build_market_data_payload(
     *,
     run_row: dict[str, Any],
     fills_frame: pd.DataFrame,
     market_frame: pd.DataFrame,
+    symbol: str | None = None,
 ) -> dict[str, Any]:
     run_id = str(run_row.get("run_id") or "")
-    context = _resolve_market_context(run_row=run_row, fills_frame=fills_frame)
+    context = _resolve_market_context(run_row=run_row, fills_frame=fills_frame, symbol=symbol)
     payload = {
         **_empty_surface_payload(run_id=run_id, reason="ok"),
         "market_context": context,
+        "symbols": _observed_symbols(fills_frame),
         "summary_metrics": [],
         "recent_bars": [],
+        "bar_window": {"start": None, "end": None, "bar_count": 0},
         "indicator_summary": [
             overview_metric("Strategy", context["strategy"], key="strategy"),
-            overview_metric(
-                "Indicator Mode",
-                "price-only parity preview",
-                key="indicator_mode",
-            ),
         ],
         "warnings": [],
     }
@@ -661,6 +853,7 @@ def build_market_data_payload(
     first_close = close_series.dropna().iloc[0] if close_series.notna().any() else None
     price_change_pct = None
     if first_close not in (None, 0):
+        # Raw fraction per the cross-side convention; frontend renders x100.
         price_change_pct = (_safe_float(latest_close) - float(first_close)) / float(first_close)
 
     payload["summary_metrics"] = [
@@ -683,8 +876,39 @@ def build_market_data_payload(
             key="price_change_pct",
         ),
     ]
+    indicators = _compute_market_indicators(market_frame)
     payload["indicator_summary"].extend(
         [
+            overview_metric(
+                f"RSI ({RSI_WINDOW})", _round_or_none(indicators["rsi_14"]), key="rsi_14"
+            ),
+            overview_metric(
+                f"ATR ({ATR_WINDOW})", _round_or_none(indicators["atr_14"]), key="atr_14"
+            ),
+            overview_metric("ATR %", _round_or_none(indicators["atr_pct"]), key="atr_pct"),
+            overview_metric(
+                f"Realized Vol ({REALIZED_VOL_WINDOW} bars, annualized)",
+                _round_or_none(indicators["realized_vol_30"]),
+                key="realized_vol_30",
+            ),
+            overview_metric(
+                f"Dist From {RANGE_WINDOW}-Bar High",
+                _round_or_none(indicators["dist_from_20bar_high"]),
+                key="dist_from_20bar_high",
+            ),
+            overview_metric(
+                f"Dist From {RANGE_WINDOW}-Bar Low",
+                _round_or_none(indicators["dist_from_20bar_low"]),
+                key="dist_from_20bar_low",
+            ),
+            overview_metric(
+                "Last Close", _round_or_none(indicators["last_close"]), key="last_close"
+            ),
+            overview_metric(
+                "Window Volume",
+                _round_or_none(indicators["window_volume"]),
+                key="window_volume",
+            ),
             overview_metric(
                 "Price Range",
                 (
@@ -701,6 +925,15 @@ def build_market_data_payload(
             ),
         ]
     )
+    payload["bar_window"] = {
+        "start": _isoformat(market_frame["datetime"].iloc[0])
+        if "datetime" in market_frame.columns
+        else None,
+        "end": _isoformat(market_frame["datetime"].iloc[-1])
+        if "datetime" in market_frame.columns
+        else None,
+        "bar_count": len(market_frame.index),
+    }
     payload["recent_bars"] = [
         {
             "timestamp": _isoformat(row.datetime),
@@ -710,7 +943,7 @@ def build_market_data_payload(
             "close": _normalize_json_value(getattr(row, "close", None)),
             "volume": _normalize_json_value(getattr(row, "volume", None)),
         }
-        for row in market_frame.tail(24).itertuples(index=False)
+        for row in market_frame.tail(RECENT_BAR_LIMIT).itertuples(index=False)
         if _isoformat(row.datetime) is not None
     ]
     return payload
@@ -775,7 +1008,14 @@ def build_optimization_insights_payload(
             }
         )
 
-    ordered = optimization_frame.assign(_sharpe=sharpe).sort_values(
+    # cagr/mdd are persisted as percent-magnitude TEXT ('12.3456', 'N/A') by
+    # cli/optimize.py; the contract declares number|null RAW FRACTIONS, so
+    # coerce here ('N/A' -> None via NaN, percent magnitude -> fraction).
+    cagr_fraction = pd.to_numeric(optimization_frame.get("cagr"), errors="coerce") / 100.0
+    mdd_fraction = pd.to_numeric(optimization_frame.get("mdd"), errors="coerce") / 100.0
+    ordered = optimization_frame.assign(
+        _sharpe=sharpe, cagr=cagr_fraction, mdd=mdd_fraction
+    ).sort_values(
         by=["_sharpe", "created_at"],
         ascending=[False, False],
         na_position="last",
@@ -911,67 +1151,87 @@ def build_report_export_payload(
     return payload
 
 
+def _empty_performance_price_payload(reason: str, *, runs: list[dict[str, Any]]) -> dict[str, Any]:
+    return {
+        **_empty_surface_payload(reason=reason),
+        "source": {"status": reason},
+        "runs": runs,
+        "summary_metrics": [],
+        "performance_metrics": {},
+        "equity_curve": [],
+        "drawdown_curve": [],
+        "benchmark_curve": [],
+        "funding_curve": [],
+        # Contract-required even on empty shapes (null = unknown).
+        "benchmark_symbol": None,
+        "trade_markers": [],
+    }
+
+
 def load_performance_price_payload(
     *,
     dsn: str | None = None,
     point_limit: int = 240,
     fill_limit: int = 80,
+    run_id: str | None = None,
 ) -> dict[str, Any]:
     if dsn is not None and not str(dsn).strip():
-        return {
-            **_empty_surface_payload(reason="missing_dsn"),
-            "source": {"status": "missing_dsn"},
-            "summary_metrics": [],
-            "performance_metrics": {},
-            "equity_curve": [],
-            "drawdown_curve": [],
-            "benchmark_curve": [],
-            "funding_curve": [],
-            "trade_markers": [],
-        }
+        return _empty_performance_price_payload("missing_dsn", runs=[])
     resolved_dsn = resolve_dashboard_postgres_dsn(dsn)
     if not resolved_dsn:
-        return {
-            **_empty_surface_payload(reason="missing_dsn"),
-            "source": {"status": "missing_dsn"},
-            "summary_metrics": [],
-            "performance_metrics": {},
-            "equity_curve": [],
-            "drawdown_curve": [],
-            "benchmark_curve": [],
-            "funding_curve": [],
-            "trade_markers": [],
-        }
+        return _empty_performance_price_payload("missing_dsn", runs=[])
 
-    runs = _load_runs(resolved_dsn, run_limit=10)
+    runs = _load_runs(resolved_dsn, run_limit=RUN_SELECTOR_LIMIT)
     if runs.empty:
-        return {
-            **_empty_surface_payload(reason="no_runs"),
-            "source": {"status": "no_runs"},
-            "summary_metrics": [],
-            "performance_metrics": {},
-            "equity_curve": [],
-            "drawdown_curve": [],
-            "benchmark_curve": [],
-            "funding_curve": [],
-            "trade_markers": [],
-        }
+        return _empty_performance_price_payload("no_runs", runs=[])
+    runs_list = recent_runs_from_frame(runs)
+    run_row = _select_run_row(resolved_dsn, runs, run_id)
+    if run_row is None:
+        return _empty_performance_price_payload("run_not_found", runs=runs_list)
 
-    run_id = str(runs.iloc[0]["run_id"] or "")
-    metrics = _load_metrics(resolved_dsn, run_id, point_limit=point_limit)
-    fills = _load_fills(resolved_dsn, run_id, fill_limit=fill_limit)
+    selected_run_id = str(run_row.get("run_id") or "")
+    # Headline metrics must describe the FULL run (mirrors the overview P0
+    # fix): compute performance/summary metrics from the full equity series
+    # and only downsample the payload curves to point_limit.
+    metrics = _load_metrics(resolved_dsn, selected_run_id, point_limit=FULL_EQUITY_ROW_CAP)
+    fills = _load_fills(resolved_dsn, selected_run_id, fill_limit=fill_limit)
+    curve_point_limit = int(max(2, point_limit))
     overview_payload = build_overview_payload_from_frames(
         contract=_dashboard_contract(),
         runs_frame=runs,
         equity_frame=metrics[["datetime", "total"]].copy()
         if {"datetime", "total"}.issubset(metrics.columns)
         else pd.DataFrame(),
+        selected_run_row=run_row,
+        curve_point_limit=curve_point_limit,
+        equity_truncated=len(metrics.index) >= FULL_EQUITY_ROW_CAP,
     )
-    return build_performance_price_payload(
+    curve_driver = (
+        metrics["total"] if "total" in metrics.columns else pd.Series(range(len(metrics.index)))
+    )
+    curve_indices = downsample_curve_indices(curve_driver, curve_point_limit)
+    payload = build_performance_price_payload(
         overview_payload=overview_payload,
-        metrics_frame=metrics,
+        metrics_frame=metrics.iloc[curve_indices],
         fills_frame=fills,
+        run_row=run_row,
     )
+    payload["runs"] = runs_list
+    payload["equity_window"] = overview_payload.get("equity_window")
+    return payload
+
+
+def _empty_execution_analytics_payload(
+    reason: str, *, runs: list[dict[str, Any]]
+) -> dict[str, Any]:
+    return {
+        **_empty_surface_payload(reason=reason),
+        "runs": runs,
+        "summary": {},
+        "direction_breakdown": [],
+        "order_status": [],
+        "recent_closed_trades": [],
+    }
 
 
 def load_execution_analytics_payload(
@@ -979,41 +1239,41 @@ def load_execution_analytics_payload(
     dsn: str | None = None,
     fill_limit: int = 200,
     order_limit: int = 200,
+    run_id: str | None = None,
 ) -> dict[str, Any]:
     if dsn is not None and not str(dsn).strip():
-        return {
-            **_empty_surface_payload(reason="missing_dsn"),
-            "summary": {},
-            "direction_breakdown": [],
-            "order_status": [],
-            "recent_closed_trades": [],
-        }
+        return _empty_execution_analytics_payload("missing_dsn", runs=[])
     resolved_dsn = resolve_dashboard_postgres_dsn(dsn)
     if not resolved_dsn:
-        return {
-            **_empty_surface_payload(reason="missing_dsn"),
-            "summary": {},
-            "direction_breakdown": [],
-            "order_status": [],
-            "recent_closed_trades": [],
-        }
-    runs = _load_runs(resolved_dsn, run_limit=1)
+        return _empty_execution_analytics_payload("missing_dsn", runs=[])
+    runs = _load_runs(resolved_dsn, run_limit=RUN_SELECTOR_LIMIT)
     if runs.empty:
-        return {
-            **_empty_surface_payload(reason="no_runs"),
-            "summary": {},
-            "direction_breakdown": [],
-            "order_status": [],
-            "recent_closed_trades": [],
-        }
-    run_id = str(runs.iloc[0]["run_id"] or "")
-    fills = _load_fills(resolved_dsn, run_id, fill_limit=fill_limit)
-    orders = _load_orders(resolved_dsn, run_id, order_limit=order_limit)
-    return build_execution_analytics_payload(
-        run_id=run_id,
+        return _empty_execution_analytics_payload("no_runs", runs=[])
+    runs_list = recent_runs_from_frame(runs)
+    run_row = _select_run_row(resolved_dsn, runs, run_id)
+    if run_row is None:
+        return _empty_execution_analytics_payload("run_not_found", runs=runs_list)
+    selected_run_id = str(run_row.get("run_id") or "")
+    fills = _load_fills(resolved_dsn, selected_run_id, fill_limit=fill_limit)
+    orders = _load_orders(resolved_dsn, selected_run_id, order_limit=order_limit)
+    payload = build_execution_analytics_payload(
+        run_id=selected_run_id,
         fills_frame=fills,
         orders_frame=orders,
     )
+    payload["runs"] = runs_list
+    return payload
+
+
+def _empty_report_export_payload(reason: str, *, runs: list[dict[str, Any]]) -> dict[str, Any]:
+    return {
+        **_empty_surface_payload(reason=reason),
+        "runs": runs,
+        "filenames": {},
+        "json_report": {},
+        "markdown_report": "",
+        "cutover_gate": {},
+    }
 
 
 def load_report_export_payload(
@@ -1022,53 +1282,61 @@ def load_report_export_payload(
     point_limit: int = 240,
     fill_limit: int = 200,
     event_limit: int = 50,
+    run_id: str | None = None,
 ) -> dict[str, Any]:
     if dsn is not None and not str(dsn).strip():
-        return {
-            **_empty_surface_payload(reason="missing_dsn"),
-            "filenames": {},
-            "json_report": {},
-            "markdown_report": "",
-            "cutover_gate": {},
-        }
+        return _empty_report_export_payload("missing_dsn", runs=[])
     resolved_dsn = resolve_dashboard_postgres_dsn(dsn)
     if not resolved_dsn:
-        return {
-            **_empty_surface_payload(reason="missing_dsn"),
-            "filenames": {},
-            "json_report": {},
-            "markdown_report": "",
-            "cutover_gate": {},
-        }
-    runs = _load_runs(resolved_dsn, run_limit=10)
+        return _empty_report_export_payload("missing_dsn", runs=[])
+    runs = _load_runs(resolved_dsn, run_limit=RUN_SELECTOR_LIMIT)
     if runs.empty:
-        return {
-            **_empty_surface_payload(reason="no_runs"),
-            "filenames": {},
-            "json_report": {},
-            "markdown_report": "",
-            "cutover_gate": {},
-        }
-    run_row = runs.iloc[0].to_dict()
-    run_id = str(run_row.get("run_id") or "")
-    metrics = _load_metrics(resolved_dsn, run_id, point_limit=point_limit)
-    fills = _load_fills(resolved_dsn, run_id, fill_limit=fill_limit)
-    risk = _load_risk_events(resolved_dsn, run_id, limit=event_limit)
-    heartbeats = _load_heartbeats(resolved_dsn, run_id, limit=event_limit)
+        return _empty_report_export_payload("no_runs", runs=[])
+    runs_list = recent_runs_from_frame(runs)
+    run_row = _select_run_row(resolved_dsn, runs, run_id)
+    if run_row is None:
+        return _empty_report_export_payload("run_not_found", runs=runs_list)
+    selected_run_id = str(run_row.get("run_id") or "")
+    # Headline metrics must describe the FULL run (mirrors the overview P0
+    # fix and load_performance_price_payload): compute report metrics from the
+    # full equity series and only downsample the payload curves.
+    metrics = _load_metrics(resolved_dsn, selected_run_id, point_limit=FULL_EQUITY_ROW_CAP)
+    fills = _load_fills(resolved_dsn, selected_run_id, fill_limit=fill_limit)
+    risk = _load_risk_events(resolved_dsn, selected_run_id, limit=event_limit)
+    heartbeats = _load_heartbeats(resolved_dsn, selected_run_id, limit=event_limit)
     overview_payload = build_overview_payload_from_frames(
         contract=_dashboard_contract(),
         runs_frame=runs,
         equity_frame=metrics[["datetime", "total"]].copy()
         if {"datetime", "total"}.issubset(metrics.columns)
         else pd.DataFrame(),
+        selected_run_row=run_row,
+        curve_point_limit=int(max(2, point_limit)),
+        equity_truncated=len(metrics.index) >= FULL_EQUITY_ROW_CAP,
     )
-    return build_report_export_payload(
+    payload = build_report_export_payload(
         run_row=run_row,
         overview_payload=overview_payload,
         fills_frame=fills,
         risk_frame=risk,
         heartbeats_frame=heartbeats,
     )
+    payload["runs"] = runs_list
+    return payload
+
+
+def _empty_market_data_payload(reason: str, *, runs: list[dict[str, Any]]) -> dict[str, Any]:
+    return {
+        **_empty_surface_payload(reason=reason),
+        "runs": runs,
+        "market_context": {},
+        "symbols": [],
+        "summary_metrics": [],
+        "recent_bars": [],
+        "bar_window": {"start": None, "end": None, "bar_count": 0},
+        "indicator_summary": [],
+        "warnings": [],
+    }
 
 
 def load_market_data_payload(
@@ -1076,41 +1344,25 @@ def load_market_data_payload(
     dsn: str | None = None,
     point_limit: int = 240,
     fill_limit: int = 80,
+    run_id: str | None = None,
+    symbol: str | None = None,
 ) -> dict[str, Any]:
     if dsn is not None and not str(dsn).strip():
-        return {
-            **_empty_surface_payload(reason="missing_dsn"),
-            "market_context": {},
-            "summary_metrics": [],
-            "recent_bars": [],
-            "indicator_summary": [],
-            "warnings": [],
-        }
+        return _empty_market_data_payload("missing_dsn", runs=[])
     resolved_dsn = resolve_dashboard_postgres_dsn(dsn)
     if not resolved_dsn:
-        return {
-            **_empty_surface_payload(reason="missing_dsn"),
-            "market_context": {},
-            "summary_metrics": [],
-            "recent_bars": [],
-            "indicator_summary": [],
-            "warnings": [],
-        }
-    runs = _load_runs(resolved_dsn, run_limit=10)
+        return _empty_market_data_payload("missing_dsn", runs=[])
+    runs = _load_runs(resolved_dsn, run_limit=RUN_SELECTOR_LIMIT)
     if runs.empty:
-        return {
-            **_empty_surface_payload(reason="no_runs"),
-            "market_context": {},
-            "summary_metrics": [],
-            "recent_bars": [],
-            "indicator_summary": [],
-            "warnings": [],
-        }
+        return _empty_market_data_payload("no_runs", runs=[])
+    runs_list = recent_runs_from_frame(runs)
+    run_row = _select_run_row(resolved_dsn, runs, run_id)
+    if run_row is None:
+        return _empty_market_data_payload("run_not_found", runs=runs_list)
 
-    run_row = runs.iloc[0].to_dict()
-    run_id = str(run_row.get("run_id") or "")
-    fills = _load_fills(resolved_dsn, run_id, fill_limit=fill_limit)
-    market_context = _resolve_market_context(run_row=run_row, fills_frame=fills)
+    selected_run_id = str(run_row.get("run_id") or "")
+    fills = _load_fills(resolved_dsn, selected_run_id, fill_limit=fill_limit)
+    market_context = _resolve_market_context(run_row=run_row, fills_frame=fills, symbol=symbol)
     market = _load_market(
         market_db_path=str(market_context.get("market_db_path") or ""),
         symbol=str(market_context.get("symbol") or ""),
@@ -1118,11 +1370,14 @@ def load_market_data_payload(
         exchange=str(market_context.get("exchange") or "binance"),
         point_limit=point_limit,
     )
-    return build_market_data_payload(
+    payload = build_market_data_payload(
         run_row=run_row,
         fills_frame=fills,
         market_frame=market,
+        symbol=symbol,
     )
+    payload["runs"] = runs_list
+    return payload
 
 
 def load_optimization_insights_payload(
@@ -1156,47 +1411,49 @@ def load_optimization_insights_payload(
     )
 
 
+def _empty_raw_data_payload(reason: str, *, runs: list[dict[str, Any]]) -> dict[str, Any]:
+    return {
+        **_empty_surface_payload(reason=reason),
+        "runs": runs,
+        "context": {},
+        "frame_summaries": [],
+        "previews": [],
+    }
+
+
 def load_raw_data_payload(
     *,
     dsn: str | None = None,
     point_limit: int = 60,
+    run_id: str | None = None,
 ) -> dict[str, Any]:
     if dsn is not None and not str(dsn).strip():
-        return {
-            **_empty_surface_payload(reason="missing_dsn"),
-            "context": {},
-            "frame_summaries": [],
-            "previews": [],
-        }
+        return _empty_raw_data_payload("missing_dsn", runs=[])
     resolved_dsn = resolve_dashboard_postgres_dsn(dsn)
     if not resolved_dsn:
-        return {
-            **_empty_surface_payload(reason="missing_dsn"),
-            "context": {},
-            "frame_summaries": [],
-            "previews": [],
-        }
-    runs = _load_runs(resolved_dsn, run_limit=10)
+        return _empty_raw_data_payload("missing_dsn", runs=[])
+    runs = _load_runs(resolved_dsn, run_limit=RUN_SELECTOR_LIMIT)
     if runs.empty:
-        return {
-            **_empty_surface_payload(reason="no_runs"),
-            "context": {},
-            "frame_summaries": [],
-            "previews": [],
-        }
+        return _empty_raw_data_payload("no_runs", runs=[])
+    runs_list = recent_runs_from_frame(runs)
+    run_row = _select_run_row(resolved_dsn, runs, run_id)
+    if run_row is None:
+        return _empty_raw_data_payload("run_not_found", runs=runs_list)
 
-    run_row = runs.iloc[0].to_dict()
-    run_id = str(run_row.get("run_id") or "")
-    fills = _load_fills(resolved_dsn, run_id, fill_limit=point_limit)
+    selected_run_id = str(run_row.get("run_id") or "")
+    fills = _load_fills(resolved_dsn, selected_run_id, fill_limit=point_limit)
     market_context = _resolve_market_context(run_row=run_row, fills_frame=fills)
     frames: list[tuple[str, pd.DataFrame]] = [
         ("Runs", runs.head(point_limit)),
-        ("Equity", _load_metrics(resolved_dsn, run_id, point_limit=point_limit)),
+        ("Equity", _load_metrics(resolved_dsn, selected_run_id, point_limit=point_limit)),
         ("Fills", fills.head(point_limit)),
-        ("Orders", _load_orders(resolved_dsn, run_id, order_limit=point_limit)),
-        ("Risk Events", _load_risk_events(resolved_dsn, run_id, limit=point_limit)),
-        ("Heartbeats", _load_heartbeats(resolved_dsn, run_id, limit=point_limit)),
-        ("Order State Events", _load_order_states(resolved_dsn, run_id, limit=point_limit)),
+        ("Orders", _load_orders(resolved_dsn, selected_run_id, order_limit=point_limit)),
+        ("Risk Events", _load_risk_events(resolved_dsn, selected_run_id, limit=point_limit)),
+        ("Heartbeats", _load_heartbeats(resolved_dsn, selected_run_id, limit=point_limit)),
+        (
+            "Order State Events",
+            _load_order_states(resolved_dsn, selected_run_id, limit=point_limit),
+        ),
         (
             "Market OHLCV",
             _load_market(
@@ -1211,7 +1468,7 @@ def load_raw_data_payload(
         ("Workflow Jobs", _load_recent_workflow_jobs_frame(resolved_dsn, limit=point_limit)),
     ]
     context = {
-        "run_id": run_id,
+        "run_id": selected_run_id,
         "source": "postgres",
         "market": (
             f"{market_context.get('symbol', 'n/a')} "
@@ -1219,11 +1476,13 @@ def load_raw_data_payload(
             f"({market_context.get('exchange', 'n/a')})"
         ),
     }
-    return build_raw_data_payload(
-        run_id=run_id,
+    payload = build_raw_data_payload(
+        run_id=selected_run_id,
         context=context,
         frames=frames,
     )
+    payload["runs"] = runs_list
+    return payload
 
 
 __all__ = [
@@ -1311,6 +1570,18 @@ def main(argv: list[str] | None = None) -> int:
         dest="event_limit",
         help="Max risk/heartbeat event rows (default: 50).",
     )
+    parser.add_argument(
+        "--run-id",
+        dest="run_id",
+        default=None,
+        help="Build the payload for this run instead of the latest one.",
+    )
+    parser.add_argument(
+        "--symbol",
+        dest="symbol",
+        default=None,
+        help="Market-data only: build market context/bars for this symbol.",
+    )
     args = parser.parse_args(argv)
 
     fn = fn_map[args.fn]
@@ -1327,6 +1598,10 @@ def main(argv: list[str] | None = None) -> int:
         kwargs["order_limit"] = args.order_limit
     if "event_limit" in sig.parameters:
         kwargs["event_limit"] = args.event_limit
+    if "run_id" in sig.parameters:
+        kwargs["run_id"] = args.run_id
+    if "symbol" in sig.parameters:
+        kwargs["symbol"] = args.symbol
 
     payload = fn(**kwargs)
     print(json.dumps(payload, indent=2, sort_keys=True, default=str))

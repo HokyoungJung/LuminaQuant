@@ -39,6 +39,7 @@ from lumina_quant.strategies.intraday_overnight_alpha_sleeves import (
 )
 from lumina_quant.strategies.seasonal_xs_persistence_alpha_sleeves import (
     CrossSectionalSeasonalPersistenceStrategy,
+    _SEASONAL_XS_PERSISTENCE_SLICE,
     _quarter_id,
     _week_of_quarter,
 )
@@ -417,3 +418,181 @@ def test_schema_keys_snake_case_and_hyperparam() -> None:
         assert isinstance(value, HyperParam)
     for required in ("seasonal_lookback_quarters", "min_history_quarters", "min_hold_weeks"):
         assert required in schema
+
+
+def test_slice_multi_timeframe_scaling() -> None:
+    """1h/4h cells mirror 1d; only the bar-denominated vol window scales (x24/x6)."""
+    slice_map = _SEASONAL_XS_PERSISTENCE_SLICE
+    assert set(slice_map.keys()) == {"1h", "4h", "1d"}
+    base = slice_map["1d"]
+    names = tuple(spec["variant"] for spec in base)
+    assert names == ("k6", "k4")
+    for timeframe, variants in slice_map.items():
+        assert len(variants) == len(base), timeframe
+        assert tuple(spec["variant"] for spec in variants) == names, timeframe
+
+    # The quarter-aligned weekly decision clock is TIMESTAMP-based, so the
+    # quarter/week horizons stay timeframe-invariant; the ONLY bar-denominated
+    # param is the realized-vol window, which scales x6 (4h) / x24 (1h).
+    unchanged_keys = (
+        "seasonal_lookback_quarters",
+        "min_history_quarters",
+        "quantile_pct",
+        "min_hold_weeks",
+        "min_symbols",
+        "allow_short",
+        "target_gross_exposure",
+        "target_vol",
+        "stop_loss_pct",
+    )
+    for factor, timeframe in ((6, "4h"), (24, "1h")):
+        for base_spec, tf_spec in zip(base, slice_map[timeframe], strict=True):
+            assert tf_spec["vol_window"] == base_spec["vol_window"] * factor, timeframe
+            assert tf_spec["vol_window"] <= 9000, timeframe
+            for key in unchanged_keys:
+                assert tf_spec[key] == base_spec[key], (timeframe, key)
+
+
+# --------------------------------------------------------------------------- #
+# vol-target HORIZON fix (direct-method regression).  ``_inverse_vol_weights``
+# must annualize the per-bar portfolio vol via sqrt(bars_per_year) -- inferred
+# from the median gap of the recorded per-bar epochs -- before the
+# ``min(1, target_vol / vol)`` clamp.  Driving the method directly with fixed
+# ``vols`` and a synthetic ``_recent_times`` isolates the fix from the weekly
+# feed.  The pre-fix code compared 0.20 against a per-bar 0.0005..0.03 and was
+# both spacing-INVARIANT and pinned at scalar == 1.0 for any realistic vol.
+# --------------------------------------------------------------------------- #
+
+
+def _epochs(count: int, spacing_s: int) -> list[float]:
+    return [float(1_700_000_000 + i * spacing_s) for i in range(count)]
+
+
+def _vt_targets(symbols: list[str]) -> dict[str, tuple[str, float, dict[str, Any]]]:
+    return {symbol: ("LONG", 1.0, {}) for symbol in symbols}
+
+
+def test_vol_target_scalar_annualized_and_spacing_sensitive() -> None:
+    symbols = ["A/USDT", "B/USDT", "C/USDT", "D/USDT"]
+    targets = _vt_targets(symbols)
+    stormy = dict.fromkeys(symbols, 0.03)
+
+    daily = _strategy(symbols, target_vol=0.20)
+    daily._recent_times.clear()
+    daily._recent_times.extend(_epochs(10, 86_400))  # ~365 bars/yr
+    daily_w, daily_scalar = daily._inverse_vol_weights(targets, stormy)
+
+    hourly = _strategy(symbols, target_vol=0.20)
+    hourly._recent_times.clear()
+    hourly._recent_times.extend(_epochs(10, 3_600))  # ~8766 bars/yr
+    _hourly_w, hourly_scalar = hourly._inverse_vol_weights(targets, stormy)
+
+    # Stormy per-bar vol annualizes above target_vol -> the clamp ENGAGES.
+    assert daily_scalar < 1.0
+    # Finer spacing => more bars/yr => larger annualized vol => harder throttle.
+    # The old per-bar comparison was spacing-invariant, so this ordering is the
+    # signature of the horizon fix.
+    assert hourly_scalar < daily_scalar
+    # Gross notional scales with the (now sub-1) scalar.
+    assert sum(daily_w.values()) < 1.0
+
+
+def test_vol_target_scalar_calm_passes_through() -> None:
+    symbols = ["A/USDT", "B/USDT", "C/USDT", "D/USDT"]
+    targets = _vt_targets(symbols)
+    strat = _strategy(symbols, target_vol=0.20)
+    strat._recent_times.clear()
+    strat._recent_times.extend(_epochs(10, 86_400))
+    # Calm per-bar vol annualizes well below target_vol -> pass-through.
+    _w, scalar = strat._inverse_vol_weights(targets, dict.fromkeys(symbols, 0.0005))
+    assert scalar == 1.0
+
+
+def test_vol_target_scalar_passthrough_when_spacing_unavailable() -> None:
+    symbols = ["A/USDT", "B/USDT"]
+    targets = _vt_targets(symbols)
+    strat = _strategy(symbols, target_vol=0.20)
+    strat._recent_times.clear()  # < 2 timestamps -> spacing unknowable
+    # Even a violent per-bar vol cannot be annualized without spacing, so the
+    # throttle passes through rather than guessing a horizon.
+    _w, scalar = strat._inverse_vol_weights(targets, dict.fromkeys(symbols, 0.75))
+    assert scalar == 1.0
+
+
+def test_vol_target_scalar_determinism() -> None:
+    symbols = ["A/USDT", "B/USDT", "C/USDT"]
+    targets = _vt_targets(symbols)
+    vols = {"A/USDT": 0.02, "B/USDT": 0.04, "C/USDT": 0.03}
+
+    def _run() -> tuple[float, tuple[float, ...]]:
+        strat = _strategy(symbols, target_vol=0.20)
+        strat._recent_times.clear()
+        strat._recent_times.extend(_epochs(10, 86_400))
+        weights, scalar = strat._inverse_vol_weights(targets, vols)
+        return round(scalar, 12), tuple(round(weights[s], 12) for s in symbols)
+
+    assert _run() == _run()
+
+
+def test_gap_spanning_return_never_booked_into_single_bucket() -> None:
+    """A multi-week data gap must NOT book its whole return as one 'weekly'
+    observation (v5 fix): pre-fix, a 5-week gap with a 2x move booked
+    log(2)~=0.69 into the resumption bucket and polluted that bucket's
+    seasonal estimate for the full K-quarter lookback."""
+    symbol = "GAP/USDT"
+    strat = _strategy([symbol], min_symbols=1)
+    q_start = date(2025, 4, 1)  # Q2 2025 opens the quarter grid at week 0
+    # Weeks 0-2: constant price, clean zero weekly returns.
+    for day in range(21):
+        strat.calculate_signals(_event(symbol, q_start + timedelta(days=day), 100.0))
+    # 5-week outage; the price DOUBLES while no bars arrive.
+    for day in range(56, 77):
+        strat.calculate_signals(_event(symbol, q_start + timedelta(days=day), 200.0))
+
+    item = strat._state[symbol]
+    recorded = [(b, v) for b, dq in item.buckets.items() for v in dq]
+    recorded += [(b, item.pending_sum[b]) for b in item.pending_sum]
+    for bucket, value in recorded:
+        assert abs(value) < 0.5, f"gap return leaked into bucket {bucket}: {value}"
+    # Clean post-gap grid-adjacent weeks must resume recording.
+    assert any(bucket == 9 for bucket, _ in recorded), recorded
+
+
+# --------------------------------------------------------------------------- #
+# v5 zero-alloc gate: a computed alloc of 0 must NOT emit a LONG/SHORT --
+# ``_target_metadata`` omits ``target_allocation`` at alloc 0 and the engine
+# would resize the entry to its DEFAULT allocation (an unsized, un-vol-gated bet).
+# --------------------------------------------------------------------------- #
+
+
+def test_zero_alloc_entry_skipped_not_default_sized() -> None:
+    symbols = ["FLIP/USDT", "FRESH/USDT", "N0/USDT", "N1/USDT", "N2/USDT", "N3/USDT"]
+    strat = _strategy(symbols)
+    flip = strat._state["FLIP/USDT"]
+    flip.mode = "LONG"
+    flip.entry_price = 100.0
+    flip.weeks_held = 10_000  # clear the min-hold so the side flip is live
+    targets = {
+        "FLIP/USDT": ("SHORT", -1.0, {}),
+        "FRESH/USDT": ("LONG", 1.0, {}),
+    }
+    # empty weights -> alloc == 0 for every targeted symbol
+    strat._emit_targets(targets, {}, 1.0, "2026-01-01T00:00:00Z")
+    kinds = [(sig.symbol, str(sig.signal_type).upper()) for sig in strat.events.items]
+    assert not [sym for sym, kind in kinds if kind in {"LONG", "SHORT"}], kinds
+    # the side-flip EXIT still fired and FLIP is now flat (state matches the exit)
+    assert ("FLIP/USDT", "EXIT") in kinds
+    assert strat._state["FLIP/USDT"].mode == "OUT"
+    assert strat._state["FLIP/USDT"].entry_price is None
+
+    # a positive inverse-vol weight DOES emit a sized entry carrying a strictly
+    # positive ``target_allocation``.
+    sized = _strategy(symbols)
+    sized._emit_targets(
+        {"FRESH/USDT": ("LONG", 1.0, {})}, {"FRESH/USDT": 0.5}, 1.0, "2026-01-01T00:00:00Z"
+    )
+    entries = [
+        sig for sig in sized.events.items if str(sig.signal_type).upper() in {"LONG", "SHORT"}
+    ]
+    assert entries, "a positive inverse-vol weight must emit a sized entry"
+    assert all(float((sig.metadata or {}).get("target_allocation", 0.0)) > 0.0 for sig in entries)

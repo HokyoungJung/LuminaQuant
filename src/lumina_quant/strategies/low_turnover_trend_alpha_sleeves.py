@@ -92,6 +92,7 @@ from lumina_quant.indicators.trend import average_directional_index
 from lumina_quant.strategies.external_alpha_sleeves import (
     _EPS,
     _Snapshot,
+    _annualize_per_bar_vol,
     _emit,
     _event_datetime_utc,
     _event_symbols,
@@ -251,12 +252,18 @@ class LowTurnoverTrendPersistenceStrategy(Strategy):
             )
             for symbol in self.symbol_list
         }
+        # Recent DISTINCT bar epochs (seconds) for deterministic bar-spacing
+        # inference: ``_vol_scaled_allocation`` annualizes the per-bar realized
+        # vol via sqrt(bars_per_year) from the median gap here before the
+        # Moreira-Muir vol-target ratio.
+        self._recent_times: deque[float] = deque(maxlen=16)
 
     # ------------------------------------------------------------------ #
     # state
     # ------------------------------------------------------------------ #
     def get_state(self) -> dict[str, Any]:
         return {
+            "recent_times": list(self._recent_times),
             "symbol_state": {
                 symbol: {
                     "opens": list(item.opens),
@@ -272,11 +279,14 @@ class LowTurnoverTrendPersistenceStrategy(Strategy):
                     "score": item.score,
                 }
                 for symbol, item in self._state.items()
-            }
+            },
         }
 
     def set_state(self, state: dict[str, Any]) -> None:
-        raw = state.get("symbol_state") if isinstance(state, dict) else None
+        if not isinstance(state, dict):
+            return
+        _restore_deque(self._recent_times, state.get("recent_times"))
+        raw = state.get("symbol_state")
         if not isinstance(raw, dict):
             return
         for symbol, payload in raw.items():
@@ -318,8 +328,19 @@ class LowTurnoverTrendPersistenceStrategy(Strategy):
         iso = dt.isocalendar()
         return f"{int(iso[0]):04d}-W{int(iso[1]):02d}"
 
+    def _note_bar_time(self, raw_time: Any) -> None:
+        """Record a DISTINCT decision-bar epoch for deterministic spacing inference."""
+        dt = _event_datetime_utc(raw_time)
+        if dt is None:
+            return
+        epoch = dt.timestamp()
+        if self._recent_times and self._recent_times[-1] == epoch:
+            return
+        self._recent_times.append(epoch)
+
     def calculate_signals_window(self, event: Any, aggregator: Any = None) -> None:
         _ = aggregator
+        self._note_bar_time(getattr(event, "time", None))
         for symbol in _event_symbols(event, self.symbol_list):
             snapshot = _window_snapshot(event, symbol)
             if snapshot is not None:
@@ -335,6 +356,7 @@ class LowTurnoverTrendPersistenceStrategy(Strategy):
         if symbol in self._state:
             snapshot = _market_snapshot(event)
             if snapshot is not None:
+                self._note_bar_time(snapshot.time)
                 self._process_symbol(str(symbol), snapshot)
 
     def _process_symbol(self, symbol: str, snapshot: _Snapshot) -> None:
@@ -411,12 +433,22 @@ class LowTurnoverTrendPersistenceStrategy(Strategy):
     # sizing
     # ------------------------------------------------------------------ #
     def _vol_scaled_allocation(self, closes: list[float], conviction: float) -> float:
-        """Vol-target the base allocation and scale by KER conviction; clamped."""
+        """Vol-target the base allocation and scale by KER conviction; clamped.
+
+        ``realized_volatility`` returns a PER-BAR estimate; ``target_vol`` (0.20) is
+        an annual-scale target.  Annualize the per-bar vol via sqrt(bars_per_year)
+        inferred from observed bar spacing before the Moreira-Muir ratio -- without
+        it the ratio pins to the 2x clamp on every bar (the throttle is INERT).
+        When spacing is unavailable the allocation passes through at its base level
+        (no inflation) rather than sizing on a horizon-mismatched ratio.
+        """
         alloc = self.target_allocation
         if self.target_vol > 0.0:
             vol = realized_volatility(closes, window=self.vol_window)
             if vol is not None and vol > _EPS:
-                alloc = self.target_allocation * (self.target_vol / vol)
+                vol_ann = _annualize_per_bar_vol(vol, self._recent_times)
+                if vol_ann is not None and vol_ann > _EPS:
+                    alloc = self.target_allocation * (self.target_vol / vol_ann)
         alloc *= conviction
         return max(0.0, min(self.target_allocation * 2.0, alloc))
 
@@ -536,13 +568,62 @@ _SUGGESTED_CANDIDATE_TAGS: tuple[str, ...] = (
     "crypto",
 )
 
-# Candidate slice (DAILY bars only: the ``tsmom_short/mid/long`` defaults of
-# 28/56/84 are 4/8/12 weeks of 1d bars -- the multi-week TSMOM thesis is only
-# honest at the 1d cadence, so the sleeve is deliberately NOT wired at
-# intraday timeframes).  Per-symbol single-asset (``candidate_mix_type ==
-# "single"``).  ``min_hold_bars``/``cooldown_bars`` are WEEKLY decision bars --
-# the proven min-hold rescue that lifts RPT above the 10bps floor.
+# Candidate slice.  The ``tsmom_short/mid/long`` defaults of 28/56/84 are the
+# 4/8/12-WEEK wall-clock horizons the thesis rests on (28/56/84 * bars_per_day),
+# and every signal window here (TSMOM lookbacks, ``efficiency_period``,
+# ``adx_period``, the ``vol_persist_fast/slow`` ratio windows, and the vol-target
+# ``vol_window``) reads the RAW ingested bar series -- so at 4h/1h they scale x6
+# / x24 to keep those wall-clock spans (and the multi-week TSMOM thesis) honest
+# at intraday cadence rather than collapsing to a few days.  The decision clock
+# itself is a timestamp-based WEEKLY ISO key (``_week_key``), so
+# ``min_hold_bars``/``cooldown_bars``/``max_hold_bars`` are WEEKLY decision bars
+# -- timeframe-agnostic and UNCHANGED (the proven min-hold rescue that lifts RPT
+# above the 10bps floor).  Efficiency/ADX/vol-persist THRESHOLDS and ``target_vol``
+# are scale-invariant and unchanged.  Per-symbol single-asset
+# (``candidate_mix_type == "single"``).
 _LOW_TURNOVER_TREND_PERSISTENCE_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "4h": (
+        {
+            "variant": "core_4_8_12wk",
+            "tsmom_short": 168,
+            "tsmom_mid": 336,
+            "tsmom_long": 504,
+            "efficiency_period": 120,
+            "min_efficiency": 0.30,
+            "adx_period": 84,
+            "adx_min": 20.0,
+            "vol_persist_fast": 96,
+            "vol_persist_slow": 384,
+            "vol_persist_max": 1.5,
+            "min_hold_bars": 36,
+            "cooldown_bars": 4,
+            "max_hold_bars": 2000,
+            "vol_window": 336,
+            "target_vol": 0.20,
+            "allow_short": True,
+        },
+    ),
+    "1h": (
+        {
+            "variant": "core_4_8_12wk",
+            "tsmom_short": 672,
+            "tsmom_mid": 1344,
+            "tsmom_long": 2016,
+            "efficiency_period": 480,
+            "min_efficiency": 0.30,
+            "adx_period": 336,
+            "adx_min": 20.0,
+            "vol_persist_fast": 384,
+            "vol_persist_slow": 1536,
+            "vol_persist_max": 1.5,
+            "min_hold_bars": 36,
+            "cooldown_bars": 4,
+            "max_hold_bars": 2000,
+            "vol_window": 1344,
+            "target_vol": 0.20,
+            "allow_short": True,
+        },
+    ),
     "1d": (
         {
             "variant": "core_4_8_12wk",

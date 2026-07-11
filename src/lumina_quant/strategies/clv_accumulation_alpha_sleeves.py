@@ -71,6 +71,10 @@ from typing import Any
 
 from lumina_quant.core.plugin_registry import register
 from lumina_quant.indicators.alpha_features import realized_volatility, simple_return
+from lumina_quant.indicators.annualization import (
+    annualize_per_bar_vol,
+    bars_per_year_from_spacing,
+)
 from lumina_quant.indicators.common import safe_float, time_key
 from lumina_quant.indicators.cross_sectional_residualize import cross_sectional_residualize
 from lumina_quant.indicators.volume import chaikin_money_flow
@@ -82,6 +86,7 @@ from lumina_quant.strategies.external_alpha_sleeves import (
     _EPS,
     _Snapshot,
     _emit,
+    _event_datetime_utc,
     _event_symbols,
     _market_snapshot,
     _safe_non_negative_int,
@@ -242,6 +247,10 @@ class CrossSectionalCloseLocationAccumulationStrategy(Strategy):
         }
         self._last_eval_time_key = ""
         self._tick = 0
+        # Recent decision-bar epochs (seconds) for deterministic bar-spacing
+        # inference: the vol-target scalar annualizes the per-bar portfolio vol
+        # via sqrt(bars_per_year) so the Moreira-Muir clamp is not left inert.
+        self._recent_times: deque[float] = deque(maxlen=16)
 
     # ------------------------------------------------------------------ #
     # state
@@ -250,6 +259,7 @@ class CrossSectionalCloseLocationAccumulationStrategy(Strategy):
         return {
             "last_eval_time_key": self._last_eval_time_key,
             "tick": int(self._tick),
+            "recent_times": list(self._recent_times),
             "symbol_state": {
                 symbol: {
                     "closes": list(item.closes),
@@ -271,6 +281,11 @@ class CrossSectionalCloseLocationAccumulationStrategy(Strategy):
             return
         self._last_eval_time_key = str(state.get("last_eval_time_key", ""))
         self._tick = _safe_non_negative_int(state.get("tick"))
+        self._recent_times.clear()
+        for value in _coerce_float_list(state.get("recent_times"))[
+            -int(self._recent_times.maxlen or 0) :
+        ]:
+            self._recent_times.append(value)
         raw = state.get("symbol_state")
         if not isinstance(raw, dict):
             return
@@ -469,10 +484,21 @@ class CrossSectionalCloseLocationAccumulationStrategy(Strategy):
         total_inv = sum(inv.values())
         if total_inv <= _EPS:
             return {}, 1.0
+        # ``portfolio_vol`` is the inverse-vol-weighted PER-BAR vol; the
+        # ``inv / total_inv`` normalization above is scale-invariant (annualizing
+        # every vol_i cancels), so the risk-parity weights are horizon-free.
+        # The vol-target SCALAR, however, compares ``portfolio_vol`` against an
+        # annual-scale ``target_vol`` (0.20): annualize the per-bar estimate via
+        # sqrt(bars_per_year) inferred from observed bar spacing first, otherwise
+        # the Moreira-Muir clamp is INERT. When spacing is unavailable we pass
+        # through (scalar=1.0) rather than throttle on mismatched horizons.
         portfolio_vol = sum((inv[symbol] / total_inv) * vols[symbol] for symbol in inv)
         scalar = 1.0
         if self.target_vol > 0.0 and portfolio_vol > _EPS:
-            scalar = min(1.0, self.target_vol / portfolio_vol)
+            bars_per_year = bars_per_year_from_spacing(self._recent_times)
+            portfolio_vol_ann = annualize_per_bar_vol(portfolio_vol, bars_per_year)
+            if portfolio_vol_ann is not None and portfolio_vol_ann > _EPS:
+                scalar = min(1.0, self.target_vol / portfolio_vol_ann)
         weights = {
             symbol: (inv[symbol] / total_inv) * self.target_gross_exposure * scalar
             for symbol in inv
@@ -497,6 +523,11 @@ class CrossSectionalCloseLocationAccumulationStrategy(Strategy):
     def _evaluate(self, event_time: Any) -> None:
         if len(self.symbol_list) < self.min_symbols:
             return
+        # Record the decision-bar epoch so the vol-target scalar can infer bar
+        # spacing (this runs once per new bar, before the rebalance gate).
+        dt = _event_datetime_utc(event_time)
+        if dt is not None:
+            self._recent_times.append(dt.timestamp())
         # Stops / max-hold age EVERY bar so a held name is always protected,
         # independent of the slow weekly rebalance clock.  This DOES advance the
         # min-hold decision counter as well (a hard turnover floor).
@@ -557,6 +588,17 @@ class CrossSectionalCloseLocationAccumulationStrategy(Strategy):
                 )
             weight = float(weights.get(symbol, 0.0))
             alloc = max(0.0, self.base_allocation * weight)
+            if alloc <= 0.0:
+                # Zero-alloc entries omit ``target_allocation`` from metadata and
+                # the engine resizes them to its DEFAULT allocation -- an unsized,
+                # un-vol-gated position. Skip the entry; if a side-flip EXIT was
+                # just emitted, drop to OUT so state matches it.
+                if item.mode != "OUT":
+                    item.mode = "OUT"
+                    item.entry_price = None
+                    item.bars_held = 0
+                    item.score = None
+                continue
             stop_loss = None
             if price is not None and self.stop_loss_pct > 0.0:
                 stop_loss = price * (
@@ -613,10 +655,87 @@ _SUGGESTED_CANDIDATE_TAGS: tuple[str, ...] = (
     "crypto",
 )
 
-# Candidate slice (daily bars; weekly rebalance via ``rebalance_bars``).  The
-# data-PC owns the 1/2/4/8wk accumulation-window factor_ic sweep, so we seed only
-# two windows (~2wk and ~4wk of 1d bars) to keep the candidate library thin.
+# Candidate slice.  The data-PC owns the 1/2/4/8wk accumulation-window factor_ic
+# sweep, so we seed only two windows (~2wk and ~4wk) per timeframe to keep the
+# candidate library thin.  The bar-denominated windows (accumulation / momentum /
+# nearness / min-history / vol) scale x6 (4h) / x24 (1h) to hold their wall-clock
+# span, and ``rebalance_bars`` -- the bar-count weekly clock -- scales the same way
+# (7 -> 42 -> 168) to keep the weekly rebalance cadence.  The ``min_hold_decisions``
+# floor, the integer ``rank_hysteresis_buffer`` (rank positions), the quantile, and
+# the vol-target / exposure fractions are timeframe-invariant and stay fixed.
 _CLV_ACCUMULATION_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "4h": (
+        {
+            "variant": "acc4wk",
+            "accumulation_window_bars": 168,
+            "momentum_window_bars": 168,
+            "nearness_window_bars": 2184,
+            "min_history_bars": 180,
+            "vol_window": 180,
+            "quantile_pct": 0.25,
+            "rebalance_bars": 42,
+            "min_hold_decisions": 2,
+            "rank_hysteresis_buffer": 1,
+            "min_symbols": 6,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+            "target_vol": 0.20,
+            "stop_loss_pct": 0.10,
+        },
+        {
+            "variant": "acc2wk",
+            "accumulation_window_bars": 84,
+            "momentum_window_bars": 84,
+            "nearness_window_bars": 1260,
+            "min_history_bars": 180,
+            "vol_window": 180,
+            "quantile_pct": 0.25,
+            "rebalance_bars": 42,
+            "min_hold_decisions": 2,
+            "rank_hysteresis_buffer": 1,
+            "min_symbols": 6,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+            "target_vol": 0.20,
+            "stop_loss_pct": 0.10,
+        },
+    ),
+    "1h": (
+        {
+            "variant": "acc4wk",
+            "accumulation_window_bars": 672,
+            "momentum_window_bars": 672,
+            "nearness_window_bars": 8736,
+            "min_history_bars": 720,
+            "vol_window": 720,
+            "quantile_pct": 0.25,
+            "rebalance_bars": 168,
+            "min_hold_decisions": 2,
+            "rank_hysteresis_buffer": 1,
+            "min_symbols": 6,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+            "target_vol": 0.20,
+            "stop_loss_pct": 0.10,
+        },
+        {
+            "variant": "acc2wk",
+            "accumulation_window_bars": 336,
+            "momentum_window_bars": 336,
+            "nearness_window_bars": 5040,
+            "min_history_bars": 720,
+            "vol_window": 720,
+            "quantile_pct": 0.25,
+            "rebalance_bars": 168,
+            "min_hold_decisions": 2,
+            "rank_hysteresis_buffer": 1,
+            "min_symbols": 6,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+            "target_vol": 0.20,
+            "stop_loss_pct": 0.10,
+        },
+    ),
     "1d": (
         {
             "variant": "acc4wk",

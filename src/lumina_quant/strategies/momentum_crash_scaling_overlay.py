@@ -580,6 +580,17 @@ _SUGGESTED_CANDIDATE_TAGS: tuple[str, ...] = (
     "crypto",
 )
 
+# MULTI-TIMEFRAME (1d / 4h / 1h) slice.  All slice params here are BAR-denominated
+# windows or bar-count clocks, so each scales x6 (4h) / x24 (1h) to preserve its
+# wall-clock span, EXCEPT the two tf-invariant magnitude THRESHOLDS
+# (``dd_threshold`` drawdown depth, ``rebound_threshold`` rebound size), which are
+# UNCHANGED -- the rebound-size threshold stays constant precisely because its
+# lookback scales, so it measures the same +5% over the same wall-clock.
+# SCHEMA CAP at 1h (silent-clamp guard -- written value == effective value): the
+# ``dm_continuous`` cell would scale ``bear_lookback_bars`` to 2160 and
+# ``dd_window_bars`` to 4320, so both are CAPPED to their schema maxima (2000 and
+# 4000; ~83d and ~167d of hourly history) with the wall-clock span slightly
+# shortened there.  All other scaled windows stay within bounds.
 _MOMENTUM_CRASH_SCALING_OVERLAY_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
     "1d": (
         {
@@ -601,6 +612,50 @@ _MOMENTUM_CRASH_SCALING_OVERLAY_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
             "rebound_threshold": 0.04,
             "sigma_half_life_bars": 14,
             "bucket_min_hold_bars": 16,
+        },
+    ),
+    "4h": (
+        {
+            "variant": "dm_continuous",
+            "bear_lookback_bars": 540,
+            "dd_window_bars": 1080,
+            "dd_threshold": -0.20,
+            "rebound_lookback_bars": 60,
+            "rebound_threshold": 0.05,
+            "sigma_half_life_bars": 120,
+            "bucket_min_hold_bars": 144,
+        },
+        {
+            "variant": "dm_fast_rebound",
+            "bear_lookback_bars": 360,
+            "dd_window_bars": 720,
+            "dd_threshold": -0.15,
+            "rebound_lookback_bars": 42,
+            "rebound_threshold": 0.04,
+            "sigma_half_life_bars": 84,
+            "bucket_min_hold_bars": 96,
+        },
+    ),
+    "1h": (
+        {
+            "variant": "dm_continuous",
+            "bear_lookback_bars": 2000,  # capped from 90*24=2160 (schema max 2000)
+            "dd_window_bars": 4000,  # capped from 180*24=4320 (schema max 4000)
+            "dd_threshold": -0.20,
+            "rebound_lookback_bars": 240,
+            "rebound_threshold": 0.05,
+            "sigma_half_life_bars": 480,
+            "bucket_min_hold_bars": 576,
+        },
+        {
+            "variant": "dm_fast_rebound",
+            "bear_lookback_bars": 1440,
+            "dd_window_bars": 2880,
+            "dd_threshold": -0.15,
+            "rebound_lookback_bars": 168,
+            "rebound_threshold": 0.04,
+            "sigma_half_life_bars": 336,
+            "bucket_min_hold_bars": 384,
         },
     ),
 }

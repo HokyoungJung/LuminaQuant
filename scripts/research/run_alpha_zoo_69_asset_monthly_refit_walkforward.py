@@ -140,6 +140,62 @@ _SELECTION_GATE_STATE: dict[str, Any] = {
     "emit_candidate_overfit_stats": False,
 }
 
+# Equity-flow complements (eq-flow v5 follow-up, 2026-07-10): five ADDITIVE
+# walk-forward variants / ranking treatments from the fold-by-fold equity-flow
+# diagnosis (.omc/research/equity-flow-analysis-20260710.md). Every switch
+# defaults OFF so the legacy candidate set and rankings are byte-identical
+# (the 72 dynamic-conviction rows / 5 router rows count pins hold); the
+# honest-research profile (configs/profiles/research.yaml) turns them ON.
+# Variant parameters are PRE-REGISTERED module constants near their host
+# builders, not tunable grids.
+_EQFLOW_VARIANT_STATE: dict[str, bool] = {
+    # C1: corr-guarded twin of the preregistered risk-trimmed lagged router.
+    "corr_guard_router_variant": False,
+    # B2: momentum-crash-scaled twin of the dynamic-conviction switch.
+    "crash_scaled_conviction_variant": False,
+    # A3a: validation-saturation twin of the dynamic-conviction switch.
+    "val_saturation_conviction_variant": False,
+    # A3b: bar_count-aware partial-fold weighting in the aggregate rankings.
+    "partial_fold_bar_count_weighting": False,
+    # D4: regime-gated twin of strict_efficiency:static_guarded.
+    "regime_gated_strict_efficiency_variant": False,
+}
+
+
+def _configure_eqflow_variants(args: argparse.Namespace) -> None:
+    """Resolve the eq-flow variant switches (explicit CLI > loaded config > OFF).
+
+    Same plumbing contract as ``_configure_selection_gate``: called once from
+    ``main`` after ``parse_args``; a store_true CLI flag can only turn a variant
+    ON, otherwise the ``--config`` / ``LQ_CONFIG_PATH`` research profile decides;
+    with neither, every switch stays OFF and the runner's output is
+    byte-identical to the legacy path.
+    """
+    cfg: dict[str, bool] = dict.fromkeys(_EQFLOW_VARIANT_STATE, False)
+    config_path = getattr(args, "config", None) or os.getenv("LQ_CONFIG_PATH")
+    if config_path:
+        from lumina_quant.configuration.loader import load_runtime_config
+
+        research = load_runtime_config(str(config_path)).research
+        cfg["corr_guard_router_variant"] = bool(
+            getattr(research, "walkforward_corr_guard_router_variant", False)
+        )
+        cfg["crash_scaled_conviction_variant"] = bool(
+            getattr(research, "walkforward_crash_scaled_conviction_variant", False)
+        )
+        cfg["val_saturation_conviction_variant"] = bool(
+            getattr(research, "walkforward_val_saturation_conviction_variant", False)
+        )
+        cfg["partial_fold_bar_count_weighting"] = bool(
+            getattr(research, "walkforward_partial_fold_bar_count_weighting", False)
+        )
+        cfg["regime_gated_strict_efficiency_variant"] = bool(
+            getattr(research, "walkforward_regime_gated_strict_efficiency_variant", False)
+        )
+    for key in _EQFLOW_VARIANT_STATE:
+        cli_on = bool(getattr(args, f"eqflow_{key}", False))
+        _EQFLOW_VARIANT_STATE[key] = cli_on or cfg[key]
+
 
 def _configure_selection_gate(args: argparse.Namespace) -> None:
     """Resolve reject/dedup gate params (explicit CLI > loaded config > legacy
@@ -879,6 +935,100 @@ def _candidate_overfit_stats(
     }
 
 
+# Turnover-sum floor below which the return-per-turnover ratio is undefined (an
+# all-zero / no-trade window). Emitted as ``rpt_bps=None`` rather than dividing by
+# zero -- see ``_candidate_rpt_bps``.
+_RPT_TURNOVER_EPS = 1e-12
+
+
+def _window_turnover_sum(
+    turnover: pd.Series | float | int, start_ns: int, end_ns: int
+) -> float | None:
+    """Total turnover over ``[start_ns, end_ns]`` (both edges inclusive, matching
+    :func:`_period_metrics`' window slice) for :func:`_candidate_rpt_bps`.
+
+    Accepts either a per-bar ``pd.Series`` aligned to the return index (summed over
+    the window, tolerating an unsorted index exactly as :func:`_prepared_returns`
+    does) or a single per-window scalar (this runner's native turnover shape --
+    ``turnover_by_split`` is a per-split scalar -- used unchanged). Non-finite or
+    unusable input -> ``None`` (never-raise).
+    """
+    if isinstance(turnover, bool):
+        return None
+    if isinstance(turnover, (float, int)):
+        value = float(turnover)
+        return value if math.isfinite(value) else None
+    if isinstance(turnover, pd.Series):
+        if turnover.empty:
+            return 0.0
+        index = pd.DatetimeIndex(turnover.index)
+        index_ns = index.view("int64")
+        values = turnover.to_numpy(dtype=float, copy=False)
+        if not index.is_monotonic_increasing:
+            order = np.argsort(index_ns, kind="mergesort")
+            index_ns = index_ns[order]
+            values = values[order]
+        lo = int(np.searchsorted(index_ns, start_ns, side="left"))
+        hi = int(np.searchsorted(index_ns, end_ns, side="right"))
+        total = float(np.sum(values[lo:hi]))
+        return total if math.isfinite(total) else None
+    return None
+
+
+def _candidate_rpt_bps(
+    returns: pd.Series,
+    turnover: pd.Series | float | int | None,
+    window: tuple[pd.Timestamp, pd.Timestamp],
+) -> dict[str, float | None]:
+    """Config-gated per-candidate return-per-turnover, in bps, for a metric block.
+
+    Automates the repo's graveyard gate ``RPT >= 10bps per split`` -- the exact
+    floor that retired the #13/#14 momentum families, until now recomputed by hand
+    on the data-PC -- by stamping ``rpt_bps`` into the ``validation`` block alongside
+    the E1 ``spa_pvalue`` / ``approx_pbo``. It belongs to the SAME "candidate overfit
+    stats" family, so it rides the SAME ``emit_candidate_overfit_stats`` switch (no
+    new flag) and the SAME cache-safe seam (:func:`_evaluate_candidate` mutates the
+    fresh ``_period_metrics`` copy). For the ``window`` slice::
+
+        rpt_bps = sum(returns) / max(sum(turnover), eps) * 10_000
+
+    (arithmetic return sum, consistent with the mission's turnover-normalised
+    definition). ``turnover`` is this runner's per-candidate turnover measure --
+    either a per-bar ``pd.Series`` aligned to ``returns.index`` (summed over the
+    window) or a single per-window scalar. This runner models turnover as a per-split
+    SCALAR (``turnover_by_split``); no per-bar turnover series rides a
+    ``CandidateResult`` today, so ``turnover is None`` -> the field is simply absent
+    (never-raise), exactly as the E1 estimators omit below their min-obs floor and as
+    the whole-search DSR is deferred to the data-PC. When a producer threads a
+    turnover series/scalar onto the row the field activates with no further plumbing.
+
+    Cache-safe: reads the shared (cached) ``_prepared_returns`` read-only for the
+    return sum and slices ``turnover`` in a local buffer; the metric cache is never
+    keyed on / poisoned by the flag. Strict no-op when disabled -> ``{}`` so the
+    caller's ``dict.update({})`` leaves the block byte-identical. Degenerate turnover
+    (window sum <= ``_RPT_TURNOVER_EPS``, e.g. a no-trade window) -> ``rpt_bps`` is
+    emitted as ``None`` rather than dividing by zero.
+    """
+    if not _SELECTION_GATE_STATE.get("emit_candidate_overfit_stats"):
+        return {}
+    if turnover is None:
+        return {}
+    start_ns = _timestamp_ns(window[0])
+    end_ns = _timestamp_ns(window[1])
+    prepared = _prepared_returns(returns)
+    lo = int(np.searchsorted(prepared.index_ns, start_ns, side="left"))
+    hi = int(np.searchsorted(prepared.index_ns, end_ns, side="right"))
+    ret_sum = float(np.sum(prepared.values[lo:hi]))
+    if not math.isfinite(ret_sum):
+        return {}
+    turnover_sum = _window_turnover_sum(turnover, start_ns, end_ns)
+    if turnover_sum is None:
+        return {}
+    if turnover_sum <= _RPT_TURNOVER_EPS:
+        return {"rpt_bps": None}
+    return {"rpt_bps": ret_sum / turnover_sum * 10_000.0}
+
+
 def _add_month(ts: pd.Timestamp, months: int) -> pd.Timestamp:
     return _coerce_ts(ts + pd.DateOffset(months=months)).normalize()
 
@@ -1601,6 +1751,98 @@ def _cross_candidate_hybrid_candidates(
     ]
 
 
+# --- B2 (crash_scaled_conviction_variant) pre-registered constants ----------
+# VERBATIM the registered ``MomentumCrashDynamicScalingOverlayStrategy`` schema
+# defaults (src/lumina_quant/strategies/momentum_crash_scaling_overlay.py,
+# ``get_param_schema``): bear_lookback_bars=90, dd_window_bars=180,
+# dd_threshold=-0.20, rebound_lookback_bars=10, rebound_threshold=0.05,
+# b_bear=0.5, b_panic=0.5.  The twin REUSES that registered Daniel-Moskowitz
+# bear x rebound state machine on the selected sleeve's own pre-OOS equity
+# curve -- no new tuning, no new grid.
+DM_CRASH_BEAR_LOOKBACK = 90
+DM_CRASH_DD_WINDOW = 180
+DM_CRASH_DD_THRESHOLD = -0.20
+DM_CRASH_REBOUND_LOOKBACK = 10
+DM_CRASH_REBOUND_THRESHOLD = 0.05
+DM_CRASH_B_BEAR = 0.5
+DM_CRASH_B_PANIC = 0.5
+
+# --- A3a (val_saturation_conviction_variant) pre-registered constant --------
+# validation window is ~2 months; ceiling = ~40%/month (the equity-flow brief's
+# threshold above which extreme validation empirically SIGN-FLIPS: val +180% ->
+# OOS -16.7%).  Saturation is a monotone reflection: eff(v) = v if v <= C else
+# max(0.0, C - (v - C)) -- extreme validation is read as an overfit flag that
+# REDUCES (never increases) deploy conviction.
+VAL_SATURATION_CEILING = 0.80
+
+
+def _dm_crash_bear_rebound_state(pre_oos_returns: Any) -> tuple[int, int]:
+    """Daniel-Moskowitz ``(I_bear, I_rebound)`` on a sleeve's OWN pre-OOS stream.
+
+    Mirrors ``bear_rebound_state`` in the registered momentum-crash overlay, but
+    on the sleeve's return stream rather than a benchmark close series: the
+    equity curve ``cumprod(1 + r)`` is the ``closes`` analog.  ``I_bear`` fires
+    when the trailing ``DM_CRASH_BEAR_LOOKBACK``-bar return is negative OR the
+    latest point sits at/below ``DM_CRASH_DD_THRESHOLD`` of its trailing
+    ``DM_CRASH_DD_WINDOW`` peak; ``I_rebound`` fires when the trailing
+    ``DM_CRASH_REBOUND_LOOKBACK``-bar return is at/above
+    ``DM_CRASH_REBOUND_THRESHOLD``.  Windows are anchored at the LAST pre-OOS
+    bar.  Thin / degenerate history -> ``(0, 0)``; never raises.
+    """
+    values = np.asarray(pre_oos_returns, dtype=float)
+    values = values[np.isfinite(values)]
+    need = max(DM_CRASH_BEAR_LOOKBACK, DM_CRASH_REBOUND_LOOKBACK, DM_CRASH_DD_WINDOW) + 1
+    if values.size < need:
+        return 0, 0
+    equity = np.cumprod(1.0 + values)
+    if not bool(np.all(equity > 0.0)):
+        return 0, 0
+    bear_ret = float(equity[-1] / equity[-1 - DM_CRASH_BEAR_LOOKBACK] - 1.0)
+    dd_tail = equity[-DM_CRASH_DD_WINDOW:]
+    peak = float(np.max(dd_tail))
+    drawdown = min(0.0, float(dd_tail[-1] / peak - 1.0)) if peak > 0.0 else 0.0
+    in_bear = bear_ret < 0.0 or drawdown <= DM_CRASH_DD_THRESHOLD
+    rebound_ret = float(equity[-1] / equity[-1 - DM_CRASH_REBOUND_LOOKBACK] - 1.0)
+    in_rebound = rebound_ret >= DM_CRASH_REBOUND_THRESHOLD
+    return (1 if in_bear else 0, 1 if in_rebound else 0)
+
+
+def _dm_crash_multiplier(i_bear: int, i_rebound: int) -> float:
+    """``mu = max(0, 1 - b_bear*I_bear - b_panic*I_bear*I_rebound)`` in {1.0, 0.5, 0.0}."""
+    mu = 1.0 - DM_CRASH_B_BEAR * float(i_bear) - DM_CRASH_B_PANIC * float(i_bear) * float(i_rebound)
+    return max(0.0, mu)
+
+
+def _dm_crash_scaled_twin_returns(
+    base_returns: pd.Series,
+    pre_oos_returns: Any,
+    locked_oos_window: tuple[pd.Timestamp, pd.Timestamp],
+) -> tuple[pd.Series, float, int, int]:
+    """Twin of a base cell: locked-OOS window multiplied by ``mu``, pre-OOS kept.
+
+    ``base_returns`` is the base cell's return stream (already risk-scaled); the
+    bear x rebound multiplier is computed from ``pre_oos_returns`` (the selected
+    sleeve's own train+validation stream) and applied ONLY inside
+    ``locked_oos_window``.  Returns ``(twin, mu, I_bear, I_rebound)``.
+    """
+    i_bear, i_rebound = _dm_crash_bear_rebound_state(pre_oos_returns)
+    mu = _dm_crash_multiplier(i_bear, i_rebound)
+    twin = base_returns.copy()
+    index = twin.index
+    mask = (index >= locked_oos_window[0]) & (index <= locked_oos_window[1])
+    twin.loc[mask] = twin.loc[mask] * mu
+    return twin, mu, i_bear, i_rebound
+
+
+def _saturate_validation_return(value: float) -> float:
+    """Monotone reflection past ``VAL_SATURATION_CEILING`` (A3a ``eff(v)``)."""
+    ceiling = VAL_SATURATION_CEILING
+    v = float(value)
+    if v <= ceiling:
+        return v
+    return max(0.0, ceiling - (v - ceiling))
+
+
 def _dynamic_conviction_switch_candidates(
     candidates: Sequence[CandidateResult],
     fold: MonthlyFold,
@@ -1944,6 +2186,137 @@ def _dynamic_conviction_switch_candidates(
             returns=cash_returns,
         )
 
+    # Eq-flow complements B2 / A3a.  Both default OFF -> no new code executes and
+    # the legacy 72-label set is byte-identical; the honest-research profile turns
+    # them ON.  They only add twins for the two calmar80-gate scaled cells the
+    # equity-flow diagnosis names (target_mdd 0.20/0.15, the +7.99% "clean #1"
+    # candidate and its sibling).
+    crash_scaled_on = bool(_EQFLOW_VARIANT_STATE.get("crash_scaled_conviction_variant", False))
+    val_saturation_on = bool(_EQFLOW_VARIANT_STATE.get("val_saturation_conviction_variant", False))
+
+    # A3a: re-run the selection/scale decision on saturated validation returns so
+    # the twin levers LESS (or picks a different candidate) when validation is
+    # extreme.  Materialized once, only when ON; base cells keep their own raw
+    # snapshots untouched.
+    sat_best_aggressive: CandidateResult | None = None
+    sat_best_score = -float("inf")
+    sat_strict_fallback: CandidateResult | None = None
+    sat_risk_capped_fallback: CandidateResult | None = None
+    sat_applied_flag = False
+
+    def _sat_validation_budget_scale(
+        candidate: CandidateResult,
+        *,
+        target_validation_mdd: float,
+        max_scale: float,
+    ) -> tuple[float, dict[str, dict[str, Any]]]:
+        """``_validation_budget_scale`` twin: validation return is saturated in the
+        admission test and the score so extreme validation cannot buy more gross.
+        """
+        best_scale = 1.0
+        best_snapshot = _scaled_candidate_snapshot(candidate, 1.0)
+        best_local = -float("inf")
+        for scale in (1.0, 1.10, 1.25, 1.50, 1.75, 2.00, 2.25, 2.50, 2.75, 3.00):
+            if scale > max_scale + 1e-12:
+                continue
+            snapshot = _scaled_candidate_snapshot(candidate, scale)
+            train = snapshot["train"]
+            validation = snapshot["validation"]
+            train_return = _safe_float(train["total_return"])
+            validation_return = _saturate_validation_return(_safe_float(validation["total_return"]))
+            validation_mdd = _safe_float(validation["mdd"])
+            if train_return <= -0.02 or validation_return < 0.0:
+                continue
+            if validation_mdd > target_validation_mdd + 1e-12:
+                continue
+            score = (
+                validation_return / max(validation_mdd, 0.02)
+                + 0.10 * min(train_return, 2.0)
+                - 0.03 * scale
+            )
+            if score > best_local:
+                best_local = score
+                best_scale = float(scale)
+                best_snapshot = snapshot
+        return best_scale, best_snapshot
+
+    if val_saturation_on:
+
+        def _sat_snapshot(candidate: CandidateResult) -> dict[str, float]:
+            snap = dict(_candidate_validation_snapshot(candidate, fold))
+            eff_val = _saturate_validation_return(snap["validation_return"])
+            snap["validation_return"] = eff_val
+            snap["validation_calmar"] = eff_val / max(snap["validation_mdd"], 0.01)
+            return snap
+
+        def _sat_aggressive_eligible(label: str) -> CandidateResult | None:
+            candidate = by_label.get(label)
+            if candidate is None:
+                return None
+            if not _clean_downstream_candidate(candidate):
+                return None
+            if not _leaf_strategy_material_candidate(candidate):
+                return None
+            snap = _sat_snapshot(candidate)
+            if snap["train_return"] <= 0.0 or snap["validation_return"] <= 0.0:
+                return None
+            if snap["validation_mdd"] > 0.18:
+                return None
+            return candidate
+
+        def _sat_fallback_eligible(label: str) -> CandidateResult | None:
+            candidate = by_label.get(label)
+            if candidate is None:
+                return None
+            if not _clean_downstream_candidate(candidate):
+                return None
+            if not _leaf_strategy_material_candidate(candidate):
+                return None
+            snap = _sat_snapshot(candidate)
+            if snap["train_return"] < -0.02 or snap["validation_return"] < -0.02:
+                return None
+            if snap["validation_mdd"] > 0.20:
+                return None
+            return candidate
+
+        def _sat_conviction_score(candidate: CandidateResult) -> float:
+            snap = _sat_snapshot(candidate)
+            return float(
+                min(snap["validation_return"], 1.0)
+                + 0.25 * min(snap["train_return"], 3.0)
+                - 1.5 * snap["validation_mdd"]
+                - 0.25 * snap["train_mdd"]
+            )
+
+        def _sat_fallback_score(candidate: CandidateResult) -> float:
+            snap = _sat_snapshot(candidate)
+            return float(snap["validation_return"] / max(snap["validation_mdd"], 0.02))
+
+        sat_aggressive_pool = [
+            candidate
+            for label in aggressive_labels
+            if (candidate := _sat_aggressive_eligible(label))
+        ]
+        sat_fallback_pool = [
+            candidate for label in fallback_labels if (candidate := _sat_fallback_eligible(label))
+        ]
+        if sat_fallback_pool:
+            sat_strict_fallback = max(sat_fallback_pool, key=_sat_fallback_score)
+        sat_risk_capped_fallback = sat_strict_fallback
+        if balanced_fallback is not None and growth_fallback is not None:
+            sat_balanced_snap = _sat_snapshot(balanced_fallback)
+            sat_risk_capped_fallback = (
+                growth_fallback if sat_balanced_snap["validation_mdd"] > 0.10 else balanced_fallback
+            )
+        if sat_aggressive_pool:
+            sat_best_aggressive = max(sat_aggressive_pool, key=_sat_conviction_score)
+            sat_best_score = _sat_conviction_score(sat_best_aggressive)
+        sat_applied_flag = any(
+            _candidate_validation_snapshot(candidate, fold)["validation_return"]
+            > VAL_SATURATION_CEILING
+            for candidate in [*aggressive_pool, *fallback_pool]
+        )
+
     out: list[CandidateResult] = []
     for threshold in (0.85, 0.90, 0.95, 1.00):
         for fallback_name, fallback_candidate in (
@@ -2133,6 +2506,109 @@ def _dynamic_conviction_switch_candidates(
                             },
                         )
                     )
+                    scaled_cell = (target_mdd, max_scale) in ((0.15, 2.25), (0.20, 2.50))
+                    if crash_scaled_on and scaled_cell:
+                        # B2: momentum-crash de-risk twin.  mu in {1.0, 0.5, 0.0}
+                        # from the SELECTED sleeve's own pre-OOS (train+validation)
+                        # equity path; only the locked-OOS window is multiplied.
+                        pre_oos_stream = selected.returns.loc[
+                            fold.train[0] : fold.validation[1]
+                        ].to_numpy(dtype=float)
+                        twin_returns, dm_mu, dm_bear, dm_rebound = _dm_crash_scaled_twin_returns(
+                            selected.returns * scale,
+                            pre_oos_stream,
+                            fold.locked_oos,
+                        )
+                        out.append(
+                            _emit_dynamic_candidate(
+                                label_suffix=(
+                                    f"{gate_suffix}_val_mdd{int(target_mdd * 100):02d}"
+                                    "_scaled_dm_crash_scaled"
+                                ),
+                                profile_kind=(
+                                    "train_validation_dynamic_conviction_switch_"
+                                    "momentum_crash_scaled"
+                                ),
+                                selected=selected,
+                                fallback_name=fallback_name,
+                                fallback_candidate=fallback_candidate,
+                                threshold=threshold,
+                                selected_snap=scaled_snap,
+                                returns=twin_returns,
+                                scale=scale,
+                                extra_row={
+                                    **gate_extra,
+                                    "target_validation_mdd": float(target_mdd),
+                                    "max_risk_scale": float(max_scale),
+                                    "unscaled_selected_validation_return": selected_snap[
+                                        "validation_return"
+                                    ],
+                                    "unscaled_selected_validation_mdd": selected_snap[
+                                        "validation_mdd"
+                                    ],
+                                    "dm_crash_mu": float(dm_mu),
+                                    "dm_crash_bear": int(dm_bear),
+                                    "dm_crash_rebound": int(dm_rebound),
+                                },
+                            )
+                        )
+                    if val_saturation_on and scaled_cell:
+                        # A3a: validation-saturation twin.  Its selection and scale
+                        # decision run on eff(validation_return), so extreme
+                        # validation cannot buy more gross (or a different pick).
+                        sat_fallback_candidate = (
+                            sat_strict_fallback
+                            if fallback_name == "strict_fallback"
+                            else sat_risk_capped_fallback
+                        )
+                        sat_selected = (
+                            sat_best_aggressive
+                            if sat_best_aggressive is not None and sat_best_score >= threshold
+                            else sat_fallback_candidate
+                        )
+                        if sat_selected is not None:
+                            sat_scale, sat_scale_snapshot = _sat_validation_budget_scale(
+                                sat_selected,
+                                target_validation_mdd=target_mdd,
+                                max_scale=max_scale,
+                            )
+                            sat_scaled_snap = {
+                                "train_return": _safe_float(
+                                    sat_scale_snapshot["train"]["total_return"]
+                                ),
+                                "validation_return": _safe_float(
+                                    sat_scale_snapshot["validation"]["total_return"]
+                                ),
+                                "train_mdd": _safe_float(sat_scale_snapshot["train"]["mdd"]),
+                                "validation_mdd": _safe_float(
+                                    sat_scale_snapshot["validation"]["mdd"]
+                                ),
+                            }
+                            out.append(
+                                _emit_dynamic_candidate(
+                                    label_suffix=(
+                                        f"{gate_suffix}_val_mdd{int(target_mdd * 100):02d}"
+                                        "_scaled_val_sat80"
+                                    ),
+                                    profile_kind=(
+                                        "train_validation_dynamic_conviction_switch_val_saturation"
+                                    ),
+                                    selected=sat_selected,
+                                    fallback_name=fallback_name,
+                                    fallback_candidate=sat_fallback_candidate,
+                                    threshold=threshold,
+                                    selected_snap=sat_scaled_snap,
+                                    returns=sat_selected.returns * sat_scale,
+                                    scale=sat_scale,
+                                    extra_row={
+                                        **gate_extra,
+                                        "target_validation_mdd": float(target_mdd),
+                                        "max_risk_scale": float(max_scale),
+                                        "val_saturation_ceiling": VAL_SATURATION_CEILING,
+                                        "val_saturation_applied": bool(sat_applied_flag),
+                                    },
+                                )
+                            )
     return out
 
 
@@ -4389,6 +4865,28 @@ PREREGISTERED_LAGGED_LEAF_MAX_VALIDATION_MDD = 0.25
 PREREGISTERED_LAGGED_LEAF_VALIDATION_WEIGHT = 0.25
 PREREGISTERED_LAGGED_LEAF_FALLBACK_TARGET_VALIDATION_MDD = 0.20
 PREREGISTERED_LAGGED_LEAF_FALLBACK_MAX_SCALE = 2.00
+# C1 (eq-flow v5 follow-up, 2026-07-10): corr-guarded twin of the pre-registered
+# risk-trimmed lagged router. The equity-flow diagnosis
+# (.omc/research/equity-flow-analysis-20260710.md, Brief C1) found the router
+# champion's only shared weakness is a common HIGH-CORRELATION tail (the 2026-07
+# universal-loss fold) while its idiosyncratic wins are low-correlation. The band
+# constants below are VERBATIM the registered AvgCorrelationCrashGuardOverlayStrategy
+# schema defaults (src/lumina_quant/strategies/correlation_crash_guard_overlay.py):
+# pre-registration reuses the registered correlation-crash band, no new tuning. The
+# twin is emitted ONLY when _EQFLOW_VARIANT_STATE["corr_guard_router_variant"] is ON
+# (configs/profiles/research.yaml); OFF -> zero new code paths, byte-identical output.
+PREREGISTERED_LAGGED_LEAF_ROUTER_CORR_GUARD_LABEL = (
+    PREREGISTERED_LAGGED_LEAF_ROUTER_RISK_TRIMMED_LABEL + "_eqcorr_guard"
+)
+CORR_GUARD_WINDOW = 96
+CORR_GUARD_Z_ENTER = 1.5
+CORR_GUARD_ABS_FLOOR = 0.35
+CORR_GUARD_DERISK_SCALE = 0.35
+CORR_GUARD_MIN_SYMBOLS = 4
+# Trailing rho-bar series is computed at a DECIMATED set of pre-OOS end-positions
+# (every CORR_GUARD_DECIMATION bars) to bound the O(N*T*W) full roll; the LAST
+# rho is always taken at the EXACT final pre-OOS position (part of the pre-reg).
+CORR_GUARD_DECIMATION = 8
 LAGGED_SHADOW_LEAF_ROUTER_SPECS: tuple[
     dict[str, float | str | tuple[str, ...]],
     ...,
@@ -4471,12 +4969,89 @@ def _update_lagged_shadow_leaf_prior_returns(
         )
 
 
+def _corr_guard_router_decision(
+    individual_streams: Sequence[broad69.CandidateStream] | None,
+    fold: MonthlyFold,
+) -> tuple[bool, float | None, float | None]:
+    """C1 pre-OOS average-pairwise-correlation crash-guard decision (never raises).
+
+    Mirrors ``AvgCorrelationCrashGuardOverlayStrategy``: builds one return vector per
+    distinct symbol (dedupe by ``stream.row['symbol']``, first stream wins) restricted
+    to bars STRICTLY BEFORE the fold's locked-OOS start (train+validation only -- no
+    look-ahead, the decision never reads an OOS bar), aligns them on their shared
+    pre-OOS clock, then computes a TRAILING rho-bar band via
+    :func:`_average_pairwise_correlation` over a DECIMATED set of end-positions (every
+    ``CORR_GUARD_DECIMATION`` bars, the LAST at the exact final pre-OOS position). The
+    guard ENGAGES iff the final rho z-spikes ``>= CORR_GUARD_Z_ENTER`` (sample z-score
+    vs the trailing band) AND its level is ``>= CORR_GUARD_ABS_FLOOR``. Fewer than
+    ``CORR_GUARD_MIN_SYMBOLS`` valid streams, ``individual_streams is None``, or any
+    degenerate window -> NEUTRAL ``(False, None, None)``.
+    """
+    if not individual_streams:
+        return (False, None, None)
+    from lumina_quant.strategies.correlation_crash_guard_overlay import (
+        _average_pairwise_correlation,
+        _rolling_z,
+    )
+
+    oos_start_ns = _timestamp_ns(fold.locked_oos[0])
+    per_symbol_values: dict[str, np.ndarray] = {}
+    per_symbol_index: dict[str, np.ndarray] = {}
+    for stream in individual_streams:
+        row = getattr(stream, "row", None)
+        symbol = str((row or {}).get("symbol") or "").strip() if isinstance(row, Mapping) else ""
+        if not symbol or symbol in per_symbol_values:
+            continue
+        returns = getattr(stream, "returns", None)
+        if not isinstance(returns, pd.Series) or returns.empty:
+            continue
+        prepared = _prepared_returns(returns)
+        hi = int(np.searchsorted(prepared.index_ns, oos_start_ns, side="left"))
+        if hi < CORR_GUARD_WINDOW:
+            continue
+        per_symbol_values[symbol] = prepared.values[:hi]
+        per_symbol_index[symbol] = prepared.index_ns[:hi]
+    if len(per_symbol_values) < CORR_GUARD_MIN_SYMBOLS:
+        return (False, None, None)
+
+    common_ns: np.ndarray | None = None
+    for index_ns in per_symbol_index.values():
+        common_ns = index_ns if common_ns is None else np.intersect1d(common_ns, index_ns)
+    if common_ns is None or int(common_ns.size) < CORR_GUARD_WINDOW:
+        return (False, None, None)
+    common_ns = np.sort(common_ns)
+
+    matrix_rows: list[np.ndarray] = []
+    for symbol in sorted(per_symbol_values):
+        pos = np.searchsorted(per_symbol_index[symbol], common_ns)
+        matrix_rows.append(per_symbol_values[symbol][pos])
+    matrix = np.vstack(matrix_rows)
+    n_symbols, t_common = matrix.shape
+    if n_symbols < CORR_GUARD_MIN_SYMBOLS or t_common < CORR_GUARD_WINDOW:
+        return (False, None, None)
+
+    end_positions = list(range(t_common - 1, CORR_GUARD_WINDOW - 2, -CORR_GUARD_DECIMATION))
+    end_positions.reverse()  # ascending; final element is the exact final pre-OOS bar
+    rho_series: list[float | None] = []
+    for end in end_positions:
+        window = matrix[:, end - CORR_GUARD_WINDOW + 1 : end + 1]
+        rho_series.append(_average_pairwise_correlation(window))
+    last_rho = rho_series[-1]
+    if last_rho is None:
+        return (False, None, None)
+    band = [float(value) for value in rho_series if value is not None]
+    z = _rolling_z(band)
+    engaged = bool(z >= CORR_GUARD_Z_ENTER and last_rho >= CORR_GUARD_ABS_FLOOR)
+    return (engaged, float(last_rho), float(z))
+
+
 def _lagged_shadow_leaf_router_candidates(
     candidates: Sequence[CandidateResult],
     fold: MonthlyFold,
     *,
     prior_completed_returns: Mapping[str, Sequence[float]],
     prior_completed_fold_ids: Sequence[str] = (),
+    individual_streams: Sequence[broad69.CandidateStream] | None = None,
 ) -> list[CandidateResult]:
     """Route among strict/relaxed leaves using only lagged shadow returns.
 
@@ -4906,6 +5481,55 @@ def _lagged_shadow_leaf_router_candidates(
             returns=risk_trimmed_returns,
         )
     )
+    if _EQFLOW_VARIANT_STATE["corr_guard_router_variant"]:
+        # C1 twin: exact copy of the risk-trimmed row, de-risking ONLY the locked-OOS
+        # slice by CORR_GUARD_DERISK_SCALE iff the pre-OOS correlation-crash guard
+        # engaged for this fold. Pre-OOS bars stay identical so train/validation
+        # metrics match the base twin. Guard decision is made purely from pre-OOS data.
+        corr_guard_engaged, corr_guard_rho, corr_guard_z = _corr_guard_router_decision(
+            individual_streams, fold
+        )
+        corr_guard_returns = risk_trimmed_returns.copy()
+        if corr_guard_engaged and corr_guard_returns.size:
+            oos_mask = (corr_guard_returns.index >= fold.locked_oos[0]) & (
+                corr_guard_returns.index <= fold.locked_oos[1]
+            )
+            corr_guard_returns.loc[oos_mask] = (
+                corr_guard_returns.loc[oos_mask] * CORR_GUARD_DERISK_SCALE
+            )
+        corr_guard_row = {
+            **risk_trimmed_row,
+            "profile_id": PREREGISTERED_LAGGED_LEAF_ROUTER_CORR_GUARD_LABEL,
+            "selection_policy": (
+                str(risk_trimmed_row["selection_policy"]) + "_eqcorr_crash_guard_derisk35"
+            ),
+            "corr_guard_engaged": bool(corr_guard_engaged),
+            "corr_guard_rho": corr_guard_rho,
+            "corr_guard_z": corr_guard_z,
+            "corr_guard_window": CORR_GUARD_WINDOW,
+            "corr_guard_z_enter": CORR_GUARD_Z_ENTER,
+            "corr_guard_abs_floor": CORR_GUARD_ABS_FLOOR,
+            "corr_guard_derisk_scale": CORR_GUARD_DERISK_SCALE,
+            "corr_guard_min_symbols": CORR_GUARD_MIN_SYMBOLS,
+            "corr_guard_decimation": CORR_GUARD_DECIMATION,
+            "guardrail_notes": [
+                "eqflow_c1_avg_pairwise_correlation_crash_guard_pre_oos_only",
+                "derisk35_locked_oos_scale_iff_pre_oos_rho_z_spike_no_current_oos_read",
+            ],
+            "derived_from_family_notes": [
+                "pre_registered_risk_trimmed_lagged_shadow_router_twin",
+                "avg_correlation_crash_guard_overlay_registered_band",
+            ],
+            "pre_registered_corr_guard_after_diagnostic_commit": True,
+        }
+        out.append(
+            _candidate_eval(
+                family="lagged_shadow_leaf_router",
+                label=PREREGISTERED_LAGGED_LEAF_ROUTER_CORR_GUARD_LABEL,
+                row=corr_guard_row,
+                returns=corr_guard_returns,
+            )
+        )
     return out
 
 
@@ -6443,6 +7067,126 @@ def _run_source_profile_family(
     return candidates, aux
 
 
+# D4 (eq-flow v5 follow-up, 2026-07-10): pre-registered regime-eligibility budget
+# for the regime-gated ``strict_efficiency:static_guarded`` twin. Mirrors the
+# eligibility rule the dynamic-conviction cash gate already applies to its deploy
+# decisions (validation_return >= 0, validation_mdd <= target) -- the exact
+# pattern that empirically skips strict_efficiency's shallow-bleed months
+# (.omc/research/equity-flow-analysis-20260710.md section 3, candidate D). The
+# 0.12 mdd budget matches LAGGED_SHADOW_LEAF_MAX_VALIDATION_MDD. These are fixed
+# module constants, not a tunable grid.
+REGIME_GATE_MIN_VALIDATION_RETURN = 0.0
+REGIME_GATE_MAX_VALIDATION_MDD = 0.12
+
+
+def _zero_returns_window(
+    returns: pd.Series, window: tuple[pd.Timestamp, pd.Timestamp]
+) -> pd.Series:
+    """Copy ``returns`` with the closed ``[start, end]`` slice set to cash (0.0),
+    leaving every other bar byte-identical.
+
+    The inclusive-both-edges slice matches :func:`_period_metrics`' window
+    convention (searchsorted left/right), so a window zeroed here reads as a flat
+    cash period under the same metric evaluation. Empty input is returned
+    unchanged (never-raise).
+    """
+    if returns.empty:
+        return returns.copy()
+    start, end = window
+    result = returns.copy()
+    mask = (result.index >= start) & (result.index <= end)
+    if bool(mask.any()):
+        result.loc[mask] = 0.0
+    return result
+
+
+def _regime_gated_static_guarded_twin(
+    *,
+    family: str,
+    fold: MonthlyFold,
+    profile_streams: Sequence[grid_hybrid.ProfileStream],
+    static_row: Mapping[str, Any],
+) -> CandidateResult:
+    """Build the D4 regime-gated twin of ``strict_efficiency:static_guarded``.
+
+    Deploys the static_guarded blend ONLY when its validation window clears the
+    pre-registered regime-eligibility budget (total return above
+    ``REGIME_GATE_MIN_VALIDATION_RETURN`` and drawdown within
+    ``REGIME_GATE_MAX_VALIDATION_MDD``); otherwise the fold's locked-OOS window is
+    zeroed to cash. This mirrors the dynamic-conviction cash gate's deploy rule --
+    the pattern that empirically skips strict_efficiency's shallow-bleed months.
+    Never raises: a missing / degenerate validation metric block fails the gate
+    (conservative -> cash). Pre-OOS windows (train/validation) are always
+    untouched, so their metrics stay identical to the base static_guarded row.
+    """
+    static_returns = _combine_profile_returns(
+        profile_streams, dict(static_row.get("final_weights") or {})
+    )
+    try:
+        metrics = _period_metrics(static_returns, fold.validation)
+        bar_count = int(metrics.get("bar_count") or 0)
+        val_return = _safe_float(metrics.get("total_return"))
+        val_mdd = _safe_float(metrics.get("mdd"))
+    except Exception:  # never-raise: any metric failure -> conservative cash gate
+        bar_count = 0
+        val_return = 0.0
+        val_mdd = 0.0
+    gate_passed = bool(
+        bar_count > 0
+        and val_return > REGIME_GATE_MIN_VALIDATION_RETURN
+        and val_mdd <= REGIME_GATE_MAX_VALIDATION_MDD
+    )
+    returns = (
+        static_returns if gate_passed else _zero_returns_window(static_returns, fold.locked_oos)
+    )
+    row = dict(static_row)
+    row["regime_gate_passed"] = gate_passed
+    row["regime_gate_validation_return"] = val_return
+    row["regime_gate_validation_mdd"] = val_mdd
+    notes = list(row.get("guardrail_notes") or [])
+    notes.append(
+        "regime_gated_static_guarded_deploy_only_when_validation_return_positive_and_mdd_within_budget"
+    )
+    notes.append("locked_oos_cash_when_regime_gate_fails_train_validation_identical_to_base")
+    row["guardrail_notes"] = notes
+    return _candidate_eval(
+        family=family,
+        label=f"{family}:static_guarded_regime_gated",
+        row=row,
+        returns=returns,
+    )
+
+
+def _maybe_regime_gated_static_guarded_twin(
+    *,
+    family: str,
+    relaxed: bool,
+    fold: MonthlyFold,
+    profile_streams: Sequence[grid_hybrid.ProfileStream],
+    static_row: Mapping[str, Any],
+) -> list[CandidateResult]:
+    """Return the D4 twin as a 0-or-1 element list.
+
+    Strict no-op -> ``[]`` unless the pre-registered
+    ``regime_gated_strict_efficiency_variant`` switch is ON *and* this is the
+    strict_efficiency (non-relaxed) family. Flag OFF (or a relaxed_efficiency run)
+    adds zero candidates and zero labels, so the legacy family output stays
+    byte-identical.
+    """
+    if relaxed or family != "strict_efficiency":
+        return []
+    if not _EQFLOW_VARIANT_STATE.get("regime_gated_strict_efficiency_variant"):
+        return []
+    return [
+        _regime_gated_static_guarded_twin(
+            family=family,
+            fold=fold,
+            profile_streams=profile_streams,
+            static_row=static_row,
+        )
+    ]
+
+
 def _run_efficiency_family(
     *,
     fold: MonthlyFold,
@@ -6655,6 +7399,17 @@ def _run_efficiency_family(
         selected_legal=selected_legal,
         selected_optuna=selected_optuna_for_eval,
     )
+    # D4: pre-registered regime-gated twin of strict_efficiency:static_guarded.
+    # Strict no-op (adds nothing) unless the switch is ON and family is strict.
+    candidates.extend(
+        _maybe_regime_gated_static_guarded_twin(
+            family=family,
+            relaxed=relaxed,
+            fold=fold,
+            profile_streams=profile_streams,
+            static_row=static_guarded,
+        )
+    )
     aux = {
         "profile_row_count": len(profile_rows),
         "selected_sleeve_row_count": len(sleeve_rows),
@@ -6708,6 +7463,14 @@ def _evaluate_candidate(candidate: CandidateResult, fold: MonthlyFold) -> dict[s
     # byte-identical. ``validation`` is a fresh ``_period_metrics`` copy, so this
     # mutation never poisons the metric cache.
     validation.update(_candidate_overfit_stats(candidate.returns, fold.validation))
+    # E1 family (RPT gate automation): config-gated per-candidate return-per-turnover
+    # (bps) into the SAME validation block under the SAME ``emit_candidate_overfit_stats``
+    # switch. OFF -> ``{}`` -> byte-identical. Turnover is threaded off the row (a
+    # per-bar series or this runner's native per-split scalar); absent -> field
+    # omitted. Same fresh-copy seam, so it never poisons the metric cache.
+    validation.update(
+        _candidate_rpt_bps(candidate.returns, candidate.row.get("turnover_series"), fold.validation)
+    )
     locked_oos = _period_metrics(candidate.returns, fold.locked_oos)
     row = dict(candidate.row)
     post_oos_research_variant = bool(row.get("post_oos_research_variant", False))
@@ -6842,7 +7605,47 @@ def _evaluate_candidate(candidate: CandidateResult, fold: MonthlyFold) -> dict[s
     }
 
 
+# --- A3b (partial_fold_bar_count_weighting) pre-registered constant ---------
+# A fold whose locked-OOS bar_count is at or above this fraction of the group's
+# LONGEST fold weighs 1.0; a genuine partial (e.g. the terminal 4-day 2026-07
+# fold) shrinks proportionally so it cannot set a candidate's headline ranking.
+PARTIAL_FOLD_FULL_FRACTION = 0.75
+
+
+def _partial_fold_weighting_fields(
+    oos_returns: Sequence[float],
+    oos_mdds: Sequence[float],
+    rows: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """A3b bar_count-aware fold weighting fields for one candidate group.
+
+    ``w_i = min(1.0, bar_count_i / (PARTIAL_FOLD_FULL_FRACTION * ref))`` where
+    ``ref`` is the group's longest locked-OOS bar_count.  Emitted ONLY when the
+    flag is ON; never mutates the raw fields.
+    """
+    bar_counts = [_safe_float((row.get("locked_oos") or {}).get("bar_count")) for row in rows]
+    ref = max(bar_counts) if bar_counts else 0.0
+    denom = PARTIAL_FOLD_FULL_FRACTION * ref
+    weights = [1.0 if denom <= 0.0 else min(1.0, count / denom) for count in bar_counts]
+    compounded = (
+        float(np.prod([(1.0 + r) ** w for r, w in zip(oos_returns, weights)]) - 1.0)
+        if oos_returns
+        else 0.0
+    )
+    positive = float(sum(w for r, w in zip(oos_returns, weights) if r > 0.0))
+    full_fold_mdds = [m for m, w in zip(oos_mdds, weights) if w >= 1.0]
+    return {
+        "fold_bar_weights": weights,
+        "bar_weighted_compounded_oos_return": compounded,
+        "bar_weighted_positive_oos_folds": positive,
+        "max_full_fold_oos_mdd": max(full_fold_mdds) if full_fold_mdds else None,
+    }
+
+
 def _aggregate_rows(fold_rows: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    # A3b: bar_count-aware partial-fold weighting.  OFF (default) -> no new keys,
+    # original sort key, byte-identical output.
+    weighting_on = bool(_EQFLOW_VARIANT_STATE.get("partial_fold_bar_count_weighting", False))
     by_label: dict[str, list[Mapping[str, Any]]] = defaultdict(list)
     for row in fold_rows:
         by_label[str(row["candidate_label"])].append(row)
@@ -6989,118 +7792,130 @@ def _aggregate_rows(fold_rows: Sequence[Mapping[str, Any]]) -> list[dict[str, An
             )
             for row in rows
         ]
-        aggregate.append(
-            {
-                "candidate_label": label,
-                "family": rows[0].get("family"),
-                "fold_count": len(rows),
-                "readiness_labels": readiness_labels,
-                "allowed_usage_labels": allowed_usage_labels,
-                "external_evidence_refs": external_evidence_refs,
-                "selected_symbols": selected_symbols[:30],
+        agg_row: dict[str, Any] = {
+            "candidate_label": label,
+            "family": rows[0].get("family"),
+            "fold_count": len(rows),
+            "readiness_labels": readiness_labels,
+            "allowed_usage_labels": allowed_usage_labels,
+            "external_evidence_refs": external_evidence_refs,
+            "selected_symbols": selected_symbols[:30],
+            "selected_symbol_count": len(selected_symbols),
+            "selected_timeframes": selected_timeframes,
+            "cost_stress_bps": list(COST_STRESS_BPS),
+            "cost_stress_available_folds": sum(
+                bool(item.get("has_turnover_proxy")) for item in cost_stress_rows
+            ),
+            "latest_cost_stress": cost_stress_rows[-1] if cost_stress_rows else {},
+            "concentration_summary": {
+                "max_top_symbol_weight": max(top_symbol_weights, default=0.0),
                 "selected_symbol_count": len(selected_symbols),
-                "selected_timeframes": selected_timeframes,
-                "cost_stress_bps": list(COST_STRESS_BPS),
-                "cost_stress_available_folds": sum(
-                    bool(item.get("has_turnover_proxy")) for item in cost_stress_rows
-                ),
-                "latest_cost_stress": cost_stress_rows[-1] if cost_stress_rows else {},
-                "concentration_summary": {
-                    "max_top_symbol_weight": max(top_symbol_weights, default=0.0),
-                    "selected_symbol_count": len(selected_symbols),
-                },
-                "clean_promotion_eligible": clean_candidate,
-                "ranking_usage_policy": "locked_oos_diagnostic_only_not_selection",
-                "ranking_diagnostic_only": True,
-                "locked_oos_metrics_used_for_report_ranking_only": True,
-                "nested_hybrid_dependency": nested_hybrid_dependency,
-                "moonshot_label_namespace": moonshot_label_namespace,
-                "post_oos_research_variant": post_oos_research_variant,
-                "requires_fresh_forward_shadow": requires_fresh_forward_shadow,
-                "uses_locked_oos_for_selection": uses_locked_oos_for_selection,
-                "non_clean_reasons": non_clean_reasons,
-                "compounded_oos_return": compounded,
-                "annualized_oos_return_approx": annualized_comp,
-                "mean_oos_return": float(np.mean(oos_returns)) if oos_returns else 0.0,
-                "median_oos_return": float(np.median(oos_returns)) if oos_returns else 0.0,
-                "min_oos_return": min(oos_returns) if oos_returns else 0.0,
-                "latest_oos_return": oos_returns[-1] if oos_returns else 0.0,
-                "positive_oos_folds": sum(value > 0.0 for value in oos_returns),
-                "oos_hit_rate": (
-                    float(sum(value > 0.0 for value in oos_returns) / len(oos_returns))
-                    if oos_returns
-                    else 0.0
-                ),
-                "positive_validation_folds": sum(value > 0.0 for value in val_returns),
-                "min_validation_return": min(val_returns) if val_returns else 0.0,
-                "mean_validation_return": float(np.mean(val_returns)) if val_returns else 0.0,
-                "mean_train_return": float(np.mean(train_returns)) if train_returns else 0.0,
-                "max_oos_mdd": max(oos_mdds) if oos_mdds else 0.0,
-                "monthly_equity_mdd": monthly_equity_mdd,
-                "max_validation_mdd": max(val_mdds) if val_mdds else 0.0,
-                "monthly_volatility": monthly_std,
-                "monthly_downside_volatility": downside_std,
-                "monthly_sharpe_approx": (
-                    float(np.mean(oos_array) / monthly_std * math.sqrt(12.0))
-                    if monthly_std > 0.0
-                    else 0.0
-                ),
-                "sortino_unbounded": bool(
-                    no_negative_oos_folds and oos_array.size and float(np.mean(oos_array)) > 0.0
-                ),
-                "monthly_sortino_approx": (
-                    float(np.mean(oos_array) / downside_std * math.sqrt(12.0))
-                    if downside_std > 0.0
-                    else 0.0
-                ),
-                "monthly_var_05": var_05,
-                "monthly_quantile_95": q95,
-                "monthly_cvar_25": cvar_25,
-                "tail_ratio_95_05": (float(q95 / abs(var_05)) if abs(var_05) > 0.0 else 0.0),
-                "monthly_skew": monthly_skew,
-                "monthly_excess_kurtosis": monthly_excess_kurtosis,
-                "avg_gain": float(np.mean(positive)) if positive.size else 0.0,
-                "avg_loss": float(np.mean(negative)) if negative.size else 0.0,
-                "gain_loss_ratio": (
-                    float(np.mean(positive) / abs(np.mean(negative)))
-                    if positive.size and negative.size and abs(float(np.mean(negative))) > 0.0
-                    else 0.0
-                ),
-                "gain_loss_ratio_unbounded": bool(no_negative_oos_folds and positive.size),
-                "profit_factor": (
-                    float(np.sum(positive) / abs(np.sum(negative)))
-                    if positive.size and negative.size and abs(float(np.sum(negative))) > 0.0
-                    else 0.0
-                ),
-                "profit_factor_unbounded": bool(no_negative_oos_folds and positive.size),
-                "omega_0": (
-                    float(np.sum(np.maximum(oos_array, 0.0)) / np.sum(np.maximum(-oos_array, 0.0)))
-                    if oos_array.size and np.sum(np.maximum(-oos_array, 0.0)) > 0.0
-                    else 0.0
-                ),
-                "omega_0_unbounded": bool(no_negative_oos_folds and positive.size),
-                "no_negative_oos_folds": no_negative_oos_folds,
-                "oos_return_to_max_mdd": (
-                    float(compounded / max(oos_mdds)) if oos_mdds and max(oos_mdds) > 0.0 else 0.0
-                ),
-                "annualized_return_to_monthly_equity_mdd": (
-                    float(annualized_comp / monthly_equity_mdd) if monthly_equity_mdd > 0.0 else 0.0
-                ),
-                "max_loss_streak": int(max_loss_streak),
-                "ready_for_paper_folds": sum(bool(row.get("ready_for_paper")) for row in rows),
-                "hard_stop_promotable": False,
-                "locked_oos_threshold_hit_diagnostic_only": locked_oos_threshold_hit,
-                "hard_stop_reasons": {
-                    "beats_challenger": beats_challenger,
-                    "material_risk_improvement": material_risk_improvement,
-                    "robust_default_improvement": robust_default_improvement,
-                    "clean_candidate": clean_candidate,
-                    "current_challenger_oos_comp": CURRENT_CHALLENGER_OOS_COMP,
-                    "current_challenger_max_oos_mdd": CURRENT_CHALLENGER_MAX_OOS_MDD,
-                    "robust_default_oos_comp": ROBUST_DEFAULT_OOS_COMP,
-                    "robust_default_max_oos_mdd_limit": ROBUST_DEFAULT_MAX_OOS_MDD_LIMIT,
-                },
-            }
+            },
+            "clean_promotion_eligible": clean_candidate,
+            "ranking_usage_policy": "locked_oos_diagnostic_only_not_selection",
+            "ranking_diagnostic_only": True,
+            "locked_oos_metrics_used_for_report_ranking_only": True,
+            "nested_hybrid_dependency": nested_hybrid_dependency,
+            "moonshot_label_namespace": moonshot_label_namespace,
+            "post_oos_research_variant": post_oos_research_variant,
+            "requires_fresh_forward_shadow": requires_fresh_forward_shadow,
+            "uses_locked_oos_for_selection": uses_locked_oos_for_selection,
+            "non_clean_reasons": non_clean_reasons,
+            "compounded_oos_return": compounded,
+            "annualized_oos_return_approx": annualized_comp,
+            "mean_oos_return": float(np.mean(oos_returns)) if oos_returns else 0.0,
+            "median_oos_return": float(np.median(oos_returns)) if oos_returns else 0.0,
+            "min_oos_return": min(oos_returns) if oos_returns else 0.0,
+            "latest_oos_return": oos_returns[-1] if oos_returns else 0.0,
+            "positive_oos_folds": sum(value > 0.0 for value in oos_returns),
+            "oos_hit_rate": (
+                float(sum(value > 0.0 for value in oos_returns) / len(oos_returns))
+                if oos_returns
+                else 0.0
+            ),
+            "positive_validation_folds": sum(value > 0.0 for value in val_returns),
+            "min_validation_return": min(val_returns) if val_returns else 0.0,
+            "mean_validation_return": float(np.mean(val_returns)) if val_returns else 0.0,
+            "mean_train_return": float(np.mean(train_returns)) if train_returns else 0.0,
+            "max_oos_mdd": max(oos_mdds) if oos_mdds else 0.0,
+            "monthly_equity_mdd": monthly_equity_mdd,
+            "max_validation_mdd": max(val_mdds) if val_mdds else 0.0,
+            "monthly_volatility": monthly_std,
+            "monthly_downside_volatility": downside_std,
+            "monthly_sharpe_approx": (
+                float(np.mean(oos_array) / monthly_std * math.sqrt(12.0))
+                if monthly_std > 0.0
+                else 0.0
+            ),
+            "sortino_unbounded": bool(
+                no_negative_oos_folds and oos_array.size and float(np.mean(oos_array)) > 0.0
+            ),
+            "monthly_sortino_approx": (
+                float(np.mean(oos_array) / downside_std * math.sqrt(12.0))
+                if downside_std > 0.0
+                else 0.0
+            ),
+            "monthly_var_05": var_05,
+            "monthly_quantile_95": q95,
+            "monthly_cvar_25": cvar_25,
+            "tail_ratio_95_05": (float(q95 / abs(var_05)) if abs(var_05) > 0.0 else 0.0),
+            "monthly_skew": monthly_skew,
+            "monthly_excess_kurtosis": monthly_excess_kurtosis,
+            "avg_gain": float(np.mean(positive)) if positive.size else 0.0,
+            "avg_loss": float(np.mean(negative)) if negative.size else 0.0,
+            "gain_loss_ratio": (
+                float(np.mean(positive) / abs(np.mean(negative)))
+                if positive.size and negative.size and abs(float(np.mean(negative))) > 0.0
+                else 0.0
+            ),
+            "gain_loss_ratio_unbounded": bool(no_negative_oos_folds and positive.size),
+            "profit_factor": (
+                float(np.sum(positive) / abs(np.sum(negative)))
+                if positive.size and negative.size and abs(float(np.sum(negative))) > 0.0
+                else 0.0
+            ),
+            "profit_factor_unbounded": bool(no_negative_oos_folds and positive.size),
+            "omega_0": (
+                float(np.sum(np.maximum(oos_array, 0.0)) / np.sum(np.maximum(-oos_array, 0.0)))
+                if oos_array.size and np.sum(np.maximum(-oos_array, 0.0)) > 0.0
+                else 0.0
+            ),
+            "omega_0_unbounded": bool(no_negative_oos_folds and positive.size),
+            "no_negative_oos_folds": no_negative_oos_folds,
+            "oos_return_to_max_mdd": (
+                float(compounded / max(oos_mdds)) if oos_mdds and max(oos_mdds) > 0.0 else 0.0
+            ),
+            "annualized_return_to_monthly_equity_mdd": (
+                float(annualized_comp / monthly_equity_mdd) if monthly_equity_mdd > 0.0 else 0.0
+            ),
+            "max_loss_streak": int(max_loss_streak),
+            "ready_for_paper_folds": sum(bool(row.get("ready_for_paper")) for row in rows),
+            "hard_stop_promotable": False,
+            "locked_oos_threshold_hit_diagnostic_only": locked_oos_threshold_hit,
+            "hard_stop_reasons": {
+                "beats_challenger": beats_challenger,
+                "material_risk_improvement": material_risk_improvement,
+                "robust_default_improvement": robust_default_improvement,
+                "clean_candidate": clean_candidate,
+                "current_challenger_oos_comp": CURRENT_CHALLENGER_OOS_COMP,
+                "current_challenger_max_oos_mdd": CURRENT_CHALLENGER_MAX_OOS_MDD,
+                "robust_default_oos_comp": ROBUST_DEFAULT_OOS_COMP,
+                "robust_default_max_oos_mdd_limit": ROBUST_DEFAULT_MAX_OOS_MDD_LIMIT,
+            },
+        }
+        if weighting_on:
+            agg_row.update(_partial_fold_weighting_fields(oos_returns, oos_mdds, rows))
+        aggregate.append(agg_row)
+    if weighting_on:
+        return sorted(
+            aggregate,
+            key=lambda row: (
+                _safe_float(row["bar_weighted_compounded_oos_return"]),
+                _safe_float(row["bar_weighted_positive_oos_folds"]),
+                _safe_float(row["min_oos_return"]),
+                -_safe_float(row["max_oos_mdd"]),
+            ),
+            reverse=True,
         )
     return sorted(
         aggregate,
@@ -8243,6 +9058,7 @@ def run_walkforward(args: argparse.Namespace) -> dict[str, Any]:
                 fold,
                 prior_completed_returns=lagged_shadow_leaf_prior_returns,
                 prior_completed_fold_ids=lagged_shadow_leaf_completed_folds,
+                individual_streams=source_aux.get("individual_streams"),
             )
             all_candidates.extend(lagged_shadow_leaf_router_candidates)
         else:
@@ -8492,6 +9308,23 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
             "(research.emit_candidate_overfit_stats=true)."
         ),
     )
+    for eqflow_key, eqflow_help in (
+        ("corr_guard_router_variant", "C1 corr-guarded lagged-router twin"),
+        ("crash_scaled_conviction_variant", "B2 momentum-crash-scaled conviction twin"),
+        ("val_saturation_conviction_variant", "A3a validation-saturation conviction twin"),
+        ("partial_fold_bar_count_weighting", "A3b bar_count-aware fold weighting"),
+        ("regime_gated_strict_efficiency_variant", "D4 regime-gated static_guarded twin"),
+    ):
+        parser.add_argument(
+            f"--eqflow-{eqflow_key.replace('_', '-')}",
+            dest=f"eqflow_{eqflow_key}",
+            action="store_true",
+            default=False,
+            help=(
+                f"eq-flow complement: {eqflow_help} (default OFF -> byte-identical; "
+                "also armed by --config research.walkforward_* flags)."
+            ),
+        )
     args = parser.parse_args(argv)
     families = {item.strip() for item in str(args.families).split(",") if item.strip()}
     families.add("profile_optuna")
@@ -8504,6 +9337,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
     # Arm the (default-OFF) anti-overfit selection gate for every downstream path.
     _configure_selection_gate(args)
+    # Arm the (default-OFF) eq-flow complement variants the same way.
+    _configure_eqflow_variants(args)
     output_json = Path(args.output_json).expanduser().resolve()
     output_md = Path(args.output_md).expanduser().resolve()
     if args.recompute_from_json:

@@ -54,6 +54,14 @@ research:
   # SPA/PBO axes the reject gate reads). Default OFF/byte-identical; ON here in the
   # honest-research profile. Whole-search-deflated DSR is a data-PC stamp, not this.
   emit_candidate_overfit_stats: true
+  # v5 defect fix (silent generic-fallback substitution): candidates whose
+  # strategy_class has no bespoke dispatcher handler are executed as their REAL
+  # registered event-driven class instead of being silently scored as the shared
+  # 64-bar momentum proxy (84/111 classes incl. every research_only sleeve were
+  # proxy-scored, so their recorded metrics measured the proxy, not the lane).
+  # Default OFF/legacy; ON here so research runs measure the actual strategies.
+  # The generic fallback is always labelled meta.evaluation_mode either way.
+  route_unmapped_registered_strategies: true
   # Portfolio-layer honest gate (performance_lever_measurement 2026-07-08): run
   # DSR / CSCV-PBO / SPA on the weighted-portfolio NET stream, deflating the
   # portfolio DSR by the TOTAL allocation config-grid cells searched (the
@@ -61,3 +69,13 @@ research:
   # cannot clear the gate. No cost_rate_multiplier here: this profile carries no
   # execution cost model (see backtest_cost_realistic.yaml for the cost floor).
   portfolio_honest_gate: true
+  # Equity-flow complements (eq-flow v5 follow-up, 2026-07-10): five ADDITIVE
+  # walk-forward variants / ranking treatments from the fold-by-fold equity-flow
+  # diagnosis (.omc/research/equity-flow-analysis-20260710.md). Default OFF /
+  # byte-identical (count pins hold); ON here so the next research run measures
+  # them. Variant params are PRE-REGISTERED constants in the walk-forward script.
+  walkforward_corr_guard_router_variant: true
+  walkforward_crash_scaled_conviction_variant: true
+  walkforward_val_saturation_conviction_variant: true
+  walkforward_partial_fold_bar_count_weighting: true
+  walkforward_regime_gated_strict_efficiency_variant: true

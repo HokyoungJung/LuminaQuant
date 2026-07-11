@@ -74,6 +74,7 @@ from lumina_quant.indicators.common import safe_float, time_key
 from lumina_quant.strategies.external_alpha_sleeves import (
     _EPS,
     _Snapshot,
+    _annualize_per_bar_vol,
     _emit,
     _event_datetime_utc,
     _event_symbols,
@@ -117,6 +118,23 @@ def _week_of_quarter(utc_ts: Any) -> int | None:
     return min(_MAX_BUCKET, day_within_quarter // 7)
 
 
+def _weeks_grid_adjacent(prev_key: tuple[int, int] | None, cur_key: tuple[int, int] | None) -> bool:
+    """True when ``cur_key`` is the grid week immediately after ``prev_key``.
+
+    Weeks are ``(quarter_id, week_of_quarter)`` with the tail fold capping the
+    bucket at ``_MAX_BUCKET``; every quarter's final grid week is the capped
+    bucket (all quarters have >= 85 days), so the successor of
+    ``(q, _MAX_BUCKET)`` is ``(q + 1, 0)``.
+    """
+    if prev_key is None or cur_key is None:
+        return False
+    prev_quarter, prev_week = prev_key
+    cur_quarter, cur_week = cur_key
+    if cur_quarter == prev_quarter and cur_week == prev_week + 1:
+        return True
+    return cur_quarter == prev_quarter + 1 and prev_week == _MAX_BUCKET and cur_week == 0
+
+
 @dataclass(slots=True)
 class _State:
     closes: deque[float]
@@ -126,6 +144,10 @@ class _State:
     cur_week_quarter: int = 0
     cur_week_last_close: float | None = None
     prev_week_close: float | None = None
+    # Grid week of ``prev_week_close`` -- a completed week's return is recorded
+    # ONLY when it is grid-adjacent to this week, so a data gap can never book
+    # a multi-week return into a single weekly bucket.
+    prev_week_key: tuple[int, int] | None = None
     # Current-quarter pending bucket returns (flushed to ``buckets`` when the
     # quarter rolls -- this is the one-period deferral / current-quarter cut).
     pending_quarter: int | None = None
@@ -229,6 +251,11 @@ class CrossSectionalSeasonalPersistenceStrategy(Strategy):
         self._last_eval_time_key = ""
         self._last_decision_week: tuple[int, int] | None = None
         self._tick = 0
+        # Recent PER-BAR epochs (seconds): the vol-target scalar annualizes the
+        # per-bar portfolio vol via sqrt(bars_per_year) from the median gap here.
+        # Recorded at bar cadence (not the weekly decision clock) so the spacing
+        # matches the per-bar closes the realized-vol estimate is built from.
+        self._recent_times: deque[float] = deque(maxlen=16)
 
     # ------------------------------------------------------------------ #
     # state
@@ -240,6 +267,7 @@ class CrossSectionalSeasonalPersistenceStrategy(Strategy):
                 list(self._last_decision_week) if self._last_decision_week is not None else None
             ),
             "tick": int(self._tick),
+            "recent_times": list(self._recent_times),
             "symbol_state": {
                 symbol: {
                     "closes": list(item.closes),
@@ -250,6 +278,9 @@ class CrossSectionalSeasonalPersistenceStrategy(Strategy):
                     "cur_week_quarter": int(item.cur_week_quarter),
                     "cur_week_last_close": item.cur_week_last_close,
                     "prev_week_close": item.prev_week_close,
+                    "prev_week_key": (
+                        list(item.prev_week_key) if item.prev_week_key is not None else None
+                    ),
                     "pending_quarter": item.pending_quarter,
                     "pending_sum": {str(k): float(v) for k, v in item.pending_sum.items()},
                     "pending_count": {str(k): int(v) for k, v in item.pending_count.items()},
@@ -273,6 +304,11 @@ class CrossSectionalSeasonalPersistenceStrategy(Strategy):
         raw_week = state.get("last_decision_week")
         self._last_decision_week = self._as_week_tuple(raw_week)
         self._tick = _safe_non_negative_int(state.get("tick"))
+        self._recent_times.clear()
+        for value in _coerce_float_list(state.get("recent_times"))[
+            -int(self._recent_times.maxlen or 0) :
+        ]:
+            self._recent_times.append(value)
         raw = state.get("symbol_state")
         if not isinstance(raw, dict):
             return
@@ -291,6 +327,7 @@ class CrossSectionalSeasonalPersistenceStrategy(Strategy):
                 item.cur_week_quarter = int(safe_float(payload.get("cur_week_quarter")) or 0)
                 item.cur_week_last_close = safe_float(payload.get("cur_week_last_close"))
                 item.prev_week_close = safe_float(payload.get("prev_week_close"))
+                item.prev_week_key = self._as_week_tuple(payload.get("prev_week_key"))
                 pending_q = payload.get("pending_quarter")
                 item.pending_quarter = int(pending_q) if pending_q is not None else None
                 item.pending_sum = self._as_int_float_map(payload.get("pending_sum"))
@@ -381,11 +418,17 @@ class CrossSectionalSeasonalPersistenceStrategy(Strategy):
             and item.prev_week_close > _EPS
             and completed_close is not None
             and completed_close > _EPS
+            # Gap guard: the completed week must be grid-adjacent to the week
+            # ``prev_week_close`` belongs to, otherwise ``ret`` spans a
+            # multi-week data gap and would pollute one bucket's seasonal
+            # estimate for the full K-quarter lookback.
+            and _weeks_grid_adjacent(item.prev_week_key, item.cur_week_key)
         ):
             ret = math.log(completed_close / item.prev_week_close)
             if math.isfinite(ret):
                 self._record_week(item, item.cur_week_quarter, item.cur_week_woq, ret)
         item.prev_week_close = completed_close
+        item.prev_week_key = item.cur_week_key
         item.cur_week_key = week_key
         item.cur_week_woq = woq
         item.cur_week_quarter = quarter
@@ -414,6 +457,12 @@ class CrossSectionalSeasonalPersistenceStrategy(Strategy):
         item.pending_sum.clear()
         item.pending_count.clear()
 
+    def _note_bar_time(self, event_time: Any) -> None:
+        """Record the decision-bar epoch for deterministic bar-spacing inference."""
+        dt = _event_datetime_utc(event_time)
+        if dt is not None:
+            self._recent_times.append(dt.timestamp())
+
     def calculate_signals_window(self, event: Any, aggregator: Any = None) -> None:
         _ = aggregator
         event_key = time_key(getattr(event, "time", None))
@@ -425,6 +474,7 @@ class CrossSectionalSeasonalPersistenceStrategy(Strategy):
         if updated and event_key and event_key != self._last_eval_time_key:
             self._last_eval_time_key = event_key
             self._tick += 1
+            self._note_bar_time(getattr(event, "time", None))
             self._evaluate(getattr(event, "time", None))
 
     def calculate_signals(self, event: Any) -> None:
@@ -441,6 +491,7 @@ class CrossSectionalSeasonalPersistenceStrategy(Strategy):
                 if key and key != self._last_eval_time_key:
                     self._last_eval_time_key = key
                     self._tick += 1
+                    self._note_bar_time(snapshot.time)
                     self._evaluate(snapshot.time)
 
     # ------------------------------------------------------------------ #
@@ -530,10 +581,19 @@ class CrossSectionalSeasonalPersistenceStrategy(Strategy):
         total_inv = sum(inv.values())
         if total_inv <= _EPS:
             return {}, 1.0
+        # ``portfolio_vol`` is the inverse-vol-weighted PER-BAR vol; the
+        # ``inv / total_inv`` normalization is scale-invariant, so the risk-parity
+        # weights are horizon-free.  The vol-target SCALAR compares it against an
+        # annual-scale ``target_vol`` (0.20): annualize the per-bar estimate via
+        # sqrt(bars_per_year) from observed bar spacing first, otherwise the
+        # Moreira-Muir clamp is INERT.  Pass through (scalar=1.0) when spacing is
+        # unavailable rather than throttle on mismatched horizons.
         portfolio_vol = sum((inv[symbol] / total_inv) * vols[symbol] for symbol in inv)
         scalar = 1.0
         if self.target_vol > 0.0 and portfolio_vol > _EPS:
-            scalar = min(1.0, self.target_vol / portfolio_vol)
+            portfolio_vol_ann = _annualize_per_bar_vol(portfolio_vol, self._recent_times)
+            if portfolio_vol_ann is not None and portfolio_vol_ann > _EPS:
+                scalar = min(1.0, self.target_vol / portfolio_vol_ann)
         weights = {
             symbol: (inv[symbol] / total_inv) * self.target_gross_exposure * scalar
             for symbol in inv
@@ -646,6 +706,17 @@ class CrossSectionalSeasonalPersistenceStrategy(Strategy):
                 )
             weight = float(weights.get(symbol, 0.0))
             alloc = max(0.0, self.base_allocation * weight)
+            if alloc <= 0.0:
+                # Zero-alloc entries omit ``target_allocation`` from metadata and
+                # the engine resizes them to its DEFAULT allocation -- an unsized,
+                # un-vol-gated position. Skip the entry; if a side-flip EXIT was
+                # just emitted, drop to OUT so state matches it.
+                if item.mode != "OUT":
+                    item.mode = "OUT"
+                    item.entry_price = None
+                    item.weeks_held = 0
+                    item.score = None
+                continue
             stop_loss = None
             if price is not None and self.stop_loss_pct > 0.0:
                 stop_loss = price * (
@@ -701,10 +772,78 @@ _SUGGESTED_CANDIDATE_TAGS: tuple[str, ...] = (
     "crypto",
 )
 
-# Candidate slice (daily bars; internal quarter-aligned weekly decision clock).
-# The data-PC owns the seasonal-lookback sweep and the +6wk bucket-rotation
-# placebo, so we seed only two lookbacks to keep the candidate library thin.
+# Candidate slice (internal quarter-aligned weekly decision clock).  The data-PC
+# owns the seasonal-lookback sweep and the +6wk bucket-rotation placebo, so we
+# seed only two lookbacks to keep the candidate library thin.
+#
+# MULTI-TIMEFRAME (data-PC parquet carries 1h/4h but not 1d): this sleeve's
+# clock is TIMESTAMP-based -- the week-of-quarter buckets, the K-quarter trailing
+# store, the min-history floor, and the weekly min-hold are all derived from the
+# UTC quarter grid (``_week_of_quarter``/``_quarter_id``), NOT from a bar count,
+# so ``seasonal_lookback_quarters``, ``min_history_quarters`` and
+# ``min_hold_weeks`` are timeframe-INVARIANT and stay UNCHANGED (they already
+# denote the same wall-clock on any intraday bar).  The ONLY bar-denominated
+# param is the realized-vol ``vol_window``, which scales x6 for 4h and x24 for 1h
+# to keep the same ~30d inverse-vol sizing estimate.  Ratios/counts/thresholds
+# (``quantile_pct``, ``min_symbols``, ``allow_short``, ``target_gross_exposure``,
+# per-bar ``target_vol``, ``stop_loss_pct``) stay UNCHANGED.
 _SEASONAL_XS_PERSISTENCE_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "1h": (
+        {
+            "variant": "k6",
+            "seasonal_lookback_quarters": 6,
+            "min_history_quarters": 2,
+            "vol_window": 720,  # 30 x24 (~30d); only bar-denominated param
+            "quantile_pct": 0.25,
+            "min_hold_weeks": 2,
+            "min_symbols": 5,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+            "target_vol": 0.20,
+            "stop_loss_pct": 0.12,
+        },
+        {
+            "variant": "k4",
+            "seasonal_lookback_quarters": 4,
+            "min_history_quarters": 2,
+            "vol_window": 720,
+            "quantile_pct": 0.25,
+            "min_hold_weeks": 2,
+            "min_symbols": 5,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+            "target_vol": 0.20,
+            "stop_loss_pct": 0.12,
+        },
+    ),
+    "4h": (
+        {
+            "variant": "k6",
+            "seasonal_lookback_quarters": 6,
+            "min_history_quarters": 2,
+            "vol_window": 180,  # 30 x6 (~30d); only bar-denominated param
+            "quantile_pct": 0.25,
+            "min_hold_weeks": 2,
+            "min_symbols": 5,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+            "target_vol": 0.20,
+            "stop_loss_pct": 0.12,
+        },
+        {
+            "variant": "k4",
+            "seasonal_lookback_quarters": 4,
+            "min_history_quarters": 2,
+            "vol_window": 180,
+            "quantile_pct": 0.25,
+            "min_hold_weeks": 2,
+            "min_symbols": 5,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+            "target_vol": 0.20,
+            "stop_loss_pct": 0.12,
+        },
+    ),
     "1d": (
         {
             "variant": "k6",

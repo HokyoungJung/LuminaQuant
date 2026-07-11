@@ -562,3 +562,111 @@ def test_schema_keys_snake_case_and_hyperparam() -> None:
         assert required in schema
     for cap in ("base_allocation", "max_symbol_exposure_pct", "max_order_value", "leader_symbols"):
         assert schema[cap].tunable is False
+
+
+# --------------------------------------------------------------------------- #
+# vol-target HORIZON fix (direct-method regression).  ``_inverse_vol_weights``
+# reads each book member's WEEKLY closes to form a per-week portfolio vol, which
+# must be annualized via sqrt(bars_per_year) -- inferred from the recorded WEEKLY
+# decision epochs -- before the ``min(1, target_vol / vol)`` clamp.  The pre-fix
+# code compared 0.20 against a per-week 0.002..0.05 and was pinned at scalar==1.0.
+# --------------------------------------------------------------------------- #
+
+_WEEK_SECONDS = 604_800
+
+
+def _weekly_epochs(count: int) -> list[float]:
+    return [float(1_700_000_000 + i * _WEEK_SECONDS) for i in range(count)]
+
+
+def _fill_weekly_closes(strat: Any, symbol: str, per_bar_ret: float, n: int = 16) -> None:
+    """Inject a ±``per_bar_ret`` alternating close path (realized vol ~= ret)."""
+    dq = strat._state[symbol].closes
+    dq.clear()
+    price = 100.0
+    dq.append(price)
+    sign = 1.0
+    for _ in range(n):
+        price *= math.exp(sign * per_bar_ret)
+        dq.append(price)
+        sign = -sign
+
+
+def test_vol_target_scalar_annualizes_weekly_vol_before_clamp() -> None:
+    symbols = ["A/USDT", "B/USDT", "C/USDT", "D/USDT"]
+    targets = dict.fromkeys(symbols, "LONG")
+
+    storm = _make(symbols, target_vol=0.20, vol_window=10)
+    for symbol in symbols:
+        _fill_weekly_closes(storm, symbol, 0.05)
+    storm._recent_times.clear()
+    storm._recent_times.extend(_weekly_epochs(12))
+    storm_w, storm_scalar = storm._inverse_vol_weights(targets)
+
+    calm = _make(symbols, target_vol=0.20, vol_window=10)
+    for symbol in symbols:
+        _fill_weekly_closes(calm, symbol, 0.002)
+    calm._recent_times.clear()
+    calm._recent_times.extend(_weekly_epochs(12))
+    calm_w, calm_scalar = calm._inverse_vol_weights(targets)
+
+    # Stormy per-week vol annualizes above target_vol -> clamp ENGAGES.
+    assert storm_scalar < 1.0
+    # Calm per-week vol annualizes below target_vol -> pass-through.
+    assert calm_scalar == 1.0
+    # The engaged clamp visibly shrinks the gross notional.
+    assert sum(storm_w.values()) < sum(calm_w.values())
+
+
+def test_vol_target_scalar_passthrough_when_spacing_unavailable() -> None:
+    symbols = ["A/USDT", "B/USDT", "C/USDT", "D/USDT"]
+    targets = dict.fromkeys(symbols, "LONG")
+    strat = _make(symbols, target_vol=0.20, vol_window=10)
+    for symbol in symbols:
+        _fill_weekly_closes(strat, symbol, 0.05)  # violent per-week vol
+    strat._recent_times.clear()  # < 2 timestamps -> horizon unknowable
+    _w, scalar = strat._inverse_vol_weights(targets)
+    assert scalar == 1.0
+
+
+def test_vol_target_scalar_determinism() -> None:
+    symbols = ["A/USDT", "B/USDT", "C/USDT", "D/USDT"]
+    targets = dict.fromkeys(symbols, "LONG")
+
+    def _run() -> tuple[float, tuple[float, ...]]:
+        strat = _make(symbols, target_vol=0.20, vol_window=10)
+        for offset, symbol in enumerate(symbols):
+            _fill_weekly_closes(strat, symbol, 0.02 + 0.01 * offset)
+        strat._recent_times.clear()
+        strat._recent_times.extend(_weekly_epochs(12))
+        weights, scalar = strat._inverse_vol_weights(targets)
+        return round(scalar, 12), tuple(round(weights[s], 12) for s in symbols)
+
+    assert _run() == _run()
+
+
+def test_zero_weight_target_is_vol_gated_never_default_sized() -> None:
+    """A target with no measurable realized vol must NOT enter (v5 defect fix).
+
+    Before the fix, a symbol dropped from the inverse-vol book (vol
+    unavailable) still reached ``_enter`` with weight 0.0; ``alloc=0`` omits
+    ``target_allocation`` from metadata and the ENGINE resizes the position to
+    its DEFAULT allocation -- an unsized, un-vol-gated entry.
+    """
+    symbols = ["A/USDT", "B/USDT", "C/USDT", "D/USDT"]
+    strat = _make(symbols, min_hold_bars=1, cooldown_bars=0, vol_window=10)
+    # B/USDT has no close history -> realized vol unavailable -> no weight.
+    for symbol in ("A/USDT", "C/USDT", "D/USDT"):
+        _fill_weekly_closes(strat, symbol, 0.02)
+    targets = {"A/USDT": "LONG", "B/USDT": "LONG"}
+    weights, scalar = strat._inverse_vol_weights(targets)
+    assert "B/USDT" not in weights
+
+    event_time = datetime.datetime(2026, 1, 5, tzinfo=datetime.UTC)
+    strat._decide_book({"A/USDT": 1.0, "B/USDT": 1.0}, targets, weights, scalar, True, event_time)
+    entries = [s for s in strat.events.items if s.signal_type in {"LONG", "SHORT"}]
+    entered = {s.symbol for s in entries}
+    assert "B/USDT" not in entered, "vol-gated symbol must not emit an unsized entry"
+    assert "A/USDT" in entered, "a properly weighted target must still enter"
+    for signal in entries:
+        assert float(signal.metadata.get("target_allocation", 0.0)) > 0.0

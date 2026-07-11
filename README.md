@@ -242,11 +242,13 @@ Primary driver: `simulate_symbol_fold` Rust kernel replaces the pure-Python per-
 
 ## Dashboard
 
-`uv run lq dashboard --run` starts the Next.js 15 frontend. The Python backend exposes a `DashboardBridgeContractV2` JSON contract consumed by 10 Next.js routes:
+`uv run lq dashboard --run` starts the Next.js 15 frontend. The Python backend exposes a `DashboardBridgeContractV2` JSON contract consumed by 13 Next.js routes:
 
-`/` (home) · `/performance-price` · `/risk-health` · `/optimization-insights` · `/market-data` · `/execution-analytics` · `/exact-window` · `/raw-data` · `/report-export` · `/workflows`
+`/` (home) · `/performance-price` · `/market-data` · `/optimization-insights` · `/exact-window` · `/factor-insights` · `/alpha-evidence` · `/execution-analytics` · `/risk-health` · `/workflows` · `/raw-data` · `/report-export` · `/system`
 
-The workflows route provides no-code controls for backtest, optimize, and live sessions with asynchronous job management and log streaming.
+The workflows route lists managed backtest, optimize, and live jobs with polling status and two-step stop/kill controls.
+
+Usage: set `LQ_POSTGRES_DSN` (or `storage.postgres_dsn` in `config.yaml`) so the dashboard can read run state — every page shows an actionable notice when it is missing. Stop/Kill on `/workflows` requires `LQ_DASHBOARD_CONTROL_TOKEN` in the dashboard environment plus pasting the same token into the Jobs page control-token field (fail-closed; see `apps/dashboard_web/README.md`).
 
 ---
 

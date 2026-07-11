@@ -59,7 +59,9 @@ from lumina_quant.strategies.adaptive_crypto_alpha_sleeves import (
 from lumina_quant.strategies.external_alpha_sleeves import (
     _EPS,
     _Snapshot,
+    _annualize_per_bar_vol,
     _emit,
+    _event_datetime_utc,
     _event_symbols,
     _market_snapshot,
     _safe_non_negative_int,
@@ -187,6 +189,10 @@ class CrossSectionalCapitalGainsOverhangStrategy(Strategy):
         }
         self._last_eval_time_key = ""
         self._tick = 0
+        # Recent decision-bar epochs (seconds) for deterministic bar-spacing
+        # inference: the vol-target scalar annualizes the per-bar portfolio vol
+        # via sqrt(bars_per_year) derived from the median gap here.
+        self._recent_times: deque[float] = deque(maxlen=16)
 
     # ------------------------------------------------------------------ #
     # state
@@ -195,6 +201,7 @@ class CrossSectionalCapitalGainsOverhangStrategy(Strategy):
         return {
             "last_eval_time_key": self._last_eval_time_key,
             "tick": int(self._tick),
+            "recent_times": list(self._recent_times),
             "symbol_state": {
                 symbol: {
                     "closes": list(item.closes),
@@ -214,6 +221,11 @@ class CrossSectionalCapitalGainsOverhangStrategy(Strategy):
             return
         self._last_eval_time_key = str(state.get("last_eval_time_key", ""))
         self._tick = _safe_non_negative_int(state.get("tick"))
+        self._recent_times.clear()
+        for value in _coerce_float_list(state.get("recent_times"))[
+            -int(self._recent_times.maxlen or 0) :
+        ]:
+            self._recent_times.append(value)
         raw = state.get("symbol_state")
         if not isinstance(raw, dict):
             return
@@ -367,10 +379,19 @@ class CrossSectionalCapitalGainsOverhangStrategy(Strategy):
         total_inv = sum(inv.values())
         if total_inv <= _EPS:
             return {}, 1.0
+        # ``portfolio_vol`` is the inverse-vol-weighted PER-BAR vol; the
+        # ``inv / total_inv`` normalization is scale-invariant, so the risk-parity
+        # weights are horizon-free.  The vol-target SCALAR compares it against an
+        # annual-scale ``target_vol`` (0.20): annualize the per-bar estimate via
+        # sqrt(bars_per_year) from observed bar spacing first, otherwise the
+        # Moreira-Muir clamp is INERT.  Pass through (scalar=1.0) when spacing is
+        # unavailable rather than throttle on mismatched horizons.
         portfolio_vol = sum((inv[symbol] / total_inv) * vols[symbol] for symbol in inv)
         scalar = 1.0
         if self.target_vol > 0.0 and portfolio_vol > _EPS:
-            scalar = min(1.0, self.target_vol / portfolio_vol)
+            portfolio_vol_ann = _annualize_per_bar_vol(portfolio_vol, self._recent_times)
+            if portfolio_vol_ann is not None and portfolio_vol_ann > _EPS:
+                scalar = min(1.0, self.target_vol / portfolio_vol_ann)
         weights = {
             symbol: (inv[symbol] / total_inv) * self.target_gross_exposure * scalar
             for symbol in inv
@@ -395,6 +416,11 @@ class CrossSectionalCapitalGainsOverhangStrategy(Strategy):
     def _evaluate(self, event_time: Any) -> None:
         if len(self.symbol_list) < self.min_symbols:
             return
+        # Record the decision-bar epoch so the vol-target scalar can infer bar
+        # spacing (this runs once per new bar, before the rebalance gate).
+        dt = _event_datetime_utc(event_time)
+        if dt is not None:
+            self._recent_times.append(dt.timestamp())
         # Stops / max-hold age EVERY bar so a held name is always protected,
         # independent of the slow rebalance clock.
         self._age(event_time)
@@ -454,6 +480,17 @@ class CrossSectionalCapitalGainsOverhangStrategy(Strategy):
                 )
             weight = float(weights.get(symbol, 0.0))
             alloc = max(0.0, self.base_allocation * weight)
+            if alloc <= 0.0:
+                # Zero-alloc entries omit ``target_allocation`` from metadata and
+                # the engine resizes them to its DEFAULT allocation -- an unsized,
+                # un-vol-gated position. Skip the entry; if a side-flip EXIT was
+                # just emitted, drop to OUT so state matches it.
+                if item.mode != "OUT":
+                    item.mode = "OUT"
+                    item.entry_price = None
+                    item.bars_held = 0
+                    item.score = None
+                continue
             stop_loss = None
             if price is not None and self.stop_loss_pct > 0.0:
                 stop_loss = price * (
@@ -509,11 +546,85 @@ _SUGGESTED_CANDIDATE_TAGS: tuple[str, ...] = (
     "crypto",
 )
 
-# Candidate slice (daily bars; weekly rebalance via ``rebalance_bars``).  The
-# published effect is a weekly/monthly-horizon reference; the data-PC owns the
-# 4/8/13/26wk window factor_ic sweep, so we seed only two reference lookbacks
-# (~8wk and ~13wk of 1d bars) to keep the candidate library thin.
+# Candidate slice.  The published effect is a weekly/monthly-horizon reference;
+# the data-PC owns the 4/8/13/26wk window factor_ic sweep, so we seed only two
+# reference lookbacks (~8wk and ~13wk) to keep the candidate library thin.
+#
+# MULTI-TIMEFRAME (data-PC parquet carries 1h/4h but not 1d): the ~8wk/~13wk
+# holder-cohort economics are WALL-CLOCK horizons, so every BAR-denominated
+# param (Grinblatt-Han ``window_bars``, ``skip_recent``, the realized-vol
+# ``vol_window``, the per-symbol ``min_history_bars`` floor, and the
+# ``rebalance_bars``/``min_hold_bars`` decision clocks) scales x6 for 4h and x24
+# for 1h to preserve the same weeks-of-wall-clock reference/cadence.  Ratios,
+# counts, and thresholds (``quantile_pct``, ``min_symbols``, ``allow_short``,
+# ``target_gross_exposure``, the per-bar ``target_vol`` sizing target, and the
+# ``stop_loss_pct`` price stop) are timeframe-agnostic and stay UNCHANGED.  No
+# window reaches the ~9000-bar cap.
 _CGO_DISPOSITION_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "1h": (
+        {
+            "variant": "wk8",
+            "window_bars": 1344,  # 56 x24 (~8wk of 1h bars)
+            "skip_recent": 24,  # 1 x24 (~1d)
+            "vol_window": 720,  # 30 x24 (~30d)
+            "quantile_pct": 0.25,
+            "rebalance_bars": 168,  # 7 x24 (~weekly cadence)
+            "min_hold_bars": 168,  # 7 x24
+            "min_history_bars": 1680,  # 70 x24
+            "min_symbols": 5,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+            "target_vol": 0.20,
+            "stop_loss_pct": 0.10,
+        },
+        {
+            "variant": "wk13",
+            "window_bars": 2184,  # 91 x24 (~13wk of 1h bars)
+            "skip_recent": 24,
+            "vol_window": 720,
+            "quantile_pct": 0.25,
+            "rebalance_bars": 168,
+            "min_hold_bars": 168,
+            "min_history_bars": 2520,  # 105 x24
+            "min_symbols": 5,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+            "target_vol": 0.20,
+            "stop_loss_pct": 0.10,
+        },
+    ),
+    "4h": (
+        {
+            "variant": "wk8",
+            "window_bars": 336,  # 56 x6 (~8wk of 4h bars)
+            "skip_recent": 6,  # 1 x6 (~1d)
+            "vol_window": 180,  # 30 x6 (~30d)
+            "quantile_pct": 0.25,
+            "rebalance_bars": 42,  # 7 x6 (~weekly cadence)
+            "min_hold_bars": 42,  # 7 x6
+            "min_history_bars": 420,  # 70 x6
+            "min_symbols": 5,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+            "target_vol": 0.20,
+            "stop_loss_pct": 0.10,
+        },
+        {
+            "variant": "wk13",
+            "window_bars": 546,  # 91 x6 (~13wk of 4h bars)
+            "skip_recent": 6,
+            "vol_window": 180,
+            "quantile_pct": 0.25,
+            "rebalance_bars": 42,
+            "min_hold_bars": 42,
+            "min_history_bars": 630,  # 105 x6
+            "min_symbols": 5,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+            "target_vol": 0.20,
+            "stop_loss_pct": 0.10,
+        },
+    ),
     "1d": (
         {
             "variant": "wk8",

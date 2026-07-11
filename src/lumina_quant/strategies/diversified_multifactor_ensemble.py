@@ -52,7 +52,9 @@ from lumina_quant.strategies.adaptive_crypto_alpha_sleeves import (
 from lumina_quant.strategies.external_alpha_sleeves import (
     _EPS,
     _Snapshot,
+    _annualize_per_bar_vol,
     _emit,
+    _event_datetime_utc,
     _event_symbols,
     _market_snapshot,
     _safe_non_negative_int,
@@ -223,11 +225,16 @@ class DiversifiedMultiFactorEnsembleStrategy(Strategy):
         }
         self._last_eval_time_key = ""
         self._tick = 0
+        # Recent decision-bar epochs (seconds) for deterministic bar-spacing
+        # inference: the vol-target scalar annualizes the per-bar portfolio vol
+        # via sqrt(bars_per_year) derived from the median gap here.
+        self._recent_times: deque[float] = deque(maxlen=16)
 
     def get_state(self) -> dict[str, Any]:
         return {
             "last_eval_time_key": self._last_eval_time_key,
             "tick": int(self._tick),
+            "recent_times": list(self._recent_times),
             "symbol_state": {
                 symbol: {
                     "closes": list(item.closes),
@@ -250,6 +257,11 @@ class DiversifiedMultiFactorEnsembleStrategy(Strategy):
             return
         self._last_eval_time_key = str(state.get("last_eval_time_key", ""))
         self._tick = _safe_non_negative_int(state.get("tick"))
+        self._recent_times.clear()
+        for value in list(state.get("recent_times") or [])[-int(self._recent_times.maxlen or 0) :]:
+            parsed = safe_float(value)
+            if parsed is not None:
+                self._recent_times.append(parsed)
         raw = state.get("symbol_state")
         if not isinstance(raw, dict):
             return
@@ -448,15 +460,24 @@ class DiversifiedMultiFactorEnsembleStrategy(Strategy):
         total_inv = sum(inv.values())
         if total_inv <= _EPS:
             return {}, 1.0
-        # Inverse-vol-weighted realized vol of the selected names.
+        # Inverse-vol-weighted realized vol of the selected names (PER-BAR); the
+        # optional shrunk-cov estimate below is ALSO a per-bar portfolio vol, so
+        # the annualization runs AFTER the substitution and covers both sources.
         portfolio_vol = sum((inv[symbol] / total_inv) * vols[symbol] for symbol in inv)
         if self.use_shrunk_cov_vol:
             shrunk = self._shrunk_portfolio_vol(inv, total_inv)
             if shrunk is not None and shrunk > _EPS:
                 portfolio_vol = shrunk
+        # The vol-target SCALAR compares this per-bar vol against an annual-scale
+        # ``target_vol`` (~0.20): annualize via sqrt(bars_per_year) inferred from
+        # observed bar spacing first, otherwise the Moreira-Muir clamp is INERT.
+        # When spacing is unavailable we pass through (scalar=1.0) rather than
+        # throttle on mismatched horizons.
         scalar = 1.0
         if self.target_vol > 0.0 and portfolio_vol > _EPS:
-            scalar = min(1.0, self.target_vol / portfolio_vol)
+            portfolio_vol_ann = _annualize_per_bar_vol(portfolio_vol, self._recent_times)
+            if portfolio_vol_ann is not None and portfolio_vol_ann > _EPS:
+                scalar = min(1.0, self.target_vol / portfolio_vol_ann)
         weights = {
             symbol: (inv[symbol] / total_inv) * self.target_gross_exposure * scalar
             for symbol in inv
@@ -500,6 +521,14 @@ class DiversifiedMultiFactorEnsembleStrategy(Strategy):
     def _evaluate(self, event_time: Any) -> None:
         if len(self.symbol_list) < self.min_symbols:
             return
+        # Record the decision-bar epoch so the vol-target scalar can infer bar
+        # spacing.  This runs once per NEW bar and BEFORE the rebalance gate so
+        # the inferred spacing reflects the BAR cadence, not the coarser
+        # ``rebalance_bars`` decision cadence (the ranker/sizing only fire on a
+        # rebalance tick).
+        dt = _event_datetime_utc(event_time)
+        if dt is not None:
+            self._recent_times.append(dt.timestamp())
         # Enforce stop-loss / max-hold on EVERY bar (not only off-ticks) so a held
         # name that is re-selected or stays inside rebalance_band on a rebalance
         # tick is still protected; ranking below may then re-enter on a fresh signal.
@@ -563,6 +592,27 @@ class DiversifiedMultiFactorEnsembleStrategy(Strategy):
             target_mode, composite, meta = target
             weight = float(weights.get(symbol, 0.0))
             alloc = max(0.0, self.base_allocation * weight)
+            if alloc <= 0.0:
+                # Zero-alloc entries omit ``target_allocation`` from metadata and
+                # the engine resizes them to its DEFAULT allocation.  Treat a
+                # zero-weight target as removed: flatten if held, never emit an
+                # unsized entry (a held name outside the rebalance band would
+                # otherwise re-emit with alloc=0).
+                if item.mode != "OUT":
+                    _emit(
+                        self.events,
+                        strategy_id=_STRATEGY_ID,
+                        symbol=symbol,
+                        event_time=event_time,
+                        signal_type="EXIT",
+                        price=price,
+                        metadata={"strategy": _STRATEGY_NAME, "reason": "zero_allocation"},
+                    )
+                    item.mode = "OUT"
+                    item.entry_price = None
+                    item.bars_held = 0
+                    item.composite = None
+                continue
             if item.mode == target_mode:
                 # Turnover gate: hold without a new order when the composite drift
                 # stays inside the band (and the side has not flipped).

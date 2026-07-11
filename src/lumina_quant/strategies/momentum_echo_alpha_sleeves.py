@@ -588,9 +588,76 @@ _SUGGESTED_CANDIDATE_TAGS: tuple[str, ...] = (
     "crypto",
 )
 
-# Candidate slice (DAILY bars; weekly decision clock via the ISO-week key).  Each
-# variant dict is a pre-registered sweep cell counted toward N_eff at the data-PC.
+# Candidate slice (weekly decision clock via the ISO-week key).  Each variant dict
+# is a pre-registered sweep cell counted toward N_eff at the data-PC.  The
+# formation windows are expressed in WEEKS (echo/recent_*_weeks) and converted to
+# BAR offsets via ``bars_per_week`` (echo_base_offset = bars_per_week * weeks + 1),
+# so the ONLY scaled knob is ``bars_per_week``: 7 (1d) -> 42 (4h) -> 168 (1h) to
+# keep each week span the same calendar length.  The week counts, entry/exit
+# fractions, and ``min_hold_decisions`` (weekly ISO clock) are timeframe INVARIANT
+# and stay fixed.  Deepest formation offset at 1h (echo_start_weeks 16 * 168 =
+# 2688 bars) sits well under the ~9000-bar cap.
 _MOMENTUM_ECHO_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "4h": (
+        {
+            "variant": "echo12_7_minus_recent6_2",
+            "echo_start_weeks": 12,
+            "echo_end_weeks": 7,
+            "recent_start_weeks": 6,
+            "recent_end_weeks": 2,
+            "bars_per_week": 42,
+            "quantile_entry_pct": 0.25,
+            "quantile_exit_pct": 0.40,
+            "min_hold_decisions": 4,
+            "min_symbols": 5,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+        },
+        {
+            "variant": "echo16_9_minus_recent8_2",
+            "echo_start_weeks": 16,
+            "echo_end_weeks": 9,
+            "recent_start_weeks": 8,
+            "recent_end_weeks": 2,
+            "bars_per_week": 42,
+            "quantile_entry_pct": 0.25,
+            "quantile_exit_pct": 0.40,
+            "min_hold_decisions": 4,
+            "min_symbols": 5,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+        },
+    ),
+    "1h": (
+        {
+            "variant": "echo12_7_minus_recent6_2",
+            "echo_start_weeks": 12,
+            "echo_end_weeks": 7,
+            "recent_start_weeks": 6,
+            "recent_end_weeks": 2,
+            "bars_per_week": 168,
+            "quantile_entry_pct": 0.25,
+            "quantile_exit_pct": 0.40,
+            "min_hold_decisions": 4,
+            "min_symbols": 5,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+        },
+        {
+            "variant": "echo16_9_minus_recent8_2",
+            "echo_start_weeks": 16,
+            "echo_end_weeks": 9,
+            "recent_start_weeks": 8,
+            "recent_end_weeks": 2,
+            "bars_per_week": 168,
+            "quantile_entry_pct": 0.25,
+            "quantile_exit_pct": 0.40,
+            "min_hold_decisions": 4,
+            "min_symbols": 5,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+        },
+    ),
     "1d": (
         {
             "variant": "echo12_7_minus_recent6_2",

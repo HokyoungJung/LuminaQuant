@@ -1,10 +1,17 @@
 import type { BridgeErrorBody } from '@/lib/dashboard-contracts';
 
 export async function readJsonOrThrow<T>(response: Response, fallbackMessage: string): Promise<T> {
-  const body = (await response.json()) as T;
   if (!response.ok) {
-    const errorBody = body as BridgeErrorBody;
-    throw new Error(errorBody.detail ?? fallbackMessage);
+    // Error bodies may be non-JSON (gateway HTML, empty 502s); never let a
+    // SyntaxError mask the HTTP failure.
+    let detail: string | undefined;
+    try {
+      const errorBody = (await response.json()) as BridgeErrorBody;
+      detail = errorBody.detail ?? errorBody.error;
+    } catch {
+      detail = undefined;
+    }
+    throw new Error(detail ?? `${fallbackMessage}: HTTP ${response.status}`);
   }
-  return body;
+  return (await response.json()) as T;
 }

@@ -106,6 +106,7 @@ from lumina_quant.indicators.common import safe_float, time_key
 from lumina_quant.strategies.external_alpha_sleeves import (
     _EPS,
     _Snapshot,
+    _annualize_per_bar_vol,
     _emit,
     _event_datetime_utc,
     _event_symbols,
@@ -269,6 +270,11 @@ class SlowCrossSectionalLeadLagStrategy(Strategy):
         }
         self._last_decision_week = ""
         self._tick = 0
+        # Recent WEEKLY decision epochs (seconds): the vol-target scalar annualizes
+        # the per-week portfolio vol via sqrt(bars_per_year) from the median gap
+        # here.  Recorded on the weekly decision clock so the spacing matches the
+        # WEEKLY closes (``_snapshot_weekly_closes``) the realized vol is built on.
+        self._recent_times: deque[float] = deque(maxlen=16)
 
     # ------------------------------------------------------------------ #
     # state
@@ -277,6 +283,7 @@ class SlowCrossSectionalLeadLagStrategy(Strategy):
         return {
             "last_decision_week": self._last_decision_week,
             "tick": int(self._tick),
+            "recent_times": list(self._recent_times),
             "symbol_state": {
                 symbol: {
                     "closes": list(item.closes),
@@ -298,6 +305,7 @@ class SlowCrossSectionalLeadLagStrategy(Strategy):
             return
         self._last_decision_week = str(state.get("last_decision_week", ""))
         self._tick = _safe_non_negative_int(state.get("tick"))
+        _restore_deque(self._recent_times, state.get("recent_times"))
         raw = state.get("symbol_state")
         if not isinstance(raw, dict):
             return
@@ -458,10 +466,19 @@ class SlowCrossSectionalLeadLagStrategy(Strategy):
         total_inv = sum(inv.values())
         if total_inv <= _EPS:
             return {}, 1.0
+        # ``portfolio_vol`` is the inverse-vol-weighted PER-WEEK vol; the
+        # ``inv / total_inv`` normalization is scale-invariant, so the risk-parity
+        # weights are horizon-free.  The vol-target SCALAR compares it against an
+        # annual-scale ``target_vol`` (0.20): annualize the per-week estimate via
+        # sqrt(bars_per_year) from the observed (weekly) decision spacing first,
+        # otherwise the Moreira-Muir clamp is INERT.  Pass through (scalar=1.0)
+        # when spacing is unavailable rather than throttle on mismatched horizons.
         portfolio_vol = sum((inv[symbol] / total_inv) * vols[symbol] for symbol in inv)
         scalar = 1.0
         if self.target_vol > 0.0 and portfolio_vol > _EPS:
-            scalar = min(1.0, self.target_vol / portfolio_vol)
+            portfolio_vol_ann = _annualize_per_bar_vol(portfolio_vol, self._recent_times)
+            if portfolio_vol_ann is not None and portfolio_vol_ann > _EPS:
+                scalar = min(1.0, self.target_vol / portfolio_vol_ann)
         weights = {
             symbol: (inv[symbol] / total_inv) * self.target_gross_exposure * scalar
             for symbol in inv
@@ -472,6 +489,11 @@ class SlowCrossSectionalLeadLagStrategy(Strategy):
     # decision (weekly cadence)
     # ------------------------------------------------------------------ #
     def _evaluate(self, event_time: Any) -> None:
+        # Record the weekly decision epoch so the vol-target scalar can infer the
+        # (weekly) bar spacing that annualizes the per-week portfolio vol.
+        dt = _event_datetime_utc(event_time)
+        if dt is not None:
+            self._recent_times.append(dt.timestamp())
         self._snapshot_weekly_closes()
         scores = self._spillover_scores()
         signal_available = bool(scores)
@@ -537,12 +559,20 @@ class SlowCrossSectionalLeadLagStrategy(Strategy):
                 continue
             if target == "SHORT" and not self.allow_short:
                 continue
+            weight = float(weights.get(symbol, 0.0))
+            if weight <= 0.0:
+                # Selection vol-gate: a target whose realized vol was
+                # unavailable carries no risk-parity weight.  Entering with
+                # alloc=0 would omit ``target_allocation`` from metadata and
+                # the engine would resize the position to its DEFAULT
+                # allocation — an unsized, un-vol-gated entry.
+                continue
             self._enter(
                 symbol,
                 item,
                 target,
                 float(scores.get(symbol, 0.0)),
-                float(weights.get(symbol, 0.0)),
+                weight,
                 scalar,
                 price,
                 event_time,
@@ -560,6 +590,11 @@ class SlowCrossSectionalLeadLagStrategy(Strategy):
         event_time: Any,
     ) -> None:
         alloc = max(0.0, self.base_allocation * weight)
+        if alloc <= 0.0:
+            # Never emit an entry without a positive sizing target (see the
+            # vol-gate in ``_decide_book``); metadata without
+            # ``target_allocation`` falls back to engine default sizing.
+            return
         stop_loss = None
         if price is not None and self.stop_loss_pct > 0.0:
             stop_loss = price * (
@@ -635,12 +670,62 @@ _SUGGESTED_CANDIDATE_TAGS: tuple[str, ...] = (
     "crypto",
 )
 
-# Candidate slice (DAILY bars, internally weekly-sampled: ``spillover_window``/
-# ``min_history``/``min_hold_bars`` are WEEKLY decision bars).  Broad
-# cross-sectional long-short book -- the JEDC cost-surviving construction, NOT
-# the dead single-pair form.  ``min_hold_bars`` >= 8 weeks is the RPT-survival
-# design property (the redesign's entire purpose vs graveyard #6).
+# Candidate slice.  This sleeve INTERNALLY samples ONE close per ISO week
+# (``_snapshot_weekly_closes``) and decides on a timestamp-based WEEKLY clock
+# (``_week_key``), so EVERY window here is denominated in WEEKLY decision bars,
+# NOT raw bars: ``max_lag``/``spillover_window``/``min_history``/``vol_window``
+# and the ``min_hold_bars``/``cooldown_bars``/``max_hold_bars`` turnover brakes
+# are all weeks.  That makes the sleeve fully TIMEFRAME-AGNOSTIC -- feeding it
+# 4h or 1h bars only changes which intra-week close becomes the weekly snapshot
+# -- so the 4h and 1h cells reuse the 1d params VERBATIM (nothing scales).
+# Broad cross-sectional long-short book -- the JEDC cost-surviving construction,
+# NOT the dead single-pair form.  ``min_hold_bars`` >= 8 weeks is the
+# RPT-survival design property (the redesign's entire purpose vs graveyard #6).
 _SLOW_LEADLAG_XS_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "4h": (
+        {
+            "variant": "weekly_core",
+            "max_lag": 2,
+            "ridge_alpha": 1.0,
+            "spillover_window": 60,
+            "min_history": 40,
+            "entry_z": 0.50,
+            "exit_z": 0.10,
+            "max_longs": 10,
+            "max_shorts": 10,
+            "allow_short": True,
+            "min_symbols": 5,
+            "min_hold_bars": 8,
+            "cooldown_bars": 2,
+            "max_hold_bars": 260,
+            "vol_window": 20,
+            "target_gross_exposure": 1.0,
+            "target_vol": 0.20,
+            "stop_loss_pct": 0.10,
+        },
+    ),
+    "1h": (
+        {
+            "variant": "weekly_core",
+            "max_lag": 2,
+            "ridge_alpha": 1.0,
+            "spillover_window": 60,
+            "min_history": 40,
+            "entry_z": 0.50,
+            "exit_z": 0.10,
+            "max_longs": 10,
+            "max_shorts": 10,
+            "allow_short": True,
+            "min_symbols": 5,
+            "min_hold_bars": 8,
+            "cooldown_bars": 2,
+            "max_hold_bars": 260,
+            "vol_window": 20,
+            "target_gross_exposure": 1.0,
+            "target_vol": 0.20,
+            "stop_loss_pct": 0.10,
+        },
+    ),
     "1d": (
         {
             "variant": "weekly_core",
@@ -650,8 +735,8 @@ _SLOW_LEADLAG_XS_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
             "min_history": 40,
             "entry_z": 0.50,
             "exit_z": 0.10,
-            "max_longs": 3,
-            "max_shorts": 3,
+            "max_longs": 10,
+            "max_shorts": 10,
             "allow_short": True,
             "min_symbols": 5,
             "min_hold_bars": 8,

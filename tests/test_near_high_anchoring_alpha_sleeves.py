@@ -700,3 +700,206 @@ def test_schema_keys_snake_case_and_hyperparam() -> None:
         assert required in schema
     for cap in ("base_allocation", "max_symbol_exposure_pct", "max_order_value"):
         assert schema[cap].tunable is False
+
+
+# --------------------------------------------------------------------------- #
+# vol-target HORIZON fix: the ``min(1, target_vol / portfolio_vol)`` scalar must
+# annualize the per-bar portfolio vol (via sqrt(bars_per_year) inferred from the
+# observed bar spacing) before the Moreira-Muir clamp.  Nearness spread is fixed
+# by the (elevated, constant) trailing highs; per-bar vol is controlled purely by
+# the jitter amplitude, so calm vs stormy inputs isolate the throttle.  The OLD
+# inert code compared 0.20 against a per-bar 0.0005..0.04 and always returned
+# scalar == 1.0, so ``stormy_scalar < 1.0`` is itself proof the fix engaged.
+# --------------------------------------------------------------------------- #
+
+# (symbol, constant trailing high) -- close is flat ~100 so nearness = 100 / high;
+# highs stay >= any jittered close (< ~104 at amp 0.03) so the ordering is stable.
+_VT_LEVELS: list[tuple[str, float]] = [
+    ("VL0/USDT", 104.0),  # highest nearness -> LONG
+    ("VL1/USDT", 106.0),
+    ("VM0/USDT", 118.0),
+    ("VM1/USDT", 130.0),
+    ("VS0/USDT", 150.0),
+    ("VS1/USDT", 185.0),  # lowest nearness -> SHORT
+]
+_VT_N = 20
+_VT_KWARGS: dict[str, Any] = dict(
+    high_lookback_bars=30,
+    min_history_bars=6,
+    vol_window=5,
+    quantile_pct=0.16,  # int(0.16 * 6) -> n_side clamps to 1 (extreme long/short)
+    rebalance_bars=1,
+    min_hold_bars=0,
+    allow_short=True,
+    min_symbols=4,
+    target_gross_exposure=1.0,
+    target_vol=0.20,
+    base_allocation=0.20,
+    stop_loss_pct=0.0,
+    max_hold_bars=0,
+    min_price=0.01,
+)
+
+
+def _feed_daily(strategy: Any, symbols: list[str], series: Series, n: int) -> None:
+    """Feed ``n`` MARKET_WINDOW bars spaced ONE DAY apart (epoch-second times)."""
+    base_epoch = 1_700_000_000
+    for idx in range(n):
+        bars_1s: dict[str, list[dict[str, Any]]] = {}
+        stamp = base_epoch + idx * 86_400
+        for symbol in symbols:
+            closes, highs, volumes = series[symbol]
+            if idx >= len(closes):
+                continue
+            bars_1s[symbol] = [
+                {
+                    "time": stamp,
+                    "open": closes[idx],
+                    "high": highs[idx],
+                    "low": closes[idx],
+                    "close": closes[idx],
+                    "volume": volumes[idx],
+                }
+            ]
+        event = SimpleNamespace(type="MARKET_WINDOW", time=stamp, bars_1s=bars_1s)
+        strategy.calculate_signals(event)
+
+
+def _vt_universe(amp: float) -> tuple[list[str], Series]:
+    symbols = [name for name, _ in _VT_LEVELS]
+    series: Series = {}
+    for offset, (name, high) in enumerate(_VT_LEVELS):
+        closes = _jitter([100.0] * _VT_N, seed=971 + offset, amp=amp)
+        series[name] = (closes, [high] * _VT_N, [1000.0] * _VT_N)
+    return symbols, series
+
+
+def _entry_scalars(signals: list[Any]) -> list[float]:
+    return [
+        float((sig.metadata or {}).get("vol_target_scalar"))
+        for sig in _entries(signals)
+        if (sig.metadata or {}).get("vol_target_scalar") is not None
+    ]
+
+
+def _entry_alloc_sum(signals: list[Any]) -> float:
+    return sum(
+        float((sig.metadata or {}).get("target_allocation", 0.0)) for sig in _entries(signals)
+    )
+
+
+def test_vol_target_scalar_throttles_high_vol_at_daily_spacing() -> None:
+    """Stormy input trips the vol-target clamp (scalar < 1); calm input passes
+    through at scalar == 1.  The stormy book carries a strictly smaller notional
+    -- the fix the horizon-mismatch bug (inert scalar) leaves impossible."""
+    calm_symbols, calm_series = _vt_universe(amp=0.0004)
+    calm = CrossSectionalNearHighAnchoringStrategy(_Bars(calm_symbols), _Queue(), **_VT_KWARGS)
+    _feed_daily(calm, calm_symbols, calm_series, _VT_N)
+    calm_scalars = _entry_scalars(calm.events.items)
+
+    storm_symbols, storm_series = _vt_universe(amp=0.03)
+    storm = CrossSectionalNearHighAnchoringStrategy(_Bars(storm_symbols), _Queue(), **_VT_KWARGS)
+    _feed_daily(storm, storm_symbols, storm_series, _VT_N)
+    storm_scalars = _entry_scalars(storm.events.items)
+
+    assert calm_scalars, "expected at least one calm entry carrying a vol_target_scalar"
+    assert storm_scalars, "expected at least one stormy entry carrying a vol_target_scalar"
+
+    # (ii) calm input -> throttle passes through (annualized vol << target_vol).
+    assert max(calm_scalars) == 1.0 and min(calm_scalars) == 1.0, calm_scalars
+    # (i) stormy input -> throttle ENGAGES (annualized vol > target_vol).  Under
+    # the pre-fix per-bar comparison this scalar was pinned at 1.0.
+    assert max(storm_scalars) < 1.0, storm_scalars
+    # ... and the reduced scalar visibly shrinks the emitted notional.
+    assert _entry_alloc_sum(storm.events.items) < _entry_alloc_sum(calm.events.items)
+
+
+def test_vol_target_scalar_passthrough_when_spacing_unavailable() -> None:
+    """A single-bar-spacing feed (all bars share one timestamp key is impossible
+    here, so we feed identical epochs collapsed to one accepted bar) cannot infer
+    spacing; the throttle must PASS THROUGH (scalar == 1.0) rather than guess."""
+    symbols, series = _vt_universe(amp=0.03)
+    strategy = CrossSectionalNearHighAnchoringStrategy(_Bars(symbols), _Queue(), **_VT_KWARGS)
+    # Feed with a constant timestamp: only the first bar per symbol is ingested
+    # (dedup on last_time_key), so at most one decision-bar epoch is recorded and
+    # bar spacing is never inferable.
+    for _ in range(_VT_N):
+        bars_1s = {
+            name: [
+                {
+                    "time": 1_700_000_000,
+                    "open": series[name][0][0],
+                    "high": series[name][1][0],
+                    "low": series[name][0][0],
+                    "close": series[name][0][0],
+                    "volume": 1000.0,
+                }
+            ]
+            for name in symbols
+        }
+        strategy.calculate_signals(
+            SimpleNamespace(type="MARKET_WINDOW", time=1_700_000_000, bars_1s=bars_1s)
+        )
+    # With < 2 distinct timestamps the annualizer returns None -> pass-through.
+    for scalar in _entry_scalars(strategy.events.items):
+        assert scalar == 1.0
+
+
+def test_vol_target_fix_determinism_two_runs_identical() -> None:
+    """Re-running the throttled path twice yields byte-identical signals."""
+    symbols, series = _vt_universe(amp=0.03)
+
+    def _run() -> list[tuple[Any, ...]]:
+        strat = CrossSectionalNearHighAnchoringStrategy(_Bars(symbols), _Queue(), **_VT_KWARGS)
+        _feed_daily(strat, symbols, series, _VT_N)
+        return [
+            (
+                sig.symbol,
+                str(sig.signal_type),
+                round(float((sig.metadata or {}).get("vol_target_scalar", 0.0)), 12),
+                round(float((sig.metadata or {}).get("target_allocation", 0.0)), 12),
+            )
+            for sig in strat.events.items
+        ]
+
+    assert _run() == _run()
+
+
+# --------------------------------------------------------------------------- #
+# v5 zero-alloc gate: a computed alloc of 0 must NOT emit a LONG/SHORT --
+# ``_target_metadata`` omits ``target_allocation`` at alloc 0 and the engine
+# would resize the entry to its DEFAULT allocation (an unsized, un-vol-gated bet).
+# --------------------------------------------------------------------------- #
+
+
+def test_zero_alloc_entry_skipped_not_default_sized() -> None:
+    symbols = ["FLIP/USDT", "FRESH/USDT", "N0/USDT", "N1/USDT", "N2/USDT", "N3/USDT"]
+    strat = CrossSectionalNearHighAnchoringStrategy(_Bars(symbols), _Queue(), **_A1_B2_KWARGS)
+    flip = strat._state["FLIP/USDT"]
+    flip.mode = "LONG"
+    flip.entry_price = 100.0
+    flip.bars_held = 10_000  # clear the min-hold so the side flip is live
+    targets = {
+        "FLIP/USDT": ("SHORT", -1.0, {}),
+        "FRESH/USDT": ("LONG", 1.0, {}),
+    }
+    # empty weights -> alloc == 0 for every targeted symbol
+    strat._emit_targets(targets, {}, 1.0, "2026-01-01T00:00:00Z")
+    kinds = [(sig.symbol, str(sig.signal_type).upper()) for sig in strat.events.items]
+    assert not [sym for sym, kind in kinds if kind in {"LONG", "SHORT"}], kinds
+    # the side-flip EXIT still fired and FLIP is now flat (state matches the exit)
+    assert ("FLIP/USDT", "EXIT") in kinds
+    assert strat._state["FLIP/USDT"].mode == "OUT"
+    assert strat._state["FLIP/USDT"].entry_price is None
+
+    # a positive inverse-vol weight DOES emit a sized entry carrying a strictly
+    # positive ``target_allocation``.
+    sized = CrossSectionalNearHighAnchoringStrategy(_Bars(symbols), _Queue(), **_A1_B2_KWARGS)
+    sized._emit_targets(
+        {"FRESH/USDT": ("LONG", 1.0, {})}, {"FRESH/USDT": 0.5}, 1.0, "2026-01-01T00:00:00Z"
+    )
+    entries = [
+        sig for sig in sized.events.items if str(sig.signal_type).upper() in {"LONG", "SHORT"}
+    ]
+    assert entries, "a positive inverse-vol weight must emit a sized entry"
+    assert all(float((sig.metadata or {}).get("target_allocation", 0.0)) > 0.0 for sig in entries)

@@ -364,6 +364,11 @@ class LongRunOverreactionReversalStrategy(Strategy):
             # SCORE = -z, inverse-formation-vol sized: an extreme LOSER (z << 0)
             # scores high positive -> LONG; an extreme WINNER (z >> 0) scores
             # negative -> SHORT.
+            # vol-target horizon classification: category C (SCORE denominator, NOT
+            # a sizing throttle).  There is no ``target_vol`` here; sizing normalizes
+            # to ``target_gross_exposure`` downstream, and a global sqrt(bars_per_year)
+            # rescale of every ``vol`` cancels under the ranking / gross-normalization,
+            # so no per-bar-vs-annual horizon mismatch exists.
             score = -z / max(vol, _EPS)
             rows.append(
                 (
@@ -423,14 +428,75 @@ _SUGGESTED_CANDIDATE_TAGS: tuple[str, ...] = (
     "crypto",
 )
 
+# MULTI-TIMEFRAME (data-PC parquet carries 1h/4h but not 1d): the De Bondt-Thaler
+# 3-6mo formation window, the skip-month excision, and the monthly rebalance are
+# WALL-CLOCK horizons, so every BAR-denominated param (``formation_bars``,
+# ``skip_bars``, and the ``rebalance_bars``/``min_hold_bars`` monthly decision
+# clocks) scales x6 for 4h and x24 for 1h to keep the same multi-month
+# formation/cadence.  The extremeness gate ``z_min``, the ``max_universe`` /
+# ``min_symbols`` counts, the ``quantile_pct`` ratio, and ``allow_short`` are
+# timeframe-agnostic and stay UNCHANGED.  Longest window (formation_126 @1h =
+# 3024 bars) stays well under the ~9000-bar cap.
 _LONGRUN_OVERREACTION_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "1h": (
+        {
+            "variant": "formation_126",
+            "formation_bars": 3024,  # 126 x24 (~6mo of 1h bars)
+            "skip_bars": 504,  # 21 x24 (~1mo)
+            "z_min": 1.0,
+            "max_universe": 128,
+            "rebalance_bars": 504,  # 21 x24 (~monthly cadence)
+            "min_hold_bars": 504,  # 21 x24
+            "quantile_pct": 0.25,
+            "min_symbols": 5,
+            "allow_short": True,
+        },
+        {
+            "variant": "formation_91",
+            "formation_bars": 2184,  # 91 x24 (~4.3mo of 1h bars)
+            "skip_bars": 504,
+            "z_min": 1.0,
+            "max_universe": 128,
+            "rebalance_bars": 504,
+            "min_hold_bars": 504,
+            "quantile_pct": 0.25,
+            "min_symbols": 5,
+            "allow_short": True,
+        },
+    ),
+    "4h": (
+        {
+            "variant": "formation_126",
+            "formation_bars": 756,  # 126 x6 (~6mo of 4h bars)
+            "skip_bars": 126,  # 21 x6 (~1mo)
+            "z_min": 1.0,
+            "max_universe": 128,
+            "rebalance_bars": 126,  # 21 x6 (~monthly cadence)
+            "min_hold_bars": 126,  # 21 x6
+            "quantile_pct": 0.25,
+            "min_symbols": 5,
+            "allow_short": True,
+        },
+        {
+            "variant": "formation_91",
+            "formation_bars": 546,  # 91 x6 (~4.3mo of 4h bars)
+            "skip_bars": 126,
+            "z_min": 1.0,
+            "max_universe": 128,
+            "rebalance_bars": 126,
+            "min_hold_bars": 126,
+            "quantile_pct": 0.25,
+            "min_symbols": 5,
+            "allow_short": True,
+        },
+    ),
     "1d": (
         {
             "variant": "formation_126",
             "formation_bars": 126,
             "skip_bars": 21,
             "z_min": 1.0,
-            "max_universe": 12,
+            "max_universe": 128,
             "rebalance_bars": 21,
             "min_hold_bars": 21,
             "quantile_pct": 0.25,
@@ -442,7 +508,7 @@ _LONGRUN_OVERREACTION_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
             "formation_bars": 91,
             "skip_bars": 21,
             "z_min": 1.0,
-            "max_universe": 12,
+            "max_universe": 128,
             "rebalance_bars": 21,
             "min_hold_bars": 21,
             "quantile_pct": 0.25,

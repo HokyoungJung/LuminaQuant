@@ -25,6 +25,7 @@ from typing import Any
 
 from lumina_quant.strategies.cgo_disposition_alpha_sleeves import (
     CrossSectionalCapitalGainsOverhangStrategy,
+    _CGO_DISPOSITION_SLICE,
 )
 from lumina_quant.strategies.near_high_anchoring_alpha_sleeves import (
     CrossSectionalNearHighAnchoringStrategy,
@@ -463,3 +464,158 @@ def test_schema_keys_snake_case_and_hyperparam() -> None:
         assert isinstance(value, HyperParam)
     for required in ("window_bars", "skip_recent", "v_clip_max", "quantile_pct", "min_hold_bars"):
         assert required in schema
+
+
+def test_slice_multi_timeframe_scaling() -> None:
+    """1h/4h cells mirror the 1d variants with x24/x6-scaled bar-denominated params."""
+    slice_map = _CGO_DISPOSITION_SLICE
+    assert set(slice_map.keys()) == {"1h", "4h", "1d"}
+    base = slice_map["1d"]
+    names = tuple(spec["variant"] for spec in base)
+    assert names == ("wk8", "wk13")
+    for timeframe, variants in slice_map.items():
+        assert len(variants) == len(base), timeframe
+        assert tuple(spec["variant"] for spec in variants) == names, timeframe
+
+    # Every bar-denominated window (reference/skip/vol/history) and the weekly
+    # decision clocks scale x6 (4h) / x24 (1h); ratios, counts and price/vol
+    # thresholds are timeframe-agnostic and stay identical.
+    scaled_keys = (
+        "window_bars",
+        "skip_recent",
+        "vol_window",
+        "rebalance_bars",
+        "min_hold_bars",
+        "min_history_bars",
+    )
+    unchanged_keys = (
+        "quantile_pct",
+        "min_symbols",
+        "allow_short",
+        "target_gross_exposure",
+        "target_vol",
+        "stop_loss_pct",
+    )
+    for factor, timeframe in ((6, "4h"), (24, "1h")):
+        for base_spec, tf_spec in zip(base, slice_map[timeframe], strict=True):
+            for key in scaled_keys:
+                assert tf_spec[key] == base_spec[key] * factor, (timeframe, key)
+            for key in unchanged_keys:
+                assert tf_spec[key] == base_spec[key], (timeframe, key)
+    for variants in slice_map.values():
+        for spec in variants:
+            # Per-symbol history floor still exceeds the reference window, and no
+            # window reaches the ~9000-bar cap.
+            assert spec["min_history_bars"] > spec["window_bars"], spec["variant"]
+            assert spec["window_bars"] <= 9000, spec["variant"]
+
+
+# --------------------------------------------------------------------------- #
+# vol-target HORIZON fix (direct-method regression).  ``_inverse_vol_weights``
+# must annualize the per-bar portfolio vol via sqrt(bars_per_year) -- inferred
+# from the median gap of the recorded per-bar epochs -- before the
+# ``min(1, target_vol / vol)`` clamp.  The pre-fix code compared 0.20 against a
+# per-bar 0.0005..0.03 and was both spacing-INVARIANT and pinned at scalar==1.0.
+# --------------------------------------------------------------------------- #
+
+
+def _vt_epochs(count: int, spacing_s: int) -> list[float]:
+    return [float(1_700_000_000 + i * spacing_s) for i in range(count)]
+
+
+def _vt_targets(symbols: list[str]) -> dict[str, tuple[str, float, dict[str, Any]]]:
+    return {symbol: ("LONG", 1.0, {}) for symbol in symbols}
+
+
+def test_vol_target_scalar_annualized_and_spacing_sensitive() -> None:
+    symbols = ["A/USDT", "B/USDT", "C/USDT", "D/USDT"]
+    targets = _vt_targets(symbols)
+    stormy = dict.fromkeys(symbols, 0.03)
+
+    daily = _cgo(symbols, target_vol=0.20)
+    daily._recent_times.clear()
+    daily._recent_times.extend(_vt_epochs(10, 86_400))  # ~365 bars/yr
+    daily_w, daily_scalar = daily._inverse_vol_weights(targets, stormy)
+
+    hourly = _cgo(symbols, target_vol=0.20)
+    hourly._recent_times.clear()
+    hourly._recent_times.extend(_vt_epochs(10, 3_600))  # ~8766 bars/yr
+    _hourly_w, hourly_scalar = hourly._inverse_vol_weights(targets, stormy)
+
+    assert daily_scalar < 1.0  # stormy per-bar vol annualizes above target_vol
+    assert hourly_scalar < daily_scalar  # finer spacing => harder throttle
+    assert sum(daily_w.values()) < 1.0
+
+
+def test_vol_target_scalar_calm_passes_through() -> None:
+    symbols = ["A/USDT", "B/USDT", "C/USDT", "D/USDT"]
+    targets = _vt_targets(symbols)
+    strat = _cgo(symbols, target_vol=0.20)
+    strat._recent_times.clear()
+    strat._recent_times.extend(_vt_epochs(10, 86_400))
+    _w, scalar = strat._inverse_vol_weights(targets, dict.fromkeys(symbols, 0.0005))
+    assert scalar == 1.0
+
+
+def test_vol_target_scalar_passthrough_when_spacing_unavailable() -> None:
+    symbols = ["A/USDT", "B/USDT"]
+    targets = _vt_targets(symbols)
+    strat = _cgo(symbols, target_vol=0.20)
+    strat._recent_times.clear()  # < 2 timestamps -> horizon unknowable
+    _w, scalar = strat._inverse_vol_weights(targets, dict.fromkeys(symbols, 0.75))
+    assert scalar == 1.0
+
+
+def test_vol_target_scalar_determinism() -> None:
+    symbols = ["A/USDT", "B/USDT", "C/USDT"]
+    targets = _vt_targets(symbols)
+    vols = {"A/USDT": 0.02, "B/USDT": 0.04, "C/USDT": 0.03}
+
+    def _run() -> tuple[float, tuple[float, ...]]:
+        strat = _cgo(symbols, target_vol=0.20)
+        strat._recent_times.clear()
+        strat._recent_times.extend(_vt_epochs(10, 86_400))
+        weights, scalar = strat._inverse_vol_weights(targets, vols)
+        return round(scalar, 12), tuple(round(weights[s], 12) for s in symbols)
+
+    assert _run() == _run()
+
+
+# --------------------------------------------------------------------------- #
+# v5 zero-alloc gate: a computed alloc of 0 must NOT emit a LONG/SHORT --
+# ``_target_metadata`` omits ``target_allocation`` at alloc 0 and the engine
+# would resize the entry to its DEFAULT allocation (an unsized, un-vol-gated bet).
+# --------------------------------------------------------------------------- #
+
+
+def test_zero_alloc_entry_skipped_not_default_sized() -> None:
+    symbols = ["FLIP/USDT", "FRESH/USDT", "N0/USDT", "N1/USDT", "N2/USDT", "N3/USDT"]
+    strat = _cgo(symbols)
+    flip = strat._state["FLIP/USDT"]
+    flip.mode = "LONG"
+    flip.entry_price = 100.0
+    flip.bars_held = 10_000  # clear the min-hold so the side flip is live
+    targets = {
+        "FLIP/USDT": ("SHORT", -1.0, {}),
+        "FRESH/USDT": ("LONG", 1.0, {}),
+    }
+    # empty weights -> alloc == 0 for every targeted symbol
+    strat._emit_targets(targets, {}, 1.0, "2026-01-01T00:00:00Z")
+    kinds = [(sig.symbol, str(sig.signal_type).upper()) for sig in strat.events.items]
+    assert not [sym for sym, kind in kinds if kind in {"LONG", "SHORT"}], kinds
+    # the side-flip EXIT still fired and FLIP is now flat (state matches the exit)
+    assert ("FLIP/USDT", "EXIT") in kinds
+    assert strat._state["FLIP/USDT"].mode == "OUT"
+    assert strat._state["FLIP/USDT"].entry_price is None
+
+    # a positive inverse-vol weight DOES emit a sized entry carrying a strictly
+    # positive ``target_allocation``.
+    sized = _cgo(symbols)
+    sized._emit_targets(
+        {"FRESH/USDT": ("LONG", 1.0, {})}, {"FRESH/USDT": 0.5}, 1.0, "2026-01-01T00:00:00Z"
+    )
+    entries = [
+        sig for sig in sized.events.items if str(sig.signal_type).upper() in {"LONG", "SHORT"}
+    ]
+    assert entries, "a positive inverse-vol weight must emit a sized entry"
+    assert all(float((sig.metadata or {}).get("target_allocation", 0.0)) > 0.0 for sig in entries)
