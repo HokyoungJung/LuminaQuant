@@ -92,6 +92,15 @@ class _FailingRestoreChild(_CapsuleChild):
             raise RuntimeError("restore failed")
 
 
+class _WarmupReadyChild(_CapsuleChild):
+    def __init__(self, bars, events, **params):
+        super().__init__(bars, events, **params)
+        self.warmup_ready_calls = 0
+
+    def validate_research_warmup_ready(self):
+        self.warmup_ready_calls += 1
+
+
 def _install_child_mapping(monkeypatch, mapping):
     def _resolve(name, default_name=None):
         _ = default_name
@@ -265,7 +274,7 @@ def test_research_indicator_restore_rolls_back_partial_child_mutation(monkeypatc
     assert _child_states(target) == before
 
 
-def test_finalize_completed_native_buckets_forwards_to_capable_children_only(monkeypatch):
+def test_finalize_completed_native_buckets_fails_before_any_partial_child_mutation(monkeypatch):
     strategy = _strategy(
         monkeypatch,
         [
@@ -275,16 +284,112 @@ def test_finalize_completed_native_buckets_forwards_to_capable_children_only(mon
         mapping={"CapsuleChild": _CapsuleChild, "NonCapableChild": _NonCapableChild},
     )
 
-    result = strategy.finalize_completed_native_buckets("2026-07-01T00:00:00Z")
-
-    assert sorted(result) == ["capable"]
-    assert result["capable"]["watermark"] == "2026-07-01T00:00:00Z"
     capable_child = next(
         child
         for component, child, _queue in strategy._children
         if component.component_id == "capable"
     )
-    assert capable_child.finalize_calls == ["2026-07-01T00:00:00Z"]
+    with pytest.raises(ValueError, match="completed native bucket child is not capable: legacy"):
+        strategy.finalize_completed_native_buckets("2026-07-01T00:00:00Z")
+    assert capable_child.finalize_calls == []
+
+
+def test_finalize_completed_native_buckets_covers_exactly_all_child_ids(monkeypatch):
+    strategy = _strategy(
+        monkeypatch,
+        [_component("b-child"), _component("a-child")],
+    )
+
+    result = strategy.finalize_completed_native_buckets("2026-07-01T00:00:00Z")
+
+    assert sorted(result) == ["a-child", "b-child"]
+    assert all(item["watermark"] == "2026-07-01T00:00:00Z" for item in result.values())
+
+
+def test_finalize_completed_native_buckets_rejects_duplicate_ids_before_calls(monkeypatch):
+    strategy = _strategy(monkeypatch, [_component("duplicate"), _component("duplicate")])
+
+    with pytest.raises(ValueError, match="duplicate completed native bucket child ids"):
+        strategy.finalize_completed_native_buckets("2026-07-01T00:00:00Z")
+    assert all(child.finalize_calls == [] for _component, child, _queue in strategy._children)
+
+
+def test_validate_research_warmup_ready_checks_all_children_before_calling_any(monkeypatch):
+    strategy = _strategy(
+        monkeypatch,
+        [
+            _component("ready", strategy_class="WarmupReadyChild"),
+            _component("legacy", strategy_class="NonCapableChild"),
+        ],
+        mapping={
+            "WarmupReadyChild": _WarmupReadyChild,
+            "NonCapableChild": _NonCapableChild,
+        },
+    )
+    ready_child = next(
+        child
+        for component, child, _queue in strategy._children
+        if component.component_id == "ready"
+    )
+
+    with pytest.raises(ValueError, match="research warmup child is not capable: legacy"):
+        strategy.validate_research_warmup_ready()
+    assert ready_child.warmup_ready_calls == 0
+
+
+def test_validate_research_warmup_ready_delegates_through_public_wrapper(monkeypatch):
+    strategy = _strategy(
+        monkeypatch,
+        [
+            _component("b-child", strategy_class="WarmupReadyChild"),
+            _component("a-child", strategy_class="WarmupReadyChild"),
+        ],
+        mapping={"WarmupReadyChild": _WarmupReadyChild},
+    )
+
+    assert strategy.validate_research_warmup_ready() is None
+    assert {
+        component.component_id: child.warmup_ready_calls
+        for component, child, _queue in strategy._children
+    } == {"a-child": 1, "b-child": 1}
+
+
+def test_validation_capsule_cannot_be_relabelled_as_prelock_final_refit(monkeypatch):
+    _CapsuleChild.instances = []
+    _patch_definition(monkeypatch, [_component("comp-a")])
+    _install_child_mapping(monkeypatch, {"CapsuleChild": _CapsuleChild})
+    validation_mode = "manifest:/sealed/validation_train_fit/row-a.json"
+    final_refit_mode = "manifest:/sealed/prelock_final_refit/row-a.json"
+    validation = MODULE.ArtifactPortfolioModeStrategy(
+        bars=_bars(),
+        events=SimpleNamespace(put=lambda item: None),
+        portfolio_mode=validation_mode,
+    )
+    validation_capsule = validation.get_research_indicator_state()
+    final_refit = MODULE.ArtifactPortfolioModeStrategy(
+        bars=_bars(),
+        events=SimpleNamespace(put=lambda item: None),
+        portfolio_mode=final_refit_mode,
+    )
+    before = _child_states(final_refit)
+
+    with pytest.raises(ValueError, match="portfolio_mode mismatch"):
+        final_refit.set_research_indicator_state(validation_capsule)
+    assert _child_states(final_refit) == before
+
+    relabelled = dict(validation_capsule)
+    relabelled["portfolio_mode"] = final_refit_mode
+    with pytest.raises(ValueError, match="sha256 mismatch"):
+        final_refit.set_research_indicator_state(relabelled)
+    assert _child_states(final_refit) == before
+
+    freshly_replayed = MODULE.ArtifactPortfolioModeStrategy(
+        bars=_bars(),
+        events=SimpleNamespace(put=lambda item: None),
+        portfolio_mode=final_refit_mode,
+    ).get_research_indicator_state()
+    final_refit.set_research_indicator_state(freshly_replayed)
+    assert _child_states(final_refit) == [entry["state"] for entry in freshly_replayed["children"]]
 
 
 def test_component_param_override_preserves_receipt_tuple_identity(monkeypatch):

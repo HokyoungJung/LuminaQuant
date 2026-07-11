@@ -482,11 +482,20 @@ class ResearchOnlyDailyLowTurnoverTrendPersistenceStrategy(
                 }
             )
             symbol_state[str(symbol)] = item
-        return {**self._capsule_prefix(), "symbol_state": symbol_state}
+        return {
+            **self._capsule_prefix(),
+            "recent_times": list(state.get("recent_times") or []),
+            "symbol_state": symbol_state,
+        }
 
     def set_research_indicator_state(self, capsule: Mapping[str, Any]) -> None:
         self._restore_native_capsule_prefix(capsule)
-        self.set_state({"symbol_state": dict(capsule.get("symbol_state") or {})})
+        self.set_state(
+            {
+                "recent_times": list(capsule.get("recent_times") or []),
+                "symbol_state": dict(capsule.get("symbol_state") or {}),
+            }
+        )
 
 
 class _NearHighBarrierError(ValueError):
@@ -715,6 +724,7 @@ class ResearchOnlyDailyCrossSectionalNearHighAnchoringStrategy(
             ),
             "last_eval_time_key": self._last_eval_time_key,
             "tick": int(self._tick),
+            "recent_times": list(state.get("recent_times") or []),
             "symbol_state": symbol_state,
         }
 
@@ -741,6 +751,7 @@ class ResearchOnlyDailyCrossSectionalNearHighAnchoringStrategy(
             {
                 "last_eval_time_key": capsule.get("last_eval_time_key", ""),
                 "tick": capsule.get("tick", 0),
+                "recent_times": list(capsule.get("recent_times") or []),
                 "symbol_state": dict(capsule.get("symbol_state") or {}),
             }
         )
@@ -821,9 +832,9 @@ class ResearchOnlyFourHourFundingHarvestCarryStrategy(
 
     def calculate_signals_context(self, context: Any) -> None:
         lookup = (
-            context.get("funding_lookup")
+            context.get("feature_lookup")
             if isinstance(context, Mapping)
-            else getattr(context, "funding_lookup", None)
+            else getattr(context, "feature_lookup", None)
         )
         aggregator = (
             context.get("aggregator")

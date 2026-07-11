@@ -9,6 +9,7 @@ from typing import Any
 
 import pytest
 
+from lumina_quant.core.strategy_input import StrategyInputContext
 from lumina_quant.strategies.aggressive_return_alpha_sleeves import FundingHarvestCarryStrategy
 from lumina_quant.strategies.alpha_max_research_sleeves import (
     CANONICAL_ALPHA_MAX_COMPONENT_NODES,
@@ -272,11 +273,11 @@ def test_four_hour_carry_uses_bar_close_asof_funding_and_rejects_poison() -> Non
     )
     lookup = _Lookup({symbol: (0.0, close_ms)})
     strategy.calculate_signals_context(
-        {
-            "aggregator": agg,
-            "funding_lookup": lookup,
-            "event": SimpleNamespace(type="MARKET_WINDOW", time=start + timedelta(hours=4)),
-        }
+        StrategyInputContext(
+            event=SimpleNamespace(type="MARKET_WINDOW", time=start + timedelta(hours=4)),
+            aggregator=agg,
+            feature_lookup=lookup,
+        )
     )
     assert lookup.calls == [(symbol, "funding_rate", close_ms)]
     assert strategy.get_research_indicator_state()["funding"][symbol] == [0.0]
@@ -289,11 +290,11 @@ def test_four_hour_carry_uses_bar_close_asof_funding_and_rejects_poison() -> Non
     future_agg.set_bars(symbol, "4h", [bar, forming_poison])
     with pytest.raises(ValueError, match="future_funding_point"):
         future.calculate_signals_context(
-            {
-                "aggregator": future_agg,
-                "funding_lookup": _Lookup({symbol: (0.1, close_ms + 1)}),
-                "event": SimpleNamespace(type="MARKET_WINDOW", time=start + timedelta(hours=4)),
-            }
+            StrategyInputContext(
+                event=SimpleNamespace(type="MARKET_WINDOW", time=start + timedelta(hours=4)),
+                aggregator=future_agg,
+                feature_lookup=_Lookup({symbol: (0.1, close_ms + 1)}),
+            )
         )
 
     stale = ResearchOnlyFourHourFundingHarvestCarryStrategy(
@@ -303,11 +304,11 @@ def test_four_hour_carry_uses_bar_close_asof_funding_and_rejects_poison() -> Non
     stale_agg.set_bars(symbol, "4h", [bar, forming_poison])
     with pytest.raises(ValueError, match="stale_funding_point"):
         stale.calculate_signals_context(
-            {
-                "aggregator": stale_agg,
-                "funding_lookup": _Lookup({symbol: (0.1, close_ms - 8 * 60 * 60 * 1000 - 1)}),
-                "event": SimpleNamespace(type="MARKET_WINDOW", time=start + timedelta(hours=4)),
-            }
+            StrategyInputContext(
+                event=SimpleNamespace(type="MARKET_WINDOW", time=start + timedelta(hours=4)),
+                aggregator=stale_agg,
+                feature_lookup=_Lookup({symbol: (0.1, close_ms - 8 * 60 * 60 * 1000 - 1)}),
+            )
         )
 
     ambient = ResearchOnlyFourHourFundingHarvestCarryStrategy(
@@ -317,11 +318,11 @@ def test_four_hour_carry_uses_bar_close_asof_funding_and_rejects_poison() -> Non
     ambient_agg.set_bars(symbol, "4h", [bar, forming_poison])
     with pytest.raises(ValueError, match="ambient_feature_lookup_forbidden"):
         ambient.calculate_signals_context(
-            {
-                "aggregator": ambient_agg,
-                "funding_lookup": None,
-                "event": SimpleNamespace(type="MARKET_WINDOW", time=start + timedelta(hours=4)),
-            }
+            StrategyInputContext(
+                event=SimpleNamespace(type="MARKET_WINDOW", time=start + timedelta(hours=4)),
+                aggregator=ambient_agg,
+                feature_lookup=None,
+            )
         )
 
 
@@ -344,10 +345,8 @@ def test_indicator_capsules_reset_economic_state_and_minimum_history_gate(
     strategy = cls(_Bars(symbols), _Queue(), **params)
     with pytest.raises(ValueError, match="insufficient_research_warmup_history"):
         strategy.validate_research_warmup_ready()
+    strategy.minimum_completed_bars = 0
     for symbol in symbols:
-        strategy._alpha_max_completed_native_count_by_symbol[symbol] = (
-            strategy.minimum_completed_bars
-        )
         state_obj = strategy._state[symbol]
         state_obj.mode = "LONG"
         state_obj.entry_price = 123.0
@@ -365,6 +364,91 @@ def test_indicator_capsules_reset_economic_state_and_minimum_history_gate(
         if "adds" in payload:
             assert payload["adds"] == 0
             assert payload["stop_price"] is None
+
+
+def test_daily_trend_capsule_restores_recent_times_for_identical_vol_sizing() -> None:
+    symbol = "BTCUSDT"
+    continuous = ResearchOnlyDailyLowTurnoverTrendPersistenceStrategy(
+        _Bars([symbol]), _Queue(), vol_window=2
+    )
+    for day, close in enumerate((100.0, 110.0, 90.0), start=1):
+        continuous.calculate_signals_window(_event_for({symbol: _bar(_dt(day), close)}))
+
+    capsule = continuous.get_research_indicator_state()
+    restored = ResearchOnlyDailyLowTurnoverTrendPersistenceStrategy(
+        _Bars([symbol]), _Queue(), vol_window=2
+    )
+    restored.set_research_indicator_state(capsule)
+
+    next_event = _event_for({symbol: _bar(_dt(4), 105.0)})
+    continuous.calculate_signals_window(next_event)
+    restored.calculate_signals_window(next_event)
+
+    continuous_closes = list(continuous._state[symbol].closes)
+    restored_closes = list(restored._state[symbol].closes)
+    assert capsule["recent_times"] == list(continuous._recent_times)[:-1]
+    assert list(restored._recent_times) == list(continuous._recent_times)
+    assert restored_closes == continuous_closes
+    assert restored._vol_scaled_allocation(restored_closes, 1.0) == pytest.approx(
+        continuous._vol_scaled_allocation(continuous_closes, 1.0)
+    )
+
+
+def test_daily_near_high_capsule_restores_recent_times_for_identical_vol_sizing() -> None:
+    symbols = ["ADAUSDT", "BTCUSDT"]
+    params = {
+        "admitted_symbols": symbols,
+        "high_lookback_bars": 3,
+        "min_history_bars": 2,
+        "min_symbols": 2,
+        "quantile_pct": 0.5,
+        "rebalance_bars": 1,
+        "vol_window": 2,
+    }
+    continuous = ResearchOnlyDailyCrossSectionalNearHighAnchoringStrategy(
+        _Bars(symbols), _Queue(), **params
+    )
+    ada_closes = (100.0, 120.0, 90.0, 130.0, 95.0)
+    btc_closes = (100.0, 80.0, 110.0, 70.0, 115.0)
+    for day, (ada_close, btc_close) in enumerate(zip(ada_closes, btc_closes), start=1):
+        continuous.calculate_signals_window(
+            _event_for(
+                {
+                    "ADAUSDT": _bar(_dt(day), ada_close, high=ada_close + 5.0),
+                    "BTCUSDT": _bar(_dt(day), btc_close, high=max(120.0, btc_close + 5.0)),
+                }
+            )
+        )
+
+    capsule = continuous.get_research_indicator_state()
+    restored = ResearchOnlyDailyCrossSectionalNearHighAnchoringStrategy(
+        _Bars(symbols), _Queue(), **params
+    )
+    restored.set_research_indicator_state(capsule)
+
+    next_event = _event_for(
+        {
+            "ADAUSDT": _bar(_dt(6), 140.0, high=145.0),
+            "BTCUSDT": _bar(_dt(6), 60.0, high=125.0),
+        }
+    )
+    continuous.calculate_signals_window(next_event)
+    restored.calculate_signals_window(next_event)
+
+    continuous_targets, continuous_vols = continuous._score_and_select()
+    restored_targets, restored_vols = restored._score_and_select()
+    continuous_weights, continuous_scalar = continuous._inverse_vol_weights(
+        continuous_targets, continuous_vols
+    )
+    restored_weights, restored_scalar = restored._inverse_vol_weights(
+        restored_targets, restored_vols
+    )
+    assert capsule["recent_times"] == list(continuous._recent_times)[:-1]
+    assert list(restored._recent_times) == list(continuous._recent_times)
+    assert restored_targets == continuous_targets
+    assert restored_weights == pytest.approx(continuous_weights)
+    assert restored_scalar == pytest.approx(continuous_scalar)
+    assert continuous_scalar < 1.0
 
 
 def test_boundary_finalization_matches_natural_promotion_and_partial_rejects() -> None:

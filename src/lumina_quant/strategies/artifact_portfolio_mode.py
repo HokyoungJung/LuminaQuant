@@ -2606,13 +2606,46 @@ class ArtifactPortfolioModeStrategy(Strategy):
                 setter(rollback_states[component.component_id])
             raise
 
-    def finalize_completed_native_buckets(self, watermark: Any) -> dict[str, Any]:
-        results: dict[str, Any] = {}
+    def _checked_child_methods(self, *, method_name: str, capability_name: str) -> dict[str, Any]:
+        handlers: dict[str, Any] = {}
+        duplicate_ids: set[str] = set()
         for component, child, _queue in self._children:
-            finalizer = getattr(child, "finalize_completed_native_buckets", None)
-            if callable(finalizer):
-                results[component.component_id] = _canonical_json_value(finalizer(watermark))
-        return results
+            component_id = component.component_id
+            if component_id in handlers:
+                duplicate_ids.add(component_id)
+                continue
+            method = getattr(child, method_name, None)
+            if not callable(method):
+                raise ValueError(f"{capability_name} child is not capable: {component_id}")
+            handlers[component_id] = method
+        if duplicate_ids:
+            raise ValueError(f"duplicate {capability_name} child ids: {sorted(duplicate_ids)}")
+        expected_ids = {component.component_id for component, _child, _queue in self._children}
+        if set(handlers) != expected_ids:
+            missing = sorted(expected_ids - set(handlers))
+            extra = sorted(set(handlers) - expected_ids)
+            raise ValueError(
+                f"{capability_name} child id mismatch: missing={missing} extra={extra}"
+            )
+        return handlers
+
+    def validate_research_warmup_ready(self) -> None:
+        handlers = self._checked_child_methods(
+            method_name="validate_research_warmup_ready",
+            capability_name="research warmup",
+        )
+        for validator in handlers.values():
+            validator()
+
+    def finalize_completed_native_buckets(self, watermark: Any) -> dict[str, Any]:
+        handlers = self._checked_child_methods(
+            method_name="finalize_completed_native_buckets",
+            capability_name="completed native bucket",
+        )
+        return {
+            component_id: _canonical_json_value(finalizer(watermark))
+            for component_id, finalizer in handlers.items()
+        }
 
     def _component_client_order_id(
         self, *, component: PortfolioModeComponent, signal: SignalEvent
