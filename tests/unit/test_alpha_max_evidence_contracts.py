@@ -211,6 +211,45 @@ def test_ordered_lookup_selects_newest_causal_cross_boundary_point(monkeypatch, 
     assert all(call[2] == "funding_rate" for call in _FakeFeatureLookup.calls)
 
 
+def test_ordered_lookup_reads_actual_adjacent_parquet_roots_causally(tmp_path):
+    pl = pytest.importorskip("polars")
+    previous = _spec(tmp_path, "purge")
+    current = _spec(tmp_path, "validation")
+    boundary_ms = current.start_timestamp_ms
+
+    def write_point(spec, timestamp_ms: int, rate: float) -> None:
+        timestamp = datetime.fromtimestamp(timestamp_ms / 1000.0, UTC)
+        directory = (
+            Path(spec.path)
+            / "feature_points"
+            / "exchange=binance"
+            / "symbol=BTCUSDT"
+            / f"date={timestamp:%Y-%m-%d}"
+        )
+        directory.mkdir(parents=True, exist_ok=True)
+        pl.DataFrame(
+            {
+                "timestamp_ms": [timestamp_ms],
+                "funding_rate": [rate],
+            }
+        ).write_parquet(directory / "part-0.parquet")
+
+    write_point(previous, boundary_ms - 1, 0.0001)
+    write_point(current, boundary_ms + 1, 0.0002)
+    lookup = AlphaMaxOrderedFundingLookup((previous, current))
+
+    assert lookup.get_latest_point(
+        "BTCUSDT",
+        "funding_rate",
+        timestamp_ms=boundary_ms,
+    ) == FeaturePoint(0.0001, boundary_ms - 1)
+    assert lookup.get_latest_point(
+        "BTCUSDT",
+        "funding_rate",
+        timestamp_ms=boundary_ms + 1,
+    ) == FeaturePoint(0.0002, boundary_ms + 1)
+
+
 def test_ordered_lookup_rejects_field_query_bound_stale_future_owned_and_tie_poison(
     monkeypatch, tmp_path
 ):
