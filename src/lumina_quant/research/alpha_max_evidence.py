@@ -210,7 +210,10 @@ _ADMISSION_MEDIAN_MINIMUM: Final[float] = 20_000_000.0
 _ADMISSION_P10_MINIMUM: Final[float] = 2_000_000.0
 
 _FUNDING_INTERVAL_MS: Final[int] = 8 * 60 * 60 * 1000
-_FEATURE_CAUSAL_EDGE_MS: Final[int] = 1000
+_TON_FUNDING_INTERVAL_MS: Final[int] = 4 * 60 * 60 * 1000
+_FUNDING_SOURCE_MAX_JITTER_MS: Final[int] = 1000
+_RAW_INTERVAL_MS: Final[int] = 1000
+_RAW_OHLCV_COLUMNS: Final[tuple[str, ...]] = ("open", "high", "low", "close", "volume")
 _RAW_CLOSE_MAX_STALE_MS: Final[int] = 1000
 _MANIFEST_PHASES: Final[tuple[str, str]] = (
     "validation_train_fit",
@@ -300,6 +303,21 @@ def _epoch_ms(value: datetime) -> int:
     return int(value.timestamp() * 1000)
 
 
+def _alpha_max_funding_interval_ms(symbol: str) -> int:
+    if symbol not in ALPHA_MAX_CANDIDATE_SYMBOLS:
+        raise ValueError("alpha_max_feature_symbol_outside_candidates")
+    return _TON_FUNDING_INTERVAL_MS if symbol == "TONUSDT" else _FUNDING_INTERVAL_MS
+
+
+def _alpha_max_expected_grid_timestamps(
+    start_ms: int,
+    end_ms: int,
+    interval_ms: int,
+) -> tuple[int, ...]:
+    first = ((start_ms + interval_ms - 1) // interval_ms) * interval_ms
+    return tuple(range(first, end_ms, interval_ms))
+
+
 def _canonical_json_bytes(value: Any, *, newline: bool) -> bytes:
     payload = json.dumps(
         value,
@@ -371,6 +389,142 @@ _ROOT_INTERVALS: Final[dict[str, tuple[datetime, datetime]]] = {
         datetime(2026, 7, 1, tzinfo=UTC),
     ),
 }
+_MAPPING_PROXY_TYPE: Final[type] = type(MappingProxyType({}))
+_ALPHA_MAX_AVAILABILITY_FLOOR: Final[datetime] = _ROOT_INTERVALS["warmup"][0]
+_ALPHA_MAX_AVAILABILITY_CEILING: Final[datetime] = _ROOT_INTERVALS["historical_exposed_evaluation"][
+    1
+]
+_ALPHA_MAX_TONUSDT_RAW_AVAILABILITY_START: Final[datetime] = datetime(
+    2024,
+    3,
+    1,
+    12,
+    31,
+    10,
+    tzinfo=UTC,
+)
+_ALPHA_MAX_TONUSDT_FEATURE_AVAILABILITY_START: Final[datetime] = datetime(
+    2024,
+    3,
+    1,
+    16,
+    tzinfo=UTC,
+)
+_ALPHA_MAX_TONUSDT_AVAILABILITY_END: Final[datetime] = datetime(
+    2026,
+    6,
+    23,
+    9,
+    tzinfo=UTC,
+)
+_ALPHA_MAX_RAW_AVAILABILITY_START_BY_SYMBOL: Final[Mapping[str, datetime]] = MappingProxyType(
+    {
+        symbol: (
+            _ALPHA_MAX_TONUSDT_RAW_AVAILABILITY_START
+            if symbol == "TONUSDT"
+            else _ALPHA_MAX_AVAILABILITY_FLOOR
+        )
+        for symbol in ALPHA_MAX_CANDIDATE_SYMBOLS
+    }
+)
+_ALPHA_MAX_FEATURE_AVAILABILITY_START_BY_SYMBOL: Final[Mapping[str, datetime]] = MappingProxyType(
+    {
+        symbol: (
+            _ALPHA_MAX_TONUSDT_FEATURE_AVAILABILITY_START
+            if symbol == "TONUSDT"
+            else _ALPHA_MAX_AVAILABILITY_FLOOR
+        )
+        for symbol in ALPHA_MAX_CANDIDATE_SYMBOLS
+    }
+)
+_ALPHA_MAX_RAW_AVAILABILITY_END_BY_SYMBOL: Final[Mapping[str, datetime]] = MappingProxyType(
+    {
+        symbol: (
+            _ALPHA_MAX_TONUSDT_AVAILABILITY_END
+            if symbol == "TONUSDT"
+            else _ALPHA_MAX_AVAILABILITY_CEILING
+        )
+        for symbol in ALPHA_MAX_CANDIDATE_SYMBOLS
+    }
+)
+_ALPHA_MAX_FEATURE_AVAILABILITY_END_BY_SYMBOL: Final[Mapping[str, datetime]] = MappingProxyType(
+    dict(_ALPHA_MAX_RAW_AVAILABILITY_END_BY_SYMBOL)
+)
+
+
+def _alpha_max_availability_boundary_by_symbol(
+    value: Mapping[str, datetime],
+    *,
+    field: str,
+) -> Mapping[str, datetime]:
+    """Copy one externally immutable exact-ten-symbol availability contract."""
+    if type(value) is not _MAPPING_PROXY_TYPE:
+        raise TypeError(f"alpha_max_{field}_must_be_immutable")
+    if set(value) != set(ALPHA_MAX_CANDIDATE_SYMBOLS) or len(value) != len(
+        ALPHA_MAX_CANDIDATE_SYMBOLS
+    ):
+        raise ValueError(f"alpha_max_{field}_symbols_invalid")
+    ordered: dict[str, datetime] = {}
+    for symbol in ALPHA_MAX_CANDIDATE_SYMBOLS:
+        raw_start = value[symbol]
+        if type(raw_start) is not datetime:
+            raise TypeError(f"alpha_max_{field}_timestamp_must_be_datetime")
+        ordered[symbol] = _utc(raw_start, field=f"{field}_{symbol.lower()}")
+    # Copy before wrapping so a caller cannot mutate the proxy through a retained
+    # reference to its original backing dict after the evidence object is sealed.
+    return MappingProxyType(ordered)
+
+
+def _alpha_max_availability_boundary_payload(
+    value: Mapping[str, datetime],
+) -> dict[str, str]:
+    return {
+        symbol: value[symbol].isoformat().replace("+00:00", "Z")
+        for symbol in ALPHA_MAX_CANDIDATE_SYMBOLS
+    }
+
+
+def _alpha_max_availability_payload(
+    start_by_symbol: Mapping[str, datetime],
+    end_by_symbol: Mapping[str, datetime],
+) -> dict[str, dict[str, str]]:
+    return {
+        "availability_end_by_symbol": _alpha_max_availability_boundary_payload(end_by_symbol),
+        "availability_start_by_symbol": _alpha_max_availability_boundary_payload(start_by_symbol),
+    }
+
+
+def _alpha_max_availability_sha256(
+    start_by_symbol: Mapping[str, datetime],
+    end_by_symbol: Mapping[str, datetime],
+) -> str:
+    return _sha256_bytes(
+        _canonical_json_bytes(
+            _alpha_max_availability_payload(start_by_symbol, end_by_symbol),
+            newline=True,
+        )
+    )
+
+
+def _alpha_max_root_availability_contract(
+    start_by_symbol: Mapping[str, datetime] | None,
+    end_by_symbol: Mapping[str, datetime] | None,
+) -> tuple[Mapping[str, datetime], Mapping[str, datetime]]:
+    if start_by_symbol is None or end_by_symbol is None:
+        raise TypeError("alpha_max_availability_interval_must_supply_start_and_end")
+    start = _alpha_max_availability_boundary_by_symbol(
+        start_by_symbol,
+        field="availability_start_by_symbol",
+    )
+    end = _alpha_max_availability_boundary_by_symbol(
+        end_by_symbol,
+        field="availability_end_by_symbol",
+    )
+    if any(start[symbol] >= end[symbol] for symbol in ALPHA_MAX_CANDIDATE_SYMBOLS):
+        raise ValueError("alpha_max_availability_interval_bounds_invalid")
+    return start, end
+
+
 _ALLOWED_ROOT_SEQUENCES: Final[frozenset[tuple[str, ...]]] = frozenset(
     {
         ("warmup",),
@@ -633,29 +787,43 @@ class AlphaMaxOrderedFundingLookup:
                     point = FeaturePoint(
                         value=float(point.value),
                         source_timestamp_ms=int(point.source_timestamp_ms),
+                        canonical_timestamp_ms=int(
+                            getattr(
+                                point,
+                                "canonical_timestamp_ms",
+                                point.source_timestamp_ms,
+                            )
+                        ),
                     )
                 except (AttributeError, TypeError, ValueError) as exc:
                     raise ValueError("alpha_max_funding_point_invalid") from exc
             candidates.append((spec, point))
 
-        timestamps = [point.source_timestamp_ms for _, point in candidates]
+        timestamps = [point.canonical_timestamp_ms for _, point in candidates]
         if len(timestamps) != len(set(timestamps)):
             raise ValueError("alpha_max_funding_equal_timestamp_conflict")
-        eligible: list[FeaturePoint] = []
+        eligible: list[tuple[int, FeaturePoint]] = []
         for spec, point in candidates:
             source_ms = point.source_timestamp_ms
-            if not (spec.start_timestamp_ms <= source_ms < spec.end_timestamp_ms):
+            canonical_ms = point.canonical_timestamp_ms
+            if (
+                type(source_ms) is not int
+                or type(canonical_ms) is not int
+                or not 0 <= source_ms - canonical_ms <= _FUNDING_SOURCE_MAX_JITTER_MS
+            ):
+                raise ValueError("alpha_max_funding_point_source_timestamp_invalid")
+            if not (spec.start_timestamp_ms <= canonical_ms < spec.end_timestamp_ms):
                 raise ValueError("alpha_max_funding_point_outside_owned_root")
-            if source_ms > query_ms:
+            if canonical_ms > query_ms:
                 raise ValueError("alpha_max_funding_point_from_future")
-            if query_ms - source_ms > FEATURE_POINT_MAX_STALE_MS:
+            if query_ms - canonical_ms > FEATURE_POINT_MAX_STALE_MS:
                 raise ValueError("alpha_max_funding_point_stale")
             if not math.isfinite(point.value):
                 raise ValueError("alpha_max_funding_point_nonfinite")
-            eligible.append(point)
+            eligible.append((canonical_ms, point))
         if not eligible:
             return None
-        return max(eligible, key=lambda point: point.source_timestamp_ms)
+        return max(eligible, key=lambda candidate: candidate[0])[1]
 
     def get_latest(
         self,
@@ -916,6 +1084,8 @@ class AlphaMaxFundingBoundaryResolver:
         validated = validate_alpha_max_admitted_symbols(
             ALPHA_MAX_CANDIDATE_SYMBOLS, admitted_symbols
         )
+        if "TONUSDT" in validated:
+            raise ValueError("alpha_max_ton_4h_funding_forbidden_in_8h_resolver")
         object.__setattr__(self, "_ordered_lookup", ordered_lookup)
         object.__setattr__(self, "_admitted_symbols", admitted_symbols)
         if validated is not admitted_symbols:
@@ -968,7 +1138,7 @@ class AlphaMaxFundingBoundaryResolver:
                 or type(row.rate_source_timestamp_ms) is not int
                 or type(row.price_row_timestamp_ms) is not int
                 or type(row.price_close_timestamp_ms) is not int
-                or row.rate_source_timestamp_ms > row.boundary_ms
+                or row.rate_source_timestamp_ms - row.boundary_ms > _FUNDING_SOURCE_MAX_JITTER_MS
                 or row.boundary_ms - row.rate_source_timestamp_ms > _FUNDING_INTERVAL_MS
                 or row.price_close_timestamp_ms != row.price_row_timestamp_ms + 1000
                 or row.price_close_timestamp_ms > row.boundary_ms
@@ -1079,10 +1249,15 @@ class AlphaMaxFundingBoundaryResolver:
             raise ValueError("funding_boundary_coverage")
         rate = float(rate_point.value)
         price = float(price_point.value)
+        rate_canonical_timestamp_ms = rate_point.canonical_timestamp_ms
         if (
             not math.isfinite(rate)
-            or rate_point.source_timestamp_ms > boundary_ms
-            or boundary_ms - rate_point.source_timestamp_ms > _FUNDING_INTERVAL_MS
+            or type(rate_canonical_timestamp_ms) is not int
+            or not 0
+            <= rate_point.source_timestamp_ms - rate_canonical_timestamp_ms
+            <= _FUNDING_SOURCE_MAX_JITTER_MS
+            or rate_canonical_timestamp_ms > boundary_ms
+            or boundary_ms - rate_canonical_timestamp_ms > _FUNDING_INTERVAL_MS
         ):
             raise ValueError("funding_boundary_coverage")
         if (
@@ -3155,7 +3330,7 @@ def build_alpha_max_statistical_evidence(
 
 
 # ---------------------------------------------------------------------------
-# Revision 5.14 pure data, evidence, selection, and sealing contracts.
+# Revision 5.15 pure data, evidence, selection, and sealing contracts.
 # These helpers intentionally remain below the canonical statistical primitives
 # so orchestration code has one deterministic evidence module and no parallel
 # implementation of admission, selection, reconciliation, or serialization.
@@ -3252,61 +3427,146 @@ def _alpha_max_validate_root_inventory_coverage(
     start: datetime,
     end: datetime,
     expected_symbols: tuple[str, ...],
+    availability_start_by_symbol: Mapping[str, datetime],
+    availability_end_by_symbol: Mapping[str, datetime],
 ) -> None:
     observed: dict[str, list[tuple[datetime, AlphaMaxTreeEntry]]] = {
         symbol: [] for symbol in expected_symbols
     }
     for entry in entries:
-        symbol, partition_start, _ = _alpha_max_partition_contract(
+        symbol, partition_start, partition_end = _alpha_max_partition_contract(
             entry.relative_path,
             root_kind=root_kind,
             exchange=exchange,
         )
         if symbol not in observed:
             raise ValueError("alpha_max_root_symbol_scope_mismatch")
-        if (
-            root_kind == "feature"
-            and entry.maximum_gap_ms > _FUNDING_INTERVAL_MS + _FEATURE_CAUSAL_EDGE_MS
-        ):
-            raise ValueError("alpha_max_feature_root_timestamp_cadence_invalid")
+        availability_start = availability_start_by_symbol[symbol]
+        availability_end = availability_end_by_symbol[symbol]
+        if partition_end <= availability_start:
+            raise ValueError("alpha_max_root_partition_before_availability")
+        if partition_start >= availability_end:
+            raise ValueError("alpha_max_root_partition_after_availability")
+        if entry.minimum_timestamp_ms < _epoch_ms(max(start, availability_start)):
+            raise ValueError("alpha_max_root_content_before_availability")
+        if entry.maximum_timestamp_ms >= _epoch_ms(min(end, availability_end)):
+            raise ValueError("alpha_max_root_content_after_availability")
         observed[symbol].append((partition_start, entry))
-    if any(not values for values in observed.values()):
-        raise ValueError("alpha_max_root_symbol_coverage_incomplete")
 
     if root_kind == "feature":
-        expected_partitions = tuple(
-            start + timedelta(days=index) for index in range((end - start).days)
-        )
-        for values in observed.values():
+        for symbol, values in observed.items():
+            availability_start = availability_start_by_symbol[symbol]
+            coverage_start = max(start, availability_start)
+            coverage_end = min(end, availability_end_by_symbol[symbol])
+            expected_partitions: tuple[datetime, ...]
+            if coverage_start >= coverage_end:
+                expected_partitions = ()
+            else:
+                first_day = coverage_start.replace(hour=0, minute=0, second=0, microsecond=0)
+                partitions: list[datetime] = []
+                cursor = first_day
+                while cursor < coverage_end:
+                    partitions.append(cursor)
+                    cursor += timedelta(days=1)
+                expected_partitions = tuple(partitions)
             ordered = tuple(sorted(values, key=lambda value: value[0]))
             actual = tuple(partition for partition, _ in ordered)
             if actual != expected_partitions:
                 raise ValueError("alpha_max_feature_root_interval_coverage_incomplete")
+            if not ordered:
+                continue
+            interval_ms = _alpha_max_funding_interval_ms(symbol)
+            expected_all = _alpha_max_expected_grid_timestamps(
+                _epoch_ms(coverage_start),
+                _epoch_ms(coverage_end),
+                interval_ms,
+            )
+            if not expected_all:
+                raise ValueError("alpha_max_feature_root_funding_coverage_incomplete")
+            for partition_start, entry in ordered:
+                partition_end = partition_start + timedelta(days=1)
+                owned_start_ms = _epoch_ms(max(coverage_start, partition_start))
+                owned_end_ms = _epoch_ms(min(coverage_end, partition_end))
+                expected = _alpha_max_expected_grid_timestamps(
+                    owned_start_ms,
+                    owned_end_ms,
+                    interval_ms,
+                )
+                expected_gap = interval_ms if len(expected) > 1 else 0
+                if (
+                    not expected
+                    or entry.minimum_timestamp_ms != expected[0]
+                    or entry.maximum_timestamp_ms != expected[-1]
+                    or entry.row_count != len(expected)
+                    or entry.maximum_gap_ms != expected_gap
+                ):
+                    raise ValueError("alpha_max_feature_root_funding_coverage_incomplete")
             if (
-                ordered[0][1].minimum_timestamp_ms > _epoch_ms(start) + _FUNDING_INTERVAL_MS
-                or ordered[-1][1].maximum_timestamp_ms < _epoch_ms(end) - _FUNDING_INTERVAL_MS
+                sum(entry.row_count for _, entry in ordered) != len(expected_all)
+                or ordered[0][1].minimum_timestamp_ms != expected_all[0]
+                or ordered[-1][1].maximum_timestamp_ms != expected_all[-1]
                 or any(
-                    right.minimum_timestamp_ms - left.maximum_timestamp_ms
-                    > _FUNDING_INTERVAL_MS + _FEATURE_CAUSAL_EDGE_MS
+                    right.minimum_timestamp_ms - left.maximum_timestamp_ms != interval_ms
                     for (_, left), (_, right) in pairwise(ordered)
                 )
             ):
                 raise ValueError("alpha_max_feature_root_funding_coverage_incomplete")
         return
 
-    expected_months: list[datetime] = []
-    cursor = start.replace(day=1)
-    while cursor < end:
-        expected_months.append(cursor)
-        cursor = (
-            cursor.replace(year=cursor.year + 1, month=1)
-            if cursor.month == 12
-            else cursor.replace(month=cursor.month + 1)
-        )
-    for values in observed.values():
+    for symbol, values in observed.items():
+        expected_months: list[datetime] = []
+        coverage_start = max(start, availability_start_by_symbol[symbol])
+        coverage_end = min(end, availability_end_by_symbol[symbol])
+        if coverage_start < coverage_end:
+            cursor = coverage_start.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            while cursor < coverage_end:
+                expected_months.append(cursor)
+                cursor = (
+                    cursor.replace(year=cursor.year + 1, month=1)
+                    if cursor.month == 12
+                    else cursor.replace(month=cursor.month + 1)
+                )
         ordered = tuple(sorted(values, key=lambda value: value[0]))
         if tuple(partition for partition, _ in ordered) != tuple(expected_months):
             raise ValueError("alpha_max_raw_root_interval_coverage_incomplete")
+        if not ordered:
+            continue
+        coverage_start_ms = _epoch_ms(coverage_start)
+        coverage_end_ms = _epoch_ms(coverage_end)
+        if (
+            coverage_start_ms % _RAW_INTERVAL_MS
+            or coverage_end_ms % _RAW_INTERVAL_MS
+            or coverage_start_ms >= coverage_end_ms
+        ):
+            raise ValueError("alpha_max_raw_root_owned_interval_alignment_invalid")
+        for partition_start, entry in ordered:
+            partition_end = (
+                partition_start.replace(year=partition_start.year + 1, month=1)
+                if partition_start.month == 12
+                else partition_start.replace(month=partition_start.month + 1)
+            )
+            owned_start_ms = _epoch_ms(max(coverage_start, partition_start))
+            owned_end_ms = _epoch_ms(min(coverage_end, partition_end))
+            expected_rows = (owned_end_ms - owned_start_ms) // _RAW_INTERVAL_MS
+            expected_gap = _RAW_INTERVAL_MS if expected_rows > 1 else 0
+            if (
+                entry.minimum_timestamp_ms != owned_start_ms
+                or entry.maximum_timestamp_ms != owned_end_ms - _RAW_INTERVAL_MS
+                or entry.row_count != expected_rows
+                or entry.maximum_gap_ms != expected_gap
+            ):
+                raise ValueError("alpha_max_raw_root_exact_1s_coverage_incomplete")
+        expected_total = (coverage_end_ms - coverage_start_ms) // _RAW_INTERVAL_MS
+        if (
+            sum(entry.row_count for _, entry in ordered) != expected_total
+            or ordered[0][1].minimum_timestamp_ms != coverage_start_ms
+            or ordered[-1][1].maximum_timestamp_ms != coverage_end_ms - _RAW_INTERVAL_MS
+            or any(
+                right.minimum_timestamp_ms - left.maximum_timestamp_ms != _RAW_INTERVAL_MS
+                for (_, left), (_, right) in pairwise(ordered)
+            )
+        ):
+            raise ValueError("alpha_max_raw_root_exact_1s_coverage_incomplete")
 
 
 def _alpha_max_parquet_timestamp_bounds(
@@ -3324,10 +3584,17 @@ def _alpha_max_parquet_timestamp_bounds(
             schema = pl.read_parquet_schema(parquet_file)
             parquet_file.seek(0)
             columns = [column]
-            if root_kind == "feature":
-                if "funding_rate" not in schema:
+            if root_kind == "raw":
+                if any(
+                    value not in schema or not schema[value].is_numeric()
+                    for value in _RAW_OHLCV_COLUMNS
+                ):
+                    raise ValueError("alpha_max_raw_root_ohlcv_schema_invalid")
+                columns.extend(_RAW_OHLCV_COLUMNS)
+            else:
+                if "funding_rate" not in schema or "source_timestamp_ms" not in schema:
                     raise ValueError("alpha_max_feature_root_funding_column_missing")
-                columns.append("funding_rate")
+                columns.extend(("source_timestamp_ms", "funding_rate"))
             columns.extend(value for value in ("symbol", "exchange") if value in schema)
             frame = pl.read_parquet(parquet_file, columns=columns)
     except ValueError:
@@ -3351,6 +3618,31 @@ def _alpha_max_parquet_timestamp_bounds(
     minimum = series.min()
     maximum = series.max()
     if root_kind == "raw":
+        normalized_ohlcv = frame.select(
+            pl.col(value).cast(pl.Float64).alias(value) for value in _RAW_OHLCV_COLUMNS
+        )
+        if any(
+            values.null_count() or not bool(values.is_finite().all())
+            for values in (normalized_ohlcv.get_column(value) for value in _RAW_OHLCV_COLUMNS)
+        ):
+            raise ValueError("alpha_max_raw_root_ohlcv_value_invalid")
+        if any(
+            bool((normalized_ohlcv.get_column(value) <= 0.0).any())
+            for value in ("open", "high", "low", "close")
+        ):
+            raise ValueError("alpha_max_raw_root_ohlc_nonpositive")
+        if bool((normalized_ohlcv.get_column("volume") < 0.0).any()):
+            raise ValueError("alpha_max_raw_root_volume_negative")
+        if not normalized_ohlcv.filter(
+            (pl.col("high") < pl.col("open"))
+            | (pl.col("high") < pl.col("close"))
+            | (pl.col("low") > pl.col("open"))
+            | (pl.col("low") > pl.col("close"))
+            | (pl.col("high") < pl.col("low"))
+        ).is_empty():
+            raise ValueError("alpha_max_raw_root_ohlcv_relation_invalid")
+        if bool((series.dt.nanosecond() != 0).fill_null(False).any()):
+            raise ValueError("alpha_max_raw_root_timestamp_subsecond_invalid")
         if type(minimum) is not datetime or type(maximum) is not datetime:
             raise ValueError("alpha_max_raw_root_timestamp_schema_invalid")
         if minimum.tzinfo is None:
@@ -3368,6 +3660,10 @@ def _alpha_max_parquet_timestamp_bounds(
         timestamp_series = series
     if minimum_ms < 0 or maximum_ms < minimum_ms:
         raise ValueError("alpha_max_root_timestamp_bounds_invalid")
+    if minimum_ms < owned_start_ms:
+        raise ValueError("alpha_max_root_content_before_availability")
+    if maximum_ms >= owned_end_ms:
+        raise ValueError("alpha_max_root_content_after_availability")
     if timestamp_series.null_count() or timestamp_series.n_unique() != timestamp_series.len():
         raise ValueError("alpha_max_root_timestamp_duplicate_or_null")
     diffs = timestamp_series.diff().drop_nulls()
@@ -3375,11 +3671,58 @@ def _alpha_max_parquet_timestamp_bounds(
     minimum_gap_ms = 0 if diffs.is_empty() else int(diffs.min())
     if timestamp_series.len() > 1 and minimum_gap_ms <= 0:
         raise ValueError("alpha_max_root_timestamp_not_strictly_increasing")
-    if root_kind == "raw" and any(int(value) % 1000 != 0 for value in timestamp_series):
-        raise ValueError("alpha_max_raw_root_timestamp_alignment_invalid")
-    if root_kind == "feature" and maximum_gap_ms > _FUNDING_INTERVAL_MS + _FEATURE_CAUSAL_EDGE_MS:
-        raise ValueError("alpha_max_feature_root_timestamp_cadence_invalid")
-    if root_kind == "feature":
+    if root_kind == "raw":
+        expected_rows = (owned_end_ms - owned_start_ms) // _RAW_INTERVAL_MS
+        expected_gap = _RAW_INTERVAL_MS if expected_rows > 1 else 0
+        if (
+            owned_start_ms % _RAW_INTERVAL_MS
+            or owned_end_ms % _RAW_INTERVAL_MS
+            or owned_start_ms >= owned_end_ms
+            or any(int(value) % _RAW_INTERVAL_MS != 0 for value in timestamp_series)
+            or minimum_ms != owned_start_ms
+            or maximum_ms != owned_end_ms - _RAW_INTERVAL_MS
+            or timestamp_series.len() != expected_rows
+            or minimum_gap_ms != expected_gap
+            or maximum_gap_ms != expected_gap
+        ):
+            raise ValueError("alpha_max_raw_root_exact_1s_coverage_incomplete")
+    else:
+        interval_ms = _alpha_max_funding_interval_ms(expected_symbol)
+        expected_timestamps = _alpha_max_expected_grid_timestamps(
+            owned_start_ms,
+            owned_end_ms,
+            interval_ms,
+        )
+        if (
+            not expected_timestamps
+            or tuple(int(value) for value in timestamp_series) != expected_timestamps
+            or minimum_gap_ms != (interval_ms if len(expected_timestamps) > 1 else 0)
+            or maximum_gap_ms != (interval_ms if len(expected_timestamps) > 1 else 0)
+        ):
+            raise ValueError("alpha_max_feature_root_funding_canonical_coverage_invalid")
+        source_timestamps = frame.get_column("source_timestamp_ms")
+        if not source_timestamps.dtype.is_integer():
+            raise ValueError("alpha_max_feature_root_source_timestamp_schema_invalid")
+        if (
+            source_timestamps.null_count()
+            or source_timestamps.n_unique() != source_timestamps.len()
+        ):
+            raise ValueError("alpha_max_feature_root_source_timestamp_duplicate_or_null")
+        source_values = tuple(int(value) for value in source_timestamps)
+        if any(
+            not owned_start_ms <= source < owned_end_ms
+            or source - settlement < 0
+            or source - settlement > _FUNDING_SOURCE_MAX_JITTER_MS
+            for source, settlement in zip(
+                source_values,
+                expected_timestamps,
+                strict=True,
+            )
+        ):
+            raise ValueError("alpha_max_feature_root_source_timestamp_jitter_invalid")
+        source_diffs = source_timestamps.diff().drop_nulls()
+        if not source_diffs.is_empty() and int(source_diffs.min()) <= 0:
+            raise ValueError("alpha_max_feature_root_source_timestamp_not_increasing")
         funding = frame.get_column("funding_rate")
         rates = funding.to_list()
         if any(type(rate) not in {int, float} or not math.isfinite(float(rate)) for rate in rates):
@@ -3554,6 +3897,9 @@ class AlphaMaxRootReceipt:
     symbols: tuple[str, ...]
     start_utc: datetime
     end_utc: datetime
+    availability_start_by_symbol: Mapping[str, datetime]
+    availability_end_by_symbol: Mapping[str, datetime]
+    availability_sha256: str
     inventory_sha256: str
     content_sha256: str
     file_count: int
@@ -3574,6 +3920,27 @@ class AlphaMaxRootReceipt:
             raise ValueError("alpha_max_root_receipt_bounds_invalid")
         object.__setattr__(self, "start_utc", start)
         object.__setattr__(self, "end_utc", end)
+        availability_start = _alpha_max_availability_boundary_by_symbol(
+            self.availability_start_by_symbol,
+            field="root_receipt_availability_start_by_symbol",
+        )
+        availability_end = _alpha_max_availability_boundary_by_symbol(
+            self.availability_end_by_symbol,
+            field="root_receipt_availability_end_by_symbol",
+        )
+        if any(
+            availability_start[symbol] >= availability_end[symbol]
+            for symbol in ALPHA_MAX_CANDIDATE_SYMBOLS
+        ):
+            raise ValueError("alpha_max_root_receipt_availability_bounds_invalid")
+        object.__setattr__(self, "availability_start_by_symbol", availability_start)
+        object.__setattr__(self, "availability_end_by_symbol", availability_end)
+        expected_availability_sha256 = _alpha_max_availability_sha256(
+            availability_start,
+            availability_end,
+        )
+        if self.availability_sha256 != expected_availability_sha256:
+            raise ValueError("alpha_max_root_receipt_availability_sha256_mismatch")
         object.__setattr__(
             self,
             "path",
@@ -3595,11 +3962,18 @@ class AlphaMaxRootReceipt:
                 field="alpha_max_root_receipt_content_sha256",
             ),
         )
-        if type(self.file_count) is not int or self.file_count <= 0:
+        if type(self.file_count) is not int or self.file_count < 0:
             raise ValueError("alpha_max_root_receipt_file_count_invalid")
 
     def to_payload(self) -> dict[str, Any]:
         return {
+            "availability_sha256": self.availability_sha256,
+            "availability_end_by_symbol": _alpha_max_availability_boundary_payload(
+                self.availability_end_by_symbol
+            ),
+            "availability_start_by_symbol": _alpha_max_availability_boundary_payload(
+                self.availability_start_by_symbol
+            ),
             "content_sha256": self.content_sha256,
             "end_utc": self.end_utc.isoformat().replace("+00:00", "Z"),
             "exchange": self.exchange,
@@ -3624,6 +3998,9 @@ class AlphaMaxRootSeal:
     symbols: tuple[str, ...]
     start_utc: datetime
     end_utc: datetime
+    availability_start_by_symbol: Mapping[str, datetime]
+    availability_end_by_symbol: Mapping[str, datetime]
+    availability_sha256: str
     entries: tuple[AlphaMaxTreeEntry, ...]
     inventory_sha256: str
     content_sha256: str
@@ -3648,9 +4025,29 @@ class AlphaMaxRootSeal:
             field="alpha_max_root_seal_path",
         )
         object.__setattr__(self, "path", canonical_path)
+        availability_start = _alpha_max_availability_boundary_by_symbol(
+            self.availability_start_by_symbol,
+            field="root_seal_availability_start_by_symbol",
+        )
+        availability_end = _alpha_max_availability_boundary_by_symbol(
+            self.availability_end_by_symbol,
+            field="root_seal_availability_end_by_symbol",
+        )
+        if any(
+            availability_start[symbol] >= availability_end[symbol]
+            for symbol in ALPHA_MAX_CANDIDATE_SYMBOLS
+        ):
+            raise ValueError("alpha_max_root_seal_availability_bounds_invalid")
+        object.__setattr__(self, "availability_start_by_symbol", availability_start)
+        object.__setattr__(self, "availability_end_by_symbol", availability_end)
+        expected_availability_sha256 = _alpha_max_availability_sha256(
+            availability_start,
+            availability_end,
+        )
+        if self.availability_sha256 != expected_availability_sha256:
+            raise ValueError("alpha_max_root_seal_availability_sha256_mismatch")
         if (
             type(self.entries) is not tuple
-            or not self.entries
             or any(type(value) is not AlphaMaxTreeEntry for value in self.entries)
             or tuple(sorted(self.entries, key=lambda value: value.relative_path)) != self.entries
             or len({value.relative_path for value in self.entries}) != len(self.entries)
@@ -3659,11 +4056,13 @@ class AlphaMaxRootSeal:
         root_start_ms = _epoch_ms(expected_start)
         root_end_ms = _epoch_ms(expected_end)
         for entry in self.entries:
-            _, partition_start, partition_end = _alpha_max_partition_contract(
+            symbol, partition_start, partition_end = _alpha_max_partition_contract(
                 entry.relative_path,
                 root_kind=self.root_kind,
                 exchange=self.exchange,
             )
+            availability_start_ms = _epoch_ms(availability_start[symbol])
+            availability_end_ms = _epoch_ms(availability_end[symbol])
             if not (
                 _epoch_ms(partition_start)
                 <= entry.minimum_timestamp_ms
@@ -3673,8 +4072,10 @@ class AlphaMaxRootSeal:
                 <= entry.minimum_timestamp_ms
                 <= entry.maximum_timestamp_ms
                 < root_end_ms
+                and entry.minimum_timestamp_ms >= availability_start_ms
+                and entry.maximum_timestamp_ms < availability_end_ms
             ):
-                raise ValueError("alpha_max_root_seal_partition_content_mismatch")
+                raise ValueError("alpha_max_root_seal_partition_or_availability_content_mismatch")
         _alpha_max_validate_root_inventory_coverage(
             self.entries,
             root_kind=self.root_kind,
@@ -3682,6 +4083,8 @@ class AlphaMaxRootSeal:
             start=expected_start,
             end=expected_end,
             expected_symbols=self.symbols,
+            availability_start_by_symbol=availability_start,
+            availability_end_by_symbol=availability_end,
         )
         inventory_payload = [
             {
@@ -3713,7 +4116,14 @@ class AlphaMaxRootSeal:
         if self.inventory_sha256 != expected_inventory or self.content_sha256 != expected_content:
             raise ValueError("alpha_max_root_seal_digest_mismatch")
         payload = {
-            "artifact_kind": "alpha_max_root_seal.v1",
+            "artifact_kind": "alpha_max_root_seal.v2",
+            "availability_sha256": expected_availability_sha256,
+            "availability_end_by_symbol": _alpha_max_availability_boundary_payload(
+                availability_end
+            ),
+            "availability_start_by_symbol": _alpha_max_availability_boundary_payload(
+                availability_start
+            ),
             "content_sha256": expected_content,
             "end_utc": expected_end.isoformat().replace("+00:00", "Z"),
             "entries": [entry.to_payload() for entry in self.entries],
@@ -3746,6 +4156,9 @@ class AlphaMaxRootSeal:
             symbols=self.symbols,
             start_utc=self.start_utc,
             end_utc=self.end_utc,
+            availability_start_by_symbol=self.availability_start_by_symbol,
+            availability_end_by_symbol=self.availability_end_by_symbol,
+            availability_sha256=self.availability_sha256,
             inventory_sha256=self.inventory_sha256,
             content_sha256=self.content_sha256,
             file_count=len(self.entries),
@@ -3759,6 +4172,8 @@ def seal_alpha_max_root_tree(
     *,
     exchange: str = "binance",
     expected_symbols: tuple[str, ...] = ALPHA_MAX_CANDIDATE_SYMBOLS,
+    availability_start_by_symbol: Mapping[str, datetime],
+    availability_end_by_symbol: Mapping[str, datetime],
 ) -> AlphaMaxRootSeal:
     """Stream-hash one explicit root through an immutable opened-directory capability."""
     if root_id not in _ROOT_INTERVALS:
@@ -3771,6 +4186,14 @@ def seal_alpha_max_root_tree(
         raise ValueError("alpha_max_root_expected_symbols_invalid")
     canonical = _require_explicit_canonical_path(root_path, field="alpha_max_root_path")
     start, end = _ROOT_INTERVALS[root_id]
+    availability_start, availability_end = _alpha_max_root_availability_contract(
+        availability_start_by_symbol,
+        availability_end_by_symbol,
+    )
+    availability_sha256 = _alpha_max_availability_sha256(
+        availability_start,
+        availability_end,
+    )
     root_start_ms = _epoch_ms(start)
     root_end_ms = _epoch_ms(end)
 
@@ -3822,8 +4245,16 @@ def seal_alpha_max_root_tree(
                 root_kind=root_kind,
                 exchange=exchange,
             )
-            owned_partition_start = max(start, partition_start)
-            owned_partition_end = min(end, partition_end)
+            symbol_availability_start = availability_start[symbol]
+            symbol_availability_end = availability_end[symbol]
+            if partition_end <= symbol_availability_start:
+                raise ValueError("alpha_max_root_partition_before_availability")
+            if partition_start >= symbol_availability_end:
+                raise ValueError("alpha_max_root_partition_after_availability")
+            owned_partition_start = max(start, symbol_availability_start, partition_start)
+            owned_partition_end = min(end, symbol_availability_end, partition_end)
+            if owned_partition_start >= owned_partition_end:
+                raise ValueError("alpha_max_root_partition_outside_owned_availability")
             try:
                 file_fd = os.open(name, file_flags, dir_fd=directory_fd)
             except OSError as exc:
@@ -3858,6 +4289,10 @@ def seal_alpha_max_root_tree(
                 raise ValueError("alpha_max_root_partition_content_mismatch")
             if not (root_start_ms <= minimum_timestamp_ms <= maximum_timestamp_ms < root_end_ms):
                 raise ValueError("alpha_max_root_content_outside_interval")
+            if minimum_timestamp_ms < _epoch_ms(symbol_availability_start):
+                raise ValueError("alpha_max_root_content_before_availability")
+            if maximum_timestamp_ms >= _epoch_ms(symbol_availability_end):
+                raise ValueError("alpha_max_root_content_after_availability")
             entries.append(
                 AlphaMaxTreeEntry(
                     relative_path=relative,
@@ -3895,8 +4330,6 @@ def seal_alpha_max_root_tree(
         for descriptor in reversed(opened_chain):
             os.close(descriptor)
     ordered = tuple(sorted(entries, key=lambda entry: entry.relative_path))
-    if not ordered:
-        raise ValueError("alpha_max_root_inventory_empty")
     _alpha_max_validate_root_inventory_coverage(
         ordered,
         root_kind=root_kind,
@@ -3904,6 +4337,8 @@ def seal_alpha_max_root_tree(
         start=start,
         end=end,
         expected_symbols=ALPHA_MAX_CANDIDATE_SYMBOLS,
+        availability_start_by_symbol=availability_start,
+        availability_end_by_symbol=availability_end,
     )
     inventory_payload = [
         {
@@ -3933,7 +4368,12 @@ def seal_alpha_max_root_tree(
     inventory_sha256 = _sha256_bytes(_canonical_json_bytes(inventory_payload, newline=True))
     content_sha256 = _sha256_bytes(_canonical_json_bytes(content_payload, newline=True))
     payload = {
-        "artifact_kind": "alpha_max_root_seal.v1",
+        "artifact_kind": "alpha_max_root_seal.v2",
+        "availability_sha256": availability_sha256,
+        "availability_end_by_symbol": _alpha_max_availability_boundary_payload(availability_end),
+        "availability_start_by_symbol": _alpha_max_availability_boundary_payload(
+            availability_start
+        ),
         "content_sha256": content_sha256,
         "end_utc": end.isoformat().replace("+00:00", "Z"),
         "entries": [entry.to_payload() for entry in ordered],
@@ -3955,6 +4395,9 @@ def seal_alpha_max_root_tree(
         symbols=ALPHA_MAX_CANDIDATE_SYMBOLS,
         start_utc=start,
         end_utc=end,
+        availability_start_by_symbol=availability_start,
+        availability_end_by_symbol=availability_end,
+        availability_sha256=availability_sha256,
         entries=ordered,
         inventory_sha256=inventory_sha256,
         content_sha256=content_sha256,
@@ -3974,10 +4417,59 @@ class AlphaMaxContractRecord:
     settle_asset: str
     volume_unit: str
     contract_multiplier: float
+    raw_availability_start_utc: datetime
+    raw_availability_end_utc: datetime
+    feature_availability_start_utc: datetime
+    feature_availability_end_utc: datetime
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "raw_availability_start_utc",
+            _utc(
+                self.raw_availability_start_utc,
+                field=f"contract_manifest_{self.symbol.lower()}_raw_availability_start",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "raw_availability_end_utc",
+            _utc(
+                self.raw_availability_end_utc,
+                field=f"contract_manifest_{self.symbol.lower()}_raw_availability_end",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "feature_availability_start_utc",
+            _utc(
+                self.feature_availability_start_utc,
+                field=f"contract_manifest_{self.symbol.lower()}_feature_availability_start",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "feature_availability_end_utc",
+            _utc(
+                self.feature_availability_end_utc,
+                field=f"contract_manifest_{self.symbol.lower()}_feature_availability_end",
+            ),
+        )
+        if (
+            self.raw_availability_start_utc >= self.raw_availability_end_utc
+            or self.feature_availability_start_utc >= self.feature_availability_end_utc
+        ):
+            raise ValueError("alpha_max_contract_record_availability_bounds_invalid")
 
     def to_payload(self) -> dict[str, Any]:
         return {
             "contract_multiplier": self.contract_multiplier,
+            "feature_availability_end_utc": self.feature_availability_end_utc.isoformat().replace(
+                "+00:00", "Z"
+            ),
+            "feature_availability_start_utc": self.feature_availability_start_utc.isoformat().replace(
+                "+00:00", "Z"
+            ),
             "inverse": self.inverse,
             "linear": self.linear,
             "margin_asset": self.margin_asset,
@@ -3985,6 +4477,12 @@ class AlphaMaxContractRecord:
             "quote_asset": self.quote_asset,
             "settle_asset": self.settle_asset,
             "symbol": self.symbol,
+            "raw_availability_end_utc": self.raw_availability_end_utc.isoformat().replace(
+                "+00:00", "Z"
+            ),
+            "raw_availability_start_utc": self.raw_availability_start_utc.isoformat().replace(
+                "+00:00", "Z"
+            ),
             "volume_unit": self.volume_unit,
         }
 
@@ -3993,9 +4491,54 @@ class AlphaMaxContractRecord:
 class AlphaMaxContractManifestSeal:
     path: str
     records: tuple[AlphaMaxContractRecord, ...]
+    raw_availability_start_by_symbol: Mapping[str, datetime]
+    raw_availability_end_by_symbol: Mapping[str, datetime]
+    feature_availability_start_by_symbol: Mapping[str, datetime]
+    feature_availability_end_by_symbol: Mapping[str, datetime]
     byte_count: int
     canonical_bytes: bytes
     sha256: str
+
+    def __post_init__(self) -> None:
+        raw_availability = _alpha_max_availability_boundary_by_symbol(
+            self.raw_availability_start_by_symbol,
+            field="contract_manifest_raw_availability_start_by_symbol",
+        )
+        feature_availability = _alpha_max_availability_boundary_by_symbol(
+            self.feature_availability_start_by_symbol,
+            field="contract_manifest_feature_availability_start_by_symbol",
+        )
+        raw_availability_end = _alpha_max_availability_boundary_by_symbol(
+            self.raw_availability_end_by_symbol,
+            field="contract_manifest_raw_availability_end_by_symbol",
+        )
+        feature_availability_end = _alpha_max_availability_boundary_by_symbol(
+            self.feature_availability_end_by_symbol,
+            field="contract_manifest_feature_availability_end_by_symbol",
+        )
+        expected_raw = MappingProxyType(
+            {record.symbol: record.raw_availability_start_utc for record in self.records}
+        )
+        expected_feature = MappingProxyType(
+            {record.symbol: record.feature_availability_start_utc for record in self.records}
+        )
+        expected_raw_end = MappingProxyType(
+            {record.symbol: record.raw_availability_end_utc for record in self.records}
+        )
+        expected_feature_end = MappingProxyType(
+            {record.symbol: record.feature_availability_end_utc for record in self.records}
+        )
+        if (
+            dict(raw_availability) != dict(expected_raw)
+            or dict(feature_availability) != dict(expected_feature)
+            or dict(raw_availability_end) != dict(expected_raw_end)
+            or dict(feature_availability_end) != dict(expected_feature_end)
+        ):
+            raise ValueError("alpha_max_contract_manifest_availability_mismatch")
+        object.__setattr__(self, "raw_availability_start_by_symbol", raw_availability)
+        object.__setattr__(self, "raw_availability_end_by_symbol", raw_availability_end)
+        object.__setattr__(self, "feature_availability_start_by_symbol", feature_availability)
+        object.__setattr__(self, "feature_availability_end_by_symbol", feature_availability_end)
 
     def to_payload(self) -> dict[str, Any]:
         return json.loads(self.canonical_bytes)
@@ -4012,6 +4555,10 @@ def _alpha_max_expected_contract_record(symbol: str) -> AlphaMaxContractRecord:
         settle_asset="USDT",
         volume_unit="base_asset",
         contract_multiplier=1.0,
+        raw_availability_start_utc=_ALPHA_MAX_RAW_AVAILABILITY_START_BY_SYMBOL[symbol],
+        raw_availability_end_utc=_ALPHA_MAX_RAW_AVAILABILITY_END_BY_SYMBOL[symbol],
+        feature_availability_start_utc=_ALPHA_MAX_FEATURE_AVAILABILITY_START_BY_SYMBOL[symbol],
+        feature_availability_end_utc=_ALPHA_MAX_FEATURE_AVAILABILITY_END_BY_SYMBOL[symbol],
     )
 
 
@@ -4032,7 +4579,7 @@ def seal_alpha_max_contract_manifest(
     expected = {
         "exchange": "binance",
         "records": [record.to_payload() for record in expected_records],
-        "schema_version": "alpha_max_contract_manifest.v1",
+        "schema_version": "alpha_max_contract_manifest.v2",
     }
     if payload != expected:
         raise ValueError("alpha_max_contract_manifest_mismatch")
@@ -4044,6 +4591,18 @@ def seal_alpha_max_contract_manifest(
     return AlphaMaxContractManifestSeal(
         path=receipt.canonical_path,
         records=expected_records,
+        raw_availability_start_by_symbol=MappingProxyType(
+            {record.symbol: record.raw_availability_start_utc for record in expected_records}
+        ),
+        raw_availability_end_by_symbol=MappingProxyType(
+            {record.symbol: record.raw_availability_end_utc for record in expected_records}
+        ),
+        feature_availability_start_by_symbol=MappingProxyType(
+            {record.symbol: record.feature_availability_start_utc for record in expected_records}
+        ),
+        feature_availability_end_by_symbol=MappingProxyType(
+            {record.symbol: record.feature_availability_end_utc for record in expected_records}
+        ),
         byte_count=receipt.byte_count,
         canonical_bytes=canonical,
         sha256=receipt.sha256,
@@ -9229,7 +9788,7 @@ def alpha_max_terminal_outcome(
     champion_historical_complete: bool | None,
     champion_historical_passed: bool | None,
 ) -> str:
-    """Return the singular first-match Revision 5.14 terminal outcome."""
+    """Return the singular first-match Revision 5.15 terminal outcome."""
     if prelock_champion is None:
         return "no_demonstrated_alpha"
     _alpha_max_nonempty_token(prelock_champion, field="terminal_prelock_champion")

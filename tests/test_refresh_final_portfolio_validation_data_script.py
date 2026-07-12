@@ -88,6 +88,7 @@ def test_refresh_symbol_raw_first_ohlcv_derives_from_stored_raw_aggtrades(
             (1, 100.0, 0.1, 1_735_689_600_000, False),
             (2, 101.0, 0.2, 1_735_689_600_500, True),
             (3, 102.0, 0.3, 1_735_689_601_500, False),
+            (4, 999.0, 0.4, 1_735_689_602_500, False),
         ]
     )
 
@@ -137,6 +138,124 @@ def test_refresh_symbol_raw_first_ohlcv_derives_from_stored_raw_aggtrades(
     assert result.stage_timings_seconds["total_refresh"] >= 0.0
     assert result.live_raw_rows_upserted == 0
     assert result.derived_ohlcv_rows_upserted >= 2
+
+
+def test_refresh_archive_includes_final_second_and_seals_inclusive_cutoff(
+    tmp_path: Path, monkeypatch
+) -> None:
+    repo = ParquetMarketDataRepository(str(tmp_path))
+    cutoff_dt = MODULE.parse_utc("2025-01-01T23:59:59.999Z")
+    floor_dt = MODULE.parse_utc("2025-01-01T23:59:58Z")
+    assert cutoff_dt is not None
+    assert floor_dt is not None
+    cutoff_ms = int(cutoff_dt.timestamp() * 1000)
+
+    archive_zip = _build_archive_zip(
+        [
+            (1, 100.0, 0.1, cutoff_ms - 1_499, False),
+            (2, 101.0, 0.2, cutoff_ms, True),
+        ]
+    )
+    monkeypatch.setattr(MODULE, "_download_zip_bytes", lambda *args, **kwargs: archive_zip)
+    monkeypatch.setattr(
+        MODULE, "_binance_archive_url", lambda *args, **kwargs: "https://example.test"
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "_collect_live_raw_rows",
+        lambda **kwargs: pytest.fail("inclusive archive cutoff must not leak into live tail"),
+    )
+
+    result = MODULE.refresh_symbol_raw_first_ohlcv(
+        repo=repo,
+        symbol="BTC/USDT",
+        db_path=str(tmp_path),
+        exchange_id="binance",
+        cutoff_dt=cutoff_dt,
+        floor_dt=floor_dt,
+        guard=None,
+    )
+
+    raw = repo.load_raw_aggtrades(
+        exchange="binance",
+        symbol="BTC/USDT",
+        start_date=floor_dt,
+        end_date=cutoff_dt,
+    )
+    ohlcv = repo.load_ohlcv(
+        exchange="binance",
+        symbol="BTC/USDT",
+        timeframe="1s",
+        start_date=floor_dt,
+        end_date=cutoff_dt,
+    )
+    checkpoint = repo.read_raw_checkpoint(exchange="binance", symbol="BTC/USDT")
+
+    assert raw.get_column("timestamp_ms").to_list() == [cutoff_ms - 1_499, cutoff_ms]
+    assert ohlcv.get_column("datetime").dt.strftime("%H:%M:%S").to_list() == [
+        "23:59:58",
+        "23:59:59",
+    ]
+    assert result.after_ohlcv_max_utc == "2025-01-01T23:59:59Z"
+    assert result.live_tail_status == "not_needed"
+    assert checkpoint["last_timestamp_ms"] == cutoff_ms
+    assert checkpoint["observed_until_ms"] == cutoff_ms
+
+
+def test_refresh_bootstrap_day_carries_prior_close_across_the_next_utc_left_edge(
+    tmp_path: Path, monkeypatch
+) -> None:
+    repo = ParquetMarketDataRepository(str(tmp_path))
+    floor_dt = MODULE.parse_utc("2024-12-31T23:59:59Z")
+    cutoff_dt = MODULE.parse_utc("2025-01-01T00:00:03.999Z")
+    assert floor_dt is not None
+    assert cutoff_dt is not None
+    prior_day_trade_ms = int(floor_dt.timestamp() * 1000) + 500
+    next_day_trade_ms = int(cutoff_dt.timestamp() * 1000)
+    archives = {
+        "2024-12-31": _build_archive_zip([(1, 100.0, 0.1, prior_day_trade_ms, False)]),
+        "2025-01-01": _build_archive_zip([(2, 101.0, 0.2, next_day_trade_ms, True)]),
+    }
+
+    def _download(url: str, **_kwargs) -> bytes:
+        day_token = next(day for day in archives if day in url)
+        return archives[day_token]
+
+    monkeypatch.setattr(MODULE, "_download_zip_bytes", _download)
+    monkeypatch.setattr(
+        MODULE,
+        "_collect_live_raw_rows",
+        lambda **kwargs: pytest.fail("complete archive cutoff must not use live tail"),
+    )
+
+    result = MODULE.refresh_symbol_raw_first_ohlcv(
+        repo=repo,
+        symbol="BTC/USDT",
+        db_path=str(tmp_path),
+        exchange_id="binance",
+        cutoff_dt=cutoff_dt,
+        floor_dt=floor_dt,
+        guard=None,
+    )
+
+    ohlcv = repo.load_ohlcv(
+        exchange="binance",
+        symbol="BTC/USDT",
+        timeframe="1s",
+        start_date=floor_dt,
+        end_date=cutoff_dt,
+    )
+
+    assert ohlcv.get_column("datetime").dt.strftime("%Y-%m-%dT%H:%M:%S").to_list() == [
+        "2024-12-31T23:59:59",
+        "2025-01-01T00:00:00",
+        "2025-01-01T00:00:01",
+        "2025-01-01T00:00:02",
+        "2025-01-01T00:00:03",
+    ]
+    assert ohlcv.get_column("close").to_list() == [100.0, 100.0, 100.0, 100.0, 101.0]
+    assert ohlcv.get_column("volume").to_list() == [0.1, 0.0, 0.0, 0.0, 0.2]
+    assert result.after_ohlcv_max_utc == "2025-01-01T00:00:03Z"
 
 
 def test_refresh_symbol_raw_first_ohlcv_repairs_raw_ahead_of_ohlcv_gap(

@@ -35,8 +35,10 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 PRELOCK_PATH = REPO_ROOT / "scripts/research/run_alpha_max_prelock.py"
 HISTORICAL_PATH = REPO_ROOT / "scripts/research/run_alpha_max_historical_evaluation.py"
 PROCESS_FIXTURE_PATH = REPO_ROOT / "tests/research/_alpha_max_cli_process_fixture.py"
-CONFIG_PATH = REPO_ROOT / "configs/research/alpha_max_portfolio_20260710.json"
-CONTRACT_PATH = REPO_ROOT / "configs/research/alpha_max_contract_manifest_20260710.json"
+CONFIG_PATH = REPO_ROOT / "configs/research/alpha_max_portfolio_20260711_listing_aware.json"
+CONTRACT_PATH = (
+    REPO_ROOT / "configs/research/alpha_max_contract_manifest_20260711_listing_aware.json"
+)
 PRELOCK_OPTIONS = {
     "--config",
     "--contract-manifest",
@@ -719,6 +721,10 @@ def _run_physical_schedule_child(temp_root: Path) -> None:
     prelock.mkdir()
     marker = b"prelock-read-only\n"
     (prelock / "marker").write_bytes(marker)
+    contract_manifest_bytes = CONTRACT_PATH.read_bytes()
+    contract_manifest_path = prelock / "inputs/contract_manifest.json"
+    contract_manifest_path.parent.mkdir()
+    contract_manifest_path.write_bytes(contract_manifest_bytes)
     output = (temp_root / "historical-output").resolve()
     duplicate_output = (temp_root / "historical-output-duplicate").resolve()
     snapshot = SimpleNamespace(root_path=str(prelock))
@@ -757,6 +763,7 @@ def _run_physical_schedule_child(temp_root: Path) -> None:
         return {
             "roots/feature/embargo.json": embargo_bytes,
             "run/prelock_result.json": prelock_payload,
+            "inputs/contract_manifest.json": contract_manifest_bytes,
             "inputs/prior_trial_inventory.json": b"{}\n",
             "admission/train.json": b"{}\n",
             "admission/train_computation.json": admission_computation_bytes,

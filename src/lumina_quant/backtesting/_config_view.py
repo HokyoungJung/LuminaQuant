@@ -137,6 +137,16 @@ class BacktestConfigView:
         self.MARKET_DATA_EXCHANGE = str(st.market_data_exchange)
         self.POSTGRES_DSN = str(st.postgres_dsn)
         self.POSTGRES_DSN_ENV = str(st.postgres_dsn_env)
+        self.WAL_MAX_BYTES = int(st.wal_max_bytes)
+        self.WAL_COMPACT_ON_THRESHOLD = bool(st.wal_compact_on_threshold)
+        self.WAL_COMPACTION_INTERVAL_SECONDS = int(st.wal_compaction_interval_seconds)
+        self.COLLECTOR_PERIODIC_ENABLED = bool(st.collector_periodic_enabled)
+        self.COLLECTOR_POLL_SECONDS = int(st.collector_poll_seconds)
+        self.COLLECTOR_BOOTSTRAP_LOOKBACK_HOURS = int(st.collector_bootstrap_lookback_hours)
+        self.MATERIALIZER_PERIODIC_ENABLED = bool(st.materializer_periodic_enabled)
+        self.MATERIALIZER_POLL_SECONDS = int(st.materializer_poll_seconds)
+        self.MATERIALIZER_BASE_TIMEFRAME = str(st.materializer_base_timeframe)
+        self.MATERIALIZER_REQUIRED_TIMEFRAMES = list(st.materializer_required_timeframes)
 
         # Backtest
         self.START_DATE = bt.start_date

@@ -230,6 +230,7 @@ def test_ordered_lookup_reads_actual_adjacent_parquet_roots_causally(tmp_path):
         pl.DataFrame(
             {
                 "timestamp_ms": [timestamp_ms],
+                "source_timestamp_ms": [timestamp_ms + 500],
                 "funding_rate": [rate],
             }
         ).write_parquet(directory / "part-0.parquet")
@@ -242,12 +243,12 @@ def test_ordered_lookup_reads_actual_adjacent_parquet_roots_causally(tmp_path):
         "BTCUSDT",
         "funding_rate",
         timestamp_ms=boundary_ms,
-    ) == FeaturePoint(0.0001, boundary_ms - 1)
+    ) == FeaturePoint(0.0001, boundary_ms + 499, boundary_ms - 1)
     assert lookup.get_latest_point(
         "BTCUSDT",
         "funding_rate",
         timestamp_ms=boundary_ms + 1,
-    ) == FeaturePoint(0.0002, boundary_ms + 1)
+    ) == FeaturePoint(0.0002, boundary_ms + 501, boundary_ms + 1)
 
 
 def test_ordered_lookup_rejects_field_query_bound_stale_future_owned_and_tie_poison(
@@ -273,6 +274,18 @@ def test_ordered_lookup_rejects_field_query_bound_stale_future_owned_and_tie_poi
         specs[1].path: {"BTCUSDT": FeaturePoint(0.1, query_ms + 1)}
     }
     with pytest.raises(ValueError, match="future"):
+        lookup.get_latest_point("BTCUSDT", "funding_rate", timestamp_ms=query_ms)
+
+    _FakeFeatureLookup.points_by_path = {
+        specs[1].path: {
+            "BTCUSDT": FeaturePoint(
+                0.1,
+                query_ms + evidence._FUNDING_SOURCE_MAX_JITTER_MS + 1,
+                query_ms,
+            )
+        }
+    }
+    with pytest.raises(ValueError, match="source_timestamp_invalid"):
         lookup.get_latest_point("BTCUSDT", "funding_rate", timestamp_ms=query_ms)
 
     _FakeFeatureLookup.points_by_path = {
@@ -651,6 +664,27 @@ def test_funding_resolver_enforces_exact_bound_accessor_and_causal_points(monkey
             latest_datetime=latest + timedelta(hours=8),
             raw_point_accessor=lambda *args, **kwargs: None,
         )
+
+
+def test_funding_resolver_preserves_official_source_jitter_in_committed_ledger(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    resolver, _, handler, boundary_ms, admitted = _resolver_fixture(monkeypatch, tmp_path)
+    _FakeFeatureLookup.points_by_path[resolver.ordered_lookup.current_root.path][admitted[0]] = (
+        FeaturePoint(0.001, boundary_ms + 500, boundary_ms)
+    )
+    latest = datetime.fromtimestamp((boundary_ms + 1000) / 1000, UTC)
+
+    committed = resolver.resolve_batch(
+        (AlphaMaxFundingBoundaryRequest(admitted[0], boundary_ms, 2.0, latest),),
+        raw_point_accessor=handler.get_latest_raw_point,
+        execution_model=_execution_model(),
+    )
+
+    assert committed[0].rate_source_timestamp_ms == boundary_ms + 500
+    carried = resolver.carry_forward()
+    assert carried.ledger == committed
 
 
 def test_funding_resolver_batch_is_atomic_and_ledger_rows_are_immutable(monkeypatch, tmp_path):

@@ -50,10 +50,15 @@ FEATURE_POINT_MAX_STALE_MS: Final[int] = 8 * 60 * 60 * 1000
 
 @dataclass(frozen=True, slots=True)
 class FeaturePoint:
-    """Latest feature value with provenance timestamp."""
+    """Latest feature value with canonical and official-source timestamps."""
 
     value: float
     source_timestamp_ms: int
+    canonical_timestamp_ms: int | None = None
+
+    def __post_init__(self) -> None:
+        if self.canonical_timestamp_ms is None:
+            object.__setattr__(self, "canonical_timestamp_ms", self.source_timestamp_ms)
 
 
 @dataclass(frozen=True, slots=True)
@@ -97,6 +102,7 @@ class _FeatureCache:
     timestamps_ms: list[int]
     columns: dict[str, list[float | None]]
     raw_columns: dict[str, list[float | None]]
+    canonical_timestamps_ms: dict[str, list[int | None]]
     source_timestamps_ms: dict[str, list[int | None]]
 
 
@@ -177,9 +183,10 @@ class FeaturePointLookup:
         if value is None:
             return None
         source_timestamp = cache.source_timestamps_ms.get(token, [None])[idx]
-        if source_timestamp is None:
+        canonical_timestamp = cache.canonical_timestamps_ms.get(token, [None])[idx]
+        if source_timestamp is None or canonical_timestamp is None:
             return None
-        if int(timestamp_ms) - int(source_timestamp) > FEATURE_POINT_MAX_STALE_MS:
+        if int(timestamp_ms) - int(canonical_timestamp) > FEATURE_POINT_MAX_STALE_MS:
             return None
         try:
             parsed = float(value)
@@ -187,7 +194,11 @@ class FeaturePointLookup:
             return None
         if not math.isfinite(parsed):
             return None
-        return FeaturePoint(value=parsed, source_timestamp_ms=int(source_timestamp))
+        return FeaturePoint(
+            value=parsed,
+            source_timestamp_ms=int(source_timestamp),
+            canonical_timestamp_ms=int(canonical_timestamp),
+        )
 
     def sum_between(
         self,
@@ -260,6 +271,7 @@ class FeaturePointLookup:
                 timestamps_ms=[],
                 columns=empty,
                 raw_columns=dict(empty),
+                canonical_timestamps_ms=dict(empty),
                 source_timestamps_ms=dict(empty),
             )
 
@@ -272,15 +284,24 @@ class FeaturePointLookup:
                 timestamps_ms=[],
                 columns=empty,
                 raw_columns=dict(empty),
+                canonical_timestamps_ms=dict(empty),
                 source_timestamps_ms=dict(empty),
             )
 
         for field in FEATURE_COLUMNS:
             if field not in cleaned.columns:
                 cleaned = cleaned.with_columns(pl.lit(None, dtype=pl.Float64).alias(field))
+        if "source_timestamp_ms" not in cleaned.columns:
+            cleaned = cleaned.with_columns(
+                pl.lit(None, dtype=pl.Int64).alias("source_timestamp_ms")
+            )
+        else:
+            cleaned = cleaned.with_columns(
+                pl.col("source_timestamp_ms").cast(pl.Int64, strict=False)
+            )
 
         cleaned = (
-            cleaned.select(["timestamp_ms", *FEATURE_COLUMNS])
+            cleaned.select(["timestamp_ms", "source_timestamp_ms", *FEATURE_COLUMNS])
             .sort("timestamp_ms")
             .unique(
                 subset=["timestamp_ms"],
@@ -294,6 +315,7 @@ class FeaturePointLookup:
             ]
             for field in FEATURE_COLUMNS
         }
+        canonical_cols = [f"__{field}_canonical_timestamp_ms" for field in FEATURE_COLUMNS]
         source_cols = [f"__{field}_source_timestamp_ms" for field in FEATURE_COLUMNS]
         value_cols = [f"__{field}_ffill" for field in FEATURE_COLUMNS]
         bounded = cleaned.with_columns(
@@ -301,6 +323,15 @@ class FeaturePointLookup:
                 *[
                     pl.when(pl.col(field).is_not_null())
                     .then(pl.col("timestamp_ms"))
+                    .otherwise(None)
+                    .cast(pl.Int64)
+                    .forward_fill()
+                    .alias(canonical_col)
+                    for field, canonical_col in zip(FEATURE_COLUMNS, canonical_cols, strict=True)
+                ],
+                *[
+                    pl.when(pl.col(field).is_not_null())
+                    .then(pl.coalesce("source_timestamp_ms", "timestamp_ms"))
                     .otherwise(None)
                     .cast(pl.Int64)
                     .forward_fill()
@@ -315,15 +346,18 @@ class FeaturePointLookup:
         ).with_columns(
             [
                 pl.when(
-                    pl.col(source_col).is_not_null()
-                    & ((pl.col("timestamp_ms") - pl.col(source_col)) <= FEATURE_POINT_MAX_STALE_MS)
+                    pl.col(canonical_col).is_not_null()
+                    & (
+                        (pl.col("timestamp_ms") - pl.col(canonical_col))
+                        <= FEATURE_POINT_MAX_STALE_MS
+                    )
                 )
                 .then(pl.col(value_col))
                 .otherwise(None)
                 .alias(field)
-                for field, source_col, value_col in zip(
+                for field, canonical_col, value_col in zip(
                     FEATURE_COLUMNS,
-                    source_cols,
+                    canonical_cols,
                     value_cols,
                     strict=True,
                 )
@@ -338,6 +372,13 @@ class FeaturePointLookup:
             ]
             for field in FEATURE_COLUMNS
         }
+        canonical_timestamps_ms = {
+            field: [
+                int(value) if value is not None else None
+                for value in bounded.get_column(canonical_col).to_list()
+            ]
+            for field, canonical_col in zip(FEATURE_COLUMNS, canonical_cols, strict=True)
+        }
         source_timestamps_ms = {
             field: [
                 int(value) if value is not None else None
@@ -349,6 +390,7 @@ class FeaturePointLookup:
             timestamps_ms=timestamps_ms,
             columns=columns,
             raw_columns=raw_columns,
+            canonical_timestamps_ms=canonical_timestamps_ms,
             source_timestamps_ms=source_timestamps_ms,
         )
 

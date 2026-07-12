@@ -29,7 +29,9 @@ from lumina_quant.research.alpha_max_engine_runner import (
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-CONFIG_PATH = (REPO_ROOT / "configs/research/alpha_max_portfolio_20260710.json").resolve()
+CONFIG_PATH = (
+    REPO_ROOT / "configs/research/alpha_max_portfolio_20260711_listing_aware.json"
+).resolve()
 ADMITTED_SYMBOLS = ALPHA_MAX_CANDIDATE_SYMBOLS[:5]
 
 
@@ -122,7 +124,9 @@ def test_u40_every_lq_prefix_is_rejected_and_relative_path_is_not_an_override(
         AlphaMaxRuntimeContractError,
         match="alpha_max_config_path_not_explicit_canonical",
     ):
-        preflight_alpha_max_runtime_contract("configs/research/alpha_max_portfolio_20260710.json")
+        preflight_alpha_max_runtime_contract(
+            "configs/research/alpha_max_portfolio_20260711_listing_aware.json"
+        )
 
 
 def test_u40_yaml_profile_and_default_runtime_poison_are_never_loaded(

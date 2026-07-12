@@ -140,7 +140,7 @@ def _date_from_ms(timestamp_ms: int) -> date:
 def _day_bounds_ms(day_value: date) -> tuple[int, int]:
     day_start = datetime(day_value.year, day_value.month, day_value.day, tzinfo=UTC)
     start_ms = int(day_start.timestamp() * 1000)
-    end_ms = start_ms + 86_399_000
+    end_ms = start_ms + 86_400_000 - 1
     return start_ms, end_ms
 
 
@@ -753,6 +753,13 @@ def _merge_feature_point(
     row.update(fields)
 
 
+def _optional_float_field(value: Any) -> float | None:
+    """Parse an optional numeric API field without treating an empty string as data."""
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return None
+    return float(value)
+
+
 def _fetch_funding_history(
     *,
     symbol: str,
@@ -1010,12 +1017,9 @@ def sync_futures_feature_points(
                 ts = int(row.get("fundingTime", 0) or 0)
                 if ts <= 0:
                     continue
-                funding_rate = (
-                    float(row.get("fundingRate")) if row.get("fundingRate") is not None else None
-                )
-                funding_mark_price = (
-                    float(row.get("markPrice")) if row.get("markPrice") is not None else None
-                )
+                raw_funding_rate = row.get("fundingRate")
+                funding_rate = float(raw_funding_rate) if raw_funding_rate is not None else None
+                funding_mark_price = _optional_float_field(row.get("markPrice"))
                 _merge_feature_point(
                     points,
                     ts,

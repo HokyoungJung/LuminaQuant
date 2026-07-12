@@ -444,7 +444,8 @@ def test_real_alpha_max_config_bypasses_runtime_config_attribute_probes(
     )
 
     config_path = (
-        Path(__file__).resolve().parents[2] / "configs/research/alpha_max_portfolio_20260710.json"
+        Path(__file__).resolve().parents[2]
+        / "configs/research/alpha_max_portfolio_20260711_listing_aware.json"
     ).resolve()
     preflight = preflight_alpha_max_runtime_contract(config_path)
     config = build_alpha_max_backtest_config(

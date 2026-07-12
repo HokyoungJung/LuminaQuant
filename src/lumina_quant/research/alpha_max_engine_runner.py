@@ -6,7 +6,7 @@ checks, indicator-only warmup, raw-first cell replay, matrix status accounting,
 and the two physical CLI bundles all stay here so that the pure evidence module
 never needs to construct or mutate a backtest.
 
-The experiment config is a sealed Revision 5.14 artifact.  No profile, ambient
+The experiment config is a sealed Revision 5.15 artifact.  No profile, ambient
 ``LQ_*`` value, default runtime config, YAML file, or merge layer participates in
 construction.
 """
@@ -168,13 +168,13 @@ ALPHA_MAX_RUNTIME_CONTRACT_SHA256: Final[str] = (
     "b3859443c842cf8b04d04ed32923e6c6a8207af18e26f68a717ba623b4edfef9"
 )
 ALPHA_MAX_CONFIG_PAYLOAD_SHA256: Final[str] = (
-    "b53c2274624fe4bc017ead59975efc805d166038f841773337bb48d55ee9692d"
+    "b062e3805d94087cc18cd22634918815503f94dd73f8fa8ac1979e7aef535f85"
 )
 ALPHA_MAX_CONFIG_CANONICAL_SHA256: Final[str] = (
-    "85ab64360d77265441d2eeaaa7a41a4df12589667bccdfec75b62572bfcf5e62"
+    "691bf756519be1984ebb331142dce1b8787783d8da1d3e9911fbdd8d7d0d4ac3"
 )
 ALPHA_MAX_CONFIG_FILE_SHA256: Final[str] = (
-    "34f1ea894b0af984d4f76348f52fbca09fab45b9e3d5d963f257ec9d128ee356"
+    "2f267451c4df6b6b7471d972b7756327e41c82522ae2ef4b9198fbf6aa8b5e9c"
 )
 ALPHA_MAX_INCUMBENT_RESOLUTION_AUDIT_SHA256: Final[str] = (
     "5133bc40116399fe7af32e75a1ecc52a4f385dc8a0b5d3a4a9585e2437615ed8"
@@ -1544,8 +1544,12 @@ def _validate_runtime_contract(config: dict[str, Any]) -> dict[str, Any]:
     _require_exact(
         config.get("schema_version"), "alpha_max_portfolio_experiment.v1", field="schema"
     )
-    _require_exact(config.get("experiment_id"), "alpha_max_portfolio_20260710", field="experiment")
-    _require_exact(config.get("revision"), "5.14", field="revision")
+    _require_exact(
+        config.get("experiment_id"),
+        "alpha_max_portfolio_20260711_listing_aware",
+        field="experiment",
+    )
+    _require_exact(config.get("revision"), "5.15", field="revision")
     _require_exact(
         config.get("candidate_symbols"), list(ALPHA_MAX_CANDIDATE_SYMBOLS), field="symbols"
     )
@@ -1843,7 +1847,7 @@ register_alpha_max_backtest_config_type(AlphaMaxBacktestConfig)
 
 
 def alpha_max_common_rng_seed_payload(split_or_fold_id: str, nominal_cost_bps: int) -> bytes:
-    """Build the exact Revision 5.14 common-random-number seed payload."""
+    """Build the exact Revision 5.15 common-random-number seed payload."""
     if type(split_or_fold_id) is not str or not split_or_fold_id:
         raise AlphaMaxRuntimeContractError("alpha_max_seed_phase_id_invalid")
     if type(nominal_cost_bps) is not int or nominal_cost_bps not in ALPHA_MAX_COST_CELL_BPS:
@@ -2626,6 +2630,8 @@ def _validate_alpha_max_root_seals(
             "raw",
             retained.path,
             exchange=retained.exchange,
+            availability_start_by_symbol=retained.availability_start_by_symbol,
+            availability_end_by_symbol=retained.availability_end_by_symbol,
         )
         for retained in raw_root_seals
     )
@@ -2635,6 +2641,8 @@ def _validate_alpha_max_root_seals(
             "feature",
             retained.path,
             exchange=retained.exchange,
+            availability_start_by_symbol=retained.availability_start_by_symbol,
+            availability_end_by_symbol=retained.availability_end_by_symbol,
         )
         for retained in feature_root_seals
     )
@@ -4982,14 +4990,95 @@ def _validate_alpha_max_adjacent_feature_roots(
                 current_first.get(symbol, entry.minimum_timestamp_ms),
                 entry.minimum_timestamp_ms,
             )
+        predecessor_availability_start = getattr(
+            predecessor,
+            "availability_start_by_symbol",
+            None,
+        )
+        current_availability_start = getattr(current, "availability_start_by_symbol", None)
+        predecessor_availability_end = getattr(
+            predecessor,
+            "availability_end_by_symbol",
+            None,
+        )
+        current_availability_end = getattr(current, "availability_end_by_symbol", None)
         if (
-            tuple(sorted(predecessor_last)) != ALPHA_MAX_CANDIDATE_SYMBOLS
-            or tuple(sorted(current_first)) != ALPHA_MAX_CANDIDATE_SYMBOLS
-            or any(
-                not 0 < current_first[symbol] - predecessor_last[symbol] <= maximum_gap_ms
-                for symbol in ALPHA_MAX_CANDIDATE_SYMBOLS
-            )
+            predecessor_availability_start is None
+            or current_availability_start is None
+            or predecessor_availability_end is None
+            or current_availability_end is None
+            or predecessor_availability_start != current_availability_start
+            or predecessor_availability_end != current_availability_end
+            or tuple(predecessor_availability_start) != ALPHA_MAX_CANDIDATE_SYMBOLS
+            or tuple(predecessor_availability_end) != ALPHA_MAX_CANDIDATE_SYMBOLS
         ):
+            complete = False
+        else:
+            complete = True
+            predecessor_start_ms = int(predecessor.start_utc.timestamp() * 1000)
+            predecessor_end_ms = int(predecessor.end_utc.timestamp() * 1000)
+            current_start_ms = int(current.start_utc.timestamp() * 1000)
+            current_end_ms = int(current.end_utc.timestamp() * 1000)
+            for symbol in ALPHA_MAX_CANDIDATE_SYMBOLS:
+                availability_start = predecessor_availability_start[symbol]
+                availability_end = predecessor_availability_end[symbol]
+                if (
+                    not isinstance(availability_start, datetime)
+                    or availability_start.tzinfo != UTC
+                    or not isinstance(availability_end, datetime)
+                    or availability_end.tzinfo != UTC
+                    or availability_end <= availability_start
+                ):
+                    complete = False
+                    break
+                availability_start_ms = int(availability_start.timestamp() * 1000)
+                availability_end_ms = int(availability_end.timestamp() * 1000)
+                predecessor_owned_start_ms = max(
+                    predecessor_start_ms,
+                    availability_start_ms,
+                )
+                predecessor_owned_end_ms = min(
+                    predecessor_end_ms,
+                    availability_end_ms,
+                )
+                current_owned_start_ms = max(current_start_ms, availability_start_ms)
+                current_owned_end_ms = min(current_end_ms, availability_end_ms)
+                predecessor_active = predecessor_owned_start_ms < predecessor_owned_end_ms
+                current_active = current_owned_start_ms < current_owned_end_ms
+
+                if not predecessor_active and not current_active:
+                    if symbol in predecessor_last or symbol in current_first:
+                        complete = False
+                        break
+                    continue
+                if not predecessor_active:
+                    if (
+                        symbol in predecessor_last
+                        or symbol not in current_first
+                        or not 0 <= current_first[symbol] - current_owned_start_ms <= maximum_gap_ms
+                    ):
+                        complete = False
+                        break
+                    continue
+                if not current_active:
+                    if (
+                        symbol not in predecessor_last
+                        or symbol in current_first
+                        or not 0
+                        < predecessor_owned_end_ms - predecessor_last[symbol]
+                        <= maximum_gap_ms
+                    ):
+                        complete = False
+                        break
+                    continue
+                if (
+                    symbol not in predecessor_last
+                    or symbol not in current_first
+                    or not 0 < current_first[symbol] - predecessor_last[symbol] <= maximum_gap_ms
+                ):
+                    complete = False
+                    break
+        if not complete:
             raise AlphaMaxRuntimeContractError(
                 "alpha_max_adjacent_feature_root_funding_coverage_incomplete"
             )
@@ -6172,18 +6261,24 @@ def _alpha_max_root_validation(
     roots: Sequence[tuple[str, str, str]],
     *,
     exchange: str,
+    availability_start_by_kind: Mapping[str, Mapping[str, datetime]],
+    availability_end_by_kind: Mapping[str, Mapping[str, datetime]],
 ) -> tuple[dict[tuple[str, str], AlphaMaxRootSeal], tuple[str, ...]]:
     seals: dict[tuple[str, str], AlphaMaxRootSeal] = {}
     failures: list[str] = []
     for root_id, root_kind, root_path in roots:
         try:
+            availability_start_by_symbol = availability_start_by_kind[root_kind]
+            availability_end_by_symbol = availability_end_by_kind[root_kind]
             seals[(root_id, root_kind)] = seal_alpha_max_root_tree(
                 root_id,
                 root_kind,
                 root_path,
                 exchange=exchange,
+                availability_start_by_symbol=availability_start_by_symbol,
+                availability_end_by_symbol=availability_end_by_symbol,
             )
-        except (OSError, TypeError, ValueError) as exc:
+        except (KeyError, OSError, TypeError, ValueError) as exc:
             failures.append(_alpha_max_failure_reason(f"{root_id}_{root_kind}_root", exc))
     return seals, tuple(failures)
 
@@ -6306,7 +6401,22 @@ def run_alpha_max_prelock_process(
         ("embargo", "raw", embargo_raw_root),
         ("embargo", "feature", embargo_feature_root),
     )
-    root_seals, root_failures = _alpha_max_root_validation(roots, exchange=exchange)
+    if contract_seal is None:
+        root_seals = {}
+        root_failures = ("root_validation:contract_manifest_required",)
+    else:
+        root_seals, root_failures = _alpha_max_root_validation(
+            roots,
+            exchange=exchange,
+            availability_start_by_kind={
+                "feature": contract_seal.feature_availability_start_by_symbol,
+                "raw": contract_seal.raw_availability_start_by_symbol,
+            },
+            availability_end_by_kind={
+                "feature": contract_seal.feature_availability_end_by_symbol,
+                "raw": contract_seal.raw_availability_end_by_symbol,
+            },
+        )
     failures.extend(root_failures)
     required_feature_roots = {
         (root_id, "feature") for root_id in ("warmup", "train", "purge", "validation", "embargo")
@@ -7159,23 +7269,51 @@ def run_alpha_max_historical_process(
     if champion is not None and (type(champion) is not str or not champion):
         raise AlphaMaxRuntimeContractError("alpha_max_prelock_champion_invalid")
 
-    root_seals, failures = _alpha_max_root_validation(
+    failure_list: list[str] = []
+    contract_seal: AlphaMaxContractManifestSeal | None = None
+    try:
+        retained_contract_bytes = _read_alpha_max_prelock_artifact(
+            before,
+            "inputs/contract_manifest.json",
+        )
+        contract_seal = seal_alpha_max_contract_manifest(
+            Path(before.root_path) / "inputs/contract_manifest.json"
+        )
+        if contract_seal.canonical_bytes != retained_contract_bytes:
+            raise AlphaMaxRuntimeContractError("alpha_max_contract_manifest_snapshot_mismatch")
+    except (AlphaMaxRuntimeContractError, OSError, TypeError, ValueError) as exc:
+        failure_list.append(_alpha_max_failure_reason("contract_manifest", exc))
+
+    historical_roots = (
+        ("embargo", "feature", embargo_feature_root),
         (
-            ("embargo", "feature", embargo_feature_root),
-            (
-                "historical_exposed_evaluation",
-                "raw",
-                historical_evaluation_raw_root,
-            ),
-            (
-                "historical_exposed_evaluation",
-                "feature",
-                historical_evaluation_feature_root,
-            ),
+            "historical_exposed_evaluation",
+            "raw",
+            historical_evaluation_raw_root,
         ),
-        exchange=exchange,
+        (
+            "historical_exposed_evaluation",
+            "feature",
+            historical_evaluation_feature_root,
+        ),
     )
-    failure_list = list(failures)
+    if contract_seal is None:
+        root_seals: dict[tuple[str, str], AlphaMaxRootSeal] = {}
+        failure_list.append("root_validation:contract_manifest_required")
+    else:
+        root_seals, failures = _alpha_max_root_validation(
+            historical_roots,
+            exchange=exchange,
+            availability_start_by_kind={
+                "feature": contract_seal.feature_availability_start_by_symbol,
+                "raw": contract_seal.raw_availability_start_by_symbol,
+            },
+            availability_end_by_kind={
+                "feature": contract_seal.feature_availability_end_by_symbol,
+                "raw": contract_seal.raw_availability_end_by_symbol,
+            },
+        )
+        failure_list.extend(failures)
     if {
         ("embargo", "feature"),
         ("historical_exposed_evaluation", "feature"),

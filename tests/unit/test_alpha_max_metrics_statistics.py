@@ -41,7 +41,7 @@ from lumina_quant.research.alpha_max_evidence import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-CONFIG_PATH = REPO_ROOT / "configs/research/alpha_max_portfolio_20260710.json"
+CONFIG_PATH = REPO_ROOT / "configs/research/alpha_max_portfolio_20260711_listing_aware.json"
 PRIOR_FILE_SHA256 = "f2c86ae7bb9f9719143fa0b11e73c68ad021160aeac03a0aa5c6fa93636d57b6"
 PRIOR_KEY_SET_SHA256 = "3b078011040f89e8d788b2cef9214c58f687221104381e26a688a7f8cdbddd78"
 CURRENT_REGISTRY_SHA256 = "cfe3a04620c52cc235d6f1cda1cac617ba30cd7327c753fc2f620d8250d51a4e"

@@ -31,7 +31,9 @@ from lumina_quant.research.alpha_max_evidence import (
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-CONFIG_SOURCE = (REPO_ROOT / "configs/research/alpha_max_portfolio_20260710.json").resolve()
+CONFIG_SOURCE = (
+    REPO_ROOT / "configs/research/alpha_max_portfolio_20260711_listing_aware.json"
+).resolve()
 INCUMBENT_AUDIT_SOURCE = (REPO_ROOT / ".omx/plans/alpha-max-incumbent-resolution-v1.json").resolve()
 
 

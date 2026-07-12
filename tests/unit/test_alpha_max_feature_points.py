@@ -2,14 +2,54 @@ from __future__ import annotations
 
 from dataclasses import FrozenInstanceError
 
+import polars as pl
 import pytest
 
+import lumina_quant.data.feature_points as feature_points
 from lumina_quant.data.feature_points import (
     FEATURE_POINT_MAX_STALE_MS,
     FeaturePoint,
     FeaturePointLookup,
 )
 from lumina_quant.market_data import upsert_futures_feature_points_rows
+
+
+def test_feature_point_lookup_keeps_canonical_and_official_source_clocks_separate(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    canonical_ms = 1_700_000_000_000
+    next_ms = canonical_ms + 60_000
+    frame = pl.DataFrame(
+        {
+            "timestamp_ms": [canonical_ms, next_ms],
+            "source_timestamp_ms": [canonical_ms + 500, None],
+            "funding_rate": [0.0001, None],
+            "mark_price": [None, 50_000.0],
+        }
+    )
+    monkeypatch.setattr(
+        feature_points,
+        "load_futures_feature_points_from_db",
+        lambda *_args, **_kwargs: frame,
+    )
+    lookup = FeaturePointLookup(db_path=str(tmp_path / "features"), exchange="binance")
+
+    assert lookup.get_latest_point(
+        "BTC/USDT",
+        "funding_rate",
+        timestamp_ms=canonical_ms,
+    ) == FeaturePoint(0.0001, canonical_ms + 500, canonical_ms)
+    assert lookup.get_latest_point(
+        "BTC/USDT",
+        "funding_rate",
+        timestamp_ms=next_ms,
+    ) == FeaturePoint(0.0001, canonical_ms + 500, canonical_ms)
+    assert lookup.get_latest_point(
+        "BTC/USDT",
+        "mark_price",
+        timestamp_ms=next_ms,
+    ) == FeaturePoint(50_000.0, next_ms, next_ms)
 
 
 def test_feature_point_lookup_exposes_immutable_source_timestamp_and_scalar_parity(tmp_path):

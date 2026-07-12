@@ -5,6 +5,7 @@ import tempfile
 
 import pytest
 import yaml
+from lumina_quant.backtesting._config_view import BacktestConfigView
 from lumina_quant.configuration.loader import load_runtime_config
 from lumina_quant.configuration.validate import validate_runtime_config
 
@@ -61,6 +62,35 @@ def test_periodic_loop_config_defaults_and_env_override():
     assert runtime.storage.materializer_poll_seconds == 5
     assert runtime.storage.materializer_base_timeframe == "1s"
     assert runtime.storage.materializer_required_timeframes == ["1s", "5m", "1h"]
+
+
+def test_backtest_config_view_exposes_storage_loop_controls():
+    payload = _base_payload()
+    payload["storage"] = {
+        "wal_max_bytes": 123_456,
+        "wal_compact_on_threshold": False,
+        "wal_compaction_interval_seconds": 17,
+        "collector_periodic_enabled": False,
+        "collector_poll_seconds": 11,
+        "collector_bootstrap_lookback_hours": 48,
+        "materializer_periodic_enabled": False,
+        "materializer_poll_seconds": 13,
+        "materializer_base_timeframe": "1s",
+        "materializer_required_timeframes": ["1s", "5m", "1h"],
+    }
+
+    view = BacktestConfigView(_load_runtime(payload))
+
+    assert view.WAL_MAX_BYTES == 123_456
+    assert view.WAL_COMPACT_ON_THRESHOLD is False
+    assert view.WAL_COMPACTION_INTERVAL_SECONDS == 17
+    assert view.COLLECTOR_PERIODIC_ENABLED is False
+    assert view.COLLECTOR_POLL_SECONDS == 11
+    assert view.COLLECTOR_BOOTSTRAP_LOOKBACK_HOURS == 48
+    assert view.MATERIALIZER_PERIODIC_ENABLED is False
+    assert view.MATERIALIZER_POLL_SECONDS == 13
+    assert view.MATERIALIZER_BASE_TIMEFRAME == "1s"
+    assert view.MATERIALIZER_REQUIRED_TIMEFRAMES == ["1s", "5m", "1h"]
 
 
 @pytest.mark.parametrize(

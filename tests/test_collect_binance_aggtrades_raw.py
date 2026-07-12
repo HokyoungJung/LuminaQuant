@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import json
 import zipfile
+from datetime import date
 from types import SimpleNamespace
 
 import pytest
@@ -24,6 +25,14 @@ def _zip_csv(payload: str) -> bytes:
     with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as zf:
         zf.writestr("payload.csv", payload)
     return buffer.getvalue()
+
+
+def test_archive_day_bounds_include_the_final_millisecond() -> None:
+    start_ms, end_ms = data_sync._day_bounds_ms(date(2025, 1, 1))
+
+    assert start_ms == 1_735_689_600_000
+    assert end_ms == 1_735_775_999_999
+    assert end_ms - start_ms + 1 == 86_400_000
 
 
 def test_collect_binance_aggtrades_raw_checkpoint_resume(tmp_path, monkeypatch):

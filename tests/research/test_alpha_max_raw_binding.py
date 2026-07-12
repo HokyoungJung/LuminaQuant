@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from datetime import timedelta
 from pathlib import Path
+from types import MappingProxyType
 
 import polars as pl
 import pytest
@@ -17,27 +18,55 @@ from lumina_quant.research.alpha_max_evidence import (
 
 def _write_raw_root(root: Path, root_id: str = "purge") -> None:
     start, end = evidence._ROOT_INTERVALS[root_id]
+    timestamps = pl.datetime_range(
+        start,
+        end,
+        interval="1s",
+        closed="left",
+        time_zone="UTC",
+        eager=True,
+    )
+    row_count = len(timestamps)
     for symbol in ALPHA_MAX_CANDIDATE_SYMBOLS:
         target = root / "market_ohlcv_1s" / "binance" / symbol / f"{start:%Y-%m}.parquet"
         target.parent.mkdir(parents=True, exist_ok=True)
         pl.DataFrame(
             {
-                "datetime": [start + timedelta(seconds=7), end - timedelta(seconds=11)],
-                "symbol": [symbol, symbol],
-                "exchange": ["binance", "binance"],
-                "open": [99.0, 100.0],
-                "high": [101.0, 102.0],
-                "low": [98.0, 99.0],
-                "close": [100.0, 101.0],
-                "volume": [1.0, 2.0],
+                "datetime": timestamps,
+                "symbol": [symbol] * row_count,
+                "exchange": ["binance"] * row_count,
+                "open": [100.0] * row_count,
+                "high": [101.0] * row_count,
+                "low": [99.0] * row_count,
+                "close": [100.0] * row_count,
+                "volume": [1.0] * row_count,
             }
         ).write_parquet(target)
 
 
-def _sealed_raw_fixture(tmp_path: Path):
+def _sealed_raw_fixture(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    start = evidence._ROOT_INTERVALS["purge"][0]
+    monkeypatch.setitem(
+        evidence._ROOT_INTERVALS,
+        "purge",
+        (start, start + timedelta(seconds=20)),
+    )
     root = (tmp_path / "raw").resolve()
     _write_raw_root(root)
-    seal = seal_alpha_max_root_tree("purge", "raw", root)
+    seal = seal_alpha_max_root_tree(
+        "purge",
+        "raw",
+        root,
+        availability_start_by_symbol=MappingProxyType(
+            dict.fromkeys(ALPHA_MAX_CANDIDATE_SYMBOLS, evidence._ROOT_INTERVALS["warmup"][0])
+        ),
+        availability_end_by_symbol=MappingProxyType(
+            dict.fromkeys(
+                ALPHA_MAX_CANDIDATE_SYMBOLS,
+                evidence._ROOT_INTERVALS["historical_exposed_evaluation"][1],
+            )
+        ),
+    )
     entry = next(
         candidate
         for candidate in seal.entries
@@ -53,23 +82,32 @@ def _sealed_raw_fixture(tmp_path: Path):
 
 def _write_replacement(target: Path, *, close: float = 999.0) -> None:
     start, end = evidence._ROOT_INTERVALS["purge"]
+    timestamps = pl.datetime_range(
+        start,
+        end,
+        interval="1s",
+        closed="left",
+        time_zone="UTC",
+        eager=True,
+    )
+    row_count = len(timestamps)
     target.parent.mkdir(parents=True, exist_ok=True)
     pl.DataFrame(
         {
-            "datetime": [start + timedelta(seconds=7), end - timedelta(seconds=11)],
-            "symbol": ["BTCUSDT", "BTCUSDT"],
-            "exchange": ["binance", "binance"],
-            "open": [close, close],
-            "high": [close, close],
-            "low": [close, close],
-            "close": [close, close],
-            "volume": [1.0, 2.0],
+            "datetime": timestamps,
+            "symbol": ["BTCUSDT"] * row_count,
+            "exchange": ["binance"] * row_count,
+            "open": [close] * row_count,
+            "high": [close] * row_count,
+            "low": [close] * row_count,
+            "close": [close] * row_count,
+            "volume": [1.0] * row_count,
         }
     ).write_parquet(target)
 
 
 def test_raw_admission_reads_verified_bytes_without_path_scan(tmp_path, monkeypatch) -> None:
-    _root, seal, _entry, _target = _sealed_raw_fixture(tmp_path)
+    _root, seal, _entry, _target = _sealed_raw_fixture(tmp_path, monkeypatch)
 
     def forbid_path_scan(*_args, **_kwargs):
         raise AssertionError("path scan must not be used after sealing")
@@ -84,11 +122,11 @@ def test_raw_admission_reads_verified_bytes_without_path_scan(tmp_path, monkeypa
 
     assert daily == ()
     assert integrity is True
-    assert len(completed) == 2
+    assert len(completed) == 1
 
 
-def test_raw_admission_rejects_post_seal_content_replacement(tmp_path) -> None:
-    _root, seal, _entry, target = _sealed_raw_fixture(tmp_path)
+def test_raw_admission_rejects_post_seal_content_replacement(tmp_path, monkeypatch) -> None:
+    _root, seal, _entry, target = _sealed_raw_fixture(tmp_path, monkeypatch)
     replacement = target.with_name("replacement.parquet")
     _write_replacement(replacement)
     os.replace(replacement, target)
@@ -104,8 +142,8 @@ def test_raw_admission_rejects_post_seal_content_replacement(tmp_path) -> None:
         )
 
 
-def test_raw_admission_rejects_post_seal_symlink(tmp_path) -> None:
-    _root, seal, _entry, target = _sealed_raw_fixture(tmp_path)
+def test_raw_admission_rejects_post_seal_symlink(tmp_path, monkeypatch) -> None:
+    _root, seal, _entry, target = _sealed_raw_fixture(tmp_path, monkeypatch)
     original = target.with_name("original.parquet")
     target.rename(original)
     target.symlink_to(original.name)
@@ -121,8 +159,8 @@ def test_raw_admission_rejects_post_seal_symlink(tmp_path) -> None:
         )
 
 
-def test_raw_admission_rejects_post_seal_hardlink(tmp_path) -> None:
-    _root, seal, _entry, target = _sealed_raw_fixture(tmp_path)
+def test_raw_admission_rejects_post_seal_hardlink(tmp_path, monkeypatch) -> None:
+    _root, seal, _entry, target = _sealed_raw_fixture(tmp_path, monkeypatch)
     os.link(target, target.with_name("hardlink.parquet"))
 
     with pytest.raises(
@@ -136,8 +174,8 @@ def test_raw_admission_rejects_post_seal_hardlink(tmp_path) -> None:
         )
 
 
-def test_raw_admission_rejects_root_path_swap_before_binding(tmp_path) -> None:
-    root, seal, entry, _target = _sealed_raw_fixture(tmp_path)
+def test_raw_admission_rejects_root_path_swap_before_binding(tmp_path, monkeypatch) -> None:
+    root, seal, entry, _target = _sealed_raw_fixture(tmp_path, monkeypatch)
     original_root = tmp_path / "original-root"
     root.rename(original_root)
     _write_replacement(root / entry.relative_path)
@@ -153,8 +191,8 @@ def test_raw_admission_rejects_root_path_swap_before_binding(tmp_path) -> None:
         )
 
 
-def test_sealed_raw_reader_retains_original_root_across_path_swap(tmp_path) -> None:
-    root, seal, entry, _target = _sealed_raw_fixture(tmp_path)
+def test_sealed_raw_reader_retains_original_root_across_path_swap(tmp_path, monkeypatch) -> None:
+    root, seal, entry, _target = _sealed_raw_fixture(tmp_path, monkeypatch)
     reader = runner._AlphaMaxSealedRawReader(seal)
     original_root = tmp_path / "original-root"
     root.rename(original_root)
@@ -164,4 +202,4 @@ def test_sealed_raw_reader_retains_original_root_across_path_swap(tmp_path) -> N
     finally:
         reader.close()
 
-    assert frame.get_column("close").to_list() == [100.0, 101.0]
+    assert frame.get_column("close").to_list() == [100.0] * 20

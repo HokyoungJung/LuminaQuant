@@ -13,7 +13,13 @@ import pytest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-CONFIG_PATH = REPO_ROOT / "configs/research/alpha_max_portfolio_20260710.json"
+CONFIG_PATH = REPO_ROOT / "configs/research/alpha_max_portfolio_20260711_listing_aware.json"
+CONTRACT_MANIFEST_PATH = (
+    REPO_ROOT / "configs/research/alpha_max_contract_manifest_20260711_listing_aware.json"
+)
+AVAILABILITY_EVIDENCE_PATH = (
+    REPO_ROOT / "configs/research/alpha_max_official_availability_evidence_20260711.json"
+)
 PLAN_ROOT = REPO_ROOT / ".omx/plans"
 CURRENT_REGISTRY_PATH = PLAN_ROOT / "alpha-max-current-trial-nodes-v1.json"
 INCUMBENT_AUDIT_PATH = PLAN_ROOT / "alpha-max-incumbent-resolution-v1.json"
@@ -27,9 +33,9 @@ CURRENT_KEY_SET_SHA256 = "3a4791cf353abcb82f9717ce89ee16b9d73d84f431d5b058135046
 PRIOR_KEY_SET_ACTUAL_LF_SHA256 = "3b078011040f89e8d788b2cef9214c58f687221104381e26a688a7f8cdbddd78"
 INCUMBENT_AUDIT_SHA256 = "5133bc40116399fe7af32e75a1ecc52a4f385dc8a0b5d3a4a9585e2437615ed8"
 RUNTIME_CONTRACT_SHA256 = "b3859443c842cf8b04d04ed32923e6c6a8207af18e26f68a717ba623b4edfef9"
-CONFIG_PAYLOAD_SHA256 = "b53c2274624fe4bc017ead59975efc805d166038f841773337bb48d55ee9692d"
-CONFIG_CANONICAL_SHA256 = "85ab64360d77265441d2eeaaa7a41a4df12589667bccdfec75b62572bfcf5e62"
-CONFIG_FILE_SHA256 = "34f1ea894b0af984d4f76348f52fbca09fab45b9e3d5d963f257ec9d128ee356"
+CONFIG_PAYLOAD_SHA256 = "b062e3805d94087cc18cd22634918815503f94dd73f8fa8ac1979e7aef535f85"
+CONFIG_CANONICAL_SHA256 = "691bf756519be1984ebb331142dce1b8787783d8da1d3e9911fbdd8d7d0d4ac3"
+CONFIG_FILE_SHA256 = "2f267451c4df6b6b7471d972b7756327e41c82522ae2ef4b9198fbf6aa8b5e9c"
 
 CANDIDATE_SYMBOLS = [
     "ADAUSDT",
@@ -224,8 +230,8 @@ def test_config_schema_and_canonical_hash_are_frozen() -> None:
     config = _strict_load(CONFIG_PATH)
     _validate_declared_config_surface(config)
 
-    assert config["experiment_id"] == "alpha_max_portfolio_20260710"
-    assert config["revision"] == "5.14"
+    assert config["experiment_id"] == "alpha_max_portfolio_20260711_listing_aware"
+    assert config["revision"] == "5.15"
     assert _sha256(CONFIG_PATH.read_bytes()) == CONFIG_FILE_SHA256
     assert _sha256(_canonical_bytes(config)) == CONFIG_CANONICAL_SHA256
 
@@ -243,6 +249,7 @@ def test_normative_artifacts_and_embedded_values_match_exactly() -> None:
     config = _strict_load(CONFIG_PATH)
     normative = config["normative_sources"]
     expected_sources = {
+        "availability_source_evidence_sha256": AVAILABILITY_EVIDENCE_PATH,
         "architect_review_sha256": (
             PLAN_ROOT / "architect-review-alpha-max-independent-20260710-revision5.14.md"
         ),
@@ -258,6 +265,12 @@ def test_normative_artifacts_and_embedded_values_match_exactly() -> None:
     }
     for key, path in expected_sources.items():
         assert normative[key] == _sha256(path.read_bytes())
+    assert normative["availability_correction_plan_sha256"] == _sha256(
+        (PLAN_ROOT / "alpha-max-listing-aware-correction-20260711.md").read_bytes()
+    )
+    assert normative["availability_correction_test_spec_sha256"] == _sha256(
+        (PLAN_ROOT / "test-spec-alpha-max-listing-aware-correction-20260711.md").read_bytes()
+    )
 
     assert normative["baseline_commit"] == BASELINE_COMMIT
     assert normative["current_trial_key_set_sha256"] == CURRENT_KEY_SET_SHA256
@@ -309,21 +322,111 @@ def test_candidate_admission_calendars_and_native_contract_are_exact() -> None:
     )
 
     manifest = config["contract_manifest_contract"]
-    assert manifest["schema_version"] == "alpha_max_contract_manifest.v1"
+    assert manifest["schema_version"] == "alpha_max_contract_manifest.v2"
     assert manifest["exchange"] == "binance"
+    assert manifest["availability_interval_granularity"] == "exact_utc_millisecond"
+    assert manifest["availability_interval_semantics"] == (
+        "kind_specific_half_open_official_source_interval;root_observed_inference_forbidden"
+    )
     assert [record["symbol"] for record in manifest["records"]] == CANDIDATE_SYMBOLS
     for record in manifest["records"]:
         assert record == {
             "contract_multiplier": 1.0,
+            "feature_availability_end_utc": (
+                "2026-06-23T09:00:00Z" if record["symbol"] == "TONUSDT" else "2026-07-01T00:00:00Z"
+            ),
+            "feature_availability_start_utc": (
+                "2024-03-01T16:00:00Z" if record["symbol"] == "TONUSDT" else "2022-12-31T00:00:00Z"
+            ),
             "inverse": False,
             "linear": True,
             "margin_asset": "USDT",
             "market_type": "perpetual",
             "quote_asset": "USDT",
+            "raw_availability_end_utc": (
+                "2026-06-23T09:00:00Z" if record["symbol"] == "TONUSDT" else "2026-07-01T00:00:00Z"
+            ),
+            "raw_availability_start_utc": (
+                "2024-03-01T12:31:10Z" if record["symbol"] == "TONUSDT" else "2022-12-31T00:00:00Z"
+            ),
             "settle_asset": "USDT",
             "symbol": record["symbol"],
             "volume_unit": "base_asset",
         }
+
+    external_manifest = _strict_load(CONTRACT_MANIFEST_PATH)
+    embedded_manifest = {
+        "exchange": manifest["exchange"],
+        "records": manifest["records"],
+        "schema_version": manifest["schema_version"],
+    }
+    assert external_manifest == embedded_manifest
+    assert CONTRACT_MANIFEST_PATH.read_bytes() == _canonical_bytes(embedded_manifest) + b"\n"
+
+    evidence = _strict_load(AVAILABILITY_EVIDENCE_PATH)
+    ton_contract = next(
+        record for record in external_manifest["records"] if record["symbol"] == "TONUSDT"
+    )
+    for kind in ("raw", "feature"):
+        owned = evidence["owned_intervals"][kind]
+        assert _parse_utc(owned["start_utc"]) == _parse_utc(
+            ton_contract[f"{kind}_availability_start_utc"]
+        )
+        assert _parse_utc(owned["end_utc"]) == _parse_utc(
+            ton_contract[f"{kind}_availability_end_utc"]
+        )
+    assert evidence["owned_intervals"]["raw"]["start_utc"] == "2024-03-01T12:31:10Z"
+    assert evidence["owned_intervals"]["feature"]["start_utc"] == "2024-03-01T16:00:00Z"
+    assert evidence["tonusdt_funding"]["first"]["funding_time_utc"] == ("2024-03-01T08:00:00.000Z")
+    transition = evidence["tonusdt_funding"]["listing_transition"]
+    assert transition["official_onboard_time_utc"] == "2024-03-01T12:30:00.000Z"
+    assert transition["missing_nominal_settlement"] == {
+        "funding_time_ms": 1_709_294_400_000,
+        "funding_time_utc": "2024-03-01T12:00:00.000Z",
+        "present_in_official_response": False,
+        "synthesis_forbidden": True,
+    }
+    assert transition["first_post_onboard_continuous_point"]["funding_time_utc"] == (
+        "2024-03-01T16:00:00.000Z"
+    )
+    returned_times = {
+        row["funding_time_ms"] for row in transition["official_query_returned_points"]
+    }
+    assert 1_709_280_000_000 in returned_times
+    assert 1_709_294_400_000 not in returned_times
+    assert 1_709_308_800_000 in returned_times
+
+    funding = config["funding_sidecar_and_settlement"]
+    assert funding["sealed_parquet_contract"] == {
+        "canonical_settlement_collision_policy": "reject",
+        "canonical_settlement_timestamp_column": "timestamp_ms",
+        "canonical_settlement_timestamp_semantics": "utc_nominal_funding_grid_epoch_milliseconds",
+        "official_source_timestamp_column": "source_timestamp_ms",
+        "official_source_timestamp_semantics": (
+            "official_binance_fundingTime_utc_epoch_milliseconds"
+        ),
+        "required_columns": [
+            "timestamp_ms",
+            "source_timestamp_ms",
+            "exchange",
+            "symbol",
+            "funding_rate",
+        ],
+        "source_minus_settlement_jitter_milliseconds": {
+            "maximum_inclusive": 1000,
+            "minimum_inclusive": 0,
+        },
+        "timestamp_duplicate_policy": "reject",
+    }
+    expected_cadence = {
+        symbol: 14_400_000 if symbol == "TONUSDT" else 28_800_000 for symbol in CANDIDATE_SYMBOLS
+    }
+    assert funding["funding_cadence_milliseconds_by_symbol"] == expected_cadence
+    assert funding["eight_hour_resolver_admission"] == {
+        "cadence_milliseconds": 28_800_000,
+        "exact_cadence_required": True,
+        "tonusdt_forbidden": True,
+    }
 
     admission = config["admission"]
     assert admission["daily_quote_notional"]["day_count"] == 517

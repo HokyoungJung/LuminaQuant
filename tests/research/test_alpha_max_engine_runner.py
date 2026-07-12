@@ -53,7 +53,9 @@ from lumina_quant.strategies.artifact_portfolio_mode import ArtifactPortfolioMod
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-CONFIG_PATH = (REPO_ROOT / "configs/research/alpha_max_portfolio_20260710.json").resolve()
+CONFIG_PATH = (
+    REPO_ROOT / "configs/research/alpha_max_portfolio_20260711_listing_aware.json"
+).resolve()
 
 
 @pytest.fixture(autouse=True)
@@ -237,8 +239,20 @@ def test_production_physical_fold_schedules_are_exact() -> None:
 
 def test_adjacent_feature_root_gap_is_closed_across_split() -> None:
     boundary = datetime(2025, 1, 1, tzinfo=UTC)
+    availability_start = MappingProxyType(
+        dict.fromkeys(
+            alpha_max_runner.ALPHA_MAX_CANDIDATE_SYMBOLS,
+            boundary.replace(year=2024),
+        )
+    )
+    availability_end = MappingProxyType(
+        dict.fromkeys(
+            alpha_max_runner.ALPHA_MAX_CANDIDATE_SYMBOLS,
+            boundary.replace(year=2026),
+        )
+    )
 
-    def seal(root_id: str, *, first: int, last: int):
+    def seal(root_id: str, *, first: int, last: int, contracted: bool = True):
         entries = tuple(
             SimpleNamespace(
                 relative_path=f"symbol={symbol}/date=2025-01-01/part.parquet",
@@ -247,12 +261,34 @@ def test_adjacent_feature_root_gap_is_closed_across_split() -> None:
             )
             for symbol in alpha_max_runner.ALPHA_MAX_CANDIDATE_SYMBOLS
         )
-        return SimpleNamespace(
+        value = SimpleNamespace(
             root_id=root_id,
             exchange="binance",
             entries=entries,
             start_utc=boundary if root_id == "right" else boundary.replace(year=2024),
             end_utc=boundary.replace(year=2026) if root_id == "right" else boundary,
+        )
+        if contracted:
+            value.availability_start_by_symbol = availability_start
+            value.availability_end_by_symbol = availability_end
+        return value
+
+    uncontracted = {
+        ("left", "feature"): seal("left", first=1, last=10_000, contracted=False),
+        ("right", "feature"): seal(
+            "right",
+            first=10_000 + 28_801_000,
+            last=40_000_000,
+            contracted=False,
+        ),
+    }
+    with pytest.raises(
+        AlphaMaxRuntimeContractError,
+        match="adjacent_feature_root_funding_coverage_incomplete",
+    ):
+        alpha_max_runner._validate_alpha_max_adjacent_feature_roots(
+            uncontracted,
+            (("left", "right"),),
         )
 
     predecessor = seal("left", first=1, last=10_000)
@@ -271,6 +307,80 @@ def test_adjacent_feature_root_gap_is_closed_across_split() -> None:
         )
         for entry in current.entries
     )
+    with pytest.raises(
+        AlphaMaxRuntimeContractError,
+        match="adjacent_feature_root_funding_coverage_incomplete",
+    ):
+        alpha_max_runner._validate_alpha_max_adjacent_feature_roots(
+            seals,
+            (("left", "right"),),
+        )
+
+
+def test_adjacent_feature_roots_accept_only_a_fresh_declared_availability_end() -> None:
+    predecessor_start = datetime(2026, 6, 1, tzinfo=UTC)
+    boundary = datetime(2026, 6, 24, tzinfo=UTC)
+    current_end = datetime(2026, 7, 1, tzinfo=UTC)
+    ton_end = datetime(2026, 6, 23, 9, tzinfo=UTC)
+    ton_last_ms = int(datetime(2026, 6, 23, 8, tzinfo=UTC).timestamp() * 1000)
+    boundary_ms = int(boundary.timestamp() * 1000)
+    availability_start = {
+        symbol: (
+            datetime(2024, 3, 1, 16, tzinfo=UTC)
+            if symbol == "TONUSDT"
+            else datetime(2022, 12, 31, tzinfo=UTC)
+        )
+        for symbol in alpha_max_runner.ALPHA_MAX_CANDIDATE_SYMBOLS
+    }
+    availability_end = {
+        symbol: ton_end if symbol == "TONUSDT" else current_end
+        for symbol in alpha_max_runner.ALPHA_MAX_CANDIDATE_SYMBOLS
+    }
+
+    def entries(*, predecessor: bool, stale_ton: bool = False) -> tuple[SimpleNamespace, ...]:
+        rows: list[SimpleNamespace] = []
+        for symbol in alpha_max_runner.ALPHA_MAX_CANDIDATE_SYMBOLS:
+            if symbol == "TONUSDT" and not predecessor:
+                continue
+            timestamp_ms = (
+                ton_last_ms - (28_801_001 if stale_ton else 0)
+                if symbol == "TONUSDT"
+                else boundary_ms - 1
+                if predecessor
+                else boundary_ms
+            )
+            rows.append(
+                SimpleNamespace(
+                    relative_path=f"symbol={symbol}/date=2026-06-23/part.parquet",
+                    minimum_timestamp_ms=timestamp_ms,
+                    maximum_timestamp_ms=timestamp_ms,
+                )
+            )
+        return tuple(rows)
+
+    predecessor = SimpleNamespace(
+        exchange="binance",
+        entries=entries(predecessor=True),
+        start_utc=predecessor_start,
+        end_utc=boundary,
+        availability_start_by_symbol=availability_start,
+        availability_end_by_symbol=availability_end,
+    )
+    current = SimpleNamespace(
+        exchange="binance",
+        entries=entries(predecessor=False),
+        start_utc=boundary,
+        end_utc=current_end,
+        availability_start_by_symbol=availability_start,
+        availability_end_by_symbol=availability_end,
+    )
+    seals = {("left", "feature"): predecessor, ("right", "feature"): current}
+    alpha_max_runner._validate_alpha_max_adjacent_feature_roots(
+        seals,
+        (("left", "right"),),
+    )
+
+    predecessor.entries = entries(predecessor=True, stale_ton=True)
     with pytest.raises(
         AlphaMaxRuntimeContractError,
         match="adjacent_feature_root_funding_coverage_incomplete",

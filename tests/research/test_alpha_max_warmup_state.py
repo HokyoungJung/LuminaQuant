@@ -24,7 +24,7 @@ from lumina_quant.strategies.alpha_max_research_sleeves import (
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-CONFIG_PATH = REPO_ROOT / "configs/research/alpha_max_portfolio_20260710.json"
+CONFIG_PATH = REPO_ROOT / "configs/research/alpha_max_portfolio_20260711_listing_aware.json"
 
 
 class _Bars:

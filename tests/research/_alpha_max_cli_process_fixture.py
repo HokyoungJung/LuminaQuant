@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from contextlib import redirect_stderr
+from collections.abc import Callable, Mapping
+from contextlib import contextmanager, redirect_stderr
 from datetime import UTC, datetime, timedelta
 import hashlib
 import importlib.util
@@ -25,8 +25,12 @@ import lumina_quant.strategies.artifact_portfolio_mode as artifact_mode
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-CONFIG_PATH = (REPO_ROOT / "configs/research/alpha_max_portfolio_20260710.json").resolve()
-CONTRACT_PATH = (REPO_ROOT / "configs/research/alpha_max_contract_manifest_20260710.json").resolve()
+CONFIG_PATH = (
+    REPO_ROOT / "configs/research/alpha_max_portfolio_20260711_listing_aware.json"
+).resolve()
+CONTRACT_PATH = (
+    REPO_ROOT / "configs/research/alpha_max_contract_manifest_20260711_listing_aware.json"
+).resolve()
 PRELOCK_PATH = REPO_ROOT / "scripts/research/run_alpha_max_prelock.py"
 HISTORICAL_PATH = REPO_ROOT / "scripts/research/run_alpha_max_historical_evaluation.py"
 ROOT_IDS = (
@@ -38,6 +42,16 @@ ROOT_IDS = (
     "historical_exposed_evaluation",
 )
 PRELOCK_ROOT_IDS = ROOT_IDS[:-1]
+_PRODUCTION_ROOT_INTERVALS = MappingProxyType(dict(evidence._ROOT_INTERVALS))
+_FIXTURE_ROOT_INTERVALS = MappingProxyType(
+    {
+        root_id: (
+            datetime(2024, 3, 1, 16, tzinfo=UTC) + timedelta(hours=8 * index),
+            datetime(2024, 3, 1, 16, tzinfo=UTC) + timedelta(hours=8 * (index + 1)),
+        )
+        for index, root_id in enumerate(ROOT_IDS)
+    }
+)
 
 
 def _sha256(payload: bytes) -> str:
@@ -63,9 +77,23 @@ def _load(name: str, path: Path):
     return module
 
 
-def _write_sparse_raw_root(root: Path, root_id: str) -> None:
+@contextmanager
+def _root_interval_scope(
+    intervals: Mapping[str, tuple[datetime, datetime]],
+):
+    previous = dict(evidence._ROOT_INTERVALS)
+    evidence._ROOT_INTERVALS.clear()
+    evidence._ROOT_INTERVALS.update(intervals)
+    try:
+        yield
+    finally:
+        evidence._ROOT_INTERVALS.clear()
+        evidence._ROOT_INTERVALS.update(previous)
+
+
+def _write_raw_root(root: Path, root_id: str) -> None:
     start, end = evidence._ROOT_INTERVALS[root_id]
-    month = start.replace(day=1)
+    month = start.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     months: list[datetime] = []
     while month < end:
         months.append(month)
@@ -77,31 +105,53 @@ def _write_sparse_raw_root(root: Path, root_id: str) -> None:
     for symbol in evidence.ALPHA_MAX_CANDIDATE_SYMBOLS:
         directory = root / "market_ohlcv_1s" / "binance" / symbol
         directory.mkdir(parents=True, exist_ok=True)
+        availability_start = evidence._ALPHA_MAX_RAW_AVAILABILITY_START_BY_SYMBOL[symbol]
+        availability_end = evidence._ALPHA_MAX_RAW_AVAILABILITY_END_BY_SYMBOL[symbol]
         for partition_start in months:
             partition_end = (
                 partition_start.replace(year=partition_start.year + 1, month=1)
                 if partition_start.month == 12
                 else partition_start.replace(month=partition_start.month + 1)
             )
-            owned_start = max(start, partition_start)
-            owned_end = min(end, partition_end)
-            timestamps = [owned_start + timedelta(seconds=7), owned_end - timedelta(seconds=11)]
-            pl.DataFrame(
-                {
-                    "datetime": timestamps,
-                    "symbol": [symbol, symbol],
-                    "exchange": ["binance", "binance"],
-                    "close": [100.0, 101.0],
-                    "volume": [1.0, 2.0],
-                }
+            owned_start = max(start, availability_start, partition_start)
+            owned_end = min(end, availability_end, partition_end)
+            if owned_start >= owned_end:
+                continue
+            timestamps = pl.datetime_range(
+                owned_start,
+                owned_end - timedelta(seconds=1),
+                interval="1s",
+                eager=True,
+            )
+            pl.DataFrame({"datetime": timestamps}).with_columns(
+                pl.lit(symbol).alias("symbol"),
+                pl.lit("binance").alias("exchange"),
+                pl.lit(100.0).alias("open"),
+                pl.lit(101.0).alias("high"),
+                pl.lit(99.0).alias("low"),
+                pl.lit(100.0).alias("close"),
+                pl.lit(1.0).alias("volume"),
             ).write_parquet(directory / f"{partition_start:%Y-%m}.parquet")
 
 
 def _write_feature_root(root: Path, root_id: str) -> None:
     start, end = evidence._ROOT_INTERVALS[root_id]
-    day = start
+    day = start.replace(hour=0, minute=0, second=0, microsecond=0)
     while day < end:
+        day_end = day + timedelta(days=1)
         for symbol in evidence.ALPHA_MAX_CANDIDATE_SYMBOLS:
+            owned_start = max(
+                start,
+                evidence._ALPHA_MAX_FEATURE_AVAILABILITY_START_BY_SYMBOL[symbol],
+                day,
+            )
+            owned_end = min(
+                end,
+                evidence._ALPHA_MAX_FEATURE_AVAILABILITY_END_BY_SYMBOL[symbol],
+                day_end,
+            )
+            if owned_start >= owned_end:
+                continue
             directory = (
                 root
                 / "feature_points"
@@ -111,17 +161,23 @@ def _write_feature_root(root: Path, root_id: str) -> None:
             )
             directory.mkdir(parents=True, exist_ok=True)
             timestamps = [
-                int((day + timedelta(hours=hour)).timestamp() * 1000) for hour in (0, 8, 16)
+                int(boundary.timestamp() * 1000)
+                for hour in ((0, 4, 8, 12, 16, 20) if symbol == "TONUSDT" else (0, 8, 16))
+                for boundary in (day + timedelta(hours=hour),)
+                if owned_start <= boundary < owned_end
             ]
+            if not timestamps:
+                raise AssertionError("listing-aware feature fixture has no owned boundary")
             pl.DataFrame(
                 {
                     "timestamp_ms": timestamps,
-                    "funding_rate": [0.0001, -0.0002, 0.0003],
-                    "symbol": [symbol] * 3,
-                    "exchange": ["binance"] * 3,
+                    "source_timestamp_ms": [value + 500 for value in timestamps],
+                    "funding_rate": [0.0001, -0.0002, 0.0003][: len(timestamps)],
+                    "symbol": [symbol] * len(timestamps),
+                    "exchange": ["binance"] * len(timestamps),
                 }
             ).write_parquet(directory / "part-0.parquet")
-        day += timedelta(days=1)
+        day = day_end
 
 
 def _snapshot_bytes(root: Path) -> dict[str, bytes]:
@@ -178,6 +234,8 @@ class _CapsuleReceiptStub:
 
 class AlphaMaxCliProcessHarness:
     def __init__(self, temp_root: Path) -> None:
+        evidence._ROOT_INTERVALS.clear()
+        evidence._ROOT_INTERVALS.update(_FIXTURE_ROOT_INTERVALS)
         self.temp_root = temp_root.resolve()
         self.temp_root.mkdir(parents=True, exist_ok=True)
         self.roots: dict[tuple[str, str], Path] = {}
@@ -207,7 +265,7 @@ class AlphaMaxCliProcessHarness:
         for root_id in ROOT_IDS:
             raw = (root_parent / f"{root_id}-raw").resolve()
             feature = (root_parent / f"{root_id}-feature").resolve()
-            _write_sparse_raw_root(raw, root_id)
+            _write_raw_root(raw, root_id)
             _write_feature_root(feature, root_id)
             self.roots[(root_id, "raw")] = raw
             self.roots[(root_id, "feature")] = feature
@@ -216,7 +274,11 @@ class AlphaMaxCliProcessHarness:
         real_root_validation = self.real_root_validation
 
         def cached_root_validation(
-            roots: tuple[tuple[str, str, str], ...], *, exchange: str
+            roots: tuple[tuple[str, str, str], ...],
+            *,
+            exchange: str,
+            availability_start_by_kind: Mapping[str, Mapping[str, datetime]] | None = None,
+            availability_end_by_kind: Mapping[str, Mapping[str, datetime]] | None = None,
         ) -> tuple[dict[tuple[str, str], runner.AlphaMaxRootSeal], tuple[str, ...]]:
             resolved: dict[tuple[str, str], runner.AlphaMaxRootSeal] = {}
             failures: list[str] = []
@@ -229,7 +291,10 @@ class AlphaMaxCliProcessHarness:
                     missing.append(entry)
             if missing:
                 observed, observed_failures = real_root_validation(
-                    tuple(missing), exchange=exchange
+                    tuple(missing),
+                    exchange=exchange,
+                    availability_start_by_kind=availability_start_by_kind,
+                    availability_end_by_kind=availability_end_by_kind,
                 )
                 resolved.update(observed)
                 failures.extend(observed_failures)
@@ -259,50 +324,53 @@ class AlphaMaxCliProcessHarness:
             cached = self.admission_cache.get(key)
             if cached is not None:
                 return cached
-            train_start = evidence._ROOT_INTERVALS["train"][0]
-            daily = tuple(
-                evidence.AlphaMaxDailyQuoteNotional(
-                    day=(train_start + timedelta(days=index)).date(),
-                    quote_notional_usdt=100_000_000.0,
-                    completed_4h_bucket_hours=(0, 4, 8, 12, 16, 20),
+            with _root_interval_scope(_PRODUCTION_ROOT_INTERVALS):
+                train_start = evidence._ROOT_INTERVALS["train"][0]
+                daily = tuple(
+                    evidence.AlphaMaxDailyQuoteNotional(
+                        day=(train_start + timedelta(days=index)).date(),
+                        quote_notional_usdt=100_000_000.0,
+                        completed_4h_bucket_hours=(0, 4, 8, 12, 16, 20),
+                    )
+                    for index in range(517)
                 )
-                for index in range(517)
-            )
-            inputs = {
-                symbol: evidence.AlphaMaxAdmissionDailyCandidateInput(
-                    symbol=symbol,
-                    daily_quote_notional=(
-                        daily
-                        if index < 5
-                        else tuple(
-                            evidence.AlphaMaxDailyQuoteNotional(
-                                day=value.day,
-                                quote_notional_usdt=1.0,
-                                completed_4h_bucket_hours=value.completed_4h_bucket_hours,
+                inputs = {
+                    symbol: evidence.AlphaMaxAdmissionDailyCandidateInput(
+                        symbol=symbol,
+                        daily_quote_notional=(
+                            daily
+                            if index < 5
+                            else tuple(
+                                evidence.AlphaMaxDailyQuoteNotional(
+                                    day=value.day,
+                                    quote_notional_usdt=1.0,
+                                    completed_4h_bucket_hours=value.completed_4h_bucket_hours,
+                                )
+                                for value in daily
                             )
-                            for value in daily
-                        )
-                    ),
-                    consecutive_completed_daily_bars_before_train=366,
-                    causal_funding_coverage_complete=True,
-                    unresolved_daily_cross_section_count=0,
-                    partition_integrity_complete=True,
+                        ),
+                        consecutive_completed_daily_bars_before_train=366,
+                        causal_funding_coverage_complete=True,
+                        unresolved_daily_cross_section_count=0,
+                        partition_integrity_complete=True,
+                    )
+                    for index, symbol in enumerate(evidence.ALPHA_MAX_CANDIDATE_SYMBOLS)
+                }
+                computed = evidence.compute_alpha_max_train_admission_from_daily_summaries(
+                    inputs,
+                    input_root_hashes={
+                        "warmup": _sha256(
+                            _canonical_bytes(
+                                {"feature": warmup_feature.sha256, "raw": warmup_raw.sha256}
+                            )
+                        ),
+                        "train": _sha256(
+                            _canonical_bytes(
+                                {"feature": train_feature.sha256, "raw": train_raw.sha256}
+                            )
+                        ),
+                    },
                 )
-                for index, symbol in enumerate(evidence.ALPHA_MAX_CANDIDATE_SYMBOLS)
-            }
-            computed = evidence.compute_alpha_max_train_admission_from_daily_summaries(
-                inputs,
-                input_root_hashes={
-                    "warmup": _sha256(
-                        _canonical_bytes(
-                            {"feature": warmup_feature.sha256, "raw": warmup_raw.sha256}
-                        )
-                    ),
-                    "train": _sha256(
-                        _canonical_bytes({"feature": train_feature.sha256, "raw": train_raw.sha256})
-                    ),
-                },
-            )
             self.admission_cache[key] = computed
             return computed
 
@@ -1315,8 +1383,11 @@ def run_alpha_max_cli_process_fixture(temp_root: Path) -> dict[str, object]:
             cli_override_code = exc.code
         else:
             cli_override_code = 0
-    final_feature = max(
-        harness.roots[("historical_exposed_evaluation", "feature")].rglob("*.parquet")
+    final_feature = next(
+        (
+            harness.roots[("historical_exposed_evaluation", "feature")]
+            / "feature_points/exchange=binance/symbol=TONUSDT"
+        ).rglob("*.parquet")
     )
     final_status = final_feature.stat()
     final_bytes = final_feature.read_bytes()
@@ -1326,7 +1397,9 @@ def run_alpha_max_cli_process_fixture(temp_root: Path) -> dict[str, object]:
     partial_endpoint_parent.mkdir()
     try:
         frame = pl.read_parquet(final_feature)
-        frame.head(2).write_parquet(final_feature)
+        if frame.height < 2:
+            raise AssertionError("partial endpoint fixture requires at least two funding rows")
+        frame.head(frame.height - 1).write_parquet(final_feature)
         partial_endpoint_error = harness.expect_error(
             lambda: harness.run_historical(
                 prelock_champion,
@@ -1452,9 +1525,7 @@ def run_alpha_max_cli_process_fixture(temp_root: Path) -> dict[str, object]:
         data = attacked_feature.read_bytes()
         harness.force_root_paths.add(str(warmup_feature))
         frame = pl.read_parquet(attacked_feature)
-        timestamps = frame["timestamp_ms"].to_list()
-        timestamps[1] = timestamps[0]
-        frame.with_columns(pl.Series("timestamp_ms", timestamps)).write_parquet(attacked_feature)
+        pl.concat((frame, frame.head(1))).write_parquet(attacked_feature)
 
         def restore() -> None:
             _restore_file(
@@ -1717,6 +1788,12 @@ def run_alpha_max_cli_process_fixture(temp_root: Path) -> dict[str, object]:
             ),
         ),
         exchange="binance",
+        availability_start_by_kind={
+            "feature": evidence._ALPHA_MAX_FEATURE_AVAILABILITY_START_BY_SYMBOL,
+        },
+        availability_end_by_kind={
+            "feature": evidence._ALPHA_MAX_FEATURE_AVAILABILITY_END_BY_SYMBOL,
+        },
     )
     assert not validation_failures
     lookup = runner._alpha_max_ordered_lookup(

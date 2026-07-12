@@ -5,9 +5,10 @@ import json
 import math
 import os
 import subprocess
-from dataclasses import FrozenInstanceError
+from dataclasses import FrozenInstanceError, replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from types import MappingProxyType
 
 import pytest
 
@@ -20,6 +21,7 @@ from lumina_quant.research.alpha_max_evidence import (
     AlphaMaxCostCellEvidence,
     AlphaMaxEquityEndpoint,
     AlphaMaxGateInput,
+    AlphaMaxFundingBoundaryResolver,
     AlphaMaxManifestMaterialization,
     AlphaMaxManifestReceipt,
     AlphaMaxTerminalGateEvidence,
@@ -54,6 +56,11 @@ from lumina_quant.research.alpha_max_evidence import (
 
 _HASH_A = "a" * 64
 _HASH_B = "b" * 64
+_AVAILABILITY_FLOOR = datetime(2022, 12, 31, tzinfo=UTC)
+_AVAILABILITY_CEILING = datetime(2026, 7, 1, tzinfo=UTC)
+_TONUSDT_RAW_AVAILABILITY_START = datetime(2024, 3, 1, 12, 31, 10, tzinfo=UTC)
+_TONUSDT_FEATURE_AVAILABILITY_START = datetime(2024, 3, 1, 16, tzinfo=UTC)
+_TONUSDT_AVAILABILITY_END = datetime(2026, 6, 23, 9, tzinfo=UTC)
 
 
 class _FeatureStrategy:
@@ -70,7 +77,7 @@ def _feature_spec(tmp_path: Path, root_id: str) -> FeatureRootSpec:
 
 def _write_sparse_raw_root(root: Path, root_id: str) -> None:
     start, end = evidence._ROOT_INTERVALS[root_id]
-    month = start.replace(day=1)
+    month = start.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     months: list[datetime] = []
     while month < end:
         months.append(month)
@@ -90,16 +97,21 @@ def _write_sparse_raw_root(root: Path, root_id: str) -> None:
             )
             owned_start = max(start, partition_start)
             owned_end = min(end, partition_end)
-            timestamps = [owned_start + timedelta(seconds=7), owned_end - timedelta(seconds=11)]
             pl = pytest.importorskip("polars")
-            pl.DataFrame(
-                {
-                    "datetime": timestamps,
-                    "symbol": [symbol, symbol],
-                    "exchange": ["binance", "binance"],
-                    "close": [100.0, 101.0],
-                    "volume": [1.0, 2.0],
-                }
+            timestamps = pl.datetime_range(
+                owned_start,
+                owned_end,
+                interval="1s",
+                closed="left",
+                time_zone="UTC",
+                eager=True,
+            )
+            pl.DataFrame({"datetime": timestamps}).with_columns(
+                pl.lit(100.0).alias("open"),
+                pl.lit(101.0).alias("high"),
+                pl.lit(99.0).alias("low"),
+                pl.lit(100.0).alias("close"),
+                pl.lit(1.0).alias("volume"),
             ).write_parquet(directory / f"{partition_start:%Y-%m}.parquet")
 
 
@@ -117,18 +129,241 @@ def _write_feature_root(root: Path, root_id: str) -> None:
                 / f"date={day:%Y-%m-%d}"
             )
             directory.mkdir(parents=True, exist_ok=True)
-            timestamps = [
-                int((day + timedelta(hours=hour)).timestamp() * 1000) for hour in (0, 8, 16)
-            ]
+            hours = (0, 4, 8, 12, 16, 20) if symbol == "TONUSDT" else (0, 8, 16)
+            timestamps = [int((day + timedelta(hours=hour)).timestamp() * 1000) for hour in hours]
             pl.DataFrame(
                 {
                     "timestamp_ms": timestamps,
-                    "funding_rate": [0.0001, -0.0002, 0.0003],
-                    "symbol": [symbol] * 3,
-                    "exchange": ["binance"] * 3,
+                    "source_timestamp_ms": [
+                        value + (index % 2) * 1000 for index, value in enumerate(timestamps)
+                    ],
+                    "funding_rate": [0.0001 * (index + 1) for index in range(len(timestamps))],
+                    "symbol": [symbol] * len(timestamps),
+                    "exchange": ["binance"] * len(timestamps),
                 }
             ).write_parquet(directory / "part-0.parquet")
         day += timedelta(days=1)
+
+
+def _ton_listing_availability_start_contract(root_kind: str) -> MappingProxyType:
+    if root_kind not in {"raw", "feature"}:
+        raise ValueError("root_kind_invalid")
+    ton_start = (
+        _TONUSDT_RAW_AVAILABILITY_START
+        if root_kind == "raw"
+        else _TONUSDT_FEATURE_AVAILABILITY_START
+    )
+    return MappingProxyType(
+        {
+            symbol: ton_start if symbol == "TONUSDT" else _AVAILABILITY_FLOOR
+            for symbol in ALPHA_MAX_CANDIDATE_SYMBOLS
+        }
+    )
+
+
+def _ton_listing_availability_end_contract() -> MappingProxyType:
+    return MappingProxyType(
+        {
+            symbol: (_TONUSDT_AVAILABILITY_END if symbol == "TONUSDT" else _AVAILABILITY_CEILING)
+            for symbol in ALPHA_MAX_CANDIDATE_SYMBOLS
+        }
+    )
+
+
+def _seal_test_root_tree(root_id: str, root_kind: str, root_path: Path, **kwargs):
+    """Seal a synthetic fixture under an explicit immutable availability interval."""
+    kwargs.setdefault(
+        "availability_start_by_symbol",
+        MappingProxyType(dict.fromkeys(ALPHA_MAX_CANDIDATE_SYMBOLS, _AVAILABILITY_FLOOR)),
+    )
+    kwargs.setdefault(
+        "availability_end_by_symbol",
+        MappingProxyType(dict.fromkeys(ALPHA_MAX_CANDIDATE_SYMBOLS, _AVAILABILITY_CEILING)),
+    )
+    return seal_alpha_max_root_tree(root_id, root_kind, root_path, **kwargs)
+
+
+def _use_short_listing_interval(
+    monkeypatch: pytest.MonkeyPatch,
+    root_id: str,
+    root_kind: str,
+) -> None:
+    intervals = {
+        "warmup": (
+            datetime(2023, 12, 29, tzinfo=UTC),
+            datetime(2024, 1, 1, tzinfo=UTC),
+        ),
+        "train": (
+            (
+                datetime(2024, 3, 1, 12, 31, 10, tzinfo=UTC)
+                if root_kind == "raw"
+                else datetime(2024, 2, 28, tzinfo=UTC)
+            ),
+            (
+                datetime(2024, 3, 1, 12, 31, 20, tzinfo=UTC)
+                if root_kind == "raw"
+                else datetime(2024, 3, 4, tzinfo=UTC)
+            ),
+        ),
+    }
+    monkeypatch.setitem(
+        evidence._ROOT_INTERVALS,
+        root_id,
+        intervals[root_id],
+    )
+
+
+def _use_short_raw_interval(monkeypatch: pytest.MonkeyPatch, root_id: str) -> None:
+    start = evidence._ROOT_INTERVALS[root_id][0]
+    monkeypatch.setitem(
+        evidence._ROOT_INTERVALS,
+        root_id,
+        (start, start + timedelta(seconds=20)),
+    )
+
+
+def _use_short_delivery_interval(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    root_kind: str,
+    start: datetime = datetime(2026, 6, 22, tzinfo=UTC),
+    end: datetime = datetime(2026, 6, 25, tzinfo=UTC),
+) -> str:
+    root_id = "historical_exposed_evaluation"
+    if root_kind == "raw":
+        if start >= _TONUSDT_AVAILABILITY_END:
+            end = start + timedelta(seconds=10)
+        else:
+            start = _TONUSDT_AVAILABILITY_END - timedelta(seconds=10)
+            end = _TONUSDT_AVAILABILITY_END + timedelta(seconds=10)
+    monkeypatch.setitem(evidence._ROOT_INTERVALS, root_id, (start, end))
+    return root_id
+
+
+def _write_listing_aware_raw_root(
+    root: Path,
+    availability_start_by_symbol: MappingProxyType,
+    availability_end_by_symbol: MappingProxyType,
+    *,
+    root_id: str = "train",
+) -> None:
+    pl = pytest.importorskip("polars")
+    start, end = evidence._ROOT_INTERVALS[root_id]
+    month = start.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    months: list[datetime] = []
+    while month < end:
+        months.append(month)
+        month = (
+            month.replace(year=month.year + 1, month=1)
+            if month.month == 12
+            else month.replace(month=month.month + 1)
+        )
+    for symbol in ALPHA_MAX_CANDIDATE_SYMBOLS:
+        directory = root / "market_ohlcv_1s" / "binance" / symbol
+        directory.mkdir(parents=True, exist_ok=True)
+        available = availability_start_by_symbol[symbol]
+        for partition_start in months:
+            partition_end = (
+                partition_start.replace(year=partition_start.year + 1, month=1)
+                if partition_start.month == 12
+                else partition_start.replace(month=partition_start.month + 1)
+            )
+            owned_start = max(start, available, partition_start)
+            owned_end = min(end, availability_end_by_symbol[symbol], partition_end)
+            if owned_start >= owned_end:
+                continue
+            timestamps = pl.datetime_range(
+                owned_start,
+                owned_end,
+                interval="1s",
+                closed="left",
+                time_zone="UTC",
+                eager=True,
+            )
+            pl.DataFrame({"datetime": timestamps}).with_columns(
+                pl.lit(100.0).alias("open"),
+                pl.lit(101.0).alias("high"),
+                pl.lit(99.0).alias("low"),
+                pl.lit(100.0).alias("close"),
+                pl.lit(1.0).alias("volume"),
+            ).write_parquet(directory / f"{partition_start:%Y-%m}.parquet")
+
+
+def _write_listing_aware_feature_root(
+    root: Path,
+    availability_start_by_symbol: MappingProxyType,
+    availability_end_by_symbol: MappingProxyType,
+    *,
+    root_id: str = "train",
+) -> None:
+    pl = pytest.importorskip("polars")
+    start, end = evidence._ROOT_INTERVALS[root_id]
+    day = start
+    while day < end:
+        day_end = day + timedelta(days=1)
+        for symbol in ALPHA_MAX_CANDIDATE_SYMBOLS:
+            owned_start = max(start, availability_start_by_symbol[symbol], day)
+            owned_end = min(end, availability_end_by_symbol[symbol], day_end)
+            if owned_start >= owned_end:
+                continue
+            directory = (
+                root
+                / "feature_points"
+                / "exchange=binance"
+                / f"symbol={symbol}"
+                / f"date={day:%Y-%m-%d}"
+            )
+            directory.mkdir(parents=True, exist_ok=True)
+            hours = (0, 4, 8, 12, 16, 20) if symbol == "TONUSDT" else (0, 8, 16)
+            timestamps = [
+                int(boundary.timestamp() * 1000)
+                for hour in hours
+                for boundary in (day + timedelta(hours=hour),)
+                if owned_start <= boundary < owned_end
+            ]
+            if not timestamps:
+                raise AssertionError("listing-aware feature fixture has no owned funding boundary")
+            pl.DataFrame(
+                {
+                    "timestamp_ms": timestamps,
+                    "source_timestamp_ms": [value + 5 for value in timestamps],
+                    "funding_rate": [0.0001 * (index + 1) for index in range(len(timestamps))],
+                    "symbol": [symbol] * len(timestamps),
+                    "exchange": ["binance"] * len(timestamps),
+                }
+            ).write_parquet(directory / "part-0.parquet")
+        day += timedelta(days=1)
+
+
+def _write_ton_prelisting_partition(root: Path, root_kind: str, *, synthetic: bool) -> None:
+    pl = pytest.importorskip("polars")
+    day = datetime(2024, 2, 29, tzinfo=UTC)
+    if root_kind == "raw":
+        target = root / "market_ohlcv_1s" / "binance" / "TONUSDT" / "2024-02.parquet"
+        pl.DataFrame(
+            {
+                "datetime": [day + timedelta(seconds=7), day + timedelta(hours=23)],
+                "open": [100.0, 101.0],
+                "high": [101.0, 102.0],
+                "low": [99.0, 100.0],
+                "close": [100.0, 101.0],
+                "volume": [1.0, 2.0],
+            }
+        ).write_parquet(target)
+        return
+    directory = root / "feature_points" / "exchange=binance" / "symbol=TONUSDT" / "date=2024-02-29"
+    directory.mkdir(parents=True, exist_ok=True)
+    timestamps = [int((day + timedelta(hours=hour)).timestamp() * 1000) for hour in (0, 8, 16)]
+    filename = "synthetic.parquet" if synthetic else "part-0.parquet"
+    pl.DataFrame(
+        {
+            "timestamp_ms": timestamps,
+            "source_timestamp_ms": timestamps,
+            "funding_rate": [0.0001, -0.0002, 0.0003],
+            "symbol": ["TONUSDT"] * 3,
+            "exchange": ["binance"] * 3,
+        }
+    ).write_parquet(directory / filename)
 
 
 def test_b2_ordered_lookup_exposes_immutable_current_root_capability_to_real_engine_gate(
@@ -243,20 +478,58 @@ def test_manifest_write_is_bound_to_opened_phase_when_ancestor_is_swapped(
     assert (moved / "row.json").read_bytes() == b'{"owned":true}\n'
 
 
-def test_root_tree_seal_is_canonical_streaming_and_rejects_unsafe_entries(tmp_path: Path) -> None:
+def test_root_tree_seal_requires_explicit_availability_contract(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _use_short_raw_interval(monkeypatch, "purge")
+    root = tmp_path / "raw"
+    _write_sparse_raw_root(root, "purge")
+    availability_start = MappingProxyType(
+        dict.fromkeys(ALPHA_MAX_CANDIDATE_SYMBOLS, _AVAILABILITY_FLOOR)
+    )
+    availability_end = MappingProxyType(
+        dict.fromkeys(ALPHA_MAX_CANDIDATE_SYMBOLS, _AVAILABILITY_CEILING)
+    )
+
+    with pytest.raises(TypeError, match="availability_start_by_symbol"):
+        seal_alpha_max_root_tree("purge", "raw", root)
+    with pytest.raises(TypeError, match="must_supply_start_and_end"):
+        seal_alpha_max_root_tree(
+            "purge",
+            "raw",
+            root,
+            availability_start_by_symbol=None,
+            availability_end_by_symbol=availability_end,
+        )
+    with pytest.raises(TypeError, match="must_supply_start_and_end"):
+        seal_alpha_max_root_tree(
+            "purge",
+            "raw",
+            root,
+            availability_start_by_symbol=availability_start,
+            availability_end_by_symbol=None,
+        )
+
+
+def test_root_tree_seal_is_canonical_streaming_and_rejects_unsafe_entries(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _use_short_raw_interval(monkeypatch, "purge")
     root = tmp_path / "raw"
     _write_sparse_raw_root(root, "purge")
 
-    first = seal_alpha_max_root_tree("purge", "raw", root)
-    second = seal_alpha_max_root_tree("purge", "raw", root)
+    first = _seal_test_root_tree("purge", "raw", root)
+    second = _seal_test_root_tree("purge", "raw", root)
     assert first == second
     assert first.symbols == ALPHA_MAX_CANDIDATE_SYMBOLS
     assert len(first.entries) == len(ALPHA_MAX_CANDIDATE_SYMBOLS)
     start, end = evidence._ROOT_INTERVALS["purge"]
-    assert min(entry.minimum_timestamp_ms for entry in first.entries) > int(
+    assert min(entry.minimum_timestamp_ms for entry in first.entries) == int(
         start.timestamp() * 1000
     )
-    assert max(entry.maximum_timestamp_ms for entry in first.entries) < int(
+    assert max(entry.maximum_timestamp_ms for entry in first.entries) == int(
         (end - timedelta(seconds=1)).timestamp() * 1000
     )
     assert first.inventory_sha256 == second.inventory_sha256
@@ -266,40 +539,413 @@ def test_root_tree_seal_is_canonical_streaming_and_rejects_unsafe_entries(tmp_pa
 
     target = root / "market_ohlcv_1s" / "binance" / "BTCUSDT" / "2025-06.parquet"
     pl = pytest.importorskip("polars")
-    pl.DataFrame(
-        {
-            "datetime": [start + timedelta(seconds=9), end - timedelta(seconds=13)],
-            "symbol": ["BTCUSDT", "BTCUSDT"],
-            "exchange": ["binance", "binance"],
-            "close": [100.0, 105.0],
-            "volume": [1.0, 2.0],
-        }
-    ).write_parquet(target)
-    mutated = seal_alpha_max_root_tree("purge", "raw", root)
+    frame = pl.read_parquet(target)
+    frame.with_columns((pl.col("close") + 1.0).alias("close")).write_parquet(target)
+    mutated = _seal_test_root_tree("purge", "raw", root)
     assert mutated.content_sha256 != first.content_sha256
     assert mutated.inventory_sha256 != first.inventory_sha256
 
     (root / "escape").symlink_to(tmp_path / "outside")
     with pytest.raises(ValueError, match="symlink"):
-        seal_alpha_max_root_tree("purge", "raw", root)
+        _seal_test_root_tree("purge", "raw", root)
     with pytest.raises(ValueError, match="must_be_absolute"):
-        seal_alpha_max_root_tree("train", "raw", Path("relative"))
+        _seal_test_root_tree("train", "raw", Path("relative"))
 
 
-def test_root_tree_seal_rejects_hardlinked_partition(tmp_path: Path) -> None:
+@pytest.mark.parametrize("root_kind", ("raw", "feature"))
+def test_train_root_seal_allows_only_ton_prelisting_gap_from_immutable_availability_contract(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    root_kind: str,
+) -> None:
+    _use_short_listing_interval(monkeypatch, "train", root_kind)
+    availability_start = _ton_listing_availability_start_contract(root_kind)
+    availability_end = _ton_listing_availability_end_contract()
+    root = tmp_path / root_kind
+    if root_kind == "raw":
+        _write_listing_aware_raw_root(root, availability_start, availability_end)
+    else:
+        _write_listing_aware_feature_root(root, availability_start, availability_end)
+
+    seal = _seal_test_root_tree(
+        "train",
+        root_kind,
+        root,
+        availability_start_by_symbol=availability_start,
+        availability_end_by_symbol=availability_end,
+    )
+
+    ton_partitions = tuple(
+        partition_start
+        for entry in seal.entries
+        for symbol, partition_start, _ in (
+            evidence._alpha_max_partition_contract(
+                entry.relative_path,
+                root_kind=root_kind,
+                exchange="binance",
+            ),
+        )
+        if symbol == "TONUSDT"
+    )
+    assert ton_partitions
+    assert min(ton_partitions) == datetime(2024, 3, 1, tzinfo=UTC)
+    assert all(
+        entry.minimum_timestamp_ms >= int(availability_start["TONUSDT"].timestamp() * 1000)
+        for entry in seal.entries
+        if "TONUSDT" in entry.relative_path
+    )
+    assert seal.to_payload()["availability_start_by_symbol"] == {
+        symbol: start.isoformat().replace("+00:00", "Z")
+        for symbol, start in availability_start.items()
+    }
+    assert seal.to_payload()["availability_end_by_symbol"] == {
+        symbol: end.isoformat().replace("+00:00", "Z") for symbol, end in availability_end.items()
+    }
+    assert seal.to_receipt().availability_sha256 == seal.availability_sha256
+
+
+def test_train_root_seal_rejects_mutable_symbol_availability_contract(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _use_short_listing_interval(monkeypatch, "train", "raw")
+    availability_start = _ton_listing_availability_start_contract("raw")
+    availability_end = _ton_listing_availability_end_contract()
+    root = tmp_path / "raw"
+    _write_listing_aware_raw_root(root, availability_start, availability_end)
+
+    with pytest.raises(TypeError, match=r"availability.*immutable"):
+        _seal_test_root_tree(
+            "train",
+            "raw",
+            root,
+            availability_start_by_symbol=dict(availability_start),
+            availability_end_by_symbol=availability_end,
+        )
+    with pytest.raises(TypeError, match=r"availability.*immutable"):
+        _seal_test_root_tree(
+            "train",
+            "raw",
+            root,
+            availability_start_by_symbol=availability_start,
+            availability_end_by_symbol=dict(availability_end),
+        )
+
+
+@pytest.mark.parametrize("root_kind", ("raw", "feature"))
+def test_train_root_seal_rejects_ton_partition_before_canonical_availability(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    root_kind: str,
+) -> None:
+    _use_short_listing_interval(monkeypatch, "train", root_kind)
+    availability_start = _ton_listing_availability_start_contract(root_kind)
+    availability_end = _ton_listing_availability_end_contract()
+    root = tmp_path / root_kind
+    if root_kind == "raw":
+        _write_listing_aware_raw_root(root, availability_start, availability_end)
+    else:
+        _write_listing_aware_feature_root(root, availability_start, availability_end)
+    _write_ton_prelisting_partition(root, root_kind, synthetic=False)
+
+    with pytest.raises(ValueError, match="availability"):
+        _seal_test_root_tree(
+            "train",
+            root_kind,
+            root,
+            availability_start_by_symbol=availability_start,
+            availability_end_by_symbol=availability_end,
+        )
+
+
+@pytest.mark.parametrize("root_kind", ("raw", "feature"))
+def test_train_root_seal_rejects_missing_ton_partition_after_availability(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    root_kind: str,
+) -> None:
+    _use_short_listing_interval(monkeypatch, "train", root_kind)
+    availability_start = _ton_listing_availability_start_contract(root_kind)
+    availability_end = _ton_listing_availability_end_contract()
+    root = tmp_path / root_kind
+    if root_kind == "raw":
+        _write_listing_aware_raw_root(root, availability_start, availability_end)
+        target = root / "market_ohlcv_1s" / "binance" / "TONUSDT" / "2024-03.parquet"
+    else:
+        _write_listing_aware_feature_root(root, availability_start, availability_end)
+        target = (
+            root
+            / "feature_points"
+            / "exchange=binance"
+            / "symbol=TONUSDT"
+            / "date=2024-03-02"
+            / "part-0.parquet"
+        )
+    target.unlink()
+
+    with pytest.raises(ValueError, match=r"symbol_coverage|interval_coverage"):
+        _seal_test_root_tree(
+            "train",
+            root_kind,
+            root,
+            availability_start_by_symbol=availability_start,
+            availability_end_by_symbol=availability_end,
+        )
+
+
+def test_train_feature_root_rejects_missing_ton_funding_cadence_after_availability(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _use_short_listing_interval(monkeypatch, "train", "feature")
+    availability_start = _ton_listing_availability_start_contract("feature")
+    availability_end = _ton_listing_availability_end_contract()
+    root = tmp_path / "feature"
+    _write_listing_aware_feature_root(root, availability_start, availability_end)
+    target = (
+        root
+        / "feature_points"
+        / "exchange=binance"
+        / "symbol=TONUSDT"
+        / "date=2024-03-01"
+        / "part-0.parquet"
+    )
+    pl = pytest.importorskip("polars")
+    frame = pl.read_parquet(target)
+    frame.filter(pl.col("timestamp_ms") != frame["timestamp_ms"][1]).write_parquet(target)
+
+    with pytest.raises(
+        ValueError,
+        match=r"funding_boundary_missing|timestamp_cadence|funding_(canonical_)?coverage",
+    ):
+        _seal_test_root_tree(
+            "train",
+            "feature",
+            root,
+            availability_start_by_symbol=availability_start,
+            availability_end_by_symbol=availability_end,
+        )
+
+
+def test_train_feature_root_rejects_synthetic_ton_file_before_availability(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _use_short_listing_interval(monkeypatch, "train", "feature")
+    availability_start = _ton_listing_availability_start_contract("feature")
+    availability_end = _ton_listing_availability_end_contract()
+    root = tmp_path / "feature"
+    _write_listing_aware_feature_root(root, availability_start, availability_end)
+    _write_ton_prelisting_partition(root, "feature", synthetic=True)
+
+    with pytest.raises(ValueError, match="availability"):
+        _seal_test_root_tree(
+            "train",
+            "feature",
+            root,
+            availability_start_by_symbol=availability_start,
+            availability_end_by_symbol=availability_end,
+        )
+
+
+@pytest.mark.parametrize("root_kind", ("raw", "feature"))
+def test_root_seal_allows_zero_ton_partitions_when_phase_is_after_delivery(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    root_kind: str,
+) -> None:
+    root_id = _use_short_delivery_interval(
+        monkeypatch,
+        root_kind=root_kind,
+        start=datetime(2026, 6, 24, tzinfo=UTC),
+        end=datetime(2026, 6, 25, tzinfo=UTC),
+    )
+    availability_start = _ton_listing_availability_start_contract(root_kind)
+    availability_end = _ton_listing_availability_end_contract()
+    root = tmp_path / root_kind
+    if root_kind == "raw":
+        _write_listing_aware_raw_root(
+            root,
+            availability_start,
+            availability_end,
+            root_id=root_id,
+        )
+    else:
+        _write_listing_aware_feature_root(
+            root,
+            availability_start,
+            availability_end,
+            root_id=root_id,
+        )
+
+    seal = _seal_test_root_tree(
+        root_id,
+        root_kind,
+        root,
+        availability_start_by_symbol=availability_start,
+        availability_end_by_symbol=availability_end,
+    )
+
+    assert seal.entries
+    assert not any("TONUSDT" in entry.relative_path for entry in seal.entries)
+    assert seal.to_payload()["availability_end_by_symbol"]["TONUSDT"] == ("2026-06-23T09:00:00Z")
+
+
+@pytest.mark.parametrize("root_kind", ("raw", "feature"))
+def test_root_seal_rejects_ton_content_or_partition_at_or_after_delivery(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    root_kind: str,
+) -> None:
+    root_id = _use_short_delivery_interval(monkeypatch, root_kind=root_kind)
+    availability_start = _ton_listing_availability_start_contract(root_kind)
+    availability_end = _ton_listing_availability_end_contract()
+    root = tmp_path / root_kind
+    pl = pytest.importorskip("polars")
+    if root_kind == "raw":
+        _write_listing_aware_raw_root(
+            root,
+            availability_start,
+            availability_end,
+            root_id=root_id,
+        )
+        target = root / "market_ohlcv_1s" / "binance" / "TONUSDT" / "2026-06.parquet"
+        frame = pl.read_parquet(target)
+        pl.concat(
+            [
+                frame,
+                pl.DataFrame(
+                    {
+                        "datetime": [_TONUSDT_AVAILABILITY_END],
+                        "open": [102.0],
+                        "high": [103.0],
+                        "low": [101.0],
+                        "close": [102.0],
+                        "volume": [3.0],
+                    }
+                ),
+            ]
+        ).write_parquet(target)
+    else:
+        _write_listing_aware_feature_root(
+            root,
+            availability_start,
+            availability_end,
+            root_id=root_id,
+        )
+        day = datetime(2026, 6, 24, tzinfo=UTC)
+        directory = (
+            root / "feature_points" / "exchange=binance" / "symbol=TONUSDT" / "date=2026-06-24"
+        )
+        directory.mkdir(parents=True)
+        pl.DataFrame(
+            {
+                "timestamp_ms": [int(day.timestamp() * 1000)],
+                "source_timestamp_ms": [int(day.timestamp() * 1000)],
+                "funding_rate": [0.0001],
+                "symbol": ["TONUSDT"],
+                "exchange": ["binance"],
+            }
+        ).write_parquet(directory / "part-0.parquet")
+
+    with pytest.raises(ValueError, match="after_availability"):
+        _seal_test_root_tree(
+            root_id,
+            root_kind,
+            root,
+            availability_start_by_symbol=availability_start,
+            availability_end_by_symbol=availability_end,
+        )
+
+
+def test_feature_root_requires_right_edge_funding_cadence_before_delivery(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root_id = _use_short_delivery_interval(monkeypatch, root_kind="feature")
+    availability_start = _ton_listing_availability_start_contract("feature")
+    availability_end = _ton_listing_availability_end_contract()
+    root = tmp_path / "feature"
+    _write_listing_aware_feature_root(
+        root,
+        availability_start,
+        availability_end,
+        root_id=root_id,
+    )
+    target = (
+        root
+        / "feature_points"
+        / "exchange=binance"
+        / "symbol=TONUSDT"
+        / "date=2026-06-23"
+        / "part-0.parquet"
+    )
+    pl = pytest.importorskip("polars")
+    frame = pl.read_parquet(target)
+    frame.filter(pl.col("timestamp_ms") != frame.get_column("timestamp_ms").max()).write_parquet(
+        target
+    )
+
+    with pytest.raises(ValueError, match=r"funding_(canonical_)?coverage"):
+        _seal_test_root_tree(
+            root_id,
+            "feature",
+            root,
+            availability_start_by_symbol=availability_start,
+            availability_end_by_symbol=availability_end,
+        )
+
+
+def test_root_seal_combined_availability_hash_rejects_end_map_or_digest_tampering(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root_id = _use_short_delivery_interval(monkeypatch, root_kind="raw")
+    availability_start = _ton_listing_availability_start_contract("raw")
+    availability_end = _ton_listing_availability_end_contract()
+    root = tmp_path / "raw"
+    _write_listing_aware_raw_root(
+        root,
+        availability_start,
+        availability_end,
+        root_id=root_id,
+    )
+    seal = _seal_test_root_tree(
+        root_id,
+        "raw",
+        root,
+        availability_start_by_symbol=availability_start,
+        availability_end_by_symbol=availability_end,
+    )
+
+    with pytest.raises(ValueError, match="availability_sha256_mismatch"):
+        replace(seal, availability_sha256=_HASH_A)
+    tampered_end = MappingProxyType(
+        dict(availability_end) | {"TONUSDT": _TONUSDT_AVAILABILITY_END + timedelta(hours=1)}
+    )
+    with pytest.raises(ValueError, match="availability_sha256_mismatch"):
+        replace(seal, availability_end_by_symbol=tampered_end)
+
+
+def test_root_tree_seal_rejects_hardlinked_partition(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _use_short_raw_interval(monkeypatch, "purge")
     root = tmp_path / "raw"
     _write_sparse_raw_root(root, "purge")
     target = root / "market_ohlcv_1s" / "binance" / "BTCUSDT" / "2025-06.parquet"
     os.link(target, tmp_path / "outside-alias.parquet")
 
     with pytest.raises(ValueError, match="hardlink"):
-        seal_alpha_max_root_tree("purge", "raw", root)
+        _seal_test_root_tree("purge", "raw", root)
 
 
 def test_root_tree_seal_stays_on_opened_ancestor_when_path_is_swapped(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    _use_short_raw_interval(monkeypatch, "purge")
     root = (tmp_path / "raw").resolve()
     outside_root = (tmp_path / "outside-raw").resolve()
     _write_sparse_raw_root(root, "purge")
@@ -342,7 +988,7 @@ def test_root_tree_seal_stays_on_opened_ancestor_when_path_is_swapped(
     monkeypatch.setattr(os, "open", hostile_open)
 
     with pytest.raises(ValueError, match=r"directory_changed|path_changed"):
-        seal_alpha_max_root_tree("purge", "raw", root)
+        _seal_test_root_tree("purge", "raw", root)
 
     assert swapped is True
     assert opened_ancestor_identity == (
@@ -360,6 +1006,7 @@ def test_root_tree_seal_hash_and_parquet_metadata_share_one_open_file(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    _use_short_raw_interval(monkeypatch, "purge")
     root = (tmp_path / "raw").resolve()
     _write_sparse_raw_root(root, "purge")
     target = root / "market_ohlcv_1s" / "binance" / "BTCUSDT" / "2025-06.parquet"
@@ -388,7 +1035,7 @@ def test_root_tree_seal_hash_and_parquet_metadata_share_one_open_file(
     monkeypatch.setattr(evidence, "_alpha_max_parquet_timestamp_bounds", hostile_bounds)
 
     with pytest.raises(ValueError, match=r"file_changed|directory_changed"):
-        seal_alpha_max_root_tree("purge", "raw", root)
+        _seal_test_root_tree("purge", "raw", root)
 
     assert swapped is True
     assert parsed_identity == original_identity
@@ -402,6 +1049,8 @@ def test_actual_run_domain_seals_bind_current_raw_and_adjacent_features(
         path = (tmp_path / f"{root_id}-{root_kind}").resolve()
         path.mkdir()
         start, end = evidence._ROOT_INTERVALS[root_id]
+        availability_start = _ton_listing_availability_start_contract(root_kind)
+        availability_end = _ton_listing_availability_end_contract()
         value = object.__new__(evidence.AlphaMaxRootSeal)
         fields = {
             "root_id": root_id,
@@ -411,6 +1060,12 @@ def test_actual_run_domain_seals_bind_current_raw_and_adjacent_features(
             "symbols": ALPHA_MAX_CANDIDATE_SYMBOLS,
             "start_utc": start,
             "end_utc": end,
+            "availability_start_by_symbol": availability_start,
+            "availability_end_by_symbol": availability_end,
+            "availability_sha256": evidence._alpha_max_availability_sha256(
+                availability_start,
+                availability_end,
+            ),
             "entries": (object(),),
             "inventory_sha256": _HASH_A,
             "content_sha256": _HASH_B,
@@ -469,15 +1124,17 @@ def test_actual_run_domain_seals_bind_current_raw_and_adjacent_features(
         ),
         (
             lambda start, end: [start - timedelta(seconds=1), end - timedelta(seconds=11)],
-            "outside_interval|partition_content",
+            "outside_interval|partition_content|before_availability",
         ),
     ],
 )
 def test_raw_root_rejects_duplicate_nonmonotone_and_out_of_range_rows(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
     timestamps,
     match: str,
 ) -> None:
+    _use_short_raw_interval(monkeypatch, "purge")
     root = tmp_path / "raw"
     _write_sparse_raw_root(root, "purge")
     start, end = evidence._ROOT_INTERVALS["purge"]
@@ -486,14 +1143,132 @@ def test_raw_root_rejects_duplicate_nonmonotone_and_out_of_range_rows(
     pl.DataFrame(
         {
             "datetime": timestamps(start, end),
-            "symbol": ["BTCUSDT", "BTCUSDT"],
-            "exchange": ["binance", "binance"],
+            "open": [100.0, 101.0],
+            "high": [101.0, 102.0],
+            "low": [99.0, 100.0],
             "close": [100.0, 101.0],
             "volume": [1.0, 2.0],
         }
     ).write_parquet(target)
     with pytest.raises(ValueError, match=match):
-        seal_alpha_max_root_tree("purge", "raw", root)
+        _seal_test_root_tree("purge", "raw", root)
+
+
+@pytest.mark.parametrize(
+    "mutation,match",
+    [
+        ("missing_open", "ohlcv_schema_invalid"),
+        ("string_close", "ohlcv_schema_invalid"),
+        ("nan_open", "ohlcv_value_invalid"),
+        ("infinite_close", "ohlcv_value_invalid"),
+        ("zero_low", "ohlc_nonpositive"),
+        ("negative_open", "ohlc_nonpositive"),
+        ("negative_volume", "volume_negative"),
+        ("high_below_open", "ohlcv_relation_invalid"),
+        ("low_above_close", "ohlcv_relation_invalid"),
+    ],
+)
+def test_raw_root_seal_rejects_invalid_ohlcv_values_and_relations(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    mutation: str,
+    match: str,
+) -> None:
+    _use_short_raw_interval(monkeypatch, "purge")
+    root = tmp_path / "raw"
+    _write_sparse_raw_root(root, "purge")
+    target = root / "market_ohlcv_1s" / "binance" / "BTCUSDT" / "2025-06.parquet"
+    pl = pytest.importorskip("polars")
+    frame = pl.read_parquet(target)
+    if mutation == "missing_open":
+        frame = frame.drop("open")
+    elif mutation == "string_close":
+        frame = frame.with_columns(pl.lit("100.0").alias("close"))
+    elif mutation == "nan_open":
+        frame = frame.with_columns(pl.lit(float("nan")).alias("open"))
+    elif mutation == "infinite_close":
+        frame = frame.with_columns(pl.lit(float("inf")).alias("close"))
+    elif mutation == "zero_low":
+        frame = frame.with_columns(pl.lit(0.0).alias("low"))
+    elif mutation == "negative_open":
+        frame = frame.with_columns(pl.lit(-1.0).alias("open"))
+    elif mutation == "negative_volume":
+        frame = frame.with_columns(pl.lit(-1.0).alias("volume"))
+    elif mutation == "high_below_open":
+        frame = frame.with_columns(pl.lit(99.5).alias("high"))
+    elif mutation == "low_above_close":
+        frame = frame.with_columns(pl.lit(100.5).alias("low"))
+    else:  # pragma: no cover - exhaustive table guard
+        raise AssertionError(f"unsupported OHLCV mutation: {mutation}")
+    frame.write_parquet(target)
+
+    with pytest.raises(ValueError, match=match):
+        _seal_test_root_tree("purge", "raw", root)
+
+
+def test_raw_root_seal_accepts_real_schema_without_symbol_or_exchange_columns(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _use_short_raw_interval(monkeypatch, "purge")
+    root = tmp_path / "raw"
+    _write_sparse_raw_root(root, "purge")
+    target = root / "market_ohlcv_1s" / "binance" / "BTCUSDT" / "2025-06.parquet"
+    pl = pytest.importorskip("polars")
+
+    assert set(pl.read_parquet_schema(target)) == {
+        "datetime",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+    }
+    seal = _seal_test_root_tree("purge", "raw", root)
+
+    assert seal.entries
+
+
+@pytest.mark.parametrize("time_unit", ("us", "ns"))
+def test_raw_root_seal_rejects_subsecond_source_timestamps(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    time_unit: str,
+) -> None:
+    _use_short_raw_interval(monkeypatch, "purge")
+    root = tmp_path / "raw"
+    _write_sparse_raw_root(root, "purge")
+    target = root / "market_ohlcv_1s" / "binance" / "BTCUSDT" / "2025-06.parquet"
+    pl = pytest.importorskip("polars")
+    frame = pl.read_parquet(target).with_columns(
+        pl.col("datetime").cast(pl.Datetime(time_unit, "UTC"))
+    )
+    offset = pl.duration(microseconds=500) if time_unit == "us" else pl.duration(nanoseconds=500)
+    frame.with_columns((pl.col("datetime") + offset).alias("datetime")).write_parquet(target)
+
+    with pytest.raises(ValueError, match="timestamp_subsecond_invalid"):
+        _seal_test_root_tree("purge", "raw", root)
+
+
+def test_raw_root_seal_enforces_exact_cross_month_partition_edge(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    start = datetime(2024, 2, 29, 23, 59, 58, tzinfo=UTC)
+    end = datetime(2024, 3, 1, 0, 0, 2, tzinfo=UTC)
+    monkeypatch.setitem(evidence._ROOT_INTERVALS, "purge", (start, end))
+    root = tmp_path / "raw"
+    _write_sparse_raw_root(root, "purge")
+
+    seal = _seal_test_root_tree("purge", "raw", root)
+
+    assert len(seal.entries) == 2 * len(ALPHA_MAX_CANDIDATE_SYMBOLS)
+    btc_march = root / "market_ohlcv_1s/binance/BTCUSDT/2024-03.parquet"
+    pl = pytest.importorskip("polars")
+    frame = pl.read_parquet(btc_march)
+    frame.filter(pl.col("datetime") != datetime(2024, 3, 1, tzinfo=UTC)).write_parquet(btc_march)
+    with pytest.raises(ValueError, match="exact_1s_coverage"):
+        _seal_test_root_tree("purge", "raw", root)
 
 
 def test_feature_root_binds_content_ownership_and_every_funding_boundary(
@@ -501,7 +1276,7 @@ def test_feature_root_binds_content_ownership_and_every_funding_boundary(
 ) -> None:
     root = tmp_path / "features"
     _write_feature_root(root, "purge")
-    seal = seal_alpha_max_root_tree("purge", "feature", root)
+    seal = _seal_test_root_tree("purge", "feature", root)
     assert seal.symbols == ALPHA_MAX_CANDIDATE_SYMBOLS
     assert len(seal.entries) == 7 * len(ALPHA_MAX_CANDIDATE_SYMBOLS)
 
@@ -517,14 +1292,17 @@ def test_feature_root_binds_content_ownership_and_every_funding_boundary(
     frame = pl.read_parquet(target)
     frame.with_columns(pl.lit("ETHUSDT").alias("symbol")).write_parquet(target)
     with pytest.raises(ValueError, match="content_symbol_mismatch"):
-        seal_alpha_max_root_tree("purge", "feature", root)
+        _seal_test_root_tree("purge", "feature", root)
 
     frame.filter(pl.col("timestamp_ms") != frame["timestamp_ms"][1]).write_parquet(target)
-    with pytest.raises(ValueError, match=r"funding_boundary_missing|timestamp_cadence"):
-        seal_alpha_max_root_tree("purge", "feature", root)
+    with pytest.raises(
+        ValueError,
+        match=r"funding_boundary_missing|timestamp_cadence|funding_canonical_coverage",
+    ):
+        _seal_test_root_tree("purge", "feature", root)
 
 
-def test_feature_root_accepts_causal_as_of_points_before_funding_boundaries(
+def test_feature_root_accepts_verified_source_jitter_after_canonical_boundaries(
     tmp_path: Path,
 ) -> None:
     root = tmp_path / "features"
@@ -542,12 +1320,12 @@ def test_feature_root_accepts_causal_as_of_points_before_funding_boundaries(
     timestamps = frame.get_column("timestamp_ms").to_list()
     frame.with_columns(
         pl.Series(
-            "timestamp_ms",
-            [timestamps[0], timestamps[1] - 1000, timestamps[2] - 1000],
+            "source_timestamp_ms",
+            [timestamps[0], timestamps[1] + 1000, timestamps[2] + 999],
         )
     ).write_parquet(target)
 
-    seal = seal_alpha_max_root_tree("purge", "feature", root)
+    seal = _seal_test_root_tree("purge", "feature", root)
 
     entry = next(
         row for row in seal.entries if "symbol=BTCUSDT/date=2025-06-01" in row.relative_path
@@ -555,9 +1333,63 @@ def test_feature_root_accepts_causal_as_of_points_before_funding_boundaries(
     assert entry.maximum_gap_ms == evidence._FUNDING_INTERVAL_MS
 
 
+@pytest.mark.parametrize(
+    "mutation,match",
+    (
+        ("jitter", "source_timestamp_jitter"),
+        ("source_duplicate", "source_timestamp_duplicate"),
+        ("canonical_collision", "timestamp_duplicate"),
+    ),
+)
+def test_feature_root_rejects_unverified_jitter_and_timestamp_collisions(
+    tmp_path: Path,
+    mutation: str,
+    match: str,
+) -> None:
+    root = tmp_path / "features"
+    _write_feature_root(root, "purge")
+    target = root / "feature_points/exchange=binance/symbol=BTCUSDT/date=2025-06-01/part-0.parquet"
+    pl = pytest.importorskip("polars")
+    frame = pl.read_parquet(target)
+    timestamps = frame.get_column("timestamp_ms").to_list()
+    if mutation == "jitter":
+        frame = frame.with_columns(
+            pl.Series(
+                "source_timestamp_ms",
+                [timestamps[0], timestamps[1] + 1001, timestamps[2]],
+            )
+        )
+    elif mutation == "source_duplicate":
+        frame = frame.with_columns(
+            pl.Series(
+                "source_timestamp_ms",
+                [timestamps[0], timestamps[0], timestamps[2]],
+            )
+        )
+    else:
+        frame = frame.with_columns(
+            pl.Series(
+                "timestamp_ms",
+                [timestamps[0], timestamps[0], timestamps[2]],
+            )
+        )
+    frame.write_parquet(target)
+
+    with pytest.raises(ValueError, match=match):
+        _seal_test_root_tree("purge", "feature", root)
+
+
+def test_eight_hour_funding_resolver_forbids_ton_admission_fail_closed() -> None:
+    ordered_lookup = object.__new__(AlphaMaxOrderedFundingLookup)
+    admitted = ("ADAUSDT", "AVAXUSDT", "BNBUSDT", "BTCUSDT", "TONUSDT")
+
+    with pytest.raises(ValueError, match="ton_4h_funding_forbidden_in_8h_resolver"):
+        AlphaMaxFundingBoundaryResolver(ordered_lookup, admitted)
+
+
 def _contract_manifest() -> dict[str, object]:
     return {
-        "schema_version": "alpha_max_contract_manifest.v1",
+        "schema_version": "alpha_max_contract_manifest.v2",
         "exchange": "binance",
         "records": [
             {
@@ -570,6 +1402,28 @@ def _contract_manifest() -> dict[str, object]:
                 "settle_asset": "USDT",
                 "volume_unit": "base_asset",
                 "contract_multiplier": 1.0,
+                "raw_availability_start_utc": (
+                    _TONUSDT_RAW_AVAILABILITY_START if symbol == "TONUSDT" else _AVAILABILITY_FLOOR
+                )
+                .isoformat()
+                .replace("+00:00", "Z"),
+                "raw_availability_end_utc": (
+                    _TONUSDT_AVAILABILITY_END if symbol == "TONUSDT" else _AVAILABILITY_CEILING
+                )
+                .isoformat()
+                .replace("+00:00", "Z"),
+                "feature_availability_start_utc": (
+                    _TONUSDT_FEATURE_AVAILABILITY_START
+                    if symbol == "TONUSDT"
+                    else _AVAILABILITY_FLOOR
+                )
+                .isoformat()
+                .replace("+00:00", "Z"),
+                "feature_availability_end_utc": (
+                    _TONUSDT_AVAILABILITY_END if symbol == "TONUSDT" else _AVAILABILITY_CEILING
+                )
+                .isoformat()
+                .replace("+00:00", "Z"),
             }
             for symbol in ALPHA_MAX_CANDIDATE_SYMBOLS
         ],
@@ -594,6 +1448,13 @@ def test_contract_manifest_seal_accepts_only_exact_canonical_ten_symbol_metadata
     seal = seal_alpha_max_contract_manifest(path)
     assert seal.sha256 == hashlib.sha256(canonical).hexdigest()
     assert tuple(record.symbol for record in seal.records) == ALPHA_MAX_CANDIDATE_SYMBOLS
+    assert type(seal.raw_availability_start_by_symbol) is type(MappingProxyType({}))
+    assert seal.raw_availability_start_by_symbol["TONUSDT"] == (_TONUSDT_RAW_AVAILABILITY_START)
+    assert seal.feature_availability_start_by_symbol["TONUSDT"] == (
+        _TONUSDT_FEATURE_AVAILABILITY_START
+    )
+    assert seal.raw_availability_end_by_symbol["TONUSDT"] == _TONUSDT_AVAILABILITY_END
+    assert seal.feature_availability_end_by_symbol["TONUSDT"] == _TONUSDT_AVAILABILITY_END
     with pytest.raises(FrozenInstanceError):
         seal.sha256 = _HASH_A
 
@@ -604,11 +1465,17 @@ def test_contract_manifest_seal_accepts_only_exact_canonical_ten_symbol_metadata
         seal_alpha_max_contract_manifest(path)
 
 
-def _candidate_input(symbol: str, *, passes: bool, missing_last_bucket: bool = False):
+def _candidate_input(
+    symbol: str,
+    *,
+    passes: bool,
+    missing_last_bucket: bool = False,
+    first_day_index: int = 0,
+):
     start = datetime(2024, 1, 1, tzinfo=UTC)
     volume = 40_000.0 if passes else 20_000.0
     rows: list[AlphaMaxRawObservation] = []
-    for day_index in range(517):
+    for day_index in range(first_day_index, 517):
         for hour in (0, 4, 8, 12, 16, 20):
             if missing_last_bucket and day_index == 516 and hour == 20:
                 continue
@@ -669,6 +1536,47 @@ def test_train_admission_missing_bucket_is_not_synthetic_zero_and_fails_membersh
             inputs,
             input_root_hashes={"warmup": _HASH_A, "train": _HASH_B},
         )
+
+
+def test_train_admission_rejects_ton_listing_gap_instead_of_fabricating_coverage() -> None:
+    inputs = {
+        symbol: _candidate_input(
+            symbol,
+            passes=index < 5 or symbol == "TONUSDT",
+            first_day_index=60 if symbol == "TONUSDT" else 0,
+        )
+        for index, symbol in enumerate(ALPHA_MAX_CANDIDATE_SYMBOLS)
+    }
+
+    result = compute_alpha_max_train_admission(
+        inputs,
+        input_root_hashes={"warmup": _HASH_A, "train": _HASH_B},
+    )
+
+    assert result.artifact.admitted_symbols == ALPHA_MAX_CANDIDATE_SYMBOLS[:5]
+    ton_days = result.daily_quote_notional_by_symbol["TONUSDT"]
+    assert len(ton_days) == 457
+    assert ton_days[0].day.isoformat() == "2024-03-01"
+    payload = json.loads(result.artifact.canonical_bytes)
+    assert payload["per_candidate"]["TONUSDT"] == {
+        "admitted": False,
+        "reasons": [
+            "daily_quote_notional_day_count_mismatch",
+            "incomplete_train_4h_keys",
+            "incomplete_train_daily_keys",
+        ],
+        "statistics": {
+            "causal_funding_coverage_complete": True,
+            "complete_train_4h_keys": False,
+            "complete_train_daily_keys": False,
+            "consecutive_completed_daily_bars_before_train": 366,
+            "daily_quote_notional_day_count": 457,
+            "median_quote_notional_usdt": 24_000_000.0,
+            "p10_quote_notional_usdt": 24_000_000.0,
+            "readable_monotone_unique_finite_partitions": True,
+            "unresolved_daily_cross_section_count": 0,
+        },
+    }
 
 
 def _train_liquidity_bucket_fixture():
