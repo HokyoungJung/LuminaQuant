@@ -55,12 +55,6 @@ Notes:
 - Root compatibility shims were removed; use `uv run lq ...` entrypoints only.
 - Runtime artifacts should prefer `var/`.
 
-## Added-plan routing
-
-- If the user says `추가된 계획`, `최신 계획`, `앞서 추가한 계획`, or `the added/latest plan` without a path, treat it as the tracked strategy-recovery handoff in `docs/research_note/data_pc_strategy_recovery_runbook_20260713.md`.
-- Read that runbook from section 0, then its linked master plan and audit, and execute the dependency-ordered contract autonomously.
-- Tracked recovery documents are authoritative; do not substitute untracked `.omc/` drafts.
-
 ---
 
 <!-- LQ:TREE:START -->
