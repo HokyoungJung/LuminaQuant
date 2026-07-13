@@ -1,0 +1,377 @@
+# Data-PC Strategy Recovery Runbook
+
+작성일: 2026-07-13
+상위 계획: [`strategy_recovery_master_plan_20260713.md`](strategy_recovery_master_plan_20260713.md)
+권한: 데이터 인벤토리, 결손 복구와 research-only 실행 준비. 주문·paper·testnet·live·실자본 권한 없음.
+
+## 1. 이 runbook에서 지금 실행할 범위
+
+데이터 PC에서 바로 수행할 것은 다음뿐이다.
+
+1. 기존 데이터 root 발견과 read-only 인벤토리
+2. core 10의 원래 Router 기간 기준 1m OHLCV 결손 확인
+3. 결손이 있을 때만 공식 archive로 append
+4. funding/support coverage 확인과 최소 복구
+5. Alpha-Max canonical 1s/funding source가 있으면 Rev5.15 phase roots 준비
+
+고-CAGR final replay, Alpha-Max prelock/historical, fresh-forward는 각각의 선행 blocker가 닫히기 전 실행하지 않는다.
+
+## 2. 안전 규칙
+
+- `set -euo pipefail`, UTC, 새 `RUN_DIR`를 사용한다.
+- 기존 데이터 root는 원본으로 취급하고 먼저 inventory를 남긴다.
+- `--no-resume`, synthetic fill, symbol 대체, 날짜 변경을 사용하지 않는다.
+- collector는 항상 고정 symbol 목록과 명시한 기간으로 실행한다.
+- broad current universe discovery는 coverage 조사에만 사용하고 frozen 성과 실험에는 사용하지 않는다.
+- collector/report output과 market data root를 같은 디렉터리에 두지 않는다.
+- 실패한 실행의 output을 고치지 말고 새 `RUN_ID`로 재실행한다.
+- 현재 main의 `scripts/materialize_market_windows.py --help`는 실패한다. D-05가 수정되기 전 final raw-first materialization 명령을 실행하지 않는다.
+
+## 3. 저장소와 실행 기록 준비
+
+```bash
+set -euo pipefail
+umask 077
+export TZ=UTC
+
+REPO="/home/hoky/Quants-agent"
+RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)"
+RUN_BASE="/absolute/path/to/quants-recovery-runs"
+RUN_DIR="$RUN_BASE/$RUN_ID"
+mkdir -p "$RUN_DIR"
+
+cd "$REPO"
+git fetch origin --prune
+git status --porcelain=v1 | tee "$RUN_DIR/main-status.txt"
+test ! -s "$RUN_DIR/main-status.txt"
+git rev-parse HEAD | tee "$RUN_DIR/main-commit.txt"
+uv sync --frozen --extra optimize --extra dev
+uv run python --version | tee "$RUN_DIR/python-version.txt"
+env | sed 's/=.*//' | LC_ALL=C sort -u > "$RUN_DIR/environment-variable-names.txt"
+uv pip freeze > "$RUN_DIR/python-packages.txt"
+```
+
+`git status`가 비어 있지 않으면 다른 clean checkout/worktree를 만들고 다시 시작한다. 데이터 파일 자체는 Git에 추가하지 않는다.
+
+## 4. 기존 데이터 root 찾기
+
+먼저 알려진 위치만 검사한다.
+
+```bash
+for candidate in \
+  "$REPO/data/market_parquet" \
+  "$REPO/LuminaQuant/data/market_parquet" \
+  "/data/market_parquet" \
+  "/mnt/d/market_parquet"
+do
+  if test -d "$candidate"; then
+    printf '%s\n' "$(readlink -f "$candidate")"
+  fi
+done | tee "$RUN_DIR/data-root-candidates.txt"
+```
+
+없으면 bounded search를 한 번 수행한다.
+
+```bash
+for root in /home /data /mnt; do
+  test ! -d "$root" || find "$root" -maxdepth 7 -type d -name market_parquet -print
+done 2>/dev/null | LC_ALL=C sort -u \
+  | tee -a "$RUN_DIR/data-root-candidates.txt"
+```
+
+실제 과거 보고서가 사용한 후보는 `.../LuminaQuant/data/market_parquet`였다. 디렉터리가 있다는 이유만으로 선택하지 말고 아래 repository coverage가 가장 완전하고 provenance를 설명할 수 있는 root를 사용한다.
+
+```bash
+export SOURCE_ROOT="/absolute/chosen/existing/path/to/market_parquet"
+export MARKET_ROOT="/absolute/new/writable/path/to/market_parquet"
+test -d "$SOURCE_ROOT"
+test ! -L "$SOURCE_ROOT"
+test ! -e "$MARKET_ROOT"
+printf '%s\n' "$(readlink -f "$SOURCE_ROOT")" | tee "$RUN_DIR/source-root.txt"
+find -P "$SOURCE_ROOT" -xdev -printf '%m\t%y\t%s\t%T@\t%p\n' \
+  | LC_ALL=C sort > "$RUN_DIR/source-file-inventory.tsv"
+mkdir -p "$MARKET_ROOT"
+cp -a --reflink=auto "$SOURCE_ROOT"/. "$MARKET_ROOT"/
+test -z "$(find -P "$MARKET_ROOT" -xdev -type l -print -quit)"
+test -z "$(find -P "$MARKET_ROOT" -xdev -type f -links +1 -print -quit)"
+printf '%s\n' "$(readlink -f "$MARKET_ROOT")" | tee "$RUN_DIR/market-root.txt"
+```
+
+`SOURCE_ROOT`는 이후 수정하지 않는다. `MARKET_ROOT`는 별도 writable filesystem snapshot으로 준비해도 되며, 위 reflink/copy에 필요한 공간이 없으면 STOP한다.
+
+## 5. 변경 전 인벤토리
+
+core 10은 새 전략 목록이 아니라 고정된 최소 데이터 검증 묶음이다.
+
+```bash
+CORE=(BTCUSDT ETHUSDT BNBUSDT SOLUSDT XRPUSDT ADAUSDT DOGEUSDT AVAXUSDT LINKUSDT LTCUSDT)
+ROUTER_SINCE="2025-01-01T00:00:00Z"
+ROUTER_UNTIL="2026-06-30T23:59:59.999Z"
+```
+
+물리 layout과 실제 repository loader를 별도로 검사한다. `--scan-dir`과 `--root`는 서로 다른 모드이므로 한 명령에 같이 쓰지 않는다.
+
+```bash
+uv run python scripts/research/report_data_coverage.py \
+  --scan-dir "$MARKET_ROOT" \
+  --exchange binance \
+  --symbols "${CORE[@]}" \
+  --timeframes 1m 1h 4h 1d \
+  --min-bars 360 \
+  --json "$RUN_DIR/physical-coverage-before.json" \
+  | tee "$RUN_DIR/physical-coverage-before.txt"
+
+uv run python scripts/research/report_data_coverage.py \
+  --root "$MARKET_ROOT" \
+  --exchange binance \
+  --symbols "${CORE[@]}" \
+  --timeframes 1m 1h 4h 1d \
+  --min-bars 360 \
+  --json "$RUN_DIR/repository-coverage-before.json" \
+  | tee "$RUN_DIR/repository-coverage-before.txt"
+
+uv run python scripts/build_strategy_support_inventory.py \
+  --symbols "${CORE[@]}" \
+  --db-path "$MARKET_ROOT" \
+  --exchange-id binance \
+  --json-path "$RUN_DIR/strategy-support-before.json" \
+  --csv-path "$RUN_DIR/strategy-support-before.csv"
+```
+
+이 세 결과는 root와 loader의 **triage coverage**일 뿐 데이터 무결성 영수증이 아니다. 현재 CLI만으로는 duplicate, nonmonotone, nonfinite, expected 1m grid의 interior gap, funding expected settlement gap을 fail-close할 수 없다. master plan의 D-01A validator가 별도 JSON receipt를 만들기 전에는 이를 통과 증거로 사용하지 않는다.
+
+파일명, 크기, mode와 mtime을 기록한다. 전체 대용량 root SHA는 초기 단계에서 강제하지 않고, 실제 frozen experiment가 소유할 subset을 정한 뒤 그 subset만 hash한다.
+
+```bash
+find -P "$MARKET_ROOT" -xdev -printf '%m\t%y\t%s\t%T@\t%p\n' \
+  | LC_ALL=C sort > "$RUN_DIR/market-file-inventory-before.tsv"
+```
+
+여기서 멈추고 JSON을 확인한다. 이미 원래 Router 기간을 덮는 series는 다시 다운로드하지 않는다.
+
+## 6. Router용 1m 결손 복구
+
+Router의 원래 train start는 `2025-01-01`이다. 이 트랙 때문에 2024년 데이터를 강제로 만들지 않는다. 위 `ROUTER_UNTIL`은 2026-06 월말로 동결해 7월 이후를 historical 재선택에 섞지 않는다.
+
+먼저 dry-run을 수행한다. 이 dry-run은 market root에 쓰지 않지만 archive를 조회할 수 있다. 이 collector는 각 series의 마지막 timestamp 다음부터 재개하는 **tail append 전용**이다. existing interval 내부의 gap은 찾거나 고치지 않는다.
+
+```bash
+uv run python scripts/collect_binance_1m_research_universe.py \
+  --source data-vision \
+  --db-path "$MARKET_ROOT" \
+  --exchange binance \
+  --since "$ROUTER_SINCE" \
+  --until "$ROUTER_UNTIL" \
+  --symbols "${CORE[@]}" \
+  --workers 4 \
+  --global-request-interval-sec 1.0 \
+  --dry-run \
+  --report-dir "$RUN_DIR/ohlcv-1m-dry-run"
+```
+
+dry-run report는 마지막 timestamp 이후의 tail 계획만 보여 주며 interior gap 부재를 증명하지 않는다. D-01A validator의 pre-append receipt가 모든 대상 series에 대해 `interior_gap_count=0`, `missing_prefix_count=0`, `safe_tail_append=true`를 기록하기 전에는 `--dry-run`을 제거하지 않는다.
+
+interior 또는 prefix gap이 하나라도 있으면 **STOP**한다. 아래 일반 collector를 실행하지 말고, 누락 interval을 명시적으로 소유하는 bounded gap-repair task와 immutable plan을 별도로 만든 뒤 validator를 다시 통과시킨다. 아래 실행 명령은 receipt가 허용한 연속 tail에만 사용한다.
+
+```bash
+uv run python scripts/collect_binance_1m_research_universe.py \
+  --source data-vision \
+  --db-path "$MARKET_ROOT" \
+  --exchange binance \
+  --since "$ROUTER_SINCE" \
+  --until "$ROUTER_UNTIL" \
+  --symbols "${CORE[@]}" \
+  --workers 4 \
+  --global-request-interval-sec 1.0 \
+  --report-dir "$RUN_DIR/ohlcv-1m-executed"
+```
+
+최근 완전한 archive 이후의 작은 tail이 성과 window에 꼭 필요한 경우에만 `--source fapi`를 별도 `RUN_ID`로 사용한다. 과거 전구간을 FAPI로 긁지 않는다. 429/418이 발생하면 STOP하고 기다린 뒤 새 run record로 재개한다.
+
+현재 static 또는 `static-plus-fapi-tradfi` universe를 frozen 실험 입력으로 사용하지 않는다. R-01이 만든 exact router manifest의 symbol tuple이 준비되면 같은 collector를 그 tuple에만 다시 적용한다.
+
+## 7. Funding 최소 복구
+
+먼저 funding만 plan-only로 확인한다. OI와 liquidation은 초기 Router/trend gate의 blocker가 아니며 수집하지 않는다.
+
+```bash
+uv run python scripts/collect_strategy_support_data.py \
+  --symbols "${CORE[@]}" \
+  --db-path "$MARKET_ROOT" \
+  --exchange-id binance \
+  --since "$ROUTER_SINCE" \
+  --until "$ROUTER_UNTIL" \
+  --include-funding \
+  --skip-mark-index \
+  --skip-open-interest \
+  --skip-liquidations \
+  --retries 3 \
+  --backend parquet \
+  | tee "$RUN_DIR/funding-plan.json"
+```
+
+plan이 정확하면 `--execute`만 추가한다. 수집 자체는 허용하지만 이 report는 settlement 완전성을 증명하지 않는다. 이후 D-01A post-append receipt가 expected funding cadence gap 0을 증명하기 전에는 전략 실행으로 넘어가지 않는다.
+
+```bash
+uv run python scripts/collect_strategy_support_data.py \
+  --symbols "${CORE[@]}" \
+  --db-path "$MARKET_ROOT" \
+  --exchange-id binance \
+  --since "$ROUTER_SINCE" \
+  --until "$ROUTER_UNTIL" \
+  --include-funding \
+  --skip-mark-index \
+  --skip-open-interest \
+  --skip-liquidations \
+  --retries 3 \
+  --backend parquet \
+  --execute \
+  | tee "$RUN_DIR/funding-executed.json"
+```
+
+진짜 spot-perp basis/carry 트랙이 별도 preregistration을 마친 뒤에만 mark/index와 spot 양 leg를 추가한다. `--feature-profile strategy-used`는 mark/index를 제외하므로 basis proof에는 사용할 수 없다.
+
+## 8. 변경 후 인벤토리와 STOP 판정
+
+```bash
+uv run python scripts/research/report_data_coverage.py \
+  --root "$MARKET_ROOT" \
+  --exchange binance \
+  --symbols "${CORE[@]}" \
+  --timeframes 1m 1h 4h 1d \
+  --min-bars 360 \
+  --json "$RUN_DIR/repository-coverage-after.json" \
+  | tee "$RUN_DIR/repository-coverage-after.txt"
+
+uv run python scripts/build_strategy_support_inventory.py \
+  --symbols "${CORE[@]}" \
+  --db-path "$MARKET_ROOT" \
+  --exchange-id binance \
+  --json-path "$RUN_DIR/strategy-support-after.json" \
+  --csv-path "$RUN_DIR/strategy-support-after.csv"
+
+find -P "$MARKET_ROOT" -xdev -printf '%m\t%y\t%s\t%T@\t%p\n' \
+  | LC_ALL=C sort > "$RUN_DIR/market-file-inventory-after.tsv"
+```
+
+현재 repository에는 아래 계약을 완전히 증명하는 실행 CLI가 없다. 따라서 이 단계의 첫 구현 작업은 master plan D-01A이며, 기존 `src/lumina_quant/compute/ohlcv_validation.py::validate_ohlcv_frame`을 재사용하고 expected-grid 및 funding-settlement 검사를 추가한다. funding은 고정 8시간을 가정하지 않고 해당 symbol/time의 거래소 원본 cadence/next-funding provenance를 기준으로 검사한다. 전략 gate가 소비할 JSON receipt의 최소 계약은 다음과 같다.
+
+```json
+{
+  "artifact_kind": "research_data_contract_validation",
+  "mode": "post_append_strict",
+  "passed": true,
+  "series": [{
+    "duplicate_count": 0,
+    "nonmonotone_count": 0,
+    "nonfinite_count": 0,
+    "expected_grid_gap_count": 0
+  }],
+  "funding": [{
+    "unexpected_settlement_gap_count": 0
+  }]
+}
+```
+
+pre-append mode는 `interior_gap_count`, `missing_prefix_count`, `missing_tail_count`, `safe_tail_append`를 추가로 출력한다. post-append strict receipt의 `passed=true`가 없으면 아래 STOP 목록을 사람이 눈으로 확인했더라도 전략 실행으로 넘어가지 않는다.
+
+다음 중 하나면 전략 실행으로 넘어가지 않는다.
+
+- required interval 안의 설명되지 않는 gap/duplicate/nonmonotone row
+- funding settlement 누락
+- source 또는 listing provenance 부재
+- current static universe만 있고 fold별 membership이 없음
+- synthetic CSV가 loader에 섞임
+- append 전후 기존 구간 값이 바뀜
+
+## 9. 고-CAGR Router 실행 전 blocker
+
+현 runner의 full rerun은 discovery용이며 exact R1/R2만 재생하는 CLI가 아니다. 또한 비용 stress가 proxy 10/15/20bp이고 final actual-engine proof가 아니다. 다음 네 산출물이 main에 merge되고 검증되기 전 고-CAGR 성과 명령을 실행하지 않는다.
+
+1. exact R1/R2 frozen manifest replay seam
+2. point-in-time symbol lifecycle manifest
+3. `generic_fallback_proxy=0` fail-close receipt
+4. 단일 strict + cost-realistic replacement profile과 10/15/20/30bp proof path
+
+준비가 끝난 후에도 original Router 경계는 그대로 사용한다.
+
+```text
+train_start=2025-01-01
+first_oos_start=2025-09-01
+candidate_count=2
+new_grid_search=false
+recompute_from_json=false
+post_oos_augment=false
+```
+
+## 10. Alpha-Max Rev5.15 phase roots 준비
+
+Alpha-Max는 main 데이터와 실행 트리를 섞지 않는다.
+
+```bash
+ALPHA_REPO="/home/hoky/Quants-agent-alpha-max-data-pc"
+ALPHA_COMMIT="629d91e5d4aac26911af65a4a5e15ebdcbded30f"
+
+cd "$REPO"
+git fetch origin feat/alpha-max-20260710
+test ! -e "$ALPHA_REPO"
+git worktree add --detach "$ALPHA_REPO" "$ALPHA_COMMIT"
+
+cd "$ALPHA_REPO"
+test "$(git rev-parse HEAD)" = "$ALPHA_COMMIT"
+test -z "$(git status --porcelain=v1)"
+uv sync --frozen --extra dev
+printf '%s  %s\n' \
+  '2f267451c4df6b6b7471d972b7756327e41c82522ae2ef4b9198fbf6aa8b5e9c' \
+  'configs/research/alpha_max_portfolio_20260711_listing_aware.json' \
+  'ae272f70f65797b4c8a87c29b7f8e64511617f8e0f2d4bd841b2d1addb7d1220' \
+  'configs/research/alpha_max_contract_manifest_20260711_listing_aware.json' \
+  '214e5da198307d8d32b30f69fb6b1f09002e0b31888dc476ed16060f79de9719' \
+  'configs/research/alpha_max_official_availability_evidence_20260711.json' \
+  'ea26b902bcec4458340e4c345fa648a3db9104e1b337fd42460d9a9461a738ac' \
+  'scripts/research/prepare_alpha_max_phase_roots.py' \
+  | sha256sum -c - \
+  | tee "$RUN_DIR/alpha-max-rev515-sha256-check.txt"
+```
+
+canonical source는 이미 존재하는 실제 1s monthly parquet와 funding feature root여야 한다. 일반 1m collector 결과를 Alpha-Max 입력으로 쓰지 않는다.
+
+```bash
+ALPHA_SOURCE="/absolute/path/to/canonical-alpha-source"
+ALPHA_PHASES="/absolute/new/path/alpha-max-phase-roots-v515-$RUN_ID"
+test -d "$ALPHA_SOURCE/market_ohlcv_1s"
+test -d "$ALPHA_SOURCE/feature_points"
+test ! -e "$ALPHA_PHASES"
+
+uv run --frozen --extra dev python scripts/research/prepare_alpha_max_phase_roots.py \
+  --raw-root "$ALPHA_SOURCE/market_ohlcv_1s" \
+  --feature-root "$ALPHA_SOURCE/feature_points" \
+  --contract-manifest "$ALPHA_REPO/configs/research/alpha_max_contract_manifest_20260711_listing_aware.json" \
+  --output-root "$ALPHA_PHASES" \
+  | tee "$RUN_DIR/alpha-max-phase-preparation.json"
+
+test -f "$ALPHA_PHASES/preparation_manifest.json"
+find -P "$ALPHA_PHASES" -xdev -printf '%m\t%y\t%s\t%p\n' \
+  | LC_ALL=C sort > "$RUN_DIR/alpha-max-phase-inventory.tsv"
+sha256sum "$ALPHA_PHASES/preparation_manifest.json" \
+  > "$RUN_DIR/alpha-max-phase-manifest.sha256"
+```
+
+이 preparer는 원래 여섯 phase의 half-open interval과 symbol별 official availability를 교차해 decode/clip/rewrite하고 새 output root에 atomic publish한다. 날짜를 줄이지 않는다. TONUSDT의 짧은 공식 availability는 root에 기록되고 admission에서 탈락한다.
+
+**중요:** branch의 기존 `alpha_max_data_pc_runbook_20260711.md`는 Rev5.14 config/manifest/hash를 지시한다. A-01의 Rev5.15 runbook 정합화와 push가 끝나기 전에는 위 phase-root preparation까지만 수행하고 `run_alpha_max_prelock.py`와 historical CLI는 실행하지 않는다.
+
+## 11. 데이터 PC에서 회수할 handoff bundle
+
+실제 market parquet를 Git이나 run bundle에 복사하지 않는다. 다음 작은 evidence만 회수한다.
+
+- `main-commit.txt`, Alpha commit
+- environment와 실행 명령
+- before/after coverage JSON과 support inventory
+- collector report와 오류 로그
+- file inventory와 frozen subset hash
+- point-in-time lifecycle provenance
+- Alpha `preparation_manifest.json`과 hash
+- data gap과 미해결 blocker 목록
+
+handoff가 끝나도 실자본 배분은 0%다. 다음 단계는 master plan의 D-04, D-05, R-01부터이며 결과가 아니라 실행 경로를 먼저 고친다.
