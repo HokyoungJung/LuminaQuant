@@ -16,6 +16,8 @@
 
 고-CAGR final replay, Alpha-Max prelock/historical, fresh-forward는 각각의 선행 blocker가 닫히기 전 실행하지 않는다.
 
+상위 계획 6장의 후속 alpha/volatility 프로그램도 지금은 비활성이다. 아래의 조건부 데이터 계약 초안만 준비할 수 있으며, candidate 성과 실행과 V-DIAG는 `R-04`, `A-03`, `C-00`, `D-01A`, `D-04`가 모두 완료되기 전 시작하지 않는다.
+
 ## 2. 안전 규칙
 
 - `set -euo pipefail`, UTC, 새 `RUN_DIR`를 사용한다.
@@ -231,6 +233,34 @@ uv run python scripts/collect_strategy_support_data.py \
 
 진짜 spot-perp basis/carry 트랙이 별도 preregistration을 마친 뒤에만 mark/index와 spot 양 leg를 추가한다. `--feature-profile strategy-used`는 mark/index를 제외하므로 basis proof에는 사용할 수 없다.
 
+### 7.1 조건부 TradFi/precious-metal 데이터 계약
+
+이 계약은 상위 계획의 C-00 manifest 초안을 위한 inventory 규칙이다. `CORE` 배열이나 Router의 정확히 두 후보 manifest에 TradFi/금속 symbol을 추가하지 않는다. 후보 데이터는 별도 `ALPHA_CANDIDATE_MANIFEST`와 SHA-256으로만 고정한다.
+
+각 series는 최소한 다음 필드를 가진다.
+
+- `canonical_symbol`, venue symbol, venue, instrument type, quote currency
+- contract multiplier, price/tick unit, session/calendar, timezone
+- first/last tradable timestamp와 point-in-time listing/delist provenance
+- perpetual이면 mark/index와 실제 funding settlement cadence
+- futures면 expiry, front/next contract mapping, roll rule과 실제 roll cost
+- spot/CFD면 executable venue와 financing/borrow 조건
+
+실제 완결된 raw/1m OHLCV와 executable BBO 또는 동등한 비용 provenance를 우선 사용한다. 1m가 있는 경우 4h/1d는 결정적으로 파생한다. daily-only 후보는 point-in-time 공식 daily OHLCV를 별도 계약으로 허용하지만 이를 intraday realized volatility나 체결비용의 대용물로 쓰지 않는다. daily realized volatility는 intraday log return 제곱합으로 계산한다. 가격 수준 rolling standard deviation, 월요일 label에 그 주 미래 평균을 넣는 `dat_ave(..., 'WS')`, current universe의 과거 역적용은 금지한다.
+
+조건부 결손 복구 순서는 다음과 같다.
+
+1. candidate manifest의 첫 평가 신호와 동결한 class/timeframe warmup으로 series별 owned interval을 계산한다.
+2. source root를 read-only inventory하고 exact venue/contract series의 overlap과 gap을 기록한다.
+3. 연속 tail만 공식 archive/API로 append한다. interior gap, expiry/roll gap 또는 prefix gap은 bounded repair manifest를 따로 만들고 symbol 대체나 synthetic fill을 하지 않는다.
+4. pre/post D-01A receipt가 기존 구간 불변, expected-grid/lifecycle/session/funding gap 0을 증명한 뒤 frozen subset만 hash한다.
+
+Router의 `2025-01-01` train start는 이 절 때문에 바뀌지 않는다. 예를 들어 C-ANCHOR를 2025-01-01부터 계산하려면 그 전에 실제 52-week-equivalent completed bars가 필요하다. 정확한 bar 수는 TradFi session calendar와 24/7 crypto calendar를 구분해 manifest에 고정하며, 데이터가 없으면 그 candidate의 최초 eligible signal만 늦추고 2024년 가격을 만들어 내지 않는다.
+
+XAU/XAG/XPT/XPD 이름만으로 spot benchmark, CFD, CME futures와 Binance TradFi perpetual을 치환하지 않는다. `static-plus-fapi-tradfi` 같은 broad discovery 결과는 inventory용일 뿐 frozen experiment 입력이 아니다. option IV/RV는 executable chain/surface snapshot이, commodity curve carry는 expiry별 settle/BBO와 roll calendar가 생길 때까지 BLOCKED다. auxiliary `precious_metal` 저장소의 credential, host 또는 secret은 복사하거나 bundle/Git에 넣지 않는다.
+
+D-01A receipt는 공통 overlap, expected grid gap, duplicate/nonfinite, session/calendar, lifecycle, funding cadence와 source provenance를 fail-close해야 한다. 한 항목이라도 불명확하면 해당 candidate만 STOP하고 Router/Alpha-Max 복구 범위를 넓히지 않는다.
+
 ## 8. 변경 후 인벤토리와 STOP 판정
 
 ```bash
@@ -372,6 +402,45 @@ sha256sum "$ALPHA_PHASES/preparation_manifest.json" \
 - file inventory와 frozen subset hash
 - point-in-time lifecycle provenance
 - Alpha `preparation_manifest.json`과 hash
+- 활성화된 경우 candidate/data/trial manifest와 hash
+- 활성화된 경우 feature-admission, overlay-ablation, cost-grid와 selection-gate report
 - data gap과 미해결 blocker 목록
 
 handoff가 끝나도 실자본 배분은 0%다. 다음 단계는 master plan의 D-04, D-05, R-01부터이며 결과가 아니라 실행 경로를 먼저 고친다.
+
+## 12. 후속 alpha/volatility 데이터-PC 실행 계약
+
+이 절은 상위 계획 6장의 C-00~C-06이 활성화된 뒤의 실행 계약이다. 다음 조건을 모두 충족하지 않으면 inventory 초안에서 STOP한다.
+
+- `candidate-manifest.json`, `data-contract.json`, `trial-ledger.json`과 SHA-256 동결
+- D-01A strict validator와 D-04 point-in-time lifecycle 통과
+- R-04와 A-03의 기존 R1/R2·Alpha-Max 판정 완료
+- single combined strict/cost profile, actual registry route와 `generic_fallback_proxy=0`
+- clean worktree, 별도 run ID, untouched lockbox와 actual cost/funding source
+
+### 12.1 실행 matrix
+
+| 묶음 | 비교 | 고정 조건 |
+|---|---|---|
+| standalone | 상위 계획 6.2의 각 candidate default 한 세트 | validation-only ranking, locked OOS report-only, 전 reject 보존 |
+| V-DIAG | own-vol HAR/EWMA 또는 univariate-GARCH baseline 대 preregistered leader-vol 추가 | 비거래 진단, untouched lockbox 제외, `RV(t+1)` 한 horizon, validation-forward QLIKE/MSE/FDR |
+| V-PAIR | 공통 `lookback_window=120`, `hedge_window=240`, `vol_lag_bars=2`; P0 `min_vol_convergence=0` 대 P1 `.60` | 기존 `state_volconv`의 나머지 parameter, pair residual, episode, execution, funding과 cost 동일 |
+| V-OVERLAY | O0 child, O1 close-to-close vol-managed, O2 complete TradFi OHLC의 Yang-Zhang, O3 correlation crash guard, 각 dynamic arm에 gross-matched O4 static control | 각 O4는 별도 trial, 첫 cycle stack 금지, 같은 pre-overlay child signal/target·market data·cost/funding model |
+| V-COV | equal-notional, inverse-vol, existing shrunk-covariance allocator | 다음 bar weight, alpha가 아닌 risk allocation 비교 |
+
+V-DIAG가 상위 계획의 admission gate를 통과하기 전에는 새 DCC/BEKK/TVP-VAR 또는 direct GARCH/volatility 방향 alpha를 구현하지 않는다. V-PAIR/V-OVERLAY/V-COV는 standalone binding gate를 통과한 child에만 실행한다.
+
+실행 전에 candidate manifest의 각 row를 실제 repository CLI, registry class와 exact parameter key에 매핑한다. producer가 없으면 명령을 추측하지 말고 STOP한 뒤, 활성화된 task에서 기존 runner를 재사용하는 최소 seam과 targeted test를 먼저 만든다.
+
+### 12.2 필수 산출물과 STOP/KILL
+
+각 run은 다음 파일 또는 동등한 immutable artifact를 회수한다.
+
+- `candidate-manifest.json`, `data-contract.json`, `trial-ledger.json`
+- `feature-admission.json`, `standalone-walkforward.json`, `overlay-ablation.json`
+- `cost-grid.json`, `selection-gate.json`, `all-candidates.csv`, `decision.md`
+- Git/config/data/candidate hash, resolved command와 environment receipt
+
+trial ledger는 candidate, universe, timeframe, estimator, threshold, allocator, overlay arm과 cost cell 전부를 센다. DSR `>=0.90`, SPA `<=0.05`, PBO `<=0.50`, 20bp net `>0`, MDD `<=30%`, leave-best-fold-out net `>0`, active fold ratio `>=0.60`을 모두 통과해야 하며 PBO missing은 fail-close다. low-turnover/lead-lag는 RPT `>=10bp`도 필요하다.
+
+source/lifecycle/cost provenance 부재, unexplained gap, synthetic/fallback route, locked-OOS 기반 선택, 한 fold·symbol 지배, liquidation/ruin 또는 20bp 실패가 하나라도 있으면 해당 candidate를 KILL한다. 결과표에는 survivor뿐 아니라 모든 reject와 사유를 남긴다. 통과해도 alpha leaf 최대 1개와 risk overlay 최대 1개만 60일 frozen shadow로 보내며 실자본은 계속 0%다.

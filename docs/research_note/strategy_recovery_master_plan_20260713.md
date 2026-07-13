@@ -6,13 +6,13 @@
 
 ## 1. 목적과 종료 조건
 
-이 계획은 새 전략을 더 만드는 계획이 아니다. 다음 세 트랙을 실제 데이터와 수정된 평가 경로로 한 번만 다시 측정하고, 통과하지 못하면 같은 표본에서 추가 튜닝하지 않고 종료하는 계획이다.
+이 계획은 검증 없이 새 전략 수를 늘리는 계획이 아니다. 먼저 다음 세 트랙을 실제 데이터와 수정된 평가 경로로 한 번만 다시 측정하고, 통과하지 못하면 같은 표본에서 추가 튜닝하지 않고 종료한다. 그 판정 뒤에는 별도 preregistration과 run ID로 기존 구현을 재사용하는 후속 알파 후보 프로그램을 열 수 있다.
 
 1. 고-CAGR router R1: `codex_lagged_leaf_router_grid:h4_avg1_tr-0.02_tmdd0.50_val0.00_vmdd0.25_lagged_plus_val025_exact_unscaled`
 2. 고-CAGR router R2: `codex_lagged_leaf_router_grid:h4_avg1_tr-0.02_tmdd0.50_val0.00_vmdd0.25_lagged_plus_val025_fallback_mdd20_cap2`
 3. Alpha-Max Revision 5.15 listing-aware 프로토콜
 
-완료 조건은 데이터 PC가 재현 가능한 입력 묶음과 실행 기록을 만들고, 각 트랙이 과학적 통과 또는 종료 판정을 받은 뒤 최대 두 후보만 fresh-forward로 넘기는 것이다. 이 계획의 완료 자체는 paper, testnet, live 또는 실자본 승인을 뜻하지 않는다.
+완료 조건은 데이터 PC가 재현 가능한 입력 묶음과 실행 기록을 만들고, 각 트랙이 과학적 통과 또는 종료 판정을 받은 뒤 최대 두 후보만 fresh-forward로 넘기는 것이다. 후속 알파 후보 프로그램도 한 cycle당 독립 알파 leaf 최대 1개와 risk overlay 최대 1개만 forward로 보낸다. 이 계획의 완료 자체는 paper, testnet, live 또는 실자본 승인을 뜻하지 않는다.
 
 ## 2. 현재 판단
 
@@ -45,7 +45,7 @@
 
 ## 3. 불변조건
 
-1. 신규 indicator, ML, overlay, router grid와 인접 후보 대체를 추가하지 않는다.
+1. R1/R2와 Alpha-Max 판정 전에는 신규 indicator, ML, overlay, router grid와 인접 후보 대체를 추가하지 않는다. 후속 알파 프로그램도 기존 class·indicator·wrapper로 검증 가능한 가설은 새 코드 없이 측정하고, feature admission을 통과했지만 기존 구현이 없는 경우에만 별도 preregistration으로 최소 구현한다.
 2. 모든 단계의 실자본 배분은 0%다.
 3. synthetic `data/BTCUSDT.csv`, `data/ETHUSDT.csv`는 성과 실험에서 제외한다.
 4. operational STOP과 scientific KILL을 구분한다.
@@ -231,15 +231,163 @@ TONUSDT는 공식 raw `[2024-03-01T12:31:10Z, 2026-06-23T09:00:00Z)`, feature `[
 
 통과는 별도 canary risk review 자격만 뜻한다. 자동 자본 배분은 없다.
 
-## 6. 복구 트랙 종료 후의 후속 연구
+## 6. 복구 트랙 종료 후의 후속 알파 후보 프로그램
 
-R1/R2와 Alpha-Max가 모두 scientific KILL이면 같은 표본에서 변형을 더 만들지 않는다. 별도 run ID와 새 preregistration으로 아래 경제 가설만 다시 열 수 있다.
+R1/R2와 Alpha-Max가 과학적 판정을 받기 전에는 아래 프로그램의 전략 성과 실행을 시작하지 않는다. 데이터 계약과 preregistration 초안은 병렬로 준비할 수 있지만, 기존 OOS를 보고 candidate·parameter·universe·overlay를 바꾸지 않는다. 활성화 시 별도 run ID, clean worktree, trial ledger와 untouched lockbox를 사용한다.
 
-1. core 6~10의 저회전 1d/4h time-series trend. Alpha-Max daily trend 결과를 먼저 증거로 사용한다.
-2. 실제 spot long + perpetual short 양 leg의 funding/basis carry. futures-only funding slope를 진짜 carry로 부르지 않는다.
-3. point-in-time crypto-only universe의 BTC beta-residual 횡단면 모멘텀. lifecycle registry가 없으면 시작하지 않는다.
+### 6.1 증거 상태와 역할 구분
 
-각 패밀리는 기존 class와 utility를 우선 재사용하고 사전등록 variant를 최소화한다. 이 후속 연구는 현재 data-PC runbook의 실행 범위가 아니며, R1/R2 실패를 본 뒤 과거 OOS에 맞춰 설계해서는 안 된다.
+| 영역 | 현재 증거 | 허용 역할 |
+|---|---|---|
+| Local auxiliary `precious_metal`의 `data.ipynb`, `anomaly_detection.ipynb` | 2026-07-13 snapshot에는 `dat_ave(..., 'WS')`, 가격수준 rolling std, 단변량 GARCH와 가격 MAPE가 있으나 causal cross-volatility 예측 또는 executable PnL 검증은 없음 | 가설 출처만; 성과 근거 금지 |
+| Quants-agent 금속 pair | tracked [4금속 split report](../../var/reports/profit_moonshot_20260501/current_tail_20260505/precious_metal_pair_aggressive/precious_pair_available_window_split_backtest.md)의 OOS `-0.0478%`, Sharpe `-0.1641` | expected-null 재검증만; 같은 z-score parameter clone 금지 |
+| Volatility-regime residual basket | 두 후보 모두 train/validation/OOS 음수, hard reject (`docs/session_handoff_20260412_broader_redesign_and_ralph_audit.md:36-49`) | 재실행 금지; 새 후보의 prior-of-death |
+| TradFi discovery | symbol discovery와 일부 diagnostic은 있으나 point-in-time lifecycle·full refresh·cost-realistic proof가 없음 | 별도 data contract가 생길 때만 research-only |
+| `VolManagedRiskOverlayStrategy`, `AvgCorrelationCrashGuardOverlayStrategy` | 코드와 회귀 테스트는 있으나 실제 금속/TradFi market replay 증거 없음 | alpha가 아닌 risk A/B |
+| Cross-metal volatility spillover | 현재 tracked artifact에는 own-vol baseline 대 causal forecast 비교와 raw tradable return provenance가 없음 | prediction diagnostic부터; 곧바로 전략 구현 금지 |
+
+외부 문헌은 volatility spillover가 존재할 수 있고 volatility-managed exposure가 위험조정 성과를 개선할 수 있다는 prior만 제공한다. 이 저장소의 수익 증거로 전용하지 않는다. [Diebold–Yilmaz directional spillover](https://www.econstor.eu/bitstream/10419/45422/1/638343968.pdf), [Moreira–Muir volatility management](https://www.nber.org/papers/w22208), [precious-metal asymmetric spillover](https://doi.org/10.1016/j.resourpol.2019.101509).
+
+### 6.2 동결 후보 레지스트리
+
+각 ID는 기본 parameter 한 세트만 manifest에 동결한다. 서로 다른 timeframe, estimator, threshold, universe 또는 allocator는 각각 별도 trial로 센다. 같은 ID 내부 grid search는 금지한다.
+
+| ID | 경제 가설 | 기존 재사용 경로 | 최초 지위와 반증 조건 |
+|---|---|---|---|
+| C-TSMOM | 저회전 1d/4h time-series trend가 비용 후 지속된다 | `LowTurnoverTrendPersistenceStrategy`, TradFi/상품은 `CrossAssetDiversifiedTrendStrategy` 또는 `AdaptiveTrendRiderStrategy` 중 manifest에서 하나만 선택 | 1순위 alpha. RPT `<10bp`, 20bp net `<=0`, best fold 제거 후 net `<=0`이면 KILL |
+| C-ANCHOR | 52주 고점 근접도가 단순 momentum과 다른 횡단면 under-reaction을 포착한다 | `CrossSectionalNearHighAnchoringStrategy` | point-in-time universe와 최소 52주 history가 없으면 STOP; incremental IC와 net long-short가 없으면 KILL |
+| C-RESMOM | BTC beta를 제거한 residual momentum이 공통시장 노출과 다른 횡단면 수익을 가진다 | `TrendGatedResidualMomentumStrategy`와 기존 rolling-beta utility | lifecycle·delisting 포함 universe가 없으면 STOP; beta-neutral net alpha가 없으면 KILL |
+| C-REBAL | 느린 diversity/equal-weight rebalancing premium이 고상관 시장에서도 비용을 넘는다 | `RebalancingPremiumHarvestStrategy` | buy-and-hold/inverse-vol basket 대비 net excess growth와 Calmar가 개선되지 않으면 KILL |
+| C-METAL-RV | 실제 거래 가능한 금속 pair의 hedge-adjusted relative-value dislocation이 episode 단위로 회귀한다 | `PairSpreadZScoreStrategy`의 기존 `state_volconv` row와 아래 P0/P1 | XAU/XAG/XPT/XPD를 venue·contract별로 식별하고 fold-local trailing residual stationarity admission을 통과해야 한다. 기존 negative evidence를 이기지 못하면 KILL |
+| C-VOLSQ | volatility compression 뒤 가격 breakout 방향의 expansion이 지속된다 | `VolatilitySqueezeBreakoutRiderStrategy` | volatility만으로 방향을 정하지 않고 completed-bar breakout 확인 필수. 20bp와 fold 안정성 실패 시 KILL |
+| C-IDIOVOL | BTC beta 제거 후 low idiosyncratic-vol long/high-vol short premium이 존재한다 | `IdiosyncraticVolatilityStrategy` 기본값 한 세트 | 기존 소표본 무거래가 prior-of-death. eligible symbol/fold 폭 또는 IC가 부족하면 KILL |
+| C-SLOW-LL | 넓은 횡단면의 느린 lead-lag loading이 단일 pair lead-lag보다 비용을 견딘다 | `SlowCrossSectionalLeadLagStrategy` | 가장 먼저 자를 conditional 후보. 20bp 또는 RPT gate 실패 시 즉시 KILL |
+| C-TRUE-CARRY | 실제 spot long + perpetual/futures short의 funding/basis가 양 leg 비용 후 남는다 | 기존 funding scorer는 비교 feature만 사용; dual-leg execution은 별도 prerequisite | spot/perp 양 leg, basis, funding settlement, borrow, margin이 없으면 BLOCKED. futures-only funding slope를 carry 성과로 인정하지 않음 |
+
+다음은 이 cycle에서 실행하지 않는다.
+
+- GARCH lower-tail 가격 경로, 가격수준 rolling-std z-score와 full-sample anomaly를 방향 alpha로 사용하는 것
+- options implied-vs-realized volatility: option chain, surface, executable quote가 없으므로 BLOCKED
+- commodity curve carry/roll yield: 연속 front price가 아니라 개별 expiry chain과 roll 체결 데이터가 생기기 전까지 BLOCKED
+- 새 DCC/BEKK/TVP-VAR 전략: 아래 volatility diagnostic이 먼저 통과하지 않으면 YAGNI
+- 기존에 실패한 volatility-regime residual basket 또는 pair-spread parameter clone 부활
+- `StationarityGatedResidualReversionStrategy`, `TimeframePairZScoreReversionStrategy`, `MetalsRelativeValueBasketStrategy`를 C-METAL-RV와 동등한 구현으로 바꿔 끼우는 것; 각각 다른 residual/ratio 가설이므로 재개 시 별도 candidate ID와 trial이 필요
+
+### 6.3 Volatility connection 프로그램
+
+Volatility는 `log return` 또는 intraday return 제곱합으로만 정의한다. 가격 수준의 rolling 표준편차는 volatility feature로 금지한다.
+
+#### V-DIAG — cross-volatility prediction admission
+
+거래하지 않는 진단이다.
+
+- target: `RV(t+1)` 한 horizon만 사용한다.
+- baseline: target 자산 자신의 lagged log-RV와 1/5/22일 trailing block을 사용한 고정 HAR/EWMA 또는 기존 univariate GARCH 중 manifest에서 하나만 선택한다.
+- candidate: baseline에 사전등록한 leader의 동일한 lagged RV block만 추가한다.
+- crypto 방향은 `BTC -> eligible asset`, metals는 실제 raw provenance가 있을 때만 `Au -> Ag/Pt/Pd`를 고정한다.
+- untouched lockbox를 제외한 validation-forward folds의 QLIKE/MSE, coefficient sign stability와 paired block bootstrap을 기록한다.
+
+**Admission**: median validation-forward QLIKE 개선 `>=5%`, non-overlapping fold의 `>=60%`에서 개선, whole-search/FDR 조정 `p<=0.05`를 모두 만족해야 한다. 실패하면 direct volatility-spillover 전략과 새 multivariate-vol 코드 전체를 KILL한다. 통과해도 이는 변동 크기 예측이며 spot/perp의 가격 방향 alpha가 아니다.
+
+#### V-PAIR — pair volatility-convergence gate
+
+`PairSpreadZScoreStrategy`가 상속하는 `PairTradingZScoreStrategy`의 `_vol_spread_zscore`, `vol_lag_bars`, `min_vol_convergence`를 재사용한다. 신규 class는 만들지 않는다. 두 arm 모두 기존 `state_volconv` row의 나머지 parameter를 같게 동결하고 `lookback_window=120`, `hedge_window=240`, `vol_lag_bars=2`를 공유한다.
+
+- Arm P0: `min_vol_convergence=0.0`, volatility gate OFF
+- Arm P1: `min_vol_convergence=0.60`, volatility gate ON
+- signal, execution, cost, funding과 episode 정의는 동일하게 고정한다.
+
+P1은 P0보다 strict alpha binding gate를 모두 통과하고 validation Calmar가 개선되어야 한다. 단순 trade 수 감소나 한 episode 반복표본으로 생긴 승률은 uplift로 인정하지 않는다.
+
+#### V-OVERLAY — risk-only A/B
+
+standalone binding gate를 통과한 child 최대 2개에만 다음 arm을 적용한다. 첫 cycle에는 overlay를 서로 stack하지 않는다.
+
+| Arm | 구성 |
+|---|---|
+| O0 | child only |
+| O1 | 동일 child + `VolManagedRiskOverlayStrategy`, `close_to_close`, class default 한 세트 |
+| O2 | TradFi OHLC가 완전할 때만 동일 child + `yang_zhang`; crypto에는 생성하지 않음 |
+| O3 | 동일 child + `AvgCorrelationCrashGuardOverlayStrategy`, class default 한 세트 |
+| O4 | O1/O2/O3 각각에 대해 그 arm의 평균 gross scale과 같은 static-scale child control; 각 control은 별도 trial |
+
+**Overlay promotion**은 alpha promotion과 분리한다. O1/O2/O3가 각각 대응하는 O4보다 Calmar가 높고, MDD와 ES95를 각각 `>=10%` 줄이고, O0의 20bp net return을 `>=90%` 보존하며, non-overlapping fold의 `>=60%`에서 risk-adjusted uplift가 있어야 한다. cost/funding coverage 누락 또는 liquidation이 하나라도 생기면 KILL하며 turnover와 비용 증가는 net 보존 gate에 포함해 보고한다. 두 overlay를 함께 쓰려면 별도 preregistration과 새 trial count가 필요하다.
+
+#### V-COV — covariance allocation
+
+동일 alpha signals에 equal-notional, inverse-vol, 기존 Ledoit-Wolf/shrunk-covariance allocator 세 개만 비교한다. 이는 return alpha가 아니라 allocation test다.
+
+- trailing 데이터만 사용하고 다음 bar부터 weight를 적용한다.
+- realized-vol target error, MDD, ES95, concentration, turnover와 비용을 보고한다.
+- target-vol absolute error가 `>=20%` 줄고 Calmar가 개선되며 20bp net이 양수일 때만 allocator로 채택한다.
+
+### 6.4 자산별 데이터 계약
+
+#### Crypto
+
+- point-in-time listing/delist membership, actual 1m OHLCV, mark/index, 실제 funding settlement, spot/perp mapping
+- 4h/1d는 validated 1m에서 결정적으로 파생
+- cross-sectional 후보는 상장 전 history를 만들거나 현재 universe를 과거에 역적용하지 않음
+
+#### TradFi와 precious metals
+
+- `canonical_symbol`, venue symbol, instrument type, contract multiplier, quote currency, session/calendar, timezone, first/last tradable timestamp를 frozen manifest에 기록
+- candidate별 owned interval은 `첫 평가 신호 - 동결 warmup`부터 계산한다. Router를 위해 2024년을 채우지는 않지만, C-ANCHOR가 2025-01-01에 첫 신호를 내려면 그 전 실제 52-week-equivalent bars가 필요하다. bar 수는 manifest의 session calendar로 고정하고, 없으면 합성하지 않고 첫 eligible signal을 늦춘다.
+- futures면 expiry·roll rule·front/next mapping, perpetual이면 mark/index/funding, spot/CFD면 financing과 executable venue를 분리
+- XAU/XAG/XPT/XPD라는 이름만 같다고 CME futures, spot benchmark, CFD와 Binance TradFi perpetual을 같은 시계열로 대체하지 않음
+- closed bar cutoff 이후 다음 bar에서만 실행하고, 월요일 label에 그 주 미래 평균을 넣는 `dat_ave(..., 'WS')` 자료는 성과 입력으로 사용하지 않음
+- auxiliary `precious_metal` 저장소의 DB credential과 내부 host를 복사하거나 Git에 추가하지 않음
+
+#### Blocked data families
+
+- option IV/RV는 executable option chain과 surface snapshot이 생길 때까지 BLOCKED
+- commodity curve carry는 expiry별 settle/BBO, roll calendar와 실제 roll cost가 생길 때까지 BLOCKED
+- fundamentals/earnings 전략은 release timestamp를 가진 point-in-time vintage가 생길 때까지 BLOCKED
+
+### 6.5 단계별 검증 순서
+
+1. **C-00 — preregistration**
+   - `candidate-manifest.json`, `data-contract.json`, `trial-ledger.json`과 SHA-256을 만든다.
+   - trial ledger는 candidate, universe, timeframe, horizon, estimator, threshold, allocator, child-overlay arm과 cost cell 전부를 센다.
+   - 모든 candidate의 prior-of-death, single falsifying measurement와 expected null을 기록한다.
+2. **C-01 — data admission**
+   - D-01A validator와 lifecycle/funding gate를 통과한다.
+   - factor IC는 causal non-overlapping label, HAC/block-bootstrap, whole-search/FDR 조정 `p<=0.05`, 가설 방향 median rank-IC 절댓값 `>=0.02`, 올바른 부호 fold 비율 `>=0.60`을 모두 사용한다. `factor_ic>0` 하나만으로 admit하지 않는다.
+3. **C-02 — volatility feature admission**
+   - V-DIAG를 이 단계에서 종료한다.
+4. **C-03 — standalone alpha walk-forward**
+   - leaf별 default 한 세트, validation-only ranking, locked OOS report-only다.
+   - actual registry/handler 실행만 허용하고 `generic_fallback_proxy=0`을 강제한다.
+5. **C-04 — overlay/covariance ablation**
+   - C-03 standalone gate를 통과한 child에만 V-PAIR/V-OVERLAY/V-COV를 적용한다.
+   - OFF/ON/static-scale control은 같은 pre-overlay child signal/target, market data와 cost/funding model을 사용한다. realized position은 동결한 arm scaling 때문에만 달라질 수 있다.
+6. **C-05 — strict proof**
+   - 같은 signal에 actual spread/fees/sqrt-impact/funding과 10/15/20/30bp를 적용한다.
+   - per-fold admit와 final merge 모두 selection/dedup gate를 통과해야 한다.
+7. **C-06 — lockbox와 fresh-forward**
+   - locked OOS는 마지막 1회 report-only다.
+   - alpha leaf 최대 1개와 overlay 최대 1개만 60일 frozen shadow로 보낸다.
+   - parameter, universe, estimator, allocator 또는 risk scale 변경 시 clock을 0일부터 다시 시작한다.
+
+### 6.6 공통 binding gate와 보고 계약
+
+Standalone alpha는 기존 R2 기준을 그대로 사용한다.
+
+- DSR `>=0.90`, SPA p-value `<=0.05`, PBO `<=0.50`; PBO missing은 fail-close
+- 20bp all-in net return `>0`, MDD `<=30%`, liquidation/ruin `0`
+- leave-best-fold-out net return `>0`, active fold ratio `>=0.60`
+- low-turnover/lead-lag 후보는 RPT `>=10bp`
+- 한 fold 또는 한 symbol이 전체 결론을 지배하지 않음
+- locked OOS 내부 quantile이나 current-fold OOS로 threshold·candidate·weight를 선택하지 않음
+
+모든 실행은 reject를 포함한 전 후보를 보고한다. 결과표에 Git SHA, resolved config/data/candidate manifest hash, evaluation mode, trial count, cost/funding coverage, STOP/KILL 사유가 없으면 무효다. 다음 표현은 금지한다.
+
+- volatility, GARCH, covariance 또는 correlation이 그 자체로 방향 alpha를 만든다
+- 동시상관이 lead-lag 예측력이다
+- TradFi full refresh 또는 metals data가 완전하다
+- 기존 고-CAGR headline이 재현·검증됐다
+- linear cost proxy가 cost-realistic proof다
+- DSR/SPA/PBO가 whole-search trial count 또는 PBO 없이 통과했다
 
 ## 7. 작업 목록과 의존성
 
@@ -259,8 +407,15 @@ R1/R2와 Alpha-Max가 모두 scientific KILL이면 같은 표본에서 변형을
 | A-02 | canonical source에서 phase roots 생성 | D-01 | preparation manifest |
 | A-03 | prelock/historical one-touch 실행 | A-01,A-02 | sealed bundles |
 | F-01 | 최대 두 champion fresh-forward | R-04,A-03 | 60-day final report |
+| C-00 | 후속 candidate/data/trial manifest preregistration | D-01; 성과 실행 gate는 R-04,A-03 | frozen JSON 3종과 SHA-256 |
+| C-01 | Crypto/TradFi/metals 데이터 계약과 feature admission 입력 검증 | D-01A,D-04,C-00,R-04,A-03 | asset-contract receipt와 frozen subset hash |
+| C-02 | V-DIAG cross-volatility prediction admission | C-01 | own-vol baseline 비교, FDR/QLIKE report |
+| C-03 | standalone alpha walk-forward | C-01; V-DIAG feature를 직접 소비하는 미래 후보만 C-02 | 전 후보·전 reject와 locked-OOS report |
+| C-04 | V-PAIR/V-OVERLAY/V-COV ablation | C-03 | OFF/ON/static-scale 동일-signal report |
+| C-05 | 후속 후보 strict/cost proof와 최종 판정 | C-03,C-04 | selection gate와 immutable decision bundle |
+| C-06 | alpha leaf 최대 1개 + overlay 최대 1개 fresh-forward | C-05 | 60-day frozen shadow report |
 
-Critical path는 `D-01A -> D-02/D-03 -> R-04 -> F-01`, `D-01 -> D-04 -> R-01 -> R-02 -> R-03 -> R-04 -> F-01`, `D-01 -> A-02`, `A-01 -> A-03 -> F-01`이다. 데이터 inventory와 validator가 준비되기 전에 전략 코드를 늘리지 않는다.
+Critical path는 `D-01A -> D-02/D-03 -> R-04 -> F-01`, `D-01 -> D-04 -> R-01 -> R-02 -> R-03 -> R-04 -> F-01`, `D-01 -> A-02`, `A-01 -> A-03 -> F-01`이다. 후속 후보 경로는 `C-00 -> C-01 -> C-02/C-03 -> C-04 -> C-05 -> C-06`이며, `C-01` 이후의 성과·feature admission 실행은 `R-04`와 `A-03` 판정 뒤에만 열린다. 데이터 inventory와 validator가 준비되기 전에 전략 코드를 늘리지 않는다.
 
 ## 8. 최종 체크리스트
 
@@ -275,8 +430,15 @@ Critical path는 `D-01A -> D-02/D-03 -> R-04 -> F-01`, `D-01 -> D-04 -> R-01 -> 
 - [ ] combined strict/cost profile 하나와 hash
 - [ ] 같은 signal의 10/15/20/30bp 결과
 - [ ] DSR/SPA/PBO, MDD, leave-best-fold-out gate
+- [ ] PBO missing은 fail-close
 - [ ] Alpha-Max Rev5.15 runbook 갱신 후 실행
 - [ ] Alpha-Max 원래 날짜 유지
 - [ ] seals, readback, before/after identity
 - [ ] 60일 forward와 변경 시 clock reset
+- [ ] 후속 candidate/data/trial manifest와 whole-search trial count 동결
+- [ ] Crypto/TradFi/metals별 venue·instrument·lifecycle·cost 계약 검증
+- [ ] V-DIAG가 own-vol baseline을 이기기 전 cross-volatility 전략 구현 0건
+- [ ] standalone alpha 통과 전 overlay/allocator 승격 0건
+- [ ] O0/O1/O2/O3/O4가 동일 pre-overlay child signal/target·market data·funding·cost model 사용
+- [ ] survivor만이 아니라 전 candidate와 reject 사유 보고
 - [ ] 모든 단계 실자본 0%
