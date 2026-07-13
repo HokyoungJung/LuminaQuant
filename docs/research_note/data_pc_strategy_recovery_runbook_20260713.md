@@ -4,6 +4,42 @@
 상위 계획: [`strategy_recovery_master_plan_20260713.md`](strategy_recovery_master_plan_20260713.md)
 권한: 데이터 인벤토리, 결손 복구와 research-only 실행 준비. 주문·paper·testnet·live·실자본 권한 없음.
 
+## 0. 다른 PC에서 한 문장으로 시작하기
+
+다른 PC의 코딩 에이전트에는 다음 한 문장만 전달한다.
+
+> 이 저장소를 최신 `origin/main`으로 안전하게 동기화하고, `docs/research_note/data_pc_strategy_recovery_runbook_20260713.md` 0절의 실행 계약에 따라 상위 master plan을 의존성 순서대로 구현·테스트·실행해라.
+
+에이전트는 아래 계약을 별도 확인 없이 수행한다.
+
+1. **안전한 최신화**
+   - 현재 작업을 삭제하거나 덮어쓰지 않는다.
+   - worktree가 clean이면 `git fetch origin --prune`, `git switch main`, `git pull --ff-only origin main`을 수행한다.
+   - dirty이면 기존 파일을 건드리지 말고 `origin/main`에서 새 clean worktree/branch를 만든다.
+   - `git merge-base --is-ancestor 09e9bee origin/main`과 `HEAD == origin/main`을 확인하고 실제 commit을 실행 기록에 남긴다.
+2. **경로와 환경 자동 발견**
+   - `REPO="$(git rev-parse --show-toplevel)"`를 사용하고 `/home/hoky`를 가정하지 않는다.
+   - `RUN_BASE`가 주어지지 않으면 repo 밖의 `$HOME/quants-recovery-runs`를 사용한다.
+   - `SOURCE_ROOT`, `MARKET_ROOT`, `ALPHA_SOURCE`는 이 runbook의 bounded inventory로 찾는다. 여러 개면 provenance와 coverage가 가장 완전한 root를 선택하고 근거를 기록한다.
+   - `uv sync --frozen --extra optimize --extra dev`가 실패하면 원인을 수정하거나 blocker receipt를 남기며 dependency version을 임의로 바꾸지 않는다.
+3. **권위 문서와 실행 순서**
+   - 먼저 [`strategy_recovery_master_plan_20260713.md`](strategy_recovery_master_plan_20260713.md), 이 runbook, [`strategy_reality_audit_20260713.md`](../audits/strategy_reality_audit_20260713.md)를 읽는다.
+   - 첫 묶음 `D-01/D-01A/D-05/A-01`, 다음 `D-02/D-03/D-04/A-02`, 이어서 `R-01 -> R-02 -> R-03 -> R-04`와 `A-03` 순서를 지킨다. `C-00` 초안은 D-01 뒤 병렬 준비할 수 있지만 `C-01` 이후는 R-04/A-03 판정 뒤에만 실행하고, F-01도 R-04/A-03 뒤에 실행한다.
+   - 문서에 없는 명령, 데이터, symbol, 날짜, parameter를 추측하지 않는다.
+4. **미구현 blocker 처리**
+   - D-01A, D-04, D-05, R-01~R-03처럼 코드가 없는 항목은 단순 STOP으로 끝내지 않는다. 기존 validator/runner/registry를 재사용하는 최소 구현과 targeted regression test로 blocker를 닫고 다음 단계로 진행한다.
+   - 테스트가 실패하면 수정 후 재실행한다. gate를 완화하거나 locked OOS를 보고 parameter를 바꾸지 않는다.
+   - 데이터·디스크·credential처럼 코드로 해결할 수 없는 blocker는 immutable receipt와 필요한 정확한 경로/기간을 남기고, 실행 가능한 독립 task를 계속한다.
+5. **데이터와 Git 경계**
+   - 원본 data root는 read-only로 취급한다. synthetic fill, symbol 대체, 상장 전 backfill, interior-gap 무단 append를 금지한다.
+   - market parquet, credential, host, secret과 대용량 run artifact는 Git에 넣지 않는다. Git에는 최소 코드, 테스트, config/manifest, 작은 evidence와 문서만 넣는다.
+   - source 변경은 새 recovery branch에 작은 단위로 commit하고 force-push하지 않는다. 검증 후 branch를 push한다.
+6. **완료 조건**
+   - 각 task에 command, Git/config/data hash, validation receipt, 테스트 결과와 PASS/STOP/KILL 판정을 남긴다.
+   - 가능한 task가 모두 terminal이고 미해결 외부 blocker가 정확히 문서화될 때까지 계속한다.
+   - 최종 보고에는 완료 task, scientific reject를 포함한 전 후보, 미해결 blocker, branch/commit과 artifact 경로를 적는다.
+   - 모든 단계에서 주문·paper·testnet·live·실자본 배분은 `0%`다.
+
 ## 1. 이 runbook에서 지금 실행할 범위
 
 데이터 PC에서 바로 수행할 것은 다음뿐이다.
@@ -36,9 +72,9 @@ set -euo pipefail
 umask 077
 export TZ=UTC
 
-REPO="/home/hoky/Quants-agent"
+REPO="$(git rev-parse --show-toplevel)"
 RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)"
-RUN_BASE="/absolute/path/to/quants-recovery-runs"
+RUN_BASE="${RUN_BASE:-$HOME/quants-recovery-runs}"
 RUN_DIR="$RUN_BASE/$RUN_ID"
 mkdir -p "$RUN_DIR"
 
@@ -84,8 +120,9 @@ done 2>/dev/null | LC_ALL=C sort -u \
 실제 과거 보고서가 사용한 후보는 `.../LuminaQuant/data/market_parquet`였다. 디렉터리가 있다는 이유만으로 선택하지 말고 아래 repository coverage가 가장 완전하고 provenance를 설명할 수 있는 root를 사용한다.
 
 ```bash
-export SOURCE_ROOT="/absolute/chosen/existing/path/to/market_parquet"
-export MARKET_ROOT="/absolute/new/writable/path/to/market_parquet"
+: "${SOURCE_ROOT:?set SOURCE_ROOT to the selected existing market_parquet root}"
+export SOURCE_ROOT
+export MARKET_ROOT="${MARKET_ROOT:-$HOME/quants-recovery-market/$RUN_ID/market_parquet}"
 test -d "$SOURCE_ROOT"
 test ! -L "$SOURCE_ROOT"
 test ! -e "$MARKET_ROOT"
@@ -339,7 +376,7 @@ post_oos_augment=false
 Alpha-Max는 main 데이터와 실행 트리를 섞지 않는다.
 
 ```bash
-ALPHA_REPO="/home/hoky/Quants-agent-alpha-max-data-pc"
+ALPHA_REPO="$(dirname "$REPO")/Quants-agent-alpha-max-data-pc"
 ALPHA_COMMIT="629d91e5d4aac26911af65a4a5e15ebdcbded30f"
 
 cd "$REPO"
@@ -367,8 +404,8 @@ printf '%s  %s\n' \
 canonical source는 이미 존재하는 실제 1s monthly parquet와 funding feature root여야 한다. 일반 1m collector 결과를 Alpha-Max 입력으로 쓰지 않는다.
 
 ```bash
-ALPHA_SOURCE="/absolute/path/to/canonical-alpha-source"
-ALPHA_PHASES="/absolute/new/path/alpha-max-phase-roots-v515-$RUN_ID"
+: "${ALPHA_SOURCE:?set ALPHA_SOURCE to the discovered canonical alpha source}"
+ALPHA_PHASES="${ALPHA_PHASES:-$HOME/quants-alpha-phase-roots/v515-$RUN_ID}"
 test -d "$ALPHA_SOURCE/market_ohlcv_1s"
 test -d "$ALPHA_SOURCE/feature_points"
 test ! -e "$ALPHA_PHASES"
