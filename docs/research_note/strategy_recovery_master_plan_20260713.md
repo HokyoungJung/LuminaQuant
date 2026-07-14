@@ -4,6 +4,8 @@
 상태: 실행 준비 계획, 실자본 배분 0%
 근거 감사: [`docs/audits/strategy_reality_audit_20260713.md`](../audits/strategy_reality_audit_20260713.md)
 
+실행 상태/세션 이관: [`strategy_recovery_session_handoff_20260714.md`](strategy_recovery_session_handoff_20260714.md). 2026-07-14 기준 D-01과 D-01A/D-04/D-05 blocker chain은 검증·commit 완료, Alpha-Max Rev5.15 runbook 정합화(G003)는 별도 clean worktree에서 시작 전 상태로 보존되었다. 격리된 불완전 Alpha source는 사용 금지이며 phase-root/prelock/historical은 실행하지 않았다.
+
 ## 1. 목적과 종료 조건
 
 이 계획은 검증 없이 새 전략 수를 늘리는 계획이 아니다. 먼저 다음 세 트랙을 실제 데이터와 수정된 평가 경로로 한 번만 다시 측정하고, 통과하지 못하면 같은 표본에서 추가 튜닝하지 않고 종료한다. 그 판정 뒤에는 별도 preregistration과 run ID로 기존 구현을 재사용하는 후속 알파 후보 프로그램을 열 수 있다.
