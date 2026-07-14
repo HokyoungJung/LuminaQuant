@@ -45,7 +45,7 @@
     "main": {
       "path": "/home/hoky/Quants-agent/LuminaQuant",
       "branch": "recovery/strategy-plan-20260714",
-      "commit": "66c85d5da2edbe42c8e9f359ea59582dd814f997"
+      "implementation_commit": "66c85d5da2edbe42c8e9f359ea59582dd814f997"
     },
     "alpha_max": {
       "path": "/home/hoky/Quants-agent/Quants-agent-alpha-max-data-pc",

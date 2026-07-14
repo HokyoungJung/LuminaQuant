@@ -7,7 +7,7 @@ Paste the following as the first message in the new coding session:
 
 이전 세션의 Strategy Recovery Ultragoal 실행을 정확히 이어서 재개해. 새 plan을 만들거나 완료된 작업을 반복하지 마.
 
-작업 저장소는 /home/hoky/Quants-agent/LuminaQuant 이고 branch는 recovery/strategy-plan-20260714, handoff 시점 HEAD는 2c9fdb19d159c9d1550afbff789bf60ff20c2df7 이다. 먼저 다음 파일을 전부 읽고 binding contract로 사용해:
+작업 저장소는 /home/hoky/Quants-agent/LuminaQuant 이고 branch는 recovery/strategy-plan-20260714 이다. 구현 commit 66c85d5da2edbe42c8e9f359ea59582dd814f997 과 그 뒤의 handoff 문서 commit들을 보존하고, branch를 reset하지 마. 먼저 다음 파일을 전부 읽고 binding contract로 사용해:
 - docs/research_note/strategy_recovery_session_handoff_20260714.md
 - docs/research_note/strategy_recovery_resume_state_20260714.json
 - docs/research_note/strategy_recovery_master_plan_20260713.md
