@@ -19,12 +19,13 @@
     },
     "ledger": {
       "path": ".gjc/_session-019f603a-0e73-7000-88a7-c94f42950c09/ultragoal/ledger.jsonl",
-      "sha256": "72afa343605c386e7aaa1d3f0c1452c3816ff9a3461246533728b207d76944f3",
-      "byte_count": 23893,
-      "line_count": 32,
-      "latest_event_id": "a4de0e18-168f-4497-88f5-3dd714b71c26",
-      "latest_event": "steering_accepted:annotate_ledger"
+      "sha256": "960688faf311308c38ffa1de4c0497d5141afcd13d267d772a39f7e09f98f2cf",
+      "byte_count": 24313,
+      "line_count": 33,
+      "latest_event_id": "fbf47968-1b9e-4acb-a723-2cd3412a06a5",
+      "latest_event": "blocker_classified:human_blocked"
     },
+    "inline_goal_status": "paused_for_user_requested_session_transfer",
     "goal_states": [
       {"id": "G001", "status": "complete", "title": "Establish the recovery execution record and D-01 inventory"},
       {"id": "G002", "status": "superseded", "title": "Close foundational implementation blockers D-01A, D-04, and D-05"},
@@ -67,6 +68,7 @@
     "Activate /skill:ultragoal in the new session.",
     "Pass GJC_SESSION_ID=019f603a-0e73-7000-88a7-c94f42950c09 to native Ultragoal commands.",
     "Read the handoff note and the canonical session-specific goals/ledger before mutation.",
+    "Resume the paused aggregate inline goal before continuing.",
     "Resume G003 only; do not repeat G001 or G012.",
     "Do not consume the quarantined Alpha source and do not run phase preparation, prelock, or historical evaluation.",
     "Do not push without explicit user instruction."

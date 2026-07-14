@@ -45,7 +45,7 @@ The session-specific paths above, not the unrelated legacy `.gjc/ultragoal/goals
 | G006 — C-00 through C-05 follow-up cycle | pending | Starts only after R-04 and A-03 are terminal. |
 | G007 — F-01/C-06 fresh-forward | pending | At most permitted champions; 30/60-day evidence; zero orders/capital. |
 
-A user-requested cross-session stop was appended to the Ultragoal ledger while G003 remained active.
+A user-requested cross-session stop was appended to the Ultragoal ledger while G003 remained active. The aggregate inline goal was then classified as human-blocked solely for the session transfer and paused; resume it in the new session before continuing G003.
 
 ## Completed foundational implementation
 
