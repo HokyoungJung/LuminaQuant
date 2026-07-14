@@ -10,6 +10,7 @@
 - Durable state: `.gjc/_session-019f603a-0e73-7000-88a7-c94f42950c09/ultragoal/goals.json`
 - Audit ledger: `.gjc/_session-019f603a-0e73-7000-88a7-c94f42950c09/ultragoal/ledger.jsonl`
 - Machine-readable state snapshot: [`strategy_recovery_resume_state_20260714.json`](strategy_recovery_resume_state_20260714.json)
+- Copy-ready new-session prompt: [`strategy_recovery_new_session_prompt_20260714.md`](strategy_recovery_new_session_prompt_20260714.md)
 - Run evidence root: `/home/hoky/quants-recovery-runs/20260714T105113Z`
 - Writable market snapshot: `/home/hoky/quants-recovery-market/20260714T105113Z/market_parquet`
 
