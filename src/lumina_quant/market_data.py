@@ -512,10 +512,7 @@ def _partition_parquet_paths(
     )
     end_token = _timestamp_ms_to_datetime(end_ms).date().isoformat() if end_ms is not None else None
 
-    try:
-        partition_dirs = sorted(path for path in base.glob("date=*") if path.is_dir())
-    except Exception:
-        return []
+    partition_dirs = sorted(path for path in base.glob("date=*") if path.is_dir())
 
     parquet_paths: list[str] = []
     for partition_dir in partition_dirs:
@@ -547,10 +544,7 @@ def _load_direct_ohlcv(
     )
     if not parquet_paths:
         return _empty_ohlcv_frame()
-    try:
-        lazy = pl.scan_parquet(parquet_paths)
-    except Exception:
-        return _empty_ohlcv_frame()
+    lazy = pl.scan_parquet(parquet_paths)
 
     start_ms = _coerce_timestamp_ms(start_date)
     end_ms = _coerce_timestamp_ms(end_date)
@@ -559,14 +553,40 @@ def _load_direct_ohlcv(
     if end_ms is not None:
         lazy = lazy.filter(pl.col("datetime") <= _timestamp_ms_to_datetime(end_ms))
 
-    try:
-        data = lazy.select(["datetime", "open", "high", "low", "close", "volume"]).collect()
-    except Exception:
-        return _empty_ohlcv_frame()
+    data = lazy.select(["datetime", "open", "high", "low", "close", "volume"]).collect()
 
     if data.is_empty():
         return _empty_ohlcv_frame()
     return data.sort("datetime").unique(subset=["datetime"], keep="last").sort("datetime")
+
+
+def load_strict_ohlcv_route(
+    db_path: str | os.PathLike[str],
+    *,
+    storage_route: str,
+    exchange: str,
+    symbol: str,
+    timeframe: str,
+    start_date: Any = None,
+    end_date: Any = None,
+) -> pl.DataFrame:
+    """Read one explicitly declared local OHLCV layout without fallback."""
+    if storage_route != "partitioned_ohlcv":
+        raise ValueError(f"unsupported OHLCV storage route: {storage_route!r}")
+    root = Path(db_path)
+    if not root.is_dir():
+        raise ValueError("market-data root must already exist")
+    base = _series_path(root, exchange=exchange, symbol=symbol, timeframe=timeframe)
+    if not base.is_dir():
+        raise FileNotFoundError(f"partitioned OHLCV series is missing: {base}")
+    return _load_direct_ohlcv(
+        root,
+        exchange=exchange,
+        symbol=symbol,
+        timeframe=timeframe,
+        start_date=start_date,
+        end_date=end_date,
+    )
 
 
 def _ensure_ohlcv_frame(rows: Any) -> pl.DataFrame:

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import importlib.util
+import subprocess
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -14,6 +16,44 @@ if _SPEC is None or _SPEC.loader is None:
     raise RuntimeError(f"Failed to load materialize script module from {_SCRIPT_PATH}")
 materialize_script = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(materialize_script)
+
+
+def test_materializer_help_exits_zero_and_exposes_options():
+    result = subprocess.run(
+        ["uv", "run", "python", "scripts/materialize_market_windows.py", "--help"],
+        cwd=_SCRIPT_PATH.parents[1],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    for option in (
+        "--symbols",
+        "--exchange",
+        "--required-timeframes",
+        "--base-timeframe",
+        "--db-path",
+        "--poll-seconds",
+        "--periodic",
+    ):
+        assert option in result.stdout
+
+
+def test_materializer_parser_defaults_use_runtime_config(monkeypatch):
+    monkeypatch.setattr(sys, "argv", [str(_SCRIPT_PATH)])
+    args = materialize_script._parse_args()
+    config = materialize_script._RUNTIME_CONFIG
+
+    assert args.symbols == ",".join(config.trading.symbols)
+    assert args.exchange == config.storage.market_data_exchange
+    assert args.required_timeframes == ",".join(config.storage.materializer_required_timeframes)
+    assert args.base_timeframe == config.storage.materializer_base_timeframe
+    assert args.db_path == config.storage.market_data_parquet_path
+    assert args.poll_seconds == config.storage.materializer_poll_seconds
+    assert materialize_script._resolve_periodic_enabled("", once=False) is (
+        config.storage.materializer_periodic_enabled
+    )
 
 
 def test_materializer_periodic_loop_resolves_required_timeframes(monkeypatch):

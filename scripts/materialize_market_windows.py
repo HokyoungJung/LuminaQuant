@@ -9,30 +9,30 @@ import time
 from datetime import UTC, datetime
 
 from lumina_quant.backtesting.cli_contract import RawFirstDataMissingError
-from lumina_quant.configuration import BacktestConfigView, get_default_runtime_config
+from lumina_quant.configuration import get_default_runtime_config
 from lumina_quant.market_data import normalize_timeframe_token, timeframe_to_milliseconds
 from lumina_quant.services.materialize_from_raw import materialize_raw_aggtrades_bundle
 from lumina_quant.storage.parquet import ParquetMarketDataRepository
 
-BaseConfig = BacktestConfigView(get_default_runtime_config())
+_RUNTIME_CONFIG = get_default_runtime_config()
 
 
 def _parse_symbols(value: str) -> list[str]:
     raw = str(value or "").strip()
     if not raw:
-        return list(BaseConfig.SYMBOLS)
+        return list(_RUNTIME_CONFIG.trading.symbols)
     out: list[str] = []
     for item in raw.split(","):
         token = str(item).strip()
         if token:
             out.append(token)
-    return out or list(BaseConfig.SYMBOLS)
+    return out or list(_RUNTIME_CONFIG.trading.symbols)
 
 
 def _parse_timeframes(value: str) -> list[str]:
     raw = str(value or "").strip()
     if not raw:
-        return list(BaseConfig.MATERIALIZER_REQUIRED_TIMEFRAMES)
+        return list(_RUNTIME_CONFIG.storage.materializer_required_timeframes)
     out: list[str] = []
     for item in raw.split(","):
         token = str(item).strip().lower()
@@ -41,7 +41,7 @@ def _parse_timeframes(value: str) -> list[str]:
     deduped = list(dict.fromkeys(out))
     if "1s" in deduped and deduped[0] != "1s":
         deduped = ["1s", *[token for token in deduped if token != "1s"]]
-    return deduped or list(BaseConfig.MATERIALIZER_REQUIRED_TIMEFRAMES)
+    return deduped or list(_RUNTIME_CONFIG.storage.materializer_required_timeframes)
 
 
 def _normalize_timeframes(values: list[str]) -> list[str]:
@@ -51,7 +51,7 @@ def _normalize_timeframes(values: list[str]) -> list[str]:
     deduped = list(dict.fromkeys(normalized))
     if "1s" in deduped and deduped[0] != "1s":
         deduped = ["1s", *[token for token in deduped if token != "1s"]]
-    return deduped or list(BaseConfig.MATERIALIZER_REQUIRED_TIMEFRAMES)
+    return deduped or list(_RUNTIME_CONFIG.storage.materializer_required_timeframes)
 
 
 def _coerce_positive_int(value: object) -> int | None:
@@ -244,17 +244,17 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--symbols",
-        default=",".join(BaseConfig.SYMBOLS),
+        default=",".join(_RUNTIME_CONFIG.trading.symbols),
         help="Comma-separated symbol list (e.g. BTC/USDT,ETH/USDT).",
     )
     parser.add_argument(
         "--exchange",
-        default=str(BaseConfig.MARKET_DATA_EXCHANGE),
+        default=str(_RUNTIME_CONFIG.storage.market_data_exchange),
         help="Exchange partition token.",
     )
     parser.add_argument(
         "--required-timeframes",
-        default=",".join(BaseConfig.MATERIALIZER_REQUIRED_TIMEFRAMES),
+        default=",".join(_RUNTIME_CONFIG.storage.materializer_required_timeframes),
         help="Comma-separated materializer required timeframes.",
     )
     parser.add_argument(
@@ -264,12 +264,12 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--base-timeframe",
-        default=str(getattr(BaseConfig, "MATERIALIZER_BASE_TIMEFRAME", "1s")),
+        default=str(_RUNTIME_CONFIG.storage.materializer_base_timeframe),
         help="Materializer base timeframe (must stay 1s).",
     )
     parser.add_argument(
         "--db-path",
-        default=str(BaseConfig.MARKET_DATA_PARQUET_PATH),
+        default=str(_RUNTIME_CONFIG.storage.market_data_parquet_path),
         help="Parquet market-data root path.",
     )
     parser.add_argument("--start-date", default=None, help="Optional start date/time.")
@@ -282,7 +282,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--poll-seconds",
         type=int,
-        default=int(BaseConfig.MATERIALIZER_POLL_SECONDS),
+        default=int(_RUNTIME_CONFIG.storage.materializer_poll_seconds),
         help="Periodic materializer cadence in seconds.",
     )
     parser.add_argument(
@@ -343,7 +343,7 @@ def _resolve_periodic_enabled(raw: str | bool | None, *, once: bool) -> bool:
         return True
     if token in {"0", "false", "no", "off"}:
         return False
-    return bool(BaseConfig.MATERIALIZER_PERIODIC_ENABLED)
+    return bool(_RUNTIME_CONFIG.storage.materializer_periodic_enabled)
 
 
 def main() -> int:
