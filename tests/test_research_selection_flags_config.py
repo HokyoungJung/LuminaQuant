@@ -53,6 +53,32 @@ def test_default_runtime_config_flags_are_legacy_off():
     assert rt.execution.funding_on_utc_boundary is False
 
 
+def test_actual_engine_routing_is_default_off_and_combined_profile_arms_it() -> None:
+    default = RuntimeConfig()
+    assert default.research.route_unmapped_registered_strategies is False
+    assert default.research.require_actual_engine_routing is False
+
+    research = load_runtime_config(_RESEARCH_PROFILE)
+    assert research.research.route_unmapped_registered_strategies is True
+    assert research.research.require_actual_engine_routing is False
+
+    combined = load_runtime_config(_COST_REALISTIC)
+    assert combined.research.route_unmapped_registered_strategies is True
+    assert combined.research.require_actual_engine_routing is True
+
+    raw = build_runtime_config(
+        {
+            "research": {
+                "route_unmapped_registered_strategies": True,
+                "require_actual_engine_routing": True,
+            }
+        },
+        env={},
+    )
+    assert raw.research.route_unmapped_registered_strategies is True
+    assert raw.research.require_actual_engine_routing is True
+
+
 def test_shipped_config_yaml_loads_flags_off():
     """The shipped config.yaml must NOT flip any correction flag (legacy path)."""
     rt = load_runtime_config("config.yaml")

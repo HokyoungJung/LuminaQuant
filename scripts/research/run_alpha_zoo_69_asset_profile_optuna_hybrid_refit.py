@@ -423,7 +423,7 @@ def _candidate_from_params(
         short_entry = (vol_adjusted < -entry) & common
         long_exit = (vol_adjusted < exit_z) | (~common)
         short_exit = (vol_adjusted > -exit_z) | (~common)
-    else:
+    elif family == "trend_pullback_reclaim":
         slow = lookback
         fast = max(4, round(slow / max(1, int(params.get("fast_divisor", 4)))))
         ema_fast = close.ewm(span=fast, adjust=False).mean()
@@ -456,6 +456,8 @@ def _candidate_from_params(
         )
         long_exit = (close < ema_slow) | (trend_slope < 0.0)
         short_exit = (close > ema_slow) | (trend_slope > 0.0)
+    else:
+        raise ValueError(f"unsupported candidate family: {family}")
 
     signal = broad69._debounced_state_signal(
         long_entry,

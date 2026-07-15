@@ -798,6 +798,10 @@ class ResearchConfig:
     # aggregates so it cannot set a candidate's headline MDD / latest-OOS.
     # OFF => uniform weights => byte-identical rankings.
     walkforward_partial_fold_bar_count_weighting: bool = False
+    # Actual-engine routing controls for research candidate scoring.  Both remain
+    # opt-in so existing profiles keep the legacy handler/proxy behavior.
+    route_unmapped_registered_strategies: bool = False
+    require_actual_engine_routing: bool = False
     # D4: append a regime-gated twin of strict_efficiency:static_guarded --
     # the always-on blend sits out when a trailing vol/drawdown regime signal
     # on its own pre-OOS combined stream says down-chop (the pattern the

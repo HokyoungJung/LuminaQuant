@@ -18,13 +18,16 @@ from __future__ import annotations
 import datetime as dtm
 
 import numpy as np
+import pytest
 
 from lumina_quant.strategy_factory import research_runner as rr
 from lumina_quant.strategy_factory.candidate_library import build_candidate_manifest
+from lumina_quant.strategy_factory.strategy_signal_dispatch import StrategySignalDispatchError
 
 _SYMBOLS = ["BTC/USDT", "ETH/USDT", "SOL/USDT", "BNB/USDT", "XRP/USDT", "ADA/USDT"]
 _N = 500
 _ROUTE_ON = {"research": {"route_unmapped_registered_strategies": True}}
+_STRICT_ROUTE_ON = {"research": {"require_actual_engine_routing": True}}
 _NEAR_HIGH_PARAMS = {
     "high_lookback_bars": 200,
     "min_history_bars": 60,
@@ -101,6 +104,17 @@ def test_flag_on_real_route_is_params_sensitive() -> None:
 def test_flag_on_unknown_class_falls_back_with_label() -> None:
     result = _signal("DoesNotExistStrategy", {}, _ROUTE_ON)
     assert result[3].get("evaluation_mode") == "generic_fallback_proxy"
+
+
+def test_strict_flag_routes_registered_class_and_rejects_unknown_class() -> None:
+    result = _signal(
+        "CrossSectionalNearHighAnchoringStrategy",
+        dict(_NEAR_HIGH_PARAMS),
+        _STRICT_ROUTE_ON,
+    )
+    assert result[3].get("evaluation_mode") == "registry_simulator"
+    with pytest.raises(StrategySignalDispatchError):
+        _signal("DoesNotExistStrategy", {}, _STRICT_ROUTE_ON)
 
 
 def test_mapped_handler_path_labelled_handler() -> None:

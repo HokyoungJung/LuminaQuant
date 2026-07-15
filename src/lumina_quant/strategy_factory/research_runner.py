@@ -6540,6 +6540,24 @@ def _registry_simulator_router(
         return None
 
 
+def _strict_registry_simulator_router(
+    strategy_class: str,
+    params: dict[str, Any],
+    aligned: dict[str, np.ndarray],
+    symbols: Sequence[str],
+) -> np.ndarray:
+    """Run a registered strategy without converting failures into a proxy route."""
+    from lumina_quant.strategies.registry import resolve_strategy_class
+
+    strategy_cls = resolve_strategy_class(strategy_class)
+    return _simulate_event_driven_strategy_exposures(
+        strategy_cls,
+        params=params,
+        aligned=aligned,
+        symbols=symbols,
+    )
+
+
 def _strategy_signal(
     candidate: dict[str, Any],
     *,
@@ -6550,17 +6568,26 @@ def _strategy_signal(
     # Config-gated (default OFF -> legacy routing): when ON, candidates whose
     # strategy_class has no bespoke handler are executed as their REAL
     # registered class instead of being silently scored as the shared generic
-    # momentum proxy (the silent-substitution defect: 84/111 classes incl. all
-    # research_only sleeves were proxy-scored).  The generic fallback is now
-    # always labelled in meta either way.
-    route_unmapped = bool(
+    # momentum proxy. Strict actual-engine routing always enables the registry
+    # route and forbids proxy substitution.
+    require_actual_engine = bool(
+        _research_flag(scoring_config, "require_actual_engine_routing", False)
+    )
+    route_unmapped = require_actual_engine or bool(
         _research_flag(scoring_config, "route_unmapped_registered_strategies", False)
     )
     return _STRATEGY_SIGNAL_DISPATCHER.dispatch(
         candidate,
         aligned=aligned,
         symbols=symbols,
-        unmapped_router=_registry_simulator_router if route_unmapped else None,
+        unmapped_router=(
+            _strict_registry_simulator_router
+            if require_actual_engine
+            else _registry_simulator_router
+        )
+        if route_unmapped
+        else None,
+        require_actual_engine=require_actual_engine,
     )
 
 

@@ -403,6 +403,10 @@ research:
   # Portfolio-layer honest gate (DSR/CSCV-PBO/SPA on the weighted-portfolio NET
   # stream, DSR deflated by the total allocation config-grid cells searched).
   portfolio_honest_gate: true
+  # G004 frozen actual-engine replay/proof wiring; this replacement profile is hashed.
+  route_unmapped_registered_strategies: true
+  require_actual_engine_routing: true
+  emit_candidate_overfit_stats: true
 
 # ------------------------------------------
 # Data Collection

@@ -18,6 +18,12 @@ def test_empty_compute_metric_payload_defaults_are_stable() -> None:
     assert payload.spa_pvalue == 1.0
 
 
+def test_max_drawdown_includes_initial_capital_peak() -> None:
+    returns = np.asarray([-0.40, 0.10, 0.10, 0.10], dtype=float)
+
+    assert research_metrics.max_drawdown(returns) == 0.40
+
+
 def test_compute_metric_summary_exposes_alias_fields() -> None:
     payload = research_metrics.ComputedMetricPayload(
         total_return=0.12,

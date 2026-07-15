@@ -143,7 +143,7 @@ def safe_mean(values: np.ndarray) -> float:
 def max_drawdown(returns: np.ndarray) -> float:
     if returns.size == 0:
         return 0.0
-    equity = np.cumprod(1.0 + returns)
+    equity = np.concatenate(([1.0], np.cumprod(1.0 + returns)))
     peaks = np.maximum.accumulate(equity)
     drawdown = 1.0 - np.divide(equity, np.maximum(peaks, 1e-12))
     return float(np.max(drawdown)) if drawdown.size else 0.0

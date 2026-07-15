@@ -21,6 +21,7 @@ COMMAND_MODULES = {
     "registry": "registry",
     "alpha": "alpha",
     "mcp": "mcp",
+    "research": "research",
 }
 
 
@@ -66,6 +67,7 @@ def main(argv: list[str] | None = None) -> int:
         "registry": COMMAND_MODULES["registry"],
         "alpha": COMMAND_MODULES["alpha"],
         "mcp": COMMAND_MODULES["mcp"],
+        "research": COMMAND_MODULES["research"],
     }
 
     parser = argparse.ArgumentParser(
