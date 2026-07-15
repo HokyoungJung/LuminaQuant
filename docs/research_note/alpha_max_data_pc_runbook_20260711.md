@@ -42,7 +42,10 @@ for variable in \
   PYTHONPLATLIBDIR GIT_DIR GIT_WORK_TREE GIT_COMMON_DIR GIT_INDEX_FILE \
   GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_CONFIG_GLOBAL \
   GIT_CONFIG_SYSTEM GIT_CONFIG_NOSYSTEM GIT_CONFIG_COUNT \
-  GIT_CONFIG_PARAMETERS GIT_EXEC_PATH
+  GIT_CONFIG_PARAMETERS GIT_EXEC_PATH GIT_NAMESPACE GIT_NO_REPLACE_OBJECTS \
+  GIT_REPLACE_REF_BASE GIT_SHALLOW_FILE VIRTUAL_ENV CONDA_PREFIX \
+  UV_PROJECT_ENVIRONMENT UV_PYTHON UV_PYTHON_PREFERENCE UV_SYSTEM_PYTHON \
+  UV_NO_SYNC
 do
   test -z "${!variable+x}" || {
     printf 'forbidden preflight environment variable: %s\n' "$variable" >&2
@@ -64,15 +67,26 @@ HISTORICAL_OUT="/absolute/path/to/new/alpha-max-historical-$RUN_ID"
 /usr/bin/mkdir -p "$RUNLOG"
 
 # This check is deliberately before any import-capable interpreter or project command.
-# Explicit options defeat status.showUntrackedFiles and fsmonitor configuration.
+# Explicit options expose ignored and untracked entries and disable mutable Git accelerators.
 STATUS_ARGS=(
+  --no-replace-objects
   -c core.fsmonitor=false
   -c core.untrackedCache=false
   -c status.showUntrackedFiles=all
-  status --porcelain=v1 --untracked-files=all
+  status --porcelain=v1 --untracked-files=all --ignored=matching
 )
 /usr/bin/git "${STATUS_ARGS[@]}" > "$RUNLOG/worktree-status-before.txt"
 test ! -s "$RUNLOG/worktree-status-before.txt"
+GIT_INDEX_PATH="$(/usr/bin/git --no-replace-objects rev-parse --git-path index)"
+GIT_GRAFTS_PATH="$(/usr/bin/git --no-replace-objects rev-parse --git-path info/grafts)"
+test -f "$GIT_INDEX_PATH"
+test ! -L "$GIT_INDEX_PATH"
+test ! -e "$GIT_GRAFTS_PATH"
+test ! -L "$GIT_GRAFTS_PATH"
+REPLACE_REFS="$(
+  /usr/bin/git --no-replace-objects for-each-ref --format='%(refname)' refs/replace/
+)"
+test -z "$REPLACE_REFS"
 test "$(/usr/bin/python3 -I -S -c 'import sys; print(int(sys.flags.isolated and sys.flags.no_site))')" = "1"
 
 case "$ALIGNMENT_RECEIPT" in /*) ;; *) exit 1 ;; esac
@@ -96,7 +110,8 @@ RECEIPT_OUTPUT="$(
   /usr/bin/python3 -I -S - \
     "$ALIGNMENT_RECEIPT" \
     "$ALIGNMENT_RECEIPT_SHA256" \
-    "$RUNLOG/alignment-receipt-readback.json" <<'PY'
+    "$RUNLOG/alignment-receipt-readback.json" \
+    "$GIT_INDEX_PATH" <<'PY'
 from __future__ import annotations
 
 import hashlib
@@ -127,9 +142,63 @@ def unique_object(pairs):
     return result
 
 
+def validate_full_index(path):
+    raw = path.read_bytes()
+    if len(raw) < 32 or raw[:4] != b"DIRC":
+        raise SystemExit("Git index header is invalid")
+    version = int.from_bytes(raw[4:8], "big")
+    if version not in {2, 3}:
+        raise SystemExit("Git index version must be 2 or 3")
+    if hashlib.sha1(raw[:-20]).digest() != raw[-20:]:
+        raise SystemExit("Git index checksum mismatch")
+
+    entry_count = int.from_bytes(raw[8:12], "big")
+    offset = 12
+    payload_end = len(raw) - 20
+    for _ in range(entry_count):
+        entry_start = offset
+        if offset + 62 > payload_end:
+            raise SystemExit("Git index entry is truncated")
+        flags = int.from_bytes(raw[offset + 60 : offset + 62], "big")
+        if flags & 0x8000:
+            raise SystemExit("Git assume-unchanged index entries are forbidden")
+        if flags & 0x4000:
+            raise SystemExit("Git extended index entries are forbidden")
+        name_length = flags & 0x0FFF
+        path_start = offset + 62
+        if name_length < 0x0FFF:
+            path_end = path_start + name_length
+            if path_end >= payload_end or raw[path_end] != 0:
+                raise SystemExit("Git index pathname is invalid")
+        else:
+            path_end = raw.find(b"\0", path_start, payload_end)
+            if path_end < 0:
+                raise SystemExit("Git index pathname is unterminated")
+        entry_length = path_end + 1 - entry_start
+        offset = entry_start + ((entry_length + 7) // 8) * 8
+        if offset > payload_end:
+            raise SystemExit("Git index entry padding is invalid")
+
+    while offset < payload_end:
+        if offset + 8 > payload_end:
+            raise SystemExit("Git index extension is truncated")
+        signature = raw[offset : offset + 4]
+        extension_length = int.from_bytes(raw[offset + 4 : offset + 8], "big")
+        offset += 8
+        if offset + extension_length > payload_end:
+            raise SystemExit("Git index extension payload is truncated")
+        if signature == b"link":
+            raise SystemExit("Git split indexes are forbidden")
+        offset += extension_length
+    if offset != payload_end:
+        raise SystemExit("Git index boundary mismatch")
+    return entry_count
+
+
 receipt_path = Path(sys.argv[1])
 expected_digest = sys.argv[2]
 readback_path = Path(sys.argv[3])
+index_entry_count = validate_full_index(Path(sys.argv[4]))
 raw = receipt_path.read_bytes()
 if hashlib.sha256(raw).hexdigest() != expected_digest:
     raise SystemExit("alignment receipt SHA-256 mismatch")
@@ -155,6 +224,7 @@ if not isinstance(receipt["final_manifest_sha256"], str) or not re.fullmatch(
 
 readback = {
     "alignment_receipt_sha256": expected_digest,
+    "git_index_entry_count": index_entry_count,
     "receipt": receipt,
 }
 readback_path.write_bytes(
@@ -177,9 +247,10 @@ RECEIPT_LOCK_SHA256="${RECEIPT_FIELDS[4]}"
 
 /usr/bin/git "${STATUS_ARGS[@]}" > "$RUNLOG/worktree-status-after-receipt.txt"
 test ! -s "$RUNLOG/worktree-status-after-receipt.txt"
-test "$(/usr/bin/git branch --show-current)" = "$RECEIPT_BRANCH"
-test "$(/usr/bin/git rev-parse HEAD)" = "$RECEIPT_ACCEPTED_COMMIT"
-/usr/bin/git merge-base --is-ancestor "$RECEIPT_BASELINE_COMMIT" HEAD
+test "$(/usr/bin/git --no-replace-objects branch --show-current)" = "$RECEIPT_BRANCH"
+test "$(/usr/bin/git --no-replace-objects rev-parse HEAD)" = "$RECEIPT_ACCEPTED_COMMIT"
+/usr/bin/git --no-replace-objects merge-base \
+  --is-ancestor "$RECEIPT_BASELINE_COMMIT" HEAD
 read -r CURRENT_MANIFEST_SHA256 _ < <(
   /usr/bin/sha256sum docs/research_note/alpha_max_final_sha256_20260711.txt
 )
@@ -187,9 +258,11 @@ test "$CURRENT_MANIFEST_SHA256" = "$RECEIPT_MANIFEST_SHA256"
 read -r CURRENT_LOCK_SHA256 _ < <(/usr/bin/sha256sum uv.lock)
 test "$CURRENT_LOCK_SHA256" = "$RECEIPT_LOCK_SHA256"
 
-/usr/bin/git branch --show-current | /usr/bin/tee "$RUNLOG/branch.txt"
-/usr/bin/git rev-parse HEAD | /usr/bin/tee "$RUNLOG/worktree-commit.txt"
-/usr/bin/git rev-parse "$RECEIPT_BASELINE_COMMIT" \
+/usr/bin/git --no-replace-objects branch --show-current \
+  | /usr/bin/tee "$RUNLOG/branch.txt"
+/usr/bin/git --no-replace-objects rev-parse HEAD \
+  | /usr/bin/tee "$RUNLOG/worktree-commit.txt"
+/usr/bin/git --no-replace-objects rev-parse "$RECEIPT_BASELINE_COMMIT" \
   | /usr/bin/tee "$RUNLOG/frozen-baseline-commit.txt"
 /usr/bin/sha256sum -c docs/research_note/alpha_max_final_sha256_20260711.txt \
   | /usr/bin/tee "$RUNLOG/source-sha256-check.txt"
