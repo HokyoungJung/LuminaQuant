@@ -34,14 +34,46 @@ receipt is not a tracked final-manifest entry.
 set -euo pipefail
 umask 077
 REPO="$(pwd -P)"
-RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)"
+ALIGNMENT_RECEIPT="${ALIGNMENT_RECEIPT:?set to the absolute approved receipt path}"
+ALIGNMENT_RECEIPT_SHA256="${ALIGNMENT_RECEIPT_SHA256:?set to the approved lowercase receipt SHA-256}"
+
+for variable in \
+  PYTHONPATH PYTHONHOME PYTHONSTARTUP PYTHONINSPECT PYTHONUSERBASE \
+  PYTHONPLATLIBDIR GIT_DIR GIT_WORK_TREE GIT_COMMON_DIR GIT_INDEX_FILE \
+  GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_CONFIG_GLOBAL \
+  GIT_CONFIG_SYSTEM GIT_CONFIG_NOSYSTEM GIT_CONFIG_COUNT \
+  GIT_CONFIG_PARAMETERS GIT_EXEC_PATH
+do
+  test -z "${!variable+x}" || {
+    printf 'forbidden preflight environment variable: %s\n' "$variable" >&2
+    exit 1
+  }
+done
+for executable in \
+  /usr/bin/date /usr/bin/git /usr/bin/mkdir /usr/bin/python3 \
+  /usr/bin/sha256sum /usr/bin/tee /usr/bin/time
+do
+  test -x "$executable"
+done
+
+RUN_ID="$(/usr/bin/date -u +%Y%m%dT%H%M%SZ)"
 RUNLOG="/absolute/path/to/alpha-max-run-record-$RUN_ID"
 DATA="/absolute/path/to/alpha-max-phase-roots"
 PRELOCK_OUT="/absolute/path/to/new/alpha-max-prelock-$RUN_ID"
 HISTORICAL_OUT="/absolute/path/to/new/alpha-max-historical-$RUN_ID"
-ALIGNMENT_RECEIPT="${ALIGNMENT_RECEIPT:?set to the absolute approved receipt path}"
-ALIGNMENT_RECEIPT_SHA256="${ALIGNMENT_RECEIPT_SHA256:?set to the approved lowercase receipt SHA-256}"
-mkdir -p "$RUNLOG"
+/usr/bin/mkdir -p "$RUNLOG"
+
+# This check is deliberately before any import-capable interpreter or project command.
+# Explicit options defeat status.showUntrackedFiles and fsmonitor configuration.
+STATUS_ARGS=(
+  -c core.fsmonitor=false
+  -c core.untrackedCache=false
+  -c status.showUntrackedFiles=all
+  status --porcelain=v1 --untracked-files=all
+)
+/usr/bin/git "${STATUS_ARGS[@]}" > "$RUNLOG/worktree-status-before.txt"
+test ! -s "$RUNLOG/worktree-status-before.txt"
+test "$(/usr/bin/python3 -I -S -c 'import sys; print(int(sys.flags.isolated and sys.flags.no_site))')" = "1"
 
 case "$ALIGNMENT_RECEIPT" in /*) ;; *) exit 1 ;; esac
 case "$ALIGNMENT_RECEIPT_SHA256" in
@@ -57,17 +89,20 @@ case "$ALIGNMENT_RECEIPT_SHA256" in
 esac
 test -f "$ALIGNMENT_RECEIPT"
 test ! -L "$ALIGNMENT_RECEIPT"
-read -r RECEIPT_ACTUAL_SHA256 _ < <(sha256sum "$ALIGNMENT_RECEIPT")
+read -r RECEIPT_ACTUAL_SHA256 _ < <(/usr/bin/sha256sum "$ALIGNMENT_RECEIPT")
 test "$RECEIPT_ACTUAL_SHA256" = "$ALIGNMENT_RECEIPT_SHA256"
-ALIGNMENT_RECEIPT="$ALIGNMENT_RECEIPT" \
-ALIGNMENT_RECEIPT_SHA256="$ALIGNMENT_RECEIPT_SHA256" \
-RUNLOG="$RUNLOG" python3 - <<'PY'
+
+RECEIPT_OUTPUT="$(
+  /usr/bin/python3 -I -S - \
+    "$ALIGNMENT_RECEIPT" \
+    "$ALIGNMENT_RECEIPT_SHA256" \
+    "$RUNLOG/alignment-receipt-readback.json" <<'PY'
 from __future__ import annotations
 
 import hashlib
 import json
-import os
 import re
+import sys
 from pathlib import Path
 
 EXPECTED_LOCK_SHA256 = "59d9de230be950761736c24e04af3456e229cf4aa077536167fb7e650a71c339"
@@ -82,6 +117,7 @@ EXPECTED = {
 }
 KEYS = set(EXPECTED) | {"accepted_commit", "final_manifest_sha256"}
 
+
 def unique_object(pairs):
     result = {}
     for key, value in pairs:
@@ -90,8 +126,10 @@ def unique_object(pairs):
         result[key] = value
     return result
 
-receipt_path = Path(os.environ["ALIGNMENT_RECEIPT"])
-expected_digest = os.environ["ALIGNMENT_RECEIPT_SHA256"]
+
+receipt_path = Path(sys.argv[1])
+expected_digest = sys.argv[2]
+readback_path = Path(sys.argv[3])
 raw = receipt_path.read_bytes()
 if hashlib.sha256(raw).hexdigest() != expected_digest:
     raise SystemExit("alignment receipt SHA-256 mismatch")
@@ -114,37 +152,49 @@ if not isinstance(receipt["final_manifest_sha256"], str) or not re.fullmatch(
     r"[0-9a-f]{64}", receipt["final_manifest_sha256"]
 ):
     raise SystemExit("alignment receipt final_manifest_sha256 is invalid")
+
 readback = {
     "alignment_receipt_sha256": expected_digest,
     "receipt": receipt,
 }
-output = json.dumps(readback, sort_keys=True, separators=(",", ":")).encode() + b"\n"
-Path(os.environ["RUNLOG"], "alignment-receipt-readback.json").write_bytes(output)
+readback_path.write_bytes(
+    json.dumps(readback, sort_keys=True, separators=(",", ":")).encode() + b"\n"
+)
+print(receipt["branch"])
+print(receipt["accepted_commit"])
+print(receipt["baseline_commit"])
+print(receipt["final_manifest_sha256"])
+print(receipt["lock_sha256"])
 PY
-RECEIPT_BRANCH="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["receipt"]["branch"])' "$RUNLOG/alignment-receipt-readback.json")"
-RECEIPT_ACCEPTED_COMMIT="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["receipt"]["accepted_commit"])' "$RUNLOG/alignment-receipt-readback.json")"
-RECEIPT_BASELINE_COMMIT="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["receipt"]["baseline_commit"])' "$RUNLOG/alignment-receipt-readback.json")"
-RECEIPT_MANIFEST_SHA256="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["receipt"]["final_manifest_sha256"])' "$RUNLOG/alignment-receipt-readback.json")"
-RECEIPT_LOCK_SHA256="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["receipt"]["lock_sha256"])' "$RUNLOG/alignment-receipt-readback.json")"
+)"
+mapfile -t RECEIPT_FIELDS <<< "$RECEIPT_OUTPUT"
+test "${#RECEIPT_FIELDS[@]}" -eq 5
+RECEIPT_BRANCH="${RECEIPT_FIELDS[0]}"
+RECEIPT_ACCEPTED_COMMIT="${RECEIPT_FIELDS[1]}"
+RECEIPT_BASELINE_COMMIT="${RECEIPT_FIELDS[2]}"
+RECEIPT_MANIFEST_SHA256="${RECEIPT_FIELDS[3]}"
+RECEIPT_LOCK_SHA256="${RECEIPT_FIELDS[4]}"
 
-command -v /usr/bin/time
-command -v sha256sum
-test "$(git branch --show-current)" = "$RECEIPT_BRANCH"
-test "$(git rev-parse HEAD)" = "$RECEIPT_ACCEPTED_COMMIT"
-git merge-base --is-ancestor "$RECEIPT_BASELINE_COMMIT" HEAD
-read -r CURRENT_MANIFEST_SHA256 _ < <(sha256sum docs/research_note/alpha_max_final_sha256_20260711.txt)
+/usr/bin/git "${STATUS_ARGS[@]}" > "$RUNLOG/worktree-status-after-receipt.txt"
+test ! -s "$RUNLOG/worktree-status-after-receipt.txt"
+test "$(/usr/bin/git branch --show-current)" = "$RECEIPT_BRANCH"
+test "$(/usr/bin/git rev-parse HEAD)" = "$RECEIPT_ACCEPTED_COMMIT"
+/usr/bin/git merge-base --is-ancestor "$RECEIPT_BASELINE_COMMIT" HEAD
+read -r CURRENT_MANIFEST_SHA256 _ < <(
+  /usr/bin/sha256sum docs/research_note/alpha_max_final_sha256_20260711.txt
+)
 test "$CURRENT_MANIFEST_SHA256" = "$RECEIPT_MANIFEST_SHA256"
-read -r CURRENT_LOCK_SHA256 _ < <(sha256sum uv.lock)
+read -r CURRENT_LOCK_SHA256 _ < <(/usr/bin/sha256sum uv.lock)
 test "$CURRENT_LOCK_SHA256" = "$RECEIPT_LOCK_SHA256"
-git branch --show-current | tee "$RUNLOG/branch.txt"
-git rev-parse HEAD | tee "$RUNLOG/worktree-commit.txt"
-git rev-parse "$RECEIPT_BASELINE_COMMIT" | tee "$RUNLOG/frozen-baseline-commit.txt"
-git status --porcelain=v1 | tee "$RUNLOG/worktree-status.txt"
-test ! -s "$RUNLOG/worktree-status.txt"
-sha256sum -c docs/research_note/alpha_max_final_sha256_20260711.txt \
-  | tee "$RUNLOG/source-sha256-check.txt"
+
+/usr/bin/git branch --show-current | /usr/bin/tee "$RUNLOG/branch.txt"
+/usr/bin/git rev-parse HEAD | /usr/bin/tee "$RUNLOG/worktree-commit.txt"
+/usr/bin/git rev-parse "$RECEIPT_BASELINE_COMMIT" \
+  | /usr/bin/tee "$RUNLOG/frozen-baseline-commit.txt"
+/usr/bin/sha256sum -c docs/research_note/alpha_max_final_sha256_20260711.txt \
+  | /usr/bin/tee "$RUNLOG/source-sha256-check.txt"
 uv sync --frozen --extra dev
-uv run --frozen --extra dev python - <<'PY' | tee "$RUNLOG/frozen-runtime-hashes.txt"
+uv run --frozen --extra dev python - <<'PY' | /usr/bin/tee "$RUNLOG/frozen-runtime-hashes.txt"
 from lumina_quant.research.alpha_max_engine_runner import (
     ALPHA_MAX_CONFIG_FILE_SHA256,
     ALPHA_MAX_CONFIG_PAYLOAD_SHA256,
