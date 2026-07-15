@@ -22,13 +22,13 @@ Paste the following as the first message in the new coding session:
 - G001, G012, G017 complete
 - G002/G003/G008–G011/G013–G016 superseded
 - G004 review_blocked
-- G018 pending review-blocker story
+- G018 active review-blocker story
 - G005–G007 pending
 
 inline aggregate goal이 세션 이관 때문에 pause되어 있으면 `goal resume`으로 재개해. objective는 다음 stable aggregate objective 하나뿐이다:
 `Complete the durable ultragoal plan in .gjc/ultragoal/goals.json, including later accepted/appended stories, under the original brief constraints; use .gjc/ultragoal/ledger.jsonl as the audit trail.`
 
-그 다음 `GJC_SESSION_ID=019f603a-0e73-7000-88a7-c94f42950c09 gjc ultragoal complete-goals`를 실행해 G018 handoff를 받아. G005를 먼저 시작하지 마.
+G018은 durable state에서 이미 active다. `complete-goals`를 다시 실행하지 말고 paused inline aggregate goal만 resume한 뒤 G018을 계속해. G005를 먼저 시작하지 마.
 
 G004 snapshot은 일부 구현이지만 proof completion이 아니다. 마지막 snapshot gate는 다음과 같다:
 

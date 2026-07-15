@@ -14,15 +14,15 @@
     },
     "goals": {
       "path": ".gjc/_session-019f603a-0e73-7000-88a7-c94f42950c09/ultragoal/goals.json",
-      "sha256": "9ae6a591d7c4aecac21c211ff49bcc6bc0d832d68bf8e4de582bb624e1fa5503",
-      "byte_count": 38330
+      "sha256": "b1da375ff3a37cdd34941c5ef880853e34c404d2a7b93a23729de684583b10d4",
+      "byte_count": 38376
     },
     "ledger": {
       "path": ".gjc/_session-019f603a-0e73-7000-88a7-c94f42950c09/ultragoal/ledger.jsonl",
-      "sha256": "341e5bb2f5c4c50c50e9308ff0111c26faa936b7ca29c63138d08c9c20ff2fd1",
-      "byte_count": 50420,
-      "line_count": 72,
-      "latest_event_id": "72a63fdd-316f-448e-abcd-9a1549d744d6",
+      "sha256": "5037d14090b05850c4bc45f611b23543afa645ed9a336791f5b6f09c0766dd22",
+      "byte_count": 51440,
+      "line_count": 75,
+      "latest_event_id": "62768895-7fda-4b33-9131-81282b936f32",
       "latest_event": "blocker_classified:human_blocked:G018"
     },
     "inline_goal_status": "paused_for_user_requested_session_transfer",
@@ -41,7 +41,7 @@
       {"id": "G016", "status": "superseded"},
       {"id": "G017", "status": "complete"},
       {"id": "G004", "status": "review_blocked"},
-      {"id": "G018", "status": "pending"},
+      {"id": "G018", "status": "active"},
       {"id": "G005", "status": "pending"},
       {"id": "G006", "status": "pending"},
       {"id": "G007", "status": "pending"}
@@ -77,7 +77,7 @@
       "ruff": "passed",
       "full_suite_run": false
     },
-    "next_command": "GJC_SESSION_ID=019f603a-0e73-7000-88a7-c94f42950c09 gjc ultragoal complete-goals",
+    "next_command": "Resume the paused inline aggregate goal and continue already-active G018; do not run complete-goals.",
     "implementation_plan": [
       "Close end-to-end strict dispatch proxy, final-array, datetime cadence, and typed-error blockers.",
       "Make router decisions/scales deterministic and bind authoritative freeze, prior-fold, receipt-byte, engine, data, and profile evidence.",
@@ -103,7 +103,7 @@
   "evidence_root": "/home/hoky/quants-recovery-runs/20260714T105113Z",
   "resume_rules": [
     "Activate /skill:ultragoal and use the existing session id; never create a competing plan.",
-    "Resume the paused aggregate inline goal, then run complete-goals to obtain G018.",
+    "Resume the paused aggregate inline goal and continue already-active G018 without running complete-goals.",
     "Verify f8ba7f1d and rerun the 72-test/Ruff snapshot gate before editing.",
     "Do not start G005 before G018 and G004 receive clean completion gates.",
     "Do not run strategy performance, data/network/order operations, or consume quarantined Alpha data during G018.",

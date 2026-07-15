@@ -40,7 +40,7 @@ Always set `GJC_SESSION_ID=019f603a-0e73-7000-88a7-c94f42950c09` on native `gjc 
 | G003, G013–G016 | superseded | Replaced by verified terminal G017 chain. |
 | G017 | complete | Alpha Rev5.15 handoff at commit `391000b40717386765bfa39bd212d91c2e3be794`; final CLEAR/APPROVE and PASS. |
 | G004 | review_blocked | Partial router/dispatch/cost infrastructure is committed at `f8ba7f1d`; it is not accepted proof. |
-| G018 | pending review-blocker story | Resume here to close all G004 architecture blockers. |
+| G018 | active, inline-paused for session transfer | Resume this review-blocker story to close all G004 architecture blockers. |
 | G005–G007 | pending | Do not start until G018 resolves and G004 receives clean final gates/checkpoint. |
 
 The inline aggregate goal is paused only for the user-requested session transfer. Resume it in the new session.
@@ -174,7 +174,7 @@ Three independent focused architects returned `BLOCK / CHANGES_REQUIRED` (tasks 
 3. Activate `/skill:ultragoal`.
 4. Set `GJC_SESSION_ID=019f603a-0e73-7000-88a7-c94f42950c09` and run `gjc ultragoal status --json`.
 5. Resume the paused inline aggregate goal.
-6. Run `gjc ultragoal complete-goals`; it must hand off the review-blocker story G018. Do not start G005.
+6. Confirm durable G018 is already active; do not run `complete-goals` or start G005.
 7. Re-run the 72-test/Ruff snapshot gate before editing to confirm the handoff checkout.
 8. Execute G018 in A → B → C → E order, using bounded executor slices and preserving the binding decisions in D.
 9. Do not run any performance/data/network/order command during G018.
