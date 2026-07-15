@@ -1,168 +1,180 @@
-# Strategy recovery cross-session handoff — 2026-07-14
+# Strategy recovery cross-session handoff — 2026-07-15
 
 ## Resume identity
 
 - Repository: `/home/hoky/Quants-agent/LuminaQuant`
-- Main recovery branch: `recovery/strategy-plan-20260714`
-- Committed implementation: `66c85d5da2edbe42c8e9f359ea59582dd814f997`
-- Original private-main baseline: `1bd4405532271527d6c89ba7e3e55bf78c510eb6`
-- Durable Ultragoal session id: `019f603a-0e73-7000-88a7-c94f42950c09`
-- Durable state: `.gjc/_session-019f603a-0e73-7000-88a7-c94f42950c09/ultragoal/goals.json`
-- Audit ledger: `.gjc/_session-019f603a-0e73-7000-88a7-c94f42950c09/ultragoal/ledger.jsonl`
-- Machine-readable state snapshot: [`strategy_recovery_resume_state_20260714.json`](strategy_recovery_resume_state_20260714.json)
-- Copy-ready new-session prompt: [`strategy_recovery_new_session_prompt_20260714.md`](strategy_recovery_new_session_prompt_20260714.md)
-- Run evidence root: `/home/hoky/quants-recovery-runs/20260714T105113Z`
+- Branch: `recovery/strategy-plan-20260714`
+- G004 code snapshot: `f8ba7f1d` (`Checkpoint G004 recovery proof infrastructure`)
+- Foundation commit: `66c85d5da2edbe42c8e9f359ea59582dd814f997`
+- Durable Ultragoal session: `019f603a-0e73-7000-88a7-c94f42950c09`
+- Durable goals: `.gjc/_session-019f603a-0e73-7000-88a7-c94f42950c09/ultragoal/goals.json`
+- Durable ledger: `.gjc/_session-019f603a-0e73-7000-88a7-c94f42950c09/ultragoal/ledger.jsonl`
+- Machine-readable resume state: [`strategy_recovery_resume_state_20260714.json`](strategy_recovery_resume_state_20260714.json)
+- Copy-ready prompt: [`strategy_recovery_new_session_prompt_20260714.md`](strategy_recovery_new_session_prompt_20260714.md)
+- Evidence root: `/home/hoky/quants-recovery-runs/20260714T105113Z`
 - Writable market snapshot: `/home/hoky/quants-recovery-market/20260714T105113Z/market_parquet`
 
-The aggregate objective remains:
+Stable aggregate objective:
 
 > Complete the durable ultragoal plan in `.gjc/ultragoal/goals.json`, including later accepted/appended stories, under the original brief constraints; use `.gjc/ultragoal/ledger.jsonl` as the audit trail.
 
-The session-specific paths above, not the unrelated legacy `.gjc/ultragoal/goals.json`, are authoritative for this run. Supply `GJC_SESSION_ID=019f603a-0e73-7000-88a7-c94f42950c09` to native `gjc ultragoal` commands in a new session.
+Always set `GJC_SESSION_ID=019f603a-0e73-7000-88a7-c94f42950c09` on native `gjc ultragoal` commands. Do not run `create-goals`.
 
-## Safety contract that remains binding
+## Binding safety contract
 
-- Preserve all user work and keep every original data root read-only.
-- Never use synthetic data, symbol substitution, pre-listing fill, forward-fill, shortened dates, missing-funding proxies, locked-OOS reselection, paper/testnet/live orders, or capital allocation.
-- Never run Alpha-Max prelock or historical evaluation until its runbook alignment is committed and a complete authorized canonical source exists.
-- Do not consume the quarantined Alpha source named below.
-- Do not push either branch unless the user explicitly requests a push.
-- Every story ends in PASS, scientific KILL, or an immutable external-blocker receipt.
+- Preserve user work. Treat every original data root as read-only.
+- Never use synthetic production data, symbol substitution, pre-listing fills, shortened dates, missing-funding proxies, fallback strategy proxies, locked-OOS parameter changes, paper/testnet/live orders, or capital allocation.
+- Do not run strategy performance, grid-search, data download, network, or order operations while G004/G018 is unresolved.
+- Do not run Alpha phase preparation, prelock, or historical evaluation while blocker-v2 is STOP.
+- Never consume `/home/hoky/Quants-agent/LuminaQuant-data/alpha_max_20260711_listing_aware_source`.
+- Do not push either recovery branch without explicit user instruction.
+- Structural/incomplete evidence is `STOP`; complete evidence failing scientific gates is `REJECT`/scientific KILL.
 
-## Durable goal state at handoff
+## Durable goal state
 
-| Goal | State | Evidence/meaning |
+| Goal | State | Meaning |
 |---|---|---|
-| G001 — D-01 inventory | complete | Source/snapshot inventories frozen; synthetic selected-root count zero; gaps disclosed. |
-| G002 — D-01A/D-04/D-05 | superseded | Cumulatively replaced and verified by G008–G012. |
-| G008 | superseded | D-04 separately approved; D-01A continued through blocker chain. |
-| G009 | superseded | Replaced by stronger funding bijection/seal work. |
-| G010 | superseded | Replaced by complete ownership work. |
-| G011 | superseded | Automatically superseded by completed G012. |
-| G012 — provider identity/receipt semantics | complete | Fresh strict quality gate, architect CLEAR/APPROVE, executor QA passed. |
-| **G003 — Alpha-Max Rev5.15 alignment** | **active** | Resume here. Foundation is recorded below; alignment files remain unmodified. |
-| G004 — exact R1/R2 replay/cost proof | pending | Start only after G003 checkpoint. |
-| G005 — bounded data recovery and R-04/A-03 decisions | pending | Depends on validated data and G003/G004 infrastructure. |
-| G006 — C-00 through C-05 follow-up cycle | pending | Starts only after R-04 and A-03 are terminal. |
-| G007 — F-01/C-06 fresh-forward | pending | At most permitted champions; 30/60-day evidence; zero orders/capital. |
+| G001 | complete | D-01 inventory and immutable source/snapshot evidence complete. |
+| G002, G008–G011 | superseded | Replaced by verified G012 chain. |
+| G012 | complete | D-01A/D-04/D-05 provider, ownership, receipt, lifecycle, and seal gates complete. |
+| G003, G013–G016 | superseded | Replaced by verified terminal G017 chain. |
+| G017 | complete | Alpha Rev5.15 handoff at commit `391000b40717386765bfa39bd212d91c2e3be794`; final CLEAR/APPROVE and PASS. |
+| G004 | review_blocked | Partial router/dispatch/cost infrastructure is committed at `f8ba7f1d`; it is not accepted proof. |
+| G018 | pending review-blocker story | Resume here to close all G004 architecture blockers. |
+| G005–G007 | pending | Do not start until G018 resolves and G004 receives clean final gates/checkpoint. |
 
-A user-requested cross-session stop was appended to the Ultragoal ledger while G003 remained active. The aggregate inline goal was then classified as human-blocked solely for the session transfer and paused; resume it in the new session before continuing G003.
+The inline aggregate goal is paused only for the user-requested session transfer. Resume it in the new session.
 
-## Completed foundational implementation
+## Completed and preserved evidence
 
-Commit `66c85d5da2edbe42c8e9f359ea59582dd814f997` contains:
+### Foundation (G012)
 
-- fail-closed research data contract validator;
-- contract-wide official funding ownership/catalog reconciliation;
-- canonical Binance provider identity and funding alias conflict rejection;
-- exact pre-receipt schema, D-04, metric, count, digest, and seal validation;
-- strict physical/repository OHLCV route parity;
-- point-in-time symbol lifecycle/fold manifests;
-- materializer `--help` root fix;
-- adversarial tests for relabeling, wrappers, overlap, truncation, hash/digest drift, lifecycle forgery, and CLI boundaries.
+- Commit: `66c85d5da2edbe42c8e9f359ea59582dd814f997`
+- Focused gate: 125 passed.
+- Full tracked suite: 4475 passed, 20 skipped, 3 xfailed.
+- Architect: CLEAR/CLEAR/CLEAR, APPROVE.
+- Executor QA: passed.
+- Real BTC June remains expected STOP: 874 OHLCV gaps and 18 funding prefix gaps; no append occurred.
 
-Latest verified evidence before handoff:
+### Alpha Rev5.15 terminal chain (G017)
 
-- focused G012 gate: `125 passed`;
-- full tracked suite: `4475 passed, 20 skipped, 3 xfailed`;
-- Ruff, format check, and `git diff --check`: clean;
-- real BTC June pre-append: expected `STOP`, exit `2`, 874 OHLCV interior gaps, 18 funding prefix gaps;
-- architect: `agent://28-G012FinalArchitect` — CLEAR/CLEAR/CLEAR, APPROVE;
-- executor QA: `agent://29-G012ExecutorQa` — passed;
-- quality gate: `/home/hoky/quants-recovery-runs/20260714T105113Z/g012-quality-gate.json`;
-- adversarial report: `/home/hoky/quants-recovery-runs/20260714T105113Z/g012-adversarial-test-report.json`.
+- Alpha branch: `recovery/alpha-max-rev515-alignment-20260714`
+- Commit: `391000b40717386765bfa39bd212d91c2e3be794`
+- Receipt v5: `/home/hoky/quants-recovery-runs/20260714T105113Z/alpha-max-rev515-alignment-receipt-v5.json`
+- Receipt SHA-256: `8687b52180502a11de9fbe317a19d00bb4492c464b3bf33d4eda2437683ca812`
+- Manifest SHA-256: `dbe018b066f556152e387f15c84770c7c2bd4e46dbc6ac8bac109e3176e5a036`
+- Lock SHA-256: `59d9de230be950761736c24e04af3456e229cf4aa077536167fb7e650a71c339`
+- Full/post-cleaner gate: 4927 passed, 36 skipped, 3 xfailed; Ruff passed.
+- Architect CLEAR/APPROVE; executor PASS.
+- Blocker-v2 remains authoritative STOP: `/home/hoky/quants-recovery-runs/20260714T105113Z/alpha-max-phase-preparation-blocker-v2.json`, SHA `3b8c04b7a6b0a7d99e3d2b0ffb2dc42551c876b9ec5879663529b2b6173a07b2`.
 
-## G003 state and exact resume point
+## G004 snapshot at `f8ba7f1d`
 
-A separate clean worktree already exists:
+This commit is a resumable implementation checkpoint, not a completion checkpoint and not a performance claim.
 
-- Worktree: `/home/hoky/Quants-agent/Quants-agent-alpha-max-data-pc`
-- Branch: `recovery/alpha-max-rev515-alignment-20260714`
-- HEAD/baseline: `629d91e5d4aac26911af65a4a5e15ebdcbded30f`
-- Status at stop: clean; no alignment edits and no commit yet.
-- Cancelled worker: `30-G003Rev515Runbook`; it stopped before editing.
+Implemented surfaces:
 
-The frozen Rev5.15 inputs were independently hash-checked and match the approved plan:
+1. Default-off strict actual-engine dispatch:
+   - `ResearchConfig.route_unmapped_registered_strategies = false`
+   - `ResearchConfig.require_actual_engine_routing = false`
+   - strict registry wrapper preserves exceptions;
+   - strict dispatcher validates aligned arrays, symbols, close prices, timestamps, exposure shape/finiteness, handler mode, and fallback metadata;
+   - legacy generic fallback remains unchanged when strict mode is off.
+2. Frozen combined profile:
+   - `configs/profiles/backtest_cost_realistic.yaml` arms strict routing and candidate-overfit statistics in the single replacement profile.
+3. Shared MDD fix:
+   - `research_metrics.max_drawdown` includes initial capital peak.
+4. Exact two-candidate router manifest validator:
+   - ordered R1/R2 IDs and SHA `ddc8996136e70d3847e8270f6165a26992ec8def8439ba6f56e3bcdbdee239b9`;
+   - no new grid search, recompute-from-json, post-OOS augmentation, orders, or capital;
+   - lifecycle/membership, leaf, handler/registry, cash/mature/scaled parity, duplicate/nonfinite parsing, and zero fallback/OOS-count checks.
+5. Read-only `lq research cost-proof` surface:
+   - strict JSON/YAML parsing and explicit external bindings;
+   - cost ladder 10/15/20/30bp;
+   - internal order/fill/position/PnL, funding, impact, grid, exposure, stop, liquidation, MDD, DSR/SPA/PBO, fold robustness, and deterministic selection checks;
+   - source-row and provenance scaffolding.
 
-| Artifact | SHA-256 |
-|---|---|
-| `configs/research/alpha_max_portfolio_20260711_listing_aware.json` | `2f267451c4df6b6b7471d972b7756327e41c82522ae2ef4b9198fbf6aa8b5e9c` |
-| `configs/research/alpha_max_contract_manifest_20260711_listing_aware.json` | `ae272f70f65797b4c8a87c29b7f8e64511617f8e0f2d4bd841b2d1addb7d1220` |
-| `configs/research/alpha_max_official_availability_evidence_20260711.json` | `214e5da198307d8d32b30f69fb6b1f09002e0b31888dc476ed16060f79de9719` |
-| `scripts/research/prepare_alpha_max_phase_roots.py` | `ea26b902bcec4458340e4c345fa648a3db9104e1b337fd42460d9a9461a738ac` |
+Latest snapshot verification:
 
-Runtime hashes that the aligned runbook must state:
+```text
+uv run pytest -q \
+  tests/research/test_cost_proof.py \
+  tests/research/test_router_replay.py \
+  tests/test_strategy_signal_dispatch.py \
+  tests/test_strategy_signal_dispatch_routing.py
+# 72 passed in 1.03s
 
-- runtime contract: `b3859443c842cf8b04d04ed32923e6c6a8207af18e26f68a717ba623b4edfef9`;
-- config payload: `b062e3805d94087cc18cd22634918815503f94dd73f8fa8ac1979e7aef535f85`;
-- config file: `2f267451c4df6b6b7471d972b7756327e41c82522ae2ef4b9198fbf6aa8b5e9c`.
+uv run ruff check \
+  src/lumina_quant/research/cost_proof.py \
+  src/lumina_quant/research/router_replay.py \
+  src/lumina_quant/strategy_factory/strategy_signal_dispatch.py \
+  tests/research/test_cost_proof.py \
+  tests/research/test_router_replay.py \
+  tests/test_strategy_signal_dispatch.py \
+  tests/test_strategy_signal_dispatch_routing.py
+# All checks passed
+```
 
-### G003 implementation still required
+Earlier combined G004 focused gate before the final review-driven hardening was 75 passed. No full-suite or final quality gate was run for `f8ba7f1d`.
 
-Delegate a bounded executor to edit only these two Alpha worktree files, then verify and commit them as the leader:
+## Mandatory G018 blocker plan
 
-1. `docs/research_note/alpha_max_data_pc_runbook_20260711.md`
-2. `docs/research_note/alpha_max_final_sha256_20260711.txt`
+Three independent focused architects returned `BLOCK / CHANGES_REQUIRED` (tasks `58-G004CostContractReview`, `59-G004RouterContractReview`, `60-G004DispatchContractReview`). Their full output was session-local, so the actionable findings are preserved here.
 
-Required alignment:
+### A. Strict dispatch — close first
 
-- title/identity and baseline become Rev5.15 / commit `629d91e5d4aac26911af65a4a5e15ebdcbded30f`;
-- make the four listing-aware artifacts and exact hashes above normative;
-- correct the three runtime/config hashes;
-- add a no-discretion phase-root preparer command using only authorized canonical `market_ohlcv_1s` plus `feature_points`, the listing-aware contract, and a new absent output root;
-- replace every prelock config/contract command with the listing-aware paths;
-- preserve immutable half-open dates:
-  - warmup `[2022-12-31, 2024-01-01)`;
-  - train `[2024-01-01, 2025-06-01)`;
-  - purge `[2025-06-01, 2025-06-08)`;
-  - validation `[2025-06-08, 2025-08-31)`;
-  - embargo `[2025-08-31, 2025-09-07)`;
-  - exposed historical `[2025-09-07, 2026-07-01)`;
-- state TONUSDT official ownership exactly: raw `[2024-03-01T12:31:10Z, 2026-06-23T09:00:00Z)`, feature `[2024-03-01T16:00:00Z, 2026-06-23T09:00:00Z)`;
-- require TON to fail original warmup/train admission; forbid GRAMUSDT substitution, synthetic warmup, synthesized listing-transition funding, date shifts, and post-delivery rows;
-- retain exact structural checks: 68 prelock cells, 816 physical validation fold runs, 17 manifests per phase, 680 historical physical runs;
-- update the final SHA manifest with the runbook hash and the four Rev5.15 artifacts.
+1. Propagate strictness through mapped pair handlers. `_apply_pair_spread_strategy` currently catches actual-engine failure and substitutes `_pair_spread_fallback_exposures`; strict mode must raise with the original cause instead.
+2. Validate final `portfolio_ret`, `turnover`, and aggregate `exposure` shape/finiteness before strict return; finite inputs can currently overflow derived arrays.
+3. Derive registry simulation cadence correctly from production `numpy.datetime64[ms]`, not the legacy 60-second exception fallback.
+4. Wrap malformed strict candidate/params coercion in `StrategySignalDispatchError` with cause.
+5. Add tests for pair-simulator failure, arithmetic overflow, NumPy datetime cadence, malformed params, and the public research call chain.
 
-Parent verification after the edit must include exact hash/date/path checks, focused Alpha config/preparer/runtime tests, cleanup, a full appropriate worktree gate, architect review, executor QA, then an Ultragoal G003 checkpoint. Commit the alignment on `recovery/alpha-max-rev515-alignment-20260714`; do not push without explicit instruction.
+### B. Router replay — make evidence authoritative and deterministic
 
-## Alpha source blocker — do not prepare phase roots
+1. Do not accept producer-declared branch/label/history/leaves as replay. Bind immutable prior-fold evidence and recompute the frozen warmup/history/lagged-average/train/MDD/validation decision.
+2. Require byte-addressable signal/position/engine receipts; hash their actual bytes and bind fold, leaf, symbols, data/window, params, handler/class, and transitive engine dependency identity.
+3. Authenticate shared fallback MDD inputs and deterministically recompute both R1 MDD30/cap3 and R2 MDD20/cap2 scales; only deterministic scale consequences may differ.
+4. Parse and bind commit/freeze provenance to an out-of-band immutable root; the current source artifact mirrors the manifest and is circular.
+5. Make combined-profile parsing recursively finite, closed enough for runtime-consumed fields, and exact-typed (`True` must not equal `1`; purge bar count must be an integer).
+6. Convert huge-number/overflow inputs into `STOP` and add adversarial tests.
 
-The only discovered 1s/funding candidate is explicitly quarantined and incomplete:
+### C. Cost proof — replace self-consistency with independent proof
 
-- candidate root: `/home/hoky/Quants-agent/LuminaQuant-data/alpha_max_20260711_listing_aware_source`;
-- frozen inventory SHA-256: `74fe748ed4505824f79090e9d83ab43c20a997dbadbb136b29afa52943ca13aa`;
-- warning: `/home/hoky/Quants-agent/LuminaQuant-data/DO_NOT_USE_alpha_max_20260711_listing_aware_source_UNAUTHORIZED_PARTIAL.txt`;
-- warning SHA-256: `64f94db085ea673ff3f19b230bfd308bf3b0fad251e4c5feb2089f409e648990`;
-- immutable blocker receipt: `/home/hoky/quants-recovery-runs/20260714T105113Z/alpha-max-phase-preparation-blocker.json`.
+1. Bind every cost fold signal/order/execution tape slice to authenticated router execution receipt commitments.
+2. Verify source rows against actual market/funding bytes or authenticated row/Merkle receipts; parse and semantically bind the data-contract and cost commit receipts.
+3. Pin the exact frozen combined-profile byte digest and exact economically relevant semantics; do not accept arbitrary positive impact coefficients.
+4. Authenticate bar volume/ADV. The shipped profile uses per-bar volume when `slippage_adv_quote=0`; fill-supplied volume is currently manipulable.
+5. Reconcile cash and inventory from fills so realized fill-price PnL, unrealized mark PnL, fees/linear costs, impact, funding, and equity form one exact ledger.
+6. Bind every period label to its declared validation/locked range. Remove implicit free position resets at segment boundaries or represent explicit flattening fills/cost/funding.
+7. Derive default stop price from profile/fill and handle entry-bar stop/liquidation with authenticated event order; reject ambiguous OHLC order fail-closed.
+8. Authenticate the complete attempted/skipped/failed whole-search trial ledger and bind every trial return row; `raw_trial_count == supplied IDs` is insufficient.
+9. Run SPA/max-statistic over the authenticated whole trial family, not independently per selected stream.
+10. Add one exploit-shaped test per invariant. Remove the duplicated first-fold `locked_ids` fixture assignment.
 
-Therefore phase-root preparation, prelock, and historical evaluation were not run. Do not read this source as performance-bearing input, materialize it, resume its backfill, or create phase roots from it. G003 can still PASS its alignment/commit portion while recording phase preparation as the external blocker.
+### D. Contract decisions that must follow the binding plan
 
-## Remaining durable objectives
+- Master plan R2 explicitly says each candidate must first pass all binding gates; if both pass, select higher validation-20bp Calmar, then lower MDD. Do not silently replace that rule with a different pre-OOS selection algorithm solely because a reviewer suggested it.
+- R1/R2 are fixed historical/post-OOS research variants, but `post_oos_augment=false`, candidate count/hash exactly two, and no new variant/search are mandatory. Preserve honest provenance and do not turn this infrastructure into a fresh-alpha claim.
+- If stronger scientific constraints make the historical Router incapable of proof, terminate it scientifically in G005; never weaken G018 gates or manufacture evidence.
 
-### G004 — Implement exact R1/R2 replay and strict cost-proof infrastructure
+### E. Verification after implementation
 
-Add an immutable exactly-two-candidate frozen replay seam for the two named router IDs; require faithful per-fold actual-engine leaf manifests, point-in-time membership, `evaluation_mode` handler or `registry_simulator`, current-fold OOS exclusion, and `generic_fallback_proxy=0`. Add one frozen combined strict plus cost-realistic replacement profile and same-signal 10/15/20/30bp proof/gate path with complete funding, sqrt impact, exposure normalization, purge/embargo, DSR, SPA, PBO, MDD, liquidation, leave-best-fold-out, and dominance checks. Test fail-closed behavior and do not perform a new grid search.
+1. Focused tests for each repaired contract and exploit.
+2. Combined G004 tests (dispatch, routing, router replay, profile, cost proof, metrics).
+3. Changed-file Ruff and format checks, `git diff --check`, AI-slop cleanup.
+4. Full tracked regression suite in sanitized environment.
+5. Evidence receipts under `/home/hoky/quants-recovery-runs/20260714T105113Z`.
+6. Fresh three-lane architect review and executor adversarial QA.
+7. Only CLEAR/CLEAR/CLEAR + APPROVE and executor PASS may checkpoint G018 and then G004.
 
-### G005 — Recover bounded data and execute R-04 and A-03 scientific decisions
+## Exact resume sequence
 
-Using only validated owned intervals, repair continuous Router tails and actual funding/support data, create pre/post receipts, and use bounded repair manifests for any interior/prefix gaps. Execute the frozen R1/R2 proof once and record PASS/KILL for every candidate. After Alpha-Max alignment and phase preparation, execute its one-touch prelock/historical protocol once, verify sealed bundles and byte identity, and record PASS/KILL without date/candidate retuning. Continue independent executable work when one track has an external blocker.
-
-The Alpha A-03 branch remains externally blocked until an authorized complete canonical source exists; continue the independent Router track rather than substituting data.
-
-### G006 — Preregister and execute C-00 through C-05
-
-Only after R-04 and A-03 are terminal, freeze `candidate-manifest.json`, `data-contract.json`, `trial-ledger.json`, and hashes for the approved bounded registry; validate Crypto/TradFi/metals contracts; run V-DIAG admission, standalone actual-engine walk-forwards, eligible V-PAIR/V-OVERLAY/V-COV ablations, and strict same-signal cost proofs. Preserve all rejects, whole-search trial counts, locked-OOS report-only semantics, prior-of-death, and exact STOP/KILL reasons. Add no new strategy implementation unless preregistered feature admission passes and no existing implementation exists.
-
-### G007 — Run F-01 and C-06 to terminal evidence
-
-Forward at most one Router/Alpha-Max champion per recovery track and at most one follow-up alpha leaf plus one risk overlay, only if prior gates pass. Freeze commit/config/manifest/universe/risk/cost hashes; start after the last previously viewed complete bar; record daily actual funding, hypothetical orders/fills, costs, reconciliation, kill switches, and hash drift with zero orders and zero capital. Maintain 30-day checkpoint and 60-day terminal PASS/KILL evidence; reset the clock on any permitted freeze change.
-
-## New-session bootstrap
-
-1. Read this handoff plus the three binding plan/runbook/audit documents.
-2. Activate `/skill:ultragoal`.
-3. For every native Ultragoal command, use `GJC_SESSION_ID=019f603a-0e73-7000-88a7-c94f42950c09` so the prior durable state is selected.
-4. Run `gjc ultragoal status --json` and confirm G003 is active, G012 is complete, G002/G008–G011 are superseded, and G004–G007 are pending.
-5. Reconcile the inline goal tool: if no active goal exists, create the stable aggregate objective printed above; if it is paused, resume it; never create a competing goal.
-6. Confirm both worktrees are clean at the commits/branches stated above.
-7. Resume G003 at the two-file runbook alignment. Do not rerun completed G001/G012 work and do not consume the quarantined source.
+1. Start in `/home/hoky/Quants-agent/LuminaQuant` and verify branch contains `f8ba7f1d`; do not reset or rewrite it.
+2. Read this note, resume-state JSON, master plan, runbook, audit, durable goals, and durable ledger.
+3. Activate `/skill:ultragoal`.
+4. Set `GJC_SESSION_ID=019f603a-0e73-7000-88a7-c94f42950c09` and run `gjc ultragoal status --json`.
+5. Resume the paused inline aggregate goal.
+6. Run `gjc ultragoal complete-goals`; it must hand off the review-blocker story G018. Do not start G005.
+7. Re-run the 72-test/Ruff snapshot gate before editing to confirm the handoff checkout.
+8. Execute G018 in A → B → C → E order, using bounded executor slices and preserving the binding decisions in D.
+9. Do not run any performance/data/network/order command during G018.

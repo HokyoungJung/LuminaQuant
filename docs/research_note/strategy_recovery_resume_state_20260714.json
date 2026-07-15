@@ -1,12 +1,12 @@
 {
   "artifact_kind": "strategy_recovery_cross_session_resume_state",
-  "schema_version": 1,
-  "created_utc": "2026-07-14",
+  "schema_version": 2,
+  "updated_utc": "2026-07-15T14:24:27Z",
   "handoff_note": "docs/research_note/strategy_recovery_session_handoff_20260714.md",
+  "new_session_prompt": "docs/research_note/strategy_recovery_new_session_prompt_20260714.md",
   "ultragoal": {
     "session_id": "019f603a-0e73-7000-88a7-c94f42950c09",
     "objective": "Complete the durable ultragoal plan in .gjc/ultragoal/goals.json, including later accepted/appended stories, under the original brief constraints; use .gjc/ultragoal/ledger.jsonl as the audit trail.",
-    "state_revision": 30,
     "brief": {
       "path": ".gjc/_session-019f603a-0e73-7000-88a7-c94f42950c09/ultragoal/brief.md",
       "sha256": "faf6f83679e7ce93a8950af4df350fc4a92557d8eaaa40ea17c9c8b918c04e57",
@@ -14,63 +14,99 @@
     },
     "goals": {
       "path": ".gjc/_session-019f603a-0e73-7000-88a7-c94f42950c09/ultragoal/goals.json",
-      "sha256": "4f60ec2da480d8d2058ae50f5508cb7c7f5c76bdda8c87dae1a9635e7ac5c2a5",
-      "byte_count": 25903
+      "sha256": "9ae6a591d7c4aecac21c211ff49bcc6bc0d832d68bf8e4de582bb624e1fa5503",
+      "byte_count": 38330
     },
     "ledger": {
       "path": ".gjc/_session-019f603a-0e73-7000-88a7-c94f42950c09/ultragoal/ledger.jsonl",
-      "sha256": "960688faf311308c38ffa1de4c0497d5141afcd13d267d772a39f7e09f98f2cf",
-      "byte_count": 24313,
-      "line_count": 33,
-      "latest_event_id": "fbf47968-1b9e-4acb-a723-2cd3412a06a5",
-      "latest_event": "blocker_classified:human_blocked"
+      "sha256": "341e5bb2f5c4c50c50e9308ff0111c26faa936b7ca29c63138d08c9c20ff2fd1",
+      "byte_count": 50420,
+      "line_count": 72,
+      "latest_event_id": "72a63fdd-316f-448e-abcd-9a1549d744d6",
+      "latest_event": "blocker_classified:human_blocked:G018"
     },
     "inline_goal_status": "paused_for_user_requested_session_transfer",
     "goal_states": [
-      {"id": "G001", "status": "complete", "title": "Establish the recovery execution record and D-01 inventory"},
-      {"id": "G002", "status": "superseded", "title": "Close foundational implementation blockers D-01A, D-04, and D-05"},
-      {"id": "G008", "status": "superseded", "title": "Resolve D-01A and D-04 verification blockers"},
-      {"id": "G009", "status": "superseded", "title": "Close funding bijection and seal authentication"},
-      {"id": "G010", "status": "superseded", "title": "Enforce contract-wide evidence ownership"},
-      {"id": "G011", "status": "superseded", "title": "Canonicalize complete evidence and seal metrics"},
-      {"id": "G012", "status": "complete", "title": "Close provider identity and receipt semantics"},
-      {"id": "G003", "status": "active", "title": "Align and prepare Alpha-Max Revision 5.15"},
-      {"id": "G004", "status": "pending", "title": "Implement exact R1/R2 replay and strict cost-proof infrastructure"},
-      {"id": "G005", "status": "pending", "title": "Recover bounded data and execute R-04 and A-03 scientific decisions"},
-      {"id": "G006", "status": "pending", "title": "Preregister and execute the follow-up alpha and volatility cycle C-00 through C-05"},
-      {"id": "G007", "status": "pending", "title": "Run frozen fresh-forward F-01 and C-06 to terminal evidence"}
+      {"id": "G001", "status": "complete"},
+      {"id": "G002", "status": "superseded"},
+      {"id": "G008", "status": "superseded"},
+      {"id": "G009", "status": "superseded"},
+      {"id": "G010", "status": "superseded"},
+      {"id": "G011", "status": "superseded"},
+      {"id": "G012", "status": "complete"},
+      {"id": "G003", "status": "superseded"},
+      {"id": "G013", "status": "superseded"},
+      {"id": "G014", "status": "superseded"},
+      {"id": "G015", "status": "superseded"},
+      {"id": "G016", "status": "superseded"},
+      {"id": "G017", "status": "complete"},
+      {"id": "G004", "status": "review_blocked"},
+      {"id": "G018", "status": "pending"},
+      {"id": "G005", "status": "pending"},
+      {"id": "G006", "status": "pending"},
+      {"id": "G007", "status": "pending"}
     ]
   },
   "repositories": {
     "main": {
       "path": "/home/hoky/Quants-agent/LuminaQuant",
       "branch": "recovery/strategy-plan-20260714",
-      "implementation_commit": "66c85d5da2edbe42c8e9f359ea59582dd814f997"
+      "g004_snapshot_commit": "f8ba7f1d",
+      "g004_snapshot_complete": false
     },
     "alpha_max": {
       "path": "/home/hoky/Quants-agent/Quants-agent-alpha-max-data-pc",
       "branch": "recovery/alpha-max-rev515-alignment-20260714",
-      "commit": "629d91e5d4aac26911af65a4a5e15ebdcbded30f",
-      "status": "clean_unmodified_alignment_pending"
+      "terminal_commit": "391000b40717386765bfa39bd212d91c2e3be794",
+      "terminal_goal": "G017",
+      "phase_preparation": "blocked_by_blocker_v2"
     }
   },
-  "current_goal": {
-    "id": "G003",
-    "next_action": "Delegate and integrate the two-file Rev5.15 Alpha-Max runbook/hash-manifest alignment described in the handoff note, verify it, and commit on the Alpha branch.",
-    "phase_preparation": "blocked",
-    "blocker_receipt": "/home/hoky/quants-recovery-runs/20260714T105113Z/alpha-max-phase-preparation-blocker.json",
-    "forbidden_source": "/home/hoky/Quants-agent/LuminaQuant-data/alpha_max_20260711_listing_aware_source",
-    "prelock_executed": false,
-    "historical_executed": false
+  "current_work": {
+    "blocked_goal": "G004",
+    "resume_goal": "G018",
+    "title": "Authenticate and reconcile G004 proof contracts",
+    "review_tasks": [
+      "58-G004CostContractReview",
+      "59-G004RouterContractReview",
+      "60-G004DispatchContractReview"
+    ],
+    "review_verdict": "BLOCK_CHANGES_REQUIRED",
+    "snapshot_verification": {
+      "tests": "72 passed in 1.03s",
+      "ruff": "passed",
+      "full_suite_run": false
+    },
+    "next_command": "GJC_SESSION_ID=019f603a-0e73-7000-88a7-c94f42950c09 gjc ultragoal complete-goals",
+    "implementation_plan": [
+      "Close end-to-end strict dispatch proxy, final-array, datetime cadence, and typed-error blockers.",
+      "Make router decisions/scales deterministic and bind authoritative freeze, prior-fold, receipt-byte, engine, data, and profile evidence.",
+      "Make cost proof bind router tapes, actual source bytes/row proofs, exact profile/volume, cash-inventory-PnL, segments, stops/liquidation, complete trials, and whole-family SPA.",
+      "Add exploit-shaped tests, run cleanup and full gates, then obtain fresh CLEAR/APPROVE architect and PASS executor QA before checkpointing G018/G004."
+    ]
+  },
+  "fixed_candidate_contract": {
+    "candidate_ids_sha256": "ddc8996136e70d3847e8270f6165a26992ec8def8439ba6f56e3bcdbdee239b9",
+    "candidate_ids": [
+      "codex_lagged_leaf_router_grid:h4_avg1_tr-0.02_tmdd0.50_val0.00_vmdd0.25_lagged_plus_val025_exact_unscaled",
+      "codex_lagged_leaf_router_grid:h4_avg1_tr-0.02_tmdd0.50_val0.00_vmdd0.25_lagged_plus_val025_fallback_mdd20_cap2"
+    ]
+  },
+  "external_blockers": {
+    "alpha_blocker_v2": {
+      "path": "/home/hoky/quants-recovery-runs/20260714T105113Z/alpha-max-phase-preparation-blocker-v2.json",
+      "sha256": "3b8c04b7a6b0a7d99e3d2b0ffb2dc42551c876b9ec5879663529b2b6173a07b2"
+    },
+    "forbidden_alpha_source": "/home/hoky/Quants-agent/LuminaQuant-data/alpha_max_20260711_listing_aware_source",
+    "btc_june": "STOP:874_ohlcv_gaps_and_18_funding_prefix_gaps"
   },
   "evidence_root": "/home/hoky/quants-recovery-runs/20260714T105113Z",
   "resume_rules": [
-    "Activate /skill:ultragoal in the new session.",
-    "Pass GJC_SESSION_ID=019f603a-0e73-7000-88a7-c94f42950c09 to native Ultragoal commands.",
-    "Read the handoff note and the canonical session-specific goals/ledger before mutation.",
-    "Resume the paused aggregate inline goal before continuing.",
-    "Resume G003 only; do not repeat G001 or G012.",
-    "Do not consume the quarantined Alpha source and do not run phase preparation, prelock, or historical evaluation.",
+    "Activate /skill:ultragoal and use the existing session id; never create a competing plan.",
+    "Resume the paused aggregate inline goal, then run complete-goals to obtain G018.",
+    "Verify f8ba7f1d and rerun the 72-test/Ruff snapshot gate before editing.",
+    "Do not start G005 before G018 and G004 receive clean completion gates.",
+    "Do not run strategy performance, data/network/order operations, or consume quarantined Alpha data during G018.",
     "Do not push without explicit user instruction."
   ]
 }
