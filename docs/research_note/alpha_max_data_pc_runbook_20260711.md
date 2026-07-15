@@ -1,4 +1,4 @@
-# Alpha-Max Revision 5.14 Data-PC Runbook
+# Alpha-Max Revision 5.15 Data-PC Runbook
 
 ## Purpose, authority, and stop condition
 
@@ -39,10 +39,10 @@ mkdir -p "$RUNLOG"
 
 command -v /usr/bin/time
 command -v sha256sum
-git cat-file -e 252910e54e280cc593365484cbc99d6ca87893f9^{commit}
+git cat-file -e 629d91e5d4aac26911af65a4a5e15ebdcbded30f^{commit}
 git branch --show-current | tee "$RUNLOG/branch.txt"
 git rev-parse HEAD | tee "$RUNLOG/worktree-commit.txt"
-git rev-parse 252910e54e280cc593365484cbc99d6ca87893f9 \
+git rev-parse 629d91e5d4aac26911af65a4a5e15ebdcbded30f \
   | tee "$RUNLOG/frozen-baseline-commit.txt"
 git status --porcelain=v1 | tee "$RUNLOG/worktree-status.txt"
 test ! -s "$RUNLOG/worktree-status.txt"
@@ -65,13 +65,24 @@ Expected frozen hashes:
 
 ```text
 runtime_contract b3859443c842cf8b04d04ed32923e6c6a8207af18e26f68a717ba623b4edfef9
-config_payload b53c2274624fe4bc017ead59975efc805d166038f841773337bb48d55ee9692d
-config_file 34f1ea894b0af984d4f76348f52fbca09fab45b9e3d5d963f257ec9d128ee356
+config_payload b062e3805d94087cc18cd22634918815503f94dd73f8fa8ac1979e7aef535f85
+config_file 2f267451c4df6b6b7471d972b7756327e41c82522ae2ef4b9198fbf6aa8b5e9c
+```
+The following Rev5.15 files are normative and must match the final SHA-256
+manifest:
+
+```text
+2f267451c4df6b6b7471d972b7756327e41c82522ae2ef4b9198fbf6aa8b5e9c  configs/research/alpha_max_portfolio_20260711_listing_aware.json
+ae272f70f65797b4c8a87c29b7f8e64511617f8e0f2d4bd841b2d1addb7d1220  configs/research/alpha_max_contract_manifest_20260711_listing_aware.json
+214e5da198307d8d32b30f69fb6b1f09002e0b31888dc476ed16060f79de9719  configs/research/alpha_max_official_availability_evidence_20260711.json
+ea26b902bcec4458340e4c345fa648a3db9104e1b337fd42460d9a9461a738ac  scripts/research/prepare_alpha_max_phase_roots.py
 ```
 
 `docs/research_note/alpha_max_checkpoint_sha256_20260711.txt` is a historical
 mid-implementation checkpoint and is not the data-PC preflight manifest. Only
 `alpha_max_final_sha256_20260711.txt` is normative for this handoff.
+Rev5.14-named files retained in that manifest are historical audit inputs only;
+they are never operational config or contract inputs.
 
 Record the exact environment after removing every forbidden `LQ_*` key. No
 profile, YAML, environment fallback, response file, runtime merge, or additional
@@ -93,10 +104,10 @@ test ! -L "$HISTORICAL_OUT"
 
 ## Phase-root contract
 
-Every root is an explicit absolute, read-only, phase-owned tree containing all
-ten candidate symbols. The train computation alone freezes the final 5--10
-symbol admitted subset. Operators must not preselect, substitute, shorten, or
-backfill symbols/dates.
+Every root is an explicit absolute, read-only, phase-owned tree containing the
+frozen ten-symbol declaration. Physical rows are only official phase
+intersections; operators must not preselect, substitute, shorten, backfill
+symbols/dates, or add post-delivery rows.
 
 | Phase | Start UTC inclusive | End UTC exclusive |
 |---|---:|---:|
@@ -114,6 +125,35 @@ provide causal funding coverage. Sparse market events are allowed; synthetic
 seconds are forbidden. Extra interval ownership, missing required partitions,
 unsafe links, multi-linked files, changing content, duplicate/nonmonotone rows,
 or incomplete native/funding boundaries fail closed.
+TONUSDT raw coverage is exactly `[2024-03-01T12:31:10Z, 2026-06-23T09:00:00Z)`
+and feature coverage is exactly `[2024-03-01T16:00:00Z, 2026-06-23T09:00:00Z)`.
+Missing TONUSDT warmup or train history rejects TONUSDT admission. GRAMUSDT
+substitution, synthetic warmup, synthesized listing-transition funding, date
+shifts, and post-delivery rows are forbidden.
+
+## No-discretion phase-root preparation
+
+Prepare phase roots only from existing authorized canonical `market_ohlcv_1s`
+and `feature_points` roots. The roots named below must be complete, canonical,
+and read-only; never use 1m, synthetic, substitute, or shortened input. The
+output root must be absent. Record the manifest and its SHA-256 before either
+process.
+
+```bash
+ALPHA_SOURCE="/absolute/path/to/authorized/alpha-max-source"
+test -d "$ALPHA_SOURCE/market_ohlcv_1s"
+test -d "$ALPHA_SOURCE/feature_points"
+test ! -e "$DATA"
+test ! -L "$DATA"
+uv run --frozen --extra dev python scripts/research/prepare_alpha_max_phase_roots.py \
+  --raw-root "$ALPHA_SOURCE/market_ohlcv_1s" \
+  --feature-root "$ALPHA_SOURCE/feature_points" \
+  --contract-manifest "$REPO/configs/research/alpha_max_contract_manifest_20260711_listing_aware.json" \
+  --output-root "$DATA"
+test -f "$DATA/preparation_manifest.json"
+sha256sum "$DATA/preparation_manifest.json" \
+  | tee "$RUNLOG/preparation-manifest.sha256"
+```
 
 Capture the input inventory before either process:
 
@@ -208,12 +248,12 @@ and peak RSS. The target must not exist. Do not add or remove an argument.
 
 ```bash
 cat > "$RUNLOG/prelock-command.txt" <<EOF_CMD
-uv run --frozen --extra dev python scripts/research/run_alpha_max_prelock.py --config $REPO/configs/research/alpha_max_portfolio_20260710.json --contract-manifest $REPO/configs/research/alpha_max_contract_manifest_20260710.json --exchange binance --output-root $PRELOCK_OUT --warmup-raw-root $DATA/warmup/raw --warmup-feature-root $DATA/warmup/feature --train-raw-root $DATA/train/raw --train-feature-root $DATA/train/feature --purge-raw-root $DATA/purge/raw --purge-feature-root $DATA/purge/feature --validation-raw-root $DATA/validation/raw --validation-feature-root $DATA/validation/feature --embargo-raw-root $DATA/embargo/raw --embargo-feature-root $DATA/embargo/feature
+uv run --frozen --extra dev python scripts/research/run_alpha_max_prelock.py --config $REPO/configs/research/alpha_max_portfolio_20260711_listing_aware.json --contract-manifest $REPO/configs/research/alpha_max_contract_manifest_20260711_listing_aware.json --exchange binance --output-root $PRELOCK_OUT --warmup-raw-root $DATA/warmup/raw --warmup-feature-root $DATA/warmup/feature --train-raw-root $DATA/train/raw --train-feature-root $DATA/train/feature --purge-raw-root $DATA/purge/raw --purge-feature-root $DATA/purge/feature --validation-raw-root $DATA/validation/raw --validation-feature-root $DATA/validation/feature --embargo-raw-root $DATA/embargo/raw --embargo-feature-root $DATA/embargo/feature
 EOF_CMD
 /usr/bin/time -v -o "$RUNLOG/prelock-time.txt" \
   uv run --frozen --extra dev python scripts/research/run_alpha_max_prelock.py \
-  --config "$REPO/configs/research/alpha_max_portfolio_20260710.json" \
-  --contract-manifest "$REPO/configs/research/alpha_max_contract_manifest_20260710.json" \
+  --config "$REPO/configs/research/alpha_max_portfolio_20260711_listing_aware.json" \
+  --contract-manifest "$REPO/configs/research/alpha_max_contract_manifest_20260711_listing_aware.json" \
   --exchange binance \
   --output-root "$PRELOCK_OUT" \
   --warmup-raw-root "$DATA/warmup/raw" \
