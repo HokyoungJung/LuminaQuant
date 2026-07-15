@@ -454,7 +454,7 @@ def validate_worktree(repo_path, entries):
             if not stat.S_ISREG(before.st_mode):
                 raise SystemExit("worktree regular-file mode mismatch")
             payload, opened = read_regular_file(absolute, before)
-            executable = bool(opened.st_mode & 0o111)
+            executable = bool(opened.st_mode & stat.S_IXUSR)
             if executable != (mode == 0o100755):
                 raise SystemExit("worktree executable mode mismatch")
         actual_oid = git_object_id(b"blob", payload)
