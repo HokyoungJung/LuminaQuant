@@ -43,9 +43,9 @@ for variable in \
   GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_CONFIG_GLOBAL \
   GIT_CONFIG_SYSTEM GIT_CONFIG_NOSYSTEM GIT_CONFIG_COUNT \
   GIT_CONFIG_PARAMETERS GIT_EXEC_PATH GIT_NAMESPACE GIT_NO_REPLACE_OBJECTS \
-  GIT_REPLACE_REF_BASE GIT_SHALLOW_FILE VIRTUAL_ENV CONDA_PREFIX \
-  UV_PROJECT_ENVIRONMENT UV_PYTHON UV_PYTHON_PREFERENCE UV_SYSTEM_PYTHON \
-  UV_NO_SYNC
+  GIT_REPLACE_REF_BASE GIT_SHALLOW_FILE GIT_ATTR_NOSYSTEM GIT_ATTR_SOURCE \
+  VIRTUAL_ENV CONDA_PREFIX UV_PROJECT_ENVIRONMENT UV_PYTHON \
+  UV_PYTHON_PREFERENCE UV_SYSTEM_PYTHON UV_NO_SYNC
 do
   test -z "${!variable+x}" || {
     printf 'forbidden preflight environment variable: %s\n' "$variable" >&2
@@ -66,25 +66,33 @@ PRELOCK_OUT="/absolute/path/to/new/alpha-max-prelock-$RUN_ID"
 HISTORICAL_OUT="/absolute/path/to/new/alpha-max-historical-$RUN_ID"
 /usr/bin/mkdir -p "$RUNLOG"
 
-# This check is deliberately before any import-capable interpreter or project command.
-# Explicit options expose ignored and untracked entries and disable mutable Git accelerators.
-STATUS_ARGS=(
+# These Git commands inspect metadata only; no configurable worktree conversion runs.
+export GIT_ATTR_NOSYSTEM=1
+GIT_TRUST_ARGS=(
   --no-replace-objects
-  -c core.fsmonitor=false
-  -c core.untrackedCache=false
-  -c status.showUntrackedFiles=all
-  status --porcelain=v1 --untracked-files=all --ignored=matching
+  -c core.commitGraph=false
+  -c core.attributesFile=/dev/null
 )
-/usr/bin/git "${STATUS_ARGS[@]}" > "$RUNLOG/worktree-status-before.txt"
-test ! -s "$RUNLOG/worktree-status-before.txt"
-GIT_INDEX_PATH="$(/usr/bin/git --no-replace-objects rev-parse --git-path index)"
-GIT_GRAFTS_PATH="$(/usr/bin/git --no-replace-objects rev-parse --git-path info/grafts)"
+GIT_INDEX_PATH="$(
+  /usr/bin/git "${GIT_TRUST_ARGS[@]}" rev-parse --git-path index
+)"
+GIT_GRAFTS_PATH="$(
+  /usr/bin/git "${GIT_TRUST_ARGS[@]}" rev-parse --git-path info/grafts
+)"
+GIT_ATTRIBUTES_PATH="$(
+  /usr/bin/git "${GIT_TRUST_ARGS[@]}" rev-parse --git-path info/attributes
+)"
+test -e .git
+test ! -L .git
 test -f "$GIT_INDEX_PATH"
 test ! -L "$GIT_INDEX_PATH"
 test ! -e "$GIT_GRAFTS_PATH"
 test ! -L "$GIT_GRAFTS_PATH"
+test ! -e "$GIT_ATTRIBUTES_PATH"
+test ! -L "$GIT_ATTRIBUTES_PATH"
 REPLACE_REFS="$(
-  /usr/bin/git --no-replace-objects for-each-ref --format='%(refname)' refs/replace/
+  /usr/bin/git "${GIT_TRUST_ARGS[@]}" \
+    for-each-ref --format='%(refname)' refs/replace/
 )"
 test -z "$REPLACE_REFS"
 test "$(/usr/bin/python3 -I -S -c 'import sys; print(int(sys.flags.isolated and sys.flags.no_site))')" = "1"
@@ -111,12 +119,15 @@ RECEIPT_OUTPUT="$(
     "$ALIGNMENT_RECEIPT" \
     "$ALIGNMENT_RECEIPT_SHA256" \
     "$RUNLOG/alignment-receipt-readback.json" \
-    "$GIT_INDEX_PATH" <<'PY'
+    "$GIT_INDEX_PATH" \
+    "$REPO" <<'PY'
 from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
+import stat
 import sys
 from pathlib import Path
 
@@ -142,6 +153,107 @@ def unique_object(pairs):
     return result
 
 
+INDEX_MODE_TEXT = {
+    0o100644: b"100644",
+    0o100755: b"100755",
+    0o120000: b"120000",
+}
+EXPECTED_GITATTRIBUTES = (
+    b"# Keep repository text diffs stable across Linux/Windows tools.\n"
+    b"* text=auto eol=lf\n"
+    b"\n"
+    b"# Windows launchers remain CRLF for native shell compatibility.\n"
+    b"*.bat text eol=crlf\n"
+    b"*.cmd text eol=crlf\n"
+    b"*.ps1 text eol=crlf\n"
+)
+CRLF_SUFFIXES = (b".bat", b".cmd", b".ps1")
+
+
+def git_object_id(kind, payload):
+    header = kind + b" " + str(len(payload)).encode("ascii") + b"\0"
+    return hashlib.sha1(header + payload).digest()
+
+
+def new_tree_node():
+    return {"dirs": {}, "files": {}}
+
+
+def summarize_tree(node, name):
+    child_summaries = {
+        child_name: summarize_tree(child, child_name)
+        for child_name, child in node["dirs"].items()
+    }
+    records = []
+    for child_name, (mode, oid) in node["files"].items():
+        records.append(
+            (
+                child_name + b"\0",
+                INDEX_MODE_TEXT[mode] + b" " + child_name + b"\0" + oid,
+            )
+        )
+    for child_name, child in child_summaries.items():
+        records.append(
+            (
+                child_name + b"/",
+                b"40000 " + child_name + b"\0" + child["oid"],
+            )
+        )
+    tree_payload = b"".join(record for _, record in sorted(records))
+    entry_count = len(node["files"]) + sum(
+        child["entry_count"] for child in child_summaries.values()
+    )
+    return {
+        "children": child_summaries,
+        "entry_count": entry_count,
+        "name": name,
+        "oid": git_object_id(b"tree", tree_payload),
+    }
+
+
+def validate_cache_tree(payload, root):
+    def parse_node(offset, expected):
+        name_end = payload.find(b"\0", offset)
+        if name_end < 0 or payload[offset:name_end] != expected["name"]:
+            raise SystemExit("Git cache-tree pathname is invalid")
+        header_end = payload.find(b"\n", name_end + 1)
+        if header_end < 0:
+            raise SystemExit("Git cache-tree header is unterminated")
+        header = payload[name_end + 1 : header_end]
+        match = re.fullmatch(rb"(0|[1-9][0-9]*) (0|[1-9][0-9]*)", header)
+        if not match:
+            raise SystemExit("Git cache-tree header is noncanonical")
+        entry_count = int(match.group(1))
+        subtree_count = int(match.group(2))
+        if (
+            entry_count != expected["entry_count"]
+            or subtree_count != len(expected["children"])
+        ):
+            raise SystemExit("Git cache-tree counts mismatch")
+        oid_start = header_end + 1
+        oid_end = oid_start + 20
+        if oid_end > len(payload) or payload[oid_start:oid_end] != expected["oid"]:
+            raise SystemExit("Git cache-tree object ID mismatch")
+
+        offset = oid_end
+        seen = set()
+        for _ in range(subtree_count):
+            child_name_end = payload.find(b"\0", offset)
+            if child_name_end < 0:
+                raise SystemExit("Git cache-tree child is unterminated")
+            child_name = payload[offset:child_name_end]
+            if child_name in seen or child_name not in expected["children"]:
+                raise SystemExit("Git cache-tree child set mismatch")
+            seen.add(child_name)
+            offset = parse_node(offset, expected["children"][child_name])
+        if seen != set(expected["children"]):
+            raise SystemExit("Git cache-tree children are incomplete")
+        return offset
+
+    if parse_node(0, root) != len(payload):
+        raise SystemExit("Git cache-tree payload has trailing bytes")
+
+
 def validate_full_index(path):
     raw = path.read_bytes()
     if len(raw) < 32 or raw[:4] != b"DIRC":
@@ -153,32 +265,83 @@ def validate_full_index(path):
         raise SystemExit("Git index checksum mismatch")
 
     entry_count = int.from_bytes(raw[8:12], "big")
+    entries = []
+    previous_path = None
     offset = 12
     payload_end = len(raw) - 20
     for _ in range(entry_count):
         entry_start = offset
         if offset + 62 > payload_end:
             raise SystemExit("Git index entry is truncated")
+        mode = int.from_bytes(raw[offset + 24 : offset + 28], "big")
+        oid = raw[offset + 40 : offset + 60]
         flags = int.from_bytes(raw[offset + 60 : offset + 62], "big")
+        if mode not in INDEX_MODE_TEXT:
+            raise SystemExit("Git index mode is forbidden")
+        if oid == b"\0" * 20:
+            raise SystemExit("Git index object ID is zero")
         if flags & 0x8000:
             raise SystemExit("Git assume-unchanged index entries are forbidden")
         if flags & 0x4000:
             raise SystemExit("Git extended index entries are forbidden")
+        if flags & 0x3000:
+            raise SystemExit("Git nonzero-stage index entries are forbidden")
+
         name_length = flags & 0x0FFF
         path_start = offset + 62
-        if name_length < 0x0FFF:
-            path_end = path_start + name_length
-            if path_end >= payload_end or raw[path_end] != 0:
-                raise SystemExit("Git index pathname is invalid")
-        else:
-            path_end = raw.find(b"\0", path_start, payload_end)
-            if path_end < 0:
-                raise SystemExit("Git index pathname is unterminated")
-        entry_length = path_end + 1 - entry_start
-        offset = entry_start + ((entry_length + 7) // 8) * 8
-        if offset > payload_end:
-            raise SystemExit("Git index entry padding is invalid")
+        path_end = raw.find(b"\0", path_start, payload_end)
+        if path_end < 0:
+            raise SystemExit("Git index pathname is unterminated")
+        index_path = raw[path_start:path_end]
+        if name_length < 0x0FFF and name_length != len(index_path):
+            raise SystemExit("Git index pathname length mismatch")
+        if name_length == 0x0FFF and len(index_path) < 0x0FFF:
+            raise SystemExit("Git long pathname marker is noncanonical")
+        parts = index_path.split(b"/")
+        if (
+            not index_path
+            or any(not part or part in {b".", b".."} for part in parts)
+            or any(part.lower() == b".git" for part in parts)
+        ):
+            raise SystemExit("Git index pathname is forbidden")
+        if previous_path is not None and index_path <= previous_path:
+            raise SystemExit("Git index paths are duplicate or unordered")
+        previous_path = index_path
 
+        entry_length = path_end + 1 - entry_start
+        next_offset = entry_start + ((entry_length + 7) // 8) * 8
+        if next_offset > payload_end:
+            raise SystemExit("Git index entry padding is invalid")
+        if any(raw[path_end:next_offset]):
+            raise SystemExit("Git index entry padding is nonzero")
+        offset = next_offset
+        entries.append((index_path, mode, oid))
+    attributes_entry = {
+        index_path: (mode, oid) for index_path, mode, oid in entries
+    }.get(b".gitattributes")
+    if attributes_entry != (
+        0o100644,
+        git_object_id(b"blob", EXPECTED_GITATTRIBUTES),
+    ):
+        raise SystemExit("tracked Git attributes are not the frozen built-in policy")
+
+    root = new_tree_node()
+    for index_path, mode, oid in entries:
+        parts = index_path.split(b"/")
+        node = root
+        for part in parts[:-1]:
+            if part in node["files"]:
+                raise SystemExit("Git index file/directory collision")
+            node = node["dirs"].setdefault(part, new_tree_node())
+        leaf = parts[-1]
+        if leaf in node["files"] or leaf in node["dirs"]:
+            raise SystemExit("Git index path collision")
+        node["files"][leaf] = (mode, oid)
+    summary = summarize_tree(root, b"")
+    if summary["entry_count"] != entry_count:
+        raise SystemExit("Git index entry count mismatch")
+
+    extensions = {}
     while offset < payload_end:
         if offset + 8 > payload_end:
             raise SystemExit("Git index extension is truncated")
@@ -187,18 +350,138 @@ def validate_full_index(path):
         offset += 8
         if offset + extension_length > payload_end:
             raise SystemExit("Git index extension payload is truncated")
-        if signature == b"link":
-            raise SystemExit("Git split indexes are forbidden")
+        if signature != b"TREE" or signature in extensions:
+            raise SystemExit("Git index extension is forbidden")
+        extensions[signature] = raw[offset : offset + extension_length]
         offset += extension_length
     if offset != payload_end:
         raise SystemExit("Git index boundary mismatch")
-    return entry_count
+    if extensions:
+        validate_cache_tree(extensions[b"TREE"], summary)
+    return entries, summary["oid"].hex()
+
+
+def filesystem_inventory(repo):
+    files = set()
+    directories = set()
+
+    def visit(absolute, relative):
+        try:
+            children = sorted(os.scandir(absolute), key=lambda entry: entry.name)
+        except OSError as error:
+            raise SystemExit(f"worktree inventory failed: {error}") from error
+        for child in children:
+            name = child.name
+            if not relative and name == b".git":
+                continue
+            child_relative = name if not relative else relative + b"/" + name
+            if child.is_symlink():
+                files.add(child_relative)
+            elif child.is_dir(follow_symlinks=False):
+                directories.add(child_relative)
+                visit(child.path, child_relative)
+            elif child.is_file(follow_symlinks=False):
+                files.add(child_relative)
+            else:
+                raise SystemExit("special worktree entries are forbidden")
+
+    visit(repo, b"")
+    return files, directories
+
+
+def stable_identity(metadata):
+    return (
+        metadata.st_dev,
+        metadata.st_ino,
+        metadata.st_mode,
+        metadata.st_size,
+        metadata.st_mtime_ns,
+        metadata.st_ctime_ns,
+    )
+
+
+def read_regular_file(path, before):
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    descriptor = os.open(path, flags)
+    try:
+        opened = os.fstat(descriptor)
+        if (opened.st_dev, opened.st_ino) != (before.st_dev, before.st_ino):
+            raise SystemExit("worktree file changed before open")
+        chunks = []
+        while True:
+            chunk = os.read(descriptor, 1024 * 1024)
+            if not chunk:
+                break
+            chunks.append(chunk)
+        after_read = os.fstat(descriptor)
+        if stable_identity(opened) != stable_identity(after_read):
+            raise SystemExit("worktree file changed while reading")
+    finally:
+        os.close(descriptor)
+    after = os.lstat(path)
+    if stable_identity(before) != stable_identity(after):
+        raise SystemExit("worktree file changed during validation")
+    return b"".join(chunks), opened
+
+
+def validate_worktree(repo_path, entries):
+    repo = os.fsencode(os.path.realpath(repo_path))
+    expected_files = {index_path for index_path, _, _ in entries}
+    expected_directories = set()
+    for index_path in expected_files:
+        parts = index_path.split(b"/")
+        expected_directories.update(
+            b"/".join(parts[:position]) for position in range(1, len(parts))
+        )
+
+    observed_files, observed_directories = filesystem_inventory(repo)
+    if observed_files != expected_files:
+        raise SystemExit("worktree file inventory differs from the index")
+    if observed_directories != expected_directories:
+        raise SystemExit("worktree directory inventory differs from the index")
+
+    for index_path, mode, expected_oid in entries:
+        absolute = os.path.join(repo, *index_path.split(b"/"))
+        before = os.lstat(absolute)
+        if mode == 0o120000:
+            if not stat.S_ISLNK(before.st_mode):
+                raise SystemExit("worktree symlink mode mismatch")
+            payload = os.readlink(absolute)
+            after = os.lstat(absolute)
+            if stable_identity(before) != stable_identity(after):
+                raise SystemExit("worktree symlink changed during validation")
+        else:
+            if not stat.S_ISREG(before.st_mode):
+                raise SystemExit("worktree regular-file mode mismatch")
+            payload, opened = read_regular_file(absolute, before)
+            executable = bool(opened.st_mode & 0o111)
+            if executable != (mode == 0o100755):
+                raise SystemExit("worktree executable mode mismatch")
+        actual_oid = git_object_id(b"blob", payload)
+        if actual_oid != expected_oid and index_path.endswith(CRLF_SUFFIXES):
+            remainder = payload.replace(b"\r\n", b"")
+            if b"\n" in remainder or b"\r" in remainder:
+                raise SystemExit(
+                    f"worktree CRLF conversion is noncanonical: "
+                    f"{os.fsdecode(index_path)}"
+                )
+            actual_oid = git_object_id(b"blob", payload.replace(b"\r\n", b"\n"))
+        if actual_oid != expected_oid:
+            raise SystemExit(
+                f"worktree blob differs from the index: {os.fsdecode(index_path)}"
+            )
+
+    final_files, final_directories = filesystem_inventory(repo)
+    if final_files != expected_files or final_directories != expected_directories:
+        raise SystemExit("worktree inventory changed during validation")
+    return len(expected_files), len(expected_directories)
 
 
 receipt_path = Path(sys.argv[1])
 expected_digest = sys.argv[2]
 readback_path = Path(sys.argv[3])
-index_entry_count = validate_full_index(Path(sys.argv[4]))
+index_path = Path(sys.argv[4])
+repo_path = sys.argv[5]
 raw = receipt_path.read_bytes()
 if hashlib.sha256(raw).hexdigest() != expected_digest:
     raise SystemExit("alignment receipt SHA-256 mismatch")
@@ -221,11 +504,18 @@ if not isinstance(receipt["final_manifest_sha256"], str) or not re.fullmatch(
     r"[0-9a-f]{64}", receipt["final_manifest_sha256"]
 ):
     raise SystemExit("alignment receipt final_manifest_sha256 is invalid")
+index_entries, index_root_tree = validate_full_index(index_path)
+worktree_file_count, worktree_directory_count = validate_worktree(
+    repo_path, index_entries
+)
 
 readback = {
     "alignment_receipt_sha256": expected_digest,
-    "git_index_entry_count": index_entry_count,
+    "git_index_entry_count": len(index_entries),
+    "index_root_tree": index_root_tree,
     "receipt": receipt,
+    "worktree_directory_count": worktree_directory_count,
+    "worktree_file_count": worktree_file_count,
 }
 readback_path.write_bytes(
     json.dumps(readback, sort_keys=True, separators=(",", ":")).encode() + b"\n"
@@ -235,21 +525,30 @@ print(receipt["accepted_commit"])
 print(receipt["baseline_commit"])
 print(receipt["final_manifest_sha256"])
 print(receipt["lock_sha256"])
+print(index_root_tree)
 PY
 )"
 mapfile -t RECEIPT_FIELDS <<< "$RECEIPT_OUTPUT"
-test "${#RECEIPT_FIELDS[@]}" -eq 5
+test "${#RECEIPT_FIELDS[@]}" -eq 6
 RECEIPT_BRANCH="${RECEIPT_FIELDS[0]}"
 RECEIPT_ACCEPTED_COMMIT="${RECEIPT_FIELDS[1]}"
 RECEIPT_BASELINE_COMMIT="${RECEIPT_FIELDS[2]}"
 RECEIPT_MANIFEST_SHA256="${RECEIPT_FIELDS[3]}"
 RECEIPT_LOCK_SHA256="${RECEIPT_FIELDS[4]}"
+INDEX_ROOT_TREE="${RECEIPT_FIELDS[5]}"
 
-/usr/bin/git "${STATUS_ARGS[@]}" > "$RUNLOG/worktree-status-after-receipt.txt"
-test ! -s "$RUNLOG/worktree-status-after-receipt.txt"
-test "$(/usr/bin/git --no-replace-objects branch --show-current)" = "$RECEIPT_BRANCH"
-test "$(/usr/bin/git --no-replace-objects rev-parse HEAD)" = "$RECEIPT_ACCEPTED_COMMIT"
-/usr/bin/git --no-replace-objects merge-base \
+test "$(
+  /usr/bin/git "${GIT_TRUST_ARGS[@]}" branch --show-current
+)" = "$RECEIPT_BRANCH"
+test "$(
+  /usr/bin/git "${GIT_TRUST_ARGS[@]}" rev-parse HEAD
+)" = "$RECEIPT_ACCEPTED_COMMIT"
+ACCEPTED_ROOT_TREE="$(
+  /usr/bin/git "${GIT_TRUST_ARGS[@]}" \
+    rev-parse "$RECEIPT_ACCEPTED_COMMIT^{tree}"
+)"
+test "$ACCEPTED_ROOT_TREE" = "$INDEX_ROOT_TREE"
+/usr/bin/git "${GIT_TRUST_ARGS[@]}" merge-base \
   --is-ancestor "$RECEIPT_BASELINE_COMMIT" HEAD
 read -r CURRENT_MANIFEST_SHA256 _ < <(
   /usr/bin/sha256sum docs/research_note/alpha_max_final_sha256_20260711.txt
@@ -258,11 +557,11 @@ test "$CURRENT_MANIFEST_SHA256" = "$RECEIPT_MANIFEST_SHA256"
 read -r CURRENT_LOCK_SHA256 _ < <(/usr/bin/sha256sum uv.lock)
 test "$CURRENT_LOCK_SHA256" = "$RECEIPT_LOCK_SHA256"
 
-/usr/bin/git --no-replace-objects branch --show-current \
+/usr/bin/git "${GIT_TRUST_ARGS[@]}" branch --show-current \
   | /usr/bin/tee "$RUNLOG/branch.txt"
-/usr/bin/git --no-replace-objects rev-parse HEAD \
+/usr/bin/git "${GIT_TRUST_ARGS[@]}" rev-parse HEAD \
   | /usr/bin/tee "$RUNLOG/worktree-commit.txt"
-/usr/bin/git --no-replace-objects rev-parse "$RECEIPT_BASELINE_COMMIT" \
+/usr/bin/git "${GIT_TRUST_ARGS[@]}" rev-parse "$RECEIPT_BASELINE_COMMIT" \
   | /usr/bin/tee "$RUNLOG/frozen-baseline-commit.txt"
 /usr/bin/sha256sum -c docs/research_note/alpha_max_final_sha256_20260711.txt \
   | /usr/bin/tee "$RUNLOG/source-sha256-check.txt"
