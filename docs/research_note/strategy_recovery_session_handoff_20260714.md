@@ -1,16 +1,19 @@
-# Strategy recovery cross-session handoff — 2026-07-15
+# Strategy recovery cross-session handoff — 2026-07-16
 
 ## Resume identity
 
 - Repository: `/home/hoky/Quants-agent/LuminaQuant`
 - Branch: `recovery/strategy-plan-20260714`
-- G004 code snapshot: `f8ba7f1d` (`Checkpoint G004 recovery proof infrastructure`)
+- Current implementation checkpoint: `512d2b804ab05bc1cf023ac4cbea81e0506a8736` (`Checkpoint G019 proof contract repairs`)
+- Prior G004 snapshot: `f8ba7f1d`
 - Foundation commit: `66c85d5da2edbe42c8e9f359ea59582dd814f997`
 - Durable Ultragoal session: `019f603a-0e73-7000-88a7-c94f42950c09`
+- Durable brief: `.gjc/_session-019f603a-0e73-7000-88a7-c94f42950c09/ultragoal/brief.md`
 - Durable goals: `.gjc/_session-019f603a-0e73-7000-88a7-c94f42950c09/ultragoal/goals.json`
 - Durable ledger: `.gjc/_session-019f603a-0e73-7000-88a7-c94f42950c09/ultragoal/ledger.jsonl`
 - Machine-readable resume state: [`strategy_recovery_resume_state_20260714.json`](strategy_recovery_resume_state_20260714.json)
 - Copy-ready prompt: [`strategy_recovery_new_session_prompt_20260714.md`](strategy_recovery_new_session_prompt_20260714.md)
+- Frozen master plan: [`strategy_recovery_master_plan_20260713.md`](strategy_recovery_master_plan_20260713.md)
 - Evidence root: `/home/hoky/quants-recovery-runs/20260714T105113Z`
 - Writable market snapshot: `/home/hoky/quants-recovery-market/20260714T105113Z/market_parquet`
 
@@ -18,17 +21,28 @@ Stable aggregate objective:
 
 > Complete the durable ultragoal plan in `.gjc/ultragoal/goals.json`, including later accepted/appended stories, under the original brief constraints; use `.gjc/ultragoal/ledger.jsonl` as the audit trail.
 
-Always set `GJC_SESSION_ID=019f603a-0e73-7000-88a7-c94f42950c09` on native `gjc ultragoal` commands. Do not run `create-goals`.
+Always set `GJC_SESSION_ID=019f603a-0e73-7000-88a7-c94f42950c09` on native `gjc ultragoal` commands. Never run `create-goals` or create a competing plan.
+
+## Stop state at handoff
+
+- All implementation work is stopped.
+- The only live subagent, final Cost architect task `97-G019CostArchitectFinal`, was paused before producing a verdict. Do not treat it as review evidence; rerun the Cost architect certification in the new session.
+- The inline aggregate goal is paused for the user-requested session transfer.
+- Durable G019 remains `active`; resume the inline goal only. Do not run `complete-goals` and do not start G005.
+- The latest durable ledger event is `blocker_classified: human_blocked: G019`, recording that only the user can open the replacement session.
+- No G019/G018/G004 completion checkpoint exists. No completion claim is authorized.
 
 ## Binding safety contract
 
-- Preserve user work. Treat every original data root as read-only.
-- Never use synthetic production data, symbol substitution, pre-listing fills, shortened dates, missing-funding proxies, fallback strategy proxies, locked-OOS parameter changes, paper/testnet/live orders, or capital allocation.
-- Do not run strategy performance, grid-search, data download, network, or order operations while G004/G018 is unresolved.
+- Preserve user work and treat all original data roots as read-only.
+- Do not use synthetic production data, symbol substitution, pre-listing fills, shortened dates, missing-funding proxies, generic strategy fallbacks, locked-OOS parameter changes, paper/testnet/live orders, or capital allocation.
+- Do not run strategy performance, grid search, data download/append, network, order, capital, or scientific execution operations while G019/G018/G004 proof certification is unresolved.
 - Do not run Alpha phase preparation, prelock, or historical evaluation while blocker-v2 is STOP.
 - Never consume `/home/hoky/Quants-agent/LuminaQuant-data/alpha_max_20260711_listing_aware_source`.
-- Do not push either recovery branch without explicit user instruction.
-- Structural/incomplete evidence is `STOP`; complete evidence failing scientific gates is `REJECT`/scientific KILL.
+- Do not reset, rebase, amend, or push without an explicit user instruction.
+- Structural, unauthenticated, malformed, or incomplete evidence is `STOP`; complete authenticated evidence failing economic/statistical gates is `REJECT`/scientific KILL.
+- R1/R2 are independently gated. Rank only passers by validation 20bp Calmar, then lower validation MDD, then frozen candidate order. Locked OOS is report/gate only and never selects or retunes.
+- Preserve `post_oos_research_variant=true`, `post_oos_augment=false`, augmentation/current-fold-OOS/grid/recompute counts zero/false, generic fallback zero, and the exact two frozen candidate IDs.
 
 ## Durable goal state
 
@@ -38,143 +52,143 @@ Always set `GJC_SESSION_ID=019f603a-0e73-7000-88a7-c94f42950c09` on native `gjc 
 | G002, G008–G011 | superseded | Replaced by verified G012 chain. |
 | G012 | complete | D-01A/D-04/D-05 provider, ownership, receipt, lifecycle, and seal gates complete. |
 | G003, G013–G016 | superseded | Replaced by verified terminal G017 chain. |
-| G017 | complete | Alpha Rev5.15 handoff at commit `391000b40717386765bfa39bd212d91c2e3be794`; final CLEAR/APPROVE and PASS. |
-| G004 | review_blocked | Partial router/dispatch/cost infrastructure is committed at `f8ba7f1d`; it is not accepted proof. |
-| G018 | active, inline-paused for session transfer | Resume this review-blocker story to close all G004 architecture blockers. |
-| G005–G007 | pending | Do not start until G018 resolves and G004 receives clean final gates/checkpoint. |
+| G017 | complete | Alpha Rev5.15 handoff at `391000b40717386765bfa39bd212d91c2e3be794`; final CLEAR/APPROVE and PASS. |
+| G004 | review_blocked | Original R1/R2 replay/cost-proof story; replacement chain not yet certified. |
+| G018 | review_blocked | Dispatch/Router/Cost authentication repair story; replaced by active final Cost blocker G019. |
+| G019 | active | Final Cost causality, overflow, SPA, and public-boundary certification blocker. |
+| G005–G007 | pending | Do not start until G019 is checkpointed and G018/G004 are superseded from fresh clean evidence. |
 
-The inline aggregate goal is paused only for the user-requested session transfer. Resume it in the new session.
+## Current committed implementation
 
-## Completed and preserved evidence
+Checkpoint `512d2b804ab05bc1cf023ac4cbea81e0506a8736` contains nine changed files:
 
-### Foundation (G012)
+- `src/lumina_quant/cli/research.py`
+- `src/lumina_quant/research/cost_proof.py`
+- `src/lumina_quant/research/router_replay.py`
+- `src/lumina_quant/strategy_factory/research_runner.py`
+- `src/lumina_quant/strategy_factory/strategy_signal_dispatch.py`
+- `tests/research/test_cost_proof.py`
+- `tests/research/test_router_replay.py`
+- `tests/test_strategy_signal_dispatch.py`
+- `tests/test_strategy_signal_dispatch_routing.py`
 
-- Commit: `66c85d5da2edbe42c8e9f359ea59582dd814f997`
-- Focused gate: 125 passed.
-- Full tracked suite: 4475 passed, 20 skipped, 3 xfailed.
-- Architect: CLEAR/CLEAR/CLEAR, APPROVE.
-- Executor QA: passed.
-- Real BTC June remains expected STOP: 874 OHLCV gaps and 18 funding prefix gaps; no append occurred.
+The checkpoint is a resumable implementation snapshot, not a completion checkpoint or performance claim.
 
-### Alpha Rev5.15 terminal chain (G017)
+### Dispatch closure
 
-- Alpha branch: `recovery/alpha-max-rev515-alignment-20260714`
-- Commit: `391000b40717386765bfa39bd212d91c2e3be794`
-- Receipt v5: `/home/hoky/quants-recovery-runs/20260714T105113Z/alpha-max-rev515-alignment-receipt-v5.json`
-- Receipt SHA-256: `8687b52180502a11de9fbe317a19d00bb4492c464b3bf33d4eda2437683ca812`
-- Manifest SHA-256: `dbe018b066f556152e387f15c84770c7c2bd4e46dbc6ac8bac109e3176e5a036`
-- Lock SHA-256: `59d9de230be950761736c24e04af3456e229cf4aa077536167fb7e650a71c339`
-- Full/post-cleaner gate: 4927 passed, 36 skipped, 3 xfailed; Ruff passed.
-- Architect CLEAR/APPROVE; executor PASS.
-- Blocker-v2 remains authoritative STOP: `/home/hoky/quants-recovery-runs/20260714T105113Z/alpha-max-phase-preparation-blocker-v2.json`, SHA `3b8c04b7a6b0a7d99e3d2b0ffb2dc42551c876b9ec5879663529b2b6173a07b2`.
+- Strict mapped handlers no longer mask actual-engine failure with proxy exposures.
+- Final return, turnover, and exposure arrays are shape/finiteness checked.
+- NumPy `datetime64[ms]` cadence is handled directly.
+- Malformed strict parameters surface typed `StrategySignalDispatchError` with cause.
+- Current focused evidence: 38 dispatch tests passed; changed dispatch files passed Ruff/format/diff checks.
+- Existing independent dispatch architect evidence was CLEAR/CLEAR/CLEAR, APPROVE (`65-G018DispatchReview`).
 
-## G004 snapshot at `f8ba7f1d`
+### Router closure
 
-This commit is a resumable implementation checkpoint, not a completion checkpoint and not a performance claim.
+- Source-first branch/leaf selection, prior-fold chronology, byte-addressed receipts, transitive engine/data/window identity, source/commit roots, exact profile types, artifact closure, and cost-row ownership are fail-closed.
+- Fallback scales are recomputed from authenticated shared train/validation returns.
+- PPM domains are field-specific: base signal/base return retain frozen bounds while derived position/return support the accepted 3x range.
+- MDD starts at pre-period equity, so an initial loss cannot disappear from drawdown.
+- Authenticated public regressions cover scaled negative outputs below -1,000,000 and re-rooted initial-loss stale-scale rejection.
+- Current evidence: 57 Router tests passed after formatting; Ruff/format/diff checks passed.
+- Final Router architect `95-G018RouterArchitectFinal`: CLEAR/CLEAR/CLEAR, APPROVE, no findings.
 
-Implemented surfaces:
+### Cost proof closure implemented in G019
 
-1. Default-off strict actual-engine dispatch:
-   - `ResearchConfig.route_unmapped_registered_strategies = false`
-   - `ResearchConfig.require_actual_engine_routing = false`
-   - strict registry wrapper preserves exceptions;
-   - strict dispatcher validates aligned arrays, symbols, close prices, timestamps, exposure shape/finiteness, handler mode, and fallback metadata;
-   - legacy generic fallback remains unchanged when strict mode is off.
-2. Frozen combined profile:
-   - `configs/profiles/backtest_cost_realistic.yaml` arms strict routing and candidate-overfit statistics in the single replacement profile.
-3. Shared MDD fix:
-   - `research_metrics.max_drawdown` includes initial capital peak.
-4. Exact two-candidate router manifest validator:
-   - ordered R1/R2 IDs and SHA `ddc8996136e70d3847e8270f6165a26992ec8def8439ba6f56e3bcdbdee239b9`;
-   - no new grid search, recompute-from-json, post-OOS augmentation, orders, or capital;
-   - lifecycle/membership, leaf, handler/registry, cash/mature/scaled parity, duplicate/nonfinite parsing, and zero fallback/OOS-count checks.
-5. Read-only `lq research cost-proof` surface:
-   - strict JSON/YAML parsing and explicit external bindings;
-   - cost ladder 10/15/20/30bp;
-   - internal order/fill/position/PnL, funding, impact, grid, exposure, stop, liquidation, MDD, DSR/SPA/PBO, fold robustness, and deterministic selection checks;
-   - source-row and provenance scaffolding.
+The Cost proof now includes:
 
-Latest snapshot verification:
+- exact Router receipt/tape ownership and complete committed artifact consumption;
+- authenticated source/profile/market/funding/trial roots and exact ordered rows;
+- volume/ADV, tick/step, sqrt impact, funding, cash/inventory/fill-price accounting, segment continuity, endpoint exits, stops, and liquidation reconciliation;
+- immediate liquidation causality from authenticated event-state marks rather than unrelated bar extremes;
+- carried breach state: after a post-event breach, the next action must be liquidation; residual breach permits consecutive liquidation only;
+- full breached terminal liquidation as an explicit zero-position endpoint exit, producing economic `REJECT`, while a healthy liquidation is malformed `STOP`;
+- guarded native numeric conversion plus `ArithmeticError` handling at `evaluate_cost_proof_file`;
+- whole-family deterministic Hansen-style SPA with 2,000 shared circular-block draws, add-one correction, originally degenerate members fixed at p=1, and positive degenerate resamples from originally nondegenerate members counted conservatively as +infinity;
+- public file-boundary and real CLI exit-2 overflow regression with fully re-rooted market/source/search/commit/trusted roots;
+- both-candidate, all-10/15/20/30bp authenticated liquidation `REJECT` fixture;
+- residual 1% partial-liquidation then non-liquidation STOP fixture that was traced to the carried-breach guard;
+- duplicate fixture setup removed.
+
+Current Cost evidence:
+
+- Full Cost suite: 61 passed after the terminal-liquidation/overflow/SPA implementation and formatting.
+- After that full run, the residual-breach fixture was strengthened to preserve Router sequence ordering and leave 99% residual exposure; its focused test passed and traced to `_strict_fold` carried-breach return line 2264.
+- Healthy-liquidation fixture traced to the immediate-causality return line 2323.
+- Because those final test-only strengthening edits occurred after the 61-test run, rerun the full Cost suite and formatter in the new session before review.
+- Architect certification 92's remaining findings were implemented, but final Cost architect task 97 was paused before verdict. Cost is not yet certified.
+
+## Verification already observed
 
 ```text
-uv run pytest -q \
-  tests/research/test_cost_proof.py \
-  tests/research/test_router_replay.py \
-  tests/test_strategy_signal_dispatch.py \
-  tests/test_strategy_signal_dispatch_routing.py
-# 72 passed in 1.03s
+uv run pytest -q tests/test_strategy_signal_dispatch.py tests/test_strategy_signal_dispatch_routing.py
+# 38 passed
 
-uv run ruff check \
-  src/lumina_quant/research/cost_proof.py \
-  src/lumina_quant/research/router_replay.py \
-  src/lumina_quant/strategy_factory/strategy_signal_dispatch.py \
-  tests/research/test_cost_proof.py \
-  tests/research/test_router_replay.py \
-  tests/test_strategy_signal_dispatch.py \
-  tests/test_strategy_signal_dispatch_routing.py
-# All checks passed
+uv run pytest -q tests/research/test_router_replay.py
+# 57 passed
+
+uv run pytest -q tests/research/test_cost_proof.py
+# 61 passed before final residual-fixture strengthening
+
+uv run pytest -q \
+  tests/test_research_profile_activation.py \
+  tests/test_research_selection_flags_config.py \
+  tests/test_alpha_zoo_69_asset_monthly_refit_walkforward.py \
+  -k 'not test_shipped_config_yaml_full_load_is_byte_identical_to_head'
+# 79 passed, 1 deselected
 ```
 
-Earlier combined G004 focused gate before the final review-driven hardening was 75 passed. No full-suite or final quality gate was run for `f8ba7f1d`.
+The excluded config test compares the worktree `config.yaml` with HEAD. The local file is user/environment-managed and differs outside this feature. Do not modify it, reveal its values, or treat that unrelated difference as a product regression.
 
-## Mandatory G018 blocker plan
+The following were clean before the last residual-fixture strengthening edits:
 
-Three independent focused architects returned `BLOCK / CHANGES_REQUIRED` (tasks `58-G004CostContractReview`, `59-G004RouterContractReview`, `60-G004DispatchContractReview`). Their full output was session-local, so the actionable findings are preserved here.
+- Router Ruff/format/diff checks.
+- Cost Ruff/format/diff checks.
+- Dispatch Ruff/format/diff checks.
+- Repository `git diff --check` immediately before checkpoint commit.
 
-### A. Strict dispatch — close first
+No combined final G018 regression, AI-slop cleaner, full strict three-lane architect review, executor QA/red-team receipt, or G019 quality-gate checkpoint has been completed.
 
-1. Propagate strictness through mapped pair handlers. `_apply_pair_spread_strategy` currently catches actual-engine failure and substitutes `_pair_spread_fallback_exposures`; strict mode must raise with the original cause instead.
-2. Validate final `portfolio_ret`, `turnover`, and aggregate `exposure` shape/finiteness before strict return; finite inputs can currently overflow derived arrays.
-3. Derive registry simulation cadence correctly from production `numpy.datetime64[ms]`, not the legacy 60-second exception fallback.
-4. Wrap malformed strict candidate/params coercion in `StrategySignalDispatchError` with cause.
-5. Add tests for pair-simulator failure, arithmetic overflow, NumPy datetime cadence, malformed params, and the public research call chain.
+## Exact remaining plan
 
-### B. Router replay — make evidence authoritative and deterministic
+### Phase 1 — resume and certify G019
 
-1. Do not accept producer-declared branch/label/history/leaves as replay. Bind immutable prior-fold evidence and recompute the frozen warmup/history/lagged-average/train/MDD/validation decision.
-2. Require byte-addressable signal/position/engine receipts; hash their actual bytes and bind fold, leaf, symbols, data/window, params, handler/class, and transitive engine dependency identity.
-3. Authenticate shared fallback MDD inputs and deterministically recompute both R1 MDD30/cap3 and R2 MDD20/cap2 scales; only deterministic scale consequences may differ.
-4. Parse and bind commit/freeze provenance to an out-of-band immutable root; the current source artifact mirrors the manifest and is circular.
-5. Make combined-profile parsing recursively finite, closed enough for runtime-consumed fields, and exact-typed (`True` must not equal `1`; purge bar count must be an integer).
-6. Convert huge-number/overflow inputs into `STOP` and add adversarial tests.
+1. Verify the branch contains `512d2b804ab05bc1cf023ac4cbea81e0506a8736` and the handoff commit containing this file. Do not rewrite history.
+2. Read this handoff, the resume-state JSON, frozen master plan, data-PC runbook, reality audit, durable goals, and durable ledger.
+3. Activate `/skill:ultragoal`, set the session ID, inspect `gjc ultragoal status --json`, and resume the paused inline aggregate goal. Durable G019 is already active; do not run `complete-goals`.
+4. Confirm the worktree is clean before mutation.
+5. Run Ruff format/check and `git diff --check` for the nine checkpoint files. A formatter-only follow-up may be needed for the final residual fixture.
+6. Rerun the complete Cost suite (expected 61 tests), Router suite (57), dispatch suite (38), and the 79-test profile/selection regression command above.
+7. Rerun the final Cost architect certification from scratch. It must explicitly certify certification-92 items 7, 10, 12, and 13: immediate liquidation causality/sequencing, valid economic REJECT, overflow STOP at file/CLI boundary, conservative degenerate SPA, and non-shallow tests.
+8. Any finding must be recorded with `gjc ultragoal record-review-blockers`, repaired by a bounded executor, and the full blocking loop rerun.
 
-### C. Cost proof — replace self-consistency with independent proof
+### Phase 2 — final G018/G019 completion gate
 
-1. Bind every cost fold signal/order/execution tape slice to authenticated router execution receipt commitments.
-2. Verify source rows against actual market/funding bytes or authenticated row/Merkle receipts; parse and semantically bind the data-contract and cost commit receipts.
-3. Pin the exact frozen combined-profile byte digest and exact economically relevant semantics; do not accept arbitrary positive impact coefficients.
-4. Authenticate bar volume/ADV. The shipped profile uses per-bar volume when `slippage_adv_quote=0`; fill-supplied volume is currently manipulable.
-5. Reconcile cash and inventory from fills so realized fill-price PnL, unrealized mark PnL, fees/linear costs, impact, funding, and equity form one exact ledger.
-6. Bind every period label to its declared validation/locked range. Remove implicit free position resets at segment boundaries or represent explicit flattening fills/cost/funding.
-7. Derive default stop price from profile/fill and handle entry-bar stop/liquidation with authenticated event order; reject ambiguous OHLC order fail-closed.
-8. Authenticate the complete attempted/skipped/failed whole-search trial ledger and bind every trial return row; `raw_trial_count == supplied IDs` is insufficient.
-9. Run SPA/max-statistic over the authenticated whole trial family, not independently per selected stream.
-10. Add one exploit-shaped test per invariant. Remove the duplicated first-fold `locked_ids` fixture assignment.
+1. Run the combined focused regression over all dispatch, Router, Cost, profile, selection, and monthly-refit files.
+2. Run the internal Ultragoal AI-slop cleaner over exactly the nine changed files. Fix every blocking finding with an executor and rerun until zero blockers.
+3. Freeze the post-cleaner change set and rerun verification.
+4. Run a fresh architect review across architecture/product/code for the complete dispatch/Router/Cost contract.
+5. Run an executor adversarial QA/red-team lane against the frozen set. Parent-owned commands must produce real API/package test-report and CLI-surface artifacts; bare inline evidence is insufficient.
+6. Require CLEAR/CLEAR/CLEAR, APPROVE, executor QA passed, full rerun true, empty blockers, and valid artifact references.
+7. Checkpoint G019 with strict `--quality-gate-json`. Do not call inline `goal complete`; later durable goals remain.
+8. After the G019 receipt exists, mark G018 superseded by completed G019 evidence, then mark G004 superseded by the completed G018/G019 replacement chain. Preserve all historical blocked goals and ledger entries.
 
-### D. Contract decisions that must follow the binding plan
+### Phase 3 — continue the frozen durable plan
 
-- Master plan R2 explicitly says each candidate must first pass all binding gates; if both pass, select higher validation-20bp Calmar, then lower MDD. Do not silently replace that rule with a different pre-OOS selection algorithm solely because a reviewer suggested it.
-- R1/R2 are fixed historical/post-OOS research variants, but `post_oos_augment=false`, candidate count/hash exactly two, and no new variant/search are mandatory. Preserve honest provenance and do not turn this infrastructure into a fresh-alpha claim.
-- If stronger scientific constraints make the historical Router incapable of proof, terminate it scientifically in G005; never weaken G018 gates or manufacture evidence.
+Only after Phase 2 is durably clean:
 
-### E. Verification after implementation
+1. Continue G005: bounded data repair and one-touch R-04/A-03 scientific decisions under source-read-only and no-retuning rules. Existing data/Alpha blockers remain authoritative; classify genuine human-only blockers before pausing.
+2. Continue G006 only after R-04 and A-03 are terminal: preregister and execute the bounded follow-up alpha/volatility cycle with complete trial ledgers and locked-OOS report-only semantics.
+3. Continue G007 only for champions that pass prior gates: frozen fresh-forward evidence with zero orders and zero capital, 30-day checkpoint, and 60-day terminal PASS/KILL.
+4. The aggregate inline goal may be completed only after every required durable goal has a fresh receipt and a fresh final aggregate receipt.
 
-1. Focused tests for each repaired contract and exploit.
-2. Combined G004 tests (dispatch, routing, router replay, profile, cost proof, metrics).
-3. Changed-file Ruff and format checks, `git diff --check`, AI-slop cleanup.
-4. Full tracked regression suite in sanitized environment.
-5. Evidence receipts under `/home/hoky/quants-recovery-runs/20260714T105113Z`.
-6. Fresh three-lane architect review and executor adversarial QA.
-7. Only CLEAR/CLEAR/CLEAR + APPROVE and executor PASS may checkpoint G018 and then G004.
+## Durable file integrity at pause
 
-## Exact resume sequence
+Recorded at `2026-07-16T17:19:11Z`:
 
-1. Start in `/home/hoky/Quants-agent/LuminaQuant` and verify branch contains `f8ba7f1d`; do not reset or rewrite it.
-2. Read this note, resume-state JSON, master plan, runbook, audit, durable goals, and durable ledger.
-3. Activate `/skill:ultragoal`.
-4. Set `GJC_SESSION_ID=019f603a-0e73-7000-88a7-c94f42950c09` and run `gjc ultragoal status --json`.
-5. Resume the paused inline aggregate goal.
-6. Confirm durable G018 is already active; do not run `complete-goals` or start G005.
-7. Re-run the 72-test/Ruff snapshot gate before editing to confirm the handoff checkout.
-8. Execute G018 in A → B → C → E order, using bounded executor slices and preserving the binding decisions in D.
-9. Do not run any performance/data/network/order command during G018.
+- `brief.md`: SHA-256 `faf6f83679e7ce93a8950af4df350fc4a92557d8eaaa40ea17c9c8b918c04e57`, 4,836 bytes.
+- `goals.json`: SHA-256 `7b593003e0c6937ec8010b7852022a3e082a9f6c4c23c4111333c17e904b2cd4`, 39,289 bytes.
+- `ledger.jsonl`: SHA-256 `6f271bcfbce1580c9b16a947c826417bf45bc743b12e29ea8e07fa880ce9a7aa`, 66,512 bytes, 96 lines.
+- Latest ledger event ID: `41bc8670-8d9a-4f2d-b044-3e4d0cf29d93` (`blocker_classified`, `human_blocked`, G019).
+
+These hashes describe the runtime state at pause. Normal resume/steering/checkpoint operations will change them and must append ledger evidence rather than editing runtime files by hand.

@@ -1,31 +1,38 @@
 {
   "artifact_kind": "strategy_recovery_cross_session_resume_state",
-  "schema_version": 2,
-  "updated_utc": "2026-07-15T14:24:27Z",
+  "schema_version": 3,
+  "updated_utc": "2026-07-16T17:19:11Z",
   "handoff_note": "docs/research_note/strategy_recovery_session_handoff_20260714.md",
   "new_session_prompt": "docs/research_note/strategy_recovery_new_session_prompt_20260714.md",
+  "master_plan": "docs/research_note/strategy_recovery_master_plan_20260713.md",
   "ultragoal": {
     "session_id": "019f603a-0e73-7000-88a7-c94f42950c09",
     "objective": "Complete the durable ultragoal plan in .gjc/ultragoal/goals.json, including later accepted/appended stories, under the original brief constraints; use .gjc/ultragoal/ledger.jsonl as the audit trail.",
     "brief": {
       "path": ".gjc/_session-019f603a-0e73-7000-88a7-c94f42950c09/ultragoal/brief.md",
-      "sha256": "faf6f83679e7ce93a8950af4df350fc4a92557d8eaaa40ea17c9c8b918c04e57",
-      "byte_count": 4836
+      "sha256_at_pause": "faf6f83679e7ce93a8950af4df350fc4a92557d8eaaa40ea17c9c8b918c04e57",
+      "byte_count_at_pause": 4836
     },
     "goals": {
       "path": ".gjc/_session-019f603a-0e73-7000-88a7-c94f42950c09/ultragoal/goals.json",
-      "sha256": "b1da375ff3a37cdd34941c5ef880853e34c404d2a7b93a23729de684583b10d4",
-      "byte_count": 38376
+      "sha256_at_pause": "7b593003e0c6937ec8010b7852022a3e082a9f6c4c23c4111333c17e904b2cd4",
+      "byte_count_at_pause": 39289
     },
     "ledger": {
       "path": ".gjc/_session-019f603a-0e73-7000-88a7-c94f42950c09/ultragoal/ledger.jsonl",
-      "sha256": "5037d14090b05850c4bc45f611b23543afa645ed9a336791f5b6f09c0766dd22",
-      "byte_count": 51440,
-      "line_count": 75,
-      "latest_event_id": "62768895-7fda-4b33-9131-81282b936f32",
-      "latest_event": "blocker_classified:human_blocked:G018"
+      "sha256_at_pause": "6f271bcfbce1580c9b16a947c826417bf45bc743b12e29ea8e07fa880ce9a7aa",
+      "byte_count_at_pause": 66512,
+      "line_count_at_pause": 96,
+      "latest_event_id": "41bc8670-8d9a-4f2d-b044-3e4d0cf29d93",
+      "latest_event": "blocker_classified:human_blocked:G019"
     },
     "inline_goal_status": "paused_for_user_requested_session_transfer",
+    "durable_current_goal": {
+      "id": "G019",
+      "title": "Resolve final Cost proof certification blockers",
+      "status": "active",
+      "objective": "Repair immediate liquidation causality and sequencing, oversized authenticated numeric STOP handling, conservative degenerate SPA bootstrap handling, and prove each at the public boundary with isolated regressions before rerunning G018 certification."
+    },
     "goal_states": [
       {"id": "G001", "status": "complete"},
       {"id": "G002", "status": "superseded"},
@@ -41,7 +48,8 @@
       {"id": "G016", "status": "superseded"},
       {"id": "G017", "status": "complete"},
       {"id": "G004", "status": "review_blocked"},
-      {"id": "G018", "status": "active"},
+      {"id": "G018", "status": "review_blocked"},
+      {"id": "G019", "status": "active"},
       {"id": "G005", "status": "pending"},
       {"id": "G006", "status": "pending"},
       {"id": "G007", "status": "pending"}
@@ -51,8 +59,9 @@
     "main": {
       "path": "/home/hoky/Quants-agent/LuminaQuant",
       "branch": "recovery/strategy-plan-20260714",
-      "g004_snapshot_commit": "f8ba7f1d",
-      "g004_snapshot_complete": false
+      "implementation_checkpoint": "512d2b804ab05bc1cf023ac4cbea81e0506a8736",
+      "checkpoint_message": "Checkpoint G019 proof contract repairs",
+      "g019_complete": false
     },
     "alpha_max": {
       "path": "/home/hoky/Quants-agent/Quants-agent-alpha-max-data-pc",
@@ -63,26 +72,40 @@
     }
   },
   "current_work": {
-    "blocked_goal": "G004",
-    "resume_goal": "G018",
-    "title": "Authenticate and reconcile G004 proof contracts",
-    "review_tasks": [
-      "58-G004CostContractReview",
-      "59-G004RouterContractReview",
-      "60-G004DispatchContractReview"
-    ],
-    "review_verdict": "BLOCK_CHANGES_REQUIRED",
-    "snapshot_verification": {
-      "tests": "72 passed in 1.03s",
-      "ruff": "passed",
-      "full_suite_run": false
+    "blocked_goal_chain": ["G004", "G018"],
+    "resume_goal": "G019",
+    "title": "Resolve final Cost proof certification blockers",
+    "implementation_status": "committed_checkpoint_pending_final_gates",
+    "paused_review": {
+      "task": "97-G019CostArchitectFinal",
+      "status": "paused_without_verdict",
+      "resume_action": "rerun_final_cost_architect_from_scratch"
     },
-    "next_command": "Resume the paused inline aggregate goal and continue already-active G018; do not run complete-goals.",
-    "implementation_plan": [
-      "Close end-to-end strict dispatch proxy, final-array, datetime cadence, and typed-error blockers.",
-      "Make router decisions/scales deterministic and bind authoritative freeze, prior-fold, receipt-byte, engine, data, and profile evidence.",
-      "Make cost proof bind router tapes, actual source bytes/row proofs, exact profile/volume, cash-inventory-PnL, segments, stops/liquidation, complete trials, and whole-family SPA.",
-      "Add exploit-shaped tests, run cleanup and full gates, then obtain fresh CLEAR/APPROVE architect and PASS executor QA before checkpointing G018/G004."
+    "accepted_reviews": {
+      "dispatch": "65-G018DispatchReview:CLEAR_CLEAR_CLEAR_APPROVE",
+      "router": "95-G018RouterArchitectFinal:CLEAR_CLEAR_CLEAR_APPROVE",
+      "cost": "pending"
+    },
+    "verification": {
+      "dispatch": "38 passed",
+      "router": "57 passed after formatting",
+      "cost": "61 passed before final residual-fixture strengthening; current residual focused test passed and traced to carried-breach guard",
+      "profile_selection_monthly_refit": "79 passed, 1 unrelated worktree-config test deselected",
+      "ruff": "dispatch/router/cost clean before final residual-fixture strengthening",
+      "diff_check": "clean before implementation checkpoint",
+      "combined_final_gate": false,
+      "ai_slop_cleaner": false,
+      "final_architect": false,
+      "executor_qa": false
+    },
+    "next_command": "Activate /skill:ultragoal, inspect status with the existing session ID, resume the paused inline aggregate goal, and continue already-active G019; do not run complete-goals.",
+    "remaining_plan": [
+      "Rerun full Cost, Router, dispatch, and profile/selection regression plus Ruff/format/diff checks on checkpoint 512d2b80.",
+      "Rerun final Cost architect certification for immediate liquidation causality/sequencing, valid economic REJECT, public file/CLI overflow STOP, conservative degenerate SPA, and branch-authentic tests.",
+      "Run the combined G018 regression matrix and the internal AI-slop cleaner on exactly nine changed files; repair every blocking finding and rerun.",
+      "Freeze the cleaned change set, obtain fresh three-lane architect CLEAR/APPROVE and executor adversarial QA with real API/package and CLI artifacts.",
+      "Checkpoint G019 with a strict quality gate, then supersede G018 and G004 from the completed replacement-chain evidence.",
+      "Continue pending G005, then G006, then G007 under the frozen master plan and all source/read-only, no-retuning, no-order constraints."
     ]
   },
   "fixed_candidate_contract": {
@@ -90,7 +113,9 @@
     "candidate_ids": [
       "codex_lagged_leaf_router_grid:h4_avg1_tr-0.02_tmdd0.50_val0.00_vmdd0.25_lagged_plus_val025_exact_unscaled",
       "codex_lagged_leaf_router_grid:h4_avg1_tr-0.02_tmdd0.50_val0.00_vmdd0.25_lagged_plus_val025_fallback_mdd20_cap2"
-    ]
+    ],
+    "selection": "independent gates; passers ranked by validation 20bp Calmar, lower validation MDD, frozen candidate order",
+    "locked_oos": "report_and_gate_only_never_select_or_retune"
   },
   "external_blockers": {
     "alpha_blocker_v2": {
@@ -98,15 +123,16 @@
       "sha256": "3b8c04b7a6b0a7d99e3d2b0ffb2dc42551c876b9ec5879663529b2b6173a07b2"
     },
     "forbidden_alpha_source": "/home/hoky/Quants-agent/LuminaQuant-data/alpha_max_20260711_listing_aware_source",
-    "btc_june": "STOP:874_ohlcv_gaps_and_18_funding_prefix_gaps"
+    "btc_june": "STOP:874_ohlcv_gaps_and_18_funding_prefix_gaps",
+    "local_config": "user-managed config.yaml differs from HEAD; do not modify or reveal values"
   },
   "evidence_root": "/home/hoky/quants-recovery-runs/20260714T105113Z",
   "resume_rules": [
-    "Activate /skill:ultragoal and use the existing session id; never create a competing plan.",
-    "Resume the paused aggregate inline goal and continue already-active G018 without running complete-goals.",
-    "Verify f8ba7f1d and rerun the 72-test/Ruff snapshot gate before editing.",
-    "Do not start G005 before G018 and G004 receive clean completion gates.",
-    "Do not run strategy performance, data/network/order operations, or consume quarantined Alpha data during G018.",
-    "Do not push without explicit user instruction."
+    "Activate /skill:ultragoal and use the existing session ID; never create a competing plan.",
+    "Resume the paused aggregate inline goal and continue already-active G019 without running complete-goals.",
+    "Verify checkpoint 512d2b804ab05bc1cf023ac4cbea81e0506a8736 and read all handoff/plan/runtime artifacts before mutation.",
+    "Do not start G005 before G019 is checkpointed and G018/G004 are superseded from fresh evidence.",
+    "Do not run strategy performance, data/network/order/capital operations or consume quarantined Alpha data during G019/G018 certification.",
+    "Do not reset, rebase, amend, or push without explicit user instruction."
   ]
 }
