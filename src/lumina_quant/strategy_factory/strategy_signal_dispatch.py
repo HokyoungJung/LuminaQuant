@@ -58,9 +58,20 @@ class StrategySignalDispatcher:
         unmapped_router: UnmappedStrategyRouter | None = None,
         require_actual_engine: bool = False,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict[str, Any]]:
-        strategy_class = str(candidate.get("strategy_class") or candidate.get("strategy") or "")
-        params = dict(candidate.get("params") or {})
-
+        if require_actual_engine:
+            strategy_class = ""
+            try:
+                strategy_class = str(
+                    candidate.get("strategy_class") or candidate.get("strategy") or ""
+                )
+                params = dict(candidate.get("params") or {})
+            except Exception as exc:
+                raise StrategySignalDispatchError(
+                    strategy_class, "invalid candidate or params"
+                ) from exc
+        else:
+            strategy_class = str(candidate.get("strategy_class") or candidate.get("strategy") or "")
+            params = dict(candidate.get("params") or {})
         if require_actual_engine:
             n = self._validate_actual_engine_input(
                 strategy_class=strategy_class,
@@ -119,12 +130,15 @@ class StrategySignalDispatcher:
                 )
                 meta["evaluation_mode"] = "registry_simulator"
             else:
+                meta["_strict_actual_engine"] = True
                 try:
                     handler(params, aligned, symbols, n, exposures, meta)
                 except Exception as exc:
                     raise StrategySignalDispatchError(
                         strategy_class, "handler raised an exception"
                     ) from exc
+                finally:
+                    meta.pop("_strict_actual_engine", None)
                 self._validate_actual_engine_exposures(
                     strategy_class=strategy_class,
                     source="handler",
@@ -179,9 +193,27 @@ class StrategySignalDispatcher:
         # and charging a spurious first-bar trade.)
         prev = np.zeros_like(exposures)
         prev[:, 1:] = exposures[:, :-1]
-        exposure = np.nanmean(exposures, axis=0)
-        portfolio_ret = np.nanmean(prev * returns, axis=0)
-        turnover = np.nanmean(np.abs(exposures - prev), axis=0)
+        if require_actual_engine:
+            try:
+                with np.errstate(over="raise", invalid="raise"):
+                    exposure = np.nanmean(exposures, axis=0)
+                    portfolio_ret = np.nanmean(prev * returns, axis=0)
+                    turnover = np.nanmean(np.abs(exposures - prev), axis=0)
+            except FloatingPointError as exc:
+                raise StrategySignalDispatchError(
+                    strategy_class, "derived portfolio outputs overflowed or became invalid"
+                ) from exc
+            self._validate_actual_engine_outputs(
+                strategy_class=strategy_class,
+                portfolio_ret=portfolio_ret,
+                turnover=turnover,
+                exposure=exposure,
+                expected_shape=(n,),
+            )
+        else:
+            exposure = np.nanmean(exposures, axis=0)
+            portfolio_ret = np.nanmean(prev * returns, axis=0)
+            turnover = np.nanmean(np.abs(exposures - prev), axis=0)
         return portfolio_ret, turnover, exposure, meta
 
     @staticmethod
@@ -334,6 +366,28 @@ class StrategySignalDispatcher:
             raise StrategySignalDispatchError(
                 strategy_class, f"{source} returned nonfinite exposures"
             )
+
+    @staticmethod
+    def _validate_actual_engine_outputs(
+        *,
+        strategy_class: str,
+        portfolio_ret: np.ndarray,
+        turnover: np.ndarray,
+        exposure: np.ndarray,
+        expected_shape: tuple[int],
+    ) -> None:
+        for name, values in (
+            ("portfolio return", portfolio_ret),
+            ("turnover", turnover),
+            ("exposure", exposure),
+        ):
+            if values.shape != expected_shape:
+                raise StrategySignalDispatchError(
+                    strategy_class,
+                    f"{name} has shape {values.shape}, expected {expected_shape}",
+                )
+            if not np.isfinite(values).all():
+                raise StrategySignalDispatchError(strategy_class, f"{name} is nonfinite")
 
     @staticmethod
     def _apply_generic_fallback(

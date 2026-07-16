@@ -179,3 +179,104 @@ def test_leadlag_spillover_flat_through_sigma_warmup() -> None:
     candidate = {"strategy_class": "LeadLagSpilloverStrategy", "params": {}}
     result = rr._strategy_signal(candidate, aligned=_aligned_panel(), symbols=_SYMBOLS)
     assert np.all(result[2][:31] == 0.0)
+
+
+def test_strict_pair_handler_propagates_simulator_failure_through_research_dispatch(
+    monkeypatch,
+) -> None:
+    def _failure(*args, **kwargs):
+        raise RuntimeError("pair simulator failure")
+
+    monkeypatch.setattr(rr, "_simulate_event_driven_strategy_exposures", _failure)
+    params = {"symbol_x": "BTC/USDT", "symbol_y": "ETH/USDT"}
+
+    legacy = _signal("PairSpreadZScoreStrategy", params)
+    assert legacy[3]["event_driven_proxy"] is False
+    assert legacy[3]["event_driven_proxy_error"] == "pair simulator failure"
+
+    with pytest.raises(StrategySignalDispatchError) as error:
+        _signal("PairSpreadZScoreStrategy", params, _STRICT_ROUTE_ON)
+    assert isinstance(error.value.__cause__, RuntimeError)
+    assert str(error.value.__cause__) == "pair simulator failure"
+
+
+def test_public_research_strict_pair_failure_reaches_dispatcher(monkeypatch) -> None:
+    def _failure(*args, **kwargs):
+        raise RuntimeError("pair simulator failure")
+
+    aligned = _aligned_panel()
+    aligned["datetime"] = np.datetime64("2025-01-01T00:00:00.000", "ms") + (
+        np.arange(_N) * np.timedelta64(14_400_000, "ms")
+    )
+    symbols = ["BTC/USDT", "ETH/USDT"]
+    cache = {
+        (symbol, "1m"): rr.SeriesBundle(
+            symbol=symbol,
+            timeframe="1m",
+            datetime=aligned["datetime"],
+            open=aligned[f"{symbol}:open"],
+            high=aligned[f"{symbol}:high"],
+            low=aligned[f"{symbol}:low"],
+            close=aligned[f"{symbol}:close"],
+            volume=aligned[f"{symbol}:volume"],
+        )
+        for symbol in symbols
+    }
+    monkeypatch.setattr(rr, "_simulate_event_driven_strategy_exposures", _failure)
+    monkeypatch.setattr(
+        rr,
+        "_load_research_run_resources",
+        lambda **kwargs: (cache, {}, {}, {}),
+    )
+
+    with pytest.raises(StrategySignalDispatchError) as error:
+        rr.run_candidate_research(
+            candidates=[
+                {
+                    "strategy_class": "PairSpreadZScoreStrategy",
+                    "symbols": symbols,
+                    "strategy_timeframe": "1m",
+                    "params": {"symbol_x": symbols[0], "symbol_y": symbols[1]},
+                }
+            ],
+            base_timeframe="1m",
+            score_config=_STRICT_ROUTE_ON,
+            data_mode="strict",
+            allow_csv_fallback=False,
+            allow_synthetic_fallback=False,
+            min_bundle_bars=2,
+        )
+    assert isinstance(error.value.__cause__, RuntimeError)
+    assert str(error.value.__cause__) == "pair simulator failure"
+
+
+def test_strict_registry_dispatch_uses_numpy_datetime64_ms_cadence(monkeypatch) -> None:
+    observed_window_seconds: list[int] = []
+
+    class _RegisteredWindowStrategy:
+        def __init__(self, bars, events, **params):
+            self.events = events
+
+        def calculate_signals_window(self, event):
+            return None
+
+        def calculate_signals(self, event):
+            observed_window_seconds.append(event.window_seconds)
+
+    monkeypatch.setattr(
+        "lumina_quant.strategies.registry.resolve_strategy_class",
+        lambda strategy_class: _RegisteredWindowStrategy,
+    )
+    aligned = _aligned_panel()
+    start = np.datetime64("2025-01-01T00:00:00.000", "ms")
+    aligned["datetime"] = start + np.arange(_N) * np.timedelta64(300_000, "ms")
+
+    result = rr._strategy_signal(
+        {"strategy_class": "RegisteredWindowStrategy", "params": {}},
+        aligned=aligned,
+        symbols=_SYMBOLS,
+        scoring_config=_STRICT_ROUTE_ON,
+    )
+
+    assert result[3]["evaluation_mode"] == "registry_simulator"
+    assert observed_window_seconds == [300] * _N

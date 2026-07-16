@@ -1,7 +1,7 @@
-"""Fail-closed, read-only validator for frozen ``cost_proof_v1`` evidence.
+"""Fail-closed, read-only validator for frozen ``cost_proof_v2`` evidence.
 
-The validator consumes records only.  It never imports a data source, engine, router,
-or order path; every identity used for a gate is recomputed from supplied evidence.
+All authority enters through caller-supplied, out-of-band raw-byte SHA-256 roots.
+Evidence-produced digest strings are only cross-references; they are never trust roots.
 """
 
 from __future__ import annotations
@@ -32,10 +32,10 @@ from lumina_quant.strategy_factory.research_metrics import (
     cscv_pbo,
     deflated_sharpe_ratio,
     max_drawdown,
-    spa_like_pvalue,
 )
 
-SCHEMA = "cost_proof_v1"
+SCHEMA = "cost_proof_v2"
+PROFILE_RAW_SHA256 = "a3e9572365d39e3388c97b8b6c094c0bb9d63a3b1fd6d38c918342b435716950"
 COST_LADDER = (10, 15, 20, 30)
 CSCV_SPLITS = 8
 CANDIDATES = (
@@ -48,6 +48,8 @@ FUNDING_HOURS = {0, 8, 16}
 EXTERNAL_ARTIFACTS = (
     "profile",
     "source_data_manifest",
+    "source_run_receipt",
+    "search_run_receipt",
     "router_replay_manifest",
     "router_source_artifact",
     "lifecycle",
@@ -58,9 +60,11 @@ EXTERNAL_ARTIFACTS = (
     "router_producer_source",
     "router_commit_receipt",
 )
-PROVENANCE_ARTIFACTS = {name: f"{name}_sha256" for name in EXTERNAL_ARTIFACTS} | {
-    "verifier_source": "verifier_source_sha256"
-}
+# The cost commit is deliberately excluded: it is created after canonical evidence
+# and binds that evidence hash. Including it would create an unconstructable cycle.
+PROVENANCE_ARTIFACTS = {
+    name: f"{name}_sha256" for name in EXTERNAL_ARTIFACTS if name != "commit_receipt"
+} | {"verifier_source": "verifier_source_sha256"}
 
 
 @dataclass(frozen=True, slots=True)
@@ -91,13 +95,19 @@ class ExternalBindings:
     hashes: Mapping[str, str]
     profile: Mapping[str, Any]
     source_manifest: Mapping[str, Any]
+    source_run_receipt: Mapping[str, Any]
+    search_run_receipt: Mapping[str, Any]
+    cost_commit: Mapping[str, Any]
     router_manifest: Mapping[str, Any]
     membership: Mapping[str, Any]
     trial_ledger: Mapping[str, Any]
+    trial_result_artifacts: Mapping[str, Mapping[str, Any]]
     market_artifact_hashes: frozenset[str]
     funding_artifact_hashes: frozenset[str]
     market_rows: Mapping[tuple[str, str, str], Mapping[str, Any]]
     funding_rows: Mapping[tuple[str, str, str], Mapping[str, Any]]
+    router_tapes: Mapping[tuple[str, str, str, int], Mapping[str, Mapping[str, Any]]]
+    trusted_roots: Mapping[str, str]
 
 
 def _reject_constant(value: str) -> Any:
@@ -147,134 +157,276 @@ def _json_bytes(raw: bytes) -> Mapping[str, Any]:
 
 def _source_contract(
     source: Mapping[str, Any],
-) -> tuple[
-    frozenset[str],
-    frozenset[str],
-    dict[tuple[str, str, str], Mapping[str, Any]],
-    dict[tuple[str, str, str], Mapping[str, Any]],
-]:
-    if set(source) != {
+    receipt: Mapping[str, Any],
+    *,
+    manifest_sha256: str,
+    artifacts: Mapping[str, tuple[str, int, str, str]],
+) -> None:
+    fields = {
         "schema",
+        "source_run_id",
         "synthetic_source_count",
         "actual_funding",
         "point_in_time_membership",
         "post_append_strict_receipt_sha256",
         "artifacts",
-        "market_rows",
-        "funding_rows",
-    }:
-        raise ValueError("invalid source-data manifest fields")
+    }
     if (
-        source["schema"] != "cost_proof_source_data_v1"
-        or source["synthetic_source_count"] != 0
-        or type(source["synthetic_source_count"]) is not int
-        or source["actual_funding"] is not True
-        or source["point_in_time_membership"] is not True
-        or not _hash(source["post_append_strict_receipt_sha256"])
+        set(source) != fields
+        or source.get("schema") != "cost_proof_source_data_v2"
+        or _string(source, "source_run_id") is None
+        or source.get("synthetic_source_count") != 0
+        or type(source.get("synthetic_source_count")) is not int
+        or source.get("actual_funding") is not True
+        or source.get("point_in_time_membership") is not True
     ):
         raise ValueError("unsafe source-data manifest")
-    artifacts = _records(source["artifacts"])
-    if not artifacts:
-        raise ValueError("empty source-data manifest")
-    by_kind: dict[str, set[str]] = {"market": set(), "funding": set()}
-    seen: set[str] = set()
-    for artifact in artifacts:
-        if set(artifact) != {"kind", "artifact_sha256"}:
-            raise ValueError("invalid source artifact fields")
-        kind = artifact["kind"]
-        digest = artifact["artifact_sha256"]
-        if kind not in by_kind or not _hash(digest) or digest in seen:
-            raise ValueError("invalid or duplicated source artifact")
-        seen.add(digest)
-        by_kind[kind].add(digest)
-    if not by_kind["market"] or not by_kind["funding"]:
-        raise ValueError("market and funding artifacts are required")
-
-    market_source_rows = _records(source["market_rows"])
-    funding_source_rows = _records(source["funding_rows"])
-    if not market_source_rows or funding_source_rows is None:
-        raise ValueError("source row collections are invalid")
-
-    market_rows: dict[tuple[str, str, str], Mapping[str, Any]] = {}
-    for row in market_source_rows:
-        if set(row) != {
-            "source_row_id",
-            "artifact_sha256",
-            "symbol",
-            "timestamp",
-            "prior_mark_price",
-            "mark_price",
-            "high",
-            "low",
-        }:
-            raise ValueError("invalid market source row fields")
-        key = (
-            str(row.get("artifact_sha256")),
-            str(row.get("source_row_id")),
-            str(row.get("symbol")),
-        )
-        values = [
-            _num(row.get(name), positive=True)
-            for name in ("prior_mark_price", "mark_price", "high", "low")
-        ]
+    projection = _records(source["artifacts"])
+    row_fields = {"kind", "artifact_sha256", "row_count", "min_timestamp_utc", "max_timestamp_utc"}
+    if not projection or any(set(row) != row_fields for row in projection):
+        raise ValueError("invalid source artifact projection")
+    for row in projection:
+        digest, parsed = row.get("artifact_sha256"), artifacts.get(row.get("artifact_sha256"))
         if (
-            key in market_rows
-            or key[0] not in by_kind["market"]
-            or _string(row, "source_row_id") is None
-            or _string(row, "symbol") is None
-            or _utc(row.get("timestamp")) is None
-            or any(value is None for value in values)
-            or float(row["low"]) > min(float(row["prior_mark_price"]), float(row["mark_price"]))
-            or float(row["high"]) < max(float(row["prior_mark_price"]), float(row["mark_price"]))
+            row.get("kind") not in {"market", "funding"}
+            or not _hash(digest)
+            or parsed is None
+            or row["kind"] != parsed[0]
+            or type(row.get("row_count")) is not int
+            or row["row_count"] != parsed[1]
+            or row.get("min_timestamp_utc") != parsed[2]
+            or row.get("max_timestamp_utc") != parsed[3]
+            or _utc(parsed[2]) is None
+            or _utc(parsed[3]) is None
+            or parsed[2] > parsed[3]
         ):
-            raise ValueError("invalid or duplicated market source row")
-        market_rows[key] = row
-
-    funding_rows: dict[tuple[str, str, str], Mapping[str, Any]] = {}
-    for row in funding_source_rows:
-        if set(row) != {
-            "source_row_id",
-            "artifact_sha256",
-            "symbol",
-            "boundary",
-            "observed_rate",
-        }:
-            raise ValueError("invalid funding source row fields")
-        key = (
-            str(row.get("artifact_sha256")),
-            str(row.get("source_row_id")),
-            str(row.get("symbol")),
-        )
-        if (
-            key in funding_rows
-            or key[0] not in by_kind["funding"]
-            or _string(row, "source_row_id") is None
-            or _string(row, "symbol") is None
-            or _utc(row.get("boundary")) is None
-            or _num(row.get("observed_rate")) is None
-        ):
-            raise ValueError("invalid or duplicated funding source row")
-        funding_rows[key] = row
-    return (
-        frozenset(by_kind["market"]),
-        frozenset(by_kind["funding"]),
-        market_rows,
-        funding_rows,
-    )
+            raise ValueError("source artifact count/range drift")
+    if (
+        len(projection) != len(artifacts)
+        or len({row["artifact_sha256"] for row in projection}) != len(projection)
+        or not {row["kind"] for row in projection} == {"market", "funding"}
+    ):
+        raise ValueError("source artifact coverage drift")
+    receipt_fields = {
+        "schema",
+        "source_run_id",
+        "manifest_sha256",
+        "artifacts",
+        "producer_source_sha256",
+        "source_commit_sha256",
+        "committed_at_utc",
+    }
+    if (
+        set(receipt) != receipt_fields
+        or receipt.get("schema") != "cost_proof_source_run_receipt_v1"
+        or receipt.get("source_run_id") != source["source_run_id"]
+        or receipt.get("manifest_sha256") != manifest_sha256
+        or receipt.get("artifacts") != projection
+        or not _hash(receipt.get("producer_source_sha256"))
+        or not _hash(receipt.get("source_commit_sha256"))
+        or _utc(receipt.get("committed_at_utc")) is None
+        or source.get("post_append_strict_receipt_sha256") != receipt.get("source_commit_sha256")
+    ):
+        raise ValueError("source-run receipt binding drift")
 
 
-def _artifact_bindings(paths: Mapping[str, str | Path]) -> ExternalBindings:
+def _trusted_roots(roots: Mapping[str, str]) -> dict[str, str]:
+    required = {
+        "source_data_commit_sha256",
+        "search_run_receipt_sha256",
+        "cost_proof_commit_sha256",
+        "router_source_artifact_sha256",
+        "router_commit_receipt_sha256",
+    }
+    if set(roots) != required or any(not _hash(value) for value in roots.values()):
+        raise ValueError("incomplete trusted SHA-256 roots")
+    return dict(roots)
+
+
+def _canonical_artifact(raw: bytes) -> Mapping[str, Any]:
+    value = _json_bytes(raw)
+    if raw != json.dumps(
+        value, allow_nan=False, ensure_ascii=False, separators=(",", ":"), sort_keys=True
+    ).encode("utf-8"):
+        raise ValueError("artifact JSON is not canonical")
+    return value
+
+
+def _artifact_bindings(
+    paths: Mapping[str, str | Path],
+    *,
+    market_artifact_paths: Mapping[str, str | Path],
+    funding_artifact_paths: Mapping[str, str | Path],
+    router_artifact_paths: Mapping[str, str | Path],
+    trial_result_artifact_paths: Mapping[str, str | Path],
+    evidence_sha256: str,
+    trusted_roots: Mapping[str, str],
+) -> ExternalBindings:
     if set(paths) != set(EXTERNAL_ARTIFACTS):
         raise ValueError("incomplete external artifact bindings")
+    roots = _trusted_roots(trusted_roots)
     concrete = {name: Path(path) for name, path in paths.items()}
     raw = {name: path.read_bytes() for name, path in concrete.items()}
+    if hashlib.sha256(raw["profile"]).hexdigest() != PROFILE_RAW_SHA256:
+        raise ValueError("profile raw SHA-256 mismatch")
     profile = yaml.load(raw["profile"].decode("utf-8"), Loader=_UniqueSafeLoader)
     if not isinstance(profile, Mapping) or not _profile_ok(profile):
         raise ValueError("profile does not satisfy frozen contract")
-    source = _json_bytes(raw["source_data_manifest"])
-    market_hashes, funding_hashes, market_rows, funding_rows = _source_contract(source)
-    lifecycle = validate_symbol_lifecycle_registry(_json_bytes(raw["lifecycle"]))
-    membership = validate_fold_membership_manifest(lifecycle, _json_bytes(raw["membership"]))
+    source = _canonical_artifact(raw["source_data_manifest"])
+    source_receipt = _canonical_artifact(raw["source_run_receipt"])
+    search_receipt = _canonical_artifact(raw["search_run_receipt"])
+    if (
+        hashlib.sha256(raw["router_source_artifact"]).hexdigest()
+        != roots["router_source_artifact_sha256"]
+    ):
+        raise ValueError("Router source trusted root mismatch")
+    if (
+        hashlib.sha256(raw["router_commit_receipt"]).hexdigest()
+        != roots["router_commit_receipt_sha256"]
+    ):
+        raise ValueError("Router commit trusted root mismatch")
+    if hashlib.sha256(raw["commit_receipt"]).hexdigest() != roots["cost_proof_commit_sha256"]:
+        raise ValueError("cost-proof commit trusted root mismatch")
+    if hashlib.sha256(raw["search_run_receipt"]).hexdigest() != roots["search_run_receipt_sha256"]:
+        raise ValueError("search-run receipt trusted root mismatch")
+    if hashlib.sha256(raw["source_run_receipt"]).hexdigest() != roots["source_data_commit_sha256"]:
+        raise ValueError("source-data commit trusted root mismatch")
+    lifecycle = validate_symbol_lifecycle_registry(_canonical_artifact(raw["lifecycle"]))
+    membership = validate_fold_membership_manifest(
+        lifecycle, _canonical_artifact(raw["membership"])
+    )
+    market_raw = {digest: Path(path).read_bytes() for digest, path in market_artifact_paths.items()}
+    funding_raw = {
+        digest: Path(path).read_bytes() for digest, path in funding_artifact_paths.items()
+    }
+    if (
+        not market_raw
+        or not funding_raw
+        or any(
+            not _hash(digest) or hashlib.sha256(content).hexdigest() != digest
+            for digest, content in {**market_raw, **funding_raw}.items()
+        )
+        or set(market_raw) & set(funding_raw)
+    ):
+        raise ValueError("invalid source artifact path map")
+
+    def source_rows(
+        contents: Mapping[str, bytes], kind: str
+    ) -> tuple[dict[tuple[str, str, str], Mapping[str, Any]], dict[str, tuple[str, int, str, str]]]:
+        result: dict[tuple[str, str, str], Mapping[str, Any]] = {}
+        stats: dict[str, tuple[str, int, str, str]] = {}
+        global_keys: set[tuple[str, str]] = set()
+        for digest, content in contents.items():
+            artifact = _canonical_artifact(content)
+            if (
+                set(artifact) != {"schema", "rows"}
+                or artifact["schema"] != f"cost_proof_{kind}_artifact_v1"
+            ):
+                raise ValueError("source artifact schema mismatch")
+            rows = _records(artifact["rows"])
+            if not rows:
+                raise ValueError("empty source artifact")
+            last: tuple[str, str] | None = None
+            for row in rows:
+                required = (
+                    {
+                        "source_row_id",
+                        "symbol",
+                        "timestamp",
+                        "prior_mark_price",
+                        "mark_price",
+                        "open",
+                        "high",
+                        "low",
+                        "close",
+                        "bar_volume_base",
+                        "price_tick_size",
+                        "quantity_step_size",
+                    }
+                    if kind == "market"
+                    else {"source_row_id", "symbol", "boundary", "observed_rate"}
+                )
+                time_key = "timestamp" if kind == "market" else "boundary"
+                stamp, symbol = _utc(row.get(time_key)), _string(row, "symbol")
+                key = (digest, _string(row, "source_row_id") or "", symbol or "")
+                chronology = (symbol or "", str(row.get(time_key)))
+                if (
+                    set(row) != required
+                    or key in result
+                    or not key[1]
+                    or stamp is None
+                    or symbol is None
+                    or chronology in global_keys
+                    or (last is not None and chronology <= last)
+                ):
+                    raise ValueError("invalid, duplicate, or unordered source row")
+                global_keys.add(chronology)
+                last = chronology
+                numbers = (
+                    (
+                        "prior_mark_price",
+                        "mark_price",
+                        "open",
+                        "high",
+                        "low",
+                        "close",
+                        "bar_volume_base",
+                        "price_tick_size",
+                        "quantity_step_size",
+                    )
+                    if kind == "market"
+                    else ("observed_rate",)
+                )
+                if any(
+                    _num(row.get(name), positive=(name != "observed_rate")) is None
+                    for name in numbers
+                ):
+                    raise ValueError("nonfinite source row")
+                if kind == "market" and (
+                    float(row["low"])
+                    > min(
+                        float(row["open"]),
+                        float(row["close"]),
+                        float(row["prior_mark_price"]),
+                        float(row["mark_price"]),
+                    )
+                    or float(row["high"])
+                    < max(
+                        float(row["open"]),
+                        float(row["close"]),
+                        float(row["prior_mark_price"]),
+                        float(row["mark_price"]),
+                    )
+                ):
+                    raise ValueError("market OHLC containment drift")
+                if kind == "funding" and (
+                    stamp.hour not in FUNDING_HOURS
+                    or stamp.minute
+                    or stamp.second
+                    or stamp.microsecond
+                ):
+                    raise ValueError("funding boundary drift")
+                result[key] = row
+            times = [str(row[time_key]) for key, row in result.items() if key[0] == digest]
+            stats[digest] = (kind, len(times), min(times), max(times))
+        return result, stats
+
+    market_rows, market_stats = source_rows(market_raw, "market")
+    funding_rows, funding_stats = source_rows(funding_raw, "funding")
+    _source_contract(
+        source,
+        source_receipt,
+        manifest_sha256=hashlib.sha256(raw["source_data_manifest"]).hexdigest(),
+        artifacts=market_stats | funding_stats,
+    )
+    if [row["artifact_sha256"] for row in source["artifacts"]] != [*market_raw, *funding_raw]:
+        raise ValueError("source artifact ordered coverage mismatch")
+    router_raw = {digest: Path(path).read_bytes() for digest, path in router_artifact_paths.items()}
+    if not router_raw or any(
+        not _hash(digest) or hashlib.sha256(content).hexdigest() != digest
+        for digest, content in router_raw.items()
+    ):
+        raise ValueError("invalid Router artifact path map")
     router_report = evaluate_router_replay(
         concrete["router_replay_manifest"],
         source_artifact_path=concrete["router_source_artifact"],
@@ -283,22 +435,368 @@ def _artifact_bindings(paths: Mapping[str, str | Path]) -> ExternalBindings:
         combined_profile_path=concrete["profile"],
         producer_source_path=concrete["router_producer_source"],
         commit_receipt_path=concrete["router_commit_receipt"],
+        trusted_source_artifact_sha256=roots["router_source_artifact_sha256"],
+        trusted_commit_receipt_sha256=roots["router_commit_receipt_sha256"],
+        artifact_paths=router_artifact_paths,
     )
     if router_report.status != "PASS":
         raise ValueError("router replay manifest is not authenticated")
+    router_commit = _canonical_artifact(raw["router_commit_receipt"])
+    index_rows = _records(router_commit.get("artifact_index"))
+    if index_rows is None:
+        raise ValueError("invalid Router commit artifact index")
+    committed_kinds: dict[str, str] = {}
+    for row in index_rows:
+        if (
+            set(row) != {"kind", "sha256"}
+            or not _hash(row.get("sha256"))
+            or not _string(row, "kind")
+        ):
+            raise ValueError("invalid Router commit artifact index row")
+        digest, kind = row["sha256"], row["kind"]
+        if digest in committed_kinds:
+            raise ValueError("duplicate Router commit artifact digest")
+        committed_kinds[digest] = kind
+    cost_kinds = {
+        "cost_tape_receipt",
+        "cost_signal_position_tape",
+        "cost_order_tape",
+        "cost_fill_tape",
+        "cost_event_tape",
+    }
+    committed_cost = {digest for digest, kind in committed_kinds.items() if kind in cost_kinds}
+    if not committed_cost or not committed_cost <= set(router_raw):
+        raise ValueError("missing committed Router cost artifact")
+    router_tapes: dict[tuple[str, str, str, int], Mapping[str, Mapping[str, Any]]] = {}
+    consumed_router: set[str] = set()
+    tape_fields = {
+        "schema",
+        "fold_id",
+        "variant_id",
+        "selected_label",
+        "leaf_id",
+        "source_row_sha256",
+        "params_sha256",
+        "engine_receipt_sha256",
+        "signal_receipt_sha256",
+        "position_receipt_sha256",
+        "tapes",
+    }
+    expected_kinds = {
+        "signal_position": ("signal_position_sha256", "cost_signal_position_tape"),
+        "order": ("order_tape_sha256", "cost_order_tape"),
+        "fill": ("fill_tape_sha256", "cost_fill_tape"),
+        "event": ("event_tape_sha256", "cost_event_tape"),
+    }
+    router_cost_owners: dict[tuple[str, str, str], Mapping[str, Any]] = {}
+    router_cost_receipts: set[str] = set()
+    router_folds = _records(_canonical_artifact(raw["router_replay_manifest"]).get("folds"))
+    if router_folds is None:
+        raise ValueError("invalid Router fold ownership")
+    for fold in router_folds:
+        fold_id = _string(fold, "fold_id")
+        selection = _mapping(fold.get("selection"))
+        variants = _records(fold.get("variants"))
+        leaves = _records(selection.get("leaves")) if selection is not None else None
+        if fold_id is None or variants is None or leaves is None:
+            raise ValueError("invalid Router ownership")
+        bases = {_string(leaf, "leaf_id"): leaf for leaf in leaves}
+        if None in bases or len(bases) != len(leaves):
+            raise ValueError("invalid Router selected leaves")
+        for variant in variants:
+            variant_id = _string(variant, "variant_id")
+            executions = _records(variant.get("execution_receipts"))
+            if variant_id is None or executions is None or len(executions) != len(leaves):
+                raise ValueError("invalid Router execution ownership")
+            for execution in executions:
+                leaf_id = _string(execution, "leaf_id")
+                receipt_digest = execution.get("cost_tape_receipt_sha256")
+                base = bases.get(leaf_id)
+                key = (fold_id, variant_id, leaf_id or "")
+                if (
+                    base is None
+                    or key in router_cost_owners
+                    or not _hash(receipt_digest)
+                    or receipt_digest in router_cost_receipts
+                ):
+                    raise ValueError("duplicate Router cost ownership")
+                router_cost_owners[key] = {
+                    "base": base,
+                    "execution": execution,
+                    "selected_label": variant.get("selected_label"),
+                }
+                router_cost_receipts.add(str(receipt_digest))
+    for digest in sorted(committed_cost):
+        if committed_kinds[digest] != "cost_tape_receipt":
+            continue
+        receipt = _canonical_artifact(router_raw[digest])
+        if (
+            receipt.get("schema") != "router_cost_tape_receipt_v1"
+            or set(receipt) != tape_fields
+            or not all(
+                _string(receipt, key) is not None
+                for key in ("fold_id", "variant_id", "leaf_id", "engine_receipt_sha256")
+            )
+        ):
+            raise ValueError("invalid Router cost tape receipt")
+        owner = router_cost_owners.get(
+            (receipt["fold_id"], receipt["variant_id"], receipt["leaf_id"])
+        )
+        if (
+            owner is None
+            or digest not in router_cost_receipts
+            or owner["execution"].get("cost_tape_receipt_sha256") != digest
+            or receipt.get("source_row_sha256") != owner["base"].get("source_row_sha256")
+            or receipt.get("params_sha256") != owner["base"].get("params_sha256")
+            or receipt.get("selected_label") != owner["selected_label"]
+            or any(
+                receipt.get(name) != owner["execution"].get(name)
+                for name in (
+                    "engine_receipt_sha256",
+                    "signal_receipt_sha256",
+                    "position_receipt_sha256",
+                )
+            )
+        ):
+            raise ValueError("Router cost receipt ownership drift")
+        tapes = _records(receipt["tapes"])
+        if tapes is None or len(tapes) != len(COST_LADDER):
+            raise ValueError("Router cost tape count mismatch")
+        consumed_router.add(digest)
+        for row, cost_bps in zip(tapes, COST_LADDER, strict=True):
+            fields = {
+                "cost_bps",
+                "signal_position_sha256",
+                "order_tape_sha256",
+                "fill_tape_sha256",
+                "event_tape_sha256",
+            }
+            if (
+                set(row) != fields
+                or type(row.get("cost_bps")) is not int
+                or row["cost_bps"] != cost_bps
+            ):
+                raise ValueError("Router cost tape projection mismatch")
+            bundle: dict[str, Mapping[str, Any]] = {"receipt": receipt}
+            for name, (field, expected_kind) in expected_kinds.items():
+                artifact_digest = row.get(field)
+                if (
+                    not _hash(artifact_digest)
+                    or artifact_digest not in committed_cost
+                    or committed_kinds.get(artifact_digest) != expected_kind
+                ):
+                    raise ValueError("Router tape committed-kind mismatch")
+                bundle[name] = _canonical_artifact(router_raw[artifact_digest])
+                consumed_router.add(artifact_digest)
+                artifact = bundle[name]
+                artifact_schema = {
+                    "signal_position": "router_cost_signal_position_tape_v1",
+                    "order": "router_cost_order_tape_v1",
+                    "fill": "router_cost_fill_tape_v1",
+                    "event": "router_cost_event_tape_v1",
+                }[name]
+                artifact_fields = {
+                    "schema",
+                    "cost_cell",
+                    "cost_bps",
+                    "fold_id",
+                    "variant_id",
+                    "leaf_id",
+                    "engine_receipt_sha256",
+                    "sequence",
+                    "sequence_sha256",
+                    "rows",
+                    "rows_sha256",
+                }
+                if (
+                    set(artifact) != artifact_fields
+                    or artifact.get("schema") != artifact_schema
+                    or artifact.get("cost_cell") != f"{cost_bps}bps"
+                    or type(artifact.get("cost_bps")) is not int
+                    or artifact["cost_bps"] != cost_bps
+                    or not isinstance(artifact.get("sequence"), list)
+                    or not artifact["sequence"]
+                    or len(artifact["sequence"]) != len(set(artifact["sequence"]))
+                    or any(type(value) is not str or not value for value in artifact["sequence"])
+                    or not isinstance(artifact.get("rows"), list)
+                    or len(artifact["rows"]) != len(artifact["sequence"])
+                    or _canonical_sha256(artifact["sequence"]) != artifact.get("sequence_sha256")
+                    or _canonical_sha256(artifact["rows"]) != artifact.get("rows_sha256")
+                    or artifact.get("fold_id") != receipt["fold_id"]
+                    or artifact.get("variant_id") != receipt["variant_id"]
+                    or artifact.get("leaf_id") != receipt["leaf_id"]
+                    or artifact.get("engine_receipt_sha256") != receipt["engine_receipt_sha256"]
+                ):
+                    raise ValueError("Router tape artifact ownership drift")
+            key = (receipt["variant_id"], receipt["fold_id"], receipt["leaf_id"], cost_bps)
+            if key in router_tapes:
+                raise ValueError("duplicate Router cost tape commitment")
+            router_tapes[key] = bundle
+    if (
+        not router_tapes
+        or consumed_router != committed_cost
+        or router_cost_receipts
+        != {digest for digest, kind in committed_kinds.items() if kind == "cost_tape_receipt"}
+    ):
+        raise ValueError("missing or unattributed committed Router cost artifact")
+    trial_raw = {
+        digest: Path(path).read_bytes() for digest, path in trial_result_artifact_paths.items()
+    }
+    if not trial_raw or any(
+        not _hash(digest) or hashlib.sha256(content).hexdigest() != digest
+        for digest, content in trial_raw.items()
+    ):
+        raise ValueError("invalid trial result artifact path map")
+    trial_results = {digest: _canonical_artifact(content) for digest, content in trial_raw.items()}
+    search_fields = {
+        "schema",
+        "trial_ledger_sha256",
+        "trial_result_artifacts",
+        "candidate_ids",
+        "candidate_ids_sha256",
+        "profile_sha256",
+        "source_manifest_sha256",
+        "router_manifest_sha256",
+        "lifecycle_sha256",
+        "membership_sha256",
+        "post_oos_research_variant",
+        "post_oos_augment",
+        "post_oos_augmentation_count",
+        "current_fold_oos_input_count",
+        "new_grid_search",
+        "recompute_from_json",
+        "frozen_at_utc",
+        "trial_projection_sha256",
+        "validation_period_ids_sha256",
+        "locked_oos_period_ids_sha256",
+    }
+    if (
+        set(search_receipt) != search_fields
+        or search_receipt.get("schema") != "cost_proof_search_run_receipt_v2"
+        or search_receipt.get("trial_ledger_sha256")
+        != hashlib.sha256(raw["trial_ledger"]).hexdigest()
+        or search_receipt.get("trial_result_artifacts")
+        != [{"artifact_sha256": digest} for digest in trial_raw]
+        or search_receipt.get("candidate_ids") != list(CANDIDATES)
+        or search_receipt.get("candidate_ids_sha256") != candidate_ids_sha256()
+        or search_receipt.get("profile_sha256") != hashlib.sha256(raw["profile"]).hexdigest()
+        or search_receipt.get("source_manifest_sha256")
+        != hashlib.sha256(raw["source_data_manifest"]).hexdigest()
+        or search_receipt.get("router_manifest_sha256")
+        != hashlib.sha256(raw["router_replay_manifest"]).hexdigest()
+        or search_receipt.get("lifecycle_sha256") != hashlib.sha256(raw["lifecycle"]).hexdigest()
+        or search_receipt.get("membership_sha256") != hashlib.sha256(raw["membership"]).hexdigest()
+        or search_receipt.get("post_oos_research_variant") is not True
+        or search_receipt.get("post_oos_augment") is not False
+        or type(search_receipt.get("post_oos_augmentation_count")) is not int
+        or search_receipt["post_oos_augmentation_count"] != 0
+        or type(search_receipt.get("current_fold_oos_input_count")) is not int
+        or search_receipt["current_fold_oos_input_count"] != 0
+        or search_receipt.get("new_grid_search") is not False
+        or search_receipt.get("recompute_from_json") is not False
+        or _utc(search_receipt.get("frozen_at_utc")) is None
+        or search_receipt.get("trial_projection_sha256")
+        != _canonical_artifact(raw["trial_ledger"]).get("trial_projection_sha256")
+        or search_receipt.get("validation_period_ids_sha256")
+        != _canonical_artifact(raw["trial_ledger"]).get("validation_period_ids_sha256")
+        or search_receipt.get("locked_oos_period_ids_sha256")
+        != _canonical_artifact(raw["trial_ledger"]).get("locked_oos_period_ids_sha256")
+    ):
+        raise ValueError("search-run receipt binding drift")
+    cost_commit = _canonical_artifact(raw["commit_receipt"])
+    commit_fields = {
+        "schema",
+        "evidence_sha256",
+        "profile_sha256",
+        "source_manifest_sha256",
+        "source_run_receipt_sha256",
+        "search_run_receipt_sha256",
+        "trial_ledger_sha256",
+        "router_manifest_sha256",
+        "lifecycle_sha256",
+        "membership_sha256",
+        "producer_source_sha256",
+        "verifier_source_sha256",
+        "candidate_ids",
+        "candidate_ids_sha256",
+        "source_artifacts",
+        "trial_result_artifacts",
+        "router_tapes",
+        "trial_projection_sha256",
+        "validation_period_ids_sha256",
+        "locked_oos_period_ids_sha256",
+        "committed_at_utc",
+    }
+    router_projection = [
+        {
+            "variant_id": key[0],
+            "fold_id": key[1],
+            "leaf_id": key[2],
+            "cost_bps": key[3],
+            "receipt_sha256": _canonical_sha256(bundle["receipt"]),
+            "signal_position_sha256": _canonical_sha256(bundle["signal_position"]),
+            "order_sha256": _canonical_sha256(bundle["order"]),
+            "fill_sha256": _canonical_sha256(bundle["fill"]),
+            "event_sha256": _canonical_sha256(bundle["event"]),
+        }
+        for key, bundle in sorted(
+            router_tapes.items(),
+            key=lambda item: (item[0][0], item[0][1], item[0][2], item[0][3]),
+        )
+    ]
+    if (
+        set(cost_commit) != commit_fields
+        or cost_commit.get("schema") != "cost_proof_commit_v2"
+        or cost_commit.get("evidence_sha256") != evidence_sha256
+        or cost_commit.get("profile_sha256") != hashlib.sha256(raw["profile"]).hexdigest()
+        or cost_commit.get("source_manifest_sha256")
+        != hashlib.sha256(raw["source_data_manifest"]).hexdigest()
+        or cost_commit.get("source_run_receipt_sha256")
+        != hashlib.sha256(raw["source_run_receipt"]).hexdigest()
+        or cost_commit.get("search_run_receipt_sha256")
+        != hashlib.sha256(raw["search_run_receipt"]).hexdigest()
+        or cost_commit.get("trial_ledger_sha256") != hashlib.sha256(raw["trial_ledger"]).hexdigest()
+        or cost_commit.get("router_manifest_sha256")
+        != hashlib.sha256(raw["router_replay_manifest"]).hexdigest()
+        or cost_commit.get("lifecycle_sha256") != hashlib.sha256(raw["lifecycle"]).hexdigest()
+        or cost_commit.get("membership_sha256") != hashlib.sha256(raw["membership"]).hexdigest()
+        or cost_commit.get("producer_source_sha256")
+        != hashlib.sha256(raw["producer_source"]).hexdigest()
+        or cost_commit.get("verifier_source_sha256")
+        != hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+        or cost_commit.get("candidate_ids") != list(CANDIDATES)
+        or cost_commit.get("candidate_ids_sha256") != candidate_ids_sha256()
+        or cost_commit.get("source_artifacts") != source["artifacts"]
+        or cost_commit.get("trial_result_artifacts")
+        != [{"artifact_sha256": digest} for digest in trial_raw]
+        or cost_commit.get("trial_projection_sha256") != search_receipt["trial_projection_sha256"]
+        or cost_commit.get("validation_period_ids_sha256")
+        != search_receipt["validation_period_ids_sha256"]
+        or cost_commit.get("locked_oos_period_ids_sha256")
+        != search_receipt["locked_oos_period_ids_sha256"]
+        or cost_commit.get("router_tapes") != router_projection
+        or _utc(cost_commit.get("committed_at_utc")) is None
+    ):
+        raise ValueError("cost-proof commit binding drift")
     hashes = {name: hashlib.sha256(content).hexdigest() for name, content in raw.items()}
     hashes["verifier_source"] = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
     return ExternalBindings(
-        hashes=hashes,
-        profile=profile,
-        source_manifest=source,
-        router_manifest=_json_bytes(raw["router_replay_manifest"]),
-        membership=membership,
-        trial_ledger=_json_bytes(raw["trial_ledger"]),
-        market_artifact_hashes=market_hashes,
-        funding_artifact_hashes=funding_hashes,
-        market_rows=market_rows,
-        funding_rows=funding_rows,
+        hashes,
+        profile,
+        source,
+        source_receipt,
+        search_receipt,
+        _canonical_artifact(raw["commit_receipt"]),
+        _canonical_artifact(raw["router_replay_manifest"]),
+        membership,
+        _canonical_artifact(raw["trial_ledger"]),
+        trial_results,
+        frozenset(market_raw),
+        frozenset(funding_raw),
+        market_rows,
+        funding_rows,
+        router_tapes,
+        roots,
     )
 
 
@@ -344,11 +842,11 @@ def _string(record: Mapping[str, Any], key: str) -> str | None:
 
 
 def _num(value: Any, *, positive: bool = False) -> float | None:
-    if isinstance(value, bool):
+    if type(value) not in {int, float}:
         return None
     try:
         number = float(value)
-    except TypeError, ValueError, OverflowError:
+    except OverflowError, ValueError:
         return None
     if not math.isfinite(number) or (positive and number <= 0):
         return None
@@ -428,20 +926,21 @@ def _profile_ok(profile: Any) -> bool:
     ):
         return False
     kinds = data.get("kinds")
-    adv_quote = _num(execution.get("slippage_adv_quote"))
     return (
         execution.get("slippage_impact_model") == "sqrt_impact"
-        and _num(execution.get("slippage_impact_coefficient"), positive=True) is not None
-        and adv_quote is not None
-        and adv_quote >= 0
+        and execution.get("slippage_impact_coefficient") == 0.10
+        and execution.get("slippage_adv_quote") == 0.0
         and execution.get("require_funding_coverage") is True
         and execution.get("funding_on_utc_boundary") is True
         and execution.get("funding_interval_hours") == 8
         and type(execution.get("funding_interval_hours")) is int
+        and execution.get("maintenance_margin_rate") == 0.005
+        and execution.get("liquidation_buffer_rate") == 0.0005
+        and risk.get("default_stop_loss_pct") == 0.01
         and risk.get("attach_default_protective_stop") is True
         and risk.get("enforce_order_risk_gate_in_backtest") is True
-        and _num(execution.get("maintenance_margin_rate"), positive=True) is not None
-        and _num(execution.get("liquidation_buffer_rate"), positive=True) is not None
+        and _mapping(root.get("backtest")) is not None
+        and root["backtest"].get("leverage") == 3
         and isinstance(kinds, list)
         and "funding" in kinds
         and live.get("mode") == "paper"
@@ -470,23 +969,100 @@ def _provenance(
             errors.append(f"{artifact} SHA mismatch")
 
 
-def _verify_tapes(scenario: Mapping[str, Any], errors: list[str]) -> tuple[str, str, str] | None:
-    signals = _records(scenario.get("signal_position_tape"))
-    orders = _records(scenario.get("orders"))
-    fills = _records(scenario.get("fills"))
-    if signals is None or orders is None or fills is None:
+def _verify_tapes(
+    scenario: Mapping[str, Any], errors: list[str]
+) -> tuple[str, str, str, str] | None:
+    tapes = (
+        scenario.get("signal_position_tape"),
+        scenario.get("orders"),
+        scenario.get("fills"),
+        scenario.get("events"),
+    )
+    if any(_records(rows) is None for rows in tapes):
         errors.append("missing recomputable tapes")
         return None
     claimed = (
         scenario.get("signal_tape_sha256"),
         scenario.get("order_tape_sha256"),
         scenario.get("execution_tape_sha256"),
+        scenario.get("event_tape_sha256"),
     )
-    computed = (_canonical_sha256(signals), _canonical_sha256(orders), _canonical_sha256(fills))
+    computed = tuple(_canonical_sha256(rows) for rows in tapes)
     if not all(_hash(item) for item in claimed) or tuple(claimed) != computed:
         errors.append("claimed tape hash does not match records")
         return None
-    return computed
+    return tuple(
+        _canonical_sha256(
+            [{key: value for key, value in row.items() if key != "cost_bps"} for row in rows]
+        )
+        for rows in tapes
+    )
+
+
+def _router_subset(
+    rows: list[Mapping[str, Any]],
+    artifact: Mapping[str, Any],
+    *,
+    fold_id: str,
+    candidate_id: str,
+    kind: str,
+) -> set[int] | None:
+    """Authenticate one exact downstream Router subset, never a self-hash."""
+    committed = _records(artifact.get("rows"))
+    sequence = artifact.get("sequence")
+    if (
+        committed is None
+        or not isinstance(sequence, list)
+        or len(sequence) != len(committed)
+        or len(set(sequence)) != len(sequence)
+        or any(not isinstance(value, str) or not value for value in sequence)
+    ):
+        return None
+    expected: dict[str, str] = {}
+    for sequence_id, row in zip(sequence, committed, strict=True):
+        if (
+            set(row)
+            != {
+                "sequence_id",
+                "fold_id",
+                "variant_id",
+                "leaf_id",
+                "engine_receipt_sha256",
+                "row_sha256",
+            }
+            or row.get("sequence_id") != sequence_id
+            or row.get("fold_id") != fold_id
+            or row.get("variant_id") != candidate_id
+            or row.get("leaf_id") != artifact.get("leaf_id")
+            or row.get("engine_receipt_sha256") != artifact.get("engine_receipt_sha256")
+            or not _hash(row.get("engine_receipt_sha256"))
+            or not _hash(row.get("row_sha256"))
+        ):
+            return None
+        expected[sequence_id] = str(row["row_sha256"])
+    matched: set[int] = set()
+    observed: list[str] = []
+    for index, row in enumerate(rows):
+        if (
+            row.get("fold_id") != fold_id
+            or row.get("variant_id") != candidate_id
+            or row.get("leaf_id") != artifact.get("leaf_id")
+        ):
+            continue
+        sequence_id = row.get("sequence_id")
+        if (
+            not isinstance(sequence_id, str)
+            or sequence_id not in expected
+            or row.get("leaf_id") != artifact.get("leaf_id")
+            or row.get("engine_receipt_sha256") != artifact.get("engine_receipt_sha256")
+            or _canonical_sha256(dict(row)) != expected[sequence_id]
+        ):
+            return None
+        observed.append(sequence_id)
+        matched.add(index)
+    if observed != sequence:
+        return None
+    return matched
 
 
 def _layout(folds: list[Mapping[str, Any]]) -> tuple[Any, ...] | None:
@@ -519,7 +1095,9 @@ def _economic_tape(folds: list[Mapping[str, Any]]) -> list[dict[str, Any]] | Non
         "impact_cost",
         "funding_cashflow",
         "active_protective_stop_ids",
-        "maintenance_margin_required",
+        "realized_pnl",
+        "unrealized_pnl",
+        "inventory_cost_basis",
     )
     output: list[dict[str, Any]] = []
     for fold in folds:
@@ -547,8 +1125,6 @@ def _economic_tape(folds: list[Mapping[str, Any]]) -> list[dict[str, Any]] | Non
                 "protective_stops": [dict(row) for row in stops],
                 "entry_count": fold.get("entry_count"),
                 "protective_stop_count": fold.get("protective_stop_count"),
-                "liquidation_count": fold.get("liquidation_count"),
-                "ruin": fold.get("ruin"),
             }
         )
     return output
@@ -695,9 +1271,16 @@ def _strict_tapes(scenario: Mapping[str, Any], bindings: ExternalBindings) -> di
     signals = _records(scenario.get("signal_position_tape"))
     orders = _records(scenario.get("orders"))
     fills = _records(scenario.get("fills"))
-    if signals is None or orders is None or fills is None:
+    events = _records(scenario.get("events"))
+    if signals is None or orders is None or fills is None or events is None:
         return None
     signal_fields = {
+        "cost_bps",
+        "sequence_id",
+        "fold_id",
+        "variant_id",
+        "leaf_id",
+        "engine_receipt_sha256",
         "period_id",
         "timestamp",
         "symbol",
@@ -742,6 +1325,8 @@ def _strict_tapes(scenario: Mapping[str, Any], bindings: ExternalBindings) -> di
             or timestamp is None
             or artifact not in bindings.market_artifact_hashes
             or any(value is None for value in values)
+            or type(signal.get("cost_bps")) is not int
+            or signal["cost_bps"] != scenario.get("cost_bps")
         ):
             return None
         _, start, _, prior, mark, high, low, gross = values
@@ -778,6 +1363,12 @@ def _strict_tapes(scenario: Mapping[str, Any], bindings: ExternalBindings) -> di
         return None
 
     order_fields = {
+        "sequence_id",
+        "fold_id",
+        "variant_id",
+        "leaf_id",
+        "engine_receipt_sha256",
+        "cost_bps",
         "order_id",
         "period_id",
         "timestamp",
@@ -809,6 +1400,8 @@ def _strict_tapes(scenario: Mapping[str, Any], bindings: ExternalBindings) -> di
             not _exact_fields(order, order_fields)
             or None in (order_id, period_id, symbol, signed_qty, requested, signed_quote)
             or timestamp is None
+            or type(order.get("cost_bps")) is not int
+            or order["cost_bps"] != scenario.get("cost_bps")
             or order_id in order_map
             or (period_id, symbol) not in signal_map
             or signed_qty == 0
@@ -818,6 +1411,7 @@ def _strict_tapes(scenario: Mapping[str, Any], bindings: ExternalBindings) -> di
             or not isinstance(order.get("is_maker"), bool)
             or not isinstance(order.get("is_entry"), bool)
             or (order_type == "LMT") != order["is_maker"]
+            or order_type not in {"MKT", "LMT"}
             or _string(order, "time_in_force") is None
             or (stop_id is not None and not isinstance(stop_id, str))
             or (order["is_entry"] and not stop_id)
@@ -836,6 +1430,12 @@ def _strict_tapes(scenario: Mapping[str, Any], bindings: ExternalBindings) -> di
     if coefficient is None or configured_adv is None or configured_adv < 0:
         return None
     fill_fields = {
+        "sequence_id",
+        "fold_id",
+        "variant_id",
+        "leaf_id",
+        "engine_receipt_sha256",
+        "cost_bps",
         "fill_id",
         "order_id",
         "period_id",
@@ -881,6 +1481,8 @@ def _strict_tapes(scenario: Mapping[str, Any], bindings: ExternalBindings) -> di
         if (
             not _exact_fields(fill, fill_fields)
             or order is None
+            or type(fill.get("cost_bps")) is not int
+            or fill["cost_bps"] != scenario.get("cost_bps")
             or None
             in (
                 fill_id,
@@ -917,6 +1519,23 @@ def _strict_tapes(scenario: Mapping[str, Any], bindings: ExternalBindings) -> di
             )
         )
         signal = signal_map[(order["period_id"], order["symbol"])]
+        source_market = bindings.market_rows.get(
+            (
+                str(signal["market_data_artifact_sha256"]),
+                str(signal["market_source_row_id"]),
+                str(signal["symbol"]),
+            )
+        )
+        if source_market is None:
+            return None
+        tick = float(source_market["price_tick_size"])
+        step = float(source_market["quantity_step_size"])
+        if (
+            not _close(bar_volume, float(source_market["bar_volume_base"]))
+            or not _close(price / tick, round(price / tick))
+            or not _close(abs(quantity) / step, round(abs(quantity) / step))
+        ):
+            return None
         adv = configured_adv if configured_adv > 0 else bar_volume * price
         expected_participation = abs(signed_quote) / adv
         expected_rate = (
@@ -962,10 +1581,76 @@ def _strict_tapes(scenario: Mapping[str, Any], bindings: ExternalBindings) -> di
         fill_sequence.append((timestamp, fill_id))
     if filled_orders != set(order_map) or fill_sequence != sorted(fill_sequence):
         return None
+    event_fields = {
+        "sequence_id",
+        "fold_id",
+        "variant_id",
+        "leaf_id",
+        "engine_receipt_sha256",
+        "cost_bps",
+        "event_id",
+        "event_index",
+        "period_id",
+        "timestamp",
+        "symbol",
+        "fill_id",
+        "event_type",
+    }
+    allowed_event_types = {"entry", "reduce", "flatten", "protective_stop_trigger", "liquidation"}
+    event_map: dict[str, Mapping[str, Any]] = {}
+    fill_events: dict[str, Mapping[str, Any]] = {}
+    events_by_period: dict[str, list[Mapping[str, Any]]] = {}
+    for event in events:
+        event_id, fill_id = _string(event, "event_id"), _string(event, "fill_id")
+        stamp = _utc(event.get("timestamp"))
+        fill = fill_map.get(fill_id or "")
+        event_type = _string(event, "event_type")
+        index = event.get("event_index")
+        if (
+            not _exact_fields(event, event_fields)
+            or type(event.get("cost_bps")) is not int
+            or event["cost_bps"] != scenario.get("cost_bps")
+            or event_id is None
+            or fill is None
+            or stamp is None
+            or event_id in event_map
+            or fill_id in fill_events
+            or type(index) is not int
+            or index < 0
+            or event_type not in allowed_event_types
+            or event.get("period_id") != fill["period_id"]
+            or event.get("timestamp") != fill["timestamp"]
+            or event.get("symbol") != fill["symbol"]
+            or (event_type == "entry") != bool(fill["is_entry"])
+            or (event_type != "entry" and fill["is_entry"] is not False)
+        ):
+            return None
+        event_map[event_id] = event
+        fill_events[str(fill_id)] = event
+        events_by_period.setdefault(str(event["period_id"]), []).append(event)
+    if set(fill_events) != set(fill_map):
+        return None
+    for period_events in events_by_period.values():
+        period_events.sort(key=lambda event: int(event["event_index"]))
+        if [event["event_index"] for event in period_events] != list(range(len(period_events))):
+            return None
+    ordered_events = sorted(
+        (event for period_events in events_by_period.values() for event in period_events),
+        key=lambda event: (
+            str(event["timestamp"]),
+            str(event["period_id"]),
+            int(event["event_index"]),
+        ),
+    )
+    if events != ordered_events or (not ordered_events and fills):
+        return None
     return {
         "signals": signal_map,
         "orders": order_map,
         "fills": fill_map,
+        "events": event_map,
+        "fill_events": fill_events,
+        "events_by_period": events_by_period,
         "deltas": deltas,
         "notionals": notionals,
         "impact": impact,
@@ -977,6 +1662,7 @@ def _strict_stops(
     times: Mapping[str, datetime],
     tape: Mapping[str, Any],
     positions: Mapping[str, tuple[dict[str, float], dict[str, float]]],
+    bindings: ExternalBindings,
 ) -> bool:
     stop_rows = _records(fold.get("protective_stops"))
     if stop_rows is None:
@@ -984,6 +1670,7 @@ def _strict_stops(
     fields = {
         "stop_id",
         "symbol",
+        "entry_fill_id",
         "side",
         "quantity",
         "stop_price",
@@ -993,120 +1680,231 @@ def _strict_stops(
         "trigger_fill_id",
     }
     stops: dict[str, Mapping[str, Any]] = {}
-    allowed_symbols = {symbol for starts, _ in positions.values() for symbol in starts}
     for stop in stop_rows:
         stop_id = _string(stop, "stop_id")
-        symbol = _string(stop, "symbol")
-        side = _string(stop, "side")
-        source = _string(stop, "source")
-        activated = _string(stop, "activated_period_id")
+        entry_id = _string(stop, "entry_fill_id")
+        entry = tape["fills"].get(entry_id or "")
+        trigger_id = stop.get("trigger_fill_id")
+        trigger = tape["fills"].get(trigger_id) if isinstance(trigger_id, str) else None
         deactivated = stop.get("deactivated_period_id")
-        trigger = stop.get("trigger_fill_id")
-        quantity = _num(stop.get("quantity"), positive=True)
-        price = _num(stop.get("stop_price"), positive=True)
+        quantity, price = (
+            _num(stop.get("quantity"), positive=True),
+            _num(stop.get("stop_price"), positive=True),
+        )
         if (
             not _exact_fields(stop, fields)
-            or None in (stop_id, symbol, side, source, activated, quantity, price)
+            or stop_id is None
             or stop_id in stops
-            or symbol not in allowed_symbols
-            or side not in {"BUY", "SELL"}
-            or source not in {"engine_default", "strategy"}
-            or activated not in times
+            or entry is None
+            or entry.get("is_entry") is not True
+            or stop.get("activated_period_id") != entry.get("period_id")
+            or _string(stop, "symbol") != entry.get("symbol")
+            or _string(stop, "side") != ("SELL" if float(entry["signed_qty"]) > 0 else "BUY")
+            or _string(stop, "source") not in {"engine_default", "strategy"}
+            or quantity is None
+            or price is None
+            or quantity + EPS < abs(float(entry["signed_qty"]))
+            or stop.get("activated_period_id") not in times
+            or (trigger_id is not None and not isinstance(trigger_id, str))
+            or (trigger_id is not None and trigger is None)
             or (
                 deactivated is not None
-                and (
-                    not isinstance(deactivated, str)
-                    or deactivated not in times
-                    or times[deactivated] < times[activated]
-                )
+                and (not isinstance(deactivated, str) or deactivated not in times)
+            )
+            or (
+                deactivated is not None
+                and times[str(deactivated)] < times[str(stop["activated_period_id"])]
             )
             or (
                 trigger is not None
                 and (
-                    not isinstance(trigger, str)
-                    or trigger not in tape["fills"]
-                    or tape["fills"][trigger].get("protective_stop_id") != stop_id
-                    or tape["fills"][trigger].get("is_entry") is not False
+                    trigger.get("is_entry") is not False
+                    or trigger.get("protective_stop_id") != stop_id
+                    or trigger.get("symbol") != stop.get("symbol")
+                    or deactivated != trigger["period_id"]
+                    or tape["fill_events"].get(str(trigger_id), {}).get("event_type")
+                    != "protective_stop_trigger"
                 )
             )
         ):
             return False
-        stops[stop_id] = stop
-    for fill in tape["fills"].values():
-        if fill["period_id"] not in times or not fill["is_entry"]:
-            continue
-        stop = stops.get(str(fill["protective_stop_id"]))
-        if (
-            stop is None
-            or stop["symbol"] != fill["symbol"]
-            or stop["activated_period_id"] != fill["period_id"]
-            or float(stop["quantity"]) + EPS < abs(float(fill["signed_qty"]))
-        ):
-            return False
-    active_ids: set[str] = set()
-    for period_id, (starts, ends) in positions.items():
-        stamp = times[period_id]
-        active = {
-            stop_id: stop
-            for stop_id, stop in stops.items()
-            if times[str(stop["activated_period_id"])] <= stamp
-            and (
-                stop["deactivated_period_id"] is None
-                or stamp <= times[str(stop["deactivated_period_id"])]
+        if stop["source"] == "engine_default":
+            signal = tape["signals"][(str(entry["period_id"]), str(entry["symbol"]))]
+            market = bindings.market_rows.get(
+                (
+                    str(signal["market_data_artifact_sha256"]),
+                    str(signal["market_source_row_id"]),
+                    str(entry["symbol"]),
+                )
             )
-        }
-        claimed = next(
-            period["active_protective_stop_ids"]
-            for period in fold["periods"]
-            if period["period_id"] == period_id
-        )
-        if (
-            not isinstance(claimed, list)
-            or len(claimed) != len(set(claimed))
-            or set(claimed) != set(active)
-        ):
-            return False
-        active_ids.update(active)
-        signals = tape["signals"]
-        for symbol, end in ends.items():
-            matching = [
-                (stop_id, stop) for stop_id, stop in active.items() if stop["symbol"] == symbol
-            ]
-            if abs(end) <= EPS:
-                if matching:
-                    return False
-                continue
-            if len(matching) != 1:
+            if market is None:
                 return False
-            stop_id, stop = matching[0]
-            signal = signals[(period_id, symbol)]
-            price = float(stop["stop_price"])
-            if (
-                float(stop["quantity"]) + EPS < abs(end)
-                or (end > 0 and (stop["side"] != "SELL" or price >= signal["mark_price"]))
-                or (end < 0 and (stop["side"] != "BUY" or price <= signal["mark_price"]))
+            tick, step = float(market["price_tick_size"]), float(market["quantity_step_size"])
+            raw = float(entry["fill_price"]) * (0.99 if float(entry["signed_qty"]) > 0 else 1.01)
+            expected = (
+                math.floor(raw / tick) * tick
+                if float(entry["signed_qty"]) > 0
+                else math.ceil(raw / tick) * tick
+            )
+            if not _close(float(stop["stop_price"]), expected) or not _close(
+                float(stop["quantity"]) / step, round(float(stop["quantity"]) / step)
             ):
                 return False
-            start = starts[symbol]
-            crossed = (start > 0 and signal["low"] <= price) or (
-                start < 0 and signal["high"] >= price
+        stops[stop_id] = stop
+
+    entries = [
+        fill
+        for fill in tape["fills"].values()
+        if fill["period_id"] in times and fill["is_entry"] is True
+    ]
+    entry_stop_ids = {_string(fill, "protective_stop_id") for fill in entries}
+    if (
+        None in entry_stop_ids
+        or len(entry_stop_ids) != len(entries)
+        or set(stops) != entry_stop_ids
+        or any(
+            stops[str(fill["protective_stop_id"])]["entry_fill_id"] != fill["fill_id"]
+            for fill in entries
+        )
+    ):
+        return False
+    trigger_stops: dict[str, str] = {}
+    ordinary_deactivations: dict[str, str] = {}
+    for stop_id, stop in stops.items():
+        trigger_id = stop["trigger_fill_id"]
+        if trigger_id is not None:
+            trigger_fill_id = str(trigger_id)
+            trigger_event = tape["fill_events"][trigger_fill_id]
+            entry_event = tape["fill_events"][str(stop["entry_fill_id"])]
+            if (
+                trigger_fill_id in trigger_stops
+                or times[str(trigger_event["period_id"])] < times[str(entry_event["period_id"])]
+                or (
+                    trigger_event["period_id"] == entry_event["period_id"]
+                    and int(trigger_event["event_index"]) <= int(entry_event["event_index"])
+                )
+            ):
+                return False
+            trigger_stops[trigger_fill_id] = stop_id
+            continue
+        deactivated = stop["deactivated_period_id"]
+        if deactivated is None:
+            continue
+        matches = [
+            event
+            for event in tape["events_by_period"].get(str(deactivated), [])
+            if event["event_type"] in {"reduce", "flatten", "liquidation"}
+            and tape["fills"][str(event["fill_id"])]["protective_stop_id"] == stop_id
+            and tape["fills"][str(event["fill_id"])]["symbol"] == stop["symbol"]
+        ]
+        if len(matches) != 1:
+            return False
+        deactivation_event = matches[0]
+        entry_event = tape["fill_events"][str(stop["entry_fill_id"])]
+        if times[str(deactivation_event["period_id"])] < times[str(entry_event["period_id"])] or (
+            deactivation_event["period_id"] == entry_event["period_id"]
+            and int(deactivation_event["event_index"]) <= int(entry_event["event_index"])
+        ):
+            return False
+        ordinary_deactivations[str(deactivation_event["fill_id"])] = stop_id
+
+    def protected_stop_ids(quantities: Mapping[str, float], active: set[str]) -> bool:
+        for symbol, position in quantities.items():
+            if abs(position) <= EPS:
+                continue
+            protected = [stop_id for stop_id in active if stops[stop_id]["symbol"] == symbol]
+            if (
+                len(protected) != 1
+                or stops[protected[0]]["side"] != ("SELL" if position > 0 else "BUY")
+                or float(stops[protected[0]]["quantity"]) + EPS < abs(position)
+            ):
+                return False
+        return True
+
+    active: set[str] = set()
+    for period in fold["periods"]:
+        period_id = str(period["period_id"])
+        claimed = period.get("active_protective_stop_ids")
+        if not isinstance(claimed, list) or len(claimed) != len(set(claimed)):
+            return False
+        quantities = dict(positions[period_id][0])
+        active_this_period = set(active)
+        if not protected_stop_ids(quantities, active):
+            return False
+        for event in tape["events_by_period"].get(period_id, []):
+            fill = tape["fills"][str(event["fill_id"])]
+            fill_id = str(fill["fill_id"])
+            stop_id = (
+                _string(fill, "protective_stop_id") if event["event_type"] == "entry" else None
             )
-            if crossed:
-                trigger = stop.get("trigger_fill_id")
-                if trigger is None or abs(end) >= abs(start) - EPS:
+            if event["event_type"] == "entry":
+                if stop_id is None or stop_id not in stops or stop_id in active:
                     return False
-                if tape["fills"][trigger]["period_id"] != period_id:
+                if stops[stop_id]["entry_fill_id"] != fill_id:
                     return False
-                if stop_id not in active:
+            elif event["event_type"] == "protective_stop_trigger":
+                stop_id = trigger_stops.get(fill_id)
+                if stop_id is None or stop_id not in active:
                     return False
-    entry_count = sum(
-        1 for fill in tape["fills"].values() if fill["period_id"] in times and fill["is_entry"]
-    )
+            quantities[str(fill["symbol"])] = quantities.get(str(fill["symbol"]), 0.0) + float(
+                fill["signed_qty"]
+            )
+            if event["event_type"] == "entry":
+                active.add(str(stop_id))
+                active_this_period.add(str(stop_id))
+            else:
+                deactivated_stop = (
+                    trigger_stops.get(fill_id)
+                    if event["event_type"] == "protective_stop_trigger"
+                    else ordinary_deactivations.get(fill_id)
+                )
+                if deactivated_stop is not None:
+                    if deactivated_stop not in active:
+                        return False
+                    if abs(quantities.get(str(stops[deactivated_stop]["symbol"]), 0.0)) > EPS:
+                        return False
+                    active.remove(deactivated_stop)
+            if not protected_stop_ids(quantities, active):
+                return False
+        if set(claimed) != active_this_period:
+            return False
+        for stop_id in active_this_period:
+            stop = stops[stop_id]
+            signal = tape["signals"][(period_id, str(stop["symbol"]))]
+            entry = tape["fills"][str(stop["entry_fill_id"])]
+            crossing = (
+                float(entry["signed_qty"]) > 0 and float(signal["low"]) <= float(stop["stop_price"])
+            ) or (
+                float(entry["signed_qty"]) < 0
+                and float(signal["high"]) >= float(stop["stop_price"])
+            )
+            trigger_id = stop["trigger_fill_id"]
+            trigger_event = (
+                tape["fill_events"].get(str(trigger_id)) if trigger_id is not None else None
+            )
+            entry_event = tape["fill_events"][str(stop["entry_fill_id"])]
+            if crossing and (
+                trigger_event is None
+                or trigger_event["period_id"] != period_id
+                or (
+                    trigger_event["period_id"] == entry_event["period_id"]
+                    and int(trigger_event["event_index"]) <= int(entry_event["event_index"])
+                )
+            ):
+                return False
+            if (
+                not crossing
+                and trigger_event is not None
+                and trigger_event["period_id"] == period_id
+            ):
+                return False
     return (
-        type(fold.get("protective_stop_count")) is int
+        not active
+        and type(fold.get("protective_stop_count")) is int
         and type(fold.get("entry_count")) is int
-        and fold["protective_stop_count"] == len(active_ids)
-        and fold["entry_count"] == entry_count
+        and fold["protective_stop_count"] == len(stops)
+        and fold["entry_count"]
+        == sum(fill["is_entry"] for fill in tape["fills"].values() if fill["period_id"] in times)
     )
 
 
@@ -1210,6 +2008,7 @@ def _strict_fold(
         list[str],
         list[tuple[str, str, float, float]],
         float,
+        bool,
     ]
     | None
 ):
@@ -1236,9 +2035,9 @@ def _strict_fold(
     if (
         not _exact_fields(fold, fold_fields)
         or grid is None
-        or fold.get("liquidation_count") != 0
         or type(fold.get("liquidation_count")) is not int
-        or fold.get("ruin") is not False
+        or fold["liquidation_count"] < 0
+        or type(fold.get("ruin")) is not bool
     ):
         return None
     times, periods, initial_equity = grid
@@ -1247,20 +2046,38 @@ def _strict_fold(
     used_orders: set[str] = set()
     used_fills: set[str] = set()
     positions: dict[str, tuple[dict[str, float], dict[str, float]]] = {}
-    previous: dict[str, float] = {}
-    previous_segment: str | None = None
+    previous: dict[str, float] = dict.fromkeys(expected_symbols, 0.0)
+    validation_range = _range(fold["validation_range"])
+    locked_range = _range(fold["locked_oos_range"])
+    validation_last: str | None = None
+    locked_last: str | None = None
+    if validation_range is None or locked_range is None:
+        return None
     for period in periods:
         period_id = str(period["period_id"])
-        segment = period.get("segment")
-        if segment not in {"validation", "locked_oos"}:
+        stamp = times[period_id]
+        segment = (
+            "validation"
+            if validation_range[0] <= stamp < validation_range[1]
+            else "locked_oos"
+            if locked_range[0] <= stamp < locked_range[1]
+            else None
+        )
+        if segment is None or period.get("segment") != segment:
             return None
+        if segment == "validation":
+            if locked_last is not None:
+                return None
+            validation_last = period_id
+        else:
+            if validation_last is None:
+                return None
+            locked_last = period_id
         signal_keys = {
             symbol for candidate_period, symbol in tape["signals"] if candidate_period == period_id
         }
         if signal_keys != expected_symbols:
             return None
-        if segment != previous_segment:
-            previous = dict.fromkeys(expected_symbols, 0.0)
         starts: dict[str, float] = {}
         ends: dict[str, float] = {}
         for symbol in expected_symbols:
@@ -1269,7 +2086,7 @@ def _strict_fold(
                 return None
             start = float(signal["start_position"])
             end = float(signal["position"])
-            if not _close(start, previous.get(symbol, 0.0)) or not _close(
+            if not _close(start, previous[symbol]) or not _close(
                 end, start + tape["deltas"].get((period_id, symbol), 0.0)
             ):
                 return None
@@ -1278,7 +2095,32 @@ def _strict_fold(
             used_signals.add((period_id, symbol))
         positions[period_id] = (starts, ends)
         previous = ends
-        previous_segment = str(segment)
+    cash_fold = not expected_symbols
+    if validation_last is None or locked_last is None:
+        return None
+    for final_period in (validation_last, locked_last):
+        _, final_positions = positions[final_period]
+        if any(abs(quantity) > EPS for quantity in final_positions.values()):
+            return None
+        if not cash_fold and not any(
+            event["event_type"] in {"flatten", "liquidation"}
+            and event["period_id"] == final_period
+            and tape["fills"][str(event["fill_id"])]["is_entry"] is False
+            for event in tape["events_by_period"].get(final_period, [])
+        ):
+            return None
+    if cash_fold and (
+        any(order["period_id"] in times for order in tape["orders"].values())
+        or any(fill["period_id"] in times for fill in tape["fills"].values())
+        or any(tape["events_by_period"].get(period_id) for period_id in times)
+        or fold["funding"]
+        or fold["protective_stops"]
+        or fold["entry_count"] != 0
+        or fold["protective_stop_count"] != 0
+        or fold["liquidation_count"] != 0
+        or fold["ruin"] is not False
+    ):
+        return None
     for order_id, order in tape["orders"].items():
         if order["period_id"] in times:
             signal = tape["signals"].get((order["period_id"], order["symbol"]))
@@ -1288,6 +2130,14 @@ def _strict_fold(
     for fill_id, fill in tape["fills"].items():
         if fill["period_id"] in times:
             used_fills.add(fill_id)
+    liquidation_events = [
+        event
+        for period_id in times
+        for event in tape["events_by_period"].get(period_id, [])
+        if event["event_type"] == "liquidation"
+    ]
+    if len(liquidation_events) != fold["liquidation_count"]:
+        return None
     funding_cash = _strict_funding(
         fold,
         times,
@@ -1295,7 +2145,7 @@ def _strict_fold(
         positions,
         bindings,
     )
-    if funding_cash is None or not _strict_stops(fold, times, tape, positions):
+    if funding_cash is None or not _strict_stops(fold, times, tape, positions, bindings):
         return None
     execution = _mapping(bindings.profile.get("execution"))
     if execution is None:
@@ -1316,6 +2166,11 @@ def _strict_fold(
         "net_pnl",
         "prior_equity",
         "equity",
+        "prior_cash_balance",
+        "cash_balance",
+        "realized_pnl",
+        "unrealized_pnl",
+        "inventory_cost_basis",
         "gross_exposure_fraction",
         "raw_net_return",
         "exposure_normalized_net_return",
@@ -1324,95 +2179,262 @@ def _strict_fold(
         "worst_intrabar_equity",
         "maintenance_margin_required",
     }
-    prior = initial_equity
+    cash = initial_equity
+    inventory = dict.fromkeys(expected_symbols, (0.0, 0.0))
     locked_ids: list[str] = []
+    ruin_seen = False
     returns: list[tuple[str, str, float, float]] = []
+    pending_immediate_breach = False
+    fills_by_period: dict[str, list[Mapping[str, Any]]] = {
+        period_id: [tape["fills"][str(event["fill_id"])] for event in events]
+        for period_id, events in tape["events_by_period"].items()
+    }
     for period in periods:
         if not _exact_fields(period, period_fields):
             return None
         period_id = str(period["period_id"])
         starts, ends = positions[period_id]
-        gross = sum(
-            float(tape["signals"][(period_id, symbol)]["gross_pnl"]) for symbol in expected_symbols
+        prior_equity = cash + sum(
+            quantity * (float(tape["signals"][(period_id, symbol)]["prior_mark_price"]) - basis)
+            for symbol, (quantity, basis) in inventory.items()
         )
-        linear = tape["notionals"].get(period_id, 0.0) * bps / 10_000
-        impact = tape["impact"].get(period_id, 0.0)
+        if any(not _close(starts[symbol], inventory[symbol][0]) for symbol in expected_symbols):
+            return None
+        start_unrealized = prior_equity - cash
+        realized = 0.0
+        period_linear = 0.0
+        period_impact = 0.0
         funding = funding_cash.get(period_id, 0.0)
-        net = gross - linear - impact + funding
-        equity = prior + net
-        start_notional = sum(
-            abs(starts[symbol] * float(tape["signals"][(period_id, symbol)]["prior_mark_price"]))
-            for symbol in expected_symbols
+        event_cash = cash + funding
+        min_intrabar_equity = event_cash + sum(
+            quantity
+            * (
+                (
+                    float(tape["signals"][(period_id, symbol)]["low"])
+                    if quantity > 0
+                    else float(tape["signals"][(period_id, symbol)]["high"])
+                )
+                - basis
+            )
+            for symbol, (quantity, basis) in inventory.items()
         )
+        maintenance_at_min_equity = sum(
+            abs(
+                quantity
+                * (
+                    float(tape["signals"][(period_id, symbol)]["low"])
+                    if quantity > 0
+                    else float(tape["signals"][(period_id, symbol)]["high"])
+                )
+            )
+            * (maintenance + buffer)
+            for symbol, (quantity, _) in inventory.items()
+        )
+        max_state_notional = sum(
+            abs(quantity * float(tape["signals"][(period_id, symbol)]["prior_mark_price"]))
+            for symbol, (quantity, _) in inventory.items()
+        )
+        for fill in fills_by_period.get(period_id, []):
+            symbol, delta, price = (
+                str(fill["symbol"]),
+                float(fill["signed_qty"]),
+                float(fill["fill_price"]),
+            )
+            quantity, basis = inventory[symbol]
+            event_realized = 0.0
+            if abs(quantity) <= EPS or quantity * delta > 0:
+                new_quantity = quantity + delta
+                new_basis = (
+                    price
+                    if abs(quantity) <= EPS
+                    else ((abs(quantity) * basis + abs(delta) * price) / abs(new_quantity))
+                )
+            else:
+                closing = min(abs(quantity), abs(delta))
+                event_realized = closing * (price - basis) * (1.0 if quantity > 0 else -1.0)
+                realized += event_realized
+                new_quantity = quantity + delta
+                new_basis = (
+                    price
+                    if quantity * new_quantity < -EPS
+                    else (basis if abs(new_quantity) > EPS else 0.0)
+                )
+            event = tape["fill_events"][str(fill["fill_id"])]
+            if pending_immediate_breach and event["event_type"] != "liquidation":
+                return None
+            old_quantity = quantity
+            if (
+                (
+                    event["event_type"] == "entry"
+                    and not (abs(old_quantity) <= EPS or old_quantity * delta > 0)
+                )
+                or (
+                    event["event_type"] == "reduce"
+                    and not (
+                        abs(old_quantity) > EPS
+                        and old_quantity * new_quantity > 0
+                        and abs(new_quantity) < abs(old_quantity) - EPS
+                    )
+                )
+                or (event["event_type"] == "flatten" and abs(new_quantity) > EPS)
+                or (
+                    event["event_type"] in {"protective_stop_trigger", "liquidation"}
+                    and not (
+                        abs(old_quantity) > EPS
+                        and old_quantity * new_quantity >= -EPS
+                        and abs(new_quantity) < abs(old_quantity) - EPS
+                    )
+                )
+            ):
+                return None
+            pre_fill_notional = sum(
+                abs(
+                    current_quantity
+                    * (
+                        price
+                        if current_symbol == symbol
+                        else float(tape["signals"][(period_id, current_symbol)]["mark_price"])
+                    )
+                )
+                for current_symbol, (current_quantity, _) in inventory.items()
+            )
+            max_state_notional = max(max_state_notional, pre_fill_notional)
+            immediate_marks = {
+                current_symbol: (
+                    price
+                    if current_symbol == symbol
+                    else float(tape["signals"][(period_id, current_symbol)]["mark_price"])
+                )
+                for current_symbol in expected_symbols
+            }
+            pre_event_equity = event_cash + sum(
+                current_quantity * (immediate_marks[current_symbol] - current_basis)
+                for current_symbol, (current_quantity, current_basis) in inventory.items()
+            )
+            pre_event_maintenance = sum(
+                abs(current_quantity * immediate_marks[current_symbol]) * (maintenance + buffer)
+                for current_symbol, (current_quantity, _) in inventory.items()
+            )
+            pre_event_breached = pre_event_equity <= pre_event_maintenance
+            if (pre_event_breached and event["event_type"] != "liquidation") or (
+                event["event_type"] == "liquidation" and not pre_event_breached
+            ):
+                return None
+            inventory[symbol] = (new_quantity, new_basis)
+            fill_linear = abs(float(fill["signed_quote_notional"])) * bps / 10_000
+            fill_impact = float(fill["sqrt_impact_cash_cost"])
+            period_linear += fill_linear
+            period_impact += fill_impact
+            event_cash += event_realized - fill_linear - fill_impact
+            immediate_equity = event_cash + sum(
+                current_quantity * (immediate_marks[current_symbol] - current_basis)
+                for current_symbol, (current_quantity, current_basis) in inventory.items()
+            )
+            immediate_maintenance = sum(
+                abs(current_quantity * immediate_marks[current_symbol]) * (maintenance + buffer)
+                for current_symbol, (current_quantity, _) in inventory.items()
+            )
+            adverse_equity = event_cash + sum(
+                current_quantity
+                * (
+                    (
+                        float(tape["signals"][(period_id, current_symbol)]["low"])
+                        if current_quantity > 0
+                        else float(tape["signals"][(period_id, current_symbol)]["high"])
+                    )
+                    - current_basis
+                )
+                for current_symbol, (current_quantity, current_basis) in inventory.items()
+            )
+            adverse_maintenance = sum(
+                abs(
+                    current_quantity
+                    * (
+                        float(tape["signals"][(period_id, current_symbol)]["low"])
+                        if current_quantity > 0
+                        else float(tape["signals"][(period_id, current_symbol)]["high"])
+                    )
+                )
+                * (maintenance + buffer)
+                for current_symbol, (current_quantity, _) in inventory.items()
+            )
+            post_fill_notional = sum(
+                abs(
+                    current_quantity
+                    * (
+                        price
+                        if current_symbol == symbol
+                        else float(tape["signals"][(period_id, current_symbol)]["mark_price"])
+                    )
+                )
+                for current_symbol, (current_quantity, _) in inventory.items()
+            )
+            max_state_notional = max(max_state_notional, post_fill_notional)
+            if adverse_equity <= min_intrabar_equity:
+                min_intrabar_equity = adverse_equity
+                maintenance_at_min_equity = adverse_maintenance
+            pending_immediate_breach = immediate_equity <= immediate_maintenance
+        if any(not _close(ends[symbol], inventory[symbol][0]) for symbol in expected_symbols):
+            return None
+        linear = period_linear
+        impact = period_impact
+        prior_cash = cash
+        cash = event_cash
+        unrealized = sum(
+            quantity * (float(tape["signals"][(period_id, symbol)]["mark_price"]) - basis)
+            for symbol, (quantity, basis) in inventory.items()
+        )
+        gross = realized + unrealized - start_unrealized
+        net = cash + unrealized - prior_equity
+        equity = cash + unrealized
         end_notional = sum(
             abs(ends[symbol] * float(tape["signals"][(period_id, symbol)]["mark_price"]))
             for symbol in expected_symbols
         )
-        exposure = max(start_notional, end_notional) / prior
+        exposure = max(max_state_notional, end_notional) / prior_equity
         position_notional = sum(
             ends[symbol] * float(tape["signals"][(period_id, symbol)]["mark_price"])
             for symbol in expected_symbols
         )
-        raw = net / prior
+        raw = net / prior_equity
         normalized = raw / exposure if exposure > EPS else 0.0
-        worst_pnl = 0.0
-        maintenance_required = 0.0
-        for symbol in expected_symbols:
-            signal = tape["signals"][(period_id, symbol)]
-            start = starts[symbol]
-            if start > 0:
-                worst_price = float(signal["low"])
-            elif start < 0:
-                worst_price = float(signal["high"])
-            else:
-                continue
-            worst_pnl += start * (worst_price - float(signal["prior_mark_price"]))
-            maintenance_required += abs(start * worst_price) * (maintenance + buffer)
-        worst_equity = prior + worst_pnl
-        claimed = [
-            _num(period.get(name))
-            for name in (
-                "gross_pnl",
-                "linear_cost",
-                "impact_cost",
-                "funding_cashflow",
-                "net_pnl",
-                "prior_equity",
-                "equity",
-                "gross_exposure_fraction",
-                "raw_net_return",
-                "exposure_normalized_net_return",
-                "position_notional",
-                "worst_intrabar_equity",
-                "maintenance_margin_required",
-            )
+        worst_equity = min_intrabar_equity
+        maintenance_required = maintenance_at_min_equity
+        basis_rows = [
+            {"symbol": symbol, "quantity": quantity, "average_entry_price": basis}
+            for symbol, (quantity, basis) in sorted(inventory.items())
+            if abs(quantity) > EPS
         ]
-        expected = [
-            gross,
-            linear,
-            impact,
-            funding,
-            net,
-            prior,
-            equity,
-            exposure,
-            raw,
-            normalized,
-            position_notional,
-            worst_equity,
-            maintenance_required,
-        ]
+        expected = {
+            "gross_pnl": gross,
+            "linear_cost": linear,
+            "impact_cost": impact,
+            "funding_cashflow": funding,
+            "net_pnl": net,
+            "prior_equity": prior_equity,
+            "equity": equity,
+            "prior_cash_balance": prior_cash,
+            "cash_balance": cash,
+            "realized_pnl": realized,
+            "unrealized_pnl": unrealized,
+            "gross_exposure_fraction": exposure,
+            "raw_net_return": raw,
+            "exposure_normalized_net_return": normalized,
+            "position_notional": position_notional,
+            "worst_intrabar_equity": worst_equity,
+            "maintenance_margin_required": maintenance_required,
+        }
         if (
-            any(value is None for value in claimed)
-            or any(
-                not _close(float(actual), target)
-                for actual, target in zip(claimed, expected, strict=True)
+            any(
+                _num(period.get(name)) is None or not _close(float(period[name]), value)
+                for name, value in expected.items()
             )
-            or prior <= 0
-            or equity <= 0
-            or worst_equity <= maintenance_required
-            or worst_equity <= 0
+            or period.get("inventory_cost_basis") != basis_rows
+            or prior_equity <= 0
+            or (fold["ruin"] is False and min_intrabar_equity <= 0)
         ):
+            return None
+        if min_intrabar_equity <= 0 and period_id != str(periods[-1]["period_id"]):
             return None
         if exposure <= EPS and any(
             abs(value) > EPS for value in (gross, linear, impact, funding, net, raw)
@@ -1420,12 +2442,29 @@ def _strict_fold(
             return None
         if period["segment"] == "locked_oos":
             locked_ids.append(period_id)
-        prior = equity
         returns.append((period_id, str(period["segment"]), raw, normalized))
-    final_equity = _num(fold.get("equity"), positive=True)
-    if final_equity is None or not _close(final_equity, prior):
+        ruin_seen = ruin_seen or min_intrabar_equity <= 0
+    if pending_immediate_breach:
         return None
-    locked_gain = sum(math.log1p(raw) for _, segment, raw, _ in returns if segment == "locked_oos")
+    final_equity = _num(fold.get("equity"))
+    if final_equity is None or not _close(
+        final_equity,
+        cash
+        + sum(
+            quantity
+            * (
+                float(tape["signals"][(str(periods[-1]["period_id"]), symbol)]["mark_price"])
+                - basis
+            )
+            for symbol, (quantity, basis) in inventory.items()
+        ),
+    ):
+        return None
+    if bool(fold["ruin"]) != ruin_seen:
+        return None
+    locked_gain = (
+        math.prod(1 + raw for _, segment, raw, _ in returns if segment == "locked_oos") - 1
+    )
     return (
         used_signals,
         used_orders,
@@ -1433,6 +2472,40 @@ def _strict_fold(
         locked_ids,
         returns,
         locked_gain,
+        bool(fold["liquidation_count"]) or ruin_seen,
+    )
+
+
+def _authenticated_router_tapes(
+    scenario: Mapping[str, Any], candidate_id: str, bindings: ExternalBindings
+) -> bool:
+    names = {
+        "signal_position_tape": "signal_position",
+        "orders": "order",
+        "fills": "fill",
+        "events": "event",
+    }
+    consumed = {name: set() for name in names}
+    for (variant, fold_id, _leaf, cost_bps), bundle in bindings.router_tapes.items():
+        if variant != candidate_id or cost_bps != scenario.get("cost_bps"):
+            continue
+        for source_name, artifact_name in names.items():
+            rows = _records(scenario.get(source_name))
+            if rows is None:
+                return False
+            subset = _router_subset(
+                rows,
+                bundle[artifact_name],
+                fold_id=fold_id,
+                candidate_id=candidate_id,
+                kind=artifact_name,
+            )
+            if subset is None or consumed[source_name] & subset:
+                return False
+            consumed[source_name].update(subset)
+    return all(
+        indices == set(range(len(_records(scenario[name]) or [])))
+        for name, indices in consumed.items()
     )
 
 
@@ -1440,7 +2513,7 @@ def _strict_engine_contract(
     scenario: Mapping[str, Any],
     candidate_id: str,
     bindings: ExternalBindings,
-) -> tuple[list[str], list[tuple[list[tuple[str, str, float, float]], float, str]]] | None:
+) -> tuple[list[str], list[tuple[list[tuple[str, str, float, float]], float, str, bool]]] | None:
     scenario_fields = {
         "cost_bps",
         "evaluation_modes",
@@ -1451,18 +2524,25 @@ def _strict_engine_contract(
         "signal_position_tape",
         "orders",
         "fills",
+        "events",
         "signal_tape_sha256",
         "order_tape_sha256",
         "execution_tape_sha256",
+        "event_tape_sha256",
         "economic_tape_sha256",
         "folds",
     }
-    if not _exact_fields(scenario, scenario_fields):
+    if not _exact_fields(scenario, scenario_fields) or type(scenario.get("cost_bps")) is not int:
         return None
     tape = _strict_tapes(scenario, bindings)
     router = _router_contract(bindings, candidate_id)
     folds = _records(scenario.get("folds"))
-    if tape is None or router is None or not folds:
+    if (
+        tape is None
+        or router is None
+        or not folds
+        or not _authenticated_router_tapes(scenario, candidate_id, bindings)
+    ):
         return None
     if [fold.get("fold_id") for fold in folds] != list(router):
         return None
@@ -1473,7 +2553,7 @@ def _strict_engine_contract(
     used_orders: set[str] = set()
     used_fills: set[str] = set()
     locked_ids: list[str] = []
-    parsed_folds: list[tuple[list[tuple[str, str, float, float]], float, str]] = []
+    parsed_folds: list[tuple[list[tuple[str, str, float, float]], float, str, bool]] = []
     for fold in folds:
         fold_id = str(fold["fold_id"])
         result = _strict_fold(
@@ -1492,6 +2572,7 @@ def _strict_engine_contract(
             fold_locked,
             fold_returns,
             locked_gain,
+            safety_failure,
         ) = result
         if used_signals & fold_signals or used_orders & fold_orders or used_fills & fold_fills:
             return None
@@ -1499,7 +2580,7 @@ def _strict_engine_contract(
         used_orders.update(fold_orders)
         used_fills.update(fold_fills)
         locked_ids.extend(fold_locked)
-        parsed_folds.append((fold_returns, locked_gain, fold_id))
+        parsed_folds.append((fold_returns, locked_gain, fold_id, safety_failure))
     if (
         used_signals != set(tape["signals"])
         or used_orders != set(tape["orders"])
@@ -1510,94 +2591,255 @@ def _strict_engine_contract(
 
 
 def _trial_ledger(
-    ledger: Mapping[str, Any], parsed: list[dict[str, Any]]
-) -> tuple[np.ndarray, int] | None:
-    required = {
+    ledger: Mapping[str, Any], parsed: list[dict[str, Any]], bindings: ExternalBindings
+) -> tuple[np.ndarray, list[str], int, int] | None:
+    """Validate the closed, authenticated attempted-trial family."""
+    fields = {
         "schema",
         "cost_bps",
-        "trial_ids",
-        "locked_oos_period_ids",
-        "normalized_returns_20bp",
+        "trials",
         "raw_trial_count",
         "effective_trial_count",
+        "validation_period_ids",
+        "locked_oos_period_ids",
+        "validation_period_ids_sha256",
+        "locked_oos_period_ids_sha256",
+        "trial_projection_sha256",
         "current_fold_oos_input_count",
-        "selection_receipt",
-        "selection_receipt_sha256",
-        "dedup_receipt",
-        "dedup_receipt_sha256",
     }
     if (
-        set(ledger) != required
-        or ledger.get("schema") != "cost_proof_trial_ledger_v1"
-        or ledger.get("cost_bps") != 20
+        set(ledger) != fields
+        or ledger.get("schema") != "cost_proof_trial_ledger_v2"
+        or type(ledger.get("cost_bps")) is not int
+        or ledger["cost_bps"] != 20
         or ledger.get("current_fold_oos_input_count") != 0
         or type(ledger.get("current_fold_oos_input_count")) is not int
     ):
         return None
-    ids = ledger.get("trial_ids")
-    period_ids = ledger.get("locked_oos_period_ids")
-    rows = ledger.get("normalized_returns_20bp")
-    raw_count = ledger.get("raw_trial_count")
-    effective_count = ledger.get("effective_trial_count")
-    selection = _mapping(ledger.get("selection_receipt"))
-    dedup = _mapping(ledger.get("dedup_receipt"))
+    trials = _records(ledger.get("trials"))
+    validation_ids, locked_ids = (
+        ledger.get("validation_period_ids"),
+        ledger.get("locked_oos_period_ids"),
+    )
+    raw_count, effective_count = ledger.get("raw_trial_count"), ledger.get("effective_trial_count")
     if (
-        not isinstance(ids, list)
-        or not all(isinstance(item, str) and item for item in ids)
-        or len(ids) != len(set(ids))
-        or not isinstance(period_ids, list)
-        or len(period_ids) != len(set(period_ids))
-        or not all(isinstance(item, str) and item for item in period_ids)
-        or len(period_ids) < 16
-        or len(period_ids) % CSCV_SPLITS
-        or not isinstance(rows, list)
-        or len(rows) != len(ids)
-        or isinstance(raw_count, bool)
-        or not isinstance(raw_count, int)
-        or raw_count != len(ids)
-        or isinstance(effective_count, bool)
-        or not isinstance(effective_count, int)
+        trials is None
+        or not isinstance(validation_ids, list)
+        or not isinstance(locked_ids, list)
+        or not all(isinstance(value, str) and value for value in validation_ids + locked_ids)
+        or len(set(validation_ids)) != len(validation_ids)
+        or len(set(locked_ids)) != len(locked_ids)
+        or len(locked_ids) < 16
+        or len(locked_ids) % CSCV_SPLITS
+        or type(raw_count) is not int
+        or raw_count != len(trials)
+        or type(effective_count) is not int
         or effective_count <= 0
         or effective_count > raw_count
-        or selection
-        != {
-            "candidate_ids": list(CANDIDATES),
-            "post_oos_research_variant": True,
-            "current_fold_oos_input_count": 0,
-        }
-        or dedup
-        != {
-            "input_trial_count": raw_count,
-            "effective_trial_count": effective_count,
-            "current_fold_oos_input_count": 0,
-        }
-        or selection["post_oos_research_variant"] is not True
-        or type(selection["current_fold_oos_input_count"]) is not int
-        or type(dedup["input_trial_count"]) is not int
-        or type(dedup["effective_trial_count"]) is not int
-        or type(dedup["current_fold_oos_input_count"]) is not int
-        or ledger.get("selection_receipt_sha256") != _canonical_sha256(selection)
-        or ledger.get("dedup_receipt_sha256") != _canonical_sha256(dedup)
+        or ledger.get("validation_period_ids_sha256") != _canonical_sha256(validation_ids)
+        or ledger.get("locked_oos_period_ids_sha256") != _canonical_sha256(locked_ids)
     ):
         return None
+    trial_fields = {
+        "trial_id",
+        "ordinal",
+        "registered_at_utc",
+        "completed_at_utc",
+        "status",
+        "status_reason",
+        "dedup_representative_trial_id",
+        "result_artifact_sha256",
+    }
+    result_fields = {
+        "schema",
+        "trial_id",
+        "ordinal",
+        "registered_at_utc",
+        "completed_at_utc",
+        "status",
+        "status_reason",
+        "dedup_representative_trial_id",
+        "validation_period_ids",
+        "locked_oos_period_ids",
+        "validation_normalized_returns",
+        "locked_oos_normalized_returns",
+    }
+    frozen = _utc(bindings.search_run_receipt.get("frozen_at_utc"))
+    if frozen is None:
+        return None
+    projection: list[dict[str, Any]] = []
     matrix_rows: list[list[float]] = []
-    for row in rows:
-        if not isinstance(row, list) or len(row) != len(period_ids):
-            return None
-        numeric = [_num(value) for value in row]
-        if any(value is None for value in numeric):
-            return None
-        matrix_rows.append([float(value) for value in numeric if value is not None])
-    by_id = dict(zip(ids, matrix_rows, strict=True))
-    for item in parsed:
+    successful: dict[str, tuple[list[float], list[float]]] = {}
+    successful_ids: list[str] = []
+    seen_ids: set[str] = set()
+    consumed: set[str] = set()
+    prior_registered: datetime | None = None
+    prior_completed: datetime | None = None
+    for ordinal, trial in enumerate(trials):
+        trial_id = _string(trial, "trial_id")
+        digest = trial.get("result_artifact_sha256")
+        status = _string(trial, "status")
+        reason = trial.get("status_reason")
+        representative = trial.get("dedup_representative_trial_id")
+        registered = _utc(trial.get("registered_at_utc"))
+        completed = _utc(trial.get("completed_at_utc"))
+        artifact = bindings.trial_result_artifacts.get(str(digest))
         if (
-            item["locked_ids"] != period_ids
-            or by_id.get(item["candidate_id"]) != item["normalized"]
+            not _exact_fields(trial, trial_fields)
+            or trial_id is None
+            or trial_id in seen_ids
+            or type(trial.get("ordinal")) is not int
+            or trial["ordinal"] != ordinal
+            or type(artifact.get("ordinal")) is not int
+            or registered is None
+            or completed is None
+            or completed < registered
+            or completed > frozen
+            or (prior_registered is not None and registered < prior_registered)
+            or (prior_completed is not None and completed < prior_completed)
+            or status not in {"succeeded", "failed", "skipped"}
+            or not _hash(digest)
+            or artifact is None
+            or digest in consumed
+            or set(artifact) != result_fields
+            or artifact.get("schema") != "cost_proof_trial_result_v2"
+            or any(
+                artifact.get(field) != trial.get(field)
+                for field in (
+                    "trial_id",
+                    "ordinal",
+                    "registered_at_utc",
+                    "completed_at_utc",
+                    "status",
+                    "status_reason",
+                    "dedup_representative_trial_id",
+                )
+            )
+            or artifact.get("validation_period_ids") != validation_ids
+            or artifact.get("locked_oos_period_ids") != locked_ids
         ):
             return None
-    return np.asarray(matrix_rows, dtype=float), raw_count
+        validation = artifact.get("validation_normalized_returns")
+        locked = artifact.get("locked_oos_normalized_returns")
+        if not isinstance(validation, list) or not isinstance(locked, list):
+            return None
+        if status == "succeeded":
+            numeric_validation = [_num(value) for value in validation]
+            numeric_locked = [_num(value) for value in locked]
+            if (
+                reason is not None
+                or representative != trial_id
+                or len(validation) != len(validation_ids)
+                or len(locked) != len(locked_ids)
+                or any(value is None for value in numeric_validation + numeric_locked)
+            ):
+                return None
+            successful[trial_id] = (
+                [float(value) for value in numeric_validation if value is not None],
+                [float(value) for value in numeric_locked if value is not None],
+            )
+            successful_ids.append(trial_id)
+            matrix_rows.append(successful[trial_id][1])
+        elif status == "failed":
+            if (
+                reason is None
+                or not isinstance(reason, str)
+                or not reason
+                or validation
+                or locked
+                or representative is not None
+            ):
+                return None
+        elif (
+            not isinstance(reason, str)
+            or not reason
+            or validation
+            or locked
+            or not isinstance(representative, str)
+            or representative not in successful
+        ):
+            return None
+        seen_ids.add(trial_id)
+        consumed.add(str(digest))
+        prior_registered, prior_completed = registered, completed
+        projection.append(dict(trial))
+    if (
+        consumed != set(bindings.trial_result_artifacts)
+        or ledger.get("trial_projection_sha256") != _canonical_sha256(projection)
+        or effective_count != len(successful_ids)
+        or not matrix_rows
+    ):
+        return None
+    for item in parsed:
+        matching = successful.get(item["candidate_id"])
+        if (
+            matching is None
+            or item["locked_ids"] != locked_ids
+            or item["validation_ids"] != validation_ids
+            or matching[1] != item["normalized"]
+            or matching[0] != item["validation"]
+        ):
+            return None
+    return np.asarray(matrix_rows, dtype=float), successful_ids, raw_count, effective_count
 
 
+def _whole_family_spa_pvalues(matrix: np.ndarray) -> np.ndarray:
+    """Deterministic Hansen-style SPA using shared circular-block bootstrap draws.
+
+    Each successful trial is a member of the null family.  The Hansen
+    consistent recentering retains only models not demonstrably poor, while
+    every draw re-studentizes its recentered return series.  The common draw
+    and max statistic control family-wise promotion; the add-one correction
+    prevents a zero finite-bootstrap p-value.
+    """
+    if matrix.ndim != 2 or matrix.shape[0] == 0 or matrix.shape[1] < 16:
+        raise ValueError("invalid SPA family matrix")
+    n = matrix.shape[1]
+    means = np.mean(matrix, axis=1)
+    sigmas = np.std(matrix, axis=1, ddof=1)
+    scale = sigmas / math.sqrt(float(n))
+    original_degenerate = scale <= 1e-12
+    observed = np.full(matrix.shape[0], 0.0)
+    np.divide(means, scale, out=observed, where=~original_degenerate)
+    observed[original_degenerate] = np.where(
+        means[original_degenerate] > 0,
+        math.inf,
+        np.where(means[original_degenerate] < 0, -math.inf, 0.0),
+    )
+    threshold = -math.sqrt(2.0 * math.log(math.log(float(n))))
+    null_means = np.where(observed >= threshold, means, 0.0)
+    recentered = matrix - null_means[:, None]
+    rng = np.random.default_rng(12345)
+    block_len = max(1, round(n ** (1.0 / 3.0)))
+    block_count = math.ceil(n / block_len)
+    bootstrap_draws = 2_000
+    exceed = np.zeros(matrix.shape[0], dtype=int)
+    for _ in range(bootstrap_draws):
+        starts = rng.integers(0, n, size=block_count)
+        offsets = (starts[:, None] + np.arange(block_len)[None, :]) % n
+        sample = recentered[:, offsets.reshape(-1)[:n]]
+        sample_sigmas = np.std(sample, axis=1, ddof=1)
+        sample_means = np.mean(sample, axis=1)
+        sample_scale = sample_sigmas / math.sqrt(float(n))
+        statistics = np.full(matrix.shape[0], 0.0)
+        np.divide(
+            sample_means,
+            sample_scale,
+            out=statistics,
+            where=sample_scale > 1e-12,
+        )
+        degenerate_sample = sample_scale <= 1e-12
+        statistics[degenerate_sample] = np.where(
+            sample_means[degenerate_sample] > 0,
+            math.inf,
+            np.where(sample_means[degenerate_sample] < 0, -math.inf, 0.0),
+        )
+        statistics[original_degenerate] = -math.inf
+        exceed += float(np.max(statistics)) >= observed
+    pvalues = (exceed + 1.0) / (bootstrap_draws + 1.0)
+    pvalues[means <= 0] = 1.0
+    pvalues[original_degenerate] = 1.0
+    return pvalues
 
 
 def _candidate(
@@ -1620,7 +2862,8 @@ def _candidate(
     if (
         candidate_id is None
         or scenarios is None
-        or tuple(item.get("cost_bps") for item in scenarios) != COST_LADDER
+        or any(type(item.get("cost_bps")) is not int for item in scenarios)
+        or tuple(item["cost_bps"] for item in scenarios) != COST_LADDER
     ):
         return None, "scenario order/count mismatch"
     if (
@@ -1629,10 +2872,13 @@ def _candidate(
         or candidate.get("membership_sha256") != provenance["membership_sha256"]
     ):
         return None, "candidate artifact binding mismatch"
-    tapes: tuple[str, str, str] | None = None
+    tapes: tuple[str, str, str, str] | None = None
     economic_tape_sha256: str | None = None
     layout: tuple[Any, ...] | None = None
-    twenty: tuple[list[float], list[float], list[tuple[str, float]], list[float]] | None = None
+    twenty: (
+        tuple[list[float], list[float], list[tuple[str, float]], bool, list[float], list[str]]
+        | None
+    ) = None
     locked_ids_20bp: list[str] | None = None
     initial_equities_20bp: tuple[float, ...] | None = None
     for scenario in scenarios:
@@ -1708,31 +2954,34 @@ def _candidate(
                 return None, "empty lockbox segment"
             locked_ids_20bp = locked_ids
             initial_equities_20bp = tuple(float(fold["initial_equity"]) for fold in folds)
+            validation_ids = [
+                row[0] for fold in parsed_folds for row in fold[0] if row[1] == "validation"
+            ]
             twenty = (
                 raw,
                 normalized,
                 [(fold[2], fold[1]) for fold in parsed_folds],
+                any(fold[3] for fold in parsed_folds),
                 validation,
+                validation_ids,
             )
     if twenty is None:
         return None, "missing 20bp scenario"
     if locked_ids_20bp is None or initial_equities_20bp is None:
         return None, "missing locked-OOS identity"
-    raw, normalized, folds, validation = twenty
+    raw, normalized, folds, safety_failure, validation, validation_ids_20bp = twenty
     if len(raw) < 16 or len(raw) % CSCV_SPLITS or len(raw) != len(normalized):
         return None, "insufficient locked-OOS data"
     values = np.asarray(raw + normalized, dtype=float)
-    if (
-        not np.isfinite(values).all()
-        or np.std(normalized, ddof=1) <= 0
-        or any(value <= -1 for value in raw)
-    ):
+    if not np.isfinite(values).all() or np.std(normalized, ddof=1) <= 0:
         return None, "nonfinite, constant, or invalid return"
     return {
         "candidate_id": candidate_id,
         "raw": raw,
         "normalized": normalized,
         "folds": folds,
+        "safety_failure": safety_failure,
+        "validation_ids": validation_ids_20bp,
         "validation": validation,
         "layout": layout,
         "initial_equities": initial_equities_20bp,
@@ -1760,8 +3009,11 @@ def evaluate_cost_proof(
             or evidence.get("schema") != SCHEMA
             or evidence.get("candidate_ids") != list(CANDIDATES)
             or candidate_ids_sha256() != CANDIDATE_IDS_SHA256
-            or evidence.get("cost_ladder_bps") != list(COST_LADDER)
-            or evidence.get("cscv_splits") != CSCV_SPLITS
+            or not isinstance(evidence.get("cost_ladder_bps"), list)
+            or any(type(value) is not int for value in evidence["cost_ladder_bps"])
+            or evidence["cost_ladder_bps"] != list(COST_LADDER)
+            or type(evidence.get("cscv_splits")) is not int
+            or evidence["cscv_splits"] != CSCV_SPLITS
         ):
             return _report("STOP", ["invalid schema, candidates, ladder, or CSCV split count"])
         errors: list[str] = []
@@ -1790,12 +3042,13 @@ def evaluate_cost_proof(
             or parsed[0]["initial_equities"] != parsed[1]["initial_equities"]
         ):
             return _report("STOP", ["invalid aligned family layout"])
-        checked_ledger = _trial_ledger(bindings.trial_ledger, parsed)
+        checked_ledger = _trial_ledger(bindings.trial_ledger, parsed, bindings)
         if checked_ledger is None:
             return _report("STOP", ["invalid whole-search trial ledger"])
-        matrix, raw_trial_count = checked_ledger
+        matrix, successful_trial_ids, raw_trial_count, effective_trial_count = checked_ledger
         if (
-            matrix.shape[0] != raw_trial_count
+            matrix.shape[0] != effective_trial_count
+            or len(successful_trial_ids) != effective_trial_count
             or matrix.shape[1] < 16
             or matrix.shape[1] % CSCV_SPLITS
             or not np.isfinite(matrix).all()
@@ -1807,9 +3060,14 @@ def evaluate_cost_proof(
             return _report("STOP", ["invalid CSCV result"])
         sharpes = np.mean(matrix, axis=1) / np.std(matrix, axis=1, ddof=1)
         variance = empirical_variance_across_trials(sharpes)
+        family_spa = _whole_family_spa_pvalues(matrix)
         reports: list[dict[str, Any]] = []
         for item in parsed:
             target = np.asarray(item["normalized"], dtype=float)
+            try:
+                trial_index = successful_trial_ids.index(item["candidate_id"])
+            except ValueError:
+                return _report("STOP", ["candidate trial is absent from authenticated family"])
             dsr = float(
                 deflated_sharpe_ratio(
                     target,
@@ -1818,15 +3076,17 @@ def evaluate_cost_proof(
                     hac_inference=True,
                 )
             )
-            spa_pvalue = float(spa_like_pvalue(target, seed=12345))
+            spa_pvalue = float(family_spa[trial_index])
             gate_passed = dsr >= 0.90 and spa_pvalue <= 0.05 and pbo <= 0.50
             raw = item["raw"]
             reasons: list[str] = []
             net = math.prod(1 + value for value in raw) - 1
             mdd = max_drawdown(np.asarray(raw, dtype=float))
             ordered = sorted(item["folds"], key=lambda value: (-value[1], value[0]))
-            leave_best = math.expm1(sum(value[1] for value in ordered[1:]))
+            leave_best = math.prod(1 + value[1] for value in ordered[1:]) - 1
             positive = [gain for _, gain in item["folds"] if gain > 0]
+            if item["safety_failure"]:
+                reasons.append("liquidation or ruin")
             if net <= 0:
                 reasons.append("20bp net not positive")
             if not math.isfinite(mdd) or mdd > 0.30:
@@ -1854,7 +3114,7 @@ def evaluate_cost_proof(
                 "validation_mdd": validation_mdd,
                 "validation_return": validation_return,
                 "raw_trial_count": float(raw_trial_count),
-                "effective_trial_count": float(bindings.trial_ledger["effective_trial_count"]),
+                "effective_trial_count": float(effective_trial_count),
             }
             if not all(math.isfinite(value) for value in metrics.values()):
                 return _report("STOP", ["nonfinite report metric"])
@@ -1874,7 +3134,7 @@ def evaluate_cost_proof(
             winners,
             key=lambda report: (
                 -report["metrics"]["calmar_validation"],
-                report["metrics"]["mdd_20bp"],
+                report["metrics"]["validation_mdd"],
                 order[report["candidate_id"]],
             ),
         )
@@ -1896,6 +3156,8 @@ def evaluate_cost_proof_file(
     profile_path: str | Path,
     *,
     source_data_manifest_path: str | Path | None = None,
+    source_run_receipt_path: str | Path | None = None,
+    search_run_receipt_path: str | Path | None = None,
     router_replay_manifest_path: str | Path | None = None,
     router_source_artifact_path: str | Path | None = None,
     lifecycle_path: str | Path | None = None,
@@ -1905,10 +3167,18 @@ def evaluate_cost_proof_file(
     commit_receipt_path: str | Path | None = None,
     router_producer_source_path: str | Path | None = None,
     router_commit_receipt_path: str | Path | None = None,
+    market_artifact_paths: Mapping[str, str | Path] | None = None,
+    funding_artifact_paths: Mapping[str, str | Path] | None = None,
+    router_artifact_paths: Mapping[str, str | Path] | None = None,
+    trial_result_artifact_paths: Mapping[str, str | Path] | None = None,
+    trusted_roots: Mapping[str, str] | None = None,
 ) -> CostProofReport:
+    """Validate v2 proof bytes against explicit out-of-band SHA-256 roots."""
     paths = {
         "profile": profile_path,
         "source_data_manifest": source_data_manifest_path,
+        "source_run_receipt": source_run_receipt_path,
+        "search_run_receipt": search_run_receipt_path,
         "router_replay_manifest": router_replay_manifest_path,
         "router_source_artifact": router_source_artifact_path,
         "lifecycle": lifecycle_path,
@@ -1919,12 +3189,29 @@ def evaluate_cost_proof_file(
         "router_producer_source": router_producer_source_path,
         "router_commit_receipt": router_commit_receipt_path,
     }
-    if any(path is None for path in paths.values()):
+    if (
+        any(path is None for path in paths.values())
+        or market_artifact_paths is None
+        or funding_artifact_paths is None
+        or router_artifact_paths is None
+        or trial_result_artifact_paths is None
+        or trusted_roots is None
+    ):
         return _report("STOP", ["missing trusted external bindings"])
     try:
-        bindings = _artifact_bindings(paths)  # type: ignore[arg-type]
-        evidence = _json_bytes(Path(input_path).read_bytes())
+        evidence_raw = Path(input_path).read_bytes()
+        evidence = _canonical_artifact(evidence_raw)
+        bindings = _artifact_bindings(
+            paths,  # type: ignore[arg-type]
+            market_artifact_paths=market_artifact_paths,
+            funding_artifact_paths=funding_artifact_paths,
+            router_artifact_paths=router_artifact_paths,
+            trial_result_artifact_paths=trial_result_artifact_paths,
+            evidence_sha256=hashlib.sha256(evidence_raw).hexdigest(),
+            trusted_roots=trusted_roots,
+        )
     except (
+        ArithmeticError,
         OSError,
         RecursionError,
         TypeError,

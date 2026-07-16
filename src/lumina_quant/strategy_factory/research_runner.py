@@ -165,7 +165,8 @@ def _simulate_event_driven_strategy_exposures(
     from lumina_quant.core.events import MarketEvent, MarketWindowEvent
 
     canonical_symbols = canonicalize_symbol_list(list(symbols))
-    datetimes = np.asarray(aligned.get("datetime"), dtype=object)
+    raw_datetimes = np.asarray(aligned.get("datetime"))
+    datetimes = np.asarray(raw_datetimes, dtype=object)
     n = len(datetimes)
     exposures = np.zeros((len(canonical_symbols), n), dtype=float)
     bars = _AlignedStrategyBarStore(canonical_symbols)
@@ -189,12 +190,13 @@ def _simulate_event_driven_strategy_exposures(
     window_seconds = 60
     if n >= 2:
         try:
-            first = datetimes[0]
-            second = datetimes[1]
-            spacing = float(second.timestamp() - first.timestamp())
+            if np.issubdtype(raw_datetimes.dtype, np.datetime64):
+                spacing = float((raw_datetimes[1] - raw_datetimes[0]) / np.timedelta64(1, "s"))
+            else:
+                spacing = float(datetimes[1].timestamp() - datetimes[0].timestamp())
             if spacing > 0.0:
-                window_seconds = int(spacing)
-        except AttributeError, TypeError, ValueError:
+                window_seconds = max(1, int(spacing))
+        except AttributeError, TypeError, ValueError, OverflowError:
             window_seconds = 60
 
     for idx in range(n):
@@ -5767,6 +5769,8 @@ def _apply_pair_spread_strategy(
         exposures[y_idx] = simulated[1]
         meta["event_driven_proxy"] = True
     except (AttributeError, TypeError, ValueError, RuntimeError) as exc:
+        if meta.get("_strict_actual_engine") is True:
+            raise
         entry_z = float(params.get("entry_z", 2.0))
         exit_z = float(params.get("exit_z", 0.35))
         lookback = int(params.get("lookback_window", 96))
@@ -5779,7 +5783,6 @@ def _apply_pair_spread_strategy(
             exit_z=exit_z,
             lookback=lookback,
         )
-
         exposures[x_idx] = x_pos
         exposures[y_idx] = y_pos
         meta["event_driven_proxy"] = False

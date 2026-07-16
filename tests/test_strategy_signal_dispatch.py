@@ -323,3 +323,41 @@ def test_strict_dispatch_accepts_handler_and_registry_simulator_modes():
         assert result[3]["evaluation_mode"] == mode
         assert result[3]["generic_fallback_proxy_count"] == 0
         assert all(np.isfinite(values).all() for values in result[:3])
+
+
+def test_strict_dispatch_wraps_malformed_candidate_and_params_causes():
+    dispatcher = StrategySignalDispatcher(handlers={})
+
+    with pytest.raises(StrategySignalDispatchError) as candidate_error:
+        dispatcher.dispatch(
+            [],
+            aligned={"BTC/USDT:close": np.array([100.0, 101.0])},
+            symbols=["BTC/USDT"],
+            require_actual_engine=True,
+        )
+    assert isinstance(candidate_error.value.__cause__, AttributeError)
+
+    with pytest.raises(StrategySignalDispatchError) as params_error:
+        dispatcher.dispatch(
+            {"strategy_class": "Known", "params": object()},
+            aligned={"BTC/USDT:close": np.array([100.0, 101.0])},
+            symbols=["BTC/USDT"],
+            require_actual_engine=True,
+        )
+    assert isinstance(params_error.value.__cause__, TypeError)
+
+
+def test_strict_dispatch_rejects_overflowed_final_portfolio_return():
+    def _handler(params, aligned, symbols, n, exposures, meta):
+        exposures[:] = np.finfo(float).max
+
+    dispatcher = StrategySignalDispatcher(handlers={"Known": _handler})
+    with pytest.raises(StrategySignalDispatchError) as error:
+        dispatcher.dispatch(
+            {"strategy_class": "Known"},
+            aligned={"BTC/USDT:close": np.array([1.0, 1e308])},
+            symbols=["BTC/USDT"],
+            require_actual_engine=True,
+        )
+    assert "derived portfolio outputs overflowed or became invalid" in str(error.value)
+    assert isinstance(error.value.__cause__, FloatingPointError)
