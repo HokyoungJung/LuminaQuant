@@ -155,12 +155,53 @@ class _AlignedStrategyBarStore:
         return row.get("datetime")
 
 
+def _strict_event_cadence_seconds(raw_datetimes: np.ndarray, datetimes: np.ndarray) -> int:
+    """Derive one exact whole-second cadence for strict event simulation."""
+    if np.issubdtype(raw_datetimes.dtype, np.datetime64):
+        normalized = raw_datetimes.astype("datetime64[ns]")
+        if np.isnat(normalized).any():
+            raise ValueError("datetime cadence contains NaT")
+        intervals = np.diff(normalized.astype(np.int64))
+        units_per_second = 1_000_000_000
+        if (
+            intervals.size == 0
+            or np.any(intervals <= 0)
+            or np.any(intervals != intervals[0])
+            or intervals[0] % units_per_second
+        ):
+            raise ValueError("datetime cadence is not positive, regular whole seconds")
+        return int(intervals[0] // units_per_second)
+
+    values: list[datetime] = []
+    for value in datetimes:
+        if (
+            not isinstance(value, datetime)
+            or value.tzinfo is None
+            or value.utcoffset() != UTC.utcoffset(value)
+        ):
+            raise ValueError("datetime cadence requires UTC-aware datetime values")
+        values.append(value)
+    intervals = [values[idx] - values[idx - 1] for idx in range(1, len(values))]
+    has_irregular_interval = any(
+        interval <= timedelta(0) or interval != intervals[0] for interval in intervals
+    )
+    if (
+        not intervals
+        or intervals[0] <= timedelta(0)
+        or has_irregular_interval
+        or intervals[0].microseconds
+    ):
+        raise ValueError("datetime cadence is not positive, regular whole seconds")
+    return int(intervals[0].total_seconds())
+
+
 def _simulate_event_driven_strategy_exposures(
     strategy_cls: type[Any],
     *,
     params: Mapping[str, Any],
     aligned: Mapping[str, np.ndarray],
     symbols: Sequence[str],
+    require_actual_engine: bool = False,
 ) -> np.ndarray:
     from lumina_quant.core.events import MarketEvent, MarketWindowEvent
 
@@ -188,15 +229,34 @@ def _simulate_event_driven_strategy_exposures(
         _BaseStrategy.calculate_signals_window
     )
     window_seconds = 60
-    if n >= 2:
+    if require_actual_engine:
+        try:
+            window_seconds = _strict_event_cadence_seconds(raw_datetimes, datetimes)
+        except (
+            AttributeError,
+            TypeError,
+            ValueError,
+            OverflowError,
+            FloatingPointError,
+        ) as exc:
+            raise ValueError("unable to derive event cadence from datetime input") from exc
+    elif n >= 2:
         try:
             if np.issubdtype(raw_datetimes.dtype, np.datetime64):
                 spacing = float((raw_datetimes[1] - raw_datetimes[0]) / np.timedelta64(1, "s"))
             else:
                 spacing = float(datetimes[1].timestamp() - datetimes[0].timestamp())
-            if spacing > 0.0:
-                window_seconds = max(1, int(spacing))
-        except AttributeError, TypeError, ValueError, OverflowError:
+            if not np.isfinite(spacing) or spacing <= 0.0:
+                raise ValueError("nonpositive or nonfinite cadence")
+            window_seconds = max(1, int(spacing))
+        except (
+            AttributeError,
+            TypeError,
+            ValueError,
+            OverflowError,
+            FloatingPointError,
+        ):
+            # Legacy cadence fallback is deliberately non-strict only.
             window_seconds = 60
 
     for idx in range(n):
@@ -249,17 +309,47 @@ def _simulate_event_driven_strategy_exposures(
 
         while not events.empty():
             signal = events.get()
-            token = canonical_symbol(str(getattr(signal, "symbol", "")))
+            raw_symbol = getattr(signal, "symbol", None)
+            raw_signal_type = getattr(signal, "signal_type", None)
+            if require_actual_engine:
+                if not isinstance(raw_symbol, str):
+                    raise ValueError("signal symbol must be an exact canonical panel symbol")
+                token = canonical_symbol(raw_symbol)
+                if raw_symbol != token:
+                    raise ValueError(
+                        f"signal symbol is not an exact canonical panel symbol: {raw_symbol}"
+                    )
+                if token not in position_state:
+                    raise ValueError(f"signal symbol is outside the panel universe: {token}")
+                if not isinstance(raw_signal_type, str) or raw_signal_type not in {
+                    "LONG",
+                    "SHORT",
+                    "EXIT",
+                }:
+                    raise ValueError(f"unsupported signal type: {raw_signal_type}")
+                signal_time = getattr(signal, "datetime", None)
+                if signal_time is None:
+                    raise ValueError("signal datetime is missing")
+                try:
+                    matches_current_event = bool(signal_time == event_time)
+                except TypeError, ValueError:
+                    matches_current_event = False
+                if not matches_current_event:
+                    raise ValueError("signal datetime does not match current event time")
+                signal_type = raw_signal_type
+            else:
+                token = canonical_symbol(str(raw_symbol or ""))
+                signal_type = str(raw_signal_type or "").upper()
             if token not in position_state:
-                continue
-            signal_type = str(getattr(signal, "signal_type", "")).upper()
+                raise ValueError(f"signal symbol is outside the panel universe: {token}")
             if signal_type == "LONG":
                 position_state[token] = 1.0
             elif signal_type == "SHORT":
                 position_state[token] = -1.0
             elif signal_type == "EXIT":
                 position_state[token] = 0.0
-
+            else:
+                raise ValueError(f"unsupported signal type: {signal_type}")
         for symbol, value in position_state.items():
             exposures[symbol_index[symbol], idx] = float(value)
 
@@ -286,7 +376,29 @@ def _load_event_driven_strategy_impl(strategy_class: str) -> type[Any]:
 def _resolve_symbol_pair(
     symbols: Sequence[str],
     params: Mapping[str, Any],
+    *,
+    strict_actual_engine: bool = False,
 ) -> tuple[str, str, int, int]:
+    if strict_actual_engine:
+        resolved: list[str] = []
+        for key, default in (("symbol_x", symbols[0]), ("symbol_y", symbols[1])):
+            if key not in params:
+                resolved.append(default)
+                continue
+            raw_symbol = params[key]
+            if not isinstance(raw_symbol, str) or not raw_symbol.strip():
+                raise ValueError(f"{key} must be a non-empty panel symbol")
+            symbol = canonical_symbol(raw_symbol)
+            if raw_symbol != symbol:
+                raise ValueError(f"{key} must be an exact canonical panel symbol: {raw_symbol}")
+            if not symbol or symbol not in symbols:
+                raise ValueError(f"{key} is outside the panel universe: {raw_symbol}")
+            resolved.append(symbol)
+        symbol_x, symbol_y = resolved
+        if symbol_x == symbol_y:
+            raise ValueError("symbol_x and symbol_y must be distinct panel symbols")
+        return symbol_x, symbol_y, symbols.index(symbol_x), symbols.index(symbol_y)
+
     symbol_x = canonical_symbol(str(params.get("symbol_x") or symbols[0]))
     symbol_y = canonical_symbol(str(params.get("symbol_y") or symbols[1]))
     if symbol_x not in symbols:
@@ -2138,7 +2250,9 @@ def _apply_basis_snapback_reversion_strategy(
         close = aligned[f"{symbol}:close"]
         mark = aligned.get(f"{symbol}:mark_price")
         index = aligned.get(f"{symbol}:index_price")
-        if mark is None or index is None:
+        if not all(
+            _has_valid_support_coverage(values, strictly_positive=True) for values in (mark, index)
+        ):
             missing_symbols.append(symbol)
             continue
         support = _crowding_support_series(
@@ -2674,8 +2788,13 @@ def _apply_lag_convergence_strategy(
     symbols: Sequence[str],
     n: int,
     exposures: np.ndarray,
+    meta: Mapping[str, Any],
 ) -> None:
-    symbol_x, symbol_y, x_idx, y_idx = _resolve_symbol_pair(symbols, params)
+    symbol_x, symbol_y, x_idx, y_idx = _resolve_symbol_pair(
+        symbols,
+        params,
+        strict_actual_engine=meta.get("_strict_actual_engine") is True,
+    )
     config = _resolve_lag_convergence_config(params)
 
     x_close = np.asarray(aligned[f"{symbol_x}:close"], dtype=float)
@@ -2730,8 +2849,8 @@ class _CrowdingSupportInputs:
     open_interest: np.ndarray
     liquidation_long_notional: np.ndarray
     liquidation_short_notional: np.ndarray
-    mark_price: np.ndarray | None
-    index_price: np.ndarray | None
+    mark_price: np.ndarray
+    index_price: np.ndarray
 
 
 @dataclass(frozen=True, slots=True)
@@ -2757,6 +2876,23 @@ def _resolve_perp_crowding_carry_config(
     )
 
 
+def _has_valid_support_coverage(
+    values: np.ndarray | None,
+    *,
+    minimum: float | None = None,
+    strictly_positive: bool = False,
+) -> bool:
+    if values is None:
+        return False
+    arr = np.asarray(values, dtype=float)
+    finite = np.isfinite(arr)
+    if not np.any(finite) or np.any(~finite & ~np.isnan(arr)):
+        return False
+    if strictly_positive:
+        return bool(np.all(arr[finite] > 0.0))
+    return minimum is None or bool(np.all(arr[finite] >= minimum))
+
+
 def _resolve_crowding_support_inputs(
     *,
     aligned: Mapping[str, np.ndarray],
@@ -2767,25 +2903,26 @@ def _resolve_crowding_support_inputs(
     liquidation_long = aligned.get(f"{symbol}:liquidation_long_notional")
     liquidation_short = aligned.get(f"{symbol}:liquidation_short_notional")
     close = aligned.get(f"{symbol}:close")
-    if (
-        funding is None
-        or open_interest is None
-        or liquidation_long is None
-        or liquidation_short is None
-        or close is None
-    ):
-        return None
-
     mark_price = aligned.get(f"{symbol}:mark_price")
     index_price = aligned.get(f"{symbol}:index_price")
+    if not (
+        _has_valid_support_coverage(funding)
+        and _has_valid_support_coverage(open_interest, minimum=0.0)
+        and _has_valid_support_coverage(liquidation_long, minimum=0.0)
+        and _has_valid_support_coverage(liquidation_short, minimum=0.0)
+        and _has_valid_support_coverage(close)
+        and _has_valid_support_coverage(mark_price, strictly_positive=True)
+        and _has_valid_support_coverage(index_price, strictly_positive=True)
+    ):
+        return None
     return _CrowdingSupportInputs(
         close=np.asarray(close, dtype=float),
         funding_rate=np.asarray(funding, dtype=float),
         open_interest=np.asarray(open_interest, dtype=float),
         liquidation_long_notional=np.asarray(liquidation_long, dtype=float),
         liquidation_short_notional=np.asarray(liquidation_short, dtype=float),
-        mark_price=None if mark_price is None else np.asarray(mark_price, dtype=float),
-        index_price=None if index_price is None else np.asarray(index_price, dtype=float),
+        mark_price=np.asarray(mark_price, dtype=float),
+        index_price=np.asarray(index_price, dtype=float),
     )
 
 
@@ -3196,6 +3333,7 @@ def _apply_cross_asset_liquidation_contagion_fade_strategy(
     aligned: Mapping[str, np.ndarray],
     symbols: Sequence[str],
     exposures: np.ndarray,
+    meta: dict[str, Any],
 ) -> None:
     config = _resolve_cross_asset_liquidation_contagion_fade_config(params)
 
@@ -3203,21 +3341,49 @@ def _apply_cross_asset_liquidation_contagion_fade_strategy(
     return_z_map: dict[str, np.ndarray] = {}
     close_map_np: dict[str, np.ndarray] = {}
     valid_symbols: list[str] = []
+    missing_symbols: list[str] = []
     for symbol in symbols:
         liq_long = aligned.get(f"{symbol}:liquidation_long_notional")
         liq_short = aligned.get(f"{symbol}:liquidation_short_notional")
         close = aligned.get(f"{symbol}:close")
-        if liq_long is None or liq_short is None or close is None:
+        try:
+            liq_long_arr = np.asarray(liq_long, dtype=float)
+            liq_short_arr = np.asarray(liq_short, dtype=float)
+            close_arr = np.asarray(close, dtype=float)
+        except TypeError, ValueError, OverflowError:
+            missing_symbols.append(symbol)
+            continue
+        if (
+            liq_long_arr.ndim != 1
+            or liq_short_arr.shape != liq_long_arr.shape
+            or close_arr.shape != liq_long_arr.shape
+        ):
+            missing_symbols.append(symbol)
+            continue
+        paired_usable = np.isfinite(liq_long_arr) & np.isfinite(liq_short_arr)
+        if not (
+            _has_valid_support_coverage(liq_long_arr, minimum=0.0)
+            and _has_valid_support_coverage(liq_short_arr, minimum=0.0)
+            and np.any(paired_usable)
+        ):
+            missing_symbols.append(symbol)
+            continue
+        first_usable = int(np.flatnonzero(paired_usable)[0])
+        if (
+            not np.all(np.isnan(liq_long_arr[:first_usable]))
+            or not np.all(np.isnan(liq_short_arr[:first_usable]))
+            or not np.all(paired_usable[first_usable:])
+        ):
+            missing_symbols.append(symbol)
             continue
         support = _crowding_support_series(
-            funding_rate=np.zeros(len(close), dtype=float),
-            open_interest=np.ones(len(close), dtype=float),
-            liquidation_long_notional=np.asarray(liq_long, dtype=float),
-            liquidation_short_notional=np.asarray(liq_short, dtype=float),
+            funding_rate=np.zeros(len(close_arr), dtype=float),
+            open_interest=np.ones(len(close_arr), dtype=float),
+            liquidation_long_notional=liq_long_arr,
+            liquidation_short_notional=liq_short_arr,
             window=config.window,
         )
         liq_z_map[symbol] = np.asarray(support["liquidation_imbalance_z"], dtype=float)
-        close_arr = np.asarray(close, dtype=float)
         close_map_np[symbol] = close_arr
         prev_close = np.r_[close_arr[0], close_arr[:-1]]
         returns = (
@@ -3245,6 +3411,7 @@ def _apply_cross_asset_liquidation_contagion_fade_strategy(
             return_z_map=return_z_map,
             config=config,
         )
+    _finalize_missing_support_symbols(meta, missing_symbols=missing_symbols)
 
 
 def _cross_asset_liquidation_contagion_position_series(
@@ -5756,7 +5923,11 @@ def _apply_pair_spread_strategy(
     exposures: np.ndarray,
     meta: dict[str, Any],
 ) -> None:
-    symbol_x, symbol_y, x_idx, y_idx = _resolve_symbol_pair(symbols, params)
+    symbol_x, symbol_y, x_idx, y_idx = _resolve_symbol_pair(
+        symbols,
+        params,
+        strict_actual_engine=meta.get("_strict_actual_engine") is True,
+    )
 
     try:
         simulated = _simulate_event_driven_strategy_exposures(
@@ -5764,6 +5935,7 @@ def _apply_pair_spread_strategy(
             params=params,
             aligned=aligned,
             symbols=(symbol_x, symbol_y),
+            require_actual_engine=meta.get("_strict_actual_engine") is True,
         )
         exposures[x_idx] = simulated[0]
         exposures[y_idx] = simulated[1]
@@ -6134,56 +6306,89 @@ def _flow_imbalance_series(
 ) -> tuple[np.ndarray, np.ndarray] | None:
     buy_quote = aligned.get(f"{symbol}:taker_buy_quote_volume")
     sell_quote = aligned.get(f"{symbol}:taker_sell_quote_volume")
-    if buy_quote is None or sell_quote is None:
+    if not all(
+        _has_valid_support_coverage(values, minimum=0.0) for values in (buy_quote, sell_quote)
+    ):
         return None
-    buy_arr = np.nan_to_num(np.asarray(buy_quote, dtype=float), nan=0.0)
-    sell_arr = np.nan_to_num(np.asarray(sell_quote, dtype=float), nan=0.0)
-    taker_imbalance = np.divide(
-        buy_arr - sell_arr,
-        np.abs(buy_arr) + np.abs(sell_arr) + 1e-12,
-        out=np.zeros(close.shape, dtype=float),
+    buy_arr = np.asarray(buy_quote, dtype=float)
+    sell_arr = np.asarray(sell_quote, dtype=float)
+    taker_valid = (
+        np.isfinite(buy_arr) & np.isfinite(sell_arr) & (buy_arr >= 0.0) & (sell_arr >= 0.0)
+    )
+    if not np.any(taker_valid):
+        return None
+    taker_imbalance = np.zeros(close.shape, dtype=float)
+    taker_imbalance[taker_valid] = (buy_arr[taker_valid] - sell_arr[taker_valid]) / (
+        buy_arr[taker_valid] + sell_arr[taker_valid] + 1e-12
     )
 
     depth = aligned.get(f"{symbol}:book_depth_imbalance_1pct")
     if depth is not None:
-        book_imbalance = np.nan_to_num(np.asarray(depth, dtype=float), nan=0.0)
+        depth_arr = np.asarray(depth, dtype=float)
+        finite_depth = np.isfinite(depth_arr)
+        if (
+            not np.any(finite_depth)
+            or np.any(~np.isnan(depth_arr) & ~finite_depth)
+            or np.any(finite_depth & ((depth_arr < -1.0) | (depth_arr > 1.0)))
+        ):
+            return None
+        book_imbalance = np.nan_to_num(depth_arr, nan=0.0)
     else:
         bid_qty = aligned.get(f"{symbol}:best_bid_quantity")
         ask_qty = aligned.get(f"{symbol}:best_ask_quantity")
-        if bid_qty is None or ask_qty is None:
+        if not all(
+            _has_valid_support_coverage(values, minimum=0.0) for values in (bid_qty, ask_qty)
+        ):
             return None
-        bid_arr = np.nan_to_num(np.asarray(bid_qty, dtype=float), nan=0.0)
-        ask_arr = np.nan_to_num(np.asarray(ask_qty, dtype=float), nan=0.0)
-        book_imbalance = np.divide(
-            bid_arr - ask_arr,
-            np.abs(bid_arr) + np.abs(ask_arr) + 1e-12,
-            out=np.zeros(close.shape, dtype=float),
+        bid_arr = np.asarray(bid_qty, dtype=float)
+        ask_arr = np.asarray(ask_qty, dtype=float)
+        quantity_valid = (
+            np.isfinite(bid_arr) & np.isfinite(ask_arr) & (bid_arr >= 0.0) & (ask_arr >= 0.0)
+        )
+        if not np.any(quantity_valid):
+            return None
+        book_imbalance = np.zeros(close.shape, dtype=float)
+        book_imbalance[quantity_valid] = (bid_arr[quantity_valid] - ask_arr[quantity_valid]) / (
+            bid_arr[quantity_valid] + ask_arr[quantity_valid] + 1e-12
         )
 
     spread = aligned.get(f"{symbol}:bbo_spread_bps")
     if spread is not None:
-        spread_bps = np.asarray(spread, dtype=float)
-    else:
+        spread_arr = np.asarray(spread, dtype=float)
+        if np.all(np.isnan(spread_arr)):
+            spread = None
+        elif not _has_valid_support_coverage(spread, minimum=0.0):
+            return None
+        else:
+            spread_valid = np.isfinite(spread_arr)
+            spread_bps = np.full(close.shape, np.inf, dtype=float)
+            spread_bps[spread_valid] = spread_arr[spread_valid]
+    if spread is None:
         bid = aligned.get(f"{symbol}:best_bid_price")
         ask = aligned.get(f"{symbol}:best_ask_price")
-        if bid is None or ask is None:
-            spread_bps = np.zeros(close.shape, dtype=float)
-        else:
-            bid_arr = np.asarray(bid, dtype=float)
-            ask_arr = np.asarray(ask, dtype=float)
-            mid = (bid_arr + ask_arr) * 0.5
-            spread_bps = (
-                np.divide(
-                    ask_arr - bid_arr,
-                    np.clip(mid, 1e-12, np.inf),
-                    out=np.zeros(close.shape, dtype=float),
-                    where=np.isfinite(mid),
-                )
-                * 10_000.0
-            )
+        if not all(
+            _has_valid_support_coverage(values, strictly_positive=True) for values in (bid, ask)
+        ):
+            return None
+        bid_arr = np.asarray(bid, dtype=float)
+        ask_arr = np.asarray(ask, dtype=float)
+        quote_valid = (
+            np.isfinite(bid_arr)
+            & np.isfinite(ask_arr)
+            & (bid_arr > 0.0)
+            & (ask_arr > 0.0)
+            & (ask_arr >= bid_arr)
+        )
+        if np.any(np.isfinite(bid_arr) & np.isfinite(ask_arr) & (ask_arr < bid_arr)):
+            return None
+        if not np.any(quote_valid):
+            return None
+        spread_bps = np.full(close.shape, np.inf, dtype=float)
+        mid = (bid_arr[quote_valid] + ask_arr[quote_valid]) * 0.5
+        spread_bps[quote_valid] = ((ask_arr[quote_valid] - bid_arr[quote_valid]) / mid) * 10_000.0
 
     flow_score = (0.60 * taker_imbalance) + (0.40 * book_imbalance)
-    return np.nan_to_num(flow_score, nan=0.0), np.nan_to_num(spread_bps, nan=np.inf)
+    return flow_score, spread_bps
 
 
 def _flow_imbalance_liquidation_position_series(
@@ -6270,7 +6475,12 @@ def _apply_flow_imbalance_liquidation_sweep_strategy(
         long_liq = aligned.get(f"{symbol}:liquidation_long_notional")
         short_liq = aligned.get(f"{symbol}:liquidation_short_notional")
         flow_payload = _flow_imbalance_series(aligned=aligned, symbol=symbol, close=close)
-        if long_liq is None or short_liq is None or flow_payload is None:
+        if (
+            not all(
+                _has_valid_support_coverage(values, minimum=0.0) for values in (long_liq, short_liq)
+            )
+            or flow_payload is None
+        ):
             missing_symbols.append(symbol)
             continue
         flow_score, spread_bps = flow_payload
@@ -6333,6 +6543,7 @@ def _apply_alpha101_formula_strategy(
         params=params,
         aligned=aligned,
         symbols=symbols,
+        require_actual_engine=meta.get("_strict_actual_engine") is True,
     )
     exposures[:] = simulated
     meta["event_driven_proxy"] = True
@@ -6470,6 +6681,7 @@ _STRATEGY_SIGNAL_DISPATCHER = StrategySignalDispatcher(
         ),
         "CrossAssetLiquidationContagionFadeStrategy": _wrap_strategy_handler(
             _apply_cross_asset_liquidation_contagion_fade_strategy,
+            include_meta=True,
         ),
         "MultiHorizonTrendExhaustionFadeStrategy": _wrap_strategy_handler(
             _apply_multi_horizon_trend_exhaustion_fade_strategy,
@@ -6494,6 +6706,7 @@ _STRATEGY_SIGNAL_DISPATCHER = StrategySignalDispatcher(
         "LagConvergenceStrategy": _wrap_strategy_handler(
             _apply_lag_convergence_strategy,
             include_n=True,
+            include_meta=True,
         ),
         "PerpCrowdingCarryStrategy": _wrap_strategy_handler(
             _apply_perp_crowding_carry_strategy,
@@ -6558,6 +6771,7 @@ def _strict_registry_simulator_router(
         params=params,
         aligned=aligned,
         symbols=symbols,
+        require_actual_engine=True,
     )
 
 

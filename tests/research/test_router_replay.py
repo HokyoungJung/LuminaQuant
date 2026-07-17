@@ -7,6 +7,7 @@ import hashlib
 import inspect
 import json
 from copy import deepcopy
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -35,25 +36,74 @@ def _write(path: Path, value: object) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _profile(path: Path) -> None:
-    path.write_text(
-        """profile: backtest_cost_realistic
-research: {strict_selection_gate: true, use_lockbox_split: true, purge_embargo_bars: 1, single_correlation_discount: true, hac_inference: true, cscv_pbo: true, exposure_normalized_promotion: true, route_unmapped_registered_strategies: true, require_actual_engine_routing: true}
-execution: {slippage_impact_model: sqrt_impact, slippage_impact_coefficient: 0.1, funding_interval_hours: 8, require_funding_coverage: true, funding_on_utc_boundary: true}
-risk: {attach_default_protective_stop: true, enforce_order_risk_gate_in_backtest: true}
-live: {mode: paper, testnet: true, require_real_enable_flag: true, allow_market_orders: false, shadow_live_enabled: false}
-data: {kinds: [funding]}
-""",
-        encoding="utf-8",
-    )
-
-
 def _rebuild(paths: dict[str, Path], trusted: dict[str, str]) -> None:
     """Re-root producer-controlled manifest claims; never change out-of-band roots by accident."""
     manifest = json.loads(paths["manifest"].read_text())
     commit = json.loads(paths["commit"].read_text())
     commit["manifest_sha256"] = _write(paths["manifest"], manifest)
     trusted["commit"] = _write(paths["commit"], commit)
+
+
+def _reroot_candidate_identity_layer(
+    paths: dict[str, Path],
+    trusted: dict[str, str],
+    layer: str,
+    candidate_ids: list[str],
+) -> None:
+    """Mutate one identity layer while preserving earlier independent bindings."""
+    candidate_ids_sha256 = _sha(candidate_ids)
+    if layer == "source":
+        source = json.loads(paths["source"].read_text(encoding="utf-8"))
+        source["candidate_ids"] = candidate_ids
+        source["candidate_ids_sha256"] = candidate_ids_sha256
+        source["candidate_order"] = candidate_ids
+        trusted["source"] = _write(paths["source"], source)
+
+        manifest = json.loads(paths["manifest"].read_text(encoding="utf-8"))
+        manifest["provenance"]["source_artifact_sha256"] = trusted["source"]
+        _write(paths["manifest"], manifest)
+
+        commit = json.loads(paths["commit"].read_text(encoding="utf-8"))
+        commit["source_artifact_sha256"] = trusted["source"]
+        commit["manifest_sha256"] = _write(paths["manifest"], manifest)
+        trusted["commit"] = _write(paths["commit"], commit)
+    elif layer == "manifest":
+        manifest = json.loads(paths["manifest"].read_text(encoding="utf-8"))
+        manifest["candidate_ids"] = candidate_ids
+        manifest["candidate_ids_sha256"] = candidate_ids_sha256
+
+        commit = json.loads(paths["commit"].read_text(encoding="utf-8"))
+        commit["manifest_sha256"] = _write(paths["manifest"], manifest)
+        trusted["commit"] = _write(paths["commit"], commit)
+    elif layer == "commit":
+        commit = json.loads(paths["commit"].read_text(encoding="utf-8"))
+        commit["candidate_ids"] = candidate_ids
+        commit["candidate_ids_sha256"] = candidate_ids_sha256
+        trusted["commit"] = _write(paths["commit"], commit)
+    else:
+        raise ValueError(f"unknown identity layer: {layer}")
+
+
+def _reroot_manifest_selection(
+    paths: dict[str, Path],
+    trusted: dict[str, str],
+    fold_index: int,
+    selected_label: str | None,
+) -> None:
+    """Re-root an authenticated manifest after changing only its claimed selection."""
+    manifest = json.loads(paths["manifest"].read_text(encoding="utf-8"))
+    selection = manifest["folds"][fold_index]["selection"]
+    selection["selected_label"] = selected_label
+    selection["selection_inputs_sha256"] = _sha(
+        {
+            "branch": selection["branch"],
+            "selected_label": selected_label,
+            "decision_receipt_sha256s": selection["decision_receipt_sha256s"],
+            "leaves": selection["leaves"],
+        }
+    )
+    _write(paths["manifest"], manifest)
+    _rebuild(paths, trusted)
 
 
 CostRowFactory = Callable[[str, str, str, int, str, str], list[dict[str, Any]] | None]
@@ -66,6 +116,8 @@ def _bundle(
     cost_rows: CostRowFactory | None = None,
     *,
     all_folds_scaled: bool = False,
+    traded_symbols: list[str] | None = None,
+    strict_candidate_eligibility: tuple[bool, bool] | None = None,
 ) -> tuple[dict[str, object], dict[str, Path], dict[str, str]]:
     """Build authoritative source, artifacts, manifest, then its trusted commit receipt."""
     producer = tmp_path / "producer.py"
@@ -79,8 +131,11 @@ def _bundle(
             ).read_bytes()
             + b"\nignored_router_key: true\n"
         )
+    traded_symbols = traded_symbols or ["BTCUSDT"]
     symbols = (
-        ["ETHUSDT", "BTCUSDT"] if mutation == "weighted_nonlexicographic_history" else ["BTCUSDT"]
+        ["ETHUSDT", "BTCUSDT"]
+        if mutation == "weighted_nonlexicographic_history"
+        else traded_symbols
     )
     registry = build_symbol_lifecycle_registry(
         {
@@ -117,6 +172,15 @@ def _bundle(
         _write(path, row)
         paths[digest], kinds[digest] = path, kind
         return digest
+
+    def grid(start: str, end: str) -> list[str]:
+        cursor = datetime.fromisoformat(start[:-1] + "+00:00")
+        finish = datetime.fromisoformat(end[:-1] + "+00:00")
+        result: list[str] = []
+        while cursor < finish:
+            result.append(cursor.astimezone(UTC).isoformat().replace("+00:00", "Z"))
+            cursor += timedelta(hours=1)
+        return result
 
     registry_mode = mode == "registry"
     strategy = "RsiStrategy" if registry_mode else "trend_pullback_reclaim"
@@ -173,12 +237,12 @@ def _bundle(
         "traded_symbols": (
             ["ETHUSDT", "BTCUSDT"]
             if mutation == "weighted_nonlexicographic_history"
-            else ["BTCUSDT"]
+            else traded_symbols
         ),
         "dependency_symbols": (
             ["ETHUSDT", "BTCUSDT"]
             if mutation == "weighted_nonlexicographic_history"
-            else ["BTCUSDT"]
+            else traded_symbols
         ),
         "native_timeframe": "1h",
         "allocation_fraction_ppm": 1_000_000,
@@ -237,14 +301,16 @@ def _bundle(
             ),
             "decision_timestamp_utc": f"2025-01-{day:02d}T00:00:00Z",
             "train_window": {
-                "start_utc": "2024-01-01T00:00:00Z",
-                "end_utc": "2024-06-01T00:00:00Z",
+                "start_utc": "2024-01-02T00:00:00Z",
+                "end_utc": "2024-01-02T01:00:00Z",
             },
             "validation_window": {
-                "start_utc": "2024-06-01T00:00:00Z",
-                "end_utc": "2024-12-31T00:00:00Z"
-                if index == 0
-                else f"2025-01-{day - 1:02d}T00:00:00Z",
+                "start_utc": "2024-06-02T00:00:00Z",
+                "end_utc": (
+                    "2024-06-02T02:00:00Z"
+                    if mutation in {"negative_scaled_short", "shared_initial_loss_rerooted"}
+                    else "2024-06-02T01:00:00Z"
+                ),
             },
             "membership_fold_sha256": _sha(member),
             "candidates": [],
@@ -328,15 +394,30 @@ def _bundle(
         digest = artifact("data_receipt", "router_data_receipt_v2", data)
         if role == "locked_oos":
             start, end = item["locked_oos"]["start_utc"], item["locked_oos"]["end_utc"]
+            grid_end = end
             if mutation == "window":
                 end = start
         elif role == "train":
-            start, end = "2024-01-01T00:00:00Z", "2024-06-01T00:00:00Z"
+            start, end = "2024-01-02T00:00:00Z", "2024-01-02T01:00:00Z"
+            grid_end = end
         else:
-            start, end = "2024-06-01T00:00:00Z", item["input_cutoff_utc"]
+            start, end = (
+                "2024-06-02T00:00:00Z",
+                (
+                    "2024-06-02T02:00:00Z"
+                    if mutation in {"negative_scaled_short", "shared_initial_loss_rerooted"}
+                    else "2024-06-02T01:00:00Z"
+                ),
+            )
+            grid_end = end
         window_role = "history" if mutation == "role" and role == "locked_oos" else role
-        output_stamp = "2024-01-02T00:00:00Z" if role == "train" else start
-        output_timestamps = [output_stamp]
+        output_timestamps = grid(start, grid_end)
+        if mutation == "native_grid_cadence_drift" and role == "locked_oos":
+            output_timestamps[2] = start.replace("00:00:00Z", "02:30:00Z")
+        elif mutation == "native_grid_sparse" and role == "locked_oos":
+            del output_timestamps[1]
+        elif mutation == "native_grid_incomplete" and role == "locked_oos":
+            output_timestamps.pop()
         if mutation == "same_key_omission" and item["fold_id"] == "f4" and role == "locked_oos":
             output_timestamps.append(start.replace("00:00:00Z", "12:00:00Z"))
         window = artifact(
@@ -391,10 +472,14 @@ def _bundle(
             "generic_fallback_proxy_count": False if mutation == "receipt_count_bool" else 0,
             "current_fold_oos_input_count": 0,
         }
-        row_stamp = (
-            item["locked_oos"]["end_utc"] if mutation == "execution_outside_window" else stamp
-        )
-        row_specs = [(row_stamp, ret)]
+        row_specs = [
+            (timestamp, ret)
+            for timestamp in json.loads(paths[window].read_text(encoding="utf-8"))[
+                "output_timestamps_utc"
+            ]
+        ]
+        if mutation == "execution_outside_window":
+            row_specs = [(item["locked_oos"]["end_utc"], ret)]
         if mutation in {"negative_scaled_short", "shared_initial_loss_rerooted"} and stamp == (
             "2024-06-02T00:00:00Z"
         ):
@@ -403,9 +488,15 @@ def _bundle(
                     "2024-06-02T00:00:00Z",
                     -18_181 if mutation == "negative_scaled_short" else -200_000,
                 ),
-                ("2024-06-03T00:00:00Z", 1_000_000),
+                ("2024-06-02T01:00:00Z", 1_000_000),
             ]
-        symbol = "ETHUSDT" if mutation == "wrong_symbol" else "BTCUSDT"
+        execution_symbols = (
+            ["ETHUSDT", "BTCUSDT"]
+            if mutation == "weighted_nonlexicographic_history"
+            else ["ETHUSDT"]
+            if mutation == "wrong_symbol"
+            else traded_symbols
+        )
         signal_rows = [
             {
                 "timestamp_utc": timestamp,
@@ -419,11 +510,13 @@ def _bundle(
                 ),
             }
             for timestamp, _ in row_specs
+            for symbol in execution_symbols
         ]
         if mutation == "weighted_nonlexicographic_history":
             signal_rows = [
-                {"timestamp_utc": row_stamp, "symbol": "ETHUSDT", "signal_ppm": 1_000_000},
-                {"timestamp_utc": row_stamp, "symbol": "BTCUSDT", "signal_ppm": -1_000_000},
+                {"timestamp_utc": timestamp, "symbol": symbol, "signal_ppm": signal_ppm}
+                for timestamp, _ in row_specs
+                for symbol, signal_ppm in (("ETHUSDT", 1_000_000), ("BTCUSDT", -1_000_000))
             ]
         base_signal_rows = signal_rows
         if mutation == "missing_row":
@@ -457,20 +550,20 @@ def _bundle(
                 "position_rows_sha256": _sha(position_rows),
             },
         )
-        weighted_returns = [80, -20] if leaf_record["leaf_id"] == "leaf" else [-40, 100]
+        weighted_returns = {"ETHUSDT": 80, "BTCUSDT": -20}
         execution_rows = [
             {
                 "timestamp_utc": signal_row["timestamp_utc"],
                 "symbol": signal_row["symbol"],
                 "base_return_ppm": (
-                    weighted_returns[index]
+                    weighted_returns[signal_row["symbol"]]
                     if mutation == "weighted_nonlexicographic_history"
                     else dict(row_specs)[signal_row["timestamp_utc"]]
                 ),
                 "return_ppm": replay._round_fraction_half_up(
                     replay.Fraction(
                         (
-                            weighted_returns[index]
+                            weighted_returns[signal_row["symbol"]]
                             if mutation == "weighted_nonlexicographic_history"
                             else dict(row_specs)[signal_row["timestamp_utc"]]
                         )
@@ -480,9 +573,7 @@ def _bundle(
                 )
                 + (1 if mutation == "fallback_return" else 0),
             }
-            for index, signal_row in enumerate(
-                base_signal_rows if mutation == "missing_row" else signal_rows
-            )
+            for signal_row in (base_signal_rows if mutation == "missing_row" else signal_rows)
         ]
         event_rows = [
             {
@@ -538,13 +629,19 @@ def _bundle(
             "leaves": strict_leaves,
             "leaf_list_sha256": _sha(strict_leaves),
         }
+        if strict_candidate_eligibility is not None:
+            for candidate, eligible in zip(
+                (balanced, growth), strict_candidate_eligibility, strict=True
+            ):
+                if not eligible:
+                    candidate["train_return_ppm"] = -20_001
         strict: dict[str, object] = {
             "candidates": [balanced, growth],
             "leaves": strict_leaves,
             "leaf_list_sha256": _sha(strict_leaves),
             "shared_mdd_receipt_sha256": None,
         }
-        if mode != "scaled":
+        if mode != "scaled" or strict_candidate_eligibility == (False, False):
             return strict
         data, train = data_window(target, "train")
         validation = artifact(
@@ -555,17 +652,23 @@ def _bundle(
                 "fold_id": target["fold_id"],
                 "role": "validation",
                 "start_utc": (
-                    "2024-05-01T00:00:00Z"
+                    "2024-01-02T00:30:00Z"
                     if mutation == "overlapping_windows"
-                    else "2024-06-01T00:00:00Z"
+                    else "2024-06-02T00:00:00Z"
                 ),
-                "end_utc": target["input_cutoff_utc"],
+                "end_utc": (
+                    "2024-06-02T02:00:00Z"
+                    if mutation in {"negative_scaled_short", "shared_initial_loss_rerooted"}
+                    else "2024-06-02T01:00:00Z"
+                ),
                 "input_cutoff_utc": target["input_cutoff_utc"],
                 "native_timeframe": "1h",
                 "membership_fold_sha256": target["membership_fold_sha256"],
                 "output_timestamps_utc": (
-                    ["2024-06-02T00:00:00Z", "2024-06-03T00:00:00Z"]
+                    ["2024-06-02T00:00:00Z", "2024-06-02T01:00:00Z"]
                     if mutation in {"negative_scaled_short", "shared_initial_loss_rerooted"}
+                    else ["2024-01-02T00:30:00Z"]
+                    if mutation == "overlapping_windows"
                     else ["2024-06-02T00:00:00Z"]
                 ),
             },
@@ -574,23 +677,14 @@ def _bundle(
         _, _, validation_engine = execute(
             target, data, validation, 1_000_000, "2024-06-02T00:00:00Z"
         )
-        train_rows = [
-            {
-                "timestamp_utc": "2024-01-02T00:00:00Z",
-                "return_ppm": 99_000 if mutation == "shared" else 100_000,
-            }
-        ]
-        validation_rows = (
-            [
-                {
-                    "timestamp_utc": "2024-06-02T00:00:00Z",
-                    "return_ppm": -18_181 if mutation == "negative_scaled_short" else -200_000,
-                },
-                {"timestamp_utc": "2024-06-03T00:00:00Z", "return_ppm": 1_000_000},
-            ]
-            if mutation in {"negative_scaled_short", "shared_initial_loss_rerooted"}
-            else [{"timestamp_utc": "2024-06-02T00:00:00Z", "return_ppm": 100_000}]
+        train_rows = replay._aggregate_candidate_return_rows(
+            [json.loads(paths[train_engine].read_text(encoding="utf-8"))], strict_leaves
         )
+        validation_rows = replay._aggregate_candidate_return_rows(
+            [json.loads(paths[validation_engine].read_text(encoding="utf-8"))], strict_leaves
+        )
+        if mutation == "shared":
+            train_rows = [{"timestamp_utc": "2024-01-02T00:00:00Z", "return_ppm": 99_000}]
         strict["shared_mdd_receipt_sha256"] = artifact(
             "shared_mdd",
             "router_shared_mdd_receipt_v2",
@@ -598,7 +692,11 @@ def _bundle(
                 "fold_id": target["fold_id"],
                 "membership_fold_sha256": target["membership_fold_sha256"],
                 "leaf_list_sha256": _sha(strict_leaves),
-                "candidate_label": replay.GROWTH_LABEL,
+                "candidate_label": (
+                    replay.BALANCED_LABEL
+                    if strict_candidate_eligibility is not None and strict_candidate_eligibility[0]
+                    else replay.GROWTH_LABEL
+                ),
                 "measurement_end_utc": target["input_cutoff_utc"],
                 "input_cutoff_utc": target["input_cutoff_utc"],
                 "data_receipt_sha256": data,
@@ -648,7 +746,9 @@ def _bundle(
             [json.loads(paths[engine].read_text(encoding="utf-8")) for engine in engines],
             prior["candidates"][0]["leaves"],
         )
-        history_return = rows[0]["return_ppm"]
+        history_return = replay._round_fraction_half_up(
+            replay._period_metrics([row["return_ppm"] for row in rows], 1_000_000)[0] * 1_000_000
+        )
         weights = [item["source_weight_ppm"] for item in history_leaves]
         if mutation == "history_weights_bool" and i == 0:
             weights[0] = False
@@ -712,9 +812,9 @@ def _bundle(
         "candidate_ids": list(replay.CANDIDATE_IDS),
         "candidate_ids_sha256": replay.CANDIDATE_IDS_SHA256,
         "controls": {
-            "new_grid_search": False,
-            "recompute_from_json": False,
-            "post_oos_augment": False,
+            "post_oos_augment": mutation == "source_post_oos_augment_rerooted",
+            "new_grid_search": mutation == "source_new_grid_search_rerooted",
+            "recompute_from_json": mutation == "source_recompute_from_json_rerooted",
             "post_oos_research_variant": True,
         },
         "frozen_at_utc": "2025-01-14T00:00:00Z",
@@ -736,34 +836,30 @@ def _bundle(
         source["folds"][4]["candidates"][0]["source_candidate"]["family"] = "excluded_family"
     elif mutation == "policy_bool":
         source["policy"]["min_history"] = False
-    elif mutation in {"source_window_mismatch", "overlapping_windows"}:
-        source["folds"][4]["validation_window"]["start_utc"] = "2024-05-01T00:00:00Z"
+    elif mutation == "source_window_mismatch":
+        source["folds"][4]["validation_window"]["start_utc"] = (
+            "2024-01-02T00:30:00Z" if mode == "handler" else "2024-06-03T00:00:00Z"
+        )
+    elif mutation == "overlapping_windows" and mode != "scaled":
+        source["folds"][4]["validation_window"]["start_utc"] = "2024-01-02T00:30:00Z"
     source_hash = _write(source_path, source)
 
     manifest_folds = []
     for i, item in enumerate(folds):
-        branch = (
-            "strict_core_cash"
-            if (i < 4 and not all_folds_scaled)
-            or mode == "cash"
-            or mutation == "weighted_nonlexicographic_history"
-            else "strict_core_scaled"
-            if mode == "scaled"
-            else "pre_registered_lagged_plus_validation_leaf"
-        )
-        label = (
-            replay.GROWTH_LABEL
-            if branch == "strict_core_scaled"
-            else "candidate"
-            if branch.startswith("pre_")
-            else None
-        )
-        leaves = [deepcopy(leaf)] if branch != "strict_core_cash" else []
-        shared = (
-            item["strict_core"]["shared_mdd_receipt_sha256"]
-            if branch == "strict_core_scaled"
-            else None
-        )
+        if mode == "scaled":
+            branch, label, leaves, strict = replay._strict_core(item)
+        else:
+            branch = (
+                "strict_core_cash"
+                if (i < 4 and not all_folds_scaled)
+                or mode == "cash"
+                or mutation == "weighted_nonlexicographic_history"
+                else "pre_registered_lagged_plus_validation_leaf"
+            )
+            label = "candidate" if branch.startswith("pre_") else None
+            leaves = [deepcopy(leaf)] if branch != "strict_core_cash" else []
+            strict = None
+        shared = strict["shared_mdd_receipt_sha256"] if strict is not None else None
         history = item["candidates"][0]["history_receipt_sha256s"]
         selection = {
             "branch": branch,
@@ -777,7 +873,9 @@ def _bundle(
                     "leaves": leaves,
                 }
             ),
-            "current_fold_oos_input_count": 0,
+            "current_fold_oos_input_count": (
+                1 if mutation == "selection_current_fold_oos_input_count_rerooted" and i == 4 else 0
+            ),
             "decision_receipt_sha256s": history,
             "fallback_mdd_receipt_sha256": shared,
             "leaves": leaves,
@@ -837,22 +935,24 @@ def _bundle(
                         else 0
                     ),
                 )
+                tape_types = (
+                    ("cost_signal_position_tape", "router_cost_signal_position_tape_v1"),
+                    ("cost_order_tape", "router_cost_order_tape_v1"),
+                    ("cost_fill_tape", "router_cost_fill_tape_v1"),
+                    ("cost_event_tape", "router_cost_event_tape_v1"),
+                )
+                base_tape_commitments: dict[str, str] = {}
                 tapes = []
                 for bps in (10, 15, 20, 30):
                     hashes = []
-                    for kind, schema in (
-                        ("cost_signal_position_tape", "router_cost_signal_position_tape_v1"),
-                        ("cost_order_tape", "router_cost_order_tape_v1"),
-                        ("cost_fill_tape", "router_cost_fill_tape_v1"),
-                        ("cost_event_tape", "router_cost_event_tape_v1"),
-                    ):
+                    for kind, schema in tape_types:
                         provided_rows = (
                             cost_rows(item["fold_id"], variant, "leaf", bps, kind, engine)
                             if callable(cost_rows)
                             else None
                         )
                         if provided_rows is None:
-                            sequence = [f"{variant}:{bps}:{kind}"]
+                            sequence = [f"{variant}:{kind}"]
                             downstream_rows = [
                                 {
                                     "sequence_id": sequence[0],
@@ -866,6 +966,44 @@ def _bundle(
                                 raise ValueError("cost row factory returned no rows")
                             downstream_rows = provided_rows
                             sequence = [str(row["sequence_id"]) for row in downstream_rows]
+                        if kind not in base_tape_commitments:
+                            base_tape_commitments[kind] = artifact(
+                                "cost_base_tape_projection",
+                                "router_cost_base_tape_projection_v1",
+                                {
+                                    "fold_id": item["fold_id"],
+                                    "variant_id": variant,
+                                    "leaf_id": "leaf",
+                                    "engine_receipt_sha256": engine,
+                                    "tape_kind": kind,
+                                    "projection": sequence,
+                                    "projection_sha256": _sha(sequence),
+                                },
+                            )
+                        base_tape_commitment = base_tape_commitments[kind]
+                        if (
+                            mutation == "cost_base_commitment_drift"
+                            and i == 4
+                            and variant_index == 0
+                            and bps == 10
+                            and kind == "cost_order_tape"
+                        ):
+                            downstream_rows = deepcopy(downstream_rows)
+                            downstream_rows[0]["sequence_id"] = f"{sequence[0]}:drift"
+                            sequence = [str(row["sequence_id"]) for row in downstream_rows]
+                            base_tape_commitment = artifact(
+                                "cost_base_tape_projection",
+                                "router_cost_base_tape_projection_v1",
+                                {
+                                    "fold_id": item["fold_id"],
+                                    "variant_id": variant,
+                                    "leaf_id": "leaf",
+                                    "engine_receipt_sha256": engine,
+                                    "tape_kind": kind,
+                                    "projection": sequence,
+                                    "projection_sha256": _sha(sequence),
+                                },
+                            )
                         tape_rows = [
                             {
                                 "sequence_id": sequence_id,
@@ -894,6 +1032,7 @@ def _bundle(
                                     "sequence_sha256": _sha(sequence),
                                     "rows": tape_rows,
                                     "rows_sha256": _sha(tape_rows),
+                                    "base_tape_projection_sha256": base_tape_commitment,
                                 },
                             )
                         )
@@ -945,7 +1084,13 @@ def _bundle(
                         "engine_receipt_sha256": engine,
                         "cost_tape_receipt_sha256": cost,
                         "generic_fallback_proxy_count": 0,
-                        "current_fold_oos_input_count": 0,
+                        "current_fold_oos_input_count": (
+                            1
+                            if mutation == "execution_current_fold_oos_input_count_rerooted"
+                            and i == 4
+                            and variant_index == 0
+                            else 0
+                        ),
                     }
                 ]
                 effective = [
@@ -986,8 +1131,8 @@ def _bundle(
             "recompute_from_json": False,
             "post_oos_augment": False,
             "real_money_enabled": False,
-            "orders_submitted": 0,
-            "capital_allocated": 0,
+            "orders_submitted": 1 if mutation == "manifest_orders_submitted_rerooted" else 0,
+            "capital_allocated": 1 if mutation == "manifest_capital_allocated_rerooted" else 0,
         },
         "provenance": {},
         "folds": manifest_folds,
@@ -996,6 +1141,10 @@ def _bundle(
         manifest["controls"]["real_money_enabled"] = 0
     elif mutation == "overflow":
         manifest["controls"]["orders_submitted"] = int("9" * 400)
+    elif mutation == "manifest_post_oos_augment_rerooted":
+        manifest["controls"]["post_oos_augment"] = True
+    elif mutation == "manifest_real_money_enabled_rerooted":
+        manifest["controls"]["real_money_enabled"] = True
     manifest_path = tmp_path / "manifest.json"
     artifact_index = [{"kind": kinds[digest], "sha256": digest} for digest in sorted(kinds)]
     if mutation == "kind":
@@ -1088,47 +1237,266 @@ def test_router_v2_source_first_positive_paths(tmp_path: Path, mode: str, branch
 
 
 @pytest.mark.parametrize(
+    ("mutation", "expected_reason"),
+    [
+        ("selection_current_fold_oos_input_count_rerooted", "selection replay drift"),
+        ("execution_current_fold_oos_input_count_rerooted", "execution zero-control drift"),
+        ("source_post_oos_augment_rerooted", "source controls are invalid"),
+        ("source_new_grid_search_rerooted", "source controls are invalid"),
+        ("source_recompute_from_json_rerooted", "source controls are invalid"),
+        ("manifest_orders_submitted_rerooted", "manifest controls are invalid"),
+        ("manifest_capital_allocated_rerooted", "manifest controls are invalid"),
+        ("manifest_post_oos_augment_rerooted", "manifest controls are invalid"),
+        ("manifest_real_money_enabled_rerooted", "manifest controls are invalid"),
+    ],
+)
+def test_router_v2_rerooted_nonzero_locked_oos_report_only_controls_stop(
+    tmp_path: Path, mutation: str, expected_reason: str
+) -> None:
+    manifest, paths, trusted = _bundle(tmp_path, "handler", mutation)
+    _rebuild(paths, trusted)
+
+    source = json.loads(paths["source"].read_text(encoding="utf-8"))
+    selection = manifest["folds"][4]["selection"]
+    execution = manifest["folds"][4]["variants"][0]["execution_receipts"][0]
+    assert type(selection["current_fold_oos_input_count"]) is int
+    assert type(execution["current_fold_oos_input_count"]) is int
+    assert type(source["controls"]["post_oos_augment"]) is bool
+    assert type(source["controls"]["new_grid_search"]) is bool
+    assert type(source["controls"]["recompute_from_json"]) is bool
+    assert type(manifest["controls"]["orders_submitted"]) is int
+    assert type(manifest["controls"]["capital_allocated"]) is int
+    assert type(manifest["controls"]["post_oos_augment"]) is bool
+    assert type(manifest["controls"]["real_money_enabled"]) is bool
+    assert selection["current_fold_oos_input_count"] == int(
+        mutation == "selection_current_fold_oos_input_count_rerooted"
+    )
+    assert execution["current_fold_oos_input_count"] == int(
+        mutation == "execution_current_fold_oos_input_count_rerooted"
+    )
+    assert source["controls"]["post_oos_augment"] is (
+        mutation == "source_post_oos_augment_rerooted"
+    )
+    assert source["controls"]["new_grid_search"] is (mutation == "source_new_grid_search_rerooted")
+    assert source["controls"]["recompute_from_json"] is (
+        mutation == "source_recompute_from_json_rerooted"
+    )
+    assert manifest["controls"]["orders_submitted"] == int(
+        mutation == "manifest_orders_submitted_rerooted"
+    )
+    assert manifest["controls"]["capital_allocated"] == int(
+        mutation == "manifest_capital_allocated_rerooted"
+    )
+    assert manifest["controls"]["post_oos_augment"] is (
+        mutation == "manifest_post_oos_augment_rerooted"
+    )
+    assert manifest["controls"]["real_money_enabled"] is (
+        mutation == "manifest_real_money_enabled_rerooted"
+    )
+
+    report = _report(paths, trusted)
+    assert report.status == "STOP"
+    assert report.fold_count == 0
+    assert report.reasons == (expected_reason,)
+
+
+@pytest.mark.parametrize(
+    ("layer", "expected_reason"),
+    [
+        ("source", "source candidate identity drift"),
+        ("manifest", "manifest candidate identity drift"),
+        ("commit", "commit candidate identity drift"),
+    ],
+)
+@pytest.mark.parametrize(
+    "expected_ids",
+    [
+        pytest.param(lambda r1, r2: [r1], id="missing"),
+        pytest.param(lambda r1, r2: [r1, r2, f"{r2}:unapproved"], id="extra"),
+        pytest.param(lambda r1, r2: [r2, r1], id="reordered"),
+        pytest.param(lambda r1, r2: [r1, f"{r2}:unapproved"], id="substituted"),
+    ],
+)
+def test_router_v2_public_rerooted_candidate_identity_layer_boundaries_stop(
+    tmp_path: Path,
+    layer: str,
+    expected_reason: str,
+    expected_ids: Callable[[str, str], list[str]],
+) -> None:
+    _, paths, trusted = _bundle(tmp_path, "handler")
+    source = json.loads(paths["source"].read_text(encoding="utf-8"))
+    r1, r2 = source["candidate_ids"]
+
+    assert tuple(source["candidate_ids"]) == replay.CANDIDATE_IDS
+    assert source["candidate_order"] == list(replay.CANDIDATE_IDS)
+    assert len(source["candidate_ids"]) == 2
+    assert source["controls"] == {
+        "post_oos_augment": False,
+        "new_grid_search": False,
+        "recompute_from_json": False,
+        "post_oos_research_variant": True,
+    }
+    assert _report(paths, trusted).status == "PASS"
+
+    candidate_ids = expected_ids(r1, r2)
+    _reroot_candidate_identity_layer(paths, trusted, layer, candidate_ids)
+
+    rerooted_source = json.loads(paths["source"].read_text(encoding="utf-8"))
+    rerooted_manifest = json.loads(paths["manifest"].read_text(encoding="utf-8"))
+    rerooted_commit = json.loads(paths["commit"].read_text(encoding="utf-8"))
+    layers = {
+        "source": rerooted_source,
+        "manifest": rerooted_manifest,
+        "commit": rerooted_commit,
+    }
+    for name, rerooted in layers.items():
+        if name == layer:
+            assert rerooted["candidate_ids"] == candidate_ids
+            assert rerooted["candidate_ids_sha256"] == _sha(candidate_ids)
+        else:
+            assert rerooted["candidate_ids"] == list(replay.CANDIDATE_IDS)
+            assert rerooted["candidate_ids_sha256"] == replay.CANDIDATE_IDS_SHA256
+    assert rerooted_source["candidate_order"] == (
+        candidate_ids if layer == "source" else list(replay.CANDIDATE_IDS)
+    )
+    assert rerooted_source["controls"] == source["controls"]
+    source_sha256 = hashlib.sha256(paths["source"].read_bytes()).hexdigest()
+    manifest_sha256 = hashlib.sha256(paths["manifest"].read_bytes()).hexdigest()
+    commit_sha256 = hashlib.sha256(paths["commit"].read_bytes()).hexdigest()
+    assert trusted["source"] == source_sha256
+    assert trusted["commit"] == commit_sha256
+    assert rerooted_manifest["provenance"]["source_artifact_sha256"] == source_sha256
+    assert rerooted_commit["source_artifact_sha256"] == source_sha256
+    assert rerooted_commit["manifest_sha256"] == manifest_sha256
+    assert rerooted_manifest["controls"] == {
+        "new_grid_search": False,
+        "recompute_from_json": False,
+        "post_oos_augment": False,
+        "real_money_enabled": False,
+        "orders_submitted": 0,
+        "capital_allocated": 0,
+    }
+
+    report = _report(paths, trusted)
+    assert report.status == "STOP"
+    assert report.fold_count == 0
+    assert report.reasons == (expected_reason,)
+
+
+def test_router_v2_native_grid_rejects_cadence_drift_sparse_and_incomplete_sequences() -> None:
+    start = replay._timestamp("2025-01-01T00:00:00Z", "test start")
+    end = replay._timestamp("2025-01-01T03:00:00Z", "test end")
+
+    replay._window_grid(
+        [
+            "2025-01-01T00:00:00Z",
+            "2025-01-01T01:00:00Z",
+            "2025-01-01T02:00:00Z",
+        ],
+        start,
+        end,
+        "1h",
+    )
+    for timestamps in (
+        [
+            "2025-01-01T00:00:00Z",
+            "2025-01-01T01:00:00Z",
+            "2025-01-01T02:30:00Z",
+        ],
+        ["2025-01-01T00:00:00Z", "2025-01-01T02:00:00Z"],
+        ["2025-01-01T00:00:00Z", "2025-01-01T01:00:00Z"],
+    ):
+        with pytest.raises(ValueError, match="window native-grid drift"):
+            replay._window_grid(timestamps, start, end, "1h")
+
+
+def test_router_v2_public_manifest_lone_surrogate_stops(tmp_path: Path) -> None:
+    _, paths, trusted = _bundle(tmp_path, "handler")
+    paths["manifest"].write_bytes(b'{"malformed":"\\ud800"}')
+
+    report = _report(paths, trusted)
+
+    assert report.status == "STOP"
+    assert report.fold_count == 0
+    assert report.reasons == ("JSON contains invalid Unicode",)
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    ("native_grid_cadence_drift", "native_grid_sparse", "native_grid_incomplete"),
+)
+def test_router_v2_public_native_grid_exploits_stop_exactly(tmp_path: Path, mutation: str) -> None:
+    _, paths, trusted = _bundle(tmp_path, "handler", mutation)
+
+    report = _report(paths, trusted)
+
+    assert report.status == "STOP"
+    assert report.fold_count == 0
+    assert report.reasons == ("window native-grid drift",)
+
+
+def test_router_v2_frozen_no_current_oos_no_augment_no_order_no_capital_lineage_passes(
+    tmp_path: Path,
+) -> None:
+    manifest, paths, trusted = _bundle(tmp_path, "handler")
+    source = json.loads(paths["source"].read_text(encoding="utf-8"))
+    selection = manifest["folds"][4]["selection"]
+    execution = manifest["folds"][4]["variants"][0]["execution_receipts"][0]
+
+    assert selection["current_fold_oos_input_count"] == 0
+    assert execution["current_fold_oos_input_count"] == 0
+    assert source["controls"]["post_oos_augment"] is False
+    assert manifest["controls"]["orders_submitted"] == 0
+    assert manifest["controls"]["capital_allocated"] == 0
+    assert _report(paths, trusted).status == "PASS"
+
+
+@pytest.mark.parametrize(
     "mutation, mode, reason",
     [
-        ("trusted", "handler", "trusted root"),
-        ("kind", "handler", "artifact kind"),
-        ("history", "handler", "history provenance"),
-        ("history_completion", "handler", "history provenance chronology"),
-        ("history_future", "handler", "history provenance chronology"),
-        ("history_timeframe", "handler", "data timeframe"),
-        ("history_weights_float", "handler", "history candidate aggregation"),
-        ("history_weights_bool", "handler", "history candidate aggregation"),
-        ("history_duplicate_leaf_id", "handler", "history leaf identity"),
-        ("history_ineligible_symbol", "handler", "leaf dependencies"),
-        ("source_eligibility", "handler", "ineligible"),
-        ("wrong_symbol", "handler", "row coverage"),
-        ("missing_row", "handler", "signal rows"),
-        ("same_key_omission", "handler", "row coverage"),
-        ("extra_row", "handler", "row coverage"),
-        ("execution_outside_window", "handler", "row coverage"),
-        ("source_window_mismatch", "scaled", "source chronology"),
-        ("overlapping_windows", "scaled", "source chronology"),
-        ("source_window_mismatch", "handler", "source chronology"),
-        ("overlapping_windows", "cash", "source chronology"),
-        ("fallback_position", "scaled", "position scale"),
-        ("fallback_return", "scaled", "execution scale"),
-        ("fallback_base_return", "scaled", "fallback base"),
-        ("profile_unknown_key", "handler", "profile bytes"),
-        ("bool", "handler", "manifest controls"),
-        ("policy_bool", "handler", "source policy"),
-        ("effective_bool", "handler", "effective leaf"),
-        ("receipt_count_bool", "handler", "receipt integer"),
-        ("scale", "handler", "variant scale"),
-        ("cost", "handler", "cost tape"),
-        ("overflow", "handler", "JSON finite"),
-        ("extra", "handler", "signal receipt keys"),
-        ("window", "handler", "window range"),
-        ("role", "handler", "window fold"),
-        ("position_engine", "handler", "position scale"),
-        ("shared", "scaled", "shared MDD"),
-        ("runner_source_drift", "cash", "commit root"),
-        ("cost_bps_float", "handler", "cost tape order"),
-        ("duplicate_row_digest", "handler", "digest is reused"),
+        ("trusted", "handler", "trusted root mismatch"),
+        ("kind", "handler", "artifact kind is missing or wrong"),
+        ("history", "handler", "history provenance chronology drift"),
+        ("history_completion", "handler", "history provenance chronology drift"),
+        ("history_future", "handler", "history provenance chronology drift"),
+        ("history_timeframe", "handler", "data timeframe drift"),
+        ("history_weights_float", "handler", "history candidate aggregation binding drift"),
+        ("history_weights_bool", "handler", "history candidate aggregation binding drift"),
+        ("history_duplicate_leaf_id", "handler", "history leaf identity/timeframe drift"),
+        ("history_ineligible_symbol", "handler", "leaf dependencies are invalid"),
+        (
+            "source_eligibility",
+            "handler",
+            "source candidate is ineligible under frozen source predicate",
+        ),
+        ("wrong_symbol", "handler", "signal row coverage/order drift"),
+        ("missing_row", "handler", "signal rows are invalid"),
+        ("same_key_omission", "handler", "window output sequence drift"),
+        ("extra_row", "handler", "signal row coverage/order drift"),
+        ("execution_outside_window", "handler", "signal row coverage/order drift"),
+        ("source_window_mismatch", "scaled", "source train/validation chronology drift"),
+        ("overlapping_windows", "scaled", "window native-grid drift"),
+        ("source_window_mismatch", "handler", "source train/validation chronology drift"),
+        ("overlapping_windows", "cash", "source train/validation chronology drift"),
+        ("fallback_position", "scaled", "position scale derivation drift"),
+        ("fallback_return", "scaled", "execution scale derivation drift"),
+        ("fallback_base_return", "scaled", "fallback base return/event parity drift"),
+        ("profile_unknown_key", "handler", "combined profile bytes drift"),
+        ("bool", "handler", "manifest controls are invalid"),
+        ("policy_bool", "handler", "source policy drift"),
+        ("effective_bool", "handler", "effective leaf integer drift"),
+        ("receipt_count_bool", "handler", "receipt integer controls are invalid"),
+        ("scale", "handler", "variant scale/rows drift"),
+        ("cost", "handler", "cost tape order drift"),
+        ("overflow", "handler", "JSON.controls.orders_submitted must be finite"),
+        ("extra", "handler", "router_signal_receipt_v2 keys are invalid"),
+        ("window", "handler", "window range drift"),
+        ("role", "handler", "window fold binding drift"),
+        ("position_engine", "handler", "position scale derivation drift"),
+        ("shared", "scaled", "shared MDD return commitment drift"),
+        ("runner_source_drift", "cash", "commit root binding drift"),
+        ("cost_bps_float", "handler", "cost tape order drift"),
+        ("duplicate_row_digest", "handler", "cost tape row digest is reused"),
     ],
 )
 def test_router_v2_exploit_boundaries_stop(
@@ -1139,7 +1507,7 @@ def test_router_v2_exploit_boundaries_stop(
         trusted["source"] = "f" * 64
     report = _report(paths, trusted)
     assert report.status == "STOP"
-    assert any(reason.split()[0] in item for item in report.reasons)
+    assert report.reasons == (reason,)
 
 
 def test_router_v2_fallback_scale_counts_initial_loss_drawdown() -> None:
@@ -1153,6 +1521,78 @@ def test_router_v2_fallback_scale_counts_initial_loss_drawdown() -> None:
     )
 
     assert scale == 500_000
+
+
+@pytest.mark.parametrize(
+    ("eligibility", "expected_branch", "expected_label"),
+    [
+        ((True, False), "strict_core_scaled", replay.BALANCED_LABEL),
+        ((False, True), "strict_core_scaled", replay.GROWTH_LABEL),
+        ((False, False), "strict_core_cash", None),
+    ],
+)
+def test_router_v2_strict_core_requires_selected_candidate_eligibility(
+    tmp_path: Path,
+    eligibility: tuple[bool, bool],
+    expected_branch: str,
+    expected_label: str | None,
+) -> None:
+    _, paths, trusted = _bundle(
+        tmp_path,
+        "scaled",
+        strict_candidate_eligibility=eligibility,
+    )
+    source = json.loads(paths["source"].read_text(encoding="utf-8"))
+    manifest = json.loads(paths["manifest"].read_text(encoding="utf-8"))
+    commit = json.loads(paths["commit"].read_text(encoding="utf-8"))
+    final_strict = source["folds"][-1]["strict_core"]
+    candidates = final_strict["candidates"]
+
+    assert trusted["source"] == hashlib.sha256(paths["source"].read_bytes()).hexdigest()
+    assert trusted["commit"] == hashlib.sha256(paths["commit"].read_bytes()).hexdigest()
+    assert manifest["provenance"]["source_artifact_sha256"] == trusted["source"]
+    assert commit["source_artifact_sha256"] == trusted["source"]
+    assert commit["manifest_sha256"] == hashlib.sha256(paths["manifest"].read_bytes()).hexdigest()
+    assert [candidate["candidate_label"] for candidate in candidates] == [
+        replay.BALANCED_LABEL,
+        replay.GROWTH_LABEL,
+    ]
+    assert [candidate["train_return_ppm"] >= -20_000 for candidate in candidates] == list(
+        eligibility
+    )
+    assert _report(paths, trusted).status == "PASS"
+
+    selection = manifest["folds"][-1]["selection"]
+    assert selection["branch"] == expected_branch
+    assert selection["selected_label"] == expected_label
+    assert selection["leaves"] == (final_strict["leaves"] if expected_label is not None else [])
+
+    if eligibility == (True, False):
+        _reroot_manifest_selection(paths, trusted, -1, replay.GROWTH_LABEL)
+        rerooted_manifest = json.loads(paths["manifest"].read_text(encoding="utf-8"))
+        rerooted_commit = json.loads(paths["commit"].read_text(encoding="utf-8"))
+        assert rerooted_manifest["folds"][-1]["selection"]["selected_label"] == replay.GROWTH_LABEL
+        assert (
+            rerooted_commit["manifest_sha256"]
+            == hashlib.sha256(paths["manifest"].read_bytes()).hexdigest()
+        )
+        assert trusted["commit"] == hashlib.sha256(paths["commit"].read_bytes()).hexdigest()
+
+        report = _report(paths, trusted)
+        assert report.status == "STOP"
+        assert report.reasons == ("selection replay drift",)
+
+
+def test_router_v2_public_cost_base_tape_commitment_control_and_drift(
+    tmp_path: Path,
+) -> None:
+    _, paths, trusted = _bundle(tmp_path, "handler")
+    assert _report(paths, trusted).status == "PASS"
+
+    _, paths, trusted = _bundle(tmp_path, "handler", "cost_base_commitment_drift")
+    report = _report(paths, trusted)
+    assert report.status == "STOP"
+    assert report.reasons == ("cost tape base commitment drift",)
 
 
 def test_router_v2_aggregate_multi_symbol_leaf_returns() -> None:
@@ -1260,7 +1700,7 @@ def test_router_v2_rerooted_initial_loss_shared_mdd_stops(tmp_path: Path) -> Non
 
     report = _report(paths, trusted)
     assert report.status == "STOP"
-    assert any("variant scale/rows drift" in reason for reason in report.reasons)
+    assert report.reasons == ("variant scale/rows drift",)
 
 
 def test_router_v2_negative_position_return_history_replay(tmp_path: Path) -> None:
@@ -1301,8 +1741,9 @@ def test_router_v2_weighted_nonlexicographic_history_bundle(tmp_path: Path) -> N
 
     assert len(history) == 4
     assert all(
-        row["candidate_return_rows"]
-        == [{"timestamp_utc": row["locked_oos"]["start_utc"], "return_ppm": 60}]
+        len(row["candidate_return_rows"]) == 24
+        and row["candidate_return_rows"][0]["timestamp_utc"] == row["locked_oos"]["start_utc"]
+        and all(item["return_ppm"] == 60 for item in row["candidate_return_rows"])
         for row in history
     )
     assert all(

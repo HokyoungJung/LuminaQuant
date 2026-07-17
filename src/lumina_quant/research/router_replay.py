@@ -12,9 +12,10 @@ import importlib
 import inspect
 import json
 import math
+import re
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from fractions import Fraction
 from pathlib import Path
 from typing import Any
@@ -163,7 +164,11 @@ def _canonical_json(path: str | Path) -> tuple[Any, str]:
     raw = Path(path).read_bytes()
     value = json.loads(raw.decode("utf-8"), object_pairs_hook=_pairs, parse_constant=_constant)
     _finite(value, "JSON")
-    if raw != _canonical_bytes(value):
+    try:
+        canonical = _canonical_bytes(value)
+    except UnicodeEncodeError as exc:
+        raise ValueError("JSON contains invalid Unicode") from exc
+    if raw != canonical:
         raise ValueError("artifact JSON is not canonical")
     return value, _raw_sha(raw)
 
@@ -190,6 +195,32 @@ def _timestamp(value: Any, name: str) -> datetime:
     if result.tzinfo != UTC or result.isoformat().replace("+00:00", "Z") != value:
         raise ValueError(f"{name} must be canonical UTC Z")
     return result
+
+
+_TF_PATTERN = re.compile(r"([1-9][0-9]*)([mhd])\Z")
+
+
+def _native_interval(value: Any) -> timedelta:
+    if type(value) is not str:
+        raise ValueError("native timeframe is invalid")
+    match = _TF_PATTERN.fullmatch(value)
+    if match is None:
+        raise ValueError("native timeframe is invalid")
+    count, unit = match.groups()
+    units = {"m": "minutes", "h": "hours", "d": "days"}
+    return timedelta(**{units[unit]: int(count)})
+
+
+def _window_grid(
+    timestamps: list[str], start: datetime, end: datetime, native_timeframe: Any
+) -> None:
+    interval = _native_interval(native_timeframe)
+    span = end - start
+    if span <= timedelta() or span % interval or len(timestamps) != span // interval:
+        raise ValueError("window native-grid drift")
+    for index, stamp in enumerate(timestamps):
+        if _timestamp(stamp, "window output timestamp") != start + index * interval:
+            raise ValueError("window native-grid drift")
 
 
 class _UniqueSafeLoader(yaml.SafeLoader):
@@ -688,6 +719,7 @@ def _data_window(
         )
     ):
         raise ValueError("window output sequence drift")
+    _window_grid(timestamps, start, end, row["native_timeframe"])
     if row["role"] == "locked_oos":
         if {"start_utc": row["start_utc"], "end_utc": row["end_utc"]} != fold[
             "locked_oos"
@@ -1135,6 +1167,7 @@ def _strict_core(
         raise ValueError("strict core leaf list drift")
     candidates: dict[str, Mapping[str, Any]] = {}
     eligible: list[tuple[Fraction, Fraction, Mapping[str, Any]]] = []
+    eligible_by_label: dict[str, Mapping[str, Any]] = {}
     expected_labels = (BALANCED_LABEL, GROWTH_LABEL)
     if len(strict["candidates"]) > len(expected_labels):
         raise ValueError("strict candidate count is invalid")
@@ -1202,21 +1235,16 @@ def _strict_core(
             and mdd <= Fraction(20, 100)
         ):
             eligible.append((validation / max(mdd, Fraction(2, 100)), validation, candidate))
+            eligible_by_label[candidate["candidate_label"]] = candidate
     expected_order = tuple(label for label in expected_labels if label in candidates)
     if tuple(candidates) != expected_order:
         raise ValueError("strict candidate order drift")
     selected = None
-    balanced = candidates.get(BALANCED_LABEL)
-    growth = candidates.get(GROWTH_LABEL)
-    if balanced is not None and growth is not None:
+    balanced = eligible_by_label.get(BALANCED_LABEL)
+    growth = eligible_by_label.get(GROWTH_LABEL)
+    if balanced is not None:
         b_mdd = Fraction(balanced["validation_mdd_ppm"], 1_000_000)
-        if (
-            balanced["leaves"]
-            and Fraction(balanced["train_return_ppm"], 1_000_000) >= Fraction(-2, 100)
-            and Fraction(balanced["validation_return_ppm"], 1_000_000) >= Fraction(-2, 100)
-            and b_mdd <= Fraction(20, 100)
-        ):
-            selected = growth if b_mdd > Fraction(10, 100) else balanced
+        selected = growth if b_mdd > Fraction(10, 100) and growth is not None else balanced
     if selected is None and eligible:
         selected = max(eligible, key=lambda item: item[:2])[2]
     if (
@@ -1327,6 +1355,46 @@ def _decision(
     )
 
 
+def _cost_base_tape_projection(
+    digest: Any,
+    fold: Mapping[str, Any],
+    variant_id: str,
+    leaf: Mapping[str, Any],
+    execution: Mapping[str, Any],
+    kind: str,
+    projection: list[Any],
+    artifacts: _Artifacts,
+) -> str:
+    row = artifacts.get(digest, "cost_base_tape_projection", "router_cost_base_tape_projection_v1")
+    row = _exact(
+        row,
+        {
+            "schema",
+            "fold_id",
+            "variant_id",
+            "leaf_id",
+            "engine_receipt_sha256",
+            "tape_kind",
+            "projection",
+            "projection_sha256",
+        },
+        "cost base tape projection",
+    )
+    if (
+        row["fold_id"] != fold["fold_id"]
+        or row["variant_id"] != variant_id
+        or row["leaf_id"] != leaf["leaf_id"]
+        or row["engine_receipt_sha256"] != execution["engine_receipt_sha256"]
+        or row["tape_kind"] != kind
+        or not isinstance(row["projection"], list)
+        or not row["projection"]
+        or row["projection"] != projection
+        or _sha(row["projection"]) != _digest(row["projection_sha256"], "cost base tape projection")
+    ):
+        raise ValueError("cost base tape projection binding drift")
+    return _digest(digest, "cost base tape projection digest")
+
+
 def _cost_tape(
     digest: Any,
     fold: Mapping[str, Any],
@@ -1372,6 +1440,7 @@ def _cost_tape(
         or len(row["tapes"]) != 4
     ):
         raise ValueError("cost tape identity drift")
+    base_commitments: dict[str, str] = {}
     for tape, bps in zip(row["tapes"], (10, 15, 20, 30), strict=True):
         tape = _exact(
             tape,
@@ -1407,6 +1476,7 @@ def _cost_tape(
                     "variant_id",
                     "leaf_id",
                     "engine_receipt_sha256",
+                    "base_tape_projection_sha256",
                     "sequence",
                     "sequence_sha256",
                     "rows",
@@ -1427,6 +1497,19 @@ def _cost_tape(
                 or _sha(artifact["rows"]) != _digest(artifact["rows_sha256"], "cost rows")
             ):
                 raise ValueError("cost tape artifact binding drift")
+            base_digest = _cost_base_tape_projection(
+                artifact["base_tape_projection_sha256"],
+                fold,
+                variant_id,
+                leaf,
+                execution,
+                kind,
+                artifact["sequence"],
+                artifacts,
+            )
+            if kind in base_commitments and base_commitments[kind] != base_digest:
+                raise ValueError("cost tape base commitment drift")
+            base_commitments[kind] = base_digest
             if (
                 not isinstance(artifact["sequence"], list)
                 or not artifact["sequence"]
@@ -1475,7 +1558,19 @@ def _variants(
     if not isinstance(value, list) or len(value) != 2:
         raise ValueError("variant count is invalid")
     shared = None
-    parity: list[list[tuple[Mapping[str, Any], str, str, str, str]]] = []
+    parity: list[
+        list[
+            tuple[
+                Mapping[str, Any],
+                str,
+                str,
+                str,
+                str,
+                list[tuple[str, str, int]],
+                list[Mapping[str, Any]],
+            ]
+        ]
+    ] = []
     if branch == "strict_core_scaled":
         shared = artifacts.get(shared_digest, "shared_mdd", "router_shared_mdd_receipt_v2")
         shared = _exact(
@@ -1680,7 +1775,17 @@ def _variants(
             or len(variant["execution_receipts"]) != len(leaves)
         ):
             raise ValueError("variant scale/rows drift")
-        variant_parity: list[tuple[Mapping[str, Any], str, str, str, str]] = []
+        variant_parity: list[
+            tuple[
+                Mapping[str, Any],
+                str,
+                str,
+                str,
+                str,
+                list[tuple[str, str, int]],
+                list[Mapping[str, Any]],
+            ]
+        ] = []
         for base, effective, execution in zip(
             leaves, variant["leaves"], variant["execution_receipts"], strict=True
         ):

@@ -16,13 +16,17 @@ lane.  These tests pin the fix:
 from __future__ import annotations
 
 import datetime as dtm
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
 
 from lumina_quant.strategy_factory import research_runner as rr
 from lumina_quant.strategy_factory.candidate_library import build_candidate_manifest
-from lumina_quant.strategy_factory.strategy_signal_dispatch import StrategySignalDispatchError
+from lumina_quant.strategy_factory.strategy_signal_dispatch import (
+    StrategySignalDispatchError,
+    StrategySignalDispatcher,
+)
 
 _SYMBOLS = ["BTC/USDT", "ETH/USDT", "SOL/USDT", "BNB/USDT", "XRP/USDT", "ADA/USDT"]
 _N = 500
@@ -65,11 +69,407 @@ def _aligned_panel() -> dict[str, np.ndarray]:
     return aligned
 
 
+def _crowding_panel(*, warmup_bars: int = 0) -> dict[str, np.ndarray]:
+    aligned = _aligned_panel()
+    warmup = slice(0, warmup_bars)
+    for s_idx, symbol in enumerate(_SYMBOLS):
+        offset = float(s_idx + 1)
+        aligned[f"{symbol}:funding_rate"] = np.linspace(-0.001, 0.001, _N) * offset
+        aligned[f"{symbol}:open_interest"] = np.linspace(1_000.0, 2_000.0, _N) * offset
+        aligned[f"{symbol}:liquidation_long_notional"] = np.linspace(10.0, 20.0, _N) * offset
+        aligned[f"{symbol}:liquidation_short_notional"] = np.linspace(20.0, 10.0, _N) * offset
+        aligned[f"{symbol}:mark_price"] = aligned[f"{symbol}:close"] * 1.0001
+        aligned[f"{symbol}:index_price"] = aligned[f"{symbol}:close"] * 0.9999
+        for field in (
+            "funding_rate",
+            "open_interest",
+            "liquidation_long_notional",
+            "liquidation_short_notional",
+            "mark_price",
+            "index_price",
+        ):
+            aligned[f"{symbol}:{field}"][warmup] = np.nan
+    return aligned
+
+
+def _flow_panel() -> dict[str, np.ndarray]:
+    aligned = _aligned_panel()
+    for s_idx, symbol in enumerate(_SYMBOLS):
+        offset = float(s_idx + 1)
+        aligned[f"{symbol}:taker_buy_quote_volume"] = np.full(_N, 1_100.0 * offset)
+        aligned[f"{symbol}:taker_sell_quote_volume"] = np.full(_N, 900.0 * offset)
+        aligned[f"{symbol}:book_depth_imbalance_1pct"] = np.full(_N, 0.2)
+        aligned[f"{symbol}:bbo_spread_bps"] = np.full(_N, 2.0)
+        aligned[f"{symbol}:liquidation_long_notional"] = np.linspace(10.0, 20.0, _N) * offset
+        aligned[f"{symbol}:liquidation_short_notional"] = np.linspace(20.0, 10.0, _N) * offset
+    return aligned
+
+
+def _assert_actual_handler(result) -> None:
+    assert result[3]["evaluation_mode"] == "handler"
+    assert result[3]["generic_fallback_proxy_count"] == 0
+
+
 def _signal(klass: str, params: dict, scoring=None):
     candidate = {"strategy_class": klass, "params": params}
     return rr._strategy_signal(
         candidate, aligned=_aligned_panel(), symbols=_SYMBOLS, scoring_config=scoring
     )
+
+
+@pytest.mark.parametrize(
+    ("klass", "field", "missing"),
+    (
+        *(
+            (klass, field, missing)
+            for klass in (
+                "PerpCrowdingCarryStrategy",
+                "CarryTrendFactorRotationStrategy",
+                "FundingLiquidationCrowdingFadeStrategy",
+                "FundingDislocationTrendCarryStrategy",
+            )
+            for field in ("mark_price", "index_price")
+            for missing in (False, True)
+        ),
+        *(
+            ("BasisSnapbackReversionStrategy", field, missing)
+            for field in ("mark_price", "index_price")
+            for missing in (False, True)
+        ),
+    ),
+)
+def test_strict_crowding_price_support_rejects_missing_or_all_null_without_fallback(
+    klass: str, field: str, missing: bool
+) -> None:
+    aligned = _crowding_panel()
+    key = f"BTC/USDT:{field}"
+    if missing:
+        aligned.pop(key)
+    else:
+        aligned[key][:] = np.nan
+
+    with pytest.raises(StrategySignalDispatchError, match="missing required support data"):
+        rr._strategy_signal(
+            {"strategy_class": klass, "params": {}},
+            aligned=aligned,
+            symbols=_SYMBOLS,
+            scoring_config=_STRICT_ROUTE_ON,
+        )
+
+
+@pytest.mark.parametrize(
+    "klass",
+    (
+        "PerpCrowdingCarryStrategy",
+        "CarryTrendFactorRotationStrategy",
+        "FundingLiquidationCrowdingFadeStrategy",
+        "FundingDislocationTrendCarryStrategy",
+        "BasisSnapbackReversionStrategy",
+    ),
+)
+def test_strict_crowding_price_support_accepts_warmup_nans_with_finite_support(
+    klass: str,
+) -> None:
+    result = rr._strategy_signal(
+        {"strategy_class": klass, "params": {}},
+        aligned=_crowding_panel(warmup_bars=24),
+        symbols=_SYMBOLS,
+        scoring_config=_STRICT_ROUTE_ON,
+    )
+    _assert_actual_handler(result)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    (
+        ("open_interest", -1.0),
+        ("liquidation_long_notional", -1.0),
+        ("liquidation_short_notional", -1.0),
+        ("mark_price", 0.0),
+        ("index_price", -1.0),
+        ("funding_rate", np.inf),
+    ),
+)
+def test_strict_crowding_rejects_invalid_support_domain_without_fallback(
+    field: str, value: float
+) -> None:
+    aligned = _crowding_panel()
+    aligned[f"BTC/USDT:{field}"][0] = value
+
+    with pytest.raises(StrategySignalDispatchError, match="missing required support data"):
+        rr._strategy_signal(
+            {"strategy_class": "PerpCrowdingCarryStrategy", "params": {}},
+            aligned=aligned,
+            symbols=_SYMBOLS,
+            scoring_config=_STRICT_ROUTE_ON,
+        )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ("missing", "all_null", "infinity", "negative", "disjoint", "post_warmup_hole"),
+)
+def test_strict_cross_asset_liquidation_rejects_malformed_paired_support_without_fallback(
+    kind: str,
+) -> None:
+    aligned = _crowding_panel()
+    long_key = "BTC/USDT:liquidation_long_notional"
+    short_key = "BTC/USDT:liquidation_short_notional"
+    if kind == "missing":
+        aligned.pop(long_key)
+    elif kind == "all_null":
+        aligned[long_key][:] = np.nan
+    elif kind == "infinity":
+        aligned[long_key][24] = np.inf
+    elif kind == "negative":
+        aligned[short_key][24] = -1.0
+    elif kind == "disjoint":
+        aligned[long_key] = np.r_[np.ones(_N // 2), np.full(_N - (_N // 2), np.nan)]
+        aligned[short_key] = np.r_[np.full(_N // 2, np.nan), np.ones(_N - (_N // 2))]
+    else:
+        aligned[long_key][:24] = np.nan
+        aligned[short_key][:24] = np.nan
+        aligned[long_key][48] = np.nan
+
+    with pytest.raises(StrategySignalDispatchError, match="missing required support data") as error:
+        rr._strategy_signal(
+            {"strategy_class": "CrossAssetLiquidationContagionFadeStrategy", "params": {}},
+            aligned=aligned,
+            symbols=_SYMBOLS,
+            scoring_config=_STRICT_ROUTE_ON,
+        )
+
+    assert error.value.__cause__ is None
+
+
+def test_strict_cross_asset_liquidation_accepts_both_leg_nan_prefix_warmup() -> None:
+    result = rr._strategy_signal(
+        {"strategy_class": "CrossAssetLiquidationContagionFadeStrategy", "params": {}},
+        aligned=_crowding_panel(warmup_bars=24),
+        symbols=_SYMBOLS,
+        scoring_config=_STRICT_ROUTE_ON,
+    )
+
+    _assert_actual_handler(result)
+
+
+def test_cross_asset_liquidation_missing_support_remains_non_strict() -> None:
+    aligned = _crowding_panel()
+    aligned.pop("BTC/USDT:liquidation_long_notional")
+
+    result = rr._strategy_signal(
+        {"strategy_class": "CrossAssetLiquidationContagionFadeStrategy", "params": {}},
+        aligned=aligned,
+        symbols=_SYMBOLS,
+    )
+
+    assert result[3]["evaluation_mode"] == "handler"
+    assert "generic_fallback_proxy" not in result[3]
+    assert "generic_fallback_proxy_count" not in result[3]
+    assert np.all(result[2][0] == 0.0)
+    assert result[3]["missing_support_symbols"] == ["BTC/USDT"]
+
+
+@pytest.mark.parametrize(
+    "field",
+    (
+        "taker_buy_quote_volume",
+        "taker_sell_quote_volume",
+        "book_depth_imbalance_1pct",
+        "bbo_spread_bps",
+    ),
+)
+def test_strict_flow_rejects_all_null_source_route_without_fallback(field: str) -> None:
+    aligned = _flow_panel()
+    aligned[f"BTC/USDT:{field}"][:] = np.nan
+
+    with pytest.raises(StrategySignalDispatchError, match="missing required support data"):
+        rr._strategy_signal(
+            {"strategy_class": "FlowImbalanceLiquidationSweepStrategy", "params": {}},
+            aligned=aligned,
+            symbols=_SYMBOLS,
+            scoring_config=_STRICT_ROUTE_ON,
+        )
+
+
+def test_strict_flow_rejects_missing_spread_route_without_fallback() -> None:
+    aligned = _flow_panel()
+    for symbol in _SYMBOLS:
+        aligned.pop(f"{symbol}:bbo_spread_bps")
+
+    with pytest.raises(StrategySignalDispatchError, match="missing required support data"):
+        rr._strategy_signal(
+            {"strategy_class": "FlowImbalanceLiquidationSweepStrategy", "params": {}},
+            aligned=aligned,
+            symbols=_SYMBOLS,
+            scoring_config=_STRICT_ROUTE_ON,
+        )
+
+
+@pytest.mark.parametrize(
+    "field",
+    ("liquidation_long_notional", "liquidation_short_notional"),
+)
+def test_strict_flow_rejects_all_null_liquidation_support_without_fallback(field: str) -> None:
+    aligned = _flow_panel()
+    aligned[f"BTC/USDT:{field}"][:] = np.nan
+
+    with pytest.raises(StrategySignalDispatchError, match="missing required support data"):
+        rr._strategy_signal(
+            {"strategy_class": "FlowImbalanceLiquidationSweepStrategy", "params": {}},
+            aligned=aligned,
+            symbols=_SYMBOLS,
+            scoring_config=_STRICT_ROUTE_ON,
+        )
+
+
+def test_strict_flow_executes_with_finite_support_without_fallback() -> None:
+    result = rr._strategy_signal(
+        {"strategy_class": "FlowImbalanceLiquidationSweepStrategy", "params": {}},
+        aligned=_flow_panel(),
+        symbols=_SYMBOLS,
+        scoring_config=_STRICT_ROUTE_ON,
+    )
+
+    _assert_actual_handler(result)
+
+
+@pytest.mark.parametrize("value", (-1.0001, 1.0001, np.inf))
+def test_strict_flow_rejects_invalid_direct_depth_support_without_fallback(value: float) -> None:
+    aligned = _flow_panel()
+    aligned["BTC/USDT:book_depth_imbalance_1pct"][0] = value
+
+    with pytest.raises(StrategySignalDispatchError, match="missing required support data"):
+        rr._strategy_signal(
+            {"strategy_class": "FlowImbalanceLiquidationSweepStrategy", "params": {}},
+            aligned=aligned,
+            symbols=_SYMBOLS,
+            scoring_config=_STRICT_ROUTE_ON,
+        )
+
+
+@pytest.mark.parametrize("boundary", (-1.0, 1.0))
+def test_strict_flow_accepts_direct_depth_boundaries_without_fallback(boundary: float) -> None:
+    aligned = _flow_panel()
+    aligned["BTC/USDT:book_depth_imbalance_1pct"] = np.r_[
+        np.full(24, np.nan), np.full(_N - 24, boundary)
+    ]
+
+    result = rr._strategy_signal(
+        {"strategy_class": "FlowImbalanceLiquidationSweepStrategy", "params": {}},
+        aligned=aligned,
+        symbols=_SYMBOLS,
+        scoring_config=_STRICT_ROUTE_ON,
+    )
+
+    _assert_actual_handler(result)
+
+
+def test_strict_flow_accepts_finite_bid_ask_quantity_depth_alternate_without_fallback() -> None:
+    aligned = _flow_panel()
+    for symbol in _SYMBOLS:
+        aligned.pop(f"{symbol}:book_depth_imbalance_1pct")
+        aligned[f"{symbol}:best_bid_quantity"] = np.full(_N, 120.0)
+        aligned[f"{symbol}:best_ask_quantity"] = np.full(_N, 80.0)
+
+    result = rr._strategy_signal(
+        {"strategy_class": "FlowImbalanceLiquidationSweepStrategy", "params": {}},
+        aligned=aligned,
+        symbols=_SYMBOLS,
+        scoring_config=_STRICT_ROUTE_ON,
+    )
+
+    _assert_actual_handler(result)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    (
+        ("liquidation_long_notional", -1.0),
+        ("liquidation_short_notional", np.inf),
+    ),
+)
+def test_strict_flow_rejects_invalid_liquidation_support_without_fallback(
+    field: str, value: float
+) -> None:
+    aligned = _flow_panel()
+    aligned[f"BTC/USDT:{field}"][0] = value
+    with pytest.raises(StrategySignalDispatchError, match="missing required support data"):
+        rr._strategy_signal(
+            {"strategy_class": "FlowImbalanceLiquidationSweepStrategy", "params": {}},
+            aligned=aligned,
+            symbols=_SYMBOLS,
+            scoring_config=_STRICT_ROUTE_ON,
+        )
+
+
+@pytest.mark.parametrize(
+    "field_pair",
+    (
+        ("taker_buy_quote_volume", "taker_sell_quote_volume"),
+        ("best_bid_quantity", "best_ask_quantity"),
+    ),
+)
+def test_strict_flow_rejects_disjoint_taker_or_quantity_pairs_without_fallback(
+    field_pair: tuple[str, str],
+) -> None:
+    aligned = _flow_panel()
+    first, second = field_pair
+    if first == "best_bid_quantity":
+        aligned["BTC/USDT:book_depth_imbalance_1pct"][:] = np.nan
+    aligned[f"BTC/USDT:{first}"] = np.r_[np.ones(_N // 2), np.full(_N - (_N // 2), np.nan)]
+    aligned[f"BTC/USDT:{second}"] = np.r_[np.full(_N // 2, np.nan), np.ones(_N - (_N // 2))]
+    with pytest.raises(StrategySignalDispatchError, match="missing required support data"):
+        rr._strategy_signal(
+            {"strategy_class": "FlowImbalanceLiquidationSweepStrategy", "params": {}},
+            aligned=aligned,
+            symbols=_SYMBOLS,
+            scoring_config=_STRICT_ROUTE_ON,
+        )
+
+
+@pytest.mark.parametrize("kind", ("negative_direct", "disjoint", "crossed", "nonpositive"))
+def test_strict_flow_rejects_invalid_bbo_routes_without_fallback(kind: str) -> None:
+    aligned = _flow_panel()
+    if kind == "negative_direct":
+        aligned["BTC/USDT:bbo_spread_bps"][:] = -1.0
+    else:
+        aligned.pop("BTC/USDT:bbo_spread_bps")
+        if kind == "disjoint":
+            aligned["BTC/USDT:best_bid_price"] = np.r_[
+                np.full(_N // 2, 100.0), np.full(_N - (_N // 2), np.nan)
+            ]
+            aligned["BTC/USDT:best_ask_price"] = np.r_[
+                np.full(_N // 2, np.nan), np.full(_N - (_N // 2), 101.0)
+            ]
+        elif kind == "crossed":
+            aligned["BTC/USDT:best_bid_price"] = np.full(_N, 101.0)
+            aligned["BTC/USDT:best_ask_price"] = np.full(_N, 100.0)
+        else:
+            aligned["BTC/USDT:best_bid_price"] = np.zeros(_N)
+            aligned["BTC/USDT:best_ask_price"] = np.full(_N, 100.0)
+    with pytest.raises(StrategySignalDispatchError, match="missing required support data"):
+        rr._strategy_signal(
+            {"strategy_class": "FlowImbalanceLiquidationSweepStrategy", "params": {}},
+            aligned=aligned,
+            symbols=_SYMBOLS,
+            scoring_config=_STRICT_ROUTE_ON,
+        )
+
+
+def test_strict_flow_executes_with_finite_alternate_bbo_without_fallback() -> None:
+    aligned = _flow_panel()
+    for symbol in _SYMBOLS:
+        aligned.pop(f"{symbol}:bbo_spread_bps")
+        aligned[f"{symbol}:best_bid_price"] = np.full(_N, 100.0)
+        aligned[f"{symbol}:best_ask_price"] = np.full(_N, 100.02)
+    result = rr._strategy_signal(
+        {"strategy_class": "FlowImbalanceLiquidationSweepStrategy", "params": {}},
+        aligned=aligned,
+        symbols=_SYMBOLS,
+        scoring_config=_STRICT_ROUTE_ON,
+    )
+    _assert_actual_handler(result)
 
 
 def test_flag_off_unmapped_classes_fall_back_identically_with_label() -> None:
@@ -200,13 +600,104 @@ def test_strict_pair_handler_propagates_simulator_failure_through_research_dispa
     assert str(error.value.__cause__) == "pair simulator failure"
 
 
+@pytest.mark.parametrize("klass", ("PairSpreadZScoreStrategy", "LagConvergenceStrategy"))
+@pytest.mark.parametrize(
+    "params",
+    (
+        {"symbol_x": "DOGE/USDT", "symbol_y": "ETH/USDT"},
+        {"symbol_x": "BTC/USDT", "symbol_y": "DOGE/USDT"},
+        {"symbol_x": "ETH/USDT", "symbol_y": "ETH/USDT"},
+        {"symbol_x": "", "symbol_y": "ETH/USDT"},
+        {"symbol_x": "BTC/USDT", "symbol_y": ""},
+        {"symbol_x": None, "symbol_y": "ETH/USDT"},
+        {"symbol_x": "BTC/USDT", "symbol_y": None},
+    ),
+)
+def test_strict_pair_handlers_reject_explicit_pair_substitutions(
+    klass: str,
+    params: dict[str, str | None],
+) -> None:
+    with pytest.raises(StrategySignalDispatchError) as error:
+        _signal(klass, params, _STRICT_ROUTE_ON)
+
+    assert isinstance(error.value.__cause__, ValueError)
+
+
+@pytest.mark.parametrize("klass", ("PairSpreadZScoreStrategy", "LagConvergenceStrategy"))
+@pytest.mark.parametrize("raw_symbol", ("eth/usdt", " ETH/USDT", "ETHUSDT"))
+def test_strict_pair_handlers_reject_canonicalizing_raw_pair_tokens_before_pair_logic(
+    klass: str,
+    raw_symbol: str,
+    monkeypatch,
+) -> None:
+    pair_logic_calls: list[str] = []
+
+    def _unexpected_pair_logic(*args, **kwargs):
+        pair_logic_calls.append(klass)
+        raise AssertionError("strict pair token validation must precede pair logic")
+
+    monkeypatch.setattr(rr, "_simulate_event_driven_strategy_exposures", _unexpected_pair_logic)
+    monkeypatch.setattr(rr, "_lag_convergence_pair_positions", _unexpected_pair_logic)
+    monkeypatch.setattr(rr, "_pair_spread_fallback_exposures", _unexpected_pair_logic)
+
+    with pytest.raises(StrategySignalDispatchError) as error:
+        _signal(
+            klass,
+            {"symbol_x": raw_symbol, "symbol_y": "SOL/USDT"},
+            _STRICT_ROUTE_ON,
+        )
+
+    assert isinstance(error.value.__cause__, ValueError)
+    assert pair_logic_calls == []
+
+
+@pytest.mark.parametrize("klass", ("PairSpreadZScoreStrategy", "LagConvergenceStrategy"))
+def test_strict_pair_handlers_accept_exact_distinct_panel_symbols_without_fallback(
+    klass: str,
+    monkeypatch,
+) -> None:
+    observed_symbols: list[tuple[str, str]] = []
+
+    def _simulate(*args, **kwargs):
+        observed_symbols.append(kwargs["symbols"])
+        return np.zeros((2, _N), dtype=float)
+
+    monkeypatch.setattr(rr, "_simulate_event_driven_strategy_exposures", _simulate)
+    params = {"symbol_x": "ETH/USDT", "symbol_y": "SOL/USDT"}
+
+    result = _signal(klass, params, _STRICT_ROUTE_ON)
+
+    _assert_actual_handler(result)
+    if klass == "PairSpreadZScoreStrategy":
+        assert observed_symbols == [("ETH/USDT", "SOL/USDT")]
+    else:
+        reads: list[str] = []
+
+        class TrackingPanel(dict[str, np.ndarray]):
+            def __getitem__(self, key: str) -> np.ndarray:
+                reads.append(key)
+                return super().__getitem__(key)
+
+        exposures = np.zeros((len(_SYMBOLS), _N), dtype=float)
+        rr._apply_lag_convergence_strategy(
+            params=params,
+            aligned=TrackingPanel(_aligned_panel()),
+            symbols=_SYMBOLS,
+            n=_N,
+            exposures=exposures,
+            meta={"_strict_actual_engine": True},
+        )
+        assert set(reads) == {"ETH/USDT:close", "SOL/USDT:close"}
+        assert np.all(exposures[[0, 3, 4, 5]] == 0.0)
+
+
 def test_public_research_strict_pair_failure_reaches_dispatcher(monkeypatch) -> None:
     def _failure(*args, **kwargs):
         raise RuntimeError("pair simulator failure")
 
     aligned = _aligned_panel()
     aligned["datetime"] = np.datetime64("2025-01-01T00:00:00.000", "ms") + (
-        np.arange(_N) * np.timedelta64(14_400_000, "ms")
+        np.arange(_N) * np.timedelta64(60_000, "ms")
     )
     symbols = ["BTC/USDT", "ETH/USDT"]
     cache = {
@@ -280,3 +771,404 @@ def test_strict_registry_dispatch_uses_numpy_datetime64_ms_cadence(monkeypatch) 
 
     assert result[3]["evaluation_mode"] == "registry_simulator"
     assert observed_window_seconds == [300] * _N
+
+
+def test_strict_dispatch_rejects_sparse_utc_grid_before_mapped_handler() -> None:
+    calls: list[str] = []
+
+    def handler(params, aligned, symbols, n, exposures, meta) -> None:
+        calls.append("handler")
+        exposures[:] = 0.25
+
+    dispatcher = StrategySignalDispatcher({"MappedStrategy": handler})
+    aligned = _aligned_panel()
+    aligned["datetime"][200:] += dtm.timedelta(hours=4)
+
+    with pytest.raises(
+        StrategySignalDispatchError,
+        match="datetime grid is not positive, regular whole seconds",
+    ):
+        dispatcher.dispatch(
+            {
+                "strategy_class": "MappedStrategy",
+                "strategy_timeframe": "4h",
+                "params": {},
+            },
+            aligned=aligned,
+            symbols=_SYMBOLS,
+            require_actual_engine=True,
+        )
+    assert calls == []
+
+    valid_result = dispatcher.dispatch(
+        {
+            "strategy_class": "MappedStrategy",
+            "strategy_timeframe": "4h",
+            "params": {},
+        },
+        aligned=_aligned_panel(),
+        symbols=_SYMBOLS,
+        require_actual_engine=True,
+    )
+    assert calls == ["handler"]
+    assert valid_result[3]["evaluation_mode"] == "handler"
+
+
+def test_strict_dispatch_rejects_numpy_cadence_mismatch_before_registry_router() -> None:
+    calls: list[str] = []
+
+    def router(strategy_class, params, aligned, symbols) -> np.ndarray:
+        calls.append("router")
+        return np.zeros((len(symbols), len(aligned["datetime"])), dtype=float)
+
+    dispatcher = StrategySignalDispatcher({})
+    aligned = _aligned_panel()
+    start = np.datetime64("2025-01-01T00:00:00.000", "ms")
+    aligned["datetime"] = start + np.arange(_N) * np.timedelta64(300_000, "ms")
+
+    with pytest.raises(
+        StrategySignalDispatchError,
+        match="datetime grid does not match declared strategy timeframe",
+    ):
+        dispatcher.dispatch(
+            {
+                "strategy_class": "RegisteredStrategy",
+                "strategy_timeframe": "4h",
+                "params": {},
+            },
+            aligned=aligned,
+            symbols=_SYMBOLS,
+            unmapped_router=router,
+            require_actual_engine=True,
+        )
+    assert calls == []
+
+    valid_result = dispatcher.dispatch(
+        {
+            "strategy_class": "RegisteredStrategy",
+            "strategy_timeframe": "5m",
+            "params": {},
+        },
+        aligned=aligned,
+        symbols=_SYMBOLS,
+        unmapped_router=router,
+        require_actual_engine=True,
+    )
+    assert calls == ["router"]
+    assert valid_result[3]["evaluation_mode"] == "registry_simulator"
+
+
+def test_strict_dispatch_rejects_conflicting_timeframes_before_registry_router() -> None:
+    calls: list[str] = []
+
+    def router(strategy_class, params, aligned, symbols) -> np.ndarray:
+        calls.append("router")
+        return np.zeros((len(symbols), len(aligned["datetime"])), dtype=float)
+
+    dispatcher = StrategySignalDispatcher({})
+    aligned = _aligned_panel()
+
+    with pytest.raises(
+        StrategySignalDispatchError,
+        match="declared strategy timeframes disagree",
+    ):
+        dispatcher.dispatch(
+            {
+                "strategy_class": "RegisteredStrategy",
+                "strategy_timeframe": "4h",
+                "timeframe": "5m",
+                "params": {},
+            },
+            aligned=aligned,
+            symbols=_SYMBOLS,
+            unmapped_router=router,
+            require_actual_engine=True,
+        )
+    assert calls == []
+
+    valid_result = dispatcher.dispatch(
+        {
+            "strategy_class": "RegisteredStrategy",
+            "strategy_timeframe": "4h",
+            "timeframe": "240m",
+            "params": {},
+        },
+        aligned=aligned,
+        symbols=_SYMBOLS,
+        unmapped_router=router,
+        require_actual_engine=True,
+    )
+    assert calls == ["router"]
+    assert valid_result[3]["evaluation_mode"] == "registry_simulator"
+
+
+@pytest.mark.parametrize("field", ("strategy_timeframe", "timeframe"))
+@pytest.mark.parametrize("value", (None, "", " ", 300))
+def test_strict_dispatch_rejects_malformed_declared_timeframe_before_router(
+    field: str, value: object
+) -> None:
+    calls: list[str] = []
+
+    def router(strategy_class, params, aligned, symbols) -> np.ndarray:
+        calls.append("router")
+        return np.zeros((len(symbols), len(aligned["datetime"])), dtype=float)
+
+    candidate: dict[str, object] = {
+        "strategy_class": "RegisteredStrategy",
+        "params": {},
+        field: value,
+    }
+    with pytest.raises(
+        StrategySignalDispatchError,
+        match="declared strategy timeframe is invalid",
+    ):
+        StrategySignalDispatcher({}).dispatch(
+            candidate,
+            aligned=_aligned_panel(),
+            symbols=_SYMBOLS,
+            unmapped_router=router,
+            require_actual_engine=True,
+        )
+    assert calls == []
+
+
+def test_event_simulator_rejects_cadence_conversion_failure_only_in_strict_mode() -> None:
+    observed_window_seconds: list[int] = []
+
+    class _WindowStrategy:
+        def __init__(self, bars, events, **params):
+            pass
+
+        def calculate_signals_window(self, event):
+            return None
+
+        def calculate_signals(self, event):
+            observed_window_seconds.append(event.window_seconds)
+
+    aligned = _aligned_panel()
+    aligned["datetime"] = np.array([object()] * _N, dtype=object)
+
+    rr._simulate_event_driven_strategy_exposures(
+        _WindowStrategy,
+        params={},
+        aligned=aligned,
+        symbols=_SYMBOLS,
+    )
+    assert observed_window_seconds == [60] * _N
+
+    with pytest.raises(ValueError, match=r"^unable to derive event cadence from datetime input$"):
+        rr._simulate_event_driven_strategy_exposures(
+            _WindowStrategy,
+            params={},
+            aligned=aligned,
+            symbols=_SYMBOLS,
+            require_actual_engine=True,
+        )
+
+
+@pytest.mark.parametrize(
+    ("kind", "cause", "corruption_index"),
+    [
+        pytest.param(
+            "later_drift",
+            "datetime cadence is not positive, regular whole seconds",
+            1,
+            id="drift-first-interval",
+        ),
+        pytest.param(
+            "later_drift",
+            "datetime cadence is not positive, regular whole seconds",
+            _N // 2,
+            id="drift-middle-interval",
+        ),
+        pytest.param(
+            "later_drift",
+            "datetime cadence is not positive, regular whole seconds",
+            _N - 1,
+            id="drift-final-interval",
+        ),
+        pytest.param("nat", "datetime cadence contains NaT", 2),
+        pytest.param(
+            "repeated",
+            "datetime cadence is not positive, regular whole seconds",
+            2,
+        ),
+        pytest.param(
+            "descending",
+            "datetime cadence is not positive, regular whole seconds",
+            2,
+        ),
+        pytest.param("naive", "datetime cadence requires UTC-aware datetime values", None),
+        pytest.param(
+            "non_utc",
+            "datetime cadence requires UTC-aware datetime values",
+            None,
+        ),
+    ],
+)
+def test_strict_event_simulator_rejects_every_invalid_datetime_interval(
+    kind: str, cause: str, corruption_index: int | None
+) -> None:
+    class _WindowStrategy:
+        def __init__(self, bars, events, **params):
+            pass
+
+        def calculate_signals_window(self, event):
+            return None
+
+        def calculate_signals(self, event):
+            return None
+
+    aligned = _aligned_panel()
+    if kind == "later_drift":
+        assert corruption_index is not None
+        aligned["datetime"][corruption_index] += dtm.timedelta(seconds=1)
+    elif kind == "nat":
+        assert corruption_index is not None
+        aligned["datetime"] = np.asarray(
+            [value.replace(tzinfo=None) for value in aligned["datetime"]],
+            dtype="datetime64[ns]",
+        )
+        aligned["datetime"][corruption_index] = np.datetime64("NaT")
+    elif kind == "repeated":
+        assert corruption_index is not None
+        aligned["datetime"][corruption_index] = aligned["datetime"][corruption_index - 1]
+    elif kind == "descending":
+        assert corruption_index is not None
+        aligned["datetime"][corruption_index] = aligned["datetime"][
+            corruption_index - 1
+        ] - dtm.timedelta(hours=4)
+    elif kind == "naive":
+        aligned["datetime"] = np.asarray(
+            [value.replace(tzinfo=None) for value in aligned["datetime"]], dtype=object
+        )
+    else:
+        non_utc = dtm.timezone(dtm.timedelta(hours=1))
+        aligned["datetime"] = np.asarray(
+            [value.astimezone(non_utc) for value in aligned["datetime"]], dtype=object
+        )
+
+    with pytest.raises(
+        ValueError, match=r"^unable to derive event cadence from datetime input$"
+    ) as error:
+        rr._simulate_event_driven_strategy_exposures(
+            _WindowStrategy,
+            params={},
+            aligned=aligned,
+            symbols=_SYMBOLS,
+            require_actual_engine=True,
+        )
+    assert isinstance(error.value.__cause__, ValueError)
+    assert str(error.value.__cause__) == cause
+
+
+@pytest.mark.parametrize(
+    ("signal_symbol", "signal_type", "timestamp_kind", "message"),
+    [
+        (
+            "DOGE/USDT",
+            "LONG",
+            "current",
+            "signal symbol is outside the panel universe: DOGE/USDT",
+        ),
+        (
+            None,
+            "LONG",
+            "current",
+            "signal symbol must be an exact canonical panel symbol",
+        ),
+        (
+            "btc/usdt",
+            "LONG",
+            "current",
+            "signal symbol is not an exact canonical panel symbol: btc/usdt",
+        ),
+        ("BTC/USDT", "HOLD", "current", "unsupported signal type: HOLD"),
+        ("BTC/USDT", "long", "current", "unsupported signal type: long"),
+        ("BTC/USDT", " LONG", "current", "unsupported signal type:  LONG"),
+        ("BTC/USDT", "LONG", "missing", "signal datetime is missing"),
+        (
+            "BTC/USDT",
+            "LONG",
+            "stale",
+            "signal datetime does not match current event time",
+        ),
+        (
+            "BTC/USDT",
+            "LONG",
+            "future",
+            "signal datetime does not match current event time",
+        ),
+    ],
+)
+def test_strict_registry_rejects_invalid_queued_signals_while_legacy_route_labels_fallback(
+    monkeypatch,
+    signal_symbol: str | None,
+    signal_type: str,
+    timestamp_kind: str,
+    message: str,
+) -> None:
+    class _RegisteredWindowStrategy:
+        def __init__(self, bars, events, **params):
+            self.events = events
+
+        def calculate_signals_window(self, event):
+            return None
+
+        def calculate_signals(self, event):
+            if timestamp_kind == "stale":
+                signal_time = event.time - dtm.timedelta(hours=4)
+            elif timestamp_kind == "future":
+                signal_time = event.time + dtm.timedelta(hours=4)
+            elif timestamp_kind == "missing":
+                signal_time = None
+            else:
+                signal_time = event.time
+            self.events.put(
+                SimpleNamespace(
+                    symbol=signal_symbol,
+                    signal_type=signal_type,
+                    datetime=signal_time,
+                )
+            )
+
+    monkeypatch.setattr(
+        "lumina_quant.strategies.registry.resolve_strategy_class",
+        lambda strategy_class: _RegisteredWindowStrategy,
+    )
+    with pytest.raises(StrategySignalDispatchError) as error:
+        _signal("RegisteredWindowStrategy", {}, _STRICT_ROUTE_ON)
+    assert isinstance(error.value.__cause__, ValueError)
+    assert str(error.value.__cause__) == message
+
+    legacy = _signal("RegisteredWindowStrategy", {}, _ROUTE_ON)
+    expected_mode = (
+        "generic_fallback_proxy"
+        if signal_symbol in {None, "DOGE/USDT"}
+        or signal_type.upper() not in {"LONG", "SHORT", "EXIT"}
+        else "registry_simulator"
+    )
+    assert legacy[3]["evaluation_mode"] == expected_mode
+
+
+def test_strict_registry_accepts_valid_queued_signals(monkeypatch) -> None:
+    class _RegisteredWindowStrategy:
+        def __init__(self, bars, events, **params):
+            self.events = events
+
+        def calculate_signals_window(self, event):
+            return None
+
+        def calculate_signals(self, event):
+            self.events.put(
+                SimpleNamespace(symbol="BTC/USDT", signal_type="LONG", datetime=event.time)
+            )
+
+    monkeypatch.setattr(
+        "lumina_quant.strategies.registry.resolve_strategy_class",
+        lambda strategy_class: _RegisteredWindowStrategy,
+    )
+
+    result = _signal("RegisteredWindowStrategy", {}, _STRICT_ROUTE_ON)
+    assert result[3]["evaluation_mode"] == "registry_simulator"
+    assert np.all(result[2] > 0.0)

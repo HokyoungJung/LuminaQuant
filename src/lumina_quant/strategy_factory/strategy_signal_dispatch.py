@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import numpy as np
+from lumina_quant.market_data import normalize_timeframe_token, timeframe_to_milliseconds
 
 StrategySignalHandler = Callable[
     [dict[str, Any], dict[str, np.ndarray], Sequence[str], int, np.ndarray, dict[str, Any]],
@@ -25,9 +26,9 @@ class StrategySignalDispatchError(RuntimeError):
 
 
 # Optional route for candidates whose ``strategy_class`` has no bespoke handler:
-# ``(strategy_class, params, aligned, symbols) -> exposures | None``.  Returning
-# ``None`` (or raising) falls back to the generic proxy, which is now always
-# labelled in ``meta`` so proxy rows can never be silently attributed to a lane.
+# ``(strategy_class, params, aligned, symbols) -> exposures | None``.  In non-strict
+# dispatch, returning ``None`` (or raising) falls back to the generic proxy, which is
+# always labelled in ``meta`` so proxy rows cannot be silently attributed to a lane.
 UnmappedStrategyRouter = Callable[
     [str, dict[str, Any], dict[str, np.ndarray], Sequence[str]],
     "np.ndarray | None",
@@ -75,6 +76,7 @@ class StrategySignalDispatcher:
         if require_actual_engine:
             n = self._validate_actual_engine_input(
                 strategy_class=strategy_class,
+                candidate=candidate,
                 aligned=aligned,
                 symbols=symbols,
             )
@@ -139,6 +141,10 @@ class StrategySignalDispatcher:
                     ) from exc
                 finally:
                     meta.pop("_strict_actual_engine", None)
+                if meta.get("missing_support_data") or meta.get("missing_support_symbols"):
+                    raise StrategySignalDispatchError(
+                        strategy_class, "handler reported missing required support data"
+                    )
                 self._validate_actual_engine_exposures(
                     strategy_class=strategy_class,
                     source="handler",
@@ -220,6 +226,7 @@ class StrategySignalDispatcher:
     def _validate_actual_engine_input(
         *,
         strategy_class: str,
+        candidate: Mapping[str, Any],
         aligned: dict[str, np.ndarray],
         symbols: Sequence[str],
     ) -> int:
@@ -239,11 +246,20 @@ class StrategySignalDispatcher:
         if len(symbols) != len(set(symbols)):
             raise StrategySignalDispatchError(strategy_class, "symbols must be unique")
 
+        required_bar_keys = {
+            f"{symbol}:{field}"
+            for symbol in symbols
+            for field in ("open", "high", "low", "close", "volume")
+        }
+        required_keys = {"datetime", *required_bar_keys}
+        for key in required_keys:
+            if key not in aligned:
+                if key == "datetime":
+                    raise StrategySignalDispatchError(strategy_class, "missing datetime array")
+                raise StrategySignalDispatchError(
+                    strategy_class, f"missing required bar array for {key}"
+                )
         first_close_key = f"{symbols[0]}:close"
-        if first_close_key not in aligned:
-            raise StrategySignalDispatchError(
-                strategy_class, f"missing close array for {symbols[0]}"
-            )
         try:
             n = len(aligned[first_close_key])
         except TypeError as exc:
@@ -261,14 +277,12 @@ class StrategySignalDispatcher:
                 ) from exc
             if values.ndim != 1 or values.shape[0] != n:
                 raise StrategySignalDispatchError(strategy_class, f"misaligned array for {key}")
-            if key == "datetime" or np.issubdtype(values.dtype, np.datetime64):
+            if key == "datetime":
                 try:
                     if np.issubdtype(values.dtype, np.datetime64):
                         if np.isnat(values).any():
                             raise ValueError("NaT")
                         timestamps = values.astype("datetime64[ns]").astype(np.int64)
-                    elif np.issubdtype(values.dtype, np.number):
-                        timestamps = values.astype(float, copy=False)
                     else:
                         normalized: list[float] = []
                         for value in values:
@@ -288,6 +302,11 @@ class StrategySignalDispatcher:
                     raise StrategySignalDispatchError(
                         strategy_class, f"nonmonotone or nonfinite datetime array for {key}"
                     )
+                StrategySignalDispatcher._validate_actual_engine_datetime_grid(
+                    strategy_class=strategy_class,
+                    candidate=candidate,
+                    values=values,
+                )
                 continue
             try:
                 numeric = values.astype(float, copy=False)
@@ -295,7 +314,7 @@ class StrategySignalDispatcher:
                 raise StrategySignalDispatchError(
                     strategy_class, f"non-numeric aligned array for {key}"
                 ) from exc
-            if not np.isfinite(numeric).all():
+            if key in required_bar_keys and not np.isfinite(numeric).all():
                 raise StrategySignalDispatchError(
                     strategy_class, f"nonfinite aligned array for {key}"
                 )
@@ -323,6 +342,89 @@ class StrategySignalDispatcher:
         return n
 
     @staticmethod
+    def _validate_actual_engine_datetime_grid(
+        *,
+        strategy_class: str,
+        candidate: Mapping[str, Any],
+        values: np.ndarray,
+    ) -> None:
+        if values.size < 2:
+            raise StrategySignalDispatchError(
+                strategy_class, "datetime grid requires at least two values"
+            )
+        try:
+            if np.issubdtype(values.dtype, np.datetime64):
+                normalized = values.astype("datetime64[ns]")
+                if np.isnat(normalized).any():
+                    raise ValueError("NaT")
+                if not np.array_equal(normalized.astype(values.dtype), values):
+                    raise ValueError("datetime conversion overflow")
+                intervals = np.diff(normalized.astype(np.int64))
+                units_per_second = 1_000_000_000
+                if (
+                    np.any(intervals <= 0)
+                    or np.any(intervals != intervals[0])
+                    or intervals[0] % units_per_second
+                ):
+                    raise ValueError("irregular cadence")
+                cadence_ms = int(intervals[0] // 1_000_000)
+            else:
+                datetimes = list(values)
+                if any(
+                    not isinstance(value, datetime)
+                    or value.tzinfo is None
+                    or value.utcoffset() != UTC.utcoffset(value)
+                    for value in datetimes
+                ):
+                    raise ValueError("non-UTC datetime")
+                intervals = [
+                    datetimes[index] - datetimes[index - 1] for index in range(1, len(datetimes))
+                ]
+                if (
+                    any(interval <= timedelta(0) for interval in intervals)
+                    or any(interval != intervals[0] for interval in intervals)
+                    or intervals[0].microseconds
+                ):
+                    raise ValueError("irregular cadence")
+                cadence_ms = (
+                    intervals[0].days * 86_400_000
+                    + intervals[0].seconds * 1_000
+                    + intervals[0].microseconds // 1_000
+                )
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise StrategySignalDispatchError(
+                strategy_class, "datetime grid is not positive, regular whole seconds"
+            ) from exc
+
+        declared_timeframes: list[int] = []
+        try:
+            for field in ("strategy_timeframe", "timeframe"):
+                if field not in candidate:
+                    continue
+                raw_timeframe = candidate[field]
+                if not isinstance(raw_timeframe, str) or not raw_timeframe.strip():
+                    raise ValueError("invalid declared timeframe")
+                token = raw_timeframe
+                declared_timeframes.append(
+                    int(timeframe_to_milliseconds(normalize_timeframe_token(token)))
+                )
+        except Exception as exc:
+            raise StrategySignalDispatchError(
+                strategy_class, "declared strategy timeframe is invalid"
+            ) from exc
+        if not declared_timeframes:
+            return
+        if len(set(declared_timeframes)) != 1:
+            raise StrategySignalDispatchError(
+                strategy_class, "declared strategy timeframes disagree"
+            )
+        declared_ms = declared_timeframes[0]
+        if cadence_ms != declared_ms:
+            raise StrategySignalDispatchError(
+                strategy_class, "datetime grid does not match declared strategy timeframe"
+            )
+
+    @staticmethod
     def _set_actual_engine_exposures(
         *,
         strategy_class: str,
@@ -336,18 +438,13 @@ class StrategySignalDispatcher:
             raise StrategySignalDispatchError(
                 strategy_class, f"{source} returned non-numeric exposures"
             ) from exc
-        if values.shape != target.shape:
-            raise StrategySignalDispatchError(
-                strategy_class,
-                f"{source} returned exposures with shape {values.shape}, expected {target.shape}",
-            )
-        target[:] = values
         StrategySignalDispatcher._validate_actual_engine_exposures(
             strategy_class=strategy_class,
             source=source,
-            exposures=target,
+            exposures=values,
             expected_shape=target.shape,
         )
+        target[:] = values
 
     @staticmethod
     def _validate_actual_engine_exposures(

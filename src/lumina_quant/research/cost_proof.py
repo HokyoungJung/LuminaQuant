@@ -463,6 +463,7 @@ def _artifact_bindings(
         "cost_order_tape",
         "cost_fill_tape",
         "cost_event_tape",
+        "cost_base_tape_projection",
     }
     committed_cost = {digest for digest, kind in committed_kinds.items() if kind in cost_kinds}
     if not committed_cost or not committed_cost <= set(router_raw):
@@ -563,6 +564,7 @@ def _artifact_bindings(
         if tapes is None or len(tapes) != len(COST_LADDER):
             raise ValueError("Router cost tape count mismatch")
         consumed_router.add(digest)
+        base_commitments: dict[str, str] = {}
         for row, cost_bps in zip(tapes, COST_LADDER, strict=True):
             fields = {
                 "cost_bps",
@@ -607,6 +609,7 @@ def _artifact_bindings(
                     "sequence_sha256",
                     "rows",
                     "rows_sha256",
+                    "base_tape_projection_sha256",
                 }
                 if (
                     set(artifact) != artifact_fields
@@ -628,6 +631,44 @@ def _artifact_bindings(
                     or artifact.get("engine_receipt_sha256") != receipt["engine_receipt_sha256"]
                 ):
                     raise ValueError("Router tape artifact ownership drift")
+                base_digest = artifact.get("base_tape_projection_sha256")
+                if (
+                    not _hash(base_digest)
+                    or base_digest not in committed_cost
+                    or committed_kinds.get(base_digest) != "cost_base_tape_projection"
+                ):
+                    raise ValueError("Router base tape committed-kind mismatch")
+                base = _canonical_artifact(router_raw[base_digest])
+                base_fields = {
+                    "schema",
+                    "fold_id",
+                    "variant_id",
+                    "leaf_id",
+                    "engine_receipt_sha256",
+                    "tape_kind",
+                    "projection",
+                    "projection_sha256",
+                }
+                if (
+                    set(base) != base_fields
+                    or base.get("schema") != "router_cost_base_tape_projection_v1"
+                    or base.get("fold_id") != receipt["fold_id"]
+                    or base.get("variant_id") != receipt["variant_id"]
+                    or base.get("leaf_id") != receipt["leaf_id"]
+                    or base.get("engine_receipt_sha256") != receipt["engine_receipt_sha256"]
+                    or base.get("tape_kind") != expected_kind
+                    or not isinstance(base.get("projection"), list)
+                    or not base["projection"]
+                    or base["projection"] != artifact["sequence"]
+                    or _canonical_sha256(base["projection"]) != base.get("projection_sha256")
+                    or (
+                        expected_kind in base_commitments
+                        and base_commitments[expected_kind] != base_digest
+                    )
+                ):
+                    raise ValueError("Router base tape ownership drift")
+                base_commitments[expected_kind] = base_digest
+                consumed_router.add(base_digest)
             key = (receipt["variant_id"], receipt["fold_id"], receipt["leaf_id"], cost_bps)
             if key in router_tapes:
                 raise ValueError("duplicate Router cost tape commitment")
@@ -864,7 +905,11 @@ def _utc(value: Any) -> datetime | None:
         parsed = datetime.fromisoformat(value[:-1] + "+00:00")
     except TypeError, ValueError, OverflowError:
         return None
-    if parsed.tzinfo is None or parsed.utcoffset() != UTC.utcoffset(parsed):
+    if (
+        parsed.tzinfo is None
+        or parsed.utcoffset() != UTC.utcoffset(parsed)
+        or parsed.astimezone(UTC).isoformat().replace("+00:00", "Z") != value
+    ):
         return None
     return parsed
 
@@ -1005,7 +1050,6 @@ def _router_subset(
     *,
     fold_id: str,
     candidate_id: str,
-    kind: str,
 ) -> set[int] | None:
     """Authenticate one exact downstream Router subset, never a self-hash."""
     committed = _records(artifact.get("rows"))
@@ -1053,7 +1097,6 @@ def _router_subset(
         if (
             not isinstance(sequence_id, str)
             or sequence_id not in expected
-            or row.get("leaf_id") != artifact.get("leaf_id")
             or row.get("engine_receipt_sha256") != artifact.get("engine_receipt_sha256")
             or _canonical_sha256(dict(row)) != expected[sequence_id]
         ):
@@ -1915,6 +1958,24 @@ def _strict_funding(
     positions: Mapping[str, tuple[dict[str, float], dict[str, float]]],
     bindings: ExternalBindings,
 ) -> dict[str, float] | None:
+    # A held end position must never bridge an unrepresented UTC funding
+    # settlement.  The next represented period then supplies both the exact
+    # source mark and the funding row through the checks below.
+    represented = set(times.values())
+    ordered_periods = list(fold["periods"])
+    for index, period in enumerate(ordered_periods[:-1]):
+        period_id = str(period["period_id"])
+        _starts, ends = positions[period_id]
+        if not any(abs(quantity) > EPS for quantity in ends.values()):
+            continue
+        stamp, next_stamp = times[period_id], times[str(ordered_periods[index + 1]["period_id"])]
+        boundary = stamp.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(
+            hours=(stamp.hour // 8 + 1) * 8
+        )
+        while boundary < next_stamp:
+            if boundary not in represented:
+                return None
+            boundary += timedelta(hours=8)
     expected: dict[tuple[str, str], float] = {}
     for period in fold["periods"]:
         period_id = period["period_id"]
@@ -2098,17 +2159,6 @@ def _strict_fold(
     cash_fold = not expected_symbols
     if validation_last is None or locked_last is None:
         return None
-    for final_period in (validation_last, locked_last):
-        _, final_positions = positions[final_period]
-        if any(abs(quantity) > EPS for quantity in final_positions.values()):
-            return None
-        if not cash_fold and not any(
-            event["event_type"] in {"flatten", "liquidation"}
-            and event["period_id"] == final_period
-            and tape["fills"][str(event["fill_id"])]["is_entry"] is False
-            for event in tape["events_by_period"].get(final_period, [])
-        ):
-            return None
     if cash_fold and (
         any(order["period_id"] in times for order in tape["orders"].values())
         or any(fill["period_id"] in times for fill in tape["fills"].values())
@@ -2152,7 +2202,14 @@ def _strict_fold(
         return None
     maintenance = _num(execution.get("maintenance_margin_rate"), positive=True)
     buffer = _num(execution.get("liquidation_buffer_rate"), positive=True)
-    if maintenance is None or buffer is None:
+    backtest = _mapping(bindings.profile.get("backtest"))
+    leverage_limit = _num(backtest.get("leverage")) if backtest is not None else None
+    if (
+        maintenance is None
+        or buffer is None
+        or leverage_limit is None
+        or not _close(leverage_limit, 3.0)
+    ):
         return None
     period_fields = {
         "period_id",
@@ -2184,16 +2241,26 @@ def _strict_fold(
     locked_ids: list[str] = []
     ruin_seen = False
     returns: list[tuple[str, str, float, float]] = []
-    pending_immediate_breach = False
+    pending_safety_breach = False
+    safety_failure_seen = False
+    endpoint_closures: dict[str, set[str]] = {}
+    endpoint_live_symbols: dict[str, set[str]] = {}
     fills_by_period: dict[str, list[Mapping[str, Any]]] = {
         period_id: [tape["fills"][str(event["fill_id"])] for event in events]
         for period_id, events in tape["events_by_period"].items()
     }
     for period in periods:
+        if pending_safety_breach:
+            return None
         if not _exact_fields(period, period_fields):
             return None
         period_id = str(period["period_id"])
         starts, ends = positions[period_id]
+        if period_id in {validation_last, locked_last}:
+            endpoint_closures[period_id] = set()
+            endpoint_live_symbols[period_id] = {
+                symbol for symbol, quantity in starts.items() if abs(quantity) > EPS
+            }
         prior_equity = cash + sum(
             quantity * (float(tape["signals"][(period_id, symbol)]["prior_mark_price"]) - basis)
             for symbol, (quantity, basis) in inventory.items()
@@ -2234,6 +2301,26 @@ def _strict_fold(
             abs(quantity * float(tape["signals"][(period_id, symbol)]["prior_mark_price"]))
             for symbol, (quantity, _) in inventory.items()
         )
+        initial_safety_breach = (
+            min_intrabar_equity > EPS and min_intrabar_equity <= maintenance_at_min_equity
+        ) or (
+            min_intrabar_equity > EPS
+            and sum(
+                abs(
+                    quantity
+                    * (
+                        float(tape["signals"][(period_id, symbol)]["low"])
+                        if quantity > 0
+                        else float(tape["signals"][(period_id, symbol)]["high"])
+                    )
+                )
+                for symbol, (quantity, _) in inventory.items()
+            )
+            / min_intrabar_equity
+            > leverage_limit + EPS
+        )
+        pending_safety_breach = pending_safety_breach or initial_safety_breach
+        safety_failure_seen = safety_failure_seen or initial_safety_breach
         for fill in fills_by_period.get(period_id, []):
             symbol, delta, price = (
                 str(fill["symbol"]),
@@ -2260,7 +2347,7 @@ def _strict_fold(
                     else (basis if abs(new_quantity) > EPS else 0.0)
                 )
             event = tape["fill_events"][str(fill["fill_id"])]
-            if pending_immediate_breach and event["event_type"] != "liquidation":
+            if pending_safety_breach and event["event_type"] != "liquidation":
                 return None
             old_quantity = quantity
             if (
@@ -2287,6 +2374,16 @@ def _strict_fold(
                 )
             ):
                 return None
+            if period_id in {validation_last, locked_last}:
+                if abs(old_quantity) > EPS or abs(new_quantity) > EPS:
+                    endpoint_live_symbols[period_id].add(symbol)
+                if (
+                    fill["is_entry"] is False
+                    and event["event_type"] in {"flatten", "liquidation"}
+                    and abs(old_quantity) > EPS
+                    and abs(new_quantity) <= EPS
+                ):
+                    endpoint_closures[period_id].add(symbol)
             pre_fill_notional = sum(
                 abs(
                     current_quantity
@@ -2315,9 +2412,13 @@ def _strict_fold(
                 abs(current_quantity * immediate_marks[current_symbol]) * (maintenance + buffer)
                 for current_symbol, (current_quantity, _) in inventory.items()
             )
-            pre_event_breached = pre_event_equity <= pre_event_maintenance
+            pre_event_breached = pre_event_equity <= pre_event_maintenance or (
+                pre_event_equity > EPS
+                and pre_fill_notional / pre_event_equity > leverage_limit + EPS
+            )
             if (pre_event_breached and event["event_type"] != "liquidation") or (
-                event["event_type"] == "liquidation" and not pre_event_breached
+                event["event_type"] == "liquidation"
+                and not (pre_event_breached or pending_safety_breach)
             ):
                 return None
             inventory[symbol] = (new_quantity, new_basis)
@@ -2358,6 +2459,17 @@ def _strict_fold(
                 * (maintenance + buffer)
                 for current_symbol, (current_quantity, _) in inventory.items()
             )
+            adverse_notional = sum(
+                abs(
+                    current_quantity
+                    * (
+                        float(tape["signals"][(period_id, current_symbol)]["low"])
+                        if current_quantity > 0
+                        else float(tape["signals"][(period_id, current_symbol)]["high"])
+                    )
+                )
+                for current_symbol, (current_quantity, _) in inventory.items()
+            )
             post_fill_notional = sum(
                 abs(
                     current_quantity
@@ -2373,8 +2485,26 @@ def _strict_fold(
             if adverse_equity <= min_intrabar_equity:
                 min_intrabar_equity = adverse_equity
                 maintenance_at_min_equity = adverse_maintenance
-            pending_immediate_breach = immediate_equity <= immediate_maintenance
+            immediate_safety_breach = immediate_equity <= immediate_maintenance or (
+                immediate_equity > EPS
+                and post_fill_notional / immediate_equity > leverage_limit + EPS
+            )
+            adverse_safety_breach = adverse_equity > EPS and (
+                adverse_equity <= adverse_maintenance
+                or adverse_notional / adverse_equity > leverage_limit + EPS
+            )
+            pending_safety_breach = (immediate_safety_breach or adverse_safety_breach) and any(
+                abs(quantity) > EPS for quantity, _ in inventory.values()
+            )
+            safety_failure_seen = (
+                safety_failure_seen or immediate_safety_breach or adverse_safety_breach
+            )
         if any(not _close(ends[symbol], inventory[symbol][0]) for symbol in expected_symbols):
+            return None
+        if period_id in {validation_last, locked_last} and (
+            any(abs(quantity) > EPS for quantity, _ in inventory.values())
+            or endpoint_closures[period_id] != endpoint_live_symbols[period_id]
+        ):
             return None
         linear = period_linear
         impact = period_impact
@@ -2444,7 +2574,7 @@ def _strict_fold(
             locked_ids.append(period_id)
         returns.append((period_id, str(period["segment"]), raw, normalized))
         ruin_seen = ruin_seen or min_intrabar_equity <= 0
-    if pending_immediate_breach:
+    if pending_safety_breach:
         return None
     final_equity = _num(fold.get("equity"))
     if final_equity is None or not _close(
@@ -2472,7 +2602,7 @@ def _strict_fold(
         locked_ids,
         returns,
         locked_gain,
-        bool(fold["liquidation_count"]) or ruin_seen,
+        safety_failure_seen or bool(fold["liquidation_count"]) or ruin_seen,
     )
 
 
@@ -2498,7 +2628,6 @@ def _authenticated_router_tapes(
                 bundle[artifact_name],
                 fold_id=fold_id,
                 candidate_id=candidate_id,
-                kind=artifact_name,
             )
             if subset is None or consumed[source_name] & subset:
                 return False
@@ -2688,6 +2817,7 @@ def _trial_ledger(
             not _exact_fields(trial, trial_fields)
             or trial_id is None
             or trial_id in seen_ids
+            or artifact is None
             or type(trial.get("ordinal")) is not int
             or trial["ordinal"] != ordinal
             or type(artifact.get("ordinal")) is not int
@@ -2699,7 +2829,6 @@ def _trial_ledger(
             or (prior_completed is not None and completed < prior_completed)
             or status not in {"succeeded", "failed", "skipped"}
             or not _hash(digest)
-            or artifact is None
             or digest in consumed
             or set(artifact) != result_fields
             or artifact.get("schema") != "cost_proof_trial_result_v2"
@@ -2876,9 +3005,9 @@ def _candidate(
     economic_tape_sha256: str | None = None
     layout: tuple[Any, ...] | None = None
     twenty: (
-        tuple[list[float], list[float], list[tuple[str, float]], bool, list[float], list[str]]
-        | None
+        tuple[list[float], list[float], list[tuple[str, float]], list[float], list[str]] | None
     ) = None
+    safety_failure = False
     locked_ids_20bp: list[str] | None = None
     initial_equities_20bp: tuple[float, ...] | None = None
     for scenario in scenarios:
@@ -2906,6 +3035,7 @@ def _candidate(
         if engine is None:
             return None, "engine ledger does not reconcile"
         locked_ids, parsed_folds = engine
+        safety_failure = safety_failure or any(fold[3] for fold in parsed_folds)
         errors: list[str] = []
         current_tapes = _verify_tapes(scenario, errors)
         if current_tapes is None:
@@ -2961,7 +3091,6 @@ def _candidate(
                 raw,
                 normalized,
                 [(fold[2], fold[1]) for fold in parsed_folds],
-                any(fold[3] for fold in parsed_folds),
                 validation,
                 validation_ids,
             )
@@ -2969,7 +3098,7 @@ def _candidate(
         return None, "missing 20bp scenario"
     if locked_ids_20bp is None or initial_equities_20bp is None:
         return None, "missing locked-OOS identity"
-    raw, normalized, folds, safety_failure, validation, validation_ids_20bp = twenty
+    raw, normalized, folds, validation, validation_ids_20bp = twenty
     if len(raw) < 16 or len(raw) % CSCV_SPLITS or len(raw) != len(normalized):
         return None, "insufficient locked-OOS data"
     values = np.asarray(raw + normalized, dtype=float)
@@ -3146,6 +3275,7 @@ def evaluate_cost_proof(
         OverflowError,
         RecursionError,
         TypeError,
+        UnicodeEncodeError,
         ValueError,
     ):
         return _report("STOP", ["malformed evidence"])
@@ -3216,6 +3346,7 @@ def evaluate_cost_proof_file(
         RecursionError,
         TypeError,
         UnicodeDecodeError,
+        UnicodeEncodeError,
         json.JSONDecodeError,
         yaml.YAMLError,
         ValueError,
