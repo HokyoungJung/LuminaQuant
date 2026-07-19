@@ -1,138 +1,165 @@
 {
-  "artifact_kind": "strategy_recovery_cross_session_resume_state",
-  "schema_version": 3,
-  "updated_utc": "2026-07-16T17:19:11Z",
-  "handoff_note": "docs/research_note/strategy_recovery_session_handoff_20260714.md",
-  "new_session_prompt": "docs/research_note/strategy_recovery_new_session_prompt_20260714.md",
-  "master_plan": "docs/research_note/strategy_recovery_master_plan_20260713.md",
-  "ultragoal": {
-    "session_id": "019f603a-0e73-7000-88a7-c94f42950c09",
-    "objective": "Complete the durable ultragoal plan in .gjc/ultragoal/goals.json, including later accepted/appended stories, under the original brief constraints; use .gjc/ultragoal/ledger.jsonl as the audit trail.",
+  "schema_version": 5,
+  "snapshot_date": "2026-07-19",
+  "repository": "/home/hoky/Quants-agent/LuminaQuant",
+  "branch": "recovery/strategy-plan-20260714",
+  "implementation_checkpoint": {
+    "commit": "5bdc3b378cc477a939428d4455462ba651dc024b",
+    "subject": "Checkpoint G056 acquisition and raw durability work",
+    "status": "incomplete"
+  },
+  "handoff_document_commit": {
+    "status": "unknown",
+    "requirement": "The commit containing these three handoff files must descend from the implementation checkpoint."
+  },
+  "authoritative_session": {
+    "id": "019f603a-0e73-7000-88a7-c94f42950c09",
+    "stable_aggregate_objective": "Complete the durable ultragoal plan in .gjc/ultragoal/goals.json, including later accepted/appended stories, under the original brief constraints; use .gjc/ultragoal/ledger.jsonl as the audit trail.",
+    "durable_goal": "G056",
+    "durable_goal_status": "active",
+    "inline_goal_status": "paused for cross-session transfer",
+    "completion_authorized": false
+  },
+  "durable_files": {
     "brief": {
       "path": ".gjc/_session-019f603a-0e73-7000-88a7-c94f42950c09/ultragoal/brief.md",
-      "sha256_at_pause": "faf6f83679e7ce93a8950af4df350fc4a92557d8eaaa40ea17c9c8b918c04e57",
-      "byte_count_at_pause": 4836
+      "sha256": "faf6f83679e7ce93a8950af4df350fc4a92557d8eaaa40ea17c9c8b918c04e57",
+      "bytes": 4836,
+      "lines": 22
     },
     "goals": {
       "path": ".gjc/_session-019f603a-0e73-7000-88a7-c94f42950c09/ultragoal/goals.json",
-      "sha256_at_pause": "7b593003e0c6937ec8010b7852022a3e082a9f6c4c23c4111333c17e904b2cd4",
-      "byte_count_at_pause": 39289
+      "sha256": "ab9119c28c1ca8e7822b5dbe21cb33888063b749ed9b525130025391eb580c17",
+      "bytes": 132956,
+      "lines": 1256
     },
     "ledger": {
       "path": ".gjc/_session-019f603a-0e73-7000-88a7-c94f42950c09/ultragoal/ledger.jsonl",
-      "sha256_at_pause": "6f271bcfbce1580c9b16a947c826417bf45bc743b12e29ea8e07fa880ce9a7aa",
-      "byte_count_at_pause": 66512,
-      "line_count_at_pause": 96,
-      "latest_event_id": "41bc8670-8d9a-4f2d-b044-3e4d0cf29d93",
-      "latest_event": "blocker_classified:human_blocked:G019"
-    },
-    "inline_goal_status": "paused_for_user_requested_session_transfer",
-    "durable_current_goal": {
-      "id": "G019",
-      "title": "Resolve final Cost proof certification blockers",
-      "status": "active",
-      "objective": "Repair immediate liquidation causality and sequencing, oversized authenticated numeric STOP handling, conservative degenerate SPA bootstrap handling, and prove each at the public boundary with isolated regressions before rerunning G018 certification."
-    },
-    "goal_states": [
-      {"id": "G001", "status": "complete"},
-      {"id": "G002", "status": "superseded"},
-      {"id": "G008", "status": "superseded"},
-      {"id": "G009", "status": "superseded"},
-      {"id": "G010", "status": "superseded"},
-      {"id": "G011", "status": "superseded"},
-      {"id": "G012", "status": "complete"},
-      {"id": "G003", "status": "superseded"},
-      {"id": "G013", "status": "superseded"},
-      {"id": "G014", "status": "superseded"},
-      {"id": "G015", "status": "superseded"},
-      {"id": "G016", "status": "superseded"},
-      {"id": "G017", "status": "complete"},
-      {"id": "G004", "status": "review_blocked"},
-      {"id": "G018", "status": "review_blocked"},
-      {"id": "G019", "status": "active"},
-      {"id": "G005", "status": "pending"},
-      {"id": "G006", "status": "pending"},
-      {"id": "G007", "status": "pending"}
-    ]
-  },
-  "repositories": {
-    "main": {
-      "path": "/home/hoky/Quants-agent/LuminaQuant",
-      "branch": "recovery/strategy-plan-20260714",
-      "implementation_checkpoint": "512d2b804ab05bc1cf023ac4cbea81e0506a8736",
-      "checkpoint_message": "Checkpoint G019 proof contract repairs",
-      "g019_complete": false
-    },
-    "alpha_max": {
-      "path": "/home/hoky/Quants-agent/Quants-agent-alpha-max-data-pc",
-      "branch": "recovery/alpha-max-rev515-alignment-20260714",
-      "terminal_commit": "391000b40717386765bfa39bd212d91c2e3be794",
-      "terminal_goal": "G017",
-      "phase_preparation": "blocked_by_blocker_v2"
+      "sha256": "3af47660386c60e8e104022a3f6ea66b239b7a97458e39cf0aca6fed79acdc32",
+      "bytes": 283276,
+      "lines": 321,
+      "latest_event": {
+        "id": "44a0ea42-0861-41b6-a74d-f18c04bfd507",
+        "type": "human_blocked",
+        "timestamp": "2026-07-19T13:53:05.860Z"
+      }
     }
   },
-  "current_work": {
-    "blocked_goal_chain": ["G004", "G018"],
-    "resume_goal": "G019",
-    "title": "Resolve final Cost proof certification blockers",
-    "implementation_status": "committed_checkpoint_pending_final_gates",
-    "paused_review": {
-      "task": "97-G019CostArchitectFinal",
-      "status": "paused_without_verdict",
-      "resume_action": "rerun_final_cost_architect_from_scratch"
-    },
-    "accepted_reviews": {
-      "dispatch": "65-G018DispatchReview:CLEAR_CLEAR_CLEAR_APPROVE",
-      "router": "95-G018RouterArchitectFinal:CLEAR_CLEAR_CLEAR_APPROVE",
-      "cost": "pending"
-    },
-    "verification": {
-      "dispatch": "38 passed",
-      "router": "57 passed after formatting",
-      "cost": "61 passed before final residual-fixture strengthening; current residual focused test passed and traced to carried-breach guard",
-      "profile_selection_monthly_refit": "79 passed, 1 unrelated worktree-config test deselected",
-      "ruff": "dispatch/router/cost clean before final residual-fixture strengthening",
-      "diff_check": "clean before implementation checkpoint",
-      "combined_final_gate": false,
-      "ai_slop_cleaner": false,
-      "final_architect": false,
-      "executor_qa": false
-    },
-    "next_command": "Activate /skill:ultragoal, inspect status with the existing session ID, resume the paused inline aggregate goal, and continue already-active G019; do not run complete-goals.",
-    "remaining_plan": [
-      "Rerun full Cost, Router, dispatch, and profile/selection regression plus Ruff/format/diff checks on checkpoint 512d2b80.",
-      "Rerun final Cost architect certification for immediate liquidation causality/sequencing, valid economic REJECT, public file/CLI overflow STOP, conservative degenerate SPA, and branch-authentic tests.",
-      "Run the combined G018 regression matrix and the internal AI-slop cleaner on exactly nine changed files; repair every blocking finding and rerun.",
-      "Freeze the cleaned change set, obtain fresh three-lane architect CLEAR/APPROVE and executor adversarial QA with real API/package and CLI artifacts.",
-      "Checkpoint G019 with a strict quality gate, then supersede G018 and G004 from the completed replacement-chain evidence.",
-      "Continue pending G005, then G006, then G007 under the frozen master plan and all source/read-only, no-retuning, no-order constraints."
-    ]
+  "goal_counts": {
+    "pending": 0,
+    "active": 1,
+    "complete": 10,
+    "failed": 0,
+    "blocked": 2,
+    "review_blocked": 14,
+    "superseded": 29
   },
-  "fixed_candidate_contract": {
-    "candidate_ids_sha256": "ddc8996136e70d3847e8270f6165a26992ec8def8439ba6f56e3bcdbdee239b9",
-    "candidate_ids": [
-      "codex_lagged_leaf_router_grid:h4_avg1_tr-0.02_tmdd0.50_val0.00_vmdd0.25_lagged_plus_val025_exact_unscaled",
-      "codex_lagged_leaf_router_grid:h4_avg1_tr-0.02_tmdd0.50_val0.00_vmdd0.25_lagged_plus_val025_fallback_mdd20_cap2"
+  "goal_statuses": {
+    "blocked": ["G036", "G037"],
+    "review_blocked_predecessors": ["G035", "G038", "G039", "G040", "G041", "G042", "G043", "G044", "G045", "G046", "G047", "G049", "G052", "G053"],
+    "completed_replacements": ["G050", "G051", "G055"]
+  },
+  "stop_state": {
+    "all_detached_workers_and_monitors_terminal": true,
+    "acquirer_or_network_acquisition_running": false,
+    "v4_started": false,
+    "eligible_receipt_exists": false,
+    "phase_prelock_historical_candidate_forward_order_or_capital_operation": false,
+    "failed_v2_v3_roots_immutable": true
+  },
+  "v3_terminal_state": {
+    "source": "/home/hoky/quants-external-data/alpha-max-g056-full-source-v3",
+    "report": "/home/hoky/quants-recovery-runs/G056-full-acquisition-report-20260719-v3",
+    "controller": "/home/hoky/quants-recovery-runs/G056-full-acquisition-controller-20260719-v3",
+    "raw_progress": "134/415 through BTCUSDT 2023-04",
+    "funding_progress": "3834/12347 through BNBUSDT 2026-06-30",
+    "failure": "archive_trade_order_invalid",
+    "eligible_receipt_exists": false,
+    "descriptor_sequence_5_receipt": {
+      "path": "/home/hoky/quants-recovery-runs/G056-full-acquisition-controller-20260719-v3/descriptor-refresh-v3-state-005.json",
+      "sha256": "47b6e8b9006718e0dad043be85b9a86757aa2e0e39de05528a9107b192589321"
+    }
+  },
+  "official_blocker": {
+    "url": "https://data.binance.vision/data/futures/um/monthly/aggTrades/BTCUSDT/BTCUSDT-aggTrades-2023-05.zip",
+    "sha256": "301acec76a7644aa73180fd7f8d913ce4eecfa7e7bca5057f1782f96d91b9ef0",
+    "bytes": 468405603,
+    "rows": 35641068,
+    "aggregate_id_range": "1715206948..1751963960",
+    "id_regressions": 1357200,
+    "timestamp_regressions": 1357200,
+    "timestamp_range": "1682899200101..1685577599904",
+    "finding": "Official bytes are valid but interleaved."
+  },
+  "committed_unverified_remediation": {
+    "acquirer": "0a8417e3d8fb36ba1c6863c328d819ac32211ffeb81c9bad2f0f77a46e897503",
+    "acquirer_tests": "2ca7a73e2b330fdc194cc84087c2bf2db4cdf4c773363bf99af50e98c3a2134c",
+    "wrapper": "2c51d6b69b695cdbdcdf61fe35394e342673bb4329b355021b1a81a051122268",
+    "wrapper_tests": "7b711ecc998d28628d4c5956f46002258d03da615ef071e8e4b7a0b73723aeb5",
+    "data_sync": "f092cd2a30928e985da2433df15c0b26e0616202cbca8991ae146357203ae59c",
+    "ohlcv_repo": "61d531b79af3182f1ac479af0bfe141c7a71b7211671e4bc5a2a5bb5e9c44536",
+    "collect_tests": "d96111bd756e3a68b23f08666b1212f660811d07a0719bae5c36f9171497ab71",
+    "wal_tests": "35b257edb8e0fc0ff91960aadf128d97a40f4cf972913a0578e30ede33cbaae6"
+  },
+  "implemented_remediation": [
+    "derivation v4",
+    "singular exact known-artifact gate",
+    "stdlib packed 32-byte >qqdd external merge by aggregate ID",
+    "250k chunks and fan-in 64",
+    "duplicate and post-sort timestamp rejection",
+    "ordinary streaming branch retained",
+    "validate_complete receipt forwarded",
+    "exclusive verify lock",
+    "adversarial tests"
+  ],
+  "unresolved_review_items": [
+    "Ruff first failed SIM115; an ExitStack fix landed but Ruff was not rerun.",
+    "The wrapper pin is stale and must be repinned after source freeze.",
+    "The source uses .order-* session directories while architect contract 414 required owned singly-linked mode-0600 .aggtrades-* scratch.",
+    "Review same-opened-inode authentication-to-parse binding.",
+    "No real-artifact two-run benchmark exists.",
+    "No ordered real-archive byte regression exists.",
+    "No post-change cleaner, architect, or executor QA exists."
+  ],
+  "fresh_v4_roots_after_approval_only": {
+    "source": "/home/hoky/quants-external-data/alpha-max-g056-full-source-v4",
+    "report": "/home/hoky/quants-recovery-runs/G056-full-acquisition-report-20260719-v4",
+    "controller": "/home/hoky/quants-recovery-runs/G056-full-acquisition-controller-20260719-v4",
+    "rule": "Never mutate, reuse, or copy into v2 or v3; advance again after any code change following a started v4."
+  },
+  "remaining_order": [
+    "Resume exact durable session and inline goal.",
+    "Close scratch and same-open authentication review; run Ruff and focused tests via uv.",
+    "Run a real allowed-v3-provenance artifact two-run deterministic/bounded benchmark and the already-ordered BTCUSDT 2024-01 byte regression; admitted output SHA ac99f6439d544901db0c09d8d2e7ad7ffcd9d328a2de73e7930231a849e2b1e8.",
+    "Freeze acquirer, repin wrapper/tests, and run focused, integrated, and full gates.",
+    "Run mandatory cleaner, then fresh architect CLEAR/CLEAR/CLEAR APPROVE and executor QA/red-team.",
+    "Run fresh v4 complete acquisition with periodic repository descriptors, validate_complete, and offline verify-eligible.",
+    "Run six authenticated phase roots and exact one-touch runbook fences 4-11 after wrapper.",
+    "Create strict G056 checkpoint, then explicitly supersede predecessors.",
+    "Run G036 C-00..C-05/C-06 candidate contracts and execution.",
+    "Run G037 fresh-forward.",
+    "Perform current-state final aggregate audit/receipt/goal complete."
+  ],
+  "quarantined_lexical_forbidden_roots": [
+    "/home/hoky/Quants-agent/LuminaQuant-data/alpha_max_20260711_listing_aware_source",
+    "/home/hoky/Quants-agent/Quants-agent-alpha-max-data-pc"
+  ],
+  "quarantine_rule": "Never inspect, stat, hash, traverse, read, copy, or use either forbidden root. They may appear only as --forbidden-root argv.",
+  "binding_constraints": [
+    "official-only; no synthetic, substitute, prelisting, date shift, retune, or locked-OOS-selection",
+    "zero order and capital",
+    "uv Python",
+    "profile-first only",
+    "Rust/native only after a material exact-equivalence benchmark",
+    "no reset, rebase, amend, or push"
+  ],
+  "portable_bootstrap": {
+    "documents": [
+      "strategy_recovery_resume_state_20260714.json",
+      "strategy_recovery_session_handoff_20260714.md",
+      "strategy_recovery_new_session_prompt_20260714.md"
     ],
-    "selection": "independent gates; passers ranked by validation 20bp Calmar, lower validation MDD, frozen candidate order",
-    "locked_oos": "report_and_gate_only_never_select_or_retune"
-  },
-  "external_blockers": {
-    "alpha_blocker_v2": {
-      "path": "/home/hoky/quants-recovery-runs/20260714T105113Z/alpha-max-phase-preparation-blocker-v2.json",
-      "sha256": "3b8c04b7a6b0a7d99e3d2b0ffb2dc42551c876b9ec5879663529b2b6173a07b2"
-    },
-    "forbidden_alpha_source": "/home/hoky/Quants-agent/LuminaQuant-data/alpha_max_20260711_listing_aware_source",
-    "btc_june": "STOP:874_ohlcv_gaps_and_18_funding_prefix_gaps",
-    "local_config": "user-managed config.yaml differs from HEAD; do not modify or reveal values"
-  },
-  "evidence_root": "/home/hoky/quants-recovery-runs/20260714T105113Z",
-  "resume_rules": [
-    "Activate /skill:ultragoal and use the existing session ID; never create a competing plan.",
-    "Resume the paused aggregate inline goal and continue already-active G019 without running complete-goals.",
-    "Verify checkpoint 512d2b804ab05bc1cf023ac4cbea81e0506a8736 and read all handoff/plan/runtime artifacts before mutation.",
-    "Do not start G005 before G019 is checkpointed and G018/G004 are superseded from fresh evidence.",
-    "Do not run strategy performance, data/network/order/capital operations or consume quarantined Alpha data during G019/G018 certification.",
-    "Do not reset, rebase, amend, or push without explicit user instruction."
-  ]
+    "canonical_same_machine_state": ".gjc",
+    "audit_trail": "ledger.jsonl"
+  }
 }
