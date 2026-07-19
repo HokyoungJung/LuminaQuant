@@ -5,13 +5,18 @@ from __future__ import annotations
 import csv
 import io
 import json
+from hashlib import sha256
+import inspect
+import math
 import os
+import re
+import stat
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
 import zipfile
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -99,6 +104,8 @@ def _fetch_trades_with_retry(
     limit: int,
     retries: int,
     base_wait_sec: float,
+    from_id: int | None = None,
+    until_ms: int | None = None,
 ) -> list[dict[str, Any]]:
     wait = max(0.1, float(base_wait_sec))
     attempt = 0
@@ -108,23 +115,40 @@ def _fetch_trades_with_retry(
             if callable(fetch_fn):
                 rows = fetch_fn(
                     symbol=symbol,
-                    start_time=int(since_ms),
-                    end_time=min(int(since_ms) + 3_599_999, _now_ms()),
+                    start_time=(int(since_ms) if from_id is None else None),
+                    end_time=(
+                        min(
+                            int(since_ms) + 3_599_999,
+                            int(until_ms) if until_ms is not None else _now_ms(),
+                        )
+                        if from_id is None
+                        else None
+                    ),
+                    from_id=from_id,
                     limit=max(1, min(int(limit), 1_000)),
                 )
-                return [
-                    {
-                        "id": int(row.get("a") or 0),
-                        "timestamp": int(row.get("T") or 0),
-                        "price": float(row.get("p") or 0.0),
-                        "amount": float(row.get("q") or 0.0),
-                        "side": "sell" if bool(row.get("m")) else "buy",
-                        "isBuyerMaker": bool(row.get("m")),
-                        "info": dict(row or {}),
-                    }
-                    for row in list(rows or [])
-                ]
-            return list(exchange.fetch_trades(symbol, since=since_ms, limit=limit) or [])
+                return list(rows or [])
+            fetch_trades = exchange.fetch_trades
+            if from_id is not None:
+                try:
+                    signature = inspect.signature(fetch_trades)
+                    supports_params = "params" in signature.parameters or any(
+                        parameter.kind is inspect.Parameter.VAR_KEYWORD
+                        for parameter in signature.parameters.values()
+                    )
+                except TypeError, ValueError:
+                    supports_params = False
+                if supports_params:
+                    return list(
+                        fetch_trades(
+                            symbol,
+                            since=since_ms,
+                            limit=limit,
+                            params={"fromId": int(from_id)},
+                        )
+                        or []
+                    )
+            return list(fetch_trades(symbol, since=since_ms, limit=limit) or [])
         except Exception:
             attempt += 1
             if attempt > max(0, int(retries)):
@@ -140,7 +164,7 @@ def _date_from_ms(timestamp_ms: int) -> date:
 def _day_bounds_ms(day_value: date) -> tuple[int, int]:
     day_start = datetime(day_value.year, day_value.month, day_value.day, tzinfo=UTC)
     start_ms = int(day_start.timestamp() * 1000)
-    end_ms = start_ms + 86_399_000
+    end_ms = start_ms + 86_399_999
     return start_ms, end_ms
 
 
@@ -273,62 +297,23 @@ class RawAggTradesSyncStats:
     checkpoint_trade_id: int | None
 
 
-def _normalize_raw_trade_row(row: dict[str, Any], *, fallback_id: int = 0) -> dict[str, Any] | None:
-    timestamp_raw = row.get("timestamp")
-    if timestamp_raw is None:
-        return None
-    try:
-        timestamp_ms = int(timestamp_raw)
-    except Exception:
-        return None
-
-    trade_id_raw = row.get("id", row.get("a", fallback_id))
-    try:
-        trade_id = int(trade_id_raw)
-    except Exception:
-        trade_id = int(fallback_id)
-
-    price_raw = row.get("price")
-    amount_raw = row.get("amount")
-    if price_raw is None or amount_raw is None:
-        return None
-    try:
-        price = float(price_raw)
-        quantity = float(amount_raw)
-    except Exception:
-        return None
-    if price <= 0.0 or quantity < 0.0:
-        return None
-
-    side_raw = row.get("side")
-    is_buyer_maker = bool(
-        row.get("isBuyerMaker")
-        if "isBuyerMaker" in row
-        else str(side_raw).strip().lower() == "sell"
-    )
-
-    return {
-        "agg_trade_id": int(trade_id),
-        "timestamp_ms": int(timestamp_ms),
-        "price": float(price),
-        "quantity": float(quantity),
-        "is_buyer_maker": bool(is_buyer_maker),
-    }
-
-
 def _raw_archive_chunk_rows() -> int:
-    raw = str(os.getenv("LQ_RAW_ARCHIVE_CHUNK_ROWS", "") or "").strip()
-    if raw:
-        try:
-            return max(1_000, int(raw))
-        except ValueError:
-            pass
-    return _DEFAULT_RAW_ARCHIVE_CHUNK_ROWS
+    raw = os.getenv("LQ_RAW_ARCHIVE_CHUNK_ROWS")
+    if raw is None or not raw.strip():
+        return _DEFAULT_RAW_ARCHIVE_CHUNK_ROWS
+    text = raw.strip()
+    if re.fullmatch(r"[0-9]+", text) is None:
+        raise ValueError("LQ_RAW_ARCHIVE_CHUNK_ROWS must be an integer row count")
+    rows = int(text)
+    if not 1_000 <= rows <= 1_000_000:
+        raise ValueError("LQ_RAW_ARCHIVE_CHUNK_ROWS must be between 1000 and 1000000 rows")
+    return rows
 
 
 def _iter_archive_rows_to_raw_aggtrades(
     zip_blob: bytes,
     *,
+    expected_member_name: str,
     cursor_ms: int,
     until_ms: int,
     chunk_rows: int | None = None,
@@ -342,25 +327,137 @@ def _iter_archive_rows_to_raw_aggtrades(
     """
     rows: list[dict[str, Any]] = []
     max_rows = max(1, int(chunk_rows or _raw_archive_chunk_rows()))
+    expected_header = [
+        "agg_trade_id",
+        "price",
+        "quantity",
+        "first_trade_id",
+        "last_trade_id",
+        "transact_time",
+        "is_buyer_maker",
+    ]
+    expected_member_match = re.fullmatch(
+        r"[A-Z0-9]+-aggTrades-(\d{4}-\d{2}-\d{2})\.csv",
+        expected_member_name,
+    )
+    if expected_member_match is None:
+        raise ValueError("aggTrades archive member identity is invalid")
+    try:
+        archive_day_bounds = _day_bounds_ms(
+            datetime.strptime(expected_member_match.group(1), "%Y-%m-%d").date()
+        )
+    except ValueError:
+        raise ValueError("aggTrades archive member has an invalid date") from None
+
     with zipfile.ZipFile(io.BytesIO(zip_blob)) as zf:
-        names = zf.namelist()
-        if not names:
-            return
-        with zf.open(names[0], "r") as raw_file:
-            text_file = io.TextIOWrapper(raw_file, encoding="utf-8")
-            reader = csv.reader(text_file)
-            for row in reader:
-                if len(row) < 7:
-                    continue
-                try:
-                    agg_trade_id = int(row[0])
-                    price = float(row[1])
-                    quantity = float(row[2])
-                    timestamp_ms = int(row[5])
-                except Exception:
-                    continue
-                if price <= 0.0 or quantity < 0.0:
-                    continue
+        members = zf.infolist()
+        if len(members) != 1:
+            raise ValueError("aggTrades archive must contain exactly one CSV member")
+        member = members[0]
+        mode = member.external_attr >> 16
+        if (
+            member.is_dir()
+            or member.filename != expected_member_name
+            or stat.S_ISLNK(mode)
+            or (stat.S_IFMT(mode) not in {0, stat.S_IFREG})
+        ):
+            raise ValueError("aggTrades archive member must be the expected regular CSV file")
+
+        def _validated_source_rows():
+            previous_agg_trade_id: int | None = None
+            previous_timestamp_ms: int | None = None
+            source_row_count = 0
+            data_row_count = 0
+            with zf.open(member, "r") as raw_file:
+                text_file = io.TextIOWrapper(raw_file, encoding="utf-8", newline="")
+                reader = csv.reader(text_file, strict=True)
+                for row in reader:
+                    if source_row_count == 0 and row == expected_header:
+                        source_row_count += 1
+                        continue
+                    source_row_count += 1
+                    data_row_count += 1
+                    if len(row) != 7 or any(value == "" or value != value.strip() for value in row):
+                        raise ValueError("aggTrades archive contains a malformed CSV row")
+                    try:
+                        (
+                            agg_trade_id_raw,
+                            price_raw,
+                            quantity_raw,
+                            first_trade_id_raw,
+                            last_trade_id_raw,
+                            timestamp_raw,
+                            is_buyer_maker_raw,
+                        ) = row
+                        if not all(
+                            re.fullmatch(r"[0-9]+", value)
+                            for value in (
+                                agg_trade_id_raw,
+                                first_trade_id_raw,
+                                last_trade_id_raw,
+                                timestamp_raw,
+                            )
+                        ) or not all(
+                            re.fullmatch(
+                                r"(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?",
+                                value,
+                            )
+                            for value in (price_raw, quantity_raw)
+                        ):
+                            raise ValueError
+                        agg_trade_id = int(agg_trade_id_raw)
+                        first_trade_id = int(first_trade_id_raw)
+                        last_trade_id = int(last_trade_id_raw)
+                        timestamp_ms = int(timestamp_raw)
+                        price = float(price_raw)
+                        quantity = float(quantity_raw)
+                    except TypeError, ValueError, OverflowError:
+                        raise ValueError(
+                            "aggTrades archive contains invalid numeric data"
+                        ) from None
+                    if (
+                        not math.isfinite(price)
+                        or not math.isfinite(quantity)
+                        or price <= 0.0
+                        or quantity <= 0.0
+                        or last_trade_id < first_trade_id
+                    ):
+                        raise ValueError("aggTrades archive contains invalid trade data")
+                    boolean_value = is_buyer_maker_raw.casefold()
+                    if boolean_value not in {"true", "false"}:
+                        raise ValueError("aggTrades archive contains an invalid buyer-maker flag")
+                    if archive_day_bounds is not None and not (
+                        archive_day_bounds[0] <= timestamp_ms <= archive_day_bounds[1]
+                    ):
+                        raise ValueError("aggTrades archive timestamp is outside its archive day")
+                    if (
+                        previous_agg_trade_id is not None and agg_trade_id <= previous_agg_trade_id
+                    ) or (
+                        previous_timestamp_ms is not None and timestamp_ms < previous_timestamp_ms
+                    ):
+                        raise ValueError("aggTrades archive is not globally ordered")
+                    previous_agg_trade_id = agg_trade_id
+                    previous_timestamp_ms = timestamp_ms
+                    yield (
+                        agg_trade_id,
+                        timestamp_ms,
+                        price,
+                        quantity,
+                        boolean_value == "true",
+                    )
+            if data_row_count == 0:
+                raise ValueError("aggTrades archive CSV member is empty")
+
+        try:
+            for _ in _validated_source_rows():
+                pass
+            for (
+                agg_trade_id,
+                timestamp_ms,
+                price,
+                quantity,
+                is_buyer_maker,
+            ) in _validated_source_rows():
                 if timestamp_ms < int(cursor_ms) or timestamp_ms > int(until_ms):
                     continue
                 rows.append(
@@ -368,17 +465,15 @@ def _iter_archive_rows_to_raw_aggtrades(
                         "agg_trade_id": agg_trade_id,
                         "timestamp_ms": timestamp_ms,
                         "price": price,
-                        "quantity": max(0.0, quantity),
-                        "is_buyer_maker": str(row[6]).strip().lower() in {"1", "true", "t", "yes"},
+                        "quantity": quantity,
+                        "is_buyer_maker": is_buyer_maker,
                     }
                 )
                 if len(rows) >= max_rows:
-                    rows.sort(
-                        key=lambda item: (int(item["timestamp_ms"]), int(item["agg_trade_id"]))
-                    )
                     yield rows
                     rows = []
-    rows.sort(key=lambda item: (int(item["timestamp_ms"]), int(item["agg_trade_id"])))
+        except csv.Error:
+            raise ValueError("aggTrades archive contains malformed CSV syntax") from None
     if rows:
         yield rows
 
@@ -386,6 +481,7 @@ def _iter_archive_rows_to_raw_aggtrades(
 def _archive_rows_to_raw_aggtrades(
     zip_blob: bytes,
     *,
+    expected_member_name: str,
     cursor_ms: int,
     until_ms: int,
 ) -> list[dict[str, Any]]:
@@ -397,6 +493,7 @@ def _archive_rows_to_raw_aggtrades(
     chunks = list(
         _iter_archive_rows_to_raw_aggtrades(
             zip_blob,
+            expected_member_name=expected_member_name,
             cursor_ms=cursor_ms,
             until_ms=until_ms,
             chunk_rows=_raw_archive_chunk_rows(),
@@ -407,7 +504,48 @@ def _archive_rows_to_raw_aggtrades(
     return [row for chunk in chunks for row in chunk]
 
 
-def sync_symbol_aggtrades_raw(
+def _checkpoint_last_row_digest(row: Mapping[str, Any]) -> str:
+    encoded = json.dumps(dict(row), sort_keys=True, separators=(",", ":"), allow_nan=False)
+    return sha256(encoded.encode("utf-8")).hexdigest()
+
+
+def _validate_live_aggtrade_identity_order(
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    checkpoint_last_row: Mapping[str, Any] | None = None,
+) -> None:
+    """Reject live aggTrades that cannot advance an authenticated stream."""
+    previous_timestamp: int | None = None
+    previous_trade_id: int | None = None
+    for row in rows:
+        timestamp_ms = int(row["timestamp_ms"])
+        trade_id = int(row["agg_trade_id"])
+        if previous_timestamp is not None and timestamp_ms < previous_timestamp:
+            raise ValueError("Live aggTrades timestamps must be nondecreasing")
+        if previous_trade_id is not None and trade_id <= previous_trade_id:
+            raise ValueError("Live aggTrades aggregate IDs must be strictly increasing")
+        previous_timestamp = timestamp_ms
+        previous_trade_id = trade_id
+
+    if not rows or checkpoint_last_row is None:
+        return
+
+    checkpoint_timestamp = int(checkpoint_last_row["timestamp_ms"])
+    checkpoint_trade_id = int(checkpoint_last_row["agg_trade_id"])
+    first_row = rows[0]
+    first_timestamp = int(first_row["timestamp_ms"])
+    first_trade_id = int(first_row["agg_trade_id"])
+    if first_row == checkpoint_last_row:
+        if len(rows) > 1 and int(rows[1]["agg_trade_id"]) <= checkpoint_trade_id:
+            raise ValueError("Live aggTrade aggregate ID does not advance checkpoint cursor")
+        return
+    if first_timestamp < checkpoint_timestamp:
+        raise ValueError("Live aggTrade timestamp precedes the checkpoint cursor")
+    if first_trade_id <= checkpoint_trade_id:
+        raise ValueError("Live aggTrade aggregate ID does not advance checkpoint cursor")
+
+
+def _sync_symbol_aggtrades_raw_under_lease(
     *,
     exchange: Any,
     db_path: str,
@@ -420,6 +558,7 @@ def sync_symbol_aggtrades_raw(
     retries: int = 3,
     base_wait_sec: float = 0.5,
     resume_from_checkpoint: bool = True,
+    lease: Any,
 ) -> RawAggTradesSyncStats:
     """Collect Binance aggTrades into raw parquet partitions with checkpoint resume."""
     from lumina_quant.storage.parquet import ParquetMarketDataRepository
@@ -427,72 +566,216 @@ def sync_symbol_aggtrades_raw(
     repo = ParquetMarketDataRepository(str(db_path))
     stream_exchange = str(exchange_id).strip().lower() or "binance"
     stream_symbol = normalize_symbol(symbol)
+    repo.recover_raw_stream(exchange=stream_exchange, symbol=stream_symbol, lease=lease)
 
     cursor = max(0, int(start_ms))
     until = max(cursor, int(end_ms))
     last_trade_id = -1
+    checkpoint_last_row: dict[str, Any] | None = None
     if bool(resume_from_checkpoint):
-        checkpoint = repo.read_raw_checkpoint(exchange=stream_exchange, symbol=stream_symbol)
-        try:
-            checkpoint_ts = int(checkpoint.get("last_timestamp_ms", 0) or 0)
-        except Exception:
-            checkpoint_ts = 0
-        try:
-            checkpoint_trade_id = int(checkpoint.get("last_trade_id", -1) or -1)
-        except Exception:
-            checkpoint_trade_id = -1
-        if checkpoint_ts > cursor:
-            cursor = checkpoint_ts
-            last_trade_id = checkpoint_trade_id
+        checkpoint = repo.read_raw_checkpoint(
+            exchange=stream_exchange, symbol=stream_symbol, lease=lease
+        )
+        if checkpoint != {}:
+            checkpoint_last_row = dict(checkpoint["last_row"])
+            persisted = repo.read_raw_recovery_bounds(
+                exchange=stream_exchange,
+                symbol=stream_symbol,
+                checkpoint_last_row=checkpoint_last_row,
+                lease=lease,
+            )
+            tail = dict(persisted.to_dicts()[-1])
+            if tail != checkpoint_last_row:
+                checkpoint_last_row = tail
+                checkpoint = {
+                    **checkpoint,
+                    "last_timestamp_ms": tail["timestamp_ms"],
+                    "last_trade_id": tail["agg_trade_id"],
+                    "observed_until_ms": max(
+                        int(checkpoint["observed_until_ms"]), int(tail["timestamp_ms"])
+                    ),
+                    "last_row": tail,
+                    "last_row_sha256": _checkpoint_last_row_digest(tail),
+                    "updated_at_utc": datetime.now(tz=UTC).isoformat(),
+                }
+                repo.write_raw_checkpoint(
+                    exchange=stream_exchange, symbol=stream_symbol, payload=checkpoint, lease=lease
+                )
+                repo.append_raw_wal_record(
+                    exchange=stream_exchange,
+                    symbol=stream_symbol,
+                    payload={
+                        "type": "aggtrades_raw_checkpoint_recovery",
+                        "last_trade_id": tail["agg_trade_id"],
+                    },
+                    lease=lease,
+                )
+            checkpoint_ts = int(checkpoint_last_row["timestamp_ms"])
+            checkpoint_trade_id = int(checkpoint_last_row["agg_trade_id"])
+            if checkpoint_ts >= cursor:
+                cursor = checkpoint_ts
+                last_trade_id = checkpoint_trade_id
+        else:
+            persisted = repo.read_raw_recovery_bounds(
+                exchange=stream_exchange,
+                symbol=stream_symbol,
+                checkpoint_last_row=None,
+                lease=lease,
+            )
+            if not persisted.is_empty():
+                checkpoint_last_row = dict(persisted.to_dicts()[-1])
+                checkpoint = {
+                    "exchange": stream_exchange,
+                    "symbol": stream_symbol,
+                    "last_timestamp_ms": checkpoint_last_row["timestamp_ms"],
+                    "last_trade_id": checkpoint_last_row["agg_trade_id"],
+                    "observed_until_ms": checkpoint_last_row["timestamp_ms"],
+                    "updated_at_utc": datetime.now(tz=UTC).isoformat(),
+                    "batch_rows": 1,
+                    "last_row": checkpoint_last_row,
+                    "last_row_sha256": _checkpoint_last_row_digest(checkpoint_last_row),
+                }
+                repo.write_raw_checkpoint(
+                    exchange=stream_exchange, symbol=stream_symbol, payload=checkpoint, lease=lease
+                )
+                repo.append_raw_wal_record(
+                    exchange=stream_exchange,
+                    symbol=stream_symbol,
+                    payload={
+                        "type": "aggtrades_raw_first_commit_recovery",
+                        "last_trade_id": checkpoint_last_row["agg_trade_id"],
+                    },
+                    lease=lease,
+                )
+                cursor = max(cursor, int(checkpoint_last_row["timestamp_ms"]))
+                last_trade_id = int(checkpoint_last_row["agg_trade_id"])
 
     fetched_rows = 0
     upserted_rows = 0
     first_ts = None
     last_ts = None
 
-    def _dedupe_new_rows(
+    def _filter_archive_rows(
         rows: list[dict[str, Any]],
         *,
         cursor_ms: int,
         last_trade_id_seen: int,
-    ) -> list[dict[str, Any]]:
-        normalized_rows: list[dict[str, Any]] = []
-        seen: set[tuple[int, int]] = set()
-        for item in rows:
-            ts = int(item["timestamp_ms"])
-            trade_id = int(item["agg_trade_id"])
-            if ts < int(cursor_ms) or ts > int(until):
-                continue
-            if ts == int(cursor_ms) and trade_id <= int(last_trade_id_seen):
-                continue
-            key = (ts, trade_id)
-            if key in seen:
-                continue
-            seen.add(key)
-            normalized_rows.append(item)
-        normalized_rows.sort(
-            key=lambda item: (int(item["timestamp_ms"]), int(item["agg_trade_id"]))
+        checkpoint_boundary_row: Mapping[str, Any] | None,
+        checkpoint_boundary_pending: bool,
+    ) -> tuple[list[dict[str, Any]], bool]:
+        filtered: list[dict[str, Any]] = []
+        boundary_row = (
+            dict(checkpoint_boundary_row) if checkpoint_boundary_row is not None else None
         )
-        return normalized_rows
+        boundary_timestamp = int(boundary_row["timestamp_ms"]) if boundary_row is not None else None
+        boundary_trade_id = int(boundary_row["agg_trade_id"]) if boundary_row is not None else None
+        for item in rows:
+            timestamp_ms = int(item["timestamp_ms"])
+            trade_id = int(item["agg_trade_id"])
+            if timestamp_ms < int(cursor_ms) or timestamp_ms > int(until):
+                continue
+            if checkpoint_boundary_pending:
+                if timestamp_ms > int(boundary_timestamp):
+                    raise ValueError("Archive aggTrade checkpoint identity is missing")
+                if timestamp_ms == int(boundary_timestamp):
+                    if trade_id < int(boundary_trade_id):
+                        continue
+                    if trade_id > int(boundary_trade_id):
+                        raise ValueError(
+                            "Archive aggTrade checkpoint is followed by a higher aggregate ID"
+                        )
+                    if item != boundary_row:
+                        raise ValueError(
+                            "Archive aggTrade checkpoint identity has a conflicting payload"
+                        )
+                    checkpoint_boundary_pending = False
+                    continue
+            if timestamp_ms == int(cursor_ms) and trade_id <= int(last_trade_id_seen):
+                if (
+                    checkpoint_last_row is None
+                    or trade_id != int(last_trade_id_seen)
+                    or item != checkpoint_last_row
+                ):
+                    raise ValueError("Archive aggTrade checkpoint overlap does not match last row")
+                continue
+            filtered.append(item)
+        return filtered, checkpoint_boundary_pending
+
+    def _validate_and_filter_live_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        _validate_live_aggtrade_identity_order(
+            rows,
+            checkpoint_last_row=(checkpoint_last_row if last_trade_id >= 0 else None),
+        )
+        filtered: list[dict[str, Any]] = []
+        for index, row in enumerate(rows):
+            timestamp_ms = int(row["timestamp_ms"])
+            trade_id = int(row["agg_trade_id"])
+            # Binance may include the authenticated boundary row in a fromId
+            # response.  Accept only its exact persisted identity before testing
+            # the timestamp cursor; every other replay remains invalid.
+            if (
+                index == 0
+                and checkpoint_last_row is not None
+                and last_trade_id >= 0
+                and row == checkpoint_last_row
+            ):
+                continue
+            if timestamp_ms < int(cursor):
+                raise ValueError("Live aggTrade timestamp precedes the checkpoint cursor")
+            if last_trade_id >= 0 and trade_id <= int(last_trade_id):
+                raise ValueError("Live aggTrade aggregate ID does not advance checkpoint cursor")
+            if timestamp_ms > int(until):
+                continue
+            filtered.append(row)
+        return filtered
 
     def _commit_batch(rows: list[dict[str, Any]], *, observed_until_ms: int) -> None:
         nonlocal fetched_rows, upserted_rows, first_ts, last_ts, last_trade_id, cursor
+        nonlocal checkpoint_last_row
         if not rows:
             return
         fetched_rows += len(rows)
-        upserted_rows += int(
-            repo.append_raw_aggtrades(
-                exchange=stream_exchange,
-                symbol=stream_symbol,
-                rows=rows,
-            )
+        repo.preflight_raw_aggtrades(
+            exchange=stream_exchange,
+            symbol=stream_symbol,
+            rows=rows,
+            lease=lease,
         )
+        date_rows: list[dict[str, Any]] = []
+        date_token: str | None = None
+        for row in rows:
+            row_date = (
+                datetime.fromtimestamp(int(row["timestamp_ms"]) / 1000, tz=UTC).date().isoformat()
+            )
+            if date_token is not None and row_date != date_token:
+                upserted_rows += int(
+                    repo.append_raw_aggtrades(
+                        exchange=stream_exchange,
+                        symbol=stream_symbol,
+                        rows=date_rows,
+                        lease=lease,
+                    )
+                )
+                date_rows = []
+            date_token = row_date
+            date_rows.append(row)
+        if date_rows:
+            upserted_rows += int(
+                repo.append_raw_aggtrades(
+                    exchange=stream_exchange,
+                    symbol=stream_symbol,
+                    rows=date_rows,
+                    lease=lease,
+                )
+            )
         first_batch_ts = int(rows[0]["timestamp_ms"])
         first_ts = first_batch_ts if first_ts is None else min(first_ts, first_batch_ts)
         last_ts = int(rows[-1]["timestamp_ms"])
         last_trade_id = int(rows[-1]["agg_trade_id"])
         cursor = int(last_ts)
 
+        last_row = dict(rows[-1])
+        checkpoint_last_row = last_row
         checkpoint_payload = {
             "exchange": stream_exchange,
             "symbol": stream_symbol,
@@ -501,11 +784,14 @@ def sync_symbol_aggtrades_raw(
             "observed_until_ms": int(observed_until_ms),
             "updated_at_utc": datetime.now(tz=UTC).isoformat(),
             "batch_rows": len(rows),
+            "last_row": last_row,
+            "last_row_sha256": _checkpoint_last_row_digest(last_row),
         }
         repo.write_raw_checkpoint(
             exchange=stream_exchange,
             symbol=stream_symbol,
             payload=checkpoint_payload,
+            lease=lease,
         )
         repo.append_raw_wal_record(
             exchange=stream_exchange,
@@ -519,9 +805,11 @@ def sync_symbol_aggtrades_raw(
                 "observed_until_ms": int(observed_until_ms),
                 "created_at_utc": datetime.now(tz=UTC).isoformat(),
             },
+            lease=lease,
         )
 
     batch = 0
+    terminally_covered = False
     archive_cutoff_ms = min(int(until), int(_now_ms()) - (2 * 86_400_000))
     if cursor <= archive_cutoff_ms:
         for day_value in _iter_days(cursor, archive_cutoff_ms):
@@ -540,80 +828,192 @@ def sync_symbol_aggtrades_raw(
                 base_wait_sec=float(base_wait_sec),
             )
             if blob is None:
-                continue
-            committed_any = False
+                # An absent official daily archive is a continuity boundary, not
+                # an empty day.  The live phase must begin at this exact cursor.
+                cursor = int(range_start)
+                last_trade_id = -1
+                break
+            archive_checkpoint_boundary = (
+                dict(checkpoint_last_row)
+                if (
+                    checkpoint_last_row is not None
+                    and last_trade_id >= 0
+                    and int(checkpoint_last_row["timestamp_ms"]) == int(range_start)
+                )
+                else None
+            )
+            archive_checkpoint_pending = archive_checkpoint_boundary is not None
             for archive_rows in _iter_archive_rows_to_raw_aggtrades(
                 blob,
+                expected_member_name=(
+                    f"{stream_symbol.replace('/', '')}-aggTrades-{day_value:%Y-%m-%d}.csv"
+                ),
                 cursor_ms=range_start,
                 until_ms=range_end,
             ):
-                deduped = _dedupe_new_rows(
+                deduped, archive_checkpoint_pending = _filter_archive_rows(
                     archive_rows,
                     cursor_ms=int(cursor),
                     last_trade_id_seen=int(last_trade_id),
+                    checkpoint_boundary_row=archive_checkpoint_boundary,
+                    checkpoint_boundary_pending=archive_checkpoint_pending,
                 )
                 if not deduped:
                     continue
-                committed_any = True
-                _commit_batch(deduped, observed_until_ms=int(range_end))
-                if last_ts is not None and int(last_ts) >= int(until):
-                    break
-            if not committed_any:
-                cursor = max(int(cursor), int(range_end) + 1)
-                last_trade_id = -1
-                continue
-            cursor = max(int(cursor) + 1, int(range_end) + 1)
+                _commit_batch(
+                    deduped,
+                    observed_until_ms=int(deduped[-1]["timestamp_ms"]),
+                )
+            if archive_checkpoint_pending:
+                raise ValueError("Archive aggTrade checkpoint identity is missing")
+            # A validated official archive, including a day with no rows in the
+            # requested interval, authoritatively covers the entire day range.
+            cursor = int(range_end) + 1
             last_trade_id = -1
-            if last_ts is not None and int(last_ts) >= int(until):
+            if cursor > until:
+                terminally_covered = True
                 break
 
-    while cursor <= until and batch < max(1, int(max_batches)):
+    while not terminally_covered and cursor <= until and batch < max(1, int(max_batches)):
         batch += 1
+        request_cursor = int(cursor)
+        used_from_id = last_trade_id >= 0
         raw_trades = _fetch_trades_with_retry(
             exchange,
             stream_symbol,
-            since_ms=int(cursor),
+            since_ms=request_cursor,
+            from_id=(int(last_trade_id) + 1 if used_from_id else None),
+            until_ms=int(until),
             limit=max(1, int(limit)),
             retries=max(0, int(retries)),
             base_wait_sec=float(base_wait_sec),
         )
         if not raw_trades:
+            if not used_from_id:
+                page_end = min(request_cursor + 3_599_999, int(until))
+                if page_end < int(until):
+                    cursor = page_end + 1
+                    continue
+            if int(until) <= int(_now_ms()):
+                terminally_covered = True
+                break
             break
 
-        normalized_rows: list[dict[str, Any]] = []
-        max_seen_ts = int(cursor)
-        for index, row in enumerate(raw_trades, start=1):
-            normalized = _normalize_raw_trade_row(dict(row or {}), fallback_id=index)
-            if normalized is None:
-                continue
-            max_seen_ts = max(max_seen_ts, int(normalized["timestamp_ms"]))
-            normalized_rows.append(normalized)
-
-        deduped = _dedupe_new_rows(
-            normalized_rows,
-            cursor_ms=int(cursor),
-            last_trade_id_seen=int(last_trade_id),
-        )
+        normalized_rows = [normalize_aggtrade_row(row) for row in raw_trades]
+        deduped = _validate_and_filter_live_rows(normalized_rows)
         if not deduped:
-            cursor = max(int(cursor) + 1, int(max_seen_ts) + 1)
-            last_trade_id = -1
-            continue
+            if int(normalized_rows[0]["timestamp_ms"]) > int(until):
+                terminally_covered = True
+                break
+            raise ValueError("Live aggTrade page does not make compound cursor progress")
 
-        _commit_batch(deduped, observed_until_ms=int(until))
-        cursor = int(last_ts or cursor) + 1
+        _commit_batch(
+            deduped,
+            observed_until_ms=int(deduped[-1]["timestamp_ms"]),
+        )
+        # Keep the timestamp boundary and advance by aggregate ID.  This retains
+        # every same-millisecond trade even when a page ends mid-millisecond.
+        cursor = int(last_ts or cursor)
 
-        if int(last_ts or 0) >= int(until) or len(deduped) < max(1, int(limit)):
+        if len(normalized_rows) < max(1, int(limit)):
+            if not used_from_id:
+                page_end = min(request_cursor + 3_599_999, int(until))
+                if page_end < int(until):
+                    cursor = page_end + 1
+                    last_trade_id = -1
+                    continue
+            if int(last_ts) >= int(until) or int(until) <= int(_now_ms()):
+                terminally_covered = True
+                break
             break
 
+    if not terminally_covered:
+        raise ValueError(
+            "Incomplete aggTrade continuity: requested interval is not terminally covered"
+        )
+
+    terminal_checkpoint = repo.read_raw_checkpoint(
+        exchange=stream_exchange,
+        symbol=stream_symbol,
+        lease=lease,
+    )
+    if terminal_checkpoint:
+        terminal_last_row = dict(terminal_checkpoint["last_row"])
+        repo.write_raw_checkpoint(
+            exchange=stream_exchange,
+            symbol=stream_symbol,
+            payload={
+                **terminal_checkpoint,
+                "last_timestamp_ms": int(terminal_last_row["timestamp_ms"]),
+                "last_trade_id": int(terminal_last_row["agg_trade_id"]),
+                "observed_until_ms": int(until),
+                "updated_at_utc": datetime.now(tz=UTC).isoformat(),
+                "last_row": terminal_last_row,
+                "last_row_sha256": _checkpoint_last_row_digest(terminal_last_row),
+            },
+            lease=lease,
+        )
+    persisted_checkpoint = repo.read_raw_checkpoint(
+        exchange=stream_exchange,
+        symbol=stream_symbol,
+        lease=lease,
+    )
+    persisted_last_row = dict(persisted_checkpoint["last_row"]) if persisted_checkpoint else None
     return RawAggTradesSyncStats(
         symbol=stream_symbol,
         fetched_rows=int(fetched_rows),
         upserted_rows=int(upserted_rows),
         first_timestamp_ms=first_ts,
-        last_timestamp_ms=last_ts,
-        checkpoint_timestamp_ms=last_ts,
-        checkpoint_trade_id=(int(last_trade_id) if last_trade_id >= 0 else None),
+        last_timestamp_ms=(
+            int(persisted_last_row["timestamp_ms"]) if persisted_last_row is not None else None
+        ),
+        checkpoint_timestamp_ms=(
+            int(persisted_checkpoint["last_timestamp_ms"]) if persisted_checkpoint else None
+        ),
+        checkpoint_trade_id=(
+            int(persisted_checkpoint["last_trade_id"]) if persisted_checkpoint else None
+        ),
     )
+
+
+def sync_symbol_aggtrades_raw(
+    *,
+    exchange: Any,
+    db_path: str,
+    exchange_id: str,
+    symbol: str,
+    start_ms: int,
+    end_ms: int,
+    limit: int = 1000,
+    max_batches: int = 100_000,
+    retries: int = 3,
+    base_wait_sec: float = 0.5,
+    resume_from_checkpoint: bool = True,
+) -> RawAggTradesSyncStats:
+    """Serialize one raw exchange/symbol stream across recovery and publication."""
+    from lumina_quant.storage.parquet import ParquetMarketDataRepository
+
+    repo = ParquetMarketDataRepository(str(db_path))
+    stream_exchange = str(exchange_id).strip().lower() or "binance"
+    stream_symbol = normalize_symbol(symbol)
+    lease = repo.acquire_raw_symbol_stream_lease(exchange=stream_exchange, symbol=stream_symbol)
+    try:
+        return _sync_symbol_aggtrades_raw_under_lease(
+            exchange=exchange,
+            db_path=db_path,
+            exchange_id=stream_exchange,
+            symbol=stream_symbol,
+            start_ms=start_ms,
+            end_ms=end_ms,
+            limit=limit,
+            max_batches=max_batches,
+            retries=retries,
+            base_wait_sec=base_wait_sec,
+            resume_from_checkpoint=resume_from_checkpoint,
+            lease=lease,
+        )
+    finally:
+        lease.release()
 
 
 def _compact_symbol(symbol: str) -> str:
@@ -664,53 +1064,120 @@ def _http_get_json(
             wait = min(wait * 2.0, 10.0)
 
 
-def normalize_aggtrade_row(trade: dict[str, Any]) -> dict[str, Any] | None:
-    """Normalize one native Binance aggTrade payload into raw aggTrades schema."""
-    payload = dict(trade or {})
-    ts_raw = payload.get("timestamp_ms", payload.get("timestamp", payload.get("T")))
-    if ts_raw is None:
-        return None
-    try:
-        timestamp_ms = int(ts_raw)
-    except Exception:
-        return None
-    if timestamp_ms <= 0:
-        return None
+def normalize_aggtrade_row(trade: Mapping[str, Any]) -> dict[str, Any]:
+    """Normalize a native Binance or CCXT aggTrade payload into raw schema."""
+    if not isinstance(trade, Mapping):
+        raise ValueError("aggTrade payload must be a mapping")
+    payload = dict(trade)
+    info = payload.get("info")
+    if info is not None and not isinstance(info, Mapping):
+        raise ValueError("aggTrade info must be a mapping")
+    native_info = dict(info or {})
 
-    price_raw = payload.get("price", payload.get("p"))
-    amount_raw = payload.get("amount", payload.get("quantity", payload.get("q")))
-    if price_raw is None or amount_raw is None:
-        return None
+    native_keys = {"a", "T", "p", "q", "m"}
+    native_mappings = [
+        mapping for mapping in (payload, native_info) if native_keys.intersection(mapping)
+    ]
+    for mapping in native_mappings:
+        if native_keys.intersection(mapping) != native_keys:
+            raise ValueError("Native Binance aggTrade fields must be complete")
 
-    trade_id_raw = payload.get("agg_trade_id", payload.get("id"))
-    if trade_id_raw is None:
-        trade_id_raw = payload.get("tradeId")
-    if trade_id_raw is None:
-        trade_id_raw = payload.get("a")
-    if trade_id_raw is None and isinstance(payload.get("info"), dict):
-        trade_id_raw = payload["info"].get("a")
-    if trade_id_raw is None:
-        return None
+    def _integer(value: Any, *, field: str, minimum: int, native: bool) -> int:
+        if native:
+            if type(value) is int:
+                parsed = value
+            elif isinstance(value, str) and re.fullmatch(r"0|[1-9][0-9]*", value):
+                parsed = int(value)
+            else:
+                raise ValueError(f"Native Binance aggTrade {field} must be canonical digits")
+        elif type(value) is int:
+            parsed = value
+        elif isinstance(value, str) and re.fullmatch(r"0|[1-9][0-9]*", value):
+            parsed = int(value)
+        else:
+            raise ValueError(f"aggTrade {field} must be an integer")
+        if parsed < minimum:
+            raise ValueError(f"aggTrade {field} is out of range")
+        return parsed
 
-    side = str(payload.get("side", "")).strip().lower()
-    info = payload.get("info") if isinstance(payload.get("info"), dict) else {}
-    maker_raw = payload.get("maker")
-    if maker_raw is None:
-        maker_raw = payload.get("is_buyer_maker", payload.get("m"))
-    if maker_raw is None:
-        maker_raw = info.get("m")
-    is_buyer_maker = bool(maker_raw) if maker_raw is not None else side == "sell"
+    def _positive_finite(value: Any, *, field: str, native: bool) -> float:
+        if native:
+            if (
+                not isinstance(value, str)
+                or re.fullmatch(r"(?:0|[1-9][0-9]*)(?:\.[0-9]+)?", value) is None
+            ):
+                raise ValueError(f"Native Binance aggTrade {field} must be a canonical decimal")
+            parsed = float(value)
+        else:
+            if type(value) in (int, float) or (
+                isinstance(value, str) and re.fullmatch(r"(?:0|[1-9][0-9]*)(?:\.[0-9]+)?", value)
+            ):
+                parsed = float(value)
+            else:
+                raise ValueError(f"aggTrade {field} must be a decoded finite number")
+        if not math.isfinite(parsed) or parsed <= 0.0:
+            raise ValueError(f"aggTrade {field} must be a finite positive number")
+        return parsed
 
-    quantity = float(amount_raw)
-    if quantity < 0.0:
-        return None
+    def _maker(value: Any, *, field: str, native: bool) -> bool:
+        _ = native
+        if type(value) is not bool:
+            raise ValueError("aggTrade buyer-maker flag must be a boolean")
+        return value
 
+    def _agreed_value(
+        keys: tuple[str, ...],
+        *,
+        field: str,
+        parser: Any,
+    ) -> Any:
+        values = [
+            parser(mapping[key], field=field, native=(key in native_keys))
+            for mapping in (payload, native_info)
+            for key in keys
+            if key in mapping
+        ]
+        if not values:
+            raise ValueError(f"aggTrade {field} is missing")
+        if any(value != values[0] for value in values[1:]):
+            raise ValueError(f"aggTrade {field} aliases disagree")
+        return values[0]
+
+    agg_trade_id = _agreed_value(
+        ("agg_trade_id", "id", "tradeId", "a"),
+        field="aggregate ID",
+        parser=lambda value, *, field, native: _integer(
+            value, field=field, minimum=0, native=native
+        ),
+    )
+    timestamp_ms = _agreed_value(
+        ("timestamp_ms", "timestamp", "T"),
+        field="timestamp",
+        parser=lambda value, *, field, native: _integer(
+            value, field=field, minimum=1, native=native
+        ),
+    )
+    price = _agreed_value(
+        ("price", "p"),
+        field="price",
+        parser=lambda value, *, field, native: _positive_finite(value, field=field, native=native),
+    )
+    quantity = _agreed_value(
+        ("amount", "quantity", "q"),
+        field="quantity",
+        parser=lambda value, *, field, native: _positive_finite(value, field=field, native=native),
+    )
+    maker = _agreed_value(
+        ("is_buyer_maker", "isBuyerMaker", "maker", "m"),
+        field="buyer-maker flag",
+        parser=_maker,
+    )
     return {
-        "agg_trade_id": int(trade_id_raw),
-        "timestamp_ms": int(timestamp_ms),
-        "price": float(price_raw),
-        "quantity": float(quantity),
-        "is_buyer_maker": bool(is_buyer_maker),
+        "agg_trade_id": agg_trade_id,
+        "timestamp_ms": timestamp_ms,
+        "price": price,
+        "quantity": quantity,
+        "is_buyer_maker": maker,
     }
 
 
@@ -732,12 +1199,8 @@ def fetch_aggtrades_batch(
         retries=max(0, int(retries)),
         base_wait_sec=float(base_wait_sec),
     )
-    normalized: list[dict[str, Any]] = []
-    for trade in rows:
-        parsed = normalize_aggtrade_row(dict(trade or {}))
-        if parsed is not None:
-            normalized.append(parsed)
-    normalized.sort(key=lambda item: (int(item["timestamp_ms"]), int(item["agg_trade_id"])))
+    normalized = [normalize_aggtrade_row(trade) for trade in rows]
+    _validate_live_aggtrade_identity_order(normalized)
     return normalized
 
 

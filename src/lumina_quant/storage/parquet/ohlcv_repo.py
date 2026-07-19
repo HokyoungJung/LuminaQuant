@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import fcntl
 import json
+import math
 import os
 import re
+import stat
 import time
+import uuid
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
@@ -22,7 +26,6 @@ from lumina_quant.backtesting.cli_contract import (
 )
 from lumina_quant.data.raw_first_lineage import resample_1s_frame
 from lumina_quant.data.timeframe import normalize_timeframe_token, timeframe_to_milliseconds
-from lumina_quant.eval.exact_window_runtime import HeavyRunActiveError, HeavyRunLock
 from lumina_quant.storage.wal.binary import BinaryWAL, WALRecord
 from lumina_quant.storage.wal.native_backend import append_ohlcv_frame_native
 from lumina_quant.symbols import canonical_symbol
@@ -83,6 +86,67 @@ _MATERIALIZED_REQUIRED_MANIFEST_FIELDS = (
     "status",
 )
 _RAW_PART_PATTERN = re.compile(r"^part-(\d+)\.parquet$")
+_RAW_TRANSACTION_STAGE_PATTERN = re.compile(r"^\.raw-stage-[0-9a-f]{32}\.parquet$")
+_RAW_TRANSACTION_TEMP_PATTERN = re.compile(r"^\.raw-transaction-[0-9a-f]{32}\.tmp$")
+_RAW_CONTROL_TEMP_PATTERN = re.compile(
+    r"^\.raw-(?:checkpoint|inventory|meta|wal-bootstrap|wal-tail)-[0-9a-f]{32}\.tmp$"
+)
+_RAW_CHECKPOINT_FIELDS = frozenset(
+    {
+        "exchange",
+        "symbol",
+        "last_timestamp_ms",
+        "last_trade_id",
+        "observed_until_ms",
+        "updated_at_utc",
+        "batch_rows",
+        "last_row",
+        "last_row_sha256",
+    }
+)
+_RAW_WAL_MAX_RECORD_BYTES = 1_048_576
+_RAW_CONTROL_MAX_BYTES = 8 * 1_048_576
+_RAW_TRANSACTION_NAME = ".raw-transaction.json"
+
+_RAW_INVENTORY_NAME = ".raw-inventory.json"
+_RAW_WAL_NAME = "wal.bin"
+_RAW_META_NAME = "compaction.meta.json"
+_RAW_WAL_TAIL_NAME = ".raw-wal-tail.json"
+_RAW_WAL_BOOTSTRAP_NAME = ".raw-wal-bootstrap.json"
+_RAW_WAL_TAIL_VERSION = 1
+_RAW_WAL_RECORD_VERSION = 2
+_RAW_COMPONENT_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
+_RAW_DATE_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+@dataclass
+class _RawStreamLease:
+    """Small, process-safe raw-stream lease backed by an owned flock file."""
+
+    lock_path: Path
+    _fd: int
+    _released: bool = False
+
+    def release(self) -> None:
+        if self._released:
+            return
+        try:
+            fcntl.flock(self._fd, fcntl.LOCK_UN)
+        finally:
+            os.close(self._fd)
+            self._released = True
+
+
+@dataclass(frozen=True)
+class _RawInventorySnapshot:
+    """One authenticated, immutable-on-disk inventory generation."""
+
+    raw: bytes
+    payload: dict[str, Any]
+    entries: tuple[dict[str, Any], ...]
+    generation: int
+    inventory_sha256: str
+    file_identity: tuple[int, int, int, int, int]
 
 
 class RawPartitionBusyError(RuntimeError):
@@ -124,11 +188,67 @@ class ParquetMarketDataRepository:
 
     @staticmethod
     def _normalize_exchange(exchange: str) -> str:
-        return str(exchange).strip().lower()
+        value = str(exchange).strip().lower()
+        if (
+            not _RAW_COMPONENT_PATTERN.fullmatch(value)
+            or value in {".", ".."}
+            or any(ord(char) < 32 or ord(char) == 127 for char in value)
+        ):
+            raise ValueError("Raw exchange must be a canonical safe path component")
+        return value
 
     @staticmethod
     def _normalize_symbol_token(symbol: str) -> str:
-        return normalize_symbol(symbol).replace("/", "")
+        value = normalize_symbol(symbol).replace("/", "")
+        if (
+            not _RAW_COMPONENT_PATTERN.fullmatch(value.lower())
+            or value in {".", ".."}
+            or any(ord(char) < 32 or ord(char) == 127 for char in value)
+        ):
+            raise ValueError("Raw symbol must normalize to a canonical safe path component")
+        return value
+
+    @staticmethod
+    def _normalize_raw_exchange_token(exchange: str) -> str:
+        if not isinstance(exchange, str) or exchange != exchange.strip() or "\x00" in exchange:
+            raise ValueError("Raw exchange must be a canonical safe path component")
+        if (
+            not _RAW_COMPONENT_PATTERN.fullmatch(exchange.lower())
+            or exchange in {".", ".."}
+            or "/" in exchange
+            or "\\" in exchange
+            or any(ord(char) < 32 or ord(char) == 127 for char in exchange)
+        ):
+            raise ValueError("Raw exchange must be a canonical safe path component")
+        return exchange.lower()
+
+    @staticmethod
+    def _normalize_raw_symbol_token(symbol: str) -> str:
+        if not isinstance(symbol, str) or symbol != symbol.strip() or "\x00" in symbol:
+            raise ValueError("Raw symbol must be a canonical safe path component")
+        if symbol in {".", ".."} or "\\" in symbol or symbol.startswith("/"):
+            raise ValueError("Raw symbol must be a canonical safe path component")
+        separators = sum(symbol.count(separator) for separator in "/_-")
+        if separators > 1 or (
+            "/" in symbol
+            and (
+                not all(symbol.split("/"))
+                or symbol.count("/") != 1
+                or any(component in {".", ".."} for component in symbol.split("/"))
+            )
+        ):
+            raise ValueError("Raw symbol has ambiguous pair separators")
+        if any(ord(char) < 32 or ord(char) == 127 for char in symbol):
+            raise ValueError("Raw symbol must be a canonical safe path component")
+        value = normalize_symbol(symbol).replace("/", "")
+        if (
+            not _RAW_COMPONENT_PATTERN.fullmatch(value.lower())
+            or value in {".", ".."}
+            or "/" in value
+            or "\\" in value
+        ):
+            raise ValueError("Raw symbol must normalize to a canonical safe path component")
+        return value
 
     @staticmethod
     def _empty_ohlcv_frame() -> pl.DataFrame:
@@ -185,9 +305,19 @@ class ParquetMarketDataRepository:
 
     @staticmethod
     def _partition_date_token(partition_date: str | date) -> str:
-        if isinstance(partition_date, date):
-            return partition_date.strftime("%Y-%m-%d")
-        return str(partition_date).strip()
+        token = (
+            partition_date.strftime("%Y-%m-%d")
+            if isinstance(partition_date, date)
+            else str(partition_date).strip()
+        )
+        if not _RAW_DATE_PATTERN.fullmatch(token):
+            raise ValueError("Raw partition date must be YYYY-MM-DD")
+        try:
+            if date.fromisoformat(token).strftime("%Y-%m-%d") != token:
+                raise ValueError
+        except ValueError as exc:
+            raise ValueError("Raw partition date must be a valid UTC calendar date") from exc
+        return token
 
     @staticmethod
     def _iter_month_tokens(start: datetime, end: datetime) -> list[str]:
@@ -220,12 +350,14 @@ class ParquetMarketDataRepository:
         return self._symbol_root(exchange=exchange, symbol=symbol) / "compaction.meta.json"
 
     def _raw_symbol_root(self, *, exchange: str, symbol: str) -> Path:
-        return (
-            self.root_path
-            / "market_data_raw_aggtrades"
-            / self._normalize_exchange(exchange)
-            / self._normalize_symbol_token(symbol)
+        root = self.root_path / "market_data_raw_aggtrades"
+        path = (
+            root
+            / self._normalize_raw_exchange_token(exchange)
+            / self._normalize_raw_symbol_token(symbol)
         )
+        self._assert_raw_path_confined(path)
+        return path
 
     def raw_partition_path(
         self,
@@ -430,71 +562,316 @@ class ParquetMarketDataRepository:
         )
 
     def _raw_wal_path(self, *, exchange: str, symbol: str) -> Path:
-        return self._raw_symbol_root(exchange=exchange, symbol=symbol) / "wal.bin"
+        return self._raw_symbol_root(exchange=exchange, symbol=symbol) / _RAW_WAL_NAME
 
     def _raw_checkpoint_path(self, *, exchange: str, symbol: str) -> Path:
         return self._raw_symbol_root(exchange=exchange, symbol=symbol) / "checkpoint.json"
 
     def _raw_meta_path(self, *, exchange: str, symbol: str) -> Path:
-        return self._raw_symbol_root(exchange=exchange, symbol=symbol) / "compaction.meta.json"
+        return self._raw_symbol_root(exchange=exchange, symbol=symbol) / _RAW_META_NAME
 
-    @staticmethod
-    def _raw_part_paths(partition_root: Path) -> list[Path]:
-        return sorted(
-            path
-            for path in partition_root.glob("part-*.parquet")
-            if _RAW_PART_PATTERN.fullmatch(path.name) is not None
-        )
-
-    @staticmethod
-    def _next_raw_part_path(partition_root: Path) -> Path:
-        highest = -1
-        for path in ParquetMarketDataRepository._raw_part_paths(partition_root):
-            match = _RAW_PART_PATTERN.fullmatch(path.name)
-            if match is None:
-                continue
-            highest = max(highest, int(match.group(1)))
-        next_index = highest + 1
-        return partition_root / f"part-{next_index:04d}.parquet"
-
-    @staticmethod
-    def _raw_tail_key(paths: list[Path]) -> tuple[int, int] | None:
-        latest: tuple[int, int] | None = None
-        for path in paths:
-            try:
-                tail = (
-                    pl.scan_parquet(str(path))
-                    .select(["timestamp_ms", "agg_trade_id"])
-                    .sort(["timestamp_ms", "agg_trade_id"], descending=[True, True])
-                    .limit(1)
-                    .collect()
-                )
-            except Exception:
-                return None
-            if tail.is_empty():
-                continue
-            key = (int(tail["timestamp_ms"][0]), int(tail["agg_trade_id"][0]))
-            latest = key if latest is None else max(latest, key)
-        return latest
-
-    @staticmethod
-    def _rename_corrupt_raw_part(path: Path) -> None:
-        corrupt_path = path.with_name(
-            f"{path.stem}.corrupt-{datetime.now(UTC).strftime('%Y%m%dT%H%M%S%fZ')}{path.suffix}"
-        )
-        path.replace(corrupt_path)
-        ParquetMarketDataRepository._fsync_dir(path.parent)
-
-    @staticmethod
-    def _raw_checkpoint_key(payload: dict[str, Any]) -> tuple[int, int] | None:
+    def _raw_components(self, path: Path) -> tuple[str, ...]:
+        root = self.root_path.absolute()
         try:
-            ts_ms = int(payload.get("last_timestamp_ms", 0) or 0)
-            trade_id = int(payload.get("last_trade_id", -1) or -1)
+            return path.absolute().relative_to(root).parts
+        except ValueError as exc:
+            raise ValueError("Raw aggTrades path escapes its repository root") from exc
+
+    @staticmethod
+    def _raw_checked_dir_fd(fd: int, *, path: Path) -> os.stat_result:
+        info = os.fstat(fd)
+        if not stat.S_ISDIR(info.st_mode):
+            raise ValueError(f"Raw aggTrades path is not a directory: {path}")
+        return info
+
+    def _raw_dir_fd(self, path: Path, *, create: bool = False) -> int:
+        """Open a managed raw directory from filesystem-root anchored descriptors."""
+        root = self.root_path.absolute()
+        target_components = self._raw_components(path)
+        root_components = root.parts[1:]
+        if root.anchor != os.path.sep:
+            raise ValueError("Raw aggTrades repository root must be absolute")
+
+        fd = os.open(root.anchor, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        current = Path(root.anchor)
+        try:
+            self._raw_checked_dir_fd(fd, path=current)
+            for component in (*root_components, *target_components):
+                if component in {"", ".", ".."} or "/" in component:
+                    raise ValueError("Raw aggTrades path has an unsafe component")
+                current /= component
+                try:
+                    child = os.open(
+                        component, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd
+                    )
+                except FileNotFoundError:
+                    if not create:
+                        raise
+                    try:
+                        os.mkdir(component, 0o700, dir_fd=fd)
+                    except FileExistsError:
+                        pass
+                    else:
+                        os.fsync(fd)
+                    child = os.open(
+                        component, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd
+                    )
+                try:
+                    self._raw_checked_dir_fd(child, path=current)
+                except Exception:
+                    os.close(child)
+                    raise
+                os.close(fd)
+                fd = child
+            return fd
         except Exception:
-            return None
-        if ts_ms <= 0:
-            return None
-        return (ts_ms, trade_id)
+            os.close(fd)
+            raise
+
+    def _assert_raw_path_confined(self, path: Path) -> None:
+        """Validate syntax only; raw I/O must use `_raw_dir_fd` below."""
+        for component in self._raw_components(path):
+            if component in {".", ".."} or "/" in component:
+                raise ValueError("Raw aggTrades path has an unsafe component")
+
+    @staticmethod
+    def _raw_checked_fd(fd: int, *, path: Path) -> os.stat_result:
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+            raise ValueError(f"Raw aggTrades file is not an owned regular file: {path}")
+        return info
+
+    def _raw_open_regular(
+        self, parent_fd: int, name: str, flags: int, *, path: Path, mode: int = 0o600
+    ) -> int:
+        if "/" in name or name in {"", ".", ".."}:
+            raise ValueError("Raw aggTrades file name is unsafe")
+        fd = os.open(name, flags | os.O_NOFOLLOW | os.O_NONBLOCK, mode, dir_fd=parent_fd)
+        try:
+            self._raw_checked_fd(fd, path=path)
+            return fd
+        except Exception:
+            os.close(fd)
+            raise
+
+    @staticmethod
+    def _raw_write_all(fd: int, data: bytes) -> None:
+        view = memoryview(data)
+        while view:
+            try:
+                written = os.write(fd, view)
+            except InterruptedError:
+                continue
+            if written <= 0:
+                raise OSError("Raw aggTrades control write made no progress")
+            view = view[written:]
+
+    @staticmethod
+    def _raw_read_exact(fd: int, size: int, *, error: str) -> bytes:
+        chunks: list[bytes] = []
+        remaining = size
+        while remaining:
+            try:
+                chunk = os.read(fd, remaining)
+            except InterruptedError:
+                continue
+            if not chunk:
+                raise ValueError(error)
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        return b"".join(chunks)
+
+    def _raw_read_bytes(
+        self, parent_fd: int, name: str, *, path: Path, max_bytes: int = _RAW_CONTROL_MAX_BYTES
+    ) -> tuple[bytes, os.stat_result]:
+        fd = self._raw_open_regular(parent_fd, name, os.O_RDONLY, path=path)
+        try:
+            before = self._raw_checked_fd(fd, path=path)
+            if before.st_size > max_bytes:
+                raise ValueError(f"Raw aggTrades control file is too large: {path}")
+            chunks: list[bytes] = []
+            remaining = before.st_size
+            while remaining:
+                try:
+                    chunk = os.read(fd, min(remaining, 1_048_576))
+                except InterruptedError:
+                    continue
+                if not chunk:
+                    raise ValueError(f"Raw aggTrades control file was truncated: {path}")
+                chunks.append(chunk)
+                remaining -= len(chunk)
+            if os.read(fd, 1):
+                raise ValueError(f"Raw aggTrades control file grew while in use: {path}")
+            after = self._raw_checked_fd(fd, path=path)
+            if (
+                before.st_dev,
+                before.st_ino,
+                before.st_size,
+                before.st_mtime_ns,
+                before.st_ctime_ns,
+            ) != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns):
+                raise ValueError(f"Raw aggTrades file changed while in use: {path}")
+            return b"".join(chunks), before
+        finally:
+            os.close(fd)
+
+    def _raw_read_parquet(self, path: Path) -> pl.DataFrame:
+        parent_fd = self._raw_dir_fd(path.parent, create=False)
+        try:
+            fd = self._raw_open_regular(parent_fd, path.name, os.O_RDONLY, path=path)
+            try:
+                before = self._raw_checked_fd(fd, path=path)
+                frame = pl.read_parquet(f"/proc/self/fd/{fd}")
+                after = self._raw_checked_fd(fd, path=path)
+                if (
+                    before.st_dev,
+                    before.st_ino,
+                    before.st_size,
+                    before.st_mtime_ns,
+                    before.st_ctime_ns,
+                ) != (
+                    after.st_dev,
+                    after.st_ino,
+                    after.st_size,
+                    after.st_mtime_ns,
+                    after.st_ctime_ns,
+                ):
+                    raise ValueError(f"Raw aggTrades file changed while in use: {path}")
+                return frame
+            finally:
+                os.close(fd)
+        finally:
+            os.close(parent_fd)
+
+    def _raw_read_authenticated_parquet(self, path: Path, entry: Mapping[str, Any]) -> pl.DataFrame:
+        parent_fd = self._raw_dir_fd(path.parent, create=False)
+        try:
+            fd = self._raw_open_regular(parent_fd, path.name, os.O_RDONLY, path=path)
+            try:
+                before = self._raw_checked_fd(fd, path=path)
+                identity = entry["file_identity"]
+                if (
+                    before.st_dev != identity["dev"]
+                    or before.st_ino != identity["ino"]
+                    or before.st_size != identity["size"]
+                    or before.st_mtime_ns != identity["mtime_ns"]
+                    or before.st_size != entry["byte_count"]
+                ):
+                    raise ValueError(
+                        f"Raw aggTrades part identity does not match inventory: {path}"
+                    )
+                digest = sha256()
+                size = 0
+                while chunk := os.read(fd, 1_048_576):
+                    size += len(chunk)
+                    digest.update(chunk)
+                if size != entry["byte_count"] or digest.hexdigest() != entry["content_sha256"]:
+                    raise ValueError(f"Raw aggTrades part bytes do not match inventory: {path}")
+                os.lseek(fd, 0, os.SEEK_SET)
+                frame = pl.read_parquet(f"/proc/self/fd/{fd}")
+                frame = self._validate_raw_aggtrades_frame(frame)
+                rows = frame.to_dicts()
+                if (
+                    frame.height != entry["row_count"]
+                    or int(rows[0]["agg_trade_id"]) != entry["min_trade_id"]
+                    or int(rows[-1]["agg_trade_id"]) != entry["max_trade_id"]
+                    or int(rows[0]["timestamp_ms"]) != entry["min_timestamp_ms"]
+                    or int(rows[-1]["timestamp_ms"]) != entry["max_timestamp_ms"]
+                    or any(
+                        self._partition_date_from_ms(row["timestamp_ms"]) != entry["date"]
+                        for row in rows
+                    )
+                ):
+                    raise ValueError(
+                        f"Raw aggTrades part metadata does not match inventory: {path}"
+                    )
+                after = self._raw_checked_fd(fd, path=path)
+                if (
+                    before.st_dev,
+                    before.st_ino,
+                    before.st_size,
+                    before.st_mtime_ns,
+                    before.st_ctime_ns,
+                ) != (
+                    after.st_dev,
+                    after.st_ino,
+                    after.st_size,
+                    after.st_mtime_ns,
+                    after.st_ctime_ns,
+                ):
+                    raise ValueError(f"Raw aggTrades file changed while in use: {path}")
+                return frame
+            finally:
+                os.close(fd)
+        finally:
+            os.close(parent_fd)
+
+    def _raw_write_parquet(
+        self, parent_fd: int, name: str, *, path: Path, frame: pl.DataFrame
+    ) -> None:
+        fd = self._raw_open_regular(parent_fd, name, os.O_WRONLY, path=path)
+        try:
+            frame.write_parquet(f"/proc/self/fd/{fd}", compression="zstd", statistics=True)
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+
+    def _raw_replace(self, parent_fd: int, source: str, destination: str) -> None:
+        os.replace(source, destination, src_dir_fd=parent_fd, dst_dir_fd=parent_fd)
+        os.fsync(parent_fd)
+
+    def _raw_unlink(self, parent_fd: int, name: str) -> None:
+        os.unlink(name, dir_fd=parent_fd)
+        os.fsync(parent_fd)
+
+    def _ensure_raw_directory(self, path: Path) -> None:
+        fd = self._raw_dir_fd(path, create=True)
+        os.close(fd)
+
+    def _raw_regular_stat(self, path: Path) -> os.stat_result:
+        parent_fd = self._raw_dir_fd(path.parent, create=False)
+        try:
+            fd = self._raw_open_regular(parent_fd, path.name, os.O_RDONLY, path=path)
+            try:
+                return self._raw_checked_fd(fd, path=path)
+            finally:
+                os.close(fd)
+        finally:
+            os.close(parent_fd)
+
+    def _assert_raw_regular_stable(self, path: Path, before: os.stat_result) -> None:
+        after = self._raw_regular_stat(path)
+        if (
+            before.st_dev,
+            before.st_ino,
+            before.st_size,
+            before.st_mtime_ns,
+            before.st_ctime_ns,
+        ) != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns):
+            raise ValueError(f"Raw aggTrades file changed while in use: {path}")
+
+    @staticmethod
+    def _raw_dir_names(fd: int) -> list[str]:
+        return sorted(os.listdir(fd))
+
+    def _raw_part_paths(self, partition_root: Path) -> list[Path]:
+        fd = self._raw_dir_fd(partition_root, create=False)
+        try:
+            return [
+                partition_root / name
+                for name in self._raw_dir_names(fd)
+                if _RAW_PART_PATTERN.fullmatch(name) is not None
+            ]
+        finally:
+            os.close(fd)
+
+    def _next_raw_part_path(self, partition_root: Path) -> Path:
+        indices = [
+            int(match.group(1))
+            for path in self._raw_part_paths(partition_root)
+            if (match := _RAW_PART_PATTERN.fullmatch(path.name)) is not None
+        ]
+        return partition_root / f"part-{max(indices, default=-1) + 1:04d}.parquet"
 
     def _materialized_date_root(
         self,
@@ -614,10 +991,7 @@ class ParquetMarketDataRepository:
 
     @staticmethod
     def _fsync_dir(path: Path) -> None:
-        try:
-            fd = os.open(str(path), os.O_RDONLY)
-        except Exception:
-            return
+        fd = os.open(str(path), os.O_RDONLY)
         try:
             os.fsync(fd)
         finally:
@@ -640,66 +1014,194 @@ class ParquetMarketDataRepository:
         )
 
     @staticmethod
-    def _normalize_loaded_raw_aggtrades_frame(frame: pl.DataFrame) -> pl.DataFrame:
+    def _validate_raw_aggtrades_frame(frame: pl.DataFrame) -> pl.DataFrame:
+        """Reject malformed raw data instead of coercing, sorting, or overwriting it."""
+        if set(frame.columns) != set(_RAW_AGGTRADES_REQUIRED_COLUMNS):
+            missing = [
+                name for name in _RAW_AGGTRADES_REQUIRED_COLUMNS if name not in frame.columns
+            ]
+            unexpected = [
+                name for name in frame.columns if name not in _RAW_AGGTRADES_REQUIRED_COLUMNS
+            ]
+            raise ValueError(
+                f"Raw aggTrades schema mismatch missing={missing} unexpected={unexpected}"
+            )
+        if any(frame.schema[name] != dtype for name, dtype in _RAW_AGGTRADES_SCHEMA.items()):
+            raise ValueError("Raw aggTrades storage types are invalid")
         if frame.is_empty():
             return ParquetMarketDataRepository._empty_raw_aggtrades_frame()
-        return (
-            frame.select(list(_RAW_AGGTRADES_REQUIRED_COLUMNS))
-            .with_columns(
-                [
-                    pl.col("agg_trade_id").cast(pl.Int64),
-                    pl.col("timestamp_ms").cast(pl.Int64),
-                    pl.col("price").cast(pl.Float64),
-                    pl.col("quantity").cast(pl.Float64),
-                    pl.col("is_buyer_maker").cast(pl.Boolean),
-                ]
-            )
-            .filter(pl.col("timestamp_ms").is_not_null())
-            .sort(["timestamp_ms", "agg_trade_id"])
-            .unique(subset=["timestamp_ms", "agg_trade_id"], keep="last")
-            .sort(["timestamp_ms", "agg_trade_id"])
-        )
+        rows: list[dict[str, Any]] = []
+        previous_timestamp: int | None = None
+        previous_id: int | None = None
+        previous_row: dict[str, Any] | None = None
+        for row in frame.select(list(_RAW_AGGTRADES_REQUIRED_COLUMNS)).iter_rows(named=True):
+            if any(value is None for value in row.values()):
+                raise ValueError("Raw aggTrades rows may not contain nulls")
+            trade_id = row["agg_trade_id"]
+            timestamp_ms = row["timestamp_ms"]
+            price = row["price"]
+            quantity = row["quantity"]
+            buyer_maker = row["is_buyer_maker"]
+            if type(trade_id) is not int or trade_id < 0:
+                raise ValueError("Raw aggTrades aggregate IDs must be nonnegative integers")
+            if type(timestamp_ms) is not int or timestamp_ms <= 0:
+                raise ValueError("Raw aggTrades timestamps must be positive integers")
+            if type(price) is not float or not math.isfinite(price) or price <= 0:
+                raise ValueError("Raw aggTrades prices must be finite positive floats")
+            if type(quantity) is not float or not math.isfinite(quantity) or quantity <= 0:
+                raise ValueError("Raw aggTrades quantities must be finite positive floats")
+            if type(buyer_maker) is not bool:
+                raise ValueError("Raw aggTrades buyer-maker flags must be booleans")
+            if previous_id is not None and trade_id == previous_id:
+                if previous_row != row:
+                    raise ValueError("Raw aggTrades duplicate aggregate ID conflicts")
+                continue
+            if previous_timestamp is not None and timestamp_ms < previous_timestamp:
+                raise ValueError("Raw aggTrades timestamps must be nondecreasing")
+            if previous_id is not None and trade_id <= previous_id:
+                raise ValueError("Raw aggTrades aggregate IDs must be strictly increasing")
+            rows.append(row)
+            previous_timestamp = timestamp_ms
+            previous_id = trade_id
+            previous_row = row
+        return pl.DataFrame(rows, schema=_RAW_AGGTRADES_SCHEMA)
+
+    @staticmethod
+    def _normalize_loaded_raw_aggtrades_frame(frame: pl.DataFrame) -> pl.DataFrame:
+        return ParquetMarketDataRepository._validate_raw_aggtrades_frame(frame)
 
     @staticmethod
     def _ensure_raw_aggtrades_frame(
         rows: pl.DataFrame | list[dict[str, Any]] | tuple[dict[str, Any], ...],
     ) -> pl.DataFrame:
-        frame = rows if isinstance(rows, pl.DataFrame) else pl.DataFrame(rows or [])
-        if frame.is_empty():
+        if isinstance(rows, pl.DataFrame):
+            frame = rows
+        elif not rows:
             return ParquetMarketDataRepository._empty_raw_aggtrades_frame()
+        else:
+            frame = pl.DataFrame(rows)
+        return ParquetMarketDataRepository._validate_raw_aggtrades_frame(frame)
 
-        missing = [
-            column for column in _RAW_AGGTRADES_REQUIRED_COLUMNS if column not in frame.columns
-        ]
-        if missing:
-            raise ValueError(f"Raw aggTrades rows missing columns: {missing}")
+    @staticmethod
+    def _checkpoint_digest(row: Mapping[str, Any]) -> str:
+        return sha256(
+            json.dumps(dict(row), sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
+        ).hexdigest()
 
-        return (
-            frame.select(list(_RAW_AGGTRADES_REQUIRED_COLUMNS))
-            .with_columns(
-                [
-                    pl.col("agg_trade_id").cast(pl.Int64),
-                    pl.col("timestamp_ms").cast(pl.Int64),
-                    pl.col("price").cast(pl.Float64),
-                    pl.col("quantity").cast(pl.Float64),
-                    pl.col("is_buyer_maker").cast(pl.Boolean),
-                ]
+    def validate_raw_checkpoint(
+        self, payload: Mapping[str, Any], *, exchange: str, symbol: str
+    ) -> dict[str, Any]:
+        if set(payload) != _RAW_CHECKPOINT_FIELDS:
+            raise ValueError("Raw aggTrades checkpoint schema is invalid")
+
+        def integer(value: Any, field: str, minimum: int) -> int:
+            if type(value) is not int or value < minimum:
+                raise ValueError(f"Raw aggTrades checkpoint {field} is invalid")
+            return value
+
+        if type(payload["exchange"]) is not str or payload["exchange"] != exchange:
+            raise ValueError("Raw aggTrades checkpoint exchange does not match stream")
+        if type(payload["symbol"]) is not str or payload["symbol"] != symbol:
+            raise ValueError("Raw aggTrades checkpoint symbol does not match stream")
+        timestamp = integer(payload["last_timestamp_ms"], "last timestamp", 1)
+        trade_id = integer(payload["last_trade_id"], "last aggregate ID", 0)
+        observed = integer(payload["observed_until_ms"], "observed-until timestamp", timestamp)
+        batch_rows = integer(payload["batch_rows"], "batch row count", 1)
+        updated = payload["updated_at_utc"]
+        try:
+            parsed = (
+                datetime.fromisoformat(updated.replace("Z", "+00:00"))
+                if type(updated) is str and updated
+                else None
             )
-            .filter(pl.col("timestamp_ms").is_not_null())
-            .sort(["timestamp_ms", "agg_trade_id"])
-        )
+        except ValueError:
+            parsed = None
+        if parsed is None or parsed.tzinfo is None or parsed.utcoffset() != timedelta(0):
+            raise ValueError("Raw aggTrades checkpoint update time must be UTC")
+        if not isinstance(payload["last_row"], Mapping):
+            raise ValueError("Raw aggTrades checkpoint last row is invalid")
+        frame = self._ensure_raw_aggtrades_frame([dict(payload["last_row"])])
+        if frame.height != 1 or frame.to_dicts()[0] != dict(payload["last_row"]):
+            raise ValueError("Raw aggTrades checkpoint last row types are invalid")
+        row = frame.to_dicts()[0]
+        digest = payload["last_row_sha256"]
+        if row["timestamp_ms"] != timestamp or row["agg_trade_id"] != trade_id:
+            raise ValueError("Raw aggTrades checkpoint last row does not match cursor")
+        if (
+            type(digest) is not str
+            or not re.fullmatch(r"[0-9a-f]{64}", digest)
+            or digest != self._checkpoint_digest(row)
+        ):
+            raise ValueError("Raw aggTrades checkpoint last row binding is invalid")
+        return {
+            "exchange": exchange,
+            "symbol": symbol,
+            "last_timestamp_ms": timestamp,
+            "last_trade_id": trade_id,
+            "observed_until_ms": observed,
+            "updated_at_utc": updated,
+            "batch_rows": batch_rows,
+            "last_row": row,
+            "last_row_sha256": digest,
+        }
 
-    def read_raw_checkpoint(self, *, exchange: str, symbol: str) -> dict[str, Any]:
-        checkpoint_path = self._raw_checkpoint_path(exchange=exchange, symbol=symbol)
-        if not checkpoint_path.exists():
+    @staticmethod
+    def _json_object_no_duplicates(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("duplicate JSON object key")
+            result[key] = value
+        return result
+
+    def _read_raw_checkpoint_unlocked(self, *, exchange: str, symbol: str) -> dict[str, Any]:
+        root = self._raw_symbol_root(exchange=exchange, symbol=symbol)
+        try:
+            root_fd = self._raw_dir_fd(root, create=False)
+        except FileNotFoundError:
             return {}
         try:
-            payload = json.loads(checkpoint_path.read_text(encoding="utf-8"))
-            if isinstance(payload, dict):
-                return payload
-        except Exception:
-            return {}
-        return {}
+            if "checkpoint.json" not in self._raw_dir_names(root_fd):
+                return {}
+            raw_bytes, _ = self._raw_read_bytes(
+                root_fd, "checkpoint.json", path=root / "checkpoint.json"
+            )
+            raw = raw_bytes.decode("utf-8")
+            payload = json.loads(
+                raw,
+                object_pairs_hook=self._json_object_no_duplicates,
+                parse_constant=lambda value: (_ for _ in ()).throw(ValueError(value)),
+            )
+            if not isinstance(payload, dict):
+                raise ValueError("checkpoint is not an object")
+            checkpoint = self.validate_raw_checkpoint(payload, exchange=exchange, symbol=symbol)
+            if raw != self._raw_canonical_json(checkpoint):
+                raise ValueError("checkpoint is not canonical")
+            return checkpoint
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
+            raise ValueError("Raw aggTrades checkpoint is malformed") from exc
+        finally:
+            os.close(root_fd)
+
+    def read_raw_checkpoint(
+        self, *, exchange: str, symbol: str, lease: _RawStreamLease | None = None
+    ) -> dict[str, Any]:
+        active, owns = self._raw_stream_lease(exchange=exchange, symbol=symbol, lease=lease)
+        try:
+            self.recover_raw_stream(exchange=exchange, symbol=symbol, lease=active)
+            self._authenticate_raw_inventory(exchange=exchange, symbol=symbol)
+            checkpoint = self._read_raw_checkpoint_unlocked(exchange=exchange, symbol=symbol)
+            if checkpoint:
+                self.read_raw_recovery_bounds(
+                    exchange=exchange,
+                    symbol=symbol,
+                    checkpoint_last_row=checkpoint["last_row"],
+                    lease=active,
+                )
+            return checkpoint
+        finally:
+            if owns:
+                active.release()
 
     def write_raw_checkpoint(
         self,
@@ -707,14 +1209,1582 @@ class ParquetMarketDataRepository:
         exchange: str,
         symbol: str,
         payload: dict[str, Any],
+        lease: _RawStreamLease | None = None,
     ) -> None:
-        checkpoint_path = self._raw_checkpoint_path(exchange=exchange, symbol=symbol)
-        checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
-        checkpoint_path.write_text(
-            json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
+        checkpoint = self.validate_raw_checkpoint(payload, exchange=exchange, symbol=symbol)
+        active, owns = self._raw_stream_lease(exchange=exchange, symbol=symbol, lease=lease)
+        try:
+            self.recover_raw_stream(exchange=exchange, symbol=symbol, lease=active)
+            self._authenticate_raw_inventory(exchange=exchange, symbol=symbol)
+            existing = self._read_raw_checkpoint_unlocked(exchange=exchange, symbol=symbol)
+            if existing:
+                old = existing["last_row"]
+                new = checkpoint["last_row"]
+                old_updated = datetime.fromisoformat(
+                    existing["updated_at_utc"].replace("Z", "+00:00")
+                )
+                new_updated = datetime.fromisoformat(
+                    checkpoint["updated_at_utc"].replace("Z", "+00:00")
+                )
+                if (
+                    int(new["agg_trade_id"]) < int(old["agg_trade_id"])
+                    or int(new["timestamp_ms"]) < int(old["timestamp_ms"])
+                    or int(checkpoint["observed_until_ms"]) < int(existing["observed_until_ms"])
+                    or new_updated < old_updated
+                    or (int(new["agg_trade_id"]) == int(old["agg_trade_id"]) and new != old)
+                ):
+                    raise ValueError("Raw aggTrades checkpoint cursor regresses")
+            if self.read_raw_recovery_bounds(
+                exchange=exchange,
+                symbol=symbol,
+                checkpoint_last_row=checkpoint["last_row"],
+                lease=active,
+            ).is_empty():
+                raise ValueError("Raw aggTrades checkpoint is not bound to persisted raw parquet")
+            path = self._raw_checkpoint_path(exchange=exchange, symbol=symbol)
+            encoded = self._raw_control_bytes(checkpoint, label="checkpoint")
+            parent_fd = self._raw_dir_fd(path.parent, create=True)
+            tmp = f".raw-checkpoint-{uuid.uuid4().hex}.tmp"
+            try:
+                fd = self._raw_open_regular(
+                    parent_fd, tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, path=path.parent / tmp
+                )
+                try:
+                    self._raw_write_all(fd, encoded)
+                    os.fsync(fd)
+                finally:
+                    os.close(fd)
+                self._raw_replace(parent_fd, tmp, path.name)
+            except Exception:
+                try:
+                    if tmp in set(self._raw_dir_names(parent_fd)):
+                        self._raw_unlink(parent_fd, tmp)
+                except OSError, ValueError:
+                    pass
+                raise
+            finally:
+                os.close(parent_fd)
+        finally:
+            if owns:
+                active.release()
+
+    def _raw_wal_tail(self, *, root: Path, root_fd: int) -> dict[str, Any]:
+        raw, _ = self._raw_read_bytes(root_fd, _RAW_WAL_TAIL_NAME, path=root / _RAW_WAL_TAIL_NAME)
+        try:
+            payload = json.loads(
+                raw.decode(),
+                object_pairs_hook=self._json_object_no_duplicates,
+                parse_constant=lambda value: (_ for _ in ()).throw(ValueError(value)),
+            )
+            body = {key: value for key, value in payload.items() if key != "tail_sha256"}
+            required = {
+                "version",
+                "wal_identity",
+                "last_offset",
+                "last_length",
+                "last_sha256",
+                "record_count",
+                "generation",
+                "previous_tail_sha256",
+                "tail_sha256",
+            }
+            if (
+                not isinstance(payload, dict)
+                or set(payload) != required
+                or raw.decode() != self._raw_canonical_json(payload)
+                or type(payload["version"]) is not int
+                or payload["version"] != _RAW_WAL_TAIL_VERSION
+                or payload["tail_sha256"]
+                != sha256(self._raw_canonical_json(body).encode()).hexdigest()
+                or not isinstance(payload["wal_identity"], dict)
+                or set(payload["wal_identity"]) != {"dev", "ino", "size", "mtime_ns", "ctime_ns"}
+                or any(type(value) is not int for value in payload["wal_identity"].values())
+                or any(
+                    type(payload[key]) is not int or payload[key] < 0
+                    for key in ("last_offset", "last_length", "record_count", "generation")
+                )
+                or not 0 < payload["last_length"] <= _RAW_WAL_MAX_RECORD_BYTES
+                or payload["last_offset"] + payload["last_length"]
+                != payload["wal_identity"]["size"]
+                or payload["record_count"] < 1
+                or any(
+                    type(payload[key]) is not str
+                    or re.fullmatch(r"[0-9a-f]{64}", payload[key]) is None
+                    for key in ("last_sha256", "tail_sha256")
+                )
+                or (
+                    payload["previous_tail_sha256"] is not None
+                    and (
+                        type(payload["previous_tail_sha256"]) is not str
+                        or re.fullmatch(r"[0-9a-f]{64}", payload["previous_tail_sha256"]) is None
+                    )
+                )
+            ):
+                raise ValueError("Raw aggTrades WAL tail schema is invalid")
+            return payload
+        except (UnicodeDecodeError, TypeError, KeyError, ValueError, json.JSONDecodeError) as exc:
+            raise ValueError("Raw aggTrades WAL tail is malformed") from exc
+
+    @staticmethod
+    def _raw_wal_identity(info: os.stat_result) -> dict[str, int]:
+        return {
+            "dev": info.st_dev,
+            "ino": info.st_ino,
+            "size": info.st_size,
+            "mtime_ns": info.st_mtime_ns,
+            "ctime_ns": info.st_ctime_ns,
+        }
+
+    def _write_raw_wal_tail(self, *, root: Path, payload: Mapping[str, Any]) -> None:
+        encoded = self._raw_control_bytes(payload, label="WAL tail")
+        root_fd = self._raw_dir_fd(root, create=True)
+        tmp = f".raw-wal-tail-{uuid.uuid4().hex}.tmp"
+        try:
+            fd = self._raw_open_regular(
+                root_fd, tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, path=root / tmp
+            )
+            try:
+                self._raw_write_all(fd, encoded)
+                os.fsync(fd)
+            finally:
+                os.close(fd)
+            self._raw_replace(root_fd, tmp, _RAW_WAL_TAIL_NAME)
+        except Exception:
+            try:
+                if tmp in set(self._raw_dir_names(root_fd)):
+                    self._raw_unlink(root_fd, tmp)
+            except OSError, ValueError:
+                pass
+            raise
+        finally:
+            os.close(root_fd)
+
+    def _raw_wal_bootstrap(self, *, root: Path, root_fd: int) -> dict[str, Any]:
+        raw, _ = self._raw_read_bytes(
+            root_fd, _RAW_WAL_BOOTSTRAP_NAME, path=root / _RAW_WAL_BOOTSTRAP_NAME
         )
-        self._fsync_file(checkpoint_path)
-        self._fsync_dir(checkpoint_path.parent)
+        try:
+            payload = json.loads(
+                raw.decode(),
+                object_pairs_hook=self._json_object_no_duplicates,
+                parse_constant=lambda value: (_ for _ in ()).throw(ValueError(value)),
+            )
+            if not isinstance(payload, dict) or raw != self._raw_control_bytes(
+                payload, label="WAL bootstrap"
+            ):
+                raise ValueError("Raw aggTrades WAL bootstrap schema is invalid")
+            body = {key: value for key, value in payload.items() if key != "bootstrap_sha256"}
+            version = payload.get("version")
+            common = (
+                type(payload.get("record_hex")) is str
+                and type(payload.get("record_sha256")) is str
+                and type(payload.get("bootstrap_sha256")) is str
+                and re.fullmatch(r"[0-9a-f]{64}", payload["record_sha256"]) is not None
+                and re.fullmatch(r"[0-9a-f]{64}", payload["bootstrap_sha256"]) is not None
+                and payload["bootstrap_sha256"]
+                == sha256(self._raw_canonical_json(body).encode()).hexdigest()
+            )
+            if type(version) is not int or not common:
+                raise ValueError("Raw aggTrades WAL bootstrap schema is invalid")
+            record = bytes.fromhex(payload["record_hex"])
+            if (
+                len(record) > _RAW_WAL_MAX_RECORD_BYTES
+                or sha256(record).hexdigest() != payload["record_sha256"]
+            ):
+                raise ValueError("Raw aggTrades WAL bootstrap record is invalid")
+            marker = self._raw_wal_record(record, require_v2=True)
+            if version == 1:
+                if (
+                    set(payload) != {"version", "record_hex", "record_sha256", "bootstrap_sha256"}
+                    or marker["sequence"] != 1
+                    or marker["previous_record_sha256"] is not None
+                ):
+                    raise ValueError("Raw aggTrades WAL bootstrap record is invalid")
+                return payload
+            if version != 2 or set(payload) != {
+                "version",
+                "kind",
+                "valid_size",
+                "record_count",
+                "legacy_sha256",
+                "record_hex",
+                "record_sha256",
+                "bootstrap_sha256",
+            }:
+                raise ValueError("Raw aggTrades WAL bootstrap schema is invalid")
+            if (
+                payload["kind"] != "legacy_migration"
+                or type(payload["valid_size"]) is not int
+                or payload["valid_size"] < 0
+                or type(payload["record_count"]) is not int
+                or payload["record_count"] < 0
+                or type(payload["legacy_sha256"]) is not str
+                or re.fullmatch(r"[0-9a-f]{64}", payload["legacy_sha256"]) is None
+                or marker["sequence"] != payload["record_count"] + 1
+                or marker["previous_record_sha256"]
+                != (payload["legacy_sha256"] if payload["record_count"] else None)
+            ):
+                raise ValueError("Raw aggTrades WAL bootstrap migration is invalid")
+            return payload
+        except (UnicodeDecodeError, TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise ValueError("Raw aggTrades WAL bootstrap is malformed") from exc
+
+    def _write_raw_wal_bootstrap(self, *, root: Path, record: bytes) -> None:
+        body = {
+            "version": 1,
+            "record_hex": record.hex(),
+            "record_sha256": sha256(record).hexdigest(),
+        }
+        payload = {
+            **body,
+            "bootstrap_sha256": sha256(self._raw_canonical_json(body).encode()).hexdigest(),
+        }
+        encoded = self._raw_control_bytes(payload, label="WAL bootstrap")
+        root_fd = self._raw_dir_fd(root, create=True)
+        tmp = f".raw-wal-bootstrap-{uuid.uuid4().hex}.tmp"
+        try:
+            fd = self._raw_open_regular(
+                root_fd, tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, path=root / tmp
+            )
+            try:
+                self._raw_write_all(fd, encoded)
+                os.fsync(fd)
+            finally:
+                os.close(fd)
+            self._raw_replace(root_fd, tmp, _RAW_WAL_BOOTSTRAP_NAME)
+        except Exception:
+            try:
+                if tmp in set(self._raw_dir_names(root_fd)):
+                    self._raw_unlink(root_fd, tmp)
+            except OSError, ValueError:
+                pass
+            raise
+        finally:
+            os.close(root_fd)
+
+    def _write_raw_wal_migration_bootstrap(
+        self,
+        *,
+        root: Path,
+        valid_size: int,
+        record_count: int,
+        legacy_sha256: str,
+        record: bytes,
+    ) -> None:
+        body = {
+            "version": 2,
+            "kind": "legacy_migration",
+            "valid_size": valid_size,
+            "record_count": record_count,
+            "legacy_sha256": legacy_sha256,
+            "record_hex": record.hex(),
+            "record_sha256": sha256(record).hexdigest(),
+        }
+        payload = {
+            **body,
+            "bootstrap_sha256": sha256(self._raw_canonical_json(body).encode()).hexdigest(),
+        }
+        self._write_raw_wal_bootstrap_payload(root=root, payload=payload)
+
+    def _write_raw_wal_bootstrap_payload(self, *, root: Path, payload: Mapping[str, Any]) -> None:
+        encoded = self._raw_control_bytes(payload, label="WAL bootstrap")
+        root_fd = self._raw_dir_fd(root, create=True)
+        tmp = f".raw-wal-bootstrap-{uuid.uuid4().hex}.tmp"
+        try:
+            fd = self._raw_open_regular(
+                root_fd, tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, path=root / tmp
+            )
+            try:
+                self._raw_write_all(fd, encoded)
+                os.fsync(fd)
+            finally:
+                os.close(fd)
+            self._raw_replace(root_fd, tmp, _RAW_WAL_BOOTSTRAP_NAME)
+        except Exception:
+            try:
+                if tmp in set(self._raw_dir_names(root_fd)):
+                    self._raw_unlink(root_fd, tmp)
+            except OSError, ValueError:
+                pass
+            raise
+        finally:
+            os.close(root_fd)
+
+    def _clear_raw_wal_bootstrap(self, *, root_fd: int) -> None:
+        if _RAW_WAL_BOOTSTRAP_NAME in self._raw_dir_names(root_fd):
+            self._raw_unlink(root_fd, _RAW_WAL_BOOTSTRAP_NAME)
+
+    def _raw_wal_tail_payload(
+        self,
+        *,
+        info: os.stat_result,
+        offset: int,
+        record: bytes,
+        count: int,
+        generation: int,
+        previous: str | None,
+    ) -> dict[str, Any]:
+        body = {
+            "version": _RAW_WAL_TAIL_VERSION,
+            "wal_identity": self._raw_wal_identity(info),
+            "last_offset": offset,
+            "last_length": len(record),
+            "last_sha256": sha256(record).hexdigest(),
+            "record_count": count,
+            "generation": generation,
+            "previous_tail_sha256": previous,
+        }
+        return {**body, "tail_sha256": sha256(self._raw_canonical_json(body).encode()).hexdigest()}
+
+    def _raw_wal_record(self, record: bytes, *, require_v2: bool = False) -> dict[str, Any] | None:
+        if not record.endswith(b"\n") or len(record) > _RAW_WAL_MAX_RECORD_BYTES:
+            raise ValueError("Raw aggTrades WAL record is invalid")
+        try:
+            value = json.loads(
+                record[:-1].decode(),
+                object_pairs_hook=self._json_object_no_duplicates,
+                parse_constant=lambda value: (_ for _ in ()).throw(ValueError(value)),
+            )
+        except (UnicodeDecodeError, ValueError, json.JSONDecodeError) as exc:
+            raise ValueError("Raw aggTrades WAL has malformed complete record") from exc
+        if (
+            not isinstance(value, dict)
+            or record != self._raw_canonical_json(value).encode() + b"\n"
+        ):
+            raise ValueError("Raw aggTrades WAL has noncanonical complete record")
+        marker = value.get("_raw_wal_v2")
+        if marker is None:
+            if require_v2:
+                raise ValueError("Raw aggTrades WAL record is missing v2 metadata")
+            return None
+        required = {"version", "sequence", "previous_record_sha256", "payload"}
+        if (
+            set(value) != {"_raw_wal_v2"}
+            or not isinstance(marker, dict)
+            or set(marker) != required
+            or type(marker["version"]) is not int
+            or marker["version"] != _RAW_WAL_RECORD_VERSION
+            or type(marker["sequence"]) is not int
+            or marker["sequence"] < 1
+            or (
+                marker["previous_record_sha256"] is not None
+                and (
+                    type(marker["previous_record_sha256"]) is not str
+                    or re.fullmatch(r"[0-9a-f]{64}", marker["previous_record_sha256"]) is None
+                )
+            )
+            or not isinstance(marker["payload"], dict)
+        ):
+            raise ValueError("Raw aggTrades WAL v2 record schema is invalid")
+        return marker
+
+    def _raw_encode_wal_record(
+        self, *, payload: Mapping[str, Any], sequence: int, previous: str | None
+    ) -> bytes:
+        return (
+            self._raw_canonical_json(
+                {
+                    "_raw_wal_v2": {
+                        "version": _RAW_WAL_RECORD_VERSION,
+                        "sequence": sequence,
+                        "previous_record_sha256": previous,
+                        "payload": dict(payload),
+                    }
+                }
+            ).encode()
+            + b"\n"
+        )
+
+    def _raw_bounded_last_wal_record(self, fd: int) -> bytes | None:
+        before = self._raw_checked_fd(fd, path=Path(_RAW_WAL_NAME))
+        if before.st_size == 0:
+            return None
+        window = min(before.st_size, 2 * _RAW_WAL_MAX_RECORD_BYTES + 2)
+        os.lseek(fd, before.st_size - window, os.SEEK_SET)
+        chunks: list[bytes] = []
+        remaining = window
+        while remaining:
+            try:
+                chunk = os.read(fd, remaining)
+            except InterruptedError:
+                continue
+            if not chunk:
+                raise ValueError("Raw aggTrades WAL changed while reading its tail")
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        after = self._raw_checked_fd(fd, path=Path(_RAW_WAL_NAME))
+        if (
+            before.st_dev,
+            before.st_ino,
+            before.st_size,
+            before.st_mtime_ns,
+            before.st_ctime_ns,
+        ) != (
+            after.st_dev,
+            after.st_ino,
+            after.st_size,
+            after.st_mtime_ns,
+            after.st_ctime_ns,
+        ):
+            raise ValueError("Raw aggTrades WAL changed while reading its tail")
+        data = b"".join(chunks)
+        if not data.endswith(b"\n"):
+            suffix = data.rsplit(b"\n", 1)[-1]
+            if len(suffix) > _RAW_WAL_MAX_RECORD_BYTES:
+                raise ValueError("Raw aggTrades WAL torn suffix is too large")
+        if data.endswith(b"\n"):
+            complete = data
+        elif b"\n" in data:
+            complete = data.rsplit(b"\n", 1)[0] + b"\n"
+        else:
+            return None
+        pieces = complete.rsplit(b"\n", 2)
+        if len(pieces) < 2:
+            return None
+        record = pieces[-2] + b"\n"
+        if len(record) > _RAW_WAL_MAX_RECORD_BYTES:
+            raise ValueError("Raw aggTrades WAL record is too large")
+        return record
+
+    def _scan_legacy_raw_wal(self, fd: int, *, limit: int | None = None) -> tuple[int, int, str]:
+        os.lseek(fd, 0, os.SEEK_SET)
+        valid = 0
+        count = 0
+        pending = b""
+        digest = sha256()
+        remaining = limit
+        while remaining is None or remaining:
+            chunk_size = _RAW_WAL_MAX_RECORD_BYTES + 1
+            if remaining is not None:
+                chunk_size = min(chunk_size, remaining)
+            chunk = os.read(fd, chunk_size)
+            if not chunk:
+                break
+            if remaining is not None:
+                remaining -= len(chunk)
+            pending += chunk
+            while b"\n" in pending:
+                record, pending = pending.split(b"\n", 1)
+                record += b"\n"
+                if self._raw_wal_record(record) is not None:
+                    raise ValueError("Raw aggTrades WAL v2 record is missing its tail sidecar")
+                valid += len(record)
+                count += 1
+                digest.update(record)
+            if len(pending) > _RAW_WAL_MAX_RECORD_BYTES:
+                raise ValueError("Raw aggTrades WAL torn suffix is too large")
+        if limit is not None and remaining:
+            raise ValueError("Raw aggTrades WAL bootstrap WAL is truncated")
+        if pending and limit is not None:
+            raise ValueError("Raw aggTrades WAL bootstrap valid prefix is invalid")
+        return valid, count, digest.hexdigest()
+
+    def _migrate_raw_wal_tail(self, path: Path) -> dict[str, Any]:
+        """One-time full validation and v2 anchoring for a legacy WAL."""
+        root_fd = self._raw_dir_fd(path.parent, create=False)
+        try:
+            fd = self._raw_open_regular(root_fd, path.name, os.O_RDONLY, path=path)
+            try:
+                valid, count, legacy_sha256 = self._scan_legacy_raw_wal(fd)
+            finally:
+                os.close(fd)
+        finally:
+            os.close(root_fd)
+        anchor = self._raw_encode_wal_record(
+            payload={"_raw_wal_migration": "legacy"},
+            sequence=count + 1,
+            previous=legacy_sha256 if count else None,
+        )
+        self._write_raw_wal_migration_bootstrap(
+            root=path.parent,
+            valid_size=valid,
+            record_count=count,
+            legacy_sha256=legacy_sha256,
+            record=anchor,
+        )
+        recovered = self._recover_raw_wal(path)
+        if recovered is None:
+            raise ValueError("Raw aggTrades WAL migration recovery did not publish a tail")
+        return recovered
+
+    def _recover_raw_wal_migration_bootstrap(
+        self, *, path: Path, root: Path, root_fd: int, bootstrap: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        record = bytes.fromhex(str(bootstrap["record_hex"]))
+        if _RAW_WAL_TAIL_NAME in self._raw_dir_names(root_fd):
+            tail = self._raw_wal_tail(root=root, root_fd=root_fd)
+            if (
+                tail["record_count"] != bootstrap["record_count"] + 1
+                or tail["last_offset"] != bootstrap["valid_size"]
+                or tail["last_length"] != len(record)
+                or tail["last_sha256"] != bootstrap["record_sha256"]
+            ):
+                raise ValueError("Raw aggTrades WAL migration tail diverges")
+            self._clear_raw_wal_bootstrap(root_fd=root_fd)
+            return self._recover_raw_wal(path)
+        if path.name not in self._raw_dir_names(root_fd):
+            raise ValueError("Raw aggTrades WAL migration WAL is missing")
+        fd = self._raw_open_regular(root_fd, path.name, os.O_RDWR, path=path)
+        try:
+            info = os.fstat(fd)
+            if info.st_size < bootstrap["valid_size"]:
+                raise ValueError("Raw aggTrades WAL migration WAL is truncated")
+            valid, count, legacy_sha256 = self._scan_legacy_raw_wal(
+                fd, limit=bootstrap["valid_size"]
+            )
+            if (
+                valid != bootstrap["valid_size"]
+                or count != bootstrap["record_count"]
+                or legacy_sha256 != bootstrap["legacy_sha256"]
+            ):
+                raise ValueError("Raw aggTrades WAL migration prefix diverges")
+            os.ftruncate(fd, bootstrap["valid_size"])
+            os.fsync(fd)
+            os.fsync(root_fd)
+            os.lseek(fd, bootstrap["valid_size"], os.SEEK_SET)
+            self._raw_write_all(fd, record)
+            os.fsync(fd)
+            info = os.fstat(fd)
+        finally:
+            os.close(fd)
+        tail = self._raw_wal_tail_payload(
+            info=info,
+            offset=bootstrap["valid_size"],
+            record=record,
+            count=bootstrap["record_count"] + 1,
+            generation=0,
+            previous=None,
+        )
+        self._write_raw_wal_tail(root=root, payload=tail)
+        self._clear_raw_wal_bootstrap(root_fd=root_fd)
+        return tail
+
+    def _recover_raw_wal(self, path: Path) -> dict[str, Any] | None:
+        root = path.parent
+        root_fd = self._raw_dir_fd(root, create=False)
+        try:
+            names = set(self._raw_dir_names(root_fd))
+            if _RAW_WAL_BOOTSTRAP_NAME in names:
+                bootstrap = self._raw_wal_bootstrap(root=root, root_fd=root_fd)
+                if bootstrap["version"] == 2:
+                    return self._recover_raw_wal_migration_bootstrap(
+                        path=path, root=root, root_fd=root_fd, bootstrap=bootstrap
+                    )
+                if _RAW_WAL_TAIL_NAME in names:
+                    raise ValueError("Raw aggTrades WAL bootstrap conflicts with tail sidecar")
+                record = bytes.fromhex(bootstrap["record_hex"])
+                if path.name not in names:
+                    fd = self._raw_open_regular(
+                        root_fd,
+                        path.name,
+                        os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                        path=path,
+                    )
+                    try:
+                        self._raw_write_all(fd, record)
+                        os.fsync(fd)
+                        info = os.fstat(fd)
+                    finally:
+                        os.close(fd)
+                    os.fsync(root_fd)
+                else:
+                    fd = self._raw_open_regular(root_fd, path.name, os.O_RDWR, path=path)
+                    try:
+                        info = os.fstat(fd)
+                        if info.st_size == 0:
+                            self._raw_write_all(fd, record)
+                            os.fsync(fd)
+                            info = os.fstat(fd)
+                        elif info.st_size < len(record):
+                            os.lseek(fd, 0, os.SEEK_SET)
+                            prefix = self._raw_read_exact(
+                                fd,
+                                info.st_size,
+                                error="Raw aggTrades WAL bootstrap WAL is truncated",
+                            )
+                            if prefix != record[: info.st_size]:
+                                raise ValueError("Raw aggTrades WAL bootstrap WAL diverges")
+                            os.ftruncate(fd, 0)
+                            os.lseek(fd, 0, os.SEEK_SET)
+                            self._raw_write_all(fd, record)
+                            os.fsync(fd)
+                            info = os.fstat(fd)
+                        else:
+                            if info.st_size != len(record):
+                                raise ValueError("Raw aggTrades WAL bootstrap WAL diverges")
+                            os.lseek(fd, 0, os.SEEK_SET)
+                            if (
+                                self._raw_read_exact(
+                                    fd,
+                                    len(record),
+                                    error="Raw aggTrades WAL bootstrap WAL is truncated",
+                                )
+                                != record
+                            ):
+                                raise ValueError("Raw aggTrades WAL bootstrap WAL diverges")
+                    finally:
+                        os.close(fd)
+                tail = self._raw_wal_tail_payload(
+                    info=info,
+                    offset=0,
+                    record=record,
+                    count=1,
+                    generation=0,
+                    previous=None,
+                )
+                self._write_raw_wal_tail(root=root, payload=tail)
+                self._clear_raw_wal_bootstrap(root_fd=root_fd)
+                return tail
+            if path.name not in names:
+                if _RAW_WAL_TAIL_NAME in names:
+                    raise ValueError("Raw aggTrades WAL tail exists without WAL")
+                return None
+            if _RAW_WAL_TAIL_NAME not in names:
+                fd = self._raw_open_regular(root_fd, path.name, os.O_RDONLY, path=path)
+                try:
+                    last = self._raw_bounded_last_wal_record(fd)
+                    if last is not None and self._raw_wal_record(last) is not None:
+                        raise ValueError("Raw aggTrades WAL v2 record is missing its tail sidecar")
+                finally:
+                    os.close(fd)
+                return self._migrate_raw_wal_tail(path)
+            tail = self._raw_wal_tail(root=root, root_fd=root_fd)
+            fd = self._raw_open_regular(root_fd, path.name, os.O_RDWR, path=path)
+            try:
+                info = os.fstat(fd)
+                expected = tail["wal_identity"]
+                current = self._raw_wal_identity(info)
+                if (
+                    current["dev"] != expected["dev"]
+                    or current["ino"] != expected["ino"]
+                    or info.st_size < expected["size"]
+                ):
+                    raise ValueError("Raw aggTrades WAL identity diverges")
+                os.lseek(fd, tail["last_offset"], os.SEEK_SET)
+                record = self._raw_read_exact(
+                    fd, tail["last_length"], error="Raw aggTrades WAL tail record is truncated"
+                )
+                if (
+                    len(record) != tail["last_length"]
+                    or sha256(record).hexdigest() != tail["last_sha256"]
+                ):
+                    raise ValueError("Raw aggTrades WAL tail record diverges")
+                marker = self._raw_wal_record(record, require_v2=True)
+                if marker["sequence"] != tail["record_count"]:
+                    raise ValueError("Raw aggTrades WAL tail sequence diverges")
+                if info.st_size == expected["size"]:
+                    if current != expected:
+                        raise ValueError("Raw aggTrades WAL identity diverges")
+                    return tail
+                if info.st_size - expected["size"] > _RAW_WAL_MAX_RECORD_BYTES:
+                    raise ValueError("Raw aggTrades WAL suffix is too large")
+                os.lseek(fd, expected["size"], os.SEEK_SET)
+                suffix = self._raw_read_exact(
+                    fd,
+                    info.st_size - expected["size"],
+                    error="Raw aggTrades WAL suffix is truncated",
+                )
+                if b"\n" not in suffix:
+                    os.ftruncate(fd, expected["size"])
+                    os.fsync(fd)
+                    os.fsync(root_fd)
+                    info = os.fstat(fd)
+                    rebuilt = self._raw_wal_tail_payload(
+                        info=info,
+                        offset=tail["last_offset"],
+                        record=record,
+                        count=tail["record_count"],
+                        generation=tail["generation"] + 1,
+                        previous=tail["tail_sha256"],
+                    )
+                    self._write_raw_wal_tail(root=root, payload=rebuilt)
+                    return rebuilt
+                if suffix.count(b"\n") != 1 or not suffix.endswith(b"\n"):
+                    raise ValueError("Raw aggTrades WAL suffix is invalid")
+                suffix_marker = self._raw_wal_record(suffix, require_v2=True)
+                if (
+                    suffix_marker["sequence"] != tail["record_count"] + 1
+                    or suffix_marker["previous_record_sha256"] != tail["last_sha256"]
+                ):
+                    raise ValueError("Raw aggTrades WAL suffix sequence diverges")
+                info = os.fstat(fd)
+            finally:
+                os.close(fd)
+        finally:
+            os.close(root_fd)
+        recovered = self._raw_wal_tail_payload(
+            info=info,
+            offset=tail["wal_identity"]["size"],
+            record=suffix,
+            count=tail["record_count"] + 1,
+            generation=tail["generation"] + 1,
+            previous=tail["tail_sha256"],
+        )
+        self._write_raw_wal_tail(root=root, payload=recovered)
+        return recovered
+
+    def _raw_file_digest(self, path: Path) -> tuple[int, str]:
+        parent_fd = self._raw_dir_fd(path.parent, create=False)
+        try:
+            fd = self._raw_open_regular(parent_fd, path.name, os.O_RDONLY, path=path)
+            try:
+                self._raw_checked_fd(fd, path=path)
+                digest = sha256()
+                size = 0
+                while chunk := os.read(fd, 1_048_576):
+                    size += len(chunk)
+                    digest.update(chunk)
+                return size, digest.hexdigest()
+            finally:
+                os.close(fd)
+        finally:
+            os.close(parent_fd)
+
+    def _raw_inventory_entry(self, path: Path) -> dict[str, Any]:
+        before = self._raw_regular_stat(path)
+        try:
+            frame = self._validate_raw_aggtrades_frame(self._raw_read_parquet(path))
+        except Exception as exc:
+            raise ValueError(f"Raw aggTrades part is not strict parquet: {path}") from exc
+        self._assert_raw_regular_stable(path, before)
+        if frame.is_empty():
+            raise ValueError(f"Raw aggTrades part is empty: {path}")
+        rows = frame.to_dicts()
+        token = path.parent.name.removeprefix("date=")
+        if not _RAW_DATE_PATTERN.fullmatch(token) or any(
+            self._partition_date_from_ms(row["timestamp_ms"]) != token for row in rows
+        ):
+            raise ValueError(f"Raw aggTrades part has invalid UTC date binding: {path}")
+        byte_count, digest = self._raw_file_digest(path)
+        self._assert_raw_regular_stable(path, before)
+        return {
+            "name": f"{path.parent.name}/{path.name}",
+            "date": token,
+            "byte_count": byte_count,
+            "content_sha256": digest,
+            "row_count": frame.height,
+            "schema": {name: str(dtype) for name, dtype in _RAW_AGGTRADES_SCHEMA.items()},
+            "min_trade_id": int(rows[0]["agg_trade_id"]),
+            "max_trade_id": int(rows[-1]["agg_trade_id"]),
+            "min_timestamp_ms": int(rows[0]["timestamp_ms"]),
+            "max_timestamp_ms": int(rows[-1]["timestamp_ms"]),
+            "file_identity": {
+                "dev": before.st_dev,
+                "ino": before.st_ino,
+                "size": before.st_size,
+                "mtime_ns": before.st_mtime_ns,
+            },
+        }
+
+    @staticmethod
+    def _raw_canonical_json(value: Mapping[str, Any]) -> str:
+        return json.dumps(
+            dict(value), ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False
+        )
+
+    @classmethod
+    def _raw_control_bytes(cls, value: Mapping[str, Any], *, label: str) -> bytes:
+        encoded = cls._raw_canonical_json(value).encode()
+        if len(encoded) > _RAW_CONTROL_MAX_BYTES:
+            raise ValueError(f"Raw aggTrades {label} is too large")
+        return encoded
+
+    @classmethod
+    def _raw_inventory_payload(
+        cls,
+        *,
+        exchange: str,
+        symbol: str,
+        generation: int,
+        previous_inventory_sha256: str | None,
+        entries: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        body = {
+            "version": 2,
+            "exchange": exchange,
+            "symbol": symbol,
+            "generation": generation,
+            "previous_inventory_sha256": previous_inventory_sha256,
+            "parts": sorted(entries, key=lambda item: item["name"]),
+        }
+        return {
+            **body,
+            "inventory_sha256": sha256(cls._raw_canonical_json(body).encode()).hexdigest(),
+        }
+
+    def _parse_raw_inventory(
+        self, raw: str, *, exchange: str, symbol: str, allow_v1: bool = True
+    ) -> dict[str, Any]:
+        exchange = self._normalize_raw_exchange_token(exchange)
+        symbol = self._normalize_raw_symbol_token(symbol)
+        try:
+            payload = json.loads(
+                raw,
+                object_pairs_hook=self._json_object_no_duplicates,
+                parse_constant=lambda value: (_ for _ in ()).throw(ValueError(value)),
+            )
+            if not isinstance(payload, dict) or raw != self._raw_canonical_json(payload):
+                raise ValueError("inventory is not canonical")
+            version = payload.get("version")
+            if type(version) is int and version == 1 and allow_v1:
+                if set(payload) != {"version", "parts", "inventory_sha256"}:
+                    raise ValueError("legacy inventory fields are invalid")
+                body = {"version": 1, "parts": payload["parts"]}
+                if (
+                    payload["inventory_sha256"]
+                    != sha256(self._raw_canonical_json(body).encode()).hexdigest()
+                ):
+                    raise ValueError("legacy inventory hash is invalid")
+                return payload
+            required = {
+                "version",
+                "exchange",
+                "symbol",
+                "generation",
+                "previous_inventory_sha256",
+                "parts",
+                "inventory_sha256",
+            }
+            if set(payload) != required or type(version) is not int or version != 2:
+                raise ValueError("inventory schema is invalid")
+            if payload["exchange"] != exchange or payload["symbol"] != symbol:
+                raise ValueError("inventory stream does not match")
+            if type(payload["generation"]) is not int or payload["generation"] < 0:
+                raise ValueError("inventory generation is invalid")
+            predecessor = payload["previous_inventory_sha256"]
+            if (payload["generation"] == 0) != (predecessor is None):
+                raise ValueError("inventory predecessor is invalid")
+            if predecessor is not None and (
+                type(predecessor) is not str or not re.fullmatch(r"[0-9a-f]{64}", predecessor)
+            ):
+                raise ValueError("inventory predecessor is invalid")
+            body = {key: value for key, value in payload.items() if key != "inventory_sha256"}
+            if (
+                type(payload["inventory_sha256"]) is not str
+                or payload["inventory_sha256"]
+                != sha256(self._raw_canonical_json(body).encode()).hexdigest()
+            ):
+                raise ValueError("inventory hash is invalid")
+            if (
+                not isinstance(payload["parts"], list)
+                or any(
+                    not isinstance(entry, dict) or type(entry.get("name")) is not str
+                    for entry in payload["parts"]
+                )
+                or [entry["name"] for entry in payload["parts"]]
+                != sorted(entry["name"] for entry in payload["parts"])
+                or len({entry["name"] for entry in payload["parts"]}) != len(payload["parts"])
+            ):
+                raise ValueError("inventory part ordering is invalid")
+            return payload
+        except (TypeError, KeyError, ValueError, json.JSONDecodeError) as exc:
+            raise ValueError("Raw aggTrades inventory is malformed") from exc
+
+    def _publish_raw_inventory(self, *, root: Path, payload: Mapping[str, Any]) -> None:
+        encoded = self._raw_control_bytes(payload, label="inventory")
+        root_fd = self._raw_dir_fd(root, create=True)
+        token = uuid.uuid4().hex
+        tmp = f".raw-inventory-{token}.tmp"
+        try:
+            fd = self._raw_open_regular(
+                root_fd, tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, path=root / tmp
+            )
+            try:
+                self._raw_write_all(fd, encoded)
+                os.fsync(fd)
+            finally:
+                os.close(fd)
+            self._raw_replace(root_fd, tmp, _RAW_INVENTORY_NAME)
+        except Exception:
+            try:
+                if tmp in set(self._raw_dir_names(root_fd)):
+                    self._raw_unlink(root_fd, tmp)
+            except OSError, ValueError:
+                pass
+            raise
+        finally:
+            os.close(root_fd)
+
+    def _authenticate_raw_inventory(
+        self,
+        *,
+        exchange: str,
+        symbol: str,
+        migrate: bool = False,
+        snapshot: bool = False,
+        temporary_output: tuple[str, str, bool] | None = None,
+        temporary_obsolete: Mapping[str, Mapping[str, Any]] | None = None,
+    ) -> list[dict[str, Any]] | _RawInventorySnapshot:
+        exchange = self._normalize_raw_exchange_token(exchange)
+        symbol = self._normalize_raw_symbol_token(symbol)
+        root = self._raw_symbol_root(exchange=exchange, symbol=symbol)
+        try:
+            root_fd = self._raw_dir_fd(root, create=False)
+        except FileNotFoundError:
+            if migrate:
+                self._publish_raw_inventory(
+                    root=root,
+                    payload=self._raw_inventory_payload(
+                        exchange=exchange,
+                        symbol=symbol,
+                        generation=0,
+                        previous_inventory_sha256=None,
+                        entries=[],
+                    ),
+                )
+                if snapshot:
+                    return self._authenticate_raw_inventory(
+                        exchange=exchange, symbol=symbol, snapshot=True
+                    )
+            return []
+        try:
+            parts: list[Path] = []
+            names = self._raw_dir_names(root_fd)
+            for name in names:
+                if not name.startswith("date="):
+                    continue
+                if not _RAW_DATE_PATTERN.fullmatch(name[5:]):
+                    raise ValueError("Raw aggTrades date entry is unsafe")
+                partition = root / name
+                partition_fd = os.open(
+                    name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=root_fd
+                )
+                try:
+                    parts.extend(
+                        partition / part
+                        for part in self._raw_dir_names(partition_fd)
+                        if _RAW_PART_PATTERN.fullmatch(part) is not None
+                    )
+                finally:
+                    os.close(partition_fd)
+            actual = sorted(f"{part.parent.name}/{part.name}" for part in parts)
+            temporary_name: str | None = None
+            temporary_base_sha256: str | None = None
+            temporary_replaces_base = False
+            if temporary_output is not None:
+                temporary_name, temporary_base_sha256, temporary_replaces_base = temporary_output
+                if (
+                    type(temporary_name) is not str
+                    or type(temporary_base_sha256) is not str
+                    or type(temporary_replaces_base) is not bool
+                    or re.fullmatch(r"date=\d{4}-\d{2}-\d{2}/part-\d+\.parquet", temporary_name)
+                    is None
+                    or temporary_name not in actual
+                ):
+                    raise ValueError("Raw aggTrades temporary transaction output is invalid")
+            if _RAW_INVENTORY_NAME not in names:
+                if parts:
+                    raise ValueError(
+                        "Raw aggTrades inventory is missing after raw parts were established"
+                    )
+                if migrate:
+                    self._publish_raw_inventory(
+                        root=root,
+                        payload=self._raw_inventory_payload(
+                            exchange=exchange,
+                            symbol=symbol,
+                            generation=0,
+                            previous_inventory_sha256=None,
+                            entries=[],
+                        ),
+                    )
+                    if snapshot:
+                        return self._authenticate_raw_inventory(
+                            exchange=exchange, symbol=symbol, snapshot=True
+                        )
+                return []
+            raw, inventory_info = self._raw_read_bytes(
+                root_fd, _RAW_INVENTORY_NAME, path=root / _RAW_INVENTORY_NAME
+            )
+            payload = self._parse_raw_inventory(
+                raw.decode("utf-8"), exchange=exchange, symbol=symbol
+            )
+        finally:
+            os.close(root_fd)
+        entries = payload["parts"]
+        expected = sorted(item.get("name") for item in entries if isinstance(item, dict))
+        temporary_base_is_current = (
+            temporary_name is not None and payload["inventory_sha256"] == temporary_base_sha256
+        )
+        extra_is_authorized = (
+            temporary_base_is_current
+            and temporary_name not in expected
+            and actual == sorted([*expected, temporary_name])
+        )
+        replacement_is_authorized = (
+            temporary_base_is_current
+            and temporary_replaces_base
+            and temporary_name in expected
+            and actual == expected
+        )
+        authorized_obsolete = dict(temporary_obsolete or {})
+        if any(
+            re.fullmatch(r"date=\d{4}-\d{2}-\d{2}/part-\d+\.parquet", name) is None
+            or not isinstance(entry, Mapping)
+            for name, entry in authorized_obsolete.items()
+        ):
+            raise ValueError("Raw aggTrades temporary transaction obsolete part is invalid")
+        present_obsolete = sorted(set(actual) & set(authorized_obsolete))
+        obsolete_is_authorized = actual == sorted([*expected, *present_obsolete])
+        if any(
+            self._raw_inventory_entry(root / name) != authorized_obsolete[name]
+            for name in present_obsolete
+        ):
+            raise ValueError("Raw aggTrades obsolete transaction part diverges")
+        if (
+            not isinstance(entries, list)
+            or (actual != expected and not extra_is_authorized and not obsolete_is_authorized)
+            or (
+                actual == expected
+                and temporary_base_is_current
+                and temporary_name in expected
+                and not replacement_is_authorized
+            )
+        ):
+            raise ValueError("Raw aggTrades inventory diverges from raw parts")
+        legacy = type(payload["version"]) is int and payload["version"] == 1
+        required = {
+            "name",
+            "date",
+            "byte_count",
+            "content_sha256",
+            "row_count",
+            "schema",
+            "min_trade_id",
+            "max_trade_id",
+            "min_timestamp_ms",
+            "max_timestamp_ms",
+            "file_identity",
+        }
+        previous: dict[str, Any] | None = None
+        for entry in sorted(entries, key=lambda item: (item["min_trade_id"], item["name"])):
+            if not isinstance(entry, dict) or set(entry) != required:
+                raise ValueError("Raw aggTrades inventory entry is invalid")
+            if entry["schema"] != {
+                name: str(dtype) for name, dtype in _RAW_AGGTRADES_SCHEMA.items()
+            }:
+                raise ValueError("Raw aggTrades inventory schema is invalid")
+            if (
+                type(entry["name"]) is not str
+                or not re.fullmatch(r"date=\d{4}-\d{2}-\d{2}/part-\d+\.parquet", entry["name"])
+                or entry["date"] != entry["name"][5:15]
+            ):
+                raise ValueError("Raw aggTrades inventory part name is invalid")
+            info = self._raw_regular_stat(root / entry["name"])
+            is_authorized_replacement = (
+                replacement_is_authorized and entry["name"] == temporary_name
+            )
+            identity = entry["file_identity"]
+            expected_identity = {
+                "dev": info.st_dev,
+                "ino": info.st_ino,
+                "size": info.st_size,
+                "mtime_ns": info.st_mtime_ns,
+            }
+            if not is_authorized_replacement and (
+                not isinstance(identity, dict) or identity != expected_identity
+            ):
+                raise ValueError("Raw aggTrades inventory file identity diverges")
+            if (
+                type(entry["byte_count"]) is not int
+                or entry["byte_count"] <= 0
+                or (not is_authorized_replacement and entry["byte_count"] != info.st_size)
+            ):
+                raise ValueError("Raw aggTrades inventory byte count is invalid")
+            if any(
+                type(entry[key]) is not int
+                for key in (
+                    "row_count",
+                    "min_trade_id",
+                    "max_trade_id",
+                    "min_timestamp_ms",
+                    "max_timestamp_ms",
+                )
+            ):
+                raise ValueError("Raw aggTrades inventory numeric field is invalid")
+            if (
+                entry["row_count"] <= 0
+                or entry["min_trade_id"] < 0
+                or entry["max_trade_id"] < entry["min_trade_id"]
+                or entry["min_timestamp_ms"] <= 0
+                or entry["max_timestamp_ms"] < entry["min_timestamp_ms"]
+            ):
+                raise ValueError("Raw aggTrades inventory ranges are invalid")
+            if type(entry["content_sha256"]) is not str or not re.fullmatch(
+                r"[0-9a-f]{64}", entry["content_sha256"]
+            ):
+                raise ValueError("Raw aggTrades inventory digest is invalid")
+            if previous is not None and (
+                entry["min_trade_id"] <= previous["max_trade_id"]
+                or entry["min_timestamp_ms"] < previous["max_timestamp_ms"]
+            ):
+                raise ValueError("Raw aggTrades inventory global boundaries diverge")
+            previous = entry
+        if legacy:
+            if not migrate:
+                raise ValueError("Raw aggTrades inventory migration is required")
+            migrated_entries = [
+                self._raw_inventory_entry(root / entry["name"]) for entry in entries
+            ]
+            for old, migrated in zip(entries, migrated_entries, strict=True):
+                if {key: value for key, value in migrated.items() if key != "file_identity"} != {
+                    key: value for key, value in old.items() if key != "file_identity"
+                } or migrated["file_identity"] != old["file_identity"]:
+                    raise ValueError("Legacy raw aggTrades inventory content diverges")
+            payload = self._raw_inventory_payload(
+                exchange=exchange,
+                symbol=symbol,
+                generation=0,
+                previous_inventory_sha256=None,
+                entries=migrated_entries,
+            )
+            self._publish_raw_inventory(root=root, payload=payload)
+            if snapshot:
+                return self._authenticate_raw_inventory(
+                    exchange=exchange, symbol=symbol, snapshot=True
+                )
+            entries = migrated_entries
+        ordered_entries = sorted(entries, key=lambda item: (item["min_trade_id"], item["name"]))
+        if snapshot:
+            return _RawInventorySnapshot(
+                raw=raw,
+                payload=payload,
+                entries=tuple(ordered_entries),
+                generation=payload["generation"],
+                inventory_sha256=payload["inventory_sha256"],
+                file_identity=(
+                    inventory_info.st_dev,
+                    inventory_info.st_ino,
+                    inventory_info.st_size,
+                    inventory_info.st_mtime_ns,
+                    inventory_info.st_ctime_ns,
+                ),
+            )
+        return ordered_entries
+
+    def _revalidate_raw_inventory_snapshot(
+        self, *, exchange: str, symbol: str, snapshot: _RawInventorySnapshot
+    ) -> None:
+        root = self._raw_symbol_root(exchange=exchange, symbol=symbol)
+        root_fd = self._raw_dir_fd(root, create=False)
+        try:
+            raw, info = self._raw_read_bytes(
+                root_fd, _RAW_INVENTORY_NAME, path=root / _RAW_INVENTORY_NAME
+            )
+        finally:
+            os.close(root_fd)
+        identity = (
+            info.st_dev,
+            info.st_ino,
+            info.st_size,
+            info.st_mtime_ns,
+            info.st_ctime_ns,
+        )
+        if (
+            raw != snapshot.raw
+            or identity != snapshot.file_identity
+            or snapshot.payload["inventory_sha256"] != snapshot.inventory_sha256
+            or snapshot.payload["generation"] != snapshot.generation
+        ):
+            raise ValueError("Raw aggTrades inventory changed before transaction publication")
+
+    def _verify_raw_transaction_part(
+        self, *, path: Path, partition: Path, byte_count: int, content_sha256: str
+    ) -> None:
+        self._raw_regular_stat(path)
+        if self._raw_file_digest(path) != (byte_count, content_sha256):
+            raise ValueError("transaction part bytes do not match descriptor")
+        try:
+            frame = self._validate_raw_aggtrades_frame(self._raw_read_parquet(path))
+            token = partition.name.removeprefix("date=")
+            if any(
+                self._partition_date_from_ms(row["timestamp_ms"]) != token
+                for row in frame.to_dicts()
+            ):
+                raise ValueError("transaction part contains wrong-date row")
+        except Exception as exc:
+            raise ValueError("transaction part is not strict raw parquet") from exc
+
+    def _parse_raw_transaction(
+        self, raw: str, *, exchange: str, symbol: str, partition: Path
+    ) -> dict[str, Any]:
+        exchange = self._normalize_raw_exchange_token(exchange)
+        symbol = self._normalize_raw_symbol_token(symbol)
+        try:
+            descriptor = json.loads(
+                raw,
+                object_pairs_hook=self._json_object_no_duplicates,
+                parse_constant=lambda value: (_ for _ in ()).throw(ValueError(value)),
+            )
+            required = {
+                "version",
+                "transaction_id",
+                "exchange",
+                "symbol",
+                "partition",
+                "base_inventory",
+                "new_inventory",
+                "output",
+                "stage",
+                "obsolete",
+                "output_entry",
+                "descriptor_sha256",
+            }
+            if (
+                not isinstance(descriptor, dict)
+                or set(descriptor) != required
+                or raw != self._raw_canonical_json(descriptor)
+            ):
+                raise ValueError("transaction schema is invalid")
+            body = {key: value for key, value in descriptor.items() if key != "descriptor_sha256"}
+            if (
+                type(descriptor["version"]) is not int
+                or descriptor["version"] != 2
+                or type(descriptor["transaction_id"]) is not str
+                or not re.fullmatch(r"[0-9a-f]{32}", descriptor["transaction_id"])
+                or descriptor["exchange"] != exchange
+                or descriptor["symbol"] != symbol
+                or descriptor["partition"] != partition.name
+                or descriptor["descriptor_sha256"]
+                != sha256(self._raw_canonical_json(body).encode()).hexdigest()
+                or type(descriptor["output"]) is not str
+                or _RAW_PART_PATTERN.fullmatch(descriptor["output"]) is None
+                or type(descriptor["stage"]) is not str
+                or descriptor["stage"] != f".raw-stage-{descriptor['transaction_id']}.parquet"
+                or not isinstance(descriptor["obsolete"], list)
+                or descriptor["obsolete"] != sorted(set(descriptor["obsolete"]))
+                or any(_RAW_PART_PATTERN.fullmatch(item) is None for item in descriptor["obsolete"])
+            ):
+                raise ValueError("transaction descriptor is invalid")
+            base = self._parse_raw_inventory(
+                self._raw_canonical_json(descriptor["base_inventory"]),
+                exchange=exchange,
+                symbol=symbol,
+                allow_v1=False,
+            )
+            new = self._parse_raw_inventory(
+                self._raw_canonical_json(descriptor["new_inventory"]),
+                exchange=exchange,
+                symbol=symbol,
+                allow_v1=False,
+            )
+            if (
+                new["generation"] != base["generation"] + 1
+                or new["previous_inventory_sha256"] != base["inventory_sha256"]
+                or descriptor["output_entry"] not in new["parts"]
+                or descriptor["output_entry"]["name"] != f"{partition.name}/{descriptor['output']}"
+            ):
+                raise ValueError("transaction inventory transition is invalid")
+            base_by_name = {item["name"]: item for item in base["parts"]}
+            new_by_name = {item["name"]: item for item in new["parts"]}
+            obsolete_names = {f"{partition.name}/{item}" for item in descriptor["obsolete"]}
+            if (
+                not obsolete_names <= set(base_by_name)
+                or (
+                    descriptor["output_entry"]["name"] in base_by_name
+                    and descriptor["output_entry"]["name"] not in obsolete_names
+                )
+                or set(new_by_name)
+                != (set(base_by_name) - obsolete_names) | {descriptor["output_entry"]["name"]}
+                or any(
+                    item["name"].split("/", 1)[0] != partition.name
+                    for item in (base_by_name[name] for name in obsolete_names)
+                )
+            ):
+                raise ValueError("transaction delta is invalid")
+            output_name = descriptor["output_entry"]["name"]
+            unchanged = (set(base_by_name) - obsolete_names) - {output_name}
+            if any(base_by_name[name] != new_by_name[name] for name in unchanged):
+                raise ValueError("transaction unchanged entry diverges")
+            return descriptor
+        except (TypeError, KeyError, ValueError, json.JSONDecodeError) as exc:
+            raise ValueError("Raw aggTrades transaction is malformed") from exc
+
+    def _assert_raw_transaction_artifact_closure(
+        self, *, names: set[str], descriptor: Mapping[str, Any] | None
+    ) -> None:
+        artifacts = {
+            name
+            for name in names
+            if _RAW_TRANSACTION_STAGE_PATTERN.fullmatch(name) is not None
+            or _RAW_TRANSACTION_TEMP_PATTERN.fullmatch(name) is not None
+        }
+        expected = (
+            {descriptor["stage"]}
+            if descriptor is not None and descriptor["stage"] in artifacts
+            else set()
+        )
+        if artifacts != expected:
+            raise ValueError("unbound transaction artifact closure is invalid")
+
+    def _recover_raw_part_transaction(self, *, exchange: str, symbol: str, partition: Path) -> None:
+        partition_fd = self._raw_dir_fd(partition, create=False)
+        try:
+            names = set(self._raw_dir_names(partition_fd))
+            if _RAW_TRANSACTION_NAME not in names:
+                self._assert_raw_transaction_artifact_closure(names=names, descriptor=None)
+                return
+            raw, _ = self._raw_read_bytes(
+                partition_fd, _RAW_TRANSACTION_NAME, path=partition / _RAW_TRANSACTION_NAME
+            )
+            descriptor = self._parse_raw_transaction(
+                raw.decode("utf-8"), exchange=exchange, symbol=symbol, partition=partition
+            )
+            self._assert_raw_transaction_artifact_closure(names=names, descriptor=descriptor)
+            root = self._raw_symbol_root(exchange=exchange, symbol=symbol)
+            base = descriptor["base_inventory"]
+            new = descriptor["new_inventory"]
+            root_fd = self._raw_dir_fd(root, create=False)
+            try:
+                current_raw, _ = self._raw_read_bytes(
+                    root_fd, _RAW_INVENTORY_NAME, path=root / _RAW_INVENTORY_NAME
+                )
+            finally:
+                os.close(root_fd)
+            current_control = self._parse_raw_inventory(
+                current_raw.decode("utf-8"), exchange=exchange, symbol=symbol
+            )
+            current_identity = (
+                current_control["generation"],
+                current_control["inventory_sha256"],
+            )
+            if current_identity not in {
+                (base["generation"], base["inventory_sha256"]),
+                (new["generation"], new["inventory_sha256"]),
+            }:
+                raise ValueError("transaction does not match current inventory")
+            current_is_base = current_identity == (
+                base["generation"],
+                base["inventory_sha256"],
+            )
+            current_is_new = current_identity == (
+                new["generation"],
+                new["inventory_sha256"],
+            )
+            stage_name = descriptor["stage"]
+            output_name = descriptor["output"]
+            has_stage = stage_name in names
+            has_output = output_name in names
+            base_by_name = {entry["name"]: entry for entry in base["parts"]}
+            if has_stage and has_output:
+                if not current_is_base or output_name not in descriptor["obsolete"]:
+                    raise ValueError("transaction stage and output phase is invalid")
+                base_output_entry = base_by_name[f"{partition.name}/{output_name}"]
+                if self._raw_inventory_entry(partition / output_name) != base_output_entry:
+                    raise ValueError("transaction base output identity changed")
+                stage_entry = self._raw_inventory_entry(partition / stage_name)
+                expected_stage_entry = {
+                    **descriptor["output_entry"],
+                    "name": f"{partition.name}/{stage_name}",
+                }
+                if stage_entry != expected_stage_entry:
+                    raise ValueError("transaction stage identity changed")
+            elif has_output:
+                self._verify_raw_transaction_part(
+                    path=partition / output_name,
+                    partition=partition,
+                    byte_count=descriptor["output_entry"]["byte_count"],
+                    content_sha256=descriptor["output_entry"]["content_sha256"],
+                )
+                actual_output_entry = self._raw_inventory_entry(partition / output_name)
+                if actual_output_entry != descriptor["output_entry"]:
+                    raise ValueError("transaction output identity changed after rename")
+            authorized_obsolete = {
+                f"{partition.name}/{name}": base_by_name[f"{partition.name}/{name}"]
+                for name in descriptor["obsolete"]
+                if f"{partition.name}/{name}" not in {entry["name"] for entry in new["parts"]}
+            }
+            current = self._authenticate_raw_inventory(
+                exchange=exchange,
+                symbol=symbol,
+                snapshot=True,
+                temporary_output=(
+                    f"{partition.name}/{output_name}",
+                    base["inventory_sha256"],
+                    output_name in descriptor["obsolete"],
+                )
+                if has_output and current_is_base and not has_stage
+                else None,
+                temporary_obsolete=authorized_obsolete if current_is_new else None,
+            )
+            if not isinstance(current, _RawInventorySnapshot):
+                raise ValueError("Raw aggTrades inventory snapshot is unavailable")
+            if (
+                current.payload["generation"],
+                current.payload["inventory_sha256"],
+            ) == (new["generation"], new["inventory_sha256"]):
+                names = set(self._raw_dir_names(partition_fd))
+                for name in descriptor["obsolete"]:
+                    if name == output_name or name not in names:
+                        continue
+                    entry = base_by_name[f"{partition.name}/{name}"]
+                    info = self._raw_regular_stat(partition / name)
+                    if (
+                        info.st_dev != entry["file_identity"]["dev"]
+                        or info.st_ino != entry["file_identity"]["ino"]
+                        or info.st_size != entry["file_identity"]["size"]
+                        or info.st_mtime_ns != entry["file_identity"]["mtime_ns"]
+                    ):
+                        raise ValueError("obsolete transaction part changed")
+                    self._raw_unlink(partition_fd, name)
+                self._authenticate_raw_inventory(exchange=exchange, symbol=symbol)
+                self._raw_unlink(partition_fd, _RAW_TRANSACTION_NAME)
+                return
+            if (
+                current.payload["generation"],
+                current.payload["inventory_sha256"],
+            ) != (base["generation"], base["inventory_sha256"]):
+                raise ValueError("transaction does not match current inventory")
+            if has_stage:
+                self._verify_raw_transaction_part(
+                    path=partition / stage_name,
+                    partition=partition,
+                    byte_count=descriptor["output_entry"]["byte_count"],
+                    content_sha256=descriptor["output_entry"]["content_sha256"],
+                )
+                self._raw_replace(partition_fd, stage_name, output_name)
+            elif not has_output:
+                raise ValueError("transaction output is missing")
+            if not has_output:
+                self._verify_raw_transaction_part(
+                    path=partition / output_name,
+                    partition=partition,
+                    byte_count=descriptor["output_entry"]["byte_count"],
+                    content_sha256=descriptor["output_entry"]["content_sha256"],
+                )
+            actual_output_entry = self._raw_inventory_entry(partition / output_name)
+            if actual_output_entry != descriptor["output_entry"]:
+                raise ValueError("transaction output identity changed after rename")
+            base_by_name = {item["name"]: item for item in base["parts"]}
+            self._revalidate_raw_inventory_snapshot(
+                exchange=exchange, symbol=symbol, snapshot=current
+            )
+            self._publish_raw_inventory(root=root, payload=new)
+            names = set(self._raw_dir_names(partition_fd))
+            for name in descriptor["obsolete"]:
+                if name == output_name or name not in names:
+                    continue
+                path = partition / name
+                info = self._raw_regular_stat(path)
+                entry = base_by_name[f"{partition.name}/{name}"]
+                if (
+                    info.st_dev != entry["file_identity"]["dev"]
+                    or info.st_ino != entry["file_identity"]["ino"]
+                    or info.st_size != entry["file_identity"]["size"]
+                    or info.st_mtime_ns != entry["file_identity"]["mtime_ns"]
+                ):
+                    raise ValueError("obsolete transaction part changed")
+                self._raw_unlink(partition_fd, name)
+            self._authenticate_raw_inventory(exchange=exchange, symbol=symbol)
+            self._raw_unlink(partition_fd, _RAW_TRANSACTION_NAME)
+        finally:
+            os.close(partition_fd)
+
+    def _publish_raw_part_set(
+        self,
+        *,
+        exchange: str,
+        symbol: str,
+        partition: Path,
+        output: Path,
+        frame: pl.DataFrame,
+        obsolete: list[Path],
+    ) -> None:
+        snapshot = self._authenticate_raw_inventory(
+            exchange=exchange, symbol=symbol, migrate=True, snapshot=True
+        )
+        if not isinstance(snapshot, _RawInventorySnapshot):
+            raise ValueError("Raw aggTrades inventory snapshot is unavailable")
+        if len(snapshot.raw) > (_RAW_CONTROL_MAX_BYTES - 8192) // 2:
+            raise ValueError("Raw aggTrades transaction descriptor is too large")
+        base = snapshot.payload
+        transaction_id = uuid.uuid4().hex
+        stage_name = f".raw-stage-{transaction_id}.parquet"
+        descriptor_temp = f".raw-transaction-{transaction_id}.tmp"
+        staged = partition / stage_name
+        partition_fd = self._raw_dir_fd(partition, create=True)
+        try:
+            fd = self._raw_open_regular(
+                partition_fd, stage_name, os.O_WRONLY | os.O_CREAT | os.O_EXCL, path=staged
+            )
+            os.close(fd)
+            try:
+                self._raw_write_parquet(partition_fd, stage_name, path=staged, frame=frame)
+                output_entry = self._raw_inventory_entry(staged)
+                output_entry["name"] = f"{partition.name}/{output.name}"
+                output_entry["date"] = partition.name[5:]
+                base_by_name = {entry["name"]: entry for entry in base["parts"]}
+                obsolete_names = sorted(path.name for path in obsolete)
+                new_entries = [
+                    entry
+                    for name, entry in base_by_name.items()
+                    if name not in {f"{partition.name}/{item}" for item in obsolete_names}
+                ] + [output_entry]
+                new = self._raw_inventory_payload(
+                    exchange=self._normalize_raw_exchange_token(exchange),
+                    symbol=self._normalize_raw_symbol_token(symbol),
+                    generation=base["generation"] + 1,
+                    previous_inventory_sha256=base["inventory_sha256"],
+                    entries=new_entries,
+                )
+                descriptor_body = {
+                    "version": 2,
+                    "transaction_id": transaction_id,
+                    "exchange": self._normalize_raw_exchange_token(exchange),
+                    "symbol": self._normalize_raw_symbol_token(symbol),
+                    "partition": partition.name,
+                    "base_inventory": base,
+                    "new_inventory": new,
+                    "output": output.name,
+                    "stage": stage_name,
+                    "obsolete": obsolete_names,
+                    "output_entry": output_entry,
+                }
+                descriptor = {
+                    **descriptor_body,
+                    "descriptor_sha256": sha256(
+                        self._raw_canonical_json(descriptor_body).encode()
+                    ).hexdigest(),
+                }
+                encoded_descriptor = self._raw_control_bytes(
+                    descriptor, label="transaction descriptor"
+                )
+                temp = descriptor_temp
+                fd = self._raw_open_regular(
+                    partition_fd,
+                    temp,
+                    os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                    path=partition / temp,
+                )
+                try:
+                    self._raw_write_all(fd, encoded_descriptor)
+                    os.fsync(fd)
+                finally:
+                    os.close(fd)
+                self._revalidate_raw_inventory_snapshot(
+                    exchange=exchange, symbol=symbol, snapshot=snapshot
+                )
+                self._raw_replace(partition_fd, temp, _RAW_TRANSACTION_NAME)
+                try:
+                    self._revalidate_raw_inventory_snapshot(
+                        exchange=exchange, symbol=symbol, snapshot=snapshot
+                    )
+                except (FileNotFoundError, OSError, ValueError) as exc:
+                    raise ValueError("transaction does not match current inventory") from exc
+                self._raw_replace(partition_fd, stage_name, output.name)
+                self._recover_raw_part_transaction(
+                    exchange=exchange, symbol=symbol, partition=partition
+                )
+            except Exception:
+                names = set(self._raw_dir_names(partition_fd))
+                if _RAW_TRANSACTION_NAME not in names:
+                    if stage_name in names:
+                        self._raw_unlink(partition_fd, stage_name)
+                    if descriptor_temp in names:
+                        self._raw_unlink(partition_fd, descriptor_temp)
+                raise
+        finally:
+            os.close(partition_fd)
 
     def append_raw_wal_record(
         self,
@@ -722,17 +2792,234 @@ class ParquetMarketDataRepository:
         exchange: str,
         symbol: str,
         payload: dict[str, Any],
+        lease: _RawStreamLease | None = None,
     ) -> None:
-        wal_path = self._raw_wal_path(exchange=exchange, symbol=symbol)
-        wal_path.parent.mkdir(parents=True, exist_ok=True)
-        encoded = json.dumps(dict(payload or {}), ensure_ascii=False)
-        with wal_path.open("ab") as fh:
-            fh.write(encoded.encode("utf-8"))
-            fh.write(b"\n")
-            fh.flush()
-            os.fsync(fh.fileno())
+        try:
+            canonical_payload = json.loads(self._raw_canonical_json(payload))
+        except (TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise ValueError("Raw aggTrades WAL payload is not canonical JSON") from exc
+        if not isinstance(canonical_payload, dict):
+            raise ValueError("Raw aggTrades WAL payload must be an object")
+        path = self._raw_wal_path(exchange=exchange, symbol=symbol)
+        active, owns = self._raw_stream_lease(exchange=exchange, symbol=symbol, lease=lease)
+        try:
+            root = self._raw_symbol_root(exchange=exchange, symbol=symbol)
+            root_fd = self._raw_dir_fd(root, create=True)
+            try:
+                created = False
+                committed = False
+                owned_identity: tuple[int, int] | None = None
+                try:
+                    tail = self._recover_raw_wal(path)
+                    sequence = 1 if tail is None else tail["record_count"] + 1
+                    encoded = self._raw_encode_wal_record(
+                        payload=canonical_payload,
+                        sequence=sequence,
+                        previous=None if tail is None else tail["last_sha256"],
+                    )
+                    if len(encoded) > _RAW_WAL_MAX_RECORD_BYTES:
+                        raise ValueError("Raw aggTrades WAL record is too large")
+                    created = _RAW_WAL_NAME not in self._raw_dir_names(root_fd)
+                    if created:
+                        self._write_raw_wal_bootstrap(root=root, record=encoded)
+                    flags = os.O_WRONLY | os.O_APPEND | os.O_CREAT
+                    if created:
+                        flags |= os.O_EXCL
+                    fd = self._raw_open_regular(root_fd, _RAW_WAL_NAME, flags, path=path)
+                    try:
+                        opened = os.fstat(fd)
+                        owned_identity = (opened.st_dev, opened.st_ino)
+                        offset = opened.st_size
+                        self._raw_write_all(fd, encoded)
+                        os.fsync(fd)
+                        info = os.fstat(fd)
+                        committed = True
+                    finally:
+                        os.close(fd)
+                    if created:
+                        os.fsync(root_fd)
+                    tail_payload = self._raw_wal_tail_payload(
+                        info=info,
+                        offset=offset,
+                        record=encoded,
+                        count=sequence,
+                        generation=sequence - 1,
+                        previous=None if tail is None else tail["tail_sha256"],
+                    )
+                    self._write_raw_wal_tail(root=root, payload=tail_payload)
+                    if created:
+                        self._clear_raw_wal_bootstrap(root_fd=root_fd)
+                except Exception:
+                    clear_bootstrap = created and not committed and owned_identity is None
+                    if created and not committed and owned_identity is not None:
+                        try:
+                            fd = self._raw_open_regular(
+                                root_fd, _RAW_WAL_NAME, os.O_RDONLY, path=path
+                            )
+                            try:
+                                current = os.fstat(fd)
+                            finally:
+                                os.close(fd)
+                            if (
+                                current.st_dev,
+                                current.st_ino,
+                            ) == owned_identity and current.st_size == 0:
+                                self._raw_unlink(root_fd, _RAW_WAL_NAME)
+                                clear_bootstrap = True
+                        except FileNotFoundError:
+                            clear_bootstrap = True
+                        except OSError, ValueError:
+                            pass
+                    if clear_bootstrap:
+                        try:
+                            self._clear_raw_wal_bootstrap(root_fd=root_fd)
+                        except OSError, ValueError:
+                            pass
+                    raise
+            finally:
+                os.close(root_fd)
+        finally:
+            if owns:
+                active.release()
+
+    def recover_raw_stream(
+        self, *, exchange: str, symbol: str, lease: _RawStreamLease | None = None
+    ) -> None:
+        active, owns = self._raw_stream_lease(exchange=exchange, symbol=symbol, lease=lease)
+        try:
+            root = self._raw_symbol_root(exchange=exchange, symbol=symbol)
+            try:
+                root_fd = self._raw_dir_fd(root, create=False)
+            except FileNotFoundError:
+                return
+            try:
+                self._preflight_raw_controls(exchange=exchange, symbol=symbol)
+                for name in sorted(self._raw_dir_names(root_fd)):
+                    if not name.startswith("date="):
+                        continue
+                    if re.fullmatch(r"date=\d{4}-\d{2}-\d{2}", name) is None:
+                        raise ValueError("Raw aggTrades partition name is invalid")
+                    partition = root / name
+                    partition_fd = os.open(
+                        name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=root_fd
+                    )
+                    try:
+                        for part_name in self._raw_dir_names(partition_fd):
+                            if _RAW_PART_PATTERN.fullmatch(part_name) is not None:
+                                self._raw_regular_stat(partition / part_name)
+                    finally:
+                        os.close(partition_fd)
+                    self._recover_raw_part_transaction(
+                        exchange=exchange, symbol=symbol, partition=partition
+                    )
+                root_names = set(self._raw_dir_names(root_fd))
+                if {
+                    _RAW_WAL_NAME,
+                    _RAW_WAL_TAIL_NAME,
+                    _RAW_WAL_BOOTSTRAP_NAME,
+                } & root_names:
+                    self._recover_raw_wal(self._raw_wal_path(exchange=exchange, symbol=symbol))
+            finally:
+                os.close(root_fd)
+        finally:
+            if owns:
+                active.release()
 
     def append_raw_aggtrades(
+        self,
+        *,
+        exchange: str,
+        symbol: str,
+        rows: pl.DataFrame | list[dict[str, Any]] | tuple[dict[str, Any], ...],
+        lease: _RawStreamLease | None = None,
+    ) -> int:
+        frame = self._ensure_raw_aggtrades_frame(rows)
+        if frame.is_empty():
+            return 0
+        if (
+            len({self._partition_date_from_ms(row["timestamp_ms"]) for row in frame.to_dicts()})
+            != 1
+        ):
+            raise ValueError("Raw aggTrades append must contain exactly one UTC date")
+        active, owns = self._raw_stream_lease(exchange=exchange, symbol=symbol, lease=lease)
+        try:
+            self._preflight_raw_meta(exchange=exchange, symbol=symbol)
+            self.recover_raw_stream(exchange=exchange, symbol=symbol, lease=active)
+            self._authenticate_raw_inventory(exchange=exchange, symbol=symbol, migrate=True)
+            return self._append_raw_aggtrades_unlocked(exchange=exchange, symbol=symbol, rows=frame)
+        finally:
+            if owns:
+                active.release()
+
+    def _preflight_raw_append(self, *, exchange: str, symbol: str, frame: pl.DataFrame) -> bool:
+        """Use the authenticated inventory index; read bytes only for an overlap."""
+        entries = self._authenticate_raw_inventory(exchange=exchange, symbol=symbol)
+        rows = frame.to_dicts()
+        minimum_id = int(rows[0]["agg_trade_id"])
+        maximum_id = int(rows[-1]["agg_trade_id"])
+        minimum_ts = int(rows[0]["timestamp_ms"])
+        maximum_ts = int(rows[-1]["timestamp_ms"])
+        if not entries:
+            return True
+        tail = entries[-1]
+        token = self._partition_date_from_ms(minimum_ts)
+        if (
+            minimum_id > tail["max_trade_id"]
+            and minimum_ts >= tail["max_timestamp_ms"]
+            and token >= tail["date"]
+        ):
+            return True
+        # Exceptional overlap/backfill: only candidates whose declared ranges intersect.
+        root = self._raw_symbol_root(exchange=exchange, symbol=symbol)
+        incoming = {row["agg_trade_id"]: row for row in rows}
+        candidates = [
+            entry
+            for entry in entries
+            if not (entry["max_trade_id"] < minimum_id or entry["min_trade_id"] > maximum_id)
+        ]
+        for entry in candidates:
+            path = root / entry["name"]
+            existing = self._validate_raw_aggtrades_frame(
+                self._raw_read_authenticated_parquet(path, entry)
+            )
+            for row in existing.to_dicts():
+                if row["agg_trade_id"] in incoming and incoming[row["agg_trade_id"]] != row:
+                    raise ValueError("Raw aggTrades duplicate aggregate ID conflicts")
+        predecessor = [entry for entry in entries if entry["max_trade_id"] < minimum_id]
+        successor = [entry for entry in entries if entry["min_trade_id"] > maximum_id]
+        if predecessor and predecessor[-1]["max_timestamp_ms"] > minimum_ts:
+            raise ValueError("Raw aggTrades timestamp regresses across partitions")
+        if successor and maximum_ts > successor[0]["min_timestamp_ms"]:
+            raise ValueError("Raw aggTrades timestamp regresses across partitions")
+        return False
+
+    def preflight_raw_aggtrades(
+        self,
+        *,
+        exchange: str,
+        symbol: str,
+        rows: pl.DataFrame | list[dict[str, Any]] | tuple[dict[str, Any], ...],
+        lease: _RawStreamLease | None = None,
+    ) -> None:
+        """Fail closed on every date touched by a multi-date raw batch before publish."""
+        frame = self._ensure_raw_aggtrades_frame(rows)
+        if frame.is_empty():
+            return
+        active, owns = self._raw_stream_lease(exchange=exchange, symbol=symbol, lease=lease)
+        try:
+            self.recover_raw_stream(exchange=exchange, symbol=symbol, lease=active)
+            dated = frame.with_columns((pl.col("timestamp_ms") // 86_400_000).alias("_utc_day"))
+            for slice_frame in dated.partition_by("_utc_day", as_dict=True).values():
+                self._preflight_raw_append(
+                    exchange=exchange,
+                    symbol=symbol,
+                    frame=slice_frame.select(list(_RAW_AGGTRADES_REQUIRED_COLUMNS)),
+                )
+        finally:
+            if owns:
+                active.release()
+
+    def _append_raw_aggtrades_unlocked(
         self,
         *,
         exchange: str,
@@ -742,9 +3029,12 @@ class ParquetMarketDataRepository:
         frame = self._ensure_raw_aggtrades_frame(rows)
         if frame.is_empty():
             return 0
-        checkpoint_key = self._raw_checkpoint_key(
-            self.read_raw_checkpoint(exchange=exchange, symbol=symbol)
-        )
+        if (
+            len({self._partition_date_from_ms(row["timestamp_ms"]) for row in frame.to_dicts()})
+            != 1
+        ):
+            raise ValueError("Raw aggTrades append must contain exactly one UTC date")
+        strict_tail = self._preflight_raw_append(exchange=exchange, symbol=symbol, frame=frame)
 
         stamped = frame.with_columns(
             (pl.col("timestamp_ms") // 1000).cast(pl.Int64).alias("_ts_sec")
@@ -754,18 +3044,14 @@ class ParquetMarketDataRepository:
             .alias("_partition_date")
         )
 
-        total_rows = 0
         for partition_date, partition in stamped.partition_by(
             "_partition_date", as_dict=True
         ).items():
             part_key = str(
                 partition_date[0] if isinstance(partition_date, tuple) else partition_date
             )
-            payload = (
+            payload = self._validate_raw_aggtrades_frame(
                 partition.select(list(_RAW_AGGTRADES_REQUIRED_COLUMNS))
-                .sort(["timestamp_ms", "agg_trade_id"])
-                .unique(subset=["timestamp_ms", "agg_trade_id"], keep="last")
-                .sort(["timestamp_ms", "agg_trade_id"])
             )
             if payload.is_empty():
                 continue
@@ -774,25 +3060,101 @@ class ParquetMarketDataRepository:
                 symbol=symbol,
                 partition_date=part_key,
             )
-            part_path.mkdir(parents=True, exist_ok=True)
+            self._ensure_raw_directory(part_path)
             partition_lock = self._acquire_raw_partition_lock(
                 exchange=exchange,
                 symbol=symbol,
                 partition_root=part_path,
             )
             try:
-                existing_paths = self._raw_part_paths(part_path)
-                incoming_first_key = (
-                    int(payload["timestamp_ms"][0]),
-                    int(payload["agg_trade_id"][0]),
+                if strict_tail:
+                    entries = self._authenticate_raw_inventory(exchange=exchange, symbol=symbol)
+                    part_entries = [entry for entry in entries if entry["date"] == part_key]
+                    next_index = (
+                        max(
+                            (
+                                int(
+                                    _RAW_PART_PATTERN.fullmatch(
+                                        entry["name"].rsplit("/", 1)[1]
+                                    ).group(1)
+                                )
+                                for entry in part_entries
+                            ),
+                            default=-1,
+                        )
+                        + 1
+                    )
+                    self._publish_raw_part_set(
+                        exchange=exchange,
+                        symbol=symbol,
+                        partition=part_path,
+                        output=part_path / f"part-{next_index:04d}.parquet",
+                        frame=payload,
+                        obsolete=[],
+                    )
+                    self._enforce_raw_partition_controls(
+                        exchange=exchange, symbol=symbol, partition_root=part_path
+                    )
+                    continue
+                root = self._raw_symbol_root(exchange=exchange, symbol=symbol)
+                entries = self._authenticate_raw_inventory(exchange=exchange, symbol=symbol)
+                existing_entries = [entry for entry in entries if entry["date"] == part_key]
+                existing_paths = [root / entry["name"] for entry in existing_entries]
+                existing_frames: list[pl.DataFrame] = []
+                for entry, existing_path in zip(existing_entries, existing_paths, strict=True):
+                    try:
+                        existing_frames.append(
+                            self._validate_raw_aggtrades_frame(
+                                self._raw_read_authenticated_parquet(existing_path, entry)
+                            )
+                        )
+                    except Exception as exc:
+                        raise RuntimeError(
+                            "Cannot merge raw aggTrades with unreadable part or invalid data: "
+                            f"{existing_path}"
+                        ) from exc
+                try:
+                    existing_state = (
+                        self._validate_raw_aggtrades_frame(
+                            pl.concat(existing_frames, how="vertical_relaxed")
+                        )
+                        if existing_frames
+                        else self._empty_raw_aggtrades_frame()
+                    )
+                except Exception as exc:
+                    raise RuntimeError(
+                        f"Cannot merge raw aggTrades with conflicting valid parts: {part_path}"
+                    ) from exc
+                existing_rows_by_id = {
+                    row["agg_trade_id"]: row for row in existing_state.to_dicts()
+                }
+                new_rows: list[dict[str, Any]] = []
+                has_overlap = False
+                for row in payload.to_dicts():
+                    existing_row = existing_rows_by_id.get(row["agg_trade_id"])
+                    if existing_row is None:
+                        new_rows.append(row)
+                    elif existing_row != row:
+                        raise ValueError("Raw aggTrades duplicate aggregate ID conflicts")
+                    else:
+                        has_overlap = True
+
+                existing_tail_id = (
+                    int(existing_state["agg_trade_id"][-1])
+                    if not existing_state.is_empty()
+                    else None
                 )
-                existing_tail_key = (
-                    checkpoint_key
-                    if checkpoint_key is not None and existing_paths
-                    else (self._raw_tail_key(existing_paths) if existing_paths else None)
+                existing_tail_timestamp = (
+                    int(existing_state["timestamp_ms"][-1])
+                    if not existing_state.is_empty()
+                    else None
                 )
-                append_only = not existing_paths or (
-                    existing_tail_key is not None and incoming_first_key > existing_tail_key
+                append_only = not has_overlap and (
+                    existing_tail_id is None
+                    or (
+                        int(payload["agg_trade_id"][0]) > existing_tail_id
+                        and int(payload["timestamp_ms"][0]) >= existing_tail_timestamp
+                    )
                 )
 
                 if append_only:
@@ -801,10 +3163,14 @@ class ParquetMarketDataRepository:
                         if not existing_paths
                         else self._next_raw_part_path(part_path)
                     )
-                    payload.write_parquet(output_path, compression="zstd", statistics=True)
-                    self._fsync_file(output_path)
-                    self._fsync_dir(output_path.parent)
-                    total_rows += int(payload.height)
+                    self._publish_raw_part_set(
+                        exchange=exchange,
+                        symbol=symbol,
+                        partition=part_path,
+                        output=output_path,
+                        frame=payload,
+                        obsolete=[],
+                    )
                     self._enforce_raw_partition_controls(
                         exchange=exchange,
                         symbol=symbol,
@@ -812,37 +3178,22 @@ class ParquetMarketDataRepository:
                     )
                     continue
 
-                existing_frames: list[pl.DataFrame] = []
-                for existing_path in existing_paths:
-                    try:
-                        loaded = pl.read_parquet(existing_path).select(
-                            list(_RAW_AGGTRADES_REQUIRED_COLUMNS)
-                        )
-                    except BaseException:
-                        self._rename_corrupt_raw_part(existing_path)
-                        continue
-                    if not loaded.is_empty():
-                        existing_frames.append(loaded)
-
-                merged = (
-                    pl.concat([*existing_frames, payload], how="vertical_relaxed")
-                    .sort(["timestamp_ms", "agg_trade_id"])
-                    .unique(subset=["timestamp_ms", "agg_trade_id"], keep="last")
-                    .sort(["timestamp_ms", "agg_trade_id"])
+                merged = self._validate_raw_aggtrades_frame(
+                    pl.DataFrame(
+                        [*existing_state.to_dicts(), *new_rows],
+                        schema=_RAW_AGGTRADES_SCHEMA,
+                    ).sort("agg_trade_id")
                 )
-                total_rows += int(merged.height)
 
                 output_path = part_path / "part-0000.parquet"
-                tmp_output_path = output_path.with_suffix(".tmp.parquet")
-                merged.write_parquet(tmp_output_path, compression="zstd", statistics=True)
-                self._fsync_file(tmp_output_path)
-                tmp_output_path.replace(output_path)
-                for existing_path in existing_paths:
-                    if existing_path == output_path:
-                        continue
-                    if existing_path.exists():
-                        existing_path.unlink()
-                self._fsync_dir(output_path.parent)
+                self._publish_raw_part_set(
+                    exchange=exchange,
+                    symbol=symbol,
+                    partition=part_path,
+                    output=output_path,
+                    frame=merged,
+                    obsolete=existing_paths,
+                )
                 self._enforce_raw_partition_controls(
                     exchange=exchange,
                     symbol=symbol,
@@ -853,6 +3204,105 @@ class ParquetMarketDataRepository:
 
         return int(frame.height)
 
+    def read_raw_recovery_bounds(
+        self,
+        *,
+        exchange: str,
+        symbol: str,
+        checkpoint_last_row: Mapping[str, Any] | None,
+        lease: _RawStreamLease | None = None,
+    ) -> pl.DataFrame:
+        """Return only the authenticated checkpoint binding and current tail."""
+        active, owns = self._raw_stream_lease(exchange=exchange, symbol=symbol, lease=lease)
+        try:
+            self.recover_raw_stream(exchange=exchange, symbol=symbol, lease=active)
+            entries = self._authenticate_raw_inventory(exchange=exchange, symbol=symbol)
+            if not entries:
+                if checkpoint_last_row is not None:
+                    raise ValueError(
+                        "Raw aggTrades checkpoint is not bound to persisted raw parquet"
+                    )
+                return self._empty_raw_aggtrades_frame()
+            root = self._raw_symbol_root(exchange=exchange, symbol=symbol)
+            selected = [entries[-1]]
+            if checkpoint_last_row is not None:
+                trade_id = checkpoint_last_row["agg_trade_id"]
+                matches = [
+                    entry
+                    for entry in entries
+                    if entry["min_trade_id"] <= trade_id <= entry["max_trade_id"]
+                ]
+                if len(matches) != 1:
+                    raise ValueError(
+                        "Raw aggTrades checkpoint is not bound to persisted raw parquet"
+                    )
+                selected.insert(0, matches[0])
+            rows: list[dict[str, Any]] = []
+            for entry in {entry["name"]: entry for entry in selected}.values():
+                path = root / entry["name"]
+                frame = self._validate_raw_aggtrades_frame(
+                    self._raw_read_authenticated_parquet(path, entry)
+                )
+                if checkpoint_last_row is not None:
+                    rows.extend(
+                        row
+                        for row in frame.to_dicts()
+                        if row["agg_trade_id"] == checkpoint_last_row["agg_trade_id"]
+                    )
+                if entry is entries[-1]:
+                    rows.append(frame.to_dicts()[-1])
+            if checkpoint_last_row is not None and not any(
+                row == dict(checkpoint_last_row) for row in rows
+            ):
+                raise ValueError("Raw aggTrades checkpoint is not bound to persisted raw parquet")
+            return self._validate_raw_aggtrades_frame(
+                pl.DataFrame(rows, schema=_RAW_AGGTRADES_SCHEMA)
+            )
+        finally:
+            if owns:
+                active.release()
+
+    def read_raw_recovery_suffix(
+        self,
+        *,
+        exchange: str,
+        symbol: str,
+        checkpoint_last_row: Mapping[str, Any] | None,
+        lease: _RawStreamLease | None = None,
+    ) -> pl.DataFrame:
+        """Explicit bulk recovery API; steady sync uses bounded recovery bounds."""
+        active, owns = self._raw_stream_lease(exchange=exchange, symbol=symbol, lease=lease)
+        try:
+            self.recover_raw_stream(exchange=exchange, symbol=symbol, lease=active)
+            entries = self._authenticate_raw_inventory(exchange=exchange, symbol=symbol)
+            if not entries:
+                return self._empty_raw_aggtrades_frame()
+            root = self._raw_symbol_root(exchange=exchange, symbol=symbol)
+            loaded = self._validate_raw_aggtrades_frame(
+                pl.concat(
+                    [
+                        self._validate_raw_aggtrades_frame(
+                            self._raw_read_authenticated_parquet(root / entry["name"], entry)
+                        )
+                        for entry in entries
+                    ],
+                    how="vertical_relaxed",
+                )
+            )
+            if checkpoint_last_row is None:
+                return self._validate_raw_aggtrades_frame(loaded.tail(1))
+            suffix = self._validate_raw_aggtrades_frame(
+                loaded.filter(pl.col("agg_trade_id") >= checkpoint_last_row["agg_trade_id"])
+            )
+            if suffix.is_empty() or suffix.to_dicts()[0] != dict(checkpoint_last_row):
+                raise ValueError("Raw aggTrades checkpoint is not bound to persisted raw parquet")
+            return suffix
+        except Exception as exc:
+            raise RuntimeError("Cannot read raw aggTrades checkpoint recovery suffix") from exc
+        finally:
+            if owns:
+                active.release()
+
     def load_raw_aggtrades(
         self,
         *,
@@ -860,83 +3310,51 @@ class ParquetMarketDataRepository:
         symbol: str,
         start_date: Any = None,
         end_date: Any = None,
+        lease: _RawStreamLease | None = None,
     ) -> pl.DataFrame:
-        start_dt = self._coerce_datetime(start_date)
-        end_dt = self._coerce_datetime(end_date)
-        if end_dt is not None and start_dt is not None and end_dt < start_dt:
-            return self._empty_raw_aggtrades_frame()
-
-        root = self._raw_symbol_root(exchange=exchange, symbol=symbol)
-        if not root.exists():
-            return self._empty_raw_aggtrades_frame()
-
-        candidates = sorted(
-            path
-            for path in root.glob("date=*/part-*.parquet")
-            if _RAW_PART_PATTERN.fullmatch(path.name) is not None
-        )
-        if not candidates:
-            return self._empty_raw_aggtrades_frame()
-
-        start_ms = self._datetime_to_ms(start_dt)
-        end_ms = self._datetime_to_ms(end_dt)
-        filtered_paths: list[Path] = []
-        for path in candidates:
-            try:
-                partition_token = path.parent.name.replace("date=", "", 1)
-                partition_dt = datetime.fromisoformat(partition_token)
-            except Exception:
-                partition_dt = None
-            if (
-                start_dt is not None
-                and partition_dt is not None
-                and partition_dt.date() < start_dt.date()
-            ):
-                continue
-            if (
-                end_dt is not None
-                and partition_dt is not None
-                and partition_dt.date() > end_dt.date()
-            ):
-                continue
-            filtered_paths.append(path)
-
-        if not filtered_paths:
-            return self._empty_raw_aggtrades_frame()
-
+        active, owns = self._raw_stream_lease(exchange=exchange, symbol=symbol, lease=lease)
         try:
-            lazy = pl.scan_parquet([str(path) for path in filtered_paths]).select(
-                list(_RAW_AGGTRADES_REQUIRED_COLUMNS)
+            self.recover_raw_stream(exchange=exchange, symbol=symbol, lease=active)
+            entries = self._authenticate_raw_inventory(exchange=exchange, symbol=symbol)
+            start_dt = self._coerce_datetime(start_date)
+            end_dt = self._coerce_datetime(end_date)
+            if end_dt is not None and start_dt is not None and end_dt < start_dt:
+                return self._empty_raw_aggtrades_frame()
+            selected = [
+                entry
+                for entry in entries
+                if (
+                    start_dt is None
+                    or datetime.fromisoformat(entry["date"]).date() >= start_dt.date()
+                )
+                and (
+                    end_dt is None or datetime.fromisoformat(entry["date"]).date() <= end_dt.date()
+                )
+            ]
+            if not selected:
+                return self._empty_raw_aggtrades_frame()
+            root = self._raw_symbol_root(exchange=exchange, symbol=symbol)
+            loaded = self._validate_raw_aggtrades_frame(
+                pl.concat(
+                    [
+                        self._validate_raw_aggtrades_frame(
+                            self._raw_read_authenticated_parquet(root / entry["name"], entry)
+                        )
+                        for entry in selected
+                    ],
+                    how="vertical_relaxed",
+                )
             )
-            if start_dt is not None:
-                lazy = lazy.filter(pl.col("timestamp_ms") >= int(start_ms or 0))
-            if end_dt is not None:
-                lazy = lazy.filter(pl.col("timestamp_ms") <= int(end_ms or 0))
-            return self._normalize_loaded_raw_aggtrades_frame(self._collect_lazy(lazy))
-        except Exception:
-            pass
-
-        frames: list[pl.DataFrame] = []
-        for path in filtered_paths:
-            try:
-                loaded = pl.read_parquet(path).select(list(_RAW_AGGTRADES_REQUIRED_COLUMNS))
-            except Exception:
-                continue
-            if loaded.is_empty():
-                continue
-            frames.append(loaded)
-
-        if not frames:
-            return self._empty_raw_aggtrades_frame()
-
-        merged = self._normalize_loaded_raw_aggtrades_frame(
-            pl.concat(frames, how="vertical_relaxed")
-        )
-        if start_dt is not None:
-            merged = merged.filter(pl.col("timestamp_ms") >= int(start_ms or 0))
-        if end_dt is not None:
-            merged = merged.filter(pl.col("timestamp_ms") <= int(end_ms or 0))
-        return merged.select(list(_RAW_AGGTRADES_REQUIRED_COLUMNS))
+            start_ms = self._datetime_to_ms(start_dt)
+            end_ms = self._datetime_to_ms(end_dt)
+            if start_ms is not None:
+                loaded = loaded.filter(pl.col("timestamp_ms") >= start_ms)
+            if end_ms is not None:
+                loaded = loaded.filter(pl.col("timestamp_ms") <= end_ms)
+            return self._normalize_loaded_raw_aggtrades_frame(loaded)
+        finally:
+            if owns:
+                active.release()
 
     def _iter_materialized_manifest_paths(
         self,
@@ -1341,21 +3759,163 @@ class ParquetMarketDataRepository:
 
     def _read_raw_meta(self, *, exchange: str, symbol: str) -> dict[str, Any]:
         path = self._raw_meta_path(exchange=exchange, symbol=symbol)
-        if not path.exists():
-            return {}
+        root_fd = self._raw_dir_fd(path.parent, create=False)
         try:
-            return json.loads(path.read_text(encoding="utf-8"))
-        except Exception:
-            return {}
+            if _RAW_META_NAME not in self._raw_dir_names(root_fd):
+                return {}
+            raw_bytes, _ = self._raw_read_bytes(root_fd, _RAW_META_NAME, path=path)
+        finally:
+            os.close(root_fd)
+        try:
+            raw = raw_bytes.decode("utf-8")
+            payload = json.loads(raw, object_pairs_hook=self._json_object_no_duplicates)
+        except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
+            raise ValueError("Raw compaction metadata is malformed") from exc
+        allowed = {
+            "raw_compaction_required",
+            "last_raw_over_limit_detected_at",
+            "last_raw_over_limit_partition",
+            "last_raw_part_count",
+            "last_raw_over_limit_warning_at",
+            "last_raw_compaction_resolved_at",
+            "last_raw_compaction_partition",
+        }
+        if (
+            not isinstance(payload, dict)
+            or set(payload) - allowed
+            or raw != self._raw_canonical_json(payload)
+        ):
+            raise ValueError("Raw compaction metadata is malformed")
+        if (
+            "raw_compaction_required" in payload
+            and type(payload["raw_compaction_required"]) is not bool
+        ):
+            raise ValueError("Raw compaction metadata is malformed")
+        for key in (
+            "last_raw_over_limit_detected_at",
+            "last_raw_over_limit_warning_at",
+            "last_raw_compaction_resolved_at",
+        ):
+            if key in payload and (
+                type(payload[key]) is not str or self._parse_iso_utc(payload[key]) is None
+            ):
+                raise ValueError("Raw compaction metadata is malformed")
+        for key in ("last_raw_over_limit_partition", "last_raw_compaction_partition"):
+            if key in payload and (
+                type(payload[key]) is not str
+                or not _RAW_DATE_PATTERN.fullmatch(payload[key].removeprefix("date="))
+            ):
+                raise ValueError("Raw compaction metadata is malformed")
+        if "last_raw_part_count" in payload and (
+            type(payload["last_raw_part_count"]) is not int or payload["last_raw_part_count"] < 0
+        ):
+            raise ValueError("Raw compaction metadata is malformed")
+        return payload
+
+    def _assert_no_unbound_raw_control_temps(
+        self, *, root: Path, root_fd: int, names: set[str]
+    ) -> None:
+        for name in sorted(names):
+            if _RAW_CONTROL_TEMP_PATTERN.fullmatch(name) is None:
+                continue
+            try:
+                fd = self._raw_open_regular(root_fd, name, os.O_RDONLY, path=root / name)
+            except (OSError, ValueError) as exc:
+                raise ValueError("unbound raw control temp is present") from exc
+            os.close(fd)
+            raise ValueError("unbound raw control temp is present")
+
+    def _preflight_raw_meta(self, *, exchange: str, symbol: str) -> None:
+        """Reject unsafe persisted raw control state before raw publication begins."""
+        try:
+            self._read_raw_meta(exchange=exchange, symbol=symbol)
+        except FileNotFoundError:
+            pass
+
+    def _preflight_raw_controls(self, *, exchange: str, symbol: str) -> None:
+        """Bound and parse every existing control file before recovery mutates state."""
+        raw_exchange = self._normalize_raw_exchange_token(exchange)
+        raw_symbol = self._normalize_raw_symbol_token(symbol)
+        checkpoint_symbol = normalize_symbol(symbol)
+        root = self._raw_symbol_root(exchange=raw_exchange, symbol=raw_symbol)
+        try:
+            root_fd = self._raw_dir_fd(root, create=False)
+        except FileNotFoundError:
+            return
+        try:
+            names = set(self._raw_dir_names(root_fd))
+            self._assert_no_unbound_raw_control_temps(root=root, root_fd=root_fd, names=names)
+            if _RAW_INVENTORY_NAME in names:
+                raw, _ = self._raw_read_bytes(
+                    root_fd, _RAW_INVENTORY_NAME, path=root / _RAW_INVENTORY_NAME
+                )
+                self._parse_raw_inventory(
+                    raw.decode(), exchange=raw_exchange, symbol=raw_symbol, allow_v1=True
+                )
+            if _RAW_WAL_TAIL_NAME in names:
+                self._raw_wal_tail(root=root, root_fd=root_fd)
+            if _RAW_WAL_BOOTSTRAP_NAME in names:
+                self._raw_wal_bootstrap(root=root, root_fd=root_fd)
+            for name in names:
+                if not name.startswith("date="):
+                    continue
+                if _RAW_DATE_PATTERN.fullmatch(name[5:]) is None:
+                    raise ValueError("Raw aggTrades partition name is invalid")
+                partition = root / name
+                partition_fd = self._raw_dir_fd(partition, create=False)
+                try:
+                    names = set(self._raw_dir_names(partition_fd))
+                    descriptor = None
+                    if _RAW_TRANSACTION_NAME in names:
+                        raw, _ = self._raw_read_bytes(
+                            partition_fd,
+                            _RAW_TRANSACTION_NAME,
+                            path=partition / _RAW_TRANSACTION_NAME,
+                        )
+                        descriptor = self._parse_raw_transaction(
+                            raw.decode(),
+                            exchange=raw_exchange,
+                            symbol=raw_symbol,
+                            partition=partition,
+                        )
+                    self._assert_raw_transaction_artifact_closure(
+                        names=names, descriptor=descriptor
+                    )
+                finally:
+                    os.close(partition_fd)
+        finally:
+            os.close(root_fd)
+        self._read_raw_checkpoint_unlocked(exchange=raw_exchange, symbol=checkpoint_symbol)
+        self._preflight_raw_meta(exchange=raw_exchange, symbol=raw_symbol)
 
     def _write_raw_meta(self, *, exchange: str, symbol: str, payload: dict[str, Any]) -> None:
+        encoded = self._raw_control_bytes(payload, label="compaction metadata")
+        try:
+            self._read_raw_meta(exchange=exchange, symbol=symbol)
+        except FileNotFoundError:
+            pass
         path = self._raw_meta_path(exchange=exchange, symbol=symbol)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_suffix(".tmp.json")
-        tmp.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
-        self._fsync_file(tmp)
-        tmp.replace(path)
-        self._fsync_dir(path.parent)
+        root_fd = self._raw_dir_fd(path.parent, create=True)
+        tmp = f".raw-meta-{uuid.uuid4().hex}.tmp"
+        try:
+            fd = self._raw_open_regular(
+                root_fd, tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, path=path.parent / tmp
+            )
+            try:
+                self._raw_write_all(fd, encoded)
+                os.fsync(fd)
+            finally:
+                os.close(fd)
+            self._raw_replace(root_fd, tmp, _RAW_META_NAME)
+        except Exception:
+            try:
+                if tmp in set(self._raw_dir_names(root_fd)):
+                    self._raw_unlink(root_fd, tmp)
+            except OSError, ValueError:
+                pass
+            raise
+        finally:
+            os.close(root_fd)
 
     def _resolve_raw_partition_lock_controls(self) -> tuple[float, float]:
         timeout_raw = str(
@@ -1376,36 +3936,76 @@ class ParquetMarketDataRepository:
             poll_seconds = 0.05
         return float(timeout_seconds), float(poll_seconds)
 
+    def acquire_raw_symbol_stream_lease(self, *, exchange: str, symbol: str) -> _RawStreamLease:
+        root = self._raw_symbol_root(exchange=exchange, symbol=symbol)
+        root_fd = self._raw_dir_fd(root, create=True)
+        lock_path = root / ".raw-stream.lock"
+        try:
+            fd = self._raw_open_regular(
+                root_fd, lock_path.name, os.O_RDWR | os.O_CREAT, path=lock_path
+            )
+        finally:
+            os.close(root_fd)
+        try:
+            timeout_seconds, poll_seconds = self._resolve_raw_partition_lock_controls()
+            deadline = time.monotonic() + timeout_seconds
+            while True:
+                try:
+                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    return _RawStreamLease(lock_path=lock_path, _fd=fd)
+                except BlockingIOError:
+                    if time.monotonic() >= deadline:
+                        raise RawPartitionBusyError(f"Raw symbol stream is busy: {root}") from None
+                    time.sleep(poll_seconds)
+        except Exception:
+            os.close(fd)
+            raise
+
+    def _raw_stream_lease(
+        self, *, exchange: str, symbol: str, lease: _RawStreamLease | None
+    ) -> tuple[_RawStreamLease, bool]:
+        expected = self._raw_symbol_root(exchange=exchange, symbol=symbol) / ".raw-stream.lock"
+        if lease is not None:
+            if lease.lock_path != expected or lease._released:
+                raise ValueError("Raw aggTrades operation requires the matching live stream lease")
+            return lease, False
+        return self.acquire_raw_symbol_stream_lease(exchange=exchange, symbol=symbol), True
+
     def _acquire_raw_partition_lock(
         self,
         *,
         exchange: str,
         symbol: str,
         partition_root: Path,
-    ) -> HeavyRunLock:
-        timeout_seconds, poll_seconds = self._resolve_raw_partition_lock_controls()
-        deadline = time.monotonic() + float(timeout_seconds)
-        active_payload: dict[str, Any] = {}
+    ) -> _RawStreamLease:
+        del exchange, symbol
+        parent_fd = self._raw_dir_fd(partition_root, create=True)
         lock_path = partition_root / ".raw-partition.lock"
-        while True:
-            try:
-                return HeavyRunLock.acquire(
-                    lock_path=lock_path,
-                    label="raw_partition",
-                    metadata={
-                        "exchange": self._normalize_exchange(exchange),
-                        "symbol": self._normalize_symbol_token(symbol),
-                        "partition": partition_root.name,
-                    },
-                )
-            except HeavyRunActiveError as exc:
-                active_payload = dict(exc.active_payload)
-                if time.monotonic() >= deadline:
-                    raise RawPartitionBusyError(
-                        "Raw partition is busy; timed out waiting for writer/compaction lease "
-                        f"partition={partition_root} active={active_payload}"
-                    ) from exc
-                time.sleep(float(poll_seconds))
+        try:
+            fd = self._raw_open_regular(
+                parent_fd,
+                lock_path.name,
+                os.O_RDWR | os.O_CREAT,
+                path=lock_path,
+            )
+        finally:
+            os.close(parent_fd)
+        try:
+            timeout_seconds, poll_seconds = self._resolve_raw_partition_lock_controls()
+            deadline = time.monotonic() + timeout_seconds
+            while True:
+                try:
+                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    return _RawStreamLease(lock_path=lock_path, _fd=fd)
+                except BlockingIOError:
+                    if time.monotonic() >= deadline:
+                        raise RawPartitionBusyError(
+                            f"Raw partition is busy: {partition_root}"
+                        ) from None
+                    time.sleep(poll_seconds)
+        except Exception:
+            os.close(fd)
+            raise
 
     def _resolve_raw_part_controls(self) -> tuple[int, bool]:
         raw_max_parts = self._env_int(
@@ -1425,38 +4025,49 @@ class ParquetMarketDataRepository:
         symbol: str,
         partition_root: Path,
     ) -> int:
-        part_paths = self._raw_part_paths(partition_root)
+        self._assert_raw_path_confined(partition_root)
+        self._preflight_raw_meta(exchange=exchange, symbol=symbol)
+        self._preflight_raw_controls(exchange=exchange, symbol=symbol)
+        entries = self._authenticate_raw_inventory(exchange=exchange, symbol=symbol, migrate=True)
+        selected = [
+            entry for entry in entries if entry["name"].split("/", 1)[0] == partition_root.name
+        ]
+        part_paths = [partition_root / entry["name"].split("/", 1)[1] for entry in selected]
         if not part_paths:
             return 0
 
         frames: list[pl.DataFrame] = []
-        for path in part_paths:
+        for path, entry in zip(part_paths, selected, strict=True):
             try:
-                loaded = pl.read_parquet(path).select(list(_RAW_AGGTRADES_REQUIRED_COLUMNS))
-            except Exception:
-                self._rename_corrupt_raw_part(path)
-                continue
+                loaded = self._validate_raw_aggtrades_frame(
+                    self._raw_read_authenticated_parquet(path, entry)
+                )
+            except Exception as exc:
+                raise RuntimeError(
+                    f"Cannot compact unreadable part or invalid raw aggTrades data: {path}"
+                ) from exc
             if not loaded.is_empty():
                 frames.append(loaded)
 
         if not frames:
             return 0
 
-        merged = self._normalize_loaded_raw_aggtrades_frame(
-            pl.concat(frames, how="vertical_relaxed")
-        )
+        try:
+            merged = self._validate_raw_aggtrades_frame(pl.concat(frames, how="vertical_relaxed"))
+        except Exception as exc:
+            raise RuntimeError(
+                f"Cannot compact invalid raw aggTrades partition: {partition_root}"
+            ) from exc
         output_path = partition_root / "part-0000.parquet"
-        tmp_output_path = output_path.with_suffix(".tmp.parquet")
-        merged.write_parquet(tmp_output_path, compression="zstd", statistics=True)
-        self._fsync_file(tmp_output_path)
-        tmp_output_path.replace(output_path)
-        for path in part_paths:
-            if path == output_path:
-                continue
-            if path.exists():
-                path.unlink()
-        self._fsync_dir(output_path.parent)
-        return len([path for path in part_paths if path.exists()])
+        self._publish_raw_part_set(
+            exchange=exchange,
+            symbol=symbol,
+            partition=partition_root,
+            output=output_path,
+            frame=merged,
+            obsolete=part_paths,
+        )
+        return len(part_paths)
 
     def _enforce_raw_partition_controls(
         self,

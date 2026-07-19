@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import csv
+import hashlib
 import io
 import json
 import os
@@ -708,7 +709,17 @@ def _archive_rows_to_raw_aggtrades(
     return rows
 
 
-def _write_raw_checkpoint_for_rows(
+def _canonical_raw_row_sha256(row: dict[str, Any]) -> str:
+    encoded = json.dumps(
+        dict(row),
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _append_raw_batch_transaction(
     repo: ParquetMarketDataRepository,
     *,
     exchange_id: str,
@@ -716,37 +727,95 @@ def _write_raw_checkpoint_for_rows(
     rows: list[dict[str, Any]],
     source: str,
     observed_until_ms: int,
-) -> None:
+    stage_timings_seconds: dict[str, float],
+) -> int:
     if not rows:
-        return
-    last = dict(rows[-1])
-    repo.write_raw_checkpoint(
-        exchange=exchange_id,
-        symbol=symbol,
-        payload={
+        return 0
+    exchange = str(exchange_id).lower()
+    lease = repo.acquire_raw_symbol_stream_lease(exchange=exchange, symbol=symbol)
+    try:
+        repo.preflight_raw_aggtrades(
+            exchange=exchange,
+            symbol=symbol,
+            rows=rows,
+            lease=lease,
+        )
+        started_at = time.perf_counter()
+        appended = 0
+        date_rows: list[dict[str, Any]] = []
+        date_token: str | None = None
+        for row in rows:
+            row_date = (
+                datetime.fromtimestamp(
+                    row["timestamp_ms"] / 1000,
+                    tz=UTC,
+                )
+                .date()
+                .isoformat()
+            )
+            if date_token is not None and row_date != date_token:
+                appended += int(
+                    repo.append_raw_aggtrades(
+                        exchange=exchange,
+                        symbol=symbol,
+                        rows=date_rows,
+                        lease=lease,
+                    )
+                )
+                date_rows = []
+            date_token = row_date
+            date_rows.append(row)
+        if date_rows:
+            appended += int(
+                repo.append_raw_aggtrades(
+                    exchange=exchange,
+                    symbol=symbol,
+                    rows=date_rows,
+                    lease=lease,
+                )
+            )
+        _record_stage_duration(stage_timings_seconds, "raw_upsert", started_at)
+
+        last_row = dict(rows[-1])
+        last_timestamp_ms = int(last_row["timestamp_ms"])
+        last_trade_id = int(last_row["agg_trade_id"])
+        observed_until_ms = max(int(observed_until_ms), last_timestamp_ms)
+        checkpoint = {
+            "exchange": exchange,
             "symbol": symbol,
-            "exchange": str(exchange_id).lower(),
-            "last_timestamp_ms": int(last["timestamp_ms"]),
-            "last_trade_id": int(last["agg_trade_id"]),
-            "last_agg_trade_id": int(last["agg_trade_id"]),
-            "observed_until_ms": int(observed_until_ms),
+            "last_timestamp_ms": last_timestamp_ms,
+            "last_trade_id": last_trade_id,
+            "observed_until_ms": observed_until_ms,
             "updated_at_utc": datetime.now(UTC).isoformat(),
-            "source": str(source),
-        },
-    )
-    repo.append_raw_wal_record(
-        exchange=exchange_id,
-        symbol=symbol,
-        payload={
-            "type": "aggtrades_raw_batch",
-            "source": str(source),
-            "last_timestamp_ms": int(last["timestamp_ms"]),
-            "last_trade_id": int(last["agg_trade_id"]),
-            "observed_until_ms": int(observed_until_ms),
-            "rows": len(rows),
-            "created_at_utc": datetime.now(UTC).isoformat(),
-        },
-    )
+            "batch_rows": len(rows),
+            "last_row": last_row,
+            "last_row_sha256": _canonical_raw_row_sha256(last_row),
+        }
+        started_at = time.perf_counter()
+        repo.write_raw_checkpoint(
+            exchange=exchange,
+            symbol=symbol,
+            payload=checkpoint,
+            lease=lease,
+        )
+        repo.append_raw_wal_record(
+            exchange=exchange,
+            symbol=symbol,
+            payload={
+                "type": "aggtrades_raw_batch",
+                "source": str(source),
+                "last_timestamp_ms": last_timestamp_ms,
+                "last_trade_id": last_trade_id,
+                "observed_until_ms": observed_until_ms,
+                "rows": len(rows),
+                "created_at_utc": datetime.now(UTC).isoformat(),
+            },
+            lease=lease,
+        )
+        _record_stage_duration(stage_timings_seconds, "checkpoint_write", started_at)
+        return int(appended)
+    finally:
+        lease.release()
 
 
 def _collect_live_raw_rows(
@@ -976,23 +1045,15 @@ def refresh_symbol_raw_first_ohlcv(
                 continue
             archive_days_downloaded += 1
             archive_raw_rows_fetched += len(raw_rows)
-            started_at = time.perf_counter()
-            archive_raw_rows_upserted += repo.append_raw_aggtrades(
-                exchange=str(exchange_id).lower(),
-                symbol=symbol,
-                rows=raw_rows,
-            )
-            _record_stage_duration(stage_timings_seconds, "raw_upsert", started_at)
-            started_at = time.perf_counter()
-            _write_raw_checkpoint_for_rows(
+            archive_raw_rows_upserted += _append_raw_batch_transaction(
                 repo,
                 exchange_id=str(exchange_id).lower(),
                 symbol=symbol,
                 rows=raw_rows,
                 source="binance_archive_backfill",
                 observed_until_ms=int(range_end),
+                stage_timings_seconds=stage_timings_seconds,
             )
-            _record_stage_duration(stage_timings_seconds, "checkpoint_write", started_at)
             started_at = time.perf_counter()
             derived_frame = raw_aggtrades_to_1s_frame(
                 raw_rows,
@@ -1050,23 +1111,15 @@ def refresh_symbol_raw_first_ohlcv(
             _record_stage_duration(stage_timings_seconds, "live_fetch", started_at)
             live_raw_rows_fetched = len(live_rows)
             if live_rows:
-                started_at = time.perf_counter()
-                live_raw_rows_upserted = repo.append_raw_aggtrades(
-                    exchange=str(exchange_id).lower(),
-                    symbol=symbol,
-                    rows=live_rows,
-                )
-                _record_stage_duration(stage_timings_seconds, "raw_upsert", started_at)
-                started_at = time.perf_counter()
-                _write_raw_checkpoint_for_rows(
+                live_raw_rows_upserted = _append_raw_batch_transaction(
                     repo,
                     exchange_id=str(exchange_id).lower(),
                     symbol=symbol,
                     rows=live_rows,
                     source="binance_futures_live_tail",
                     observed_until_ms=int(cutoff_ms),
+                    stage_timings_seconds=stage_timings_seconds,
                 )
-                _record_stage_duration(stage_timings_seconds, "checkpoint_write", started_at)
                 started_at = time.perf_counter()
                 derived_frame = raw_aggtrades_to_1s_frame(
                     live_rows,

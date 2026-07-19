@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import io
 import json
@@ -137,6 +138,43 @@ def test_refresh_symbol_raw_first_ohlcv_derives_from_stored_raw_aggtrades(
     assert result.stage_timings_seconds["total_refresh"] >= 0.0
     assert result.live_raw_rows_upserted == 0
     assert result.derived_ohlcv_rows_upserted >= 2
+    checkpoint = repo.read_raw_checkpoint(exchange="binance", symbol="BTC/USDT")
+    expected_last_row = {
+        "agg_trade_id": 3,
+        "timestamp_ms": 1_735_689_601_500,
+        "price": 102.0,
+        "quantity": 0.3,
+        "is_buyer_maker": False,
+    }
+    assert set(checkpoint) == {
+        "exchange",
+        "symbol",
+        "last_timestamp_ms",
+        "last_trade_id",
+        "observed_until_ms",
+        "updated_at_utc",
+        "batch_rows",
+        "last_row",
+        "last_row_sha256",
+    }
+    assert checkpoint["exchange"] == "binance"
+    assert checkpoint["symbol"] == "BTC/USDT"
+    assert checkpoint["last_timestamp_ms"] == expected_last_row["timestamp_ms"]
+    assert checkpoint["last_trade_id"] == expected_last_row["agg_trade_id"]
+    assert checkpoint["observed_until_ms"] >= checkpoint["last_timestamp_ms"]
+    assert checkpoint["batch_rows"] == 3
+    assert checkpoint["last_row"] == expected_last_row
+    assert (
+        checkpoint["last_row_sha256"]
+        == hashlib.sha256(
+            json.dumps(
+                expected_last_row,
+                sort_keys=True,
+                separators=(",", ":"),
+                allow_nan=False,
+            ).encode("utf-8")
+        ).hexdigest()
+    )
 
 
 def test_refresh_symbol_raw_first_ohlcv_repairs_raw_ahead_of_ohlcv_gap(

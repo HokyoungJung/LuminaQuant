@@ -316,7 +316,7 @@ def test_allocate_quality_gated_handles_none_and_empty_gracefully(
 # (d) Byte-golden manifest serialization.
 # ---------------------------------------------------------------------------
 
-_GOLDEN_MANIFEST_SHA256 = "27438660c60015b03760e4e3a6998eab2262f181612284d468acd29f2b8785ee"
+_GOLDEN_MANIFEST_SHA256 = "b50db777149a7c4a5c3bba53f698ac330a8ce1998ab20674f04f69a59d2739b9"
 
 
 def test_manifest_serialization_matches_pinned_byte_golden() -> None:
@@ -354,4 +354,8 @@ def test_manifest_serialization_matches_pinned_byte_golden() -> None:
     )
     serialized = json.dumps(manifest, sort_keys=True)
 
+    assert all(
+        child["lagged_completed_shadow_optimizer_provenance"] is False
+        for child in manifest["children"]
+    )
     assert hashlib.sha256(serialized.encode("utf-8")).hexdigest() == _GOLDEN_MANIFEST_SHA256

@@ -1,9 +1,32 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from datetime import UTC, datetime
 
 from lumina_quant.storage.parquet import ParquetMarketDataRepository
 from lumina_quant.services.materialize_from_raw import materialize_raw_aggtrades
+
+
+def _checkpoint_payload(row, *, observed_until_ms):
+    return {
+        "exchange": "binance",
+        "symbol": "BTC/USDT",
+        "last_timestamp_ms": row["timestamp_ms"],
+        "last_trade_id": row["agg_trade_id"],
+        "observed_until_ms": observed_until_ms,
+        "updated_at_utc": "2025-01-01T00:00:00+00:00",
+        "batch_rows": 1,
+        "last_row": row,
+        "last_row_sha256": hashlib.sha256(
+            json.dumps(
+                row,
+                sort_keys=True,
+                separators=(",", ":"),
+                allow_nan=False,
+            ).encode("utf-8")
+        ).hexdigest(),
+    }
 
 
 def test_materialize_from_raw_produces_deterministic_committed_manifest(tmp_path):
@@ -36,10 +59,20 @@ def test_materialize_from_raw_produces_deterministic_committed_manifest(tmp_path
         ],
     )
 
+    checkpoint_row = {
+        "agg_trade_id": 2,
+        "timestamp_ms": 1_700_000_000_500,
+        "price": 101.0,
+        "quantity": 0.2,
+        "is_buyer_maker": True,
+    }
     repo.write_raw_checkpoint(
         exchange="binance",
         symbol="BTC/USDT",
-        payload={"observed_until_ms": 1_700_000_000_999, "last_timestamp_ms": 1_700_000_000_500},
+        payload=_checkpoint_payload(
+            checkpoint_row,
+            observed_until_ms=1_700_000_000_999,
+        ),
     )
 
     first = materialize_raw_aggtrades(
@@ -71,7 +104,7 @@ def test_materialize_from_raw_produces_deterministic_committed_manifest(tmp_path
     assert loaded.height >= 1
 
 
-def test_materialize_explicit_historical_range_ignores_stale_older_checkpoint(tmp_path):
+def test_materialize_explicit_historical_range_uses_bound_checkpoint(tmp_path):
     repo = ParquetMarketDataRepository(str(tmp_path))
     start_ms = int(datetime(2026, 3, 19, tzinfo=UTC).timestamp() * 1000)
     repo.append_raw_aggtrades(
@@ -94,13 +127,20 @@ def test_materialize_explicit_historical_range_ignores_stale_older_checkpoint(tm
             },
         ],
     )
+    checkpoint_row = {
+        "agg_trade_id": 11,
+        "timestamp_ms": start_ms + 1_000,
+        "price": 101.0,
+        "quantity": 0.2,
+        "is_buyer_maker": True,
+    }
     repo.write_raw_checkpoint(
         exchange="binance",
         symbol="BTC/USDT",
-        payload={
-            "observed_until_ms": int(datetime(2026, 3, 18, 23, 59, tzinfo=UTC).timestamp() * 1000),
-            "last_timestamp_ms": int(datetime(2026, 3, 18, 23, 59, tzinfo=UTC).timestamp() * 1000),
-        },
+        payload=_checkpoint_payload(
+            checkpoint_row,
+            observed_until_ms=start_ms + 1_000,
+        ),
     )
 
     commits = materialize_raw_aggtrades(
