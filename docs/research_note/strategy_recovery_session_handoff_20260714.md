@@ -4,7 +4,7 @@
 
 - Repository: `/home/hoky/Quants-agent/LuminaQuant`; branch: `recovery/strategy-plan-20260714`.
 - Implementation checkpoint: `b349cb57596a44d9e7e4a68519d0ddb586f97dc3`; it is incomplete.
-- Handoff-content commit: `__HANDOFF_CONTENT_COMMIT__` (the first commit containing this handoff must descend from that checkpoint).
+- Handoff-content commit: `6b1ce4cb2a2092c4d135023055f8c08afeb87491` (the first commit containing this handoff must descend from that checkpoint).
 - Authoritative Ultragoal session: `019f603a-0e73-7000-88a7-c94f42950c09`; durable active goal: **G058**. G056, G036, and G037 are blocked.
 - Portable bootstrap: this file, `strategy_recovery_resume_state_20260714.json`, and `strategy_recovery_new_session_prompt_20260714.md`. The canonical same-machine state is `.gjc`; `ledger.jsonl` is its audit trail.
 
@@ -12,7 +12,7 @@ Stable aggregate objective:
 
 > Complete the durable ultragoal plan in `.gjc/ultragoal/goals.json`, including later accepted/appended stories, under the original brief constraints; use `.gjc/ultragoal/ledger.jsonl` as the audit trail.
 
-The durable handoff annotation is next; pause the inline goal only after that annotation. No completion claim is authorized. Explicitly forbid `create-goals` and `complete-goals`.
+The durable handoff annotation immediately precedes the latest event and binds implementation `b349cb57596a44d9e7e4a68519d0ddb586f97dc3` and handoff content `6b1ce4cb2a2092c4d135023055f8c08afeb87491`. The inline aggregate goal is **paused** for the user-owned new-session transition; durable G058 remains active and incomplete. No completion claim is authorized. Explicitly forbid `create-goals` and `complete-goals`.
 
 ## Durable seals and stop state
 
@@ -20,9 +20,9 @@ The durable handoff annotation is next; pause the inline goal only after that an
 |---|---|---:|---:|
 | `brief.md` | `faf6f83679e7ce93a8950af4df350fc4a92557d8eaaa40ea17c9c8b918c04e57` | 4836 | 22 |
 | `goals.json` | `a0fb91089f27262196db7314257019c2edebee14e2a0a82000d67c1f35e6046a` | 137951 | 1322 |
-| `ledger.jsonl` | `8cf64435db08254e4f99afcefa7902b668f7626d89ca1bb19f36c48e3d1e2c5a` | 319528 | 350 |
+| `ledger.jsonl` | `32357a36e0d8388121059b7dcf8e86f2b4908e1f44788cf46b5dc6eeac62fe85` | 321210 | 352 |
 
-Latest pre-stop event is `goal_checkpointed` G058, `78f41109-94ae-436a-9723-5bc9089ce446`, at `2026-07-20T12:58:36.033Z`. Refresh the final ledger event and all durable-file hashes once more after the stop annotation and pause. All workers and monitors are terminal; no acquisition process runs. There is no eligible receipt, phase, prelock, historical, candidate, forward, order, or capital operation.
+Latest event is `blocker_classified` for G058, `9b3de1b5-4523-4bec-98fb-5eb670a5fee1`, classification `human_blocked`, at `2026-07-20T13:53:52.863Z`: the user ordered stop and only the user can open the new session. The durable handoff annotation immediately precedes this event and binds implementation `b349cb57596a44d9e7e4a68519d0ddb586f97dc3` and handoff content `6b1ce4cb2a2092c4d135023055f8c08afeb87491`. All workers and monitors are terminal; no acquisition process runs. There is no eligible receipt, phase, prelock, historical, candidate, forward, order, or capital operation.
 
 ## Preserved G056 v4 evidence — terminal and never reusable
 
@@ -48,7 +48,7 @@ Current verification passed: Ruff, pycompile, and git diff check; focused `185 p
 
 `27-G058AiSlopCleaner` is **BLOCKED only on the stale resume descriptor**. `29-G058ResumeDescriptorFix` corrected it, but the cleaner has not rerun. Its missing exact production-tuple test was advisory and remains unimplemented.
 
-Architect `28-G056TerminalVerifierReview` returned **BLOCK/REQUEST CHANGES** on the external terminal verifier. The files `/home/hoky/quants-recovery-runs/G056-full-acquisition-controller-20260719-v4/g056_boundary_primitives.py`, `g056_boundary_verifier.py`, and rejected `post_acquisition_gate.py` are not execution authority and must never run. Critical/high blockers: wrong topology (runbook has 14 fences and explicit no-execute language; verifier assumes 11/fences 4–11); no first-operation forbidden-root/role-disjointness proof; caller-self-authenticated authority/process receipts; assertion-only O_EXCL/non-TTY/at-most-one/publication/zero-order facts; shallow phase semantics; observability not sealed-payload bound; outcome/readback/seal disagreement allowed; and caller-self-bound manifest authority.
+Architect `28-G056TerminalVerifierReview` returned **BLOCK/REQUEST CHANGES** on the external terminal verifier. The files `/home/hoky/quants-recovery-runs/G056-full-acquisition-controller-20260719-v4/g056_boundary_primitives.py` (SHA-256 `575d96b9bbe25b6c3830bddc2760466af1c21754a9e81ead78542e9eb354c999`), `g056_boundary_verifier.py` (SHA-256 `940852718016cb3a477a7247126bfb756ab9e9ea1acb041f672cc49fb8aff8d1`), and rejected `post_acquisition_gate.py` (SHA-256 `4a2a90e0d7d20ac34fbb5394256b4fd5ca93f8594513c10a79f7f6274b0e3da5`) are not execution authority and must never run. Critical/high blockers: wrong topology (runbook has 14 fences and explicit no-execute language; verifier assumes 11/fences 4–11); no first-operation forbidden-root/role-disjointness proof; caller-self-authenticated authority/process receipts; assertion-only O_EXCL/non-TTY/at-most-one/publication/zero-order facts; shallow phase semantics; observability not sealed-payload bound; outcome/readback/seal disagreement allowed; and caller-self-bound manifest authority.
 
 ## Only future acquisition roots
 
