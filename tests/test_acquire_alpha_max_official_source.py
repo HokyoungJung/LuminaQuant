@@ -45,6 +45,7 @@ def archive(
             extra.external_attr = (stat.S_IFREG | 0o600) << 16
             output.writestr(extra, "")
     return path
+
 def may_2023_archive(tmp_path: Path, rows: list[list[str]], name: str = "may-2023.zip") -> Path:
     path = tmp_path / name
     with zipfile.ZipFile(path, "w") as output:
@@ -60,9 +61,9 @@ def parquet_bytes(frame: subject.pl.DataFrame) -> bytes:
     return destination.getvalue()
 
 
-def order_scratch_entries(root: Path) -> list[Path]:
+def aggtrades_scratch_entries(root: Path) -> list[Path]:
     scratch = subject.scratch_path(root)
-    return sorted(scratch.glob(".order-*")) if scratch.exists() else []
+    return sorted(scratch.glob(".aggtrades-*")) if scratch.exists() else []
 MAY_2023_START_MS = 1_682_899_200_000
 
 
@@ -72,6 +73,7 @@ def allow_may_2023_order(
     identity = (subject.file_sha256(source), source.stat().st_size)
     monkeypatch.setitem(subject.CANONICAL_ORDER_ARCHIVES, ("BTCUSDT", "2023-05"), identity)
     return identity
+
 def authenticated_archive_receipt(source: Path) -> dict[str, int | str]:
     return {"sha256": subject.file_sha256(source), "byte_count": source.stat().st_size}
 
@@ -376,6 +378,17 @@ def test_allowlisted_may_2023_interleaving_matches_ordered_frame_and_parquet(
     ordered = may_2023_archive(tmp_path, ordered_rows, "ordered.zip")
     digest, byte_count = allow_may_2023_order(monkeypatch, interleaved)
     assert (digest, byte_count) == (subject.file_sha256(interleaved), interleaved.stat().st_size)
+    receipt = authenticated_archive_receipt(interleaved)
+    original_stable_file = subject.stable_file
+    archive_opens = 0
+
+    def count_archive_open(path: Path):
+        nonlocal archive_opens
+        if path == interleaved:
+            archive_opens += 1
+        return original_stable_file(path)
+
+    monkeypatch.setattr(subject, "stable_file", count_archive_open)
     frame, facts = subject.frame_from_archive(
         interleaved,
         "BTCUSDT",
@@ -384,7 +397,7 @@ def test_allowlisted_may_2023_interleaving_matches_ordered_frame_and_parquet(
         None,
         "2023-05",
         scratch,
-        authenticated_archive_receipt(interleaved),
+        receipt,
     )
     reference, reference_facts = subject.frame_from_archive(
         ordered,
@@ -398,7 +411,45 @@ def test_allowlisted_may_2023_interleaving_matches_ordered_frame_and_parquet(
     assert frame.equals(reference)
     assert parquet_bytes(frame) == parquet_bytes(reference)
     assert facts == reference_facts
-    assert order_scratch_entries(scratch) == []
+    assert aggtrades_scratch_entries(scratch) == []
+    assert archive_opens == 1
+
+def test_standard_archive_parsing_authenticates_and_parses_the_same_open_inode(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    replacement = archive(
+        tmp_path,
+        [["1", "99", "1", "1", "1", "1704067200000", "False"]],
+    ).rename(tmp_path / "replacement.zip")
+    source = archive(
+        tmp_path, [["1", "10", "1", "1", "1", "1704067200000", "False"]]
+    )
+    receipt = authenticated_archive_receipt(source)
+    backup = tmp_path / "authenticated.zip"
+    original_identity = subject.opened_file_identity
+
+    def replace_after_hash(handle: object) -> tuple[str, int]:
+        identity = original_identity(handle)
+        os.replace(source, backup)
+        os.replace(replacement, source)
+        return identity
+
+    monkeypatch.setattr(subject, "opened_file_identity", replace_after_hash)
+    frame, _ = subject.frame_from_archive(
+        source, "BTCUSDT", 1704067200000, 1704067201000, None, "2024-01", None, receipt
+    )
+    assert frame["open"].to_list() == [10.0]
+
+
+def test_invalid_supplied_archive_receipt_fails_closed(tmp_path: Path) -> None:
+    source = archive(
+        tmp_path, [["1", "1", "1", "1", "1", "1704067200000", "False"]]
+    )
+    with pytest.raises(subject.AcquisitionError, match=r"^archive_receipt_invalid$"):
+        subject.frame_from_archive(
+            source, "BTCUSDT", 1704067200000, 1704067201000, None, "2024-01", None,
+            {"sha256": "0" * 64, "byte_count": 0},
+        )
 
 
 def test_may_2023_interleaving_without_exact_identity_rejects_without_scratch(
@@ -426,6 +477,48 @@ def test_may_2023_interleaving_without_exact_identity_rejects_without_scratch(
             authenticated_archive_receipt(source),
         )
     assert _tree_snapshot(tmp_path) == before
+def test_allowlisted_identity_without_receipt_stays_strict_without_scratch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = may_2023_archive(
+        tmp_path,
+        [
+            ["2", "11", "1", "2", "2", str(MAY_2023_START_MS + 1), "FALSE"],
+            ["1", "10", "1", "1", "1", str(MAY_2023_START_MS), "FALSE"],
+        ],
+    )
+    allow_may_2023_order(monkeypatch, source)
+    before = _tree_snapshot(tmp_path)
+    with pytest.raises(subject.AcquisitionError, match=r"^archive_trade_order_invalid$"):
+        subject.frame_from_archive(
+            source,
+            "BTCUSDT",
+            MAY_2023_START_MS,
+            MAY_2023_START_MS + 1000,
+            None,
+            "2023-05",
+        )
+    assert _tree_snapshot(tmp_path) == before
+
+
+def test_allowlisted_identity_with_receipt_requires_scratch_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = may_2023_archive(
+        tmp_path,
+        [["1", "10", "1", "1", "1", str(MAY_2023_START_MS), "FALSE"]],
+    )
+    allow_may_2023_order(monkeypatch, source)
+    with pytest.raises(subject.AcquisitionError, match=r"^archive_order_scratch_root_required$"):
+        subject.frame_from_archive(
+            source,
+            "BTCUSDT",
+            MAY_2023_START_MS,
+            MAY_2023_START_MS + 1000,
+            None,
+            "2023-05",
+            archive_receipt=authenticated_archive_receipt(source),
+        )
 
 def test_ordered_archive_with_explicit_scratch_root_stays_on_zero_scratch_streaming_path(
     tmp_path: Path,
@@ -474,6 +567,7 @@ def test_allowlisted_may_2023_rejects_duplicate_ids_and_post_sort_timestamp_regr
 ) -> None:
     scratch = tmp_path / "scratch"
     scratch.mkdir()
+    subject.scratch_directory(scratch)
     source = may_2023_archive(tmp_path, rows)
     allow_may_2023_order(monkeypatch, source)
     before = _tree_snapshot(tmp_path)
@@ -512,7 +606,7 @@ def test_allowlisted_external_merge_uses_packed_bounded_chunks_and_fan_in(
         original_fsync(path)
         observed_chunk_sizes.extend(
             item.stat().st_size
-            for item in subject.scratch_path(scratch).glob(".order-*/chunk-*.bin")
+            for item in subject.scratch_path(scratch).glob(".aggtrades-chunk-*")
         )
 
     def observe_heapify(values: list[object]) -> None:
@@ -536,15 +630,18 @@ def test_allowlisted_external_merge_uses_packed_bounded_chunks_and_fan_in(
     assert max(observed_chunk_sizes) <= 2 * subject.ORDER_RECORD.size
     assert observed_fan_in and max(observed_fan_in) <= 2
     assert frame["open"].to_list() == [11.0]
-    assert order_scratch_entries(scratch) == []
+    assert aggtrades_scratch_entries(scratch) == []
 
 
-def test_canonical_merge_failure_and_stale_order_session_leave_no_owned_residue(
+def test_canonical_merge_failure_and_stale_direct_file_leave_no_owned_residue(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     scratch = tmp_path / "scratch"
     scratch.mkdir()
     owned_scratch = subject.scratch_directory(scratch)
+    stale = owned_scratch / ".aggtrades-crash.bin"
+    stale.write_bytes(b"stale")
+    stale.chmod(0o600)
     rows = [
         [str(index), "1", "1", str(index), str(index), str(MAY_2023_START_MS), "FALSE"]
         for index in (3, 2, 1)
@@ -553,16 +650,43 @@ def test_canonical_merge_failure_and_stale_order_session_leave_no_owned_residue(
     allow_may_2023_order(monkeypatch, source)
     monkeypatch.setattr(subject, "ORDER_CHUNK_RECORDS", 1)
     monkeypatch.setattr(subject, "ORDER_MERGE_FAN_IN", 2)
-    before = _tree_snapshot(tmp_path)
-    stale = owned_scratch / ".order-crash"
-    stale.mkdir(mode=0o700)
-    (stale / "chunk-00000000.bin").write_bytes(b"stale")
 
     def merge_failure(_heap: list[object]) -> object:
         raise OSError("injected merge failure")
 
     monkeypatch.setattr(subject.heapq, "heappop", merge_failure)
     with pytest.raises(subject.AcquisitionError, match=r"^archive_order_canonicalization_failed$"):
+        subject.frame_from_archive(
+            source, "BTCUSDT", MAY_2023_START_MS, MAY_2023_START_MS + 1000, None,
+            "2023-05", scratch, authenticated_archive_receipt(source),
+        )
+    assert aggtrades_scratch_entries(scratch) == []
+def test_canonical_primary_failure_keeps_cleanup_failure_note(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    scratch = tmp_path / "scratch"
+    scratch.mkdir()
+    source = may_2023_archive(
+        tmp_path,
+        [
+            [str(index), "1", "1", str(index), str(index), str(MAY_2023_START_MS), "FALSE"]
+            for index in (3, 2, 1)
+        ],
+    )
+    allow_may_2023_order(monkeypatch, source)
+    monkeypatch.setattr(subject, "ORDER_CHUNK_RECORDS", 1)
+    monkeypatch.setattr(subject, "ORDER_MERGE_FAN_IN", 2)
+    monkeypatch.setattr(
+        subject.heapq,
+        "heappop",
+        lambda _: (_ for _ in ()).throw(OSError("injected merge failure")),
+    )
+    monkeypatch.setattr(
+        subject,
+        "remove_aggtrades_file",
+        lambda *_: (_ for _ in ()).throw(OSError("injected cleanup failure")),
+    )
+    with pytest.raises(subject.AcquisitionError) as raised:
         subject.frame_from_archive(
             source,
             "BTCUSDT",
@@ -573,8 +697,96 @@ def test_canonical_merge_failure_and_stale_order_session_leave_no_owned_residue(
             scratch,
             authenticated_archive_receipt(source),
         )
-    assert order_scratch_entries(scratch) == []
-    assert _tree_snapshot(tmp_path) == before
+    assert str(raised.value) == "archive_order_canonicalization_failed"
+    assert any(
+        note.startswith("archive_order_cleanup_failed:")
+        for note in getattr(raised.value, "__notes__", ())
+    )
+
+def test_canonical_merge_removal_failure_is_retried_by_finalizer(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    scratch = tmp_path / "scratch"
+    scratch.mkdir()
+    source = may_2023_archive(
+        tmp_path,
+        [
+            [str(index), "1", "1", str(index), str(index), str(MAY_2023_START_MS), "FALSE"]
+            for index in (3, 2, 1)
+        ],
+    )
+    allow_may_2023_order(monkeypatch, source)
+    monkeypatch.setattr(subject, "ORDER_CHUNK_RECORDS", 1)
+    monkeypatch.setattr(subject, "ORDER_MERGE_FAN_IN", 2)
+    original_identity = subject.scratch_file_identity
+    original_remove = subject.remove_aggtrades_file
+    tracked: set[Path] = set()
+    attempts: dict[Path, int] = {}
+    failed = False
+
+    def track_identity(path: Path) -> tuple[int, int]:
+        identity = original_identity(path)
+        if path.name.startswith(".aggtrades-"):
+            tracked.add(path)
+        return identity
+
+    def fail_first_removal(
+        path: Path, identity: tuple[int, int] | None = None
+    ) -> None:
+        nonlocal failed
+        attempts[path] = attempts.get(path, 0) + 1
+        if not failed:
+            failed = True
+            raise OSError("injected removal failure")
+        original_remove(path, identity)
+
+    monkeypatch.setattr(subject, "scratch_file_identity", track_identity)
+    monkeypatch.setattr(subject, "remove_aggtrades_file", fail_first_removal)
+    with pytest.raises(subject.AcquisitionError, match=r"^archive_order_canonicalization_failed$"):
+        subject.frame_from_archive(
+            source, "BTCUSDT", MAY_2023_START_MS, MAY_2023_START_MS + 1000, None,
+            "2023-05", scratch, authenticated_archive_receipt(source),
+        )
+    assert failed
+    assert set(attempts) == tracked
+    assert max(attempts.values()) == 2
+    assert aggtrades_scratch_entries(scratch) == []
+
+
+def test_pre_sink_identity_failure_closes_descriptor_and_is_stale_cleaned(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    scratch = tmp_path / "scratch"
+    scratch.mkdir()
+    source = may_2023_archive(
+        tmp_path,
+        [["1", "10", "1", "1", "1", str(MAY_2023_START_MS), "FALSE"]],
+    )
+    allow_may_2023_order(monkeypatch, source)
+    original_identity = subject.scratch_file_identity
+
+    def pre_sink_identity(path: Path) -> tuple[int, int]:
+        if path.name.startswith(".aggtrades-chunk-"):
+            raise subject.AcquisitionError("injected_identity_failure")
+        return original_identity(path)
+
+    def descriptor_count() -> int:
+        return len(list(Path("/proc/self/fd").iterdir()))
+    before = descriptor_count()
+    monkeypatch.setattr(subject, "scratch_file_identity", pre_sink_identity)
+    with pytest.raises(subject.AcquisitionError, match=r"^injected_identity_failure$"):
+        subject.frame_from_archive(
+            source, "BTCUSDT", MAY_2023_START_MS, MAY_2023_START_MS + 1000, None,
+            "2023-05", scratch, authenticated_archive_receipt(source),
+        )
+    assert descriptor_count() == before
+    assert aggtrades_scratch_entries(scratch)
+    monkeypatch.setattr(subject, "scratch_file_identity", original_identity)
+    subject.frame_from_archive(
+        source, "BTCUSDT", MAY_2023_START_MS, MAY_2023_START_MS + 1000, None,
+        "2023-05", scratch, authenticated_archive_receipt(source),
+    )
+    assert aggtrades_scratch_entries(scratch) == []
 
 
 def test_cleanup_failure_is_recovered_before_the_next_authenticated_canonicalization(
@@ -590,40 +802,46 @@ def test_cleanup_failure_is_recovered_before_the_next_authenticated_canonicaliza
         ],
     )
     allow_may_2023_order(monkeypatch, source)
-    original_remove = subject.remove_order_session
+    original_remove = subject.remove_aggtrades_file
     monkeypatch.setattr(
-        subject, "remove_order_session", lambda _session: (_ for _ in ()).throw(OSError("cleanup"))
+        subject, "remove_aggtrades_file", lambda *_: (_ for _ in ()).throw(OSError("cleanup"))
     )
     with pytest.raises(subject.AcquisitionError, match=r"^archive_order_canonicalization_failed$"):
         subject.frame_from_archive(
-            source,
-            "BTCUSDT",
-            MAY_2023_START_MS,
-            MAY_2023_START_MS + 1000,
-            None,
-            "2023-05",
-            scratch,
-            authenticated_archive_receipt(source),
+            source, "BTCUSDT", MAY_2023_START_MS, MAY_2023_START_MS + 1000, None,
+            "2023-05", scratch, authenticated_archive_receipt(source),
         )
-    assert order_scratch_entries(scratch)
-    monkeypatch.setattr(subject, "remove_order_session", original_remove)
+    assert aggtrades_scratch_entries(scratch)
+    monkeypatch.setattr(subject, "remove_aggtrades_file", original_remove)
     subject.frame_from_archive(
-        source,
-        "BTCUSDT",
-        MAY_2023_START_MS,
-        MAY_2023_START_MS + 1000,
-        None,
-        "2023-05",
-        scratch,
-        authenticated_archive_receipt(source),
+        source, "BTCUSDT", MAY_2023_START_MS, MAY_2023_START_MS + 1000, None,
+        "2023-05", scratch, authenticated_archive_receipt(source),
     )
-    assert order_scratch_entries(scratch) == []
-def test_unsafe_order_scratch_entry_rejects_without_mutation(tmp_path: Path) -> None:
+    assert aggtrades_scratch_entries(scratch) == []
+
+@pytest.mark.parametrize(
+    "kind",
+    ("directory", "wrong_mode", "special_mode", "hardlink"),
+)
+def test_unsafe_aggtrades_scratch_entry_rejects_without_mutation(
+    tmp_path: Path, kind: str
+) -> None:
     scratch = tmp_path / "scratch"
     scratch.mkdir()
     owned_scratch = subject.scratch_directory(scratch)
-    unsafe = owned_scratch / ".order-foreign"
-    unsafe.mkdir(mode=0o755)
+    unsafe = owned_scratch / ".aggtrades-foreign"
+    if kind == "directory":
+        unsafe.mkdir(mode=0o700)
+    else:
+        unsafe.write_bytes(b"unsafe")
+        mode = 0o600
+        if kind == "wrong_mode":
+            mode = 0o644
+        elif kind == "special_mode":
+            mode = 0o4600
+        unsafe.chmod(mode)
+        if kind == "hardlink":
+            os.link(unsafe, owned_scratch / ".acquire-linked")
     before = _lstat_tree_snapshot(tmp_path)
     with pytest.raises(subject.AcquisitionError, match=r"^unsafe_scratch_entry$"):
         subject.scratch_directory(scratch)
@@ -686,7 +904,7 @@ def test_allowlisted_branch_preserves_parse_precedence_and_cleans_order_scratch(
             scratch,
             authenticated_archive_receipt(source),
         )
-    assert order_scratch_entries(scratch) == []
+    assert aggtrades_scratch_entries(scratch) == []
     assert _tree_snapshot(tmp_path) == before
 def test_validate_complete_propagates_authenticated_archive_identity(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -706,7 +924,8 @@ def test_validate_complete_propagates_authenticated_archive_identity(
     subject.validate_complete(output, [contract], report / "provenance", report)
     archive_path = report / "provenance/archives/BTCUSDT/BTCUSDT-aggTrades-2024-01.zip"
     assert len(calls) == 1
-    assert calls[0][7] == authenticated_archive_receipt(archive_path)
+    assert calls[0][7] == subject.read_json(archive_path.with_suffix(".zip.receipt.json"))
+
 @pytest.mark.parametrize(
     "member,extra_members,mode",
     [
@@ -1545,6 +1764,7 @@ def test_acquire_archive_resets_carry_across_selected_month_gap(
         carry: float | None,
         __: str,
         ___: Path | None,
+        ____: dict[str, object] | None,
     ):
         carries.append(carry)
         return (

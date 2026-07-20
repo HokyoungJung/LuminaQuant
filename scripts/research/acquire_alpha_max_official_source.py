@@ -64,7 +64,11 @@ CANONICAL_ORDER_ARCHIVES = {
     ("BTCUSDT", "2023-05"): (
         "301acec76a7644aa73180fd7f8d913ce4eecfa7e7bca5057f1782f96d91b9ef0",
         468405603,
-    )
+    ),
+    ("BTCUSDT", "2023-10"): (
+        "d3fe5fa477d68d6730248d634e1bd37ae4838839d78709ef355d9d9c6749fea4",
+        492720741,
+    ),
 }
 ORDER_RECORD = struct.Struct(">qqdd")
 ORDER_CHUNK_RECORDS = 250_000
@@ -171,6 +175,30 @@ def file_sha256(path: Path) -> str:
             digest.update(block)
     return digest.hexdigest()
 
+def opened_file_identity(source: io.BufferedReader) -> tuple[str, int]:
+    digest = hashlib.sha256()
+    byte_count = 0
+    source.seek(0)
+    for block in iter(lambda: source.read(DOWNLOAD_CHUNK), b""):
+        digest.update(block)
+        byte_count += len(block)
+    source.seek(0)
+    return digest.hexdigest(), byte_count
+
+
+def authenticated_archive_identity(
+    source: io.BufferedReader, receipt: dict[str, Any] | None
+) -> tuple[str, int]:
+    identity = opened_file_identity(source)
+    if receipt is not None and (
+        not isinstance(receipt, dict)
+        or receipt.get("sha256") != identity[0]
+        or receipt.get("byte_count") != identity[1]
+    ):
+        raise AcquisitionError("archive_receipt_invalid")
+    return identity
+
+
 
 def safe_file_bytes(path: Path) -> bytes:
     """Read one regular, singly-linked file without following any component."""
@@ -211,22 +239,31 @@ def mkdir_durable(path: Path) -> None:
     path.mkdir(mode=0o700)
     fsync_directory(path.parent)
 
-def remove_order_session(session: Path) -> None:
-    item = session.lstat()
+def scratch_file_identity(path: Path) -> tuple[int, int]:
+    item = path.lstat()
     if (
-        not stat.S_ISDIR(item.st_mode)
+        not stat.S_ISREG(item.st_mode)
         or item.st_uid != os.getuid()
-        or item.st_mode & 0o777 != 0o700
+        or stat.S_IMODE(item.st_mode) != 0o600
+        or item.st_nlink != 1
     ):
         raise AcquisitionError("unsafe_scratch_entry")
-    for child in session.iterdir():
-        child_item = child.lstat()
-        if not stat.S_ISREG(child_item.st_mode) or child_item.st_uid != os.getuid():
-            raise AcquisitionError("unsafe_scratch_entry")
-        child.unlink()
-    fsync_directory(session)
-    session.rmdir()
-    fsync_directory(session.parent)
+    return item.st_dev, item.st_ino
+
+
+def remove_aggtrades_file(path: Path, identity: tuple[int, int] | None = None) -> None:
+    expected = identity or scratch_file_identity(path)
+    item = path.lstat()
+    if (
+        not stat.S_ISREG(item.st_mode)
+        or item.st_uid != os.getuid()
+        or stat.S_IMODE(item.st_mode) != 0o600
+        or item.st_nlink != 1
+        or (item.st_dev, item.st_ino) != expected
+    ):
+        raise AcquisitionError("unsafe_scratch_entry")
+    path.unlink()
+    fsync_directory(path.parent)
 
 
 
@@ -251,17 +288,24 @@ def scratch_directory(root: Path) -> Path:
         or item.st_dev != root.parent.stat().st_dev
     ):
         raise AcquisitionError("unsafe_scratch_directory")
-    for candidate in scratch.iterdir():
+    candidates = list(scratch.iterdir())
+    stale_aggtrades: list[tuple[Path, tuple[int, int]]] = []
+    for candidate in candidates:
         item = candidate.lstat()
-        if candidate.name.startswith(".order-") and stat.S_ISDIR(item.st_mode):
-            remove_order_session(candidate)
+        if candidate.name.startswith(".aggtrades-"):
+            stale_aggtrades.append((candidate, scratch_file_identity(candidate)))
             continue
         if not candidate.name.startswith(
-            (".acquire-", ".aggtrades-", ".derive-", ".partial-", ".recovery-", ".order-")
+            (".acquire-", ".derive-", ".partial-", ".recovery-")
         ):
             raise AcquisitionError("unsafe_scratch_entry")
         if not stat.S_ISREG(item.st_mode) or item.st_uid != os.getuid():
             raise AcquisitionError("unsafe_scratch_entry")
+    for candidate, identity in stale_aggtrades:
+        remove_aggtrades_file(candidate, identity)
+    for candidate in candidates:
+        if candidate.name.startswith(".aggtrades-"):
+            continue
         candidate.unlink()
         fsync_directory(scratch)
     return scratch
@@ -524,207 +568,12 @@ def parse_checksum(data: bytes, filename: str) -> str:
         raise AcquisitionError("archive_checksum_filename_invalid")
     return fields[0].lower()
 
-def canonical_frame_from_archive(
-    path: Path, symbol: str, start_ms: int, end_ms: int, carry: float | None,
-    month: str, expected_member: str, nominal_start: int, nominal_end: int, scratch_root: Path,
-) -> tuple[pl.DataFrame, dict[str, Any]]:
-    fd, name = scratch_file(scratch_root, ".order-")
-    os.close(fd)
-    session = Path(name)
-    session.unlink()
-    os.mkdir(session, 0o700)
-    fsync_directory(session.parent)
-    chunks: list[Path] = []
-    records: list[bytes] = []
-    count = 0
-
-    def flush() -> None:
-        nonlocal records
-        if not records:
-            return
-        records.sort(key=lambda value: ORDER_RECORD.unpack(value)[0])
-        target = session / f"chunk-{len(chunks):08d}.bin"
-        with os.fdopen(os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "wb") as sink:
-            sink.write(b"".join(records))
-            sink.flush()
-            os.fsync(sink.fileno())
-        fsync_directory(session)
-        chunks.append(target)
-        records = []
-
-    def record(source: io.BufferedReader) -> tuple[int, int, float, float] | None:
-        data = source.read(ORDER_RECORD.size)
-        if not data:
-            return None
-        if len(data) != ORDER_RECORD.size:
-            raise AcquisitionError("archive_order_canonicalization_failed")
-        return ORDER_RECORD.unpack(data)
-
+def archive_trades(
+    archive_source: io.BufferedReader, expected_member: str, nominal_start: int, nominal_end: int
+) -> Iterable[tuple[int, int, float, float]]:
+    """Lazily validate and yield archive trades in archive order."""
     try:
-        try:
-            with stable_file(path) as archive_source, zipfile.ZipFile(archive_source) as archive:
-                members = archive.infolist()
-                if len(members) != 1:
-                    raise AcquisitionError("archive_zip_schema_invalid")
-                member = members[0]
-                if member.filename != expected_member or member.is_dir() or not stat.S_ISREG(member.external_attr >> 16):
-                    raise AcquisitionError("archive_zip_schema_invalid")
-                with archive.open(member) as source:
-                    reader = csv.reader(io.TextIOWrapper(source, encoding="utf-8", newline=""), strict=True)
-                    try:
-                        first_row = next(reader)
-                    except StopIteration:
-                        first_row = []
-                    header = ["agg_trade_id", "price", "quantity", "first_trade_id", "last_trade_id", "transact_time", "is_buyer_maker"]
-                    if first_row == header:
-                        rows = reader
-                    else:
-                        if first_row and any(x.lower() in {"id", "price", "time"} or "id" in x.lower() or "price" in x.lower() or "time" in x.lower() for x in first_row):
-                            raise AcquisitionError("archive_csv_header_invalid")
-                        rows = itertools.chain((first_row,), reader) if first_row else reader
-                    for fields in rows:
-                        if len(fields) != 7 or any(x == "" for x in fields):
-                            raise AcquisitionError("archive_csv_null_or_schema_invalid")
-                        if (not fields[0].isascii() or not fields[0].isdigit() or not fields[3].isascii() or not fields[3].isdigit() or not fields[4].isascii() or not fields[4].isdigit() or not fields[5].isascii() or not fields[5].isdigit() or POSITIVE_DECIMAL.fullmatch(fields[1]) is None or POSITIVE_DECIMAL.fullmatch(fields[2]) is None or fields[6].lower() not in {"true", "false"}):
-                            raise AcquisitionError("archive_trade_value_or_month_bounds_invalid")
-                        try:
-                            aggregate_id, first_id, last_id, timestamp = int(fields[0]), int(fields[3]), int(fields[4]), int(fields[5])
-                            price, quantity = float(fields[1]), float(fields[2])
-                        except ValueError as exc:
-                            raise AcquisitionError("archive_csv_null_or_schema_invalid") from exc
-                        if (aggregate_id < 0 or first_id < 0 or last_id < first_id or timestamp < nominal_start or timestamp >= nominal_end or not math.isfinite(price) or price <= 0 or not math.isfinite(quantity) or quantity < 0):
-                            raise AcquisitionError("archive_trade_value_or_month_bounds_invalid")
-                        records.append(ORDER_RECORD.pack(aggregate_id, timestamp, price, quantity))
-                        count += 1
-                        if len(records) == ORDER_CHUNK_RECORDS:
-                            flush()
-        except csv.Error as exc:
-            raise AcquisitionError("archive_csv_schema_invalid") from exc
-        except (zipfile.BadZipFile, UnicodeError) as exc:
-            raise AcquisitionError("archive_zip_or_csv_invalid") from exc
-        flush()
-        if not count:
-            raise AcquisitionError("archive_trade_empty")
-        generation = 0
-        while len(chunks) > 1:
-            merged: list[Path] = []
-            for offset in range(0, len(chunks), ORDER_MERGE_FAN_IN):
-                group = chunks[offset : offset + ORDER_MERGE_FAN_IN]
-                target = session / f"merge-{generation:04d}-{len(merged):08d}.bin"
-                with ExitStack() as stack:
-                    sources = [stack.enter_context(open(item, "rb")) for item in group]
-                    heap = [(value[0], index, value) for index, source in enumerate(sources) if (value := record(source)) is not None]
-                    heapq.heapify(heap)
-                    with os.fdopen(os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "wb") as sink:
-                        while heap:
-                            _, index, value = heapq.heappop(heap)
-                            sink.write(ORDER_RECORD.pack(*value))
-                            if (following := record(sources[index])) is not None:
-                                heapq.heappush(heap, (following[0], index, following))
-                        sink.flush()
-                        os.fsync(sink.fileno())
-                for item in group:
-                    item.unlink()
-                fsync_directory(session)
-                merged.append(target)
-            chunks, generation = merged, generation + 1
-        size = (end_ms - start_ms) // 1000
-        op, hi, lo, cl = (array("d", [math.nan]) * size for _ in range(4))
-        vol = array("d", [0.0]) * size
-        first = last = None
-        last_aggregate = last_timestamp = None
-        with open(chunks[0], "rb") as source:
-            while (value := record(source)) is not None:
-                aggregate_id, timestamp, price, quantity = value
-                if (last_aggregate is not None and aggregate_id <= last_aggregate) or (last_timestamp is not None and timestamp < last_timestamp):
-                    raise AcquisitionError("archive_trade_order_invalid")
-                last_aggregate, last_timestamp = aggregate_id, timestamp
-                first = first or (timestamp, aggregate_id)
-                last = (timestamp, aggregate_id)
-                if timestamp < start_ms:
-                    carry = price
-                elif timestamp < end_ms:
-                    second = (timestamp - start_ms) // 1000
-                    if math.isnan(op[second]):
-                        op[second] = hi[second] = lo[second] = price
-                    else:
-                        hi[second], lo[second] = max(hi[second], price), min(lo[second], price)
-                    cl[second], vol[second] = price, vol[second] + quantity
-        if math.isnan(op[0]) and carry is None:
-            raise AcquisitionError("raw_first_owned_second_has_no_official_close")
-        close = pl.col("close").fill_nan(None).forward_fill()
-        if carry is not None:
-            close = close.fill_null(carry)
-        frame = pl.DataFrame({"datetime": pl.Series("datetime", range(start_ms, end_ms, 1000), dtype=pl.Int64).cast(pl.Datetime("ms")), "open": pl.Series("open", op, dtype=pl.Float64), "high": pl.Series("high", hi, dtype=pl.Float64), "low": pl.Series("low", lo, dtype=pl.Float64), "close": pl.Series("close", cl, dtype=pl.Float64), "volume": pl.Series("volume", vol, dtype=pl.Float64)}).with_columns(close.alias("close")).with_columns(*[pl.col(x).fill_nan(None).fill_null(pl.col("close")).alias(x) for x in ("open", "high", "low")])
-        return frame, {"trade_count": count, "first_trade": first, "last_trade": last, "carry_close": frame["close"][-1]}
-    except (OSError, struct.error) as exc:
-        raise AcquisitionError("archive_order_canonicalization_failed") from exc
-    finally:
-        try:
-            remove_order_session(session)
-        except (OSError, AcquisitionError):
-            if sys.exc_info()[0] is None:
-                raise AcquisitionError("archive_order_canonicalization_failed")
-
-
-
-def frame_from_archive(
-    path: Path,
-    symbol: str,
-    start_ms: int,
-    end_ms: int,
-    carry: float | None,
-    month: str,
-    scratch_root: Path | None = None,
-    archive_receipt: dict[str, Any] | None = None,
-) -> tuple[pl.DataFrame, dict[str, Any]]:
-    if start_ms % 1000 or end_ms % 1000 or end_ms <= start_ms:
-        raise AcquisitionError("raw_owned_bounds_invalid")
-    if not isinstance(symbol, str) or not symbol:
-        raise AcquisitionError("archive_symbol_invalid")
-    if not isinstance(month, str):
-        raise AcquisitionError("archive_month_invalid")
-    try:
-        parsed_month = datetime.strptime(month, "%Y-%m")
-    except ValueError as exc:
-        raise AcquisitionError("archive_month_invalid") from exc
-    if parsed_month.strftime("%Y-%m") != month:
-        raise AcquisitionError("archive_month_invalid")
-    nominal_start = int(parsed_month.replace(tzinfo=UTC).timestamp() * 1000)
-    expected_member = f"{symbol}-aggTrades-{month}.csv"
-    nominal_end = month_bounds(datetime.fromtimestamp(nominal_start / 1000, UTC))[1]
-    allowlisted = CANONICAL_ORDER_ARCHIVES.get((symbol, month))
-    if allowlisted is not None:
-        digest, byte_count = allowlisted
-        actual = stable_file_stat(path)
-        actual_digest = file_sha256(path)
-        if (
-            actual.st_size == byte_count
-            and actual_digest == digest
-            and isinstance(archive_receipt, dict)
-            and archive_receipt.get("sha256") == digest
-            and archive_receipt.get("byte_count") == byte_count
-            and stable_file_stat(path).st_size == byte_count
-        ):
-            if scratch_root is None:
-                raise AcquisitionError("archive_order_scratch_root_required")
-            return canonical_frame_from_archive(
-                path, symbol, start_ms, end_ms, carry, month, expected_member,
-                nominal_start, nominal_end, scratch_root,
-            )
-    size = (end_ms - start_ms) // 1000
-    op = array("d", [math.nan]) * size
-    hi = array("d", [math.nan]) * size
-    lo = array("d", [math.nan]) * size
-    cl = array("d", [math.nan]) * size
-    vol = array("d", [0.0]) * size
-    last_aggregate: int | None = None
-    last_timestamp: int | None = None
-    first = None
-    last = None
-    count = 0
-    try:
-        with stable_file(path) as archive_source, zipfile.ZipFile(archive_source) as archive:
+        with zipfile.ZipFile(archive_source) as archive:
             members = archive.infolist()
             if len(members) != 1:
                 raise AcquisitionError("archive_zip_schema_invalid")
@@ -734,14 +583,13 @@ def frame_from_archive(
                 raise AcquisitionError("archive_zip_schema_invalid")
             with archive.open(member) as source:
                 reader = csv.reader(
-                    io.TextIOWrapper(source, encoding="utf-8", newline=""),
-                    strict=True,
+                    io.TextIOWrapper(source, encoding="utf-8", newline=""), strict=True
                 )
                 try:
                     first_row = next(reader)
                 except StopIteration:
                     first_row = []
-                header_row = [
+                header = [
                     "agg_trade_id",
                     "price",
                     "quantity",
@@ -750,29 +598,20 @@ def frame_from_archive(
                     "transact_time",
                     "is_buyer_maker",
                 ]
-                if first_row == header_row:
+                if first_row == header:
                     rows = reader
                 else:
                     if first_row and any(
-                        x.lower() in {"id", "price", "time"}
-                        or "id" in x.lower()
-                        or "price" in x.lower()
-                        or "time" in x.lower()
-                        for x in first_row
+                        value.lower() in {"id", "price", "time"}
+                        or "id" in value.lower()
+                        or "price" in value.lower()
+                        or "time" in value.lower()
+                        for value in first_row
                     ):
                         raise AcquisitionError("archive_csv_header_invalid")
                     rows = itertools.chain((first_row,), reader) if first_row else reader
                 for fields in rows:
-                    if (
-                        len(fields) != 7
-                        or fields[0] == ""
-                        or fields[1] == ""
-                        or fields[2] == ""
-                        or fields[3] == ""
-                        or fields[4] == ""
-                        or fields[5] == ""
-                        or fields[6] == ""
-                    ):
+                    if len(fields) != 7 or any(value == "" for value in fields):
                         raise AcquisitionError("archive_csv_null_or_schema_invalid")
                     if (
                         not fields[0].isascii()
@@ -785,10 +624,8 @@ def frame_from_archive(
                         or not fields[5].isdigit()
                         or POSITIVE_DECIMAL.fullmatch(fields[1]) is None
                         or POSITIVE_DECIMAL.fullmatch(fields[2]) is None
+                        or fields[6].lower() not in {"true", "false"}
                     ):
-                        raise AcquisitionError("archive_trade_value_or_month_bounds_invalid")
-                    buyer = fields[6].lower()
-                    if buyer not in {"true", "false"}:
                         raise AcquisitionError("archive_trade_value_or_month_bounds_invalid")
                     try:
                         aggregate_id = int(fields[0])
@@ -811,29 +648,44 @@ def frame_from_archive(
                         or quantity < 0
                     ):
                         raise AcquisitionError("archive_trade_value_or_month_bounds_invalid")
-                    if (last_aggregate is not None and aggregate_id <= last_aggregate) or (
-                        last_timestamp is not None and timestamp < last_timestamp
-                    ):
-                        raise AcquisitionError("archive_trade_order_invalid")
-                    last_aggregate, last_timestamp = aggregate_id, timestamp
-                    first = first or (timestamp, aggregate_id)
-                    last = (timestamp, aggregate_id)
-                    count += 1
-                    if timestamp < start_ms:
-                        carry = price
-                    elif timestamp < end_ms:
-                        second = (timestamp - start_ms) // 1000
-                        if math.isnan(op[second]):
-                            op[second] = hi[second] = lo[second] = price
-                        else:
-                            hi[second] = max(hi[second], price)
-                            lo[second] = min(lo[second], price)
-                        cl[second] = price
-                        vol[second] += quantity
+                    yield aggregate_id, timestamp, price, quantity
     except csv.Error as exc:
         raise AcquisitionError("archive_csv_schema_invalid") from exc
     except (zipfile.BadZipFile, UnicodeError) as exc:
         raise AcquisitionError("archive_zip_or_csv_invalid") from exc
+
+
+def replay_archive_trades(
+    trades: Iterable[tuple[int, int, float, float]],
+    start_ms: int,
+    end_ms: int,
+    carry: float | None,
+) -> tuple[pl.DataFrame, dict[str, Any]]:
+    """Replay strictly ordered trades into the owned OHLCV seconds."""
+    size = (end_ms - start_ms) // 1000
+    op, hi, lo, cl = (array("d", [math.nan]) * size for _ in range(4))
+    vol = array("d", [0.0]) * size
+    first = last = None
+    last_aggregate = last_timestamp = None
+    count = 0
+    for aggregate_id, timestamp, price, quantity in trades:
+        if (last_aggregate is not None and aggregate_id <= last_aggregate) or (
+            last_timestamp is not None and timestamp < last_timestamp
+        ):
+            raise AcquisitionError("archive_trade_order_invalid")
+        last_aggregate, last_timestamp = aggregate_id, timestamp
+        first = first or (timestamp, aggregate_id)
+        last = (timestamp, aggregate_id)
+        count += 1
+        if timestamp < start_ms:
+            carry = price
+        elif timestamp < end_ms:
+            second = (timestamp - start_ms) // 1000
+            if math.isnan(op[second]):
+                op[second] = hi[second] = lo[second] = price
+            else:
+                hi[second], lo[second] = max(hi[second], price), min(lo[second], price)
+            cl[second], vol[second] = price, vol[second] + quantity
     if not count:
         raise AcquisitionError("archive_trade_empty")
     if math.isnan(op[0]) and carry is None:
@@ -862,14 +714,173 @@ def frame_from_archive(
             ]
         )
     )
-    carry = frame["close"][-1]
     return frame, {
         "trade_count": count,
         "first_trade": first,
         "last_trade": last,
-        "carry_close": carry,
+        "carry_close": frame["close"][-1],
     }
 
+
+def canonical_frame_from_archive(
+    archive_source: io.BufferedReader,
+    start_ms: int,
+    end_ms: int,
+    carry: float | None,
+    expected_member: str,
+    nominal_start: int,
+    nominal_end: int,
+    scratch_root: Path,
+) -> tuple[pl.DataFrame, dict[str, Any]]:
+    scratch = scratch_directory(scratch_root)
+    chunks: list[Path] = []
+    identities: dict[Path, tuple[int, int]] = {}
+    records: list[bytes] = []
+
+    def flush() -> None:
+        nonlocal records
+        if not records:
+            return
+        records.sort(key=lambda value: ORDER_RECORD.unpack(value)[0])
+        fd, name = tempfile.mkstemp(prefix=".aggtrades-chunk-", suffix=".bin", dir=scratch)
+        target = Path(name)
+        with os.fdopen(fd, "wb") as sink:
+            identities[target] = scratch_file_identity(target)
+            sink.write(b"".join(records))
+            sink.flush()
+            os.fsync(sink.fileno())
+        fsync_directory(scratch)
+        chunks.append(target)
+        records = []
+
+    def record(source: io.BufferedReader) -> tuple[int, int, float, float] | None:
+        data = source.read(ORDER_RECORD.size)
+        if not data:
+            return None
+        if len(data) != ORDER_RECORD.size:
+            raise AcquisitionError("archive_order_canonicalization_failed")
+        return ORDER_RECORD.unpack(data)
+
+    try:
+        for aggregate_id, timestamp, price, quantity in archive_trades(
+            archive_source, expected_member, nominal_start, nominal_end
+        ):
+            records.append(ORDER_RECORD.pack(aggregate_id, timestamp, price, quantity))
+            if len(records) == ORDER_CHUNK_RECORDS:
+                flush()
+        flush()
+        if not chunks:
+            return replay_archive_trades((), start_ms, end_ms, carry)
+        while len(chunks) > 1:
+            merged: list[Path] = []
+            for offset in range(0, len(chunks), ORDER_MERGE_FAN_IN):
+                group = chunks[offset : offset + ORDER_MERGE_FAN_IN]
+                fd, name = tempfile.mkstemp(prefix=".aggtrades-merge-", suffix=".bin", dir=scratch)
+                target = Path(name)
+                with os.fdopen(fd, "wb") as sink:
+                    identities[target] = scratch_file_identity(target)
+                    with ExitStack() as stack:
+                        sources = [stack.enter_context(stable_file(item)) for item in group]
+                        heap = [
+                            (value[0], index, value)
+                            for index, source in enumerate(sources)
+                            if (value := record(source)) is not None
+                        ]
+                        heapq.heapify(heap)
+                        while heap:
+                            _, index, value = heapq.heappop(heap)
+                            sink.write(ORDER_RECORD.pack(*value))
+                            if (following := record(sources[index])) is not None:
+                                heapq.heappush(heap, (following[0], index, following))
+                    sink.flush()
+                    os.fsync(sink.fileno())
+                for item in group:
+                    identity = identities[item]
+                    remove_aggtrades_file(item, identity)
+                    del identities[item]
+                fsync_directory(scratch)
+                merged.append(target)
+            chunks = merged
+        with stable_file(chunks[0]) as source:
+            return replay_archive_trades(
+                iter(lambda: record(source), None), start_ms, end_ms, carry
+            )
+    except (OSError, struct.error) as exc:
+        raise AcquisitionError("archive_order_canonicalization_failed") from exc
+    finally:
+        primary = sys.exception()
+        cleanup_failures = 0
+        for item, identity in list(identities.items()):
+            try:
+                remove_aggtrades_file(item, identity)
+            except (OSError, AcquisitionError):
+                cleanup_failures += 1
+        if cleanup_failures:
+            if primary is None:
+                raise AcquisitionError("archive_order_canonicalization_failed")
+            primary.add_note(f"archive_order_cleanup_failed:{cleanup_failures}")
+
+
+def frame_from_archive(
+    path: Path,
+    symbol: str,
+    start_ms: int,
+    end_ms: int,
+    carry: float | None,
+    month: str,
+    scratch_root: Path | None = None,
+    archive_receipt: dict[str, Any] | None = None,
+) -> tuple[pl.DataFrame, dict[str, Any]]:
+    if start_ms % 1000 or end_ms % 1000 or end_ms <= start_ms:
+        raise AcquisitionError("raw_owned_bounds_invalid")
+    if not isinstance(symbol, str) or not symbol:
+        raise AcquisitionError("archive_symbol_invalid")
+    if not isinstance(month, str):
+        raise AcquisitionError("archive_month_invalid")
+    try:
+        parsed_month = datetime.strptime(month, "%Y-%m")
+    except ValueError as exc:
+        raise AcquisitionError("archive_month_invalid") from exc
+    if parsed_month.strftime("%Y-%m") != month:
+        raise AcquisitionError("archive_month_invalid")
+    nominal_start = int(parsed_month.replace(tzinfo=UTC).timestamp() * 1000)
+    expected_member = f"{symbol}-aggTrades-{month}.csv"
+    nominal_end = month_bounds(datetime.fromtimestamp(nominal_start / 1000, UTC))[1]
+    allowlisted = CANONICAL_ORDER_ARCHIVES.get((symbol, month))
+    with stable_file(path) as archive_source:
+        if archive_receipt is not None or allowlisted is not None:
+            actual_digest, actual_byte_count = authenticated_archive_identity(
+                archive_source, archive_receipt
+            )
+        else:
+            actual_digest = actual_byte_count = None
+        if allowlisted is not None:
+            digest, byte_count = allowlisted
+            if (
+                actual_byte_count == byte_count
+                and actual_digest == digest
+                and isinstance(archive_receipt, dict)
+                and archive_receipt.get("sha256") == digest
+                and archive_receipt.get("byte_count") == byte_count
+            ):
+                if scratch_root is None:
+                    raise AcquisitionError("archive_order_scratch_root_required")
+                return canonical_frame_from_archive(
+                    archive_source,
+                    start_ms,
+                    end_ms,
+                    carry,
+                    expected_member,
+                    nominal_start,
+                    nominal_end,
+                    scratch_root,
+                )
+        return replay_archive_trades(
+            archive_trades(archive_source, expected_member, nominal_start, nominal_end),
+            start_ms,
+            end_ms,
+            carry,
+        )
 
 def root_identity(path: Path) -> list[int]:
     try:
