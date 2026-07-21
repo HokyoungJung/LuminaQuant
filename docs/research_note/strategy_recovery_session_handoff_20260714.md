@@ -4,7 +4,7 @@
 
 - Repository: `/home/hoky/Quants-agent/LuminaQuant`; branch: `recovery/strategy-plan-20260714`.
 - Complete implementation commit: `3deeb7927e29bfa6af94a8974043541cd45352b5`. Original baseline `b349cb57596a44d9e7e4a68519d0ddb586f97dc3` and prior handoff seal `6b1ce4cb2a2092c4d135023055f8c08afeb87491` are historical ancestry facts only.
-- Do not name a handoff commit yet: the docs commit produced after this edit must be recorded in the final user-facing prompt and verified by ancestry from the implementation commit.
+- Handoff-content commit: `bfce6f5caf482f8e1f11079ae1c4af83e16d515e`. The final sealed HEAD must descend from both it and implementation commit `3deeb7927e29bfa6af94a8974043541cd45352b5`.
 - Session: `019f603a-0e73-7000-88a7-c94f42950c09`. Stable aggregate objective: `Complete the durable ultragoal plan in .gjc/ultragoal/goals.json, including later accepted/appended stories, under the original brief constraints; use .gjc/ultragoal/ledger.jsonl as the audit trail.`
 - G059 is complete. G058 is superseded by its completed review-blocker replacement. G056, G036, and G037 are blocked. Counts: complete 12, superseded 30, blocked 3, review_blocked 14; pending/active/failed 0.
 - G058 supersession is **not** acquisition completion: official v5 acquisition remains outstanding under G056/continuation.
@@ -34,7 +34,7 @@ V4 is immutable failed/ineligible scientific evidence only; never reuse, continu
 
 Build a brand-new repository-native terminal authority only from the canonical runbook, without reading old drafts. Independent cleaner, architect, and QA must CLEAR all of: actual 14-fence/no-execute topology; first-operation forbidden-root and role disjointness; independently authenticated authority/process receipts; observed O_EXCL/non-TTY/at-most-one/publication/zero-order facts; deep phase semantics; sealed observability; outcome/readback/seal consistency; externally pinned manifest authority.
 
-1. Verify branch/HEAD descends from the implementation commit and forthcoming handoff commit, clean worktree, current seals, process absence, and v5 absence.
+1. Verify branch/HEAD descends from implementation commit `3deeb7927e29bfa6af94a8974043541cd45352b5` and handoff-content commit `bfce6f5caf482f8e1f11079ae1c4af83e16d515e`, clean worktree, current seals, process absence, and v5 absence.
 2. `goal get`, then `goal resume` (create the exact stable aggregate objective only if no inline goal exists); resume existing durable state without `create-goals`/`complete-goals`.
 3. Rebuild the terminal authority and independently cleaner/architect/QA CLEAR it.
 4. Only then create/freeze v5 roots.

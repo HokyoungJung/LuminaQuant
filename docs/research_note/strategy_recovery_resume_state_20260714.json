@@ -10,7 +10,8 @@
   "historical_ancestry": {
     "original_baseline_implementation_checkpoint": "b349cb57596a44d9e7e4a68519d0ddb586f97dc3",
     "original_handoff_content_commit": "6b1ce4cb2a2092c4d135023055f8c08afeb87491",
-    "rule": "These are historical ancestry facts only; the forthcoming docs commit must descend from implementation commit 3deeb7927e29bfa6af94a8974043541cd45352b5. Do not name that docs commit until it exists."
+    "handoff_content_commit": "bfce6f5caf482f8e1f11079ae1c4af83e16d515e",
+    "rule": "The final sealed HEAD must descend from implementation commit 3deeb7927e29bfa6af94a8974043541cd45352b5 and handoff-content commit bfce6f5caf482f8e1f11079ae1c4af83e16d515e."
   },
   "authoritative_session": {
     "id": "019f603a-0e73-7000-88a7-c94f42950c09",
@@ -55,7 +56,7 @@
   },
   "historical_v4": {"terminal": "failed; ineligible; immutable scientific evidence only", "rule": "Never reuse, continue, mutate, copy into, or treat v4 as execution authority."},
   "only_future_acquisition_roots": {"source": "/home/hoky/quants-external-data/alpha-max-g058-full-source-v5", "report": "/home/hoky/quants-recovery-runs/G058-full-acquisition-report-20260720-v5", "controller": "/home/hoky/quants-recovery-runs/G058-full-acquisition-controller-20260720-v5", "started_or_existing": false},
-  "continuation_order": ["verify branch/HEAD descends from implementation commit and forthcoming handoff commit, clean worktree, current seals/process/v5 absence", "goal get then resume (or create the exact stable aggregate objective only if no inline goal)", "resume existing durable state without create-goals/complete-goals", "rebuild brand-new repository-native terminal authority from canonical runbook without reading old drafts; independently cleaner/architect/QA CLEAR it", "only then create/freeze v5 roots", "launch complete official acquisition with real Python-child monitoring and descriptor refresh", "validate_complete/offline verify-eligible", "strictly resolve/checkpoint acquisition continuation and reactivate G056 explicitly", "six phase roots/one-touch", "G056 then genuinely diverse G036/G037", "final aggregate audit/receipt then inline complete"],
+  "continuation_order": ["verify branch/HEAD descends from implementation commit and handoff-content commit bfce6f5caf482f8e1f11079ae1c4af83e16d515e, clean worktree, current seals/process/v5 absence", "goal get then resume (or create the exact stable aggregate objective only if no inline goal)", "resume existing durable state without create-goals/complete-goals", "rebuild brand-new repository-native terminal authority from canonical runbook without reading old drafts; independently cleaner/architect/QA CLEAR it", "only then create/freeze v5 roots", "launch complete official acquisition with real Python-child monitoring and descriptor refresh", "validate_complete/offline verify-eligible", "strictly resolve/checkpoint acquisition continuation and reactivate G056 explicitly", "six phase roots/one-touch", "G056 then genuinely diverse G036/G037", "final aggregate audit/receipt then inline complete"],
   "quarantined_lexical_forbidden_roots": ["/home/hoky/Quants-agent/LuminaQuant-data/alpha_max_20260711_listing_aware_source", "/home/hoky/Quants-agent/Quants-agent-alpha-max-data-pc"],
   "quarantine_rule": "Never inspect, stat, hash, traverse, read, copy, or use either root. Retain only as lexical --forbidden-root strings.",
   "binding_constraints": ["official BTC proof preserved", "official-only; no synthetic, substitution, prelisting, date shift, retune, or locked-OOS selection", "zero orders and capital", "uv Python; profile-first; Rust/native only after material exact-equivalence benchmark", "no reset, rebase, amend, push, acquisition, phase work, or completion while stopped"],
