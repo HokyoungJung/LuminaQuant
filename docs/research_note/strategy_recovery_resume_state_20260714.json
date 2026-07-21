@@ -1,22 +1,23 @@
 {
-  "schema_version": 8,
-  "snapshot_date": "2026-07-20",
+  "schema_version": 9,
+  "snapshot_date": "2026-07-21",
   "repository": "/home/hoky/Quants-agent/LuminaQuant",
   "branch": "recovery/strategy-plan-20260714",
   "implementation_checkpoint": {
-    "commit": "b349cb57596a44d9e7e4a68519d0ddb586f97dc3",
-    "status": "incomplete"
+    "commit": "3deeb7927e29bfa6af94a8974043541cd45352b5",
+    "status": "complete"
   },
-  "handoff_document_commit": {
-    "commit": "6b1ce4cb2a2092c4d135023055f8c08afeb87491",
-    "status": "must_be_first_commit_containing_this_handoff",
-    "must_descend_from": "b349cb57596a44d9e7e4a68519d0ddb586f97dc3"
+  "historical_ancestry": {
+    "original_baseline_implementation_checkpoint": "b349cb57596a44d9e7e4a68519d0ddb586f97dc3",
+    "original_handoff_content_commit": "6b1ce4cb2a2092c4d135023055f8c08afeb87491",
+    "rule": "These are historical ancestry facts only; the forthcoming docs commit must descend from implementation commit 3deeb7927e29bfa6af94a8974043541cd45352b5. Do not name that docs commit until it exists."
   },
   "authoritative_session": {
     "id": "019f603a-0e73-7000-88a7-c94f42950c09",
     "stable_aggregate_objective": "Complete the durable ultragoal plan in .gjc/ultragoal/goals.json, including later accepted/appended stories, under the original brief constraints; use .gjc/ultragoal/ledger.jsonl as the audit trail.",
-    "durable_goal": "G058",
-    "durable_goal_status": "active",
+    "durable_goal": "G059",
+    "durable_goal_status": "complete",
+    "g058_status": "superseded_by_completed_review_blocker_replacement",
     "blocked_goals": ["G056", "G036", "G037"],
     "inline_goal_status": "paused",
     "completion_authorized": false,
@@ -24,47 +25,39 @@
   },
   "durable_files": {
     "brief": {"path": ".gjc/_session-019f603a-0e73-7000-88a7-c94f42950c09/ultragoal/brief.md", "sha256": "faf6f83679e7ce93a8950af4df350fc4a92557d8eaaa40ea17c9c8b918c04e57", "bytes": 4836, "lines": 22},
-    "goals": {"path": ".gjc/_session-019f603a-0e73-7000-88a7-c94f42950c09/ultragoal/goals.json", "sha256": "a0fb91089f27262196db7314257019c2edebee14e2a0a82000d67c1f35e6046a", "bytes": 137951, "lines": 1322},
-    "ledger": {"path": ".gjc/_session-019f603a-0e73-7000-88a7-c94f42950c09/ultragoal/ledger.jsonl", "sha256": "32357a36e0d8388121059b7dcf8e86f2b4908e1f44788cf46b5dc6eeac62fe85", "bytes": 321210, "lines": 352, "latest_event": {"id": "9b3de1b5-4523-4bec-98fb-5eb670a5fee1", "type": "blocker_classified", "goal": "G058", "classification": "human_blocked", "timestamp": "2026-07-20T13:53:52.863Z", "evidence": "The user ordered stop, and only the user can open the new session."}}
+    "goals": {"path": ".gjc/_session-019f603a-0e73-7000-88a7-c94f42950c09/ultragoal/goals.json", "sha256": "ca48744cdfad69363167594757d87f159b8f69867b277bd6153baccf72d4ef7c", "bytes": 140634, "lines": 1358},
+    "ledger": {"path": ".gjc/_session-019f603a-0e73-7000-88a7-c94f42950c09/ultragoal/ledger.jsonl", "sha256": "6d856688aab6f358d73788fa319371db05d447413d68e10e05feee8298f18c1e", "bytes": 331158, "lines": 359, "latest_event": {"id": "4197b419-2e89-42ec-8121-fd39f64432bd", "type": "human_blocked", "evidence": "User ordered all work stopped for session transition."}}
   },
-  "durable_handoff_annotation": {"immediately_precedes_latest_event": true, "implementation_commit": "b349cb57596a44d9e7e4a68519d0ddb586f97dc3", "handoff_content_commit": "6b1ce4cb2a2092c4d135023055f8c08afeb87491"},
-  "goal_counts": {"pending": 0, "active": 1, "complete": 11, "failed": 0, "blocked": 3, "review_blocked": 14, "superseded": 29},
-  "stop_state": {"all_workers_and_monitors_terminal": true, "acquisition_process_running": false, "eligible_receipt_exists": false, "phase_prelock_historical_candidate_forward_order_or_capital_operation": false},
-  "historical_v4": {
-    "controller": "/home/hoky/quants-recovery-runs/G056-full-acquisition-controller-20260719-v4",
-    "source": "/home/hoky/quants-external-data/alpha-max-g056-full-source-v4",
-    "report": "/home/hoky/quants-recovery-runs/G056-full-acquisition-report-20260719-v4",
-    "terminal": "failed; ineligible; immutable scientific evidence only",
-    "progress": {"raw": "139/415 through BTCUSDT 2023-09", "funding": "3834/12347", "source_bytes": 2625436018, "source_files": 3974},
-    "failure": "archive_trade_order_invalid",
-    "orders": 0,
-    "capital": 0,
-    "descriptor": {"sequence": 10, "sha256": "70b1c5d421a1f28fbce4943210db7467b058e96d0e27d59599cd3005b3d891b9"},
-    "rule": "Never reuse, continue, mutate, copy into, or treat v4 as execution authority after the code change."
+  "goal_counts": {"pending": 0, "active": 0, "complete": 12, "failed": 0, "blocked": 3, "review_blocked": 14, "superseded": 30},
+  "stop_state": {"all_workers_and_monitors_terminal": true, "terminal_authority_planner_52": "cancelled before producing a plan", "acquisition_process_running": false, "v5_roots_absent": true, "no_acquisition_phase_or_terminal_authority_implementation_executed": true},
+  "g059_checkpoint": {
+    "status": "complete",
+    "receipt": "e873a397-4812-4833-b426-9089e94d3f68",
+    "ledger_event": "4068cddb-2873-49eb-bf4c-753b91eaf513",
+    "gate_hash": "4c16e87359757d6aedb6738f281c93b8321bdafaf6ba711c111b86ccae50611a",
+    "architect": "48/49 CLEAR/CLEAR/CLEAR APPROVE",
+    "executor_qa": "51 passed",
+    "artifact": ".gjc/_session-019f603a-0e73-7000-88a7-c94f42950c09/ultragoal/artifacts/G059/g059-final-adversarial-test-report.json"
   },
   "g058_root_cause_and_repair": {
     "official_archive": {"identity": "official Binance futures-UM BTCUSDT 2023-10 archive", "sha256": "d3fe5fa477d68d6730248d634e1bd37ae4838839d78709ef355d9d9c6749fea4", "bytes": 492720741, "rows": 38272235, "adjacent_id_regressions": 3988367, "adjacent_timestamp_regressions": 3988367, "equal_adjacent_ids": 0, "finding": "interleaved valid ordered streams"},
-    "repair": "Repaired exact digest-bound allowlist and wrapper pin.",
-    "implementation_identities": {"acquirer": "864b397ee0a26cad1e4be67431c9d6e2929280a06c59966a5f57712634a2c7ad", "wrapper": "db5eab028edf78e0d816e6838a50c65f910cf122701428ca7704dcea5b5e5ee9", "acquirer_test": "2e3c71142263decb13c0dfed680ff0e4f71c7a1b497f3923b1312625bb56ce6f", "wrapper_test": "7b711ecc998d28628d4c5956f46002258d03da615ef071e8e4b7a0b73723aeb5"},
+    "repair": "Repaired exact digest-bound allowlist and wrapper pin; G059 completed the provenance review-blocker replacement.",
+    "implementation_identities": {"acquirer": "b440d79899a4ed60e18decfcd8bc2656d2de012189f03572a8be65f90cd24978", "wrapper": "054163d23e8d2f1446b225e281472bcc563ac76f06aa47552cc5f3953b7c4dd9", "acquirer_test": "b0c4bd04851600aedd5cae9b4ae3ef95e4d7292cb45d1724d31591425b527a82", "wrapper_test": "2f7ddfae5aa684b3742ea1c921d3d09bbe80b983d5662b07cd23177851c26060"},
     "canonical_proof": {"runs": 2, "rows": 2678400, "first": [1696118404732, 1862715434], "last": [1698796799559, 1900987668], "carry": 34651.4, "frame_sha256": "890b0e591990fbabf35f323f7987547d99cdc62416cba826ca601393b0b34f79", "byte_identical_proof_sha256": "9902947934a9df52685db0b5198c69d9f57f6b54836b923bb804a0bab0387b27", "scratch_residue": 0, "resource_observation": "about 520 MiB RSS; 134–136 seconds"},
     "artifacts": ["/home/hoky/quants-recovery-runs/G058-order-repro-20260720/futures-order-scan.json", "/home/hoky/quants-recovery-runs/G058-order-repro-20260720/canonical-proof-run1.json", "/home/hoky/quants-recovery-runs/G058-order-repro-20260720/canonical-proof-run2.json"],
     "non_evidence": "The unrelated spot ZIP in that artifact root is not scientific evidence."
   },
-  "verification": {"ruff": "passed", "pycompile": "passed", "git_diff_check": "passed", "focused": "185 passed +33 subtests", "integrated": "329 passed +33 subtests", "sanitized_full": "5331 passed +33 subtests, 20 skipped, 1 explicit unrelated deselection, 3 xfailed"},
-  "quality_gate_incomplete": {
-    "cleaner": "27-G058AiSlopCleaner BLOCKED only on stale resume descriptor; executor 29-G058ResumeDescriptorFix corrected that descriptor, but cleaner has not rerun.",
-    "advisory": "The cleaner's missing exact production-tuple test was advisory and is not yet implemented.",
-    "terminal_authority": "Architect 28-G056TerminalVerifierReview returned BLOCK/REQUEST CHANGES on the external terminal verifier. /home/hoky/quants-recovery-runs/G056-full-acquisition-controller-20260719-v4/g056_boundary_primitives.py, g056_boundary_verifier.py, and rejected post_acquisition_gate.py are not execution authority and must never run.",
-    "terminal_authority_external_draft_hashes": {"g056_boundary_primitives.py": "575d96b9bbe25b6c3830bddc2760466af1c21754a9e81ead78542e9eb354c999", "g056_boundary_verifier.py": "940852718016cb3a477a7247126bfb756ab9e9ea1acb041f672cc49fb8aff8d1", "post_acquisition_gate.py_rejected": "4a2a90e0d7d20ac34fbb5394256b4fd5ca93f8594513c10a79f7f6274b0e3da5"},
-    "terminal_authority_blockers": ["wrong runbook topology: 14 fences and explicit no-execute language versus assumed 11/fences 4-11", "no first-operation forbidden-root or role-disjointness proof", "caller-self-authenticated authority/process receipts", "assertion-only O_EXCL, non-TTY, at-most-one, publication, and zero-order facts", "shallow phase semantics", "observability not sealed-payload bound", "outcome/readback/seal disagreement allowed", "caller-self-bound manifest authority"]
+  "verification": {"ruff": "passed", "pycompile": "passed", "diff": "passed", "focused": "209 passed, 41 subtests", "integrated": "353 passed, 41 subtests", "sanitized_full": "5355 passed, 20 skipped, 1 deselected, 3 xfailed, 41 subtests"},
+  "acquisition_status": "G058 durable supersession does not complete official v5 acquisition. Official acquisition remains outstanding under G056/continuation.",
+  "terminal_authority": {
+    "status": "not implemented; rebuild repository-native authority from the canonical runbook without reading or executing old external drafts",
+    "acceptance": ["actual 14-fence/no-execute topology", "first-operation forbidden-root and role disjointness", "independently authenticated authority/process receipts", "observed O_EXCL/non-TTY/at-most-one/publication/zero-order facts", "deep phase semantics", "sealed observability", "outcome/readback/seal consistency", "externally pinned manifest authority"]
   },
-  "only_future_acquisition_roots": {"source": "/home/hoky/quants-external-data/alpha-max-g058-full-source-v5", "report": "/home/hoky/quants-recovery-runs/G058-full-acquisition-report-20260720-v5", "controller": "/home/hoky/quants-recovery-runs/G058-full-acquisition-controller-20260720-v5", "started_or_existing": false, "creation_rule": "May be created only after G058 cleaner rerun, post-cleaner verification, fresh acquirer architect CLEAR/CLEAR/CLEAR APPROVE, and executor QA/red-team pass."},
-  "continuation_order": ["verify Git/session/durable hashes/process absence; goal get then resume", "rerun cleaner on repaired descriptor/code, resolve only blockers, rerun Ruff/pycompile/focused/integrated/sanitized full", "fresh architect and executor QA for G058", "before wrapper/phase work, replace/rebuild and independently CLEAR the blocked terminal authority; never execute current external drafts", "create/freeze fresh v5 roots and launch official complete acquisition with real Python-child monitoring and periodic repository descriptors", "validate_complete and offline --verify-eligible", "strict G058 checkpoint, then reactivate G056 explicitly without complete-goals", "six authenticated phase roots and one-touch only after terminal authority CLEAR", "strict G056 checkpoint/supersede predecessor chain", "G036, G037, final aggregate audit/receipt, then inline completion only at the very end"],
-  "archive_failure_rule": "If another official archive fails ordering, preserve v5 and create an explicit evidence-backed replacement subgoal; never broaden automatically.",
-  "original_binding_references": ["docs/research_note/strategy_recovery_master_plan_20260713.md", "docs/research_note/data_pc_strategy_recovery_runbook_20260713.md", "docs/audits/strategy_reality_audit_20260713.md"],
+  "historical_v4": {"terminal": "failed; ineligible; immutable scientific evidence only", "rule": "Never reuse, continue, mutate, copy into, or treat v4 as execution authority."},
+  "only_future_acquisition_roots": {"source": "/home/hoky/quants-external-data/alpha-max-g058-full-source-v5", "report": "/home/hoky/quants-recovery-runs/G058-full-acquisition-report-20260720-v5", "controller": "/home/hoky/quants-recovery-runs/G058-full-acquisition-controller-20260720-v5", "started_or_existing": false},
+  "continuation_order": ["verify branch/HEAD descends from implementation commit and forthcoming handoff commit, clean worktree, current seals/process/v5 absence", "goal get then resume (or create the exact stable aggregate objective only if no inline goal)", "resume existing durable state without create-goals/complete-goals", "rebuild brand-new repository-native terminal authority from canonical runbook without reading old drafts; independently cleaner/architect/QA CLEAR it", "only then create/freeze v5 roots", "launch complete official acquisition with real Python-child monitoring and descriptor refresh", "validate_complete/offline verify-eligible", "strictly resolve/checkpoint acquisition continuation and reactivate G056 explicitly", "six phase roots/one-touch", "G056 then genuinely diverse G036/G037", "final aggregate audit/receipt then inline complete"],
   "quarantined_lexical_forbidden_roots": ["/home/hoky/Quants-agent/LuminaQuant-data/alpha_max_20260711_listing_aware_source", "/home/hoky/Quants-agent/Quants-agent-alpha-max-data-pc"],
   "quarantine_rule": "Never inspect, stat, hash, traverse, read, copy, or use either root. Retain only as lexical --forbidden-root strings.",
-  "binding_constraints": ["official-only; no synthetic, substitution, prelisting, date shift, retune, or locked-OOS selection", "zero orders and capital", "uv Python; profile-first; Rust/native only after material exact-equivalence benchmark", "no reset, rebase, amend, push, acquisition, phase work, or completion while stopped"],
-  "portable_bootstrap": {"documents": ["strategy_recovery_resume_state_20260714.json", "strategy_recovery_session_handoff_20260714.md", "strategy_recovery_new_session_prompt_20260714.md"], "canonical_same_machine_state": ".gjc", "audit_trail": "ledger.jsonl"},
-  "last_refresh_utc": "2026-07-20T13:54:53.026233Z"
+  "binding_constraints": ["official BTC proof preserved", "official-only; no synthetic, substitution, prelisting, date shift, retune, or locked-OOS selection", "zero orders and capital", "uv Python; profile-first; Rust/native only after material exact-equivalence benchmark", "no reset, rebase, amend, push, acquisition, phase work, or completion while stopped"],
+  "last_refresh_utc": "2026-07-21T00:00:00Z"
 }
