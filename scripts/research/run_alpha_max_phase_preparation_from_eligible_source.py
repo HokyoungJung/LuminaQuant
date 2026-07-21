@@ -2,6 +2,7 @@
 """Run the frozen Alpha-Max phase preparer only from a verified eligible source."""
 
 from __future__ import annotations
+from contextlib import ExitStack
 import argparse
 import errno
 import fcntl
@@ -19,7 +20,7 @@ from typing import Any
 import polars as pl
 
 CONTRACT_SHA256 = "ae272f70f65797b4c8a87c29b7f8e64511617f8e0f2d4bd841b2d1addb7d1220"
-ACQUIRER_SHA256 = "864b397ee0a26cad1e4be67431c9d6e2929280a06c59966a5f57712634a2c7ad"
+ACQUIRER_SHA256 = "b440d79899a4ed60e18decfcd8bc2656d2de012189f03572a8be65f90cd24978"
 EVIDENCE_SHA256 = "214e5da198307d8d32b30f69fb6b1f09002e0b31888dc476ed16060f79de9719"
 PREPARER_SHA256 = "ea26b902bcec4458340e4c345fa648a3db9104e1b337fd42460d9a9461a738ac"
 MAX_CAPTURE_BYTES = 65_536
@@ -155,6 +156,26 @@ def _directory_identity(path: Path, label: str) -> dict[str, int]:
     if not stat.S_ISDIR(item.st_mode):
         raise PreparationError(f"{label}_not_directory")
     return {"st_dev": item.st_dev, "st_ino": item.st_ino}
+
+
+def _open_authenticated_root(path: Path, label: str) -> tuple[int, dict[str, int]]:
+    """Open and identify an authentication root while retaining descriptor ownership."""
+    descriptor: int | None = None
+    try:
+        descriptor = os.open(
+            path, os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0)
+        )
+        item = os.fstat(descriptor)
+    except OSError as exc:
+        if descriptor is not None:
+            os.close(descriptor)
+        raise PreparationError(f"{label}_namespace_unavailable") from exc
+    return descriptor, {"st_dev": item.st_dev, "st_ino": item.st_ino}
+
+
+def _assert_directory_identity(path: Path, expected: dict[str, int], label: str) -> None:
+    if _directory_identity(path, label) != expected:
+        raise PreparationError(f"{label}_replaced")
 
 
 def file_sha256(path: Path, label: str) -> str:
@@ -613,18 +634,16 @@ def _materialize_invocation_inputs(
 def _open_materialized_inputs(
     files: dict[str, Path], expected: dict[str, tuple[int, os.stat_result, str]]
 ) -> dict[str, tuple[int, os.stat_result, str]]:
-    materialized = {
-        label: _open_pinned_file(path, f"materialized_{label}") for label, path in files.items()
-    }
-    try:
+    with ExitStack() as cleanup:
+        materialized = {}
+        for label, path in files.items():
+            materialized[label] = _open_pinned_file(path, f"materialized_{label}")
+            cleanup.callback(os.close, materialized[label][0])
         for label, (_, _, digest) in materialized.items():
             if digest != expected[label][2]:
                 raise PreparationError(f"materialized_{label}_digest_invalid")
+        cleanup.pop_all()
         return materialized
-    except Exception:
-        for descriptor, _, _ in materialized.values():
-            os.close(descriptor)
-        raise
 
 
 def _assert_materialized_inputs_unchanged(
@@ -1046,15 +1065,16 @@ def _snapshot_entry(source_root: Path, target: Path, entry: dict[str, Any]) -> N
     else:
         try:
             source_fd, source_item = _open_verified_file(source, "snapshot_source")
-            if source_item.st_size != entry["byte_count"]:
-                os.close(source_fd)
-                raise PreparationError("snapshot_source_manifest_mismatch")
-            stage_fd = _open_no_follow(stage, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
             try:
-                fcntl.ioctl(stage_fd, FICLONE, source_fd)
-                os.fsync(stage_fd)
+                if source_item.st_size != entry["byte_count"]:
+                    raise PreparationError("snapshot_source_manifest_mismatch")
+                stage_fd = _open_no_follow(stage, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+                try:
+                    fcntl.ioctl(stage_fd, FICLONE, source_fd)
+                    os.fsync(stage_fd)
+                finally:
+                    os.close(stage_fd)
             finally:
-                os.close(stage_fd)
                 os.close(source_fd)
         except OSError as exc:
             if exc.errno not in {errno.EOPNOTSUPP, errno.ENOTSUP, errno.EXDEV, errno.ENOTTY}:
@@ -1151,17 +1171,59 @@ def _parse_utc(value: Any, label: str) -> datetime:
     return parsed
 
 
-def _read_verified_parquet(path: Path, label: str) -> pl.DataFrame:
-    descriptor, before = _open_verified_file(path, label)
+def _read_pinned_parquet(
+    descriptor: int, before: os.stat_result, label: str
+) -> pl.DataFrame:
     try:
+        os.lseek(descriptor, 0, os.SEEK_SET)
         with io.FileIO(os.dup(descriptor), "rb", closefd=True) as stream:
             frame = pl.read_parquet(stream)
         _assert_stable_file(descriptor, before, label)
         return frame
+    except PreparationError:
+        raise
     except Exception as exc:
         raise PreparationError(f"{label}_invalid_parquet") from exc
+
+
+def _read_verified_parquet(path: Path, label: str) -> pl.DataFrame:
+    descriptor, before = _open_verified_file(path, label)
+    try:
+        return _read_pinned_parquet(descriptor, before, label)
     finally:
         os.close(descriptor)
+
+
+def _pinned_file_sha256(descriptor: int, before: os.stat_result, label: str) -> str:
+    digest = hashlib.sha256()
+    os.lseek(descriptor, 0, os.SEEK_SET)
+    while block := os.read(descriptor, 1 << 20):
+        digest.update(block)
+    _assert_stable_file(descriptor, before, label)
+    return digest.hexdigest()
+
+
+def _open_pinned_relative_file(
+    root_fd: int, relative_path: str, label: str
+) -> tuple[int, os.stat_result]:
+    descriptor = os.dup(root_fd)
+    try:
+        for component in _snapshot_relative_parts(relative_path):
+            next_descriptor = os.open(
+                component,
+                os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0),
+                dir_fd=descriptor,
+            )
+            os.close(descriptor)
+            descriptor = next_descriptor
+    except OSError as exc:
+        os.close(descriptor)
+        raise PreparationError(f"{label}_missing") from exc
+    item = os.fstat(descriptor)
+    if not stat.S_ISREG(item.st_mode) or item.st_nlink != 1:
+        os.close(descriptor)
+        raise PreparationError(f"{label}_unsafe_file")
+    return descriptor, item
 
 
 def _expected_output_layout(
@@ -1287,275 +1349,389 @@ def _authenticate_output_inner(
     contract_sha: str,
     snapshot: dict[str, Any],
     snapshot_root: Path,
-) -> dict[str, Any]:
-    _directory_identity(output_root, "output_root")
-    manifest_path = output_root / "preparation_manifest.json"
-    manifest = _canonical_json_file(manifest_path, "preparation_manifest")
-    required_fields = {
-        "availability",
-        "availability_sha256_by_root_kind",
-        "contract_manifest_schema_version",
-        "contract_manifest_sha256",
-        "exchange",
-        "file_count",
-        "files",
-        "phase_intervals",
-        "schema_version",
-        "symbols",
-    }
-    if (
-        not isinstance(manifest, dict)
-        or set(manifest) != required_fields
-        or manifest.get("schema_version") != "alpha_max_phase_root_preparation_manifest.v1"
-        or type(manifest.get("file_count")) is not int
-        or not isinstance(manifest.get("files"), list)
-        or manifest["file_count"] != len(manifest["files"])
-    ):
-        raise PreparationError("preparation_manifest_invalid")
-    layout, availability = _expected_output_layout(contract, snapshot)
-    symbols = [record["symbol"] for record in contract["records"]]
-    phases = [
-        {"phase_id": phase_id, "start_utc": start, "end_utc": end}
-        for phase_id, start, end in PHASE_INTERVALS
-    ]
-    if (
-        manifest.get("contract_manifest_sha256") != contract_sha
-        or manifest.get("contract_manifest_schema_version") != contract.get("schema_version")
-        or manifest.get("exchange") != "binance"
-        or manifest.get("symbols") != symbols
-        or manifest.get("phase_intervals") != phases
-        or manifest.get("availability") != availability
-        or manifest.get("availability_sha256_by_root_kind")
-        != {kind: sha256(canonical_bytes(availability[kind])) for kind in ("raw", "feature")}
-    ):
-        raise PreparationError("preparation_manifest_semantic_mismatch")
-    required_entry_fields = {
-        "output_byte_count",
-        "output_relative_path",
-        "output_row_count",
-        "output_sha256",
-        "owned_end_utc",
-        "owned_start_utc",
-        "phase_id",
-        "root_kind",
-        "source_byte_count",
-        "source_relative_path",
-        "source_sha256",
-        "symbol",
-    }
-    expected_by_path = {entry["output_relative_path"]: entry for entry in layout}
-    if (
-        len(expected_by_path) != len(layout)
-        or len(manifest["files"]) != len(layout)
-        or [
-            entry.get("output_relative_path") if isinstance(entry, dict) else None
-            for entry in manifest["files"]
+) -> tuple[dict[str, Any], dict[str, dict[str, int]]]:
+    cleanup = ExitStack()
+    try:
+        root_fd, output_root_identity = _open_authenticated_root(output_root, "output_root")
+        cleanup.callback(os.close, root_fd)
+        snapshot_fd, snapshot_root_identity = _open_authenticated_root(
+            snapshot_root, "snapshot_root"
+        )
+        cleanup.callback(os.close, snapshot_fd)
+        manifest_descriptor, manifest_item = _open_pinned_relative_file(
+            root_fd, "preparation_manifest.json", "preparation_manifest"
+        )
+        cleanup.callback(os.close, manifest_descriptor)
+        manifest_bytes = _pinned_bytes(
+            manifest_descriptor, manifest_item, "preparation_manifest"
+        )
+        try:
+            manifest = json.loads(manifest_bytes)
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise PreparationError("preparation_manifest_invalid_json") from exc
+        if manifest_bytes != canonical_bytes(manifest):
+            raise PreparationError("preparation_manifest_not_canonical")
+        manifest_sha = sha256(manifest_bytes)
+        required_fields = {
+            "availability",
+            "availability_sha256_by_root_kind",
+            "contract_manifest_schema_version",
+            "contract_manifest_sha256",
+            "exchange",
+            "file_count",
+            "files",
+            "phase_intervals",
+            "schema_version",
+            "symbols",
+        }
+        if (
+            not isinstance(manifest, dict)
+            or set(manifest) != required_fields
+            or manifest.get("schema_version") != "alpha_max_phase_root_preparation_manifest.v1"
+            or type(manifest.get("file_count")) is not int
+            or not isinstance(manifest.get("files"), list)
+            or manifest["file_count"] != len(manifest["files"])
+        ):
+            raise PreparationError("preparation_manifest_invalid")
+        layout, availability = _expected_output_layout(contract, snapshot)
+        symbols = [record["symbol"] for record in contract["records"]]
+        phases = [
+            {"phase_id": phase_id, "start_utc": start, "end_utc": end}
+            for phase_id, start, end in PHASE_INTERVALS
         ]
-        != sorted(expected_by_path)
-    ):
-        raise PreparationError("preparation_manifest_entry_set_mismatch")
-    manifest_by_path: dict[str, dict[str, Any]] = {}
-    for entry in manifest["files"]:
-        if not isinstance(entry, dict) or set(entry) != required_entry_fields:
-            raise PreparationError("preparation_manifest_entry_invalid")
-        relative = _relative_output_path(entry["output_relative_path"])
-        expected = expected_by_path.get(relative)
-        if expected is None or any(
-            entry.get(field) != expected[field]
-            for field in (
-                "phase_id",
-                "root_kind",
-                "symbol",
-                "owned_start_utc",
-                "owned_end_utc",
-                "source_relative_path",
-                "source_sha256",
-                "source_byte_count",
-            )
+        if (
+            manifest.get("contract_manifest_sha256") != contract_sha
+            or manifest.get("contract_manifest_schema_version") != contract.get("schema_version")
+            or manifest.get("exchange") != "binance"
+            or manifest.get("symbols") != symbols
+            or manifest.get("phase_intervals") != phases
+            or manifest.get("availability") != availability
+            or manifest.get("availability_sha256_by_root_kind")
+            != {kind: sha256(canonical_bytes(availability[kind])) for kind in ("raw", "feature")}
         ):
             raise PreparationError("preparation_manifest_semantic_mismatch")
+        required_entry_fields = {
+            "output_byte_count",
+            "output_relative_path",
+            "output_row_count",
+            "output_sha256",
+            "owned_end_utc",
+            "owned_start_utc",
+            "phase_id",
+            "root_kind",
+            "source_byte_count",
+            "source_relative_path",
+            "source_sha256",
+            "symbol",
+        }
+        expected_by_path = {entry["output_relative_path"]: entry for entry in layout}
         if (
-            type(entry["output_byte_count"]) is not int
-            or entry["output_byte_count"] < 0
-            or type(entry["output_row_count"]) is not int
-            or entry["output_row_count"] < 0
-            or type(entry["output_sha256"]) is not str
-            or len(entry["output_sha256"]) != 64
+            len(expected_by_path) != len(layout)
+            or len(manifest["files"]) != len(layout)
+            or [
+                entry.get("output_relative_path") if isinstance(entry, dict) else None
+                for entry in manifest["files"]
+            ]
+            != sorted(expected_by_path)
         ):
-            raise PreparationError("preparation_manifest_entry_invalid")
-        manifest_by_path[relative] = entry
-    actual: set[str] = set()
-    directories: set[str] = set()
-    stack = [output_root]
-    while stack:
-        directory = stack.pop()
-        _directory_identity(directory, "output_tree_directory")
-        for child in os.scandir(directory):
-            relative = os.path.relpath(child.path, output_root).replace(os.sep, "/")
-            item = child.stat(follow_symlinks=False)
-            if stat.S_ISLNK(item.st_mode):
-                raise PreparationError("output_tree_symlink")
-            if stat.S_ISDIR(item.st_mode):
-                directories.add(relative)
-                stack.append(Path(child.path))
-            elif stat.S_ISREG(item.st_mode) and item.st_nlink == 1:
-                if relative != "preparation_manifest.json":
-                    actual.add(relative)
-            else:
-                raise PreparationError("output_tree_unsafe_file")
-    expected_directories: set[str] = set()
-    for relative in expected_by_path:
-        parent = PurePosixPath(relative).parent
-        while parent != PurePosixPath("."):
-            expected_directories.add(parent.as_posix())
-            parent = parent.parent
-    if actual != set(expected_by_path) or directories != expected_directories:
-        raise PreparationError("preparation_manifest_mismatch")
-    for relative in sorted(actual):
-        entry = manifest_by_path[relative]
-        output = output_root / relative
-        item = _regular_file(output, "output_parquet")
-        if (
-            item.st_size != entry["output_byte_count"]
-            or file_sha256(output, "output_parquet") != entry["output_sha256"]
-        ):
-            raise PreparationError("preparation_manifest_mismatch")
-        source = snapshot_root / entry["source_relative_path"]
-        source_frame = _read_verified_parquet(source, "snapshot_parquet")
-        output_frame = _read_verified_parquet(output, "output_parquet")
-        start = _parse_utc(entry["owned_start_utc"], "owned_interval")
-        end = _parse_utc(entry["owned_end_utc"], "owned_interval")
-        if entry["root_kind"] == "raw":
-            required = {"datetime", "open", "high", "low", "close", "volume"}
-            if (
-                not required.issubset(source_frame.schema)
-                or source_frame.schema["datetime"] != pl.Datetime("ms")
-                or output_frame.schema != source_frame.schema
-            ):
-                raise PreparationError("output_raw_schema_invalid")
-            start_ms = int(start.timestamp() * 1000)
-            end_ms = int(end.timestamp() * 1000)
-            expected_frame = source_frame.filter(
-                (pl.col("datetime").dt.epoch("ms") >= start_ms)
-                & (pl.col("datetime").dt.epoch("ms") < end_ms)
-            )
-            timestamps = output_frame.get_column("datetime").dt.epoch("ms").to_list()
-            if timestamps != list(
-                range(int(start.timestamp() * 1000), int(end.timestamp() * 1000), 1000)
-            ):
-                raise PreparationError("output_raw_grid_invalid")
-            numeric = output_frame.select(
-                [
-                    pl.col(name).cast(pl.Float64)
-                    for name in ("open", "high", "low", "close", "volume")
-                ]
-            )
-            if any(series.null_count() or not bool(series.is_finite().all()) for series in numeric):
-                raise PreparationError("output_raw_values_invalid")
-            if bool(
-                output_frame.select(
-                    (
-                        (pl.col("open") <= 0)
-                        | (pl.col("high") <= 0)
-                        | (pl.col("low") <= 0)
-                        | (pl.col("close") <= 0)
-                        | (pl.col("volume") < 0)
-                    ).any()
-                ).item()
-            ):
-                raise PreparationError("output_raw_values_invalid")
-            if not output_frame.filter(
-                (pl.col("high") < pl.col("open"))
-                | (pl.col("high") < pl.col("close"))
-                | (pl.col("low") > pl.col("open"))
-                | (pl.col("low") > pl.col("close"))
-                | (pl.col("high") < pl.col("low"))
-            ).is_empty():
-                raise PreparationError("output_raw_values_invalid")
-        else:
-            required = ["timestamp_ms", "source_timestamp_ms", "exchange", "symbol", "funding_rate"]
-            if output_frame.columns != required:
-                raise PreparationError("output_feature_schema_invalid")
-            if (
-                "timestamp_ms" not in source_frame.schema
-                or "funding_rate" not in source_frame.schema
-            ):
-                raise PreparationError("output_feature_source_schema_invalid")
-            if "exchange" in source_frame.schema and (
-                source_frame.get_column("exchange").null_count()
-                or {str(value).lower() for value in source_frame.get_column("exchange").to_list()}
-                != {"binance"}
-            ):
-                raise PreparationError("output_feature_source_exchange_invalid")
-            if "symbol" in source_frame.schema and (
-                source_frame.get_column("symbol").null_count()
-                or {str(value).upper() for value in source_frame.get_column("symbol").to_list()}
-                != {entry["symbol"]}
-            ):
-                raise PreparationError("output_feature_source_symbol_invalid")
-            interval = 14_400_000 if entry["symbol"] == "TONUSDT" else 28_800_000
-            valid = source_frame.filter(
-                pl.col("funding_rate").is_not_null() & pl.col("funding_rate").is_finite()
-            )
-            source_times = valid.get_column("timestamp_ms").cast(pl.Int64)
-            canonical = (source_times // interval) * interval
-            if any(
-                source - settlement < 0 or source - settlement > 1000
-                for source, settlement in zip(
-                    source_times.to_list(), canonical.to_list(), strict=True
+            raise PreparationError("preparation_manifest_entry_set_mismatch")
+        manifest_by_path: dict[str, dict[str, Any]] = {}
+        for entry in manifest["files"]:
+            if not isinstance(entry, dict) or set(entry) != required_entry_fields:
+                raise PreparationError("preparation_manifest_entry_invalid")
+            relative = _relative_output_path(entry["output_relative_path"])
+            expected = expected_by_path.get(relative)
+            if expected is None or any(
+                entry.get(field) != expected[field]
+                for field in (
+                    "phase_id",
+                    "root_kind",
+                    "symbol",
+                    "owned_start_utc",
+                    "owned_end_utc",
+                    "source_relative_path",
+                    "source_sha256",
+                    "source_byte_count",
                 )
             ):
-                raise PreparationError("output_feature_jitter_invalid")
-            expected_frame = (
-                valid.with_columns(
+                raise PreparationError("preparation_manifest_semantic_mismatch")
+            if (
+                type(entry["output_byte_count"]) is not int
+                or entry["output_byte_count"] < 0
+                or type(entry["output_row_count"]) is not int
+                or entry["output_row_count"] < 0
+                or type(entry["output_sha256"]) is not str
+                or len(entry["output_sha256"]) != 64
+            ):
+                raise PreparationError("preparation_manifest_entry_invalid")
+            manifest_by_path[relative] = entry
+        actual: set[str] = set()
+        directories: set[str] = set()
+        pinned_outputs: dict[str, tuple[int, os.stat_result]] = {}
+    except Exception:
+        cleanup.close()
+        raise
+    try:
+        def walk(directory_fd: int, relative_path: str) -> None:
+            children_fd = os.dup(directory_fd)
+            try:
+                with os.scandir(children_fd) as children:
+                    for child in children:
+                        child_relative = (
+                            f"{relative_path}/{child.name}" if relative_path else child.name
+                        )
+                        observed = child.stat(follow_symlinks=False)
+                        if stat.S_ISLNK(observed.st_mode):
+                            raise PreparationError("output_tree_symlink")
+                        if stat.S_ISDIR(observed.st_mode):
+                            flags = os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0)
+                        elif stat.S_ISREG(observed.st_mode) and observed.st_nlink == 1:
+                            flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+                        else:
+                            raise PreparationError("output_tree_unsafe_file")
+                        try:
+                            child_fd = os.open(child.name, flags, dir_fd=directory_fd)
+                        except OSError as exc:
+                            raise PreparationError("output_tree_directory_changed") from exc
+                        item = os.fstat(child_fd)
+                        if _stable_file_identity(item) != _stable_file_identity(observed):
+                            os.close(child_fd)
+                            raise PreparationError("output_tree_directory_changed")
+                        if stat.S_ISDIR(item.st_mode):
+                            try:
+                                directories.add(child_relative)
+                                walk(child_fd, child_relative)
+                            finally:
+                                os.close(child_fd)
+                        elif child_relative != "preparation_manifest.json":
+                            actual.add(child_relative)
+                            pinned_outputs[child_relative] = (child_fd, item)
+                            cleanup.callback(os.close, child_fd)
+                        else:
+                            os.close(child_fd)
+            finally:
+                os.close(children_fd)
+
+        walk(root_fd, "")
+        expected_directories: set[str] = set()
+        for relative in expected_by_path:
+            parent = PurePosixPath(relative).parent
+            while parent != PurePosixPath("."):
+                expected_directories.add(parent.as_posix())
+                parent = parent.parent
+        if actual != set(expected_by_path) or directories != expected_directories:
+            raise PreparationError("preparation_manifest_mismatch")
+        snapshot_manifest_descriptor, snapshot_manifest_item = _open_pinned_relative_file(
+            snapshot_fd, "snapshot-manifest.json", "snapshot_manifest"
+        )
+        cleanup.callback(os.close, snapshot_manifest_descriptor)
+        if _pinned_bytes(
+            snapshot_manifest_descriptor, snapshot_manifest_item, "snapshot_manifest"
+        ) != canonical_bytes(snapshot):
+            raise PreparationError("snapshot_manifest_diverged")
+        pinned_sources: dict[str, tuple[int, os.stat_result]] = {}
+        for entry in layout:
+            relative = entry["source_relative_path"]
+            if relative not in pinned_sources:
+                pinned_sources[relative] = _open_pinned_relative_file(
+                    snapshot_fd, relative, "snapshot_parquet"
+                )
+                cleanup.callback(os.close, pinned_sources[relative][0])
+        source_declarations: dict[str, tuple[int, str]] = {}
+        for entry in layout:
+            relative = entry["source_relative_path"]
+            declaration = (entry["source_byte_count"], entry["source_sha256"])
+            if (
+                type(declaration[0]) is not int
+                or declaration[0] < 0
+                or type(declaration[1]) is not str
+                or len(declaration[1]) != 64
+            ):
+                raise PreparationError("snapshot_inventory_invalid")
+            existing = source_declarations.setdefault(relative, declaration)
+            if existing != declaration:
+                raise PreparationError("snapshot_layout_declaration_conflict")
+        for relative, (source_descriptor, source_item) in pinned_sources.items():
+            expected_size, expected_sha = source_declarations[relative]
+            if (
+                source_item.st_size != expected_size
+                or _pinned_file_sha256(
+                    source_descriptor, source_item, "snapshot_parquet"
+                ) != expected_sha
+            ):
+                raise PreparationError("snapshot_parquet_mismatch")
+        for relative in sorted(actual):
+            entry = manifest_by_path[relative]
+            output_descriptor, output_item = pinned_outputs[relative]
+            source_descriptor, source_item = pinned_sources[entry["source_relative_path"]]
+            if (
+                output_item.st_size != entry["output_byte_count"]
+                or _pinned_file_sha256(
+                    output_descriptor, output_item, "output_parquet"
+                ) != entry["output_sha256"]
+            ):
+                raise PreparationError("preparation_manifest_mismatch")
+            source_frame = _read_pinned_parquet(
+                source_descriptor, source_item, "snapshot_parquet"
+            )
+            output_frame = _read_pinned_parquet(
+                output_descriptor, output_item, "output_parquet"
+            )
+            start = _parse_utc(entry["owned_start_utc"], "owned_interval")
+            end = _parse_utc(entry["owned_end_utc"], "owned_interval")
+            if entry["root_kind"] == "raw":
+                required = {"datetime", "open", "high", "low", "close", "volume"}
+                if (
+                    not required.issubset(source_frame.schema)
+                    or source_frame.schema["datetime"] != pl.Datetime("ms")
+                    or output_frame.schema != source_frame.schema
+                ):
+                    raise PreparationError("output_raw_schema_invalid")
+                start_ms = int(start.timestamp() * 1000)
+                end_ms = int(end.timestamp() * 1000)
+                expected_frame = source_frame.filter(
+                    (pl.col("datetime").dt.epoch("ms") >= start_ms)
+                    & (pl.col("datetime").dt.epoch("ms") < end_ms)
+                )
+                timestamps = output_frame.get_column("datetime").dt.epoch("ms").to_list()
+                if timestamps != list(
+                    range(int(start.timestamp() * 1000), int(end.timestamp() * 1000), 1000)
+                ):
+                    raise PreparationError("output_raw_grid_invalid")
+                numeric = output_frame.select(
                     [
-                        pl.col("timestamp_ms").cast(pl.Int64).alias("source_timestamp_ms"),
-                        ((pl.col("timestamp_ms").cast(pl.Int64) // interval) * interval).alias(
-                            "timestamp_ms"
-                        ),
-                        pl.lit("binance").alias("exchange"),
-                        pl.lit(entry["symbol"]).alias("symbol"),
-                        pl.col("funding_rate").cast(pl.Float64),
+                        pl.col(name).cast(pl.Float64)
+                        for name in ("open", "high", "low", "close", "volume")
                     ]
                 )
-                .filter(
-                    (pl.col("timestamp_ms") >= int(start.timestamp() * 1000))
-                    & (pl.col("timestamp_ms") < int(end.timestamp() * 1000))
+                if any(series.null_count() or not bool(series.is_finite().all()) for series in numeric):
+                    raise PreparationError("output_raw_values_invalid")
+                if bool(
+                    output_frame.select(
+                        (
+                            (pl.col("open") <= 0)
+                            | (pl.col("high") <= 0)
+                            | (pl.col("low") <= 0)
+                            | (pl.col("close") <= 0)
+                            | (pl.col("volume") < 0)
+                        ).any()
+                    ).item()
+                ):
+                    raise PreparationError("output_raw_values_invalid")
+                if not output_frame.filter(
+                    (pl.col("high") < pl.col("open"))
+                    | (pl.col("high") < pl.col("close"))
+                    | (pl.col("low") > pl.col("open"))
+                    | (pl.col("low") > pl.col("close"))
+                    | (pl.col("high") < pl.col("low"))
+                ).is_empty():
+                    raise PreparationError("output_raw_values_invalid")
+            else:
+                required = ["timestamp_ms", "source_timestamp_ms", "exchange", "symbol", "funding_rate"]
+                if output_frame.columns != required:
+                    raise PreparationError("output_feature_schema_invalid")
+                if (
+                    "timestamp_ms" not in source_frame.schema
+                    or "funding_rate" not in source_frame.schema
+                ):
+                    raise PreparationError("output_feature_source_schema_invalid")
+                if "exchange" in source_frame.schema and (
+                    source_frame.get_column("exchange").null_count()
+                    or {str(value).lower() for value in source_frame.get_column("exchange").to_list()}
+                    != {"binance"}
+                ):
+                    raise PreparationError("output_feature_source_exchange_invalid")
+                if "symbol" in source_frame.schema and (
+                    source_frame.get_column("symbol").null_count()
+                    or {str(value).upper() for value in source_frame.get_column("symbol").to_list()}
+                    != {entry["symbol"]}
+                ):
+                    raise PreparationError("output_feature_source_symbol_invalid")
+                interval = 14_400_000 if entry["symbol"] == "TONUSDT" else 28_800_000
+                valid = source_frame.filter(
+                    pl.col("funding_rate").is_not_null() & pl.col("funding_rate").is_finite()
                 )
-                .select(required)
-            )
-            expected_grid = list(
-                range(
-                    ((int(start.timestamp() * 1000) + interval - 1) // interval) * interval,
-                    int(end.timestamp() * 1000),
-                    interval,
+                source_times = valid.get_column("timestamp_ms").cast(pl.Int64)
+                canonical = (source_times // interval) * interval
+                if any(
+                    source - settlement < 0 or source - settlement > 1000
+                    for source, settlement in zip(
+                        source_times.to_list(), canonical.to_list(), strict=True
+                    )
+                ):
+                    raise PreparationError("output_feature_jitter_invalid")
+                expected_frame = (
+                    valid.with_columns(
+                        [
+                            pl.col("timestamp_ms").cast(pl.Int64).alias("source_timestamp_ms"),
+                            ((pl.col("timestamp_ms").cast(pl.Int64) // interval) * interval).alias(
+                                "timestamp_ms"
+                            ),
+                            pl.lit("binance").alias("exchange"),
+                            pl.lit(entry["symbol"]).alias("symbol"),
+                            pl.col("funding_rate").cast(pl.Float64),
+                        ]
+                    )
+                    .filter(
+                        (pl.col("timestamp_ms") >= int(start.timestamp() * 1000))
+                        & (pl.col("timestamp_ms") < int(end.timestamp() * 1000))
+                    )
+                    .select(required)
                 )
-            )
-            if (
-                output_frame.get_column("timestamp_ms").to_list() != expected_grid
-                or output_frame.get_column("exchange").to_list() != ["binance"] * len(expected_grid)
-                or output_frame.get_column("symbol").to_list()
-                != [entry["symbol"]] * len(expected_grid)
+                expected_grid = list(
+                    range(
+                        ((int(start.timestamp() * 1000) + interval - 1) // interval) * interval,
+                        int(end.timestamp() * 1000),
+                        interval,
+                    )
+                )
+                if (
+                    output_frame.get_column("timestamp_ms").to_list() != expected_grid
+                    or output_frame.get_column("exchange").to_list() != ["binance"] * len(expected_grid)
+                    or output_frame.get_column("symbol").to_list()
+                    != [entry["symbol"]] * len(expected_grid)
+                ):
+                    raise PreparationError("output_feature_grid_invalid")
+            if output_frame.height != entry["output_row_count"] or not output_frame.equals(
+                expected_frame
             ):
-                raise PreparationError("output_feature_grid_invalid")
-        if output_frame.height != entry["output_row_count"] or not output_frame.equals(
-            expected_frame
-        ):
-            raise PreparationError("output_parquet_content_mismatch")
-    return {
-        "file_count": len(layout),
-        "output_root": os.fspath(output_root),
-        "preparation_manifest_sha256": file_sha256(manifest_path, "preparation_manifest"),
-    }
+                raise PreparationError("output_parquet_content_mismatch")
+        return (
+            {
+                "file_count": len(layout),
+                "output_root": os.fspath(output_root),
+                "preparation_manifest_sha256": manifest_sha,
+            },
+            {
+                "output_root": output_root_identity,
+                "snapshot_root": snapshot_root_identity,
+                "output_generation": {
+                    "preparation_manifest.json": _stable_file_identity(manifest_item),
+                    **{
+                        relative: _stable_file_identity(item)
+                        for relative, (_, item) in pinned_outputs.items()
+                    },
+                },
+                "snapshot_generation": {
+                    "snapshot-manifest.json": _stable_file_identity(snapshot_manifest_item),
+                    **{
+                        relative: _stable_file_identity(item)
+                        for relative, (_, item) in pinned_sources.items()
+                    },
+                },
+            },
+        )
+    finally:
+        cleanup.close()
 
 
-def _authenticate_output(
+def _authenticate_output_with_provenance(
     output_root: Path,
     contract: dict[str, Any] | Path,
     contract_sha: str | dict[str, Any],
     snapshot: dict[str, Any] | Path,
     snapshot_root: Path | None = None,
-) -> dict[str, Any]:
+) -> tuple[dict[str, Any], dict[str, dict[str, int]]]:
     if isinstance(contract, Path):
         if (
             not isinstance(contract_sha, dict)
@@ -1577,6 +1753,288 @@ def _authenticate_output(
         raise PreparationError("output_parquet_semantic_invalid") from exc
 
 
+def _authenticate_output(
+    output_root: Path,
+    contract: dict[str, Any] | Path,
+    contract_sha: str | dict[str, Any],
+    snapshot: dict[str, Any] | Path,
+    snapshot_root: Path | None = None,
+) -> dict[str, Any]:
+    preparer_value, _ = _authenticate_output_with_provenance(
+        output_root, contract, contract_sha, snapshot, snapshot_root
+    )
+    return preparer_value
+def _open_generation_root(
+    path: Path, expected: dict[str, int], label: str
+) -> tuple[int, dict[str, int]]:
+    try:
+        descriptor = os.open(
+            path, os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0)
+        )
+    except OSError as exc:
+        raise PreparationError(f"{label}_namespace_unavailable") from exc
+    try:
+        item = os.fstat(descriptor)
+    except OSError as exc:
+        os.close(descriptor)
+        raise PreparationError(f"{label}_namespace_unavailable") from exc
+    identity = {"st_dev": item.st_dev, "st_ino": item.st_ino}
+    if identity != expected:
+        os.close(descriptor)
+        raise PreparationError(f"{label}_replaced")
+    return descriptor, identity
+
+
+def _open_generation_file(
+    root_fd: int, relative_path: str, expected_sha: str, expected_size: int, label: str
+) -> tuple[int, os.stat_result]:
+    descriptor: int | None = None
+    try:
+        descriptor, item = _open_pinned_relative_file(root_fd, relative_path, label)
+        if (
+            item.st_size != expected_size
+            or _pinned_file_sha256(descriptor, item, label) != expected_sha
+        ):
+            raise PreparationError(f"{label}_mismatch")
+        return descriptor, item
+    except PreparationError:
+        if descriptor is not None:
+            os.close(descriptor)
+        raise
+    except OSError as exc:
+        if descriptor is not None:
+            os.close(descriptor)
+        raise PreparationError(f"{label}_namespace_unavailable") from exc
+    except Exception:
+        if descriptor is not None:
+            os.close(descriptor)
+        raise
+
+
+def _authenticate_public_generation(
+    output_root: Path,
+    snapshot_root: Path,
+    preparer_value: dict[str, Any],
+    snapshot_value: dict[str, Any],
+    authenticated_roots: dict[str, dict[str, int]],
+    cleanup: ExitStack,
+) -> dict[str, Any]:
+    """Pin every receipt-visible public object until final namespace rewalk."""
+    output_fd, _ = _open_generation_root(
+        output_root, authenticated_roots["output_root"], "output_root"
+    )
+    cleanup.callback(os.close, output_fd)
+    snapshot_fd, _ = _open_generation_root(
+        snapshot_root, authenticated_roots["snapshot_root"], "snapshot_root"
+    )
+    cleanup.callback(os.close, snapshot_fd)
+
+    manifest_fd, manifest_item = _open_pinned_relative_file(
+        output_fd, "preparation_manifest.json", "output_manifest"
+    )
+    cleanup.callback(os.close, manifest_fd)
+    manifest_bytes = _pinned_bytes(manifest_fd, manifest_item, "output_manifest")
+    if sha256(manifest_bytes) != preparer_value["preparation_manifest_sha256"]:
+        raise PreparationError("output_manifest_mismatch")
+    try:
+        manifest = json.loads(manifest_bytes)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise PreparationError("output_manifest_invalid_json") from exc
+    if manifest_bytes != canonical_bytes(manifest) or not isinstance(manifest.get("files"), list):
+        raise PreparationError("output_manifest_invalid")
+
+    snapshot_manifest_fd, snapshot_manifest_item = _open_pinned_relative_file(
+        snapshot_fd, "snapshot-manifest.json", "snapshot_manifest"
+    )
+    cleanup.callback(os.close, snapshot_manifest_fd)
+    snapshot_manifest_bytes = _pinned_bytes(
+        snapshot_manifest_fd, snapshot_manifest_item, "snapshot_manifest"
+    )
+    if snapshot_manifest_bytes != canonical_bytes(snapshot_value):
+        raise PreparationError("snapshot_manifest_diverged")
+    complete_fd, complete_item = _open_pinned_relative_file(
+        snapshot_fd, ".complete.json", "snapshot_complete"
+    )
+    cleanup.callback(os.close, complete_fd)
+    if _pinned_bytes(complete_fd, complete_item, "snapshot_complete") != canonical_bytes(
+        {
+            "schema": SNAPSHOT_SCHEMA,
+            "snapshot_manifest_sha256": sha256(canonical_bytes(snapshot_value)),
+        }
+    ):
+        raise PreparationError("snapshot_complete_diverged")
+    _snapshot_inventory(snapshot_root, snapshot_value["entries"], finalize_modes=False)
+
+    output_files: dict[str, tuple[int, os.stat_result, str, int]] = {
+        "preparation_manifest.json": (
+            manifest_fd,
+            manifest_item,
+            preparer_value["preparation_manifest_sha256"],
+            manifest_item.st_size,
+        )
+    }
+    for entry in manifest["files"]:
+        if not isinstance(entry, dict):
+            raise PreparationError("output_manifest_invalid")
+        relative = _relative_output_path(entry.get("output_relative_path"))
+        digest, size = entry.get("output_sha256"), entry.get("output_byte_count")
+        if not isinstance(digest, str) or type(size) is not int:
+            raise PreparationError("output_manifest_invalid")
+        descriptor, item = _open_generation_file(
+            output_fd, relative, digest, size, "output_parquet"
+        )
+        cleanup.callback(os.close, descriptor)
+        output_files[relative] = (descriptor, item, digest, size)
+
+    snapshot_files: dict[str, tuple[int, os.stat_result, str, int]] = {
+        "snapshot-manifest.json": (
+            snapshot_manifest_fd,
+            snapshot_manifest_item,
+            sha256(canonical_bytes(snapshot_value)),
+            snapshot_manifest_item.st_size,
+        ),
+        ".complete.json": (
+            complete_fd,
+            complete_item,
+            sha256(
+                canonical_bytes(
+                    {
+                        "schema": SNAPSHOT_SCHEMA,
+                        "snapshot_manifest_sha256": sha256(canonical_bytes(snapshot_value)),
+                    }
+                )
+            ),
+            complete_item.st_size,
+        ),
+    }
+    for entry in snapshot_value["entries"]:
+        relative, digest, size = (
+            entry["source_relative_path"],
+            entry["sha256"],
+            entry["byte_count"],
+        )
+        descriptor, item = _open_generation_file(
+            snapshot_fd, relative, digest, size, "snapshot_parquet"
+        )
+        cleanup.callback(os.close, descriptor)
+        snapshot_files[relative] = (descriptor, item, digest, size)
+    for relative, (_, item, _, _) in output_files.items():
+        if authenticated_roots["output_generation"].get(relative) != _stable_file_identity(item):
+            raise PreparationError("output_generation_replaced")
+    for relative, (_, item, _, _) in snapshot_files.items():
+        expected = authenticated_roots["snapshot_generation"].get(relative)
+        if expected is not None and expected != _stable_file_identity(item):
+            raise PreparationError("snapshot_generation_replaced")
+    return {
+        "output_fd": output_fd,
+        "snapshot_fd": snapshot_fd,
+        "output_files": output_files,
+        "snapshot_files": snapshot_files,
+    }
+
+
+def _assert_generation_inventory(
+    root_fd: int, files: dict[str, tuple[int, os.stat_result, str, int]], label: str
+) -> None:
+    expected_files = set(files)
+    expected_directories: set[str] = set()
+    for relative in expected_files:
+        parent = PurePosixPath(relative).parent
+        while parent != PurePosixPath("."):
+            expected_directories.add(parent.as_posix())
+            parent = parent.parent
+    actual_files: set[str] = set()
+    actual_directories: set[str] = set()
+
+    def walk(directory_fd: int, relative_path: str) -> None:
+        children_fd = os.dup(directory_fd)
+        try:
+            with os.scandir(children_fd) as children:
+                for child in children:
+                    child_relative = (
+                        f"{relative_path}/{child.name}" if relative_path else child.name
+                    )
+                    observed = child.stat(follow_symlinks=False)
+                    if stat.S_ISDIR(observed.st_mode):
+                        flags = os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0)
+                    elif stat.S_ISREG(observed.st_mode) and observed.st_nlink == 1:
+                        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+                    else:
+                        raise PreparationError(f"{label}_generation_inventory_mismatch")
+                    child_fd = os.open(child.name, flags, dir_fd=directory_fd)
+                    try:
+                        if _stable_file_identity(os.fstat(child_fd)) != _stable_file_identity(observed):
+                            raise PreparationError(f"{label}_generation_inventory_mismatch")
+                        if stat.S_ISDIR(observed.st_mode):
+                            actual_directories.add(child_relative)
+                            walk(child_fd, child_relative)
+                        else:
+                            actual_files.add(child_relative)
+                    finally:
+                        os.close(child_fd)
+        finally:
+            os.close(children_fd)
+
+    try:
+        walk(root_fd, "")
+    except PreparationError:
+        raise
+    except OSError as exc:
+        raise PreparationError(f"{label}_generation_inventory_unavailable") from exc
+    if actual_files != expected_files or actual_directories != expected_directories:
+        raise PreparationError(f"{label}_generation_inventory_mismatch")
+
+
+def _assert_public_generation_unchanged(
+    output_root: Path, snapshot_root: Path, snapshot_value: dict[str, Any], token: dict[str, Any]
+) -> None:
+    """Rewalk public names from pinned roots; path replacement cannot satisfy this token."""
+    for label, descriptor in (("output_root", token["output_fd"]), ("snapshot_root", token["snapshot_fd"])):
+        try:
+            os.fstat(descriptor)
+        except OSError as exc:
+            raise PreparationError(f"{label}_namespace_unavailable") from exc
+    _snapshot_inventory(snapshot_root, snapshot_value["entries"], finalize_modes=False)
+    for root_path, root_fd, files, label in (
+        (snapshot_root, token["snapshot_fd"], token["snapshot_files"], "snapshot"),
+        (output_root, token["output_fd"], token["output_files"], "output"),
+    ):
+        try:
+            namespace_fd = os.open(
+                root_path, os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0)
+            )
+        except OSError as exc:
+            raise PreparationError(f"{label}_root_namespace_unavailable") from exc
+        try:
+            try:
+                if _stable_file_identity(os.fstat(namespace_fd)) != _stable_file_identity(
+                    os.fstat(root_fd)
+                ):
+                    raise PreparationError(f"{label}_root_replaced")
+            except PreparationError:
+                raise
+            except OSError as exc:
+                raise PreparationError(f"{label}_root_namespace_unavailable") from exc
+            for relative, (descriptor, before, digest, size) in files.items():
+                try:
+                    _assert_stable_file(descriptor, before, f"{label}_generation")
+                    reopened, reopened_item = _open_generation_file(
+                        namespace_fd, relative, digest, size, f"{label}_generation"
+                    )
+                except PreparationError:
+                    raise
+                except OSError as exc:
+                    raise PreparationError(f"{label}_generation_namespace_unavailable") from exc
+                try:
+                    if _stable_file_identity(reopened_item) != _stable_file_identity(before):
+                        raise PreparationError(f"{label}_generation_mismatch")
+                finally:
+                    os.close(reopened)
+            _assert_generation_inventory(namespace_fd, files, label)
+        finally:
+            os.close(namespace_fd)
+
+
 def _output_exists(output_root: Path) -> bool:
     _assert_no_symlink_components(output_root, "output_root", include_leaf=False)
     try:
@@ -1590,7 +2048,9 @@ def _output_exists(output_root: Path) -> bool:
     return True
 
 
-def _main_with_lock(args: argparse.Namespace, lock_identity: dict[str, int]) -> int:
+def _main_with_lock_inner(
+    args: argparse.Namespace, lock_identity: dict[str, int], cleanup: ExitStack
+) -> int:
     acquirer = _absolute_clean_path(args.acquirer, "acquirer")
     source_root = _absolute_clean_path(args.source_root, "source_root")
     source_report = _absolute_clean_path(args.source_report, "source_report")
@@ -1629,12 +2089,15 @@ def _main_with_lock(args: argparse.Namespace, lock_identity: dict[str, int]) -> 
     _directory_identity(raw_root, "raw_root")
     _directory_identity(feature_root, "feature_root")
 
-    pinned = {
-        "acquirer": _open_pinned_file(acquirer, "acquirer"),
-        "contract_manifest": _open_pinned_file(contract, "contract_manifest"),
-        "availability_evidence": _open_pinned_file(evidence, "availability_evidence"),
-        "preparer": _open_pinned_file(preparer, "preparer"),
-    }
+    pinned = {}
+    for label, path in {
+        "acquirer": acquirer,
+        "contract_manifest": contract,
+        "availability_evidence": evidence,
+        "preparer": preparer,
+    }.items():
+        pinned[label] = _open_pinned_file(path, label)
+        cleanup.callback(os.close, pinned[label][0])
     acquirer_sha = pinned["acquirer"][2]
     contract_sha = pinned["contract_manifest"][2]
     evidence_sha = pinned["availability_evidence"][2]
@@ -1681,6 +2144,8 @@ def _main_with_lock(args: argparse.Namespace, lock_identity: dict[str, int]) -> 
     ]
     inputs = _materialize_invocation_inputs(sidecars["inputs"], pinned)
     materialized = _open_materialized_inputs(inputs, pinned)
+    for descriptor, _, _ in materialized.values():
+        cleanup.callback(os.close, descriptor)
     contract_bytes = _pinned_bytes(
         materialized["contract_manifest"][0],
         materialized["contract_manifest"][1],
@@ -1763,6 +2228,7 @@ def _main_with_lock(args: argparse.Namespace, lock_identity: dict[str, int]) -> 
         "invocation_descriptor",
     )
     lock_fd, _ = _open_verified_file(sidecars["descriptor"], "invocation_descriptor")
+    cleanup.callback(os.close, lock_fd)
     try:
         fcntl.flock(lock_fd, fcntl.LOCK_EX)
         output_exists = _output_exists(output_root)
@@ -1782,7 +2248,7 @@ def _main_with_lock(args: argparse.Namespace, lock_identity: dict[str, int]) -> 
         if _require_unchanged(verified, source_root, source_report) != verified:
             raise PreparationError("eligible_source_changed_after_snapshot")
         if output_exists:
-            preparer_value = _authenticate_output(
+            preparer_value, authenticated_roots = _authenticate_output_with_provenance(
                 output_root, contract_value, contract_sha, snapshot_value, sidecars["snapshot"]
             )
         else:
@@ -1803,7 +2269,7 @@ def _main_with_lock(args: argparse.Namespace, lock_identity: dict[str, int]) -> 
                 declared = json.loads(preparer_result.stdout)
             except (UnicodeDecodeError, json.JSONDecodeError) as exc:
                 raise PreparationError("phase_preparer_stdout_invalid_json") from exc
-            preparer_value = _authenticate_output(
+            preparer_value, authenticated_roots = _authenticate_output_with_provenance(
                 output_root, contract_value, contract_sha, snapshot_value, sidecars["snapshot"]
             )
             if declared != preparer_value:
@@ -1815,13 +2281,30 @@ def _main_with_lock(args: argparse.Namespace, lock_identity: dict[str, int]) -> 
             "verifier_argv_sha256": argv_sha256(verifier_argv),
             "preparer_argv_sha256": argv_sha256(preparer_argv),
             "preparer_result": preparer_value,
-            "output_root_identity": _directory_identity(output_root, "output_root"),
+            "output_root_identity": authenticated_roots["output_root"],
             "source_snapshot_manifest_sha256": sha256(canonical_bytes(snapshot_value)),
-            "source_snapshot_identity": _directory_identity(sidecars["snapshot"], "snapshot_root"),
+            "source_snapshot_identity": authenticated_roots["snapshot_root"],
             "output_manifest_sha256": preparer_value["preparation_manifest_sha256"],
         }
         _assert_materialized_inputs_unchanged(inputs, materialized)
         _assert_pinned_files_unchanged(pinned)
+        _assert_directory_identity(
+            output_root, authenticated_roots["output_root"], "output_root"
+        )
+        _assert_directory_identity(
+            sidecars["snapshot"], authenticated_roots["snapshot_root"], "snapshot_root"
+        )
+        generation_token = _authenticate_public_generation(
+            output_root,
+            sidecars["snapshot"],
+            preparer_value,
+            snapshot_value,
+            authenticated_roots,
+            cleanup,
+        )
+        _assert_public_generation_unchanged(
+            output_root, sidecars["snapshot"], snapshot_value, generation_token
+        )
         _persist_immutable(
             sidecars["receipt_stage"], sidecars["receipt"], receipt, "handoff_receipt"
         )
@@ -1829,11 +2312,11 @@ def _main_with_lock(args: argparse.Namespace, lock_identity: dict[str, int]) -> 
         return 0
     finally:
         fcntl.flock(lock_fd, fcntl.LOCK_UN)
-        os.close(lock_fd)
-        for descriptor, _, _ in pinned.values():
-            os.close(descriptor)
-        for descriptor, _, _ in materialized.values():
-            os.close(descriptor)
+
+
+def _main_with_lock(args: argparse.Namespace, lock_identity: dict[str, int]) -> int:
+    with ExitStack() as cleanup:
+        return _main_with_lock_inner(args, lock_identity, cleanup)
 
 
 def main(argv: list[str] | None = None) -> int:

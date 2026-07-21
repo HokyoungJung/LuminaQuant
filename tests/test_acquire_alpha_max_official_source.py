@@ -2480,11 +2480,239 @@ def test_validation_helpers_reject_nonfinite_discontinuous_ohlcv() -> None:
         )
 
 
+@pytest.mark.parametrize(("tree_name", "prefix"), [("output", "output"), ("report", "report")])
+def test_manifest_hashes_nested_tree_through_inventory_descriptor(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, tree_name: str, prefix: str
+) -> None:
+    output, report = tmp_path / "output", tmp_path / "report"
+    output.mkdir()
+    report.mkdir()
+    root = output if tree_name == "output" else report
+    nested = root / "nested"
+    nested.mkdir()
+    (nested / "artifact").write_bytes(b"original")
+    original_file_digest = subject.hashlib.file_digest
+    replaced = False
+
+    def replace_nested_tree(source: io.BufferedReader, algorithm: str) -> object:
+        nonlocal replaced
+        if not replaced:
+            replaced = True
+            nested.rename(root / "nested-original")
+            nested.mkdir()
+            (nested / "artifact").write_bytes(b"replacement")
+            (nested / "replacement-extra").write_bytes(b"extra")
+        return original_file_digest(source, algorithm)
+
+    monkeypatch.setattr(subject.hashlib, "file_digest", replace_nested_tree)
+
+    manifest = subject.manifest_value(output, report)
+
+    assert manifest["artifacts"] == [
+        {
+            "path": f"{prefix}/nested/artifact",
+            "sha256": hashlib.sha256(b"original").hexdigest(),
+        }
+    ]
+
+
+def test_manifest_rejects_same_inode_same_size_mutation_during_hash(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    output, report = tmp_path / "output", tmp_path / "report"
+    output.mkdir()
+    report.mkdir()
+    artifact = output / "artifact"
+    artifact.write_bytes(b"before")
+    original_file_digest = subject.hashlib.file_digest
+
+    def mutate_during_hash(source: io.BufferedReader, algorithm: str) -> object:
+        before = artifact.stat()
+        artifact.write_bytes(b"after!")
+        os.utime(
+            artifact, ns=(before.st_atime_ns, before.st_mtime_ns + 1_000_000_000)
+        )
+        after = artifact.stat()
+        assert (after.st_dev, after.st_ino, after.st_size) == (
+            before.st_dev,
+            before.st_ino,
+            before.st_size,
+        )
+        return original_file_digest(source, algorithm)
+
+    monkeypatch.setattr(subject.hashlib, "file_digest", mutate_during_hash)
+
+    with pytest.raises(subject.AcquisitionError, match=r"^complete_inventory_unsafe_object$"):
+        subject.manifest_value(output, report)
+
+
+def test_main_preserves_ambient_plan_and_verify_locks(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class Lock:
+        def __init__(self) -> None:
+            self.close_count = 0
+
+        def close(self) -> None:
+            self.close_count += 1
+
+    class NoopRunLock:
+        def __enter__(self) -> None:
+            return None
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+    monkeypatch.setattr(subject, "assert_input_paths", lambda *_: None)
+    monkeypatch.setattr(subject, "assert_roots", lambda *_: None)
+    monkeypatch.setattr(subject, "load_contract", lambda _: [])
+    monkeypatch.setattr(subject, "load_evidence", lambda _: None)
+    monkeypatch.setattr(subject, "owned_run_lock", lambda *_, **__: NoopRunLock())
+    monkeypatch.setattr(subject, "verify_eligible", lambda *_: None)
+    ambient = Lock()
+    token = subject._ACTIVE_EXECUTE_LOCK.set(ambient)
+    try:
+        common = [
+            "--contract-manifest",
+            str(tmp_path / "contract.json"),
+            "--availability-evidence",
+            str(tmp_path / "evidence.json"),
+            "--output-root",
+            str(tmp_path / "output"),
+        ]
+        assert subject.main(
+            [*common, "--report-dir", str(tmp_path / "plan-report")]
+        ) == 0
+        assert subject._ACTIVE_EXECUTE_LOCK.get() is ambient
+        assert subject.main(
+            [*common, "--report-dir", str(tmp_path / "verify-report"), "--verify-eligible"]
+        ) == 0
+        assert subject._ACTIVE_EXECUTE_LOCK.get() is ambient
+        assert ambient.close_count == 0
+    finally:
+        subject._ACTIVE_EXECUTE_LOCK.reset(token)
+
+
+def test_release_execute_lock_closes_nested_execute_lock_once() -> None:
+    class Lock:
+        def __init__(self) -> None:
+            self.close_count = 0
+
+        def close(self) -> None:
+            self.close_count += 1
+
+    ambient = Lock()
+    local = Lock()
+    token = subject._ACTIVE_EXECUTE_LOCK.set(ambient)
+    try:
+        @subject.release_execute_lock
+        def nested_execute() -> None:
+            assert subject._ACTIVE_EXECUTE_LOCK.get() is None
+            subject._ACTIVE_EXECUTE_LOCK.set(local)
+
+        @subject.release_execute_lock
+        def execute() -> None:
+            assert subject._ACTIVE_EXECUTE_LOCK.get() is None
+            nested_execute()
+            assert subject._ACTIVE_EXECUTE_LOCK.get() is None
+
+        execute()
+        assert local.close_count == 1
+        assert subject._ACTIVE_EXECUTE_LOCK.get() is ambient
+        assert ambient.close_count == 0
+    finally:
+        subject._ACTIVE_EXECUTE_LOCK.reset(token)
+
+
+def test_main_isolates_verifier_context_through_deep_execute_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(subject, "assert_input_paths", lambda *_: None)
+    monkeypatch.setattr(subject, "assert_roots", lambda *_: None)
+    monkeypatch.setattr(subject, "load_contract", lambda _: [])
+    monkeypatch.setattr(subject, "load_evidence", lambda _: None)
+    observed: list[int | None] = []
+
+    def observe_context(*_: object) -> None:
+        observed.append(subject._VERIFIER_CODE_FD.get())
+        raise subject.AcquisitionError("deep_execute_context")
+
+    monkeypatch.setattr(subject, "recover_owned_hardlink_prefixes", observe_context)
+    descriptor = os.open(_MODULE, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+    token = subject._VERIFIER_CODE_FD.set(descriptor)
+    try:
+        with pytest.raises(subject.AcquisitionError, match=r"^deep_execute_context$"):
+            subject.main(
+                [
+                    "--contract-manifest",
+                    str(tmp_path / "contract.json"),
+                    "--availability-evidence",
+                    str(tmp_path / "evidence.json"),
+                    "--output-root",
+                    str(tmp_path / "output"),
+                    "--report-dir",
+                    str(tmp_path / "report"),
+                    "--execute",
+                ]
+            )
+        assert observed == [None]
+        assert subject._VERIFIER_CODE_FD.get() == descriptor
+    finally:
+        subject._VERIFIER_CODE_FD.reset(token)
+        os.close(descriptor)
+
 def test_code_hash_uses_inherited_verifier_descriptor() -> None:
     descriptor = os.open(_MODULE, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
     token = subject._VERIFIER_CODE_FD.set(descriptor)
     try:
         assert subject.code_hash() == subject.file_sha256(_MODULE)
+    finally:
+        subject._VERIFIER_CODE_FD.reset(token)
+        os.close(descriptor)
+
+
+def test_stable_file_rejects_same_size_in_place_mutation(tmp_path: Path) -> None:
+    target = tmp_path / "source"
+    target.write_bytes(b"before")
+    original_stat = target.stat()
+
+    with (
+        pytest.raises(subject.AcquisitionError, match=r"^unsafe_file$"),
+        subject.stable_file(target) as source,
+    ):
+        target.write_bytes(b"after!")
+        os.utime(
+            target, ns=(original_stat.st_atime_ns, original_stat.st_mtime_ns + 1)
+        )
+        assert source.read() == b"after!"
+
+
+@pytest.mark.parametrize("action", [[], ["--execute"]])
+def test_main_restores_verifier_context_after_non_verifier_call(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, action: list[str]
+) -> None:
+    def reject_input_paths(*_: object) -> None:
+        raise subject.AcquisitionError("test_input_failure")
+
+    monkeypatch.setattr(subject, "assert_input_paths", reject_input_paths)
+    descriptor = os.open(_MODULE, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+    token = subject._VERIFIER_CODE_FD.set(descriptor)
+    try:
+        with pytest.raises(subject.AcquisitionError, match=r"^test_input_failure$"):
+            subject.main(
+                [
+                    "--contract-manifest",
+                    str(tmp_path / "contract.json"),
+                    "--availability-evidence",
+                    str(tmp_path / "evidence.json"),
+                    "--output-root",
+                    str(tmp_path / "output"),
+                    "--report-dir",
+                    str(tmp_path / "report"),
+                    *action,
+                ]
+            )
+        assert subject._VERIFIER_CODE_FD.get() == descriptor
     finally:
         subject._VERIFIER_CODE_FD.reset(token)
         os.close(descriptor)

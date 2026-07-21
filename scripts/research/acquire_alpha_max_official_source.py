@@ -143,10 +143,21 @@ def stable_file(path: Path) -> Iterable[io.BufferedReader]:
         with os.fdopen(os.dup(fd), "rb") as source:
             yield source
         after = os.fstat(fd)
-        if (before.st_dev, before.st_ino, before.st_size, before.st_nlink) != (
+        if (
+            before.st_dev,
+            before.st_ino,
+            before.st_mode,
+            before.st_size,
+            before.st_mtime_ns,
+            before.st_ctime_ns,
+            before.st_nlink,
+        ) != (
             after.st_dev,
             after.st_ino,
+            after.st_mode,
             after.st_size,
+            after.st_mtime_ns,
+            after.st_ctime_ns,
             after.st_nlink,
         ):
             raise AcquisitionError("unsafe_file")
@@ -1237,13 +1248,16 @@ _ACTIVE_EXECUTE_LOCK: ContextVar[OwnedRunLock | None] = ContextVar(
 
 def release_execute_lock(function: Any) -> Any:
     def wrapped(*args: Any, **kwargs: Any) -> Any:
+        lock_token = _ACTIVE_EXECUTE_LOCK.set(None)
         try:
             return function(*args, **kwargs)
         finally:
             lock = _ACTIVE_EXECUTE_LOCK.get()
-            if lock is not None:
-                lock.close()
-                _ACTIVE_EXECUTE_LOCK.set(None)
+            try:
+                if lock is not None:
+                    lock.close()
+            finally:
+                _ACTIVE_EXECUTE_LOCK.reset(lock_token)
 
     return wrapped
 
@@ -1814,7 +1828,7 @@ def funding_pages_from_provenance(
     return rows, hashes, paths
 
 
-def stable_tree(root: Path) -> tuple[set[str], set[str]]:
+def stable_tree(root: Path, file_digests: dict[str, str] | None = None) -> tuple[set[str], set[str]]:
     """Walk a root through directory descriptors without following components."""
     root = lexical(root)
     files: set[str] = set()
@@ -1843,6 +1857,47 @@ def stable_tree(root: Path) -> tuple[set[str], set[str]]:
                     finally:
                         os.close(child_fd)
                 elif stat.S_ISREG(item.st_mode) and item.st_nlink == 1:
+                    if file_digests is not None:
+                        try:
+                            file_fd = os.open(
+                                entry.name,
+                                os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0),
+                                dir_fd=fd,
+                            )
+                        except OSError as exc:
+                            raise AcquisitionError("complete_inventory_unsafe_object") from exc
+                        try:
+                            opened = os.fstat(file_fd)
+                            if (
+                                not stat.S_ISREG(opened.st_mode)
+                                or opened.st_nlink != 1
+                                or (opened.st_dev, opened.st_ino) != (item.st_dev, item.st_ino)
+                            ):
+                                raise AcquisitionError("complete_inventory_unsafe_object")
+                            with os.fdopen(os.dup(file_fd), "rb") as source:
+                                before = os.fstat(file_fd)
+                                file_digests[name] = hashlib.file_digest(source, "sha256").hexdigest()
+                                after = os.fstat(file_fd)
+                                if (
+                                    before.st_dev,
+                                    before.st_ino,
+                                    before.st_mode,
+                                    before.st_size,
+                                    before.st_mtime_ns,
+                                    before.st_ctime_ns,
+                                    before.st_nlink,
+                                ) != (
+                                    after.st_dev,
+                                    after.st_ino,
+                                    after.st_mode,
+                                    after.st_size,
+                                    after.st_mtime_ns,
+                                    after.st_ctime_ns,
+                                    after.st_nlink,
+                                ):
+                                    raise AcquisitionError("complete_inventory_unsafe_object")
+                        finally:
+                            os.close(file_fd)
                     files.add(name)
                 else:
                     raise AcquisitionError("complete_inventory_unsafe_object")
@@ -1873,11 +1928,11 @@ def manifest_value(output: Path, report: Path) -> dict[str, Any]:
             },
         ),
     ):
-        tree_files, _directories = stable_tree(root)
+        tree_digests: dict[str, str] = {}
+        tree_files, _directories = stable_tree(root, tree_digests)
         for relative in sorted(tree_files):
-            path = root / relative
-            if path.name not in excluded:
-                files.append({"path": f"{prefix}/{relative}", "sha256": file_sha256(path)})
+            if Path(relative).name not in excluded:
+                files.append({"path": f"{prefix}/{relative}", "sha256": tree_digests[relative]})
     return {
         "schema": "alpha_max_official_source_manifest.v4",
         "contract_sha256": CONTRACT_SHA256,
@@ -2173,27 +2228,34 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return args
 
 
-@release_execute_lock
-def main(argv: list[str] | None = None) -> int:
-    args = parse_args(argv)
-    code_fd_token = _VERIFIER_CODE_FD.set(args.verifier_code_fd)
-    try:
-        assert_input_paths(args.contract_manifest, args.availability_evidence, args.forbidden_root)
-        assert_roots(
-            args.output_root,
-            args.report_dir,
-            args.forbidden_root,
-            args.execute or args.verify_eligible,
-        )
-        contracts = load_contract(args.contract_manifest)
-        load_evidence(args.availability_evidence)
-        if args.verify_eligible:
-            with owned_run_lock(args.report_dir, exclusive=True):
-                verify_eligible(args.output_root, args.report_dir, contracts)
-            return 0
-    finally:
-        if args.verify_eligible:
+def invocation_verifier_code_fd(function: Any) -> Any:
+    def wrapped(argv: list[str] | None = None) -> int:
+        args = parse_args(argv)
+        code_fd_token = _VERIFIER_CODE_FD.set(args.verifier_code_fd)
+        try:
+            return function(args)
+        finally:
             _VERIFIER_CODE_FD.reset(code_fd_token)
+
+    return wrapped
+
+
+@release_execute_lock
+@invocation_verifier_code_fd
+def main(args: argparse.Namespace) -> int:
+    assert_input_paths(args.contract_manifest, args.availability_evidence, args.forbidden_root)
+    assert_roots(
+        args.output_root,
+        args.report_dir,
+        args.forbidden_root,
+        args.execute or args.verify_eligible,
+    )
+    contracts = load_contract(args.contract_manifest)
+    load_evidence(args.availability_evidence)
+    if args.verify_eligible:
+        with owned_run_lock(args.report_dir, exclusive=True):
+            verify_eligible(args.output_root, args.report_dir, contracts)
+        return 0
     selected_symbols = set(args.symbols or SYMBOLS)
     selected_months = set(args.months or [])
     if not selected_symbols <= set(SYMBOLS):
@@ -2247,13 +2309,11 @@ def main(argv: list[str] | None = None) -> int:
         recover_owned_hardlink_prefixes(output, report, plan_data)
     else:
         raise AcquisitionError("roots_resume_pair_invalid")
-    run_lock = OwnedRunLock(report, exclusive=True)
-    _ACTIVE_EXECUTE_LOCK.set(run_lock)
+    _ACTIVE_EXECUTE_LOCK.set(OwnedRunLock(report, exclusive=True))
     cleanup_scratch(output, report)
     if (report / "source_eligible_receipt.json").exists():
         if plan == full_plan():
             verify_eligible(output, report, contracts)
-            run_lock.close()
             return 0
         raise AcquisitionError("source_eligible_run_is_immutable")
     bind_input_provenance(args.contract_manifest, args.availability_evidence, report)
@@ -2303,7 +2363,6 @@ def main(argv: list[str] | None = None) -> int:
         receipt["acquisition_journal_sha256"] = file_sha256(report / "acquisition.journal.jsonl")
         verify_ownership(output, report, run_id)
         immutable_json(report / "source_eligible_receipt.json", receipt, report)
-    run_lock.close()
     return 0
 
 
