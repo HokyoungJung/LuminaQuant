@@ -69,9 +69,13 @@ mcp = [
 mt5 = [
     "MetaTrader5>=5.0.0; platform_system == 'Windows'",
 ]
+terminal-authority = [
+    "cryptography==49.0.0",
+]
 dev = [
     "pytest>=8.0.0",
     "ruff>=0.15.1",
+    "cryptography==49.0.0",
 ]
 
 [tool.setuptools]
@@ -164,4 +168,5 @@ dev = [
     # skip in local runs (also published to users via the "optimize" extra).
     "optuna>=4.0",
     "numba>=0.62",
+    "cryptography==49.0.0",
 ]
