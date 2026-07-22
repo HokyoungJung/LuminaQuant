@@ -26,7 +26,7 @@ Read these ten files in full before action:
 Required Git state:
 
 - implementation checkpoint: `475f3f2ebe37994f574dc970e1b3fa9563da8009`
-- handoff-content commit: `__HANDOFF_CONTENT_COMMIT__`
+- handoff-content commit: `039a0fe507b6fa89ff9c97dd1c7b415bf4935bd2`
 - branch HEAD must be clean and descend from both commits
 - historical commits remain ancestry only; do not reset/rebase/amend/push
 

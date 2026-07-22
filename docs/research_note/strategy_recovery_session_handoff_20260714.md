@@ -5,7 +5,7 @@
 - Repository: `/home/hoky/Quants-agent/LuminaQuant`
 - Branch: `recovery/strategy-plan-20260714`
 - G061 implementation checkpoint: `475f3f2ebe37994f574dc970e1b3fa9563da8009`
-- Handoff-content commit: `__HANDOFF_CONTENT_COMMIT__`
+- Handoff-content commit: `039a0fe507b6fa89ff9c97dd1c7b415bf4935bd2`
 - The clean resume HEAD must descend from both commits. Historical commits `3deeb7927e29bfa6af94a8974043541cd45352b5`, `bfce6f5caf482f8e1f11079ae1c4af83e16d515e`, `b349cb57596a44d9e7e4a68519d0ddb586f97dc3`, and `6b1ce4cb2a2092c4d135023055f8c08afeb87491` remain ancestry facts only.
 - Durable session: `019f603a-0e73-7000-88a7-c94f42950c09`
 - Stable aggregate objective: `Complete the durable ultragoal plan in .gjc/ultragoal/goals.json, including later accepted/appended stories, under the original brief constraints; use .gjc/ultragoal/ledger.jsonl as the audit trail.`

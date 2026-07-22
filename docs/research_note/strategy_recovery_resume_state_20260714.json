@@ -5,7 +5,7 @@
   "branch": "recovery/strategy-plan-20260714",
   "required_git_state": {
     "implementation_checkpoint": "475f3f2ebe37994f574dc970e1b3fa9563da8009",
-    "handoff_content_commit": "__HANDOFF_CONTENT_COMMIT__",
+    "handoff_content_commit": "039a0fe507b6fa89ff9c97dd1c7b415bf4935bd2",
     "final_sealed_head_policy": "The clean branch HEAD must descend from both the implementation checkpoint and handoff-content commit. The exact final HEAD is printed in the user-facing new-session prompt issued after sealing.",
     "status": "committed implementation checkpoint; story incomplete"
   },
