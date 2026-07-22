@@ -1,47 +1,134 @@
-# Strategy recovery cross-session handoff — G059 complete — 2026-07-21
+# Strategy recovery cross-session handoff — G061 stopped/incomplete — 2026-07-22
 
 ## Resume identity and stopped state
 
-- Repository: `/home/hoky/Quants-agent/LuminaQuant`; branch: `recovery/strategy-plan-20260714`.
-- Complete implementation commit: `3deeb7927e29bfa6af94a8974043541cd45352b5`. Original baseline `b349cb57596a44d9e7e4a68519d0ddb586f97dc3` and prior handoff seal `6b1ce4cb2a2092c4d135023055f8c08afeb87491` are historical ancestry facts only.
-- Handoff-content commit: `bfce6f5caf482f8e1f11079ae1c4af83e16d515e`. The final sealed HEAD must descend from both it and implementation commit `3deeb7927e29bfa6af94a8974043541cd45352b5`.
-- Session: `019f603a-0e73-7000-88a7-c94f42950c09`. Stable aggregate objective: `Complete the durable ultragoal plan in .gjc/ultragoal/goals.json, including later accepted/appended stories, under the original brief constraints; use .gjc/ultragoal/ledger.jsonl as the audit trail.`
-- G059 is complete. G058 is superseded by its completed review-blocker replacement. G056, G036, and G037 are blocked. Counts: complete 12, superseded 30, blocked 3, review_blocked 14; pending/active/failed 0.
-- G058 supersession is **not** acquisition completion: official v5 acquisition remains outstanding under G056/continuation.
-- The inline goal is paused. Explicitly forbid `create-goals` and `complete-goals`; resume the existing durable state, not a newly created plan/goals.
+- Repository: `/home/hoky/Quants-agent/LuminaQuant`
+- Branch: `recovery/strategy-plan-20260714`
+- G061 implementation checkpoint: `475f3f2ebe37994f574dc970e1b3fa9563da8009`
+- Handoff-content commit: `__HANDOFF_CONTENT_COMMIT__`
+- The clean resume HEAD must descend from both commits. Historical commits `3deeb7927e29bfa6af94a8974043541cd45352b5`, `bfce6f5caf482f8e1f11079ae1c4af83e16d515e`, `b349cb57596a44d9e7e4a68519d0ddb586f97dc3`, and `6b1ce4cb2a2092c4d135023055f8c08afeb87491` remain ancestry facts only.
+- Durable session: `019f603a-0e73-7000-88a7-c94f42950c09`
+- Stable aggregate objective: `Complete the durable ultragoal plan in .gjc/ultragoal/goals.json, including later accepted/appended stories, under the original brief constraints; use .gjc/ultragoal/ledger.jsonl as the audit trail.`
+- Current story: G061 `Resolve G060 terminal-authority integration blockers`, active/incomplete.
+- G060 remains `review_blocked`; G056, G036, and G037 remain blocked.
+- Counts: complete 12, active 1, blocked 3, review-blocked 15, superseded 30, pending/failed 0.
+- Inline aggregate goal is paused solely for this user-owned session transition.
+- Never run `create-goals` or `complete-goals`; existing durable state and plans are canonical.
 
-All workers stopped. Terminal-authority planner 52 was cancelled before producing a plan. No acquisition, phase, or terminal-authority implementation was executed; v5 roots are absent. Latest ledger event `4197b419-2e89-42ec-8121-fd39f64432bd` is `human_blocked`, with exact evidence: `User ordered all work stopped for session transition.`
+All implementation workers and monitors are terminal. Executor 91 was cancelled immediately when the user ordered all work stopped. No acquisition, phase preparation, one-touch, prelock, historical, exchange-order, or capital process ran. Latest ledger event `7523ed6e-93fb-41f8-a937-18897ac3de8f` classifies G061 as `human_blocked` only because the user must start the new session.
 
-## Durable seals and G059 checkpoint
+## Canonical cross-session files
+
+Read these in full before action:
+
+1. `docs/research_note/strategy_recovery_resume_state_20260714.json`
+2. `docs/research_note/strategy_recovery_session_handoff_20260714.md`
+3. `docs/research_note/strategy_recovery_new_session_prompt_20260714.md`
+4. `docs/research_note/g060_g061_terminal_authority_v3_resume_plan_20260722.md`
+5. `docs/research_note/strategy_recovery_master_plan_20260713.md`
+6. `docs/research_note/data_pc_strategy_recovery_runbook_20260713.md`
+7. `docs/audits/strategy_reality_audit_20260713.md`
+8. `.gjc/_session-019f603a-0e73-7000-88a7-c94f42950c09/ultragoal/brief.md`
+9. `.gjc/_session-019f603a-0e73-7000-88a7-c94f42950c09/ultragoal/goals.json`
+10. `.gjc/_session-019f603a-0e73-7000-88a7-c94f42950c09/ultragoal/ledger.jsonl`
+
+The new G060/G061 plan file is the durable replacement for inaccessible stopped-session `agent://` planning/review artifacts. It records the exact pins, typed schemas, command derivation, wire fields, state machine, recovery rules, semantic artifact contracts, completed implementation, remaining quality gate, and exact continuation order.
+
+## Durable seals
 
 | Durable file | SHA-256 | Bytes | Lines |
 |---|---|---:|---:|
 | `brief.md` | `faf6f83679e7ce93a8950af4df350fc4a92557d8eaaa40ea17c9c8b918c04e57` | 4836 | 22 |
-| `goals.json` | `ca48744cdfad69363167594757d87f159b8f69867b277bd6153baccf72d4ef7c` | 140634 | 1358 |
-| `ledger.jsonl` | `6d856688aab6f358d73788fa319371db05d447413d68e10e05feee8298f18c1e` | 331158 | 359 |
+| `goals.json` | `68c3a07e68bb8c3b1864399e0324d8fc3a0ba441e5c6d0417c03feb576c8a667` | 144365 | 1400 |
+| `ledger.jsonl` | `ee73088dd033baa68b67b90a25692af185cd7c1bf81c819b4211dfd4f81ee483` | 345608 | 376 |
 
-G059 strict checkpoint is complete: receipt `e873a397-4812-4833-b426-9089e94d3f68`; ledger event `4068cddb-2873-49eb-bf4c-753b91eaf513`; gate hash `4c16e87359757d6aedb6738f281c93b8321bdafaf6ba711c111b86ccae50611a`; architect 48/49 `CLEAR/CLEAR/CLEAR APPROVE`; executor QA `51 passed`; artifact `.gjc/_session-019f603a-0e73-7000-88a7-c94f42950c09/ultragoal/artifacts/G059/g059-final-adversarial-test-report.json`.
+Latest ledger evidence: `The user explicitly ordered all work stopped so the repository and durable Ultragoal state can be sealed for a user-owned new-session transition; only the user can start the replacement session.`
 
-Final identities: acquirer `b440d79899a4ed60e18decfcd8bc2656d2de012189f03572a8be65f90cd24978`; wrapper `054163d23e8d2f1446b225e281472bcc563ac76f06aa47552cc5f3953b7c4dd9`; acquirer test `b0c4bd04851600aedd5cae9b4ae3ef95e4d7292cb45d1724d31591425b527a82`; wrapper test `2f7ddfae5aa684b3742ea1c921d3d09bbe80b983d5662b07cd23177851c26060`. Ruff, pycompile, and diff passed; focused `209 passed, 41 subtests`; integrated `353 passed, 41 subtests`; sanitized full `5355 passed, 20 skipped, 1 deselected, 3 xfailed, 41 subtests`.
+## G061 implementation checkpoint
 
-## Preserved evidence and prohibitions
+Commit `475f3f2ebe37994f574dc970e1b3fa9563da8009` adds the repository-native typed authority boundary:
 
-The official BTC proof remains binding: Binance futures-UM BTCUSDT 2023-10 archive SHA `d3fe5fa477d68d6730248d634e1bd37ae4838839d78709ef355d9d9c6749fea4`, 492720741 bytes, 38272235 rows, 3988367 adjacent ID/timestamp regressions, no equal adjacent IDs, and interleaved valid ordered streams. Repair is exact digest-bound allowlist plus wrapper pin. Two canonical runs produced 2678400 rows, first `[1696118404732,1862715434]`, last `[1698796799559,1900987668]`, carry `34651.4`, frame SHA `890b0e591990fbabf35f323f7987547d99cdc62416cba826ca601393b0b34f79`, byte-identical proof SHA `9902947934a9df52685db0b5198c69d9f57f6b54836b923bb804a0bab0387b27`, and no scratch residue. The unrelated spot ZIP is not scientific evidence.
+- closed canonical policy/config and exact frozen pins;
+- descriptor-relative no-symlink component opens and exact lexical quarantines;
+- one-way checkpoint-to-envelope authority and real file/repository/interpreter identities;
+- secure Ed25519 key creation and raw key provenance;
+- authority-only authentication/clearance/receipt with no launch primitive;
+- observer-only `Popen`, durable launch intent, direct non-TTY logs, fixed environment/cwd, and no-bytecode execution;
+- canonical 2/1/2 acquisition/phase/one-touch argv;
+- exact challenge/proof/authorization/clearance/event/receipt schemas;
+- no-launch recovery with strict pending-tail reconciliation and exact journal equality;
+- semantic acquisition/A-02/phase/prelock/historical artifacts, immutable phase/prelock snapshots, and sealed readback/observability bindings;
+- focused adversarial tests.
 
-V4 is immutable failed/ineligible scientific evidence only; never reuse, continue, mutate, copy into, or treat it as execution authority. Never run or read old external drafts. `/home/hoky/Quants-agent/LuminaQuant-data/alpha_max_20260711_listing_aware_source` and `/home/hoky/Quants-agent/Quants-agent-alpha-max-data-pc` remain lexical `--forbidden-root` strings only: never inspect, stat, hash, traverse, read, copy, or use them. Preserve official-only/no synthetic, substitution, prelisting, date shift, retune, or locked-OOS selection; zero orders/capital; `uv` Python; profile-first; Rust/native only after material exact-equivalence benchmark; no reset, rebase, amend, or push.
+Post-stop file identities:
 
-## Terminal-authority acceptance and exact continuation
+| File | SHA-256 |
+|---|---|
+| policy JSON | `52e279875c3c1bb6fb353b305f617455097bff73c5042f976c78567cd93c180c` |
+| policy module | `57163bc8e951fdc1708cbbaf07271f043991c38159943ecd193f50d2fa27af97` |
+| key creator | `0a5a50622f38121d3c302fca5955c9b49e53e0094773c0ab356794496af8007e` |
+| authority | `d1cd36f7c25fe2be561e9452d7bec9f21a8e984a9d5df99eae6e5cedc1ebaaa1` |
+| observer | `3cd570024f3bed6c023fa6777751a216356e97345625992d0f69ad29ed189e30` |
+| policy tests | `ff93549b51f1b5880e43e243692acf1be0da2200ca85a9bdda430cb24c5b346d` |
+| envelope/semantic tests | `6b6448cbb715d9a36ec66ebc8f5dfa4b6b9c3c05bbdcb11d85c8c453aea3c9a6` |
+| authority tests | `fc7a7057a1691946b04e9a5cce797954a68f8a5498df3ce4e7370f22cd6ccc87` |
+| observer tests | `86d2a81b923c25e904def08a942f46fd71de9e9abebfbd76b613cd6ef799af46` |
 
-Build a brand-new repository-native terminal authority only from the canonical runbook, without reading old drafts. Independent cleaner, architect, and QA must CLEAR all of: actual 14-fence/no-execute topology; first-operation forbidden-root and role disjointness; independently authenticated authority/process receipts; observed O_EXCL/non-TTY/at-most-one/publication/zero-order facts; deep phase semantics; sealed observability; outcome/readback/seal consistency; externally pinned manifest authority.
+Frozen target identities remain acquirer `b440d79899a4ed60e18decfcd8bc2656d2de012189f03572a8be65f90cd24978` and wrapper `054163d23e8d2f1446b225e281472bcc563ac76f06aa47552cc5f3953b7c4dd9`.
 
-1. Verify branch/HEAD descends from implementation commit `3deeb7927e29bfa6af94a8974043541cd45352b5` and handoff-content commit `bfce6f5caf482f8e1f11079ae1c4af83e16d515e`, clean worktree, current seals, process absence, and v5 absence.
-2. `goal get`, then `goal resume` (create the exact stable aggregate objective only if no inline goal exists); resume existing durable state without `create-goals`/`complete-goals`.
-3. Rebuild the terminal authority and independently cleaner/architect/QA CLEAR it.
-4. Only then create/freeze v5 roots.
-5. Launch complete official acquisition with real Python-child monitoring and descriptor refresh.
-6. Run `validate_complete` and offline `--verify-eligible`.
-7. Strictly resolve/checkpoint acquisition continuation and reactivate G056 explicitly.
-8. Run six phase roots/one-touch; complete G056, then genuinely diverse G036/G037.
-9. Final aggregate audit/receipt, then inline complete.
+Verification at the committed stopped snapshot:
 
-If an official archive fails ordering, preserve v5 and create an evidence-backed replacement subgoal; never broaden automatically. The existing master plan/runbook and durable state are canonical; no new plan/goals.
+- Ruff format/check: passed
+- `py_compile`: passed
+- focused terminal suite: `135 passed`
+- target/external execution: none
+
+The ignored local `uv.lock` was refreshed for frozen local verification, SHA `603d057f5c520b1864944ea2ab131d2ac8af0dce065bdde0a2bac854f238a92a`; never stage or force-add it.
+
+## Incomplete gate — do not claim completion
+
+The focused suite is not the Ultragoal quality gate. The stopped session did not perform the required final cleaner rerun on the 135-test snapshot, integrated and sanitized full verification, formal architect review, executor QA/red-team, or strict G061 checkpoint. G061 remains active; G060 remains review-blocked; this code is not target execution authority.
+
+The first resumed work is verification, not root creation or acquisition:
+
+1. rerun the focused suite and verify exact committed identities;
+2. run the mandatory ai-slop-cleaner on only the changed G061 files;
+3. fix blocking findings only through an executor and repeat to zero blockers;
+4. run integrated and sanitized full verification without target execution;
+5. freeze the snapshot, then run architect architecture/product/code and executor QA/red-team lanes on the identical change set;
+6. record any blockers durably and repeat the full loop;
+7. only a clean strict G061 checkpoint may supersede/resolve G060.
+
+## Preserved scientific evidence and prohibitions
+
+The official Binance futures-UM BTCUSDT 2023-10 archive remains SHA `d3fe5fa477d68d6730248d634e1bd37ae4838839d78709ef355d9d9c6749fea4`, 492720741 bytes, 38272235 trades, and 3988367 adjacent ID/timestamp regressions. Canonical output remains 2678400 rows, frame SHA `890b0e591990fbabf35f323f7987547d99cdc62416cba826ca601393b0b34f79`, byte-identical proof SHA `9902947934a9df52685db0b5198c69d9f57f6b54836b923bb804a0bab0387b27`. The unrelated spot ZIP is not scientific evidence.
+
+V4 is immutable failed/ineligible evidence only. Never read or execute old terminal drafts. Never inspect, stat, hash, traverse, read, copy, or use:
+
+- `/home/hoky/Quants-agent/LuminaQuant-data/alpha_max_20260711_listing_aware_source`
+- `/home/hoky/Quants-agent/Quants-agent-alpha-max-data-pc`
+
+They may appear only as lexical forbidden-root argv. Preserve official-only/no synthesis, substitution, prelisting, date shifts, retuning, or locked-OOS selection; zero orders/capital; Python through `uv`; profile-first; native only after a material exact-equivalence benchmark; no reset/rebase/amend/push.
+
+Future v5 roots remain unauthorized until G061/G060 clearance:
+
+- source: `/home/hoky/quants-external-data/alpha-max-g058-full-source-v5`
+- report: `/home/hoky/quants-recovery-runs/G058-full-acquisition-report-20260720-v5`
+- controller: `/home/hoky/quants-recovery-runs/G058-full-acquisition-controller-20260720-v5`
+
+## Exact continuation after G061 clearance
+
+1. Strictly checkpoint G061 with the full quality-gate JSON.
+2. Explicitly supersede or resolve review-blocked G060 from fresh G061 receipt evidence; do not run `complete-goals`.
+3. Explicitly reactivate G056 only after terminal authority is independently CLEAR.
+4. Create/freeze fresh v5 roots, then launch complete official acquisition with monitoring bound to the real Python child and descriptor refresh.
+5. Run `validate_complete` and offline `--verify-eligible`.
+6. Create six authenticated phase roots and run one-touch only under cleared authority.
+7. Complete G056, then execute genuinely diverse G036 and G037.
+8. Produce a fresh final aggregate audit and receipt; only then complete the inline goal.
+
+If another official archive fails ordering, preserve v5 and create an explicit evidence-backed replacement subgoal. Never broaden canonical sorting automatically.
+
+## Market-cap-index clarification
+
+The exact repository `HokyoungJung/Market-Cap-Weighted-Indices` is not directly integrated. Existing TopCap-universe and turnover/flow-share work is adjacent, not equivalent to a point-in-time daily market-cap-weighted index. Any later port must use point-in-time constituent/capitalization evidence, remain research/shadow-only, and pass clean walk-forward plus cost/funding gates; current membership must not be backfilled historically. The current pipeline work increases correctness and provenance, not headline performance.
