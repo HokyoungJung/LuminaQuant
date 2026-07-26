@@ -37,6 +37,17 @@ def _absolute(value: str) -> Path:
         raise argparse.ArgumentTypeError(str(error)) from error
 
 
+def _raise_with_cleanup(
+    primary: BaseException, label: str, cleanup_errors: list[BaseException]
+) -> None:
+    if cleanup_errors:
+        cleanup = BaseExceptionGroup(f"{label} cleanup failed", cleanup_errors)
+        raise BaseExceptionGroup(
+            f"{label} failed and cleanup failed", [primary, cleanup]
+        ) from primary
+    raise primary
+
+
 def _open_secure_root(root: Path) -> int:
     root_fd = policy.open_directory_fd(root, "key root")
     try:
@@ -50,10 +61,14 @@ def _open_secure_root(root: Path) -> int:
             raise ValueError(
                 "key root must be a leader-owned 0700 directory with no subdirectories"
             )
-        return root_fd
-    except BaseException:
-        os.close(root_fd)
-        raise
+    except BaseException as primary:
+        cleanup_errors: list[BaseException] = []
+        try:
+            os.close(root_fd)
+        except BaseException as cleanup_error:
+            cleanup_errors.append(cleanup_error)
+        _raise_with_cleanup(primary, "key root open", cleanup_errors)
+    return root_fd
 
 
 def _validate_key_file(info: os.stat_result) -> None:
@@ -120,20 +135,42 @@ def _key_material() -> tuple[tuple[str, bytes, bytes], ...]:
 
 def _create_file(root_fd: int, name: str, data: bytes, created: list[tuple[str, int, int]]) -> None:
     fd = os.open(name, FILE_FLAGS, 0o400, dir_fd=root_fd)
+    identity: tuple[int, int] | None = None
     try:
         info = os.fstat(fd)
-        created.append((name, info.st_dev, info.st_ino))
+        identity = (info.st_dev, info.st_ino)
+        created.append((name, *identity))
         _validate_key_file(info)
         _write_all(fd, data)
         os.fsync(fd)
         _validate_key_file(os.fstat(fd))
-    finally:
+    except BaseException as primary:
+        cleanup_errors: list[BaseException] = []
+        if identity is None:
+            try:
+                info = os.fstat(fd)
+                identity = (info.st_dev, info.st_ino)
+                created.append((name, *identity))
+            except BaseException as cleanup_error:
+                cleanup_errors.append(cleanup_error)
+                cleanup_errors.append(
+                    ValueError(f"cannot verify created key file identity: {name}")
+                )
+        try:
+            os.close(fd)
+        except BaseException as cleanup_error:
+            cleanup_errors.append(cleanup_error)
+        _raise_with_cleanup(primary, f"key file creation: {name}", cleanup_errors)
+    else:
         os.close(fd)
 
 
 def create_keys(root: Path) -> dict[str, dict[str, str]]:
     root_fd = _open_secure_root(root)
     created: list[tuple[str, int, int]] = []
+    result: dict[str, dict[str, str]] | None = None
+    primary: BaseException | None = None
+    cleanup_errors: list[BaseException] = []
     try:
         _preflight(root_fd)
         material = _key_material()
@@ -141,7 +178,7 @@ def create_keys(root: Path) -> dict[str, dict[str, str]]:
             _create_file(root_fd, f"{key_name}.private", secret, created)
             _create_file(root_fd, f"{key_name}.public", public, created)
         os.fsync(root_fd)
-        return {
+        result = {
             key_name: {
                 "key_id": hashlib.sha256(public).hexdigest(),
                 "public_key_b64": base64.b64encode(public).decode("ascii"),
@@ -150,15 +187,22 @@ def create_keys(root: Path) -> dict[str, dict[str, str]]:
             for key_name, _secret, public in material
         }
     except BaseException as creation_error:
+        primary = creation_error
         try:
             _cleanup(root_fd, created)
         except BaseException as cleanup_error:
-            raise BaseExceptionGroup(
-                "key creation failed and cleanup failed", [creation_error, cleanup_error]
-            ) from creation_error
-        raise
-    finally:
+            cleanup_errors.append(cleanup_error)
+    try:
         os.close(root_fd)
+    except BaseException as cleanup_error:
+        cleanup_errors.append(cleanup_error)
+    if primary is not None:
+        _raise_with_cleanup(primary, "key creation", cleanup_errors)
+    if cleanup_errors:
+        raise BaseExceptionGroup("key creation cleanup failed", cleanup_errors)
+    if result is None:
+        raise AssertionError("key creation produced no result")
+    return result
 
 
 def main(argv: list[str] | None = None) -> int:

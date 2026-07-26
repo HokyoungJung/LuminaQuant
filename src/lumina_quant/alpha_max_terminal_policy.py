@@ -4,14 +4,18 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import itertools
 import json
+import math
 import os
 import re
 import socket
 import stat
 import struct
+import urllib.parse
+from contextlib import ExitStack
 from dataclasses import asdict, dataclass, field as dataclass_field, is_dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from collections.abc import Mapping
@@ -27,6 +31,49 @@ _POLICY_SCHEMA = "alpha_max_terminal_authority_policy.v3"
 _CHECKPOINT_SCHEMA = "alpha_max_terminal_checkpoint.v1"
 _ENVELOPE_SCHEMA = "alpha_max_terminal_launch_envelope.v3"
 _SCOPES = ("acquisition", "phase_preparation", "one_touch")
+_RECEIPT_PREREQUISITE_KINDS = {
+    "acquisition": ("checkpoint_pin", "alignment_receipt"),
+    "phase_preparation": (
+        "checkpoint_pin",
+        "alignment_receipt",
+        "source_eligible_receipt",
+        "source_manifest",
+        "source_journal",
+    ),
+    "one_touch": (
+        "checkpoint_pin",
+        "alignment_receipt",
+        "phase_handoff_receipt",
+        "preparation_manifest",
+    ),
+}
+_RESULT_ARTIFACT_KINDS = {
+    "acquisition": (
+        (("source_eligible_receipt", "source_manifest", "source_journal"), ()),
+        (("source_eligible_receipt", "source_manifest", "source_journal"), ()),
+    ),
+    "phase_preparation": ((("phase_handoff_receipt", "preparation_manifest"), ()),),
+    "one_touch": (
+        (
+            (
+                "prelock_readback",
+                "prelock_observability",
+                "prelock_inventory_before",
+                "input_inventory_before",
+            ),
+            ("prelock_bundle",),
+        ),
+        (
+            (
+                "historical_readback",
+                "historical_observability",
+                "prelock_inventory_after",
+                "input_inventory_after",
+            ),
+            ("historical_bundle",),
+        ),
+    ),
+}
 _FORBIDDEN_ROOTS = (
     "/home/hoky/Quants-agent/LuminaQuant-data/alpha_max_20260711_listing_aware_source",
     "/home/hoky/Quants-agent/Quants-agent-alpha-max-data-pc",
@@ -393,6 +440,8 @@ class CommandPreflight:
 class VerifiedTerminalReceipt:
     message: dict[str, Any]
     key_id: str
+    authorization: dict[str, Any]
+    events: tuple[dict[str, Any], ...]
 
 
 def _plain(value: Any) -> Any:
@@ -482,8 +531,9 @@ def _under_root(path: str, root: str) -> bool:
     return path == root or path.startswith(root + "/")
 
 
-def _digest(value: Any, label: str) -> str:
-    if not isinstance(value, str) or not _DIGEST.fullmatch(value):
+def validate_sha256(value: Any, label: str) -> str:
+    """Validate one canonical lowercase SHA-256 digest."""
+    if type(value) is not str or _DIGEST.fullmatch(value) is None:
         raise TerminalPolicyError(f"invalid {label}")
     return value
 
@@ -515,7 +565,7 @@ def _file(value: Any) -> FileIdentity:
     )
     return FileIdentity(
         _absolute(value["path"], "file path"),
-        _digest(value["sha256"], "file sha256"),
+        validate_sha256(value["sha256"], "file sha256"),
         *(
             _integer(value[key], f"file {key}")
             for key in ("byte_count", "st_dev", "st_ino", "st_uid", "st_gid", "mode", "nlink")
@@ -565,8 +615,8 @@ def _key(value: Any, *, scope: str | None = None) -> KeyBinding | ObserverKeyBin
     value = _exact(value, fields, "key binding")
     if scope is not None and value["scope"] != scope:
         raise TerminalPolicyError("observer key scope mismatch")
-    _digest(value["key_id"], "key id")
-    _digest(value["public_key_sha256"], "public key sha256")
+    validate_sha256(value["key_id"], "key id")
+    validate_sha256(value["public_key_sha256"], "public key sha256")
     try:
         raw = base64.b64decode(value["public_key_b64"], validate=True)
     except (TypeError, ValueError) as exc:
@@ -628,7 +678,7 @@ def load_policy(path: Path | str) -> TerminalPolicy:
         value["schema"],
         _commit(value["accepted_alpha_commit"], "accepted commit"),
         _commit(value["baseline_ancestor"], "baseline ancestor"),
-        {key: _digest(item, key) for key, item in value["pins"].items()},
+        {key: validate_sha256(item, key) for key, item in value["pins"].items()},
         _SCOPES,
         hashlib.sha256(canonical_bytes(value)).hexdigest(),
     )
@@ -668,9 +718,9 @@ def load_checkpoint(path: Path | str, policy: TerminalPolicy) -> CheckpointPin:
     ):
         raise TerminalPolicyError("checkpoint policy mismatch")
     for name in policy.pins:
-        if _digest(getattr(pin, name), name) != policy.pins[name]:
+        if validate_sha256(getattr(pin, name), name) != policy.pins[name]:
             raise TerminalPolicyError(f"checkpoint {name} mismatch")
-    _digest(pin.authority_manifest_sha256, "authority manifest sha256")
+    validate_sha256(pin.authority_manifest_sha256, "authority manifest sha256")
     return pin
 
 
@@ -684,11 +734,11 @@ def load_envelope(
         or value["accepted_alpha_commit"] != policy.accepted_alpha_commit
         or value["baseline_ancestor"] != policy.baseline_ancestor
         or tuple(value["scope_order"]) != _SCOPES
-        or _digest(value["policy_sha256"], "policy sha256") != policy.source_sha256
+        or validate_sha256(value["policy_sha256"], "policy sha256") != policy.source_sha256
     ):
         raise TerminalPolicyError("envelope policy mismatch")
     if (
-        _digest(checkpoint.authority_manifest_sha256, "authority manifest sha256")
+        validate_sha256(checkpoint.authority_manifest_sha256, "authority manifest sha256")
         != hashlib.sha256(canonical_bytes(value)).hexdigest()
     ):
         raise TerminalPolicyError("checkpoint authority manifest mismatch")
@@ -770,6 +820,8 @@ def load_envelope(
     )
     if any(not isinstance(item, ObserverKeyBinding) for item in observers):
         raise TerminalPolicyError("invalid observer keys")
+    if len({authority_key.key_id, *(item.key_id for item in observers)}) != len(_SCOPES) + 1:
+        raise TerminalPolicyError("duplicate authority or observer key id")
     forbidden = (
         tuple(_absolute(item, "forbidden root") for item in value["forbidden_roots"])
         if isinstance(value["forbidden_roots"], list)
@@ -911,7 +963,8 @@ def load_request(
         or value["scope"] != scope
         or not isinstance(value["request_id"], str)
         or not _REQUEST_ID.fullmatch(value["request_id"])
-        or _digest(value["checkpoint_pin_sha256"], "request checkpoint") != checkpoint.sha256
+        or validate_sha256(value["checkpoint_pin_sha256"], "request checkpoint")
+        != checkpoint.sha256
     ):
         raise TerminalPolicyError("request mismatch")
     interpreter = _file(value["interpreter"])
@@ -986,7 +1039,7 @@ def load_request(
         raise TerminalPolicyError("prerequisite kind or order mismatch")
     for item in prereqs:
         _absolute(item.path, "prerequisite path")
-        _digest(item.sha256, "prerequisite sha256")
+        validate_sha256(item.sha256, "prerequisite sha256")
         for field in (item.byte_count, item.st_dev, item.st_ino, item.mode, item.nlink):
             _integer(field, "prerequisite identity")
     if any(
@@ -1218,27 +1271,41 @@ def _same_file(left: FileIdentity, right: FileIdentity) -> bool:
 
 def _open_absolute(path: Path | str, flags: int, label: str) -> int:
     """Open an absolute path without resolving a symlinked component."""
+    try:
+        nofollow = os.O_NOFOLLOW
+        cloexec = os.O_CLOEXEC
+    except AttributeError as exc:
+        raise TerminalPolicyError("required secure open flags unavailable") from exc
+    if type(nofollow) is not int or nofollow <= 0 or type(cloexec) is not int or cloexec <= 0:
+        raise TerminalPolicyError("required secure open flags unavailable")
+
+    def open_fd(name: str, open_flags: int, *, dir_fd: int | None = None) -> int:
+        if dir_fd is None:
+            descriptor = os.open(name, open_flags)
+        else:
+            descriptor = os.open(name, open_flags, dir_fd=dir_fd)
+        try:
+            os.set_inheritable(descriptor, False)
+        except OSError:
+            os.close(descriptor)
+            raise
+        return descriptor
+
     target = validate_lexical_control_path(path)
     parts = tuple(part for part in target.split("/") if part)
-    directory_flags = (
-        os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
-    )
+    directory_flags = os.O_RDONLY | os.O_DIRECTORY | nofollow | cloexec
     try:
-        descriptor = os.open("/", directory_flags)
+        descriptor = open_fd("/", directory_flags)
     except OSError as exc:
         raise TerminalPolicyError(f"cannot open {label}") from exc
     try:
         for part in parts[:-1]:
-            child = os.open(part, directory_flags, dir_fd=descriptor)
+            child = open_fd(part, directory_flags, dir_fd=descriptor)
             os.close(descriptor)
             descriptor = child
         if not parts:
             return descriptor
-        child = os.open(
-            parts[-1],
-            flags | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
-            dir_fd=descriptor,
-        )
+        child = open_fd(parts[-1], flags | nofollow | cloexec, dir_fd=descriptor)
     except OSError as exc:
         os.close(descriptor)
         raise TerminalPolicyError(f"cannot open {label}") from exc
@@ -1299,6 +1366,217 @@ def _regular_file(
     return after, digest.hexdigest(), byte_count, b"".join(chunks) if chunks is not None else None
 
 
+def _relative_parts(relative: str, label: str) -> tuple[str, ...]:
+    if (
+        not isinstance(relative, str)
+        or not relative
+        or relative.startswith("/")
+        or "\x00" in relative
+        or any(part in {"", ".", ".."} for part in relative.split("/"))
+    ):
+        raise TerminalPolicyError(f"{label} relative path is invalid")
+    return tuple(relative.split("/"))
+
+
+def _open_child_fd(parent_fd: int, name: str, flags: int, label: str) -> int:
+    try:
+        descriptor = os.open(
+            name,
+            flags | os.O_NOFOLLOW | os.O_CLOEXEC,
+            dir_fd=parent_fd,
+        )
+    except OSError as exc:
+        raise TerminalPolicyError(f"cannot open {label}") from exc
+    try:
+        os.set_inheritable(descriptor, False)
+    except OSError as exc:
+        os.close(descriptor)
+        raise TerminalPolicyError(f"cannot open {label}") from exc
+    return descriptor
+
+
+def _open_relative_directory(root_fd: int, relative: str, label: str) -> int:
+    descriptor = os.dup(root_fd)
+    os.set_inheritable(descriptor, False)
+    try:
+        for part in _relative_parts(relative, label):
+            child = _open_child_fd(descriptor, part, os.O_RDONLY | os.O_DIRECTORY, label)
+            os.close(descriptor)
+            descriptor = child
+        info = os.fstat(descriptor)
+        if not stat.S_ISDIR(info.st_mode):
+            raise TerminalPolicyError(f"{label} is not a directory")
+        return descriptor
+    except BaseException:
+        os.close(descriptor)
+        raise
+
+
+def _regular_file_at(
+    root_fd: int,
+    relative: str,
+    label: str,
+    *,
+    capture: bool = False,
+    max_capture_bytes: int = 64 * 1024 * 1024,
+) -> tuple[os.stat_result, str, int, bytes | None]:
+    parts = _relative_parts(relative, label)
+    parent_fd = os.dup(root_fd)
+    os.set_inheritable(parent_fd, False)
+    try:
+        for part in parts[:-1]:
+            child = _open_child_fd(parent_fd, part, os.O_RDONLY | os.O_DIRECTORY, label)
+            os.close(parent_fd)
+            parent_fd = child
+        descriptor = _open_child_fd(parent_fd, parts[-1], os.O_RDONLY, label)
+    finally:
+        os.close(parent_fd)
+    chunks: list[bytes] | None = [] if capture else None
+    digest = hashlib.sha256()
+    byte_count = 0
+    try:
+        before = os.fstat(descriptor)
+        if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1:
+            raise TerminalPolicyError(f"{label} is not a private regular file")
+        while True:
+            chunk = os.read(descriptor, 1024 * 1024)
+            if not chunk:
+                break
+            byte_count += len(chunk)
+            if capture and byte_count > max_capture_bytes:
+                raise TerminalPolicyError(f"{label} exceeds the control-file limit")
+            digest.update(chunk)
+            if chunks is not None:
+                chunks.append(chunk)
+        after = os.fstat(descriptor)
+    finally:
+        os.close(descriptor)
+    stable_fields = (
+        "st_dev",
+        "st_ino",
+        "st_uid",
+        "st_gid",
+        "st_mode",
+        "st_nlink",
+        "st_size",
+        "st_mtime_ns",
+        "st_ctime_ns",
+    )
+    if (
+        any(getattr(before, field) != getattr(after, field) for field in stable_fields)
+        or byte_count != after.st_size
+    ):
+        raise TerminalPolicyError(f"{label} changed while it was read")
+    return after, digest.hexdigest(), byte_count, b"".join(chunks) if chunks is not None else None
+
+
+def _canonical_object_at(root_fd: int, relative: str, label: str) -> Any:
+    _info, _digest_value, _size, payload = _regular_file_at(root_fd, relative, label, capture=True)
+    try:
+        value = json.loads(payload)
+    except (TypeError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise TerminalPolicyError(f"{label} is not canonical JSON") from exc
+    if canonical_bytes(value) != payload:
+        raise TerminalPolicyError(f"{label} is not canonical JSON")
+    return value
+
+
+def _validate_directory_fd(
+    fd: int, identity: DirectoryIdentity | None, label: str
+) -> os.stat_result:
+    """Validate a borrowed directory descriptor without taking ownership."""
+    try:
+        info = os.fstat(fd)
+    except OSError as exc:
+        raise TerminalPolicyError(f"cannot stat {label}") from exc
+    actual = (info.st_dev, info.st_ino, info.st_uid, info.st_gid, stat.S_IMODE(info.st_mode))
+    if not stat.S_ISDIR(info.st_mode) or (
+        identity is not None
+        and actual
+        != (identity.st_dev, identity.st_ino, identity.st_uid, identity.st_gid, identity.mode)
+    ):
+        raise TerminalPolicyError(f"{label} identity drift")
+    return info
+
+
+def _open_registered_directory(descriptors: ExitStack, path: str | Path, label: str) -> int:
+    descriptor = open_directory_fd(path, label)
+    descriptors.callback(os.close, descriptor)
+    return descriptor
+
+
+def _open_registered_child(
+    descriptors: ExitStack, parent_fd: int, leaf: str, flags: int, label: str
+) -> int:
+    descriptor = _open_child_fd(parent_fd, leaf, flags, label)
+    descriptors.callback(os.close, descriptor)
+    return descriptor
+
+
+def _snapshot_identity(value: Any, label: str) -> dict[str, int]:
+    value = _exact(value, {"st_dev", "st_ino"}, label)
+    if any(type(item) is not int or item < 0 for item in value.values()):
+        raise TerminalPolicyError(f"{label} mismatch")
+    return value
+
+
+def _open_output_child(descriptors: ExitStack, output: AbsentOutput, label: str) -> tuple[int, int]:
+    output_path = Path(validate_lexical_control_path(output.path))
+    if output_path.parent != Path(output.parent.path) or output_path.name != output.leaf:
+        raise TerminalPolicyError("output parent binding mismatch")
+    parent_fd = _open_registered_directory(descriptors, output.parent.path, f"{label} parent")
+    _validate_directory_fd(parent_fd, output.parent, f"{label} parent")
+    output_fd = _open_registered_child(
+        descriptors, parent_fd, output.leaf, os.O_RDONLY | os.O_DIRECTORY, label
+    )
+    _validate_directory_fd(output_fd, None, label)
+    return parent_fd, output_fd
+
+
+def _walk_tree_at(root_fd: int, label: str) -> list[tuple[str, os.stat_result]]:
+    root_info = _validate_directory_fd(root_fd, None, f"{label} root")
+    rows: list[tuple[str, os.stat_result]] = [(".", root_info)]
+
+    def walk(directory_fd: int, prefix: str) -> None:
+        for name in sorted(os.listdir(directory_fd)):
+            if name in {".", ".."}:
+                raise TerminalPolicyError(f"{label} tree contains invalid entry")
+            try:
+                info = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+            except OSError as exc:
+                raise TerminalPolicyError(f"{label} tree entry is unavailable") from exc
+            relative = f"{prefix}/{name}" if prefix else name
+            if stat.S_ISLNK(info.st_mode):
+                raise TerminalPolicyError(f"{label} tree contains a symlink")
+            rows.append((relative, info))
+            if stat.S_ISDIR(info.st_mode):
+                child_fd = _open_child_fd(directory_fd, name, os.O_RDONLY | os.O_DIRECTORY, label)
+                try:
+                    opened = _validate_directory_fd(child_fd, None, f"{label} tree child")
+                    if (opened.st_dev, opened.st_ino) != (info.st_dev, info.st_ino):
+                        raise TerminalPolicyError(f"{label} tree identity changed")
+                    walk(child_fd, relative)
+                    after = _validate_directory_fd(child_fd, None, f"{label} tree child")
+                    if (after.st_dev, after.st_ino) != (opened.st_dev, opened.st_ino):
+                        raise TerminalPolicyError(f"{label} tree identity changed")
+                finally:
+                    os.close(child_fd)
+
+    walk(root_fd, "")
+    after = _validate_directory_fd(root_fd, None, f"{label} root")
+    if (after.st_dev, after.st_ino) != (root_info.st_dev, root_info.st_ino):
+        raise TerminalPolicyError(f"{label} root identity changed")
+    return rows
+
+
+def _walk_tree(root: Path, label: str) -> list[tuple[str, os.stat_result]]:
+    root_fd = open_directory_fd(root, label)
+    try:
+        return _walk_tree_at(root_fd, label)
+    finally:
+        os.close(root_fd)
+
+
 def _read_identity(identity: FileIdentity, label: str) -> None:
     info, digest, byte_count, _payload = _regular_file(identity.path, label)
     actual = (
@@ -1338,7 +1616,6 @@ def _read_directory(identity: DirectoryIdentity, label: str) -> None:
 
 
 def _verify_absent(output: AbsentOutput) -> None:
-    _read_directory(output.parent, f"output parent {output.path}")
     if (
         Path(output.path).parent != Path(output.parent.path)
         or Path(output.path).name != output.leaf
@@ -1346,10 +1623,13 @@ def _verify_absent(output: AbsentOutput) -> None:
         raise TerminalPolicyError("output parent binding mismatch")
     parent_fd = open_directory_fd(output.parent.path, "output parent")
     try:
+        _validate_directory_fd(parent_fd, output.parent, f"output parent {output.path}")
         try:
             os.stat(output.leaf, dir_fd=parent_fd, follow_symlinks=False)
         except FileNotFoundError:
             return
+        except OSError as exc:
+            raise TerminalPolicyError("cannot inspect output leaf") from exc
     finally:
         os.close(parent_fd)
     raise TerminalPolicyError("output is not absent")
@@ -1505,7 +1785,7 @@ def _parse_validated(value: Any) -> ValidatedArtifact:
     artifact = ValidatedArtifact(
         value["kind"],
         _absolute(value["path"], "artifact path"),
-        _digest(value["sha256"], "artifact sha256"),
+        validate_sha256(value["sha256"], "artifact sha256"),
         *(
             _integer(value[key], f"artifact {key}")
             for key in ("byte_count", "st_dev", "st_ino", "mode", "nlink")
@@ -1533,9 +1813,9 @@ def _parse_sealed(value: Any) -> SealedArtifact:
     )
     return SealedArtifact(
         *asdict(base).values(),
-        _digest(value["sealed_payload_sha256"], "sealed payload"),
-        _digest(value["canonical_inventory_sha256"], "inventory"),
-        _digest(value["readback_sha256"], "readback"),
+        validate_sha256(value["sealed_payload_sha256"], "sealed payload"),
+        validate_sha256(value["canonical_inventory_sha256"], "inventory"),
+        validate_sha256(value["readback_sha256"], "readback"),
     )
 
 
@@ -1561,11 +1841,108 @@ def _revalidate_artifact(artifact: ValidatedArtifact, label: str) -> None:
         raise TerminalPolicyError(f"{label} identity drift")
 
 
+def _revalidate_artifact_at(
+    root_fd: int, root_path: str, artifact: ValidatedArtifact, label: str
+) -> None:
+    if not _under_root(artifact.path, root_path) or artifact.path == root_path:
+        raise TerminalPolicyError(f"{label} is outside its retained root")
+    relative = artifact.path.removeprefix(root_path + "/")
+    info, digest, byte_count, _payload = _regular_file_at(root_fd, relative, label)
+    actual = (
+        digest,
+        byte_count,
+        info.st_dev,
+        info.st_ino,
+        stat.S_IMODE(info.st_mode),
+        info.st_nlink,
+    )
+    expected = (
+        artifact.sha256,
+        artifact.byte_count,
+        artifact.st_dev,
+        artifact.st_ino,
+        artifact.mode,
+        artifact.nlink,
+    )
+    if actual != expected or info.st_uid != os.getuid() or info.st_gid != os.getgid():
+        raise TerminalPolicyError(f"{label} identity drift")
+
+
+def _regular_file_at_enumerated(
+    root_fd: int,
+    relative: str,
+    label: str,
+    enumerated: dict[str, os.stat_result],
+    *,
+    capture: bool = False,
+) -> tuple[os.stat_result, str, int, bytes | None]:
+    known = enumerated.get(relative)
+    if known is None or not stat.S_ISREG(known.st_mode) or known.st_nlink != 1:
+        raise TerminalPolicyError(f"{label} was not safely enumerated")
+    info, digest, byte_count, payload = _regular_file_at(root_fd, relative, label, capture=capture)
+    if (info.st_dev, info.st_ino) != (known.st_dev, known.st_ino):
+        raise TerminalPolicyError(f"{label} tree identity changed")
+    return info, digest, byte_count, payload
+
+
+def _canonical_object_at_enumerated(
+    root_fd: int, relative: str, label: str, enumerated: dict[str, os.stat_result]
+) -> Any:
+    _info, _digest_value, _size, payload = _regular_file_at_enumerated(
+        root_fd, relative, label, enumerated, capture=True
+    )
+    try:
+        value = json.loads(payload)
+    except (TypeError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise TerminalPolicyError(f"{label} is not canonical JSON") from exc
+    if canonical_bytes(value) != payload:
+        raise TerminalPolicyError(f"{label} is not canonical JSON")
+    return value
+
+
+def _artifact_from_at_enumerated(
+    root_fd: int,
+    root_path: str,
+    relative: str,
+    kind: str,
+    enumerated: dict[str, os.stat_result],
+) -> ValidatedArtifact:
+    info, digest, byte_count, _payload = _regular_file_at_enumerated(
+        root_fd, relative, f"{kind} artifact", enumerated
+    )
+    if info.st_uid != os.getuid() or info.st_gid != os.getgid():
+        raise TerminalPolicyError(f"{kind} artifact owner mismatch")
+    return ValidatedArtifact(
+        kind,
+        str(Path(root_path) / relative),
+        digest,
+        byte_count,
+        info.st_dev,
+        info.st_ino,
+        stat.S_IMODE(info.st_mode),
+        info.st_nlink,
+    )
+
+
 def verify_signed_receipt(path: Path | str, public_key_path: Path | str) -> VerifiedTerminalReceipt:
-    receipt_path = Path(path)
-    if not receipt_path.is_absolute():
-        raise TerminalPolicyError("terminal receipt path must be absolute")
-    receipt = _canonical_object(receipt_path)
+    receipt_value = validate_lexical_control_path(path)
+    receipt_path = Path(receipt_value)
+    if receipt_path.parent == receipt_path:
+        raise TerminalPolicyError("terminal receipt path must have a parent")
+    _relative_parts(receipt_path.name, "terminal receipt leaf")
+    evidence_root_path = str(receipt_path.parent)
+    evidence_root_fd = open_directory_fd(evidence_root_path, "terminal evidence root")
+    try:
+        return _verify_signed_receipt_at(receipt_path, evidence_root_fd, public_key_path)
+    finally:
+        os.close(evidence_root_fd)
+
+
+def _verify_signed_receipt_at(
+    receipt_path: Path, evidence_root_fd: int, public_key_path: Path | str
+) -> VerifiedTerminalReceipt:
+    evidence_root_path = str(receipt_path.parent)
+    receipt = _canonical_object_at(evidence_root_fd, receipt_path.name, "terminal receipt")
     _exact(receipt, set(TERMINAL_RECEIPT_FIELDS), "terminal receipt")
     if receipt["schema"] != WIRE_SCHEMA or receipt["type"] != "terminal_receipt":
         raise TerminalPolicyError("invalid terminal receipt")
@@ -1601,7 +1978,7 @@ def verify_signed_receipt(path: Path | str, public_key_path: Path | str) -> Veri
         "events_sha256",
         "journal_sha256",
     ):
-        _digest(receipt[name], name)
+        validate_sha256(receipt[name], name)
     if (
         receipt["scope"] not in _SCOPES
         or not isinstance(receipt["request_id"], str)
@@ -1612,29 +1989,14 @@ def verify_signed_receipt(path: Path | str, public_key_path: Path | str) -> Veri
         or receipt["observer_start_ticks"] <= 0
     ):
         raise TerminalPolicyError("terminal receipt identity mismatch")
-    _utc_value(receipt["created_utc"], "receipt timestamp")
+    parse_utc_second(receipt["created_utc"], "receipt timestamp")
     command_count = 1 if receipt["scope"] == "phase_preparation" else 2
     publication = _parse_publication(receipt["publication"], command_count)
     if receipt_path.name != publication.receipt:
         raise TerminalPolicyError("terminal receipt publication mismatch")
     _terminal_state(receipt["terminal_state"])
 
-    prerequisite_kinds = {
-        "acquisition": ("checkpoint_pin", "alignment_receipt"),
-        "phase_preparation": (
-            "checkpoint_pin",
-            "alignment_receipt",
-            "source_eligible_receipt",
-            "source_manifest",
-            "source_journal",
-        ),
-        "one_touch": (
-            "checkpoint_pin",
-            "alignment_receipt",
-            "phase_handoff_receipt",
-            "preparation_manifest",
-        ),
-    }[receipt["scope"]]
+    prerequisite_kinds = _RECEIPT_PREREQUISITE_KINDS[receipt["scope"]]
     if (
         not isinstance(receipt["prerequisites"], list)
         or tuple(
@@ -1658,7 +2020,15 @@ def verify_signed_receipt(path: Path | str, public_key_path: Path | str) -> Veri
     for item in receipt["prerequisites"]:
         _exact(item, prerequisite_fields, "terminal prerequisite")
         artifact = _parse_validated(item)
-        _revalidate_artifact(artifact, f"terminal prerequisite {artifact.kind}")
+        if _under_root(artifact.path, evidence_root_path):
+            _revalidate_artifact_at(
+                evidence_root_fd,
+                evidence_root_path,
+                artifact,
+                f"terminal prerequisite {artifact.kind}",
+            )
+        else:
+            _revalidate_artifact(artifact, f"terminal prerequisite {artifact.kind}")
     results = tuple(_parse_target_result(item) for item in receipt["target_results"])
     if tuple(item.command_index for item in results) != tuple(range(len(results))):
         raise TerminalPolicyError("terminal result order mismatch")
@@ -1688,39 +2058,7 @@ def verify_signed_receipt(path: Path | str, public_key_path: Path | str) -> Veri
     elif any(item.return_code != 0 for item in results):
         raise TerminalPolicyError("unauthenticated receipt result mismatch")
 
-    expected_kinds: dict[str, tuple[tuple[tuple[str, ...], tuple[str, ...]], ...]] = {
-        "acquisition": (
-            (
-                ("source_eligible_receipt", "source_manifest", "source_journal"),
-                (),
-            ),
-            (
-                ("source_eligible_receipt", "source_manifest", "source_journal"),
-                (),
-            ),
-        ),
-        "phase_preparation": ((("phase_handoff_receipt", "preparation_manifest"), ()),),
-        "one_touch": (
-            (
-                (
-                    "prelock_readback",
-                    "prelock_observability",
-                    "prelock_inventory_before",
-                    "input_inventory_before",
-                ),
-                ("prelock_bundle",),
-            ),
-            (
-                (
-                    "historical_readback",
-                    "historical_observability",
-                    "prelock_inventory_after",
-                    "input_inventory_after",
-                ),
-                ("historical_bundle",),
-            ),
-        ),
-    }
+    expected_kinds = _RESULT_ARTIFACT_KINDS
     for result in results:
         if (
             Path(result.stdout.path)
@@ -1735,7 +2073,15 @@ def verify_signed_receipt(path: Path | str, public_key_path: Path | str) -> Veri
             *result.validated_artifacts,
             *result.sealed_artifacts,
         ):
-            _revalidate_artifact(artifact, f"terminal result {artifact.kind}")
+            if _under_root(artifact.path, evidence_root_path):
+                _revalidate_artifact_at(
+                    evidence_root_fd,
+                    evidence_root_path,
+                    artifact,
+                    f"terminal result {artifact.kind}",
+                )
+            else:
+                _revalidate_artifact(artifact, f"terminal result {artifact.kind}")
         if result.stdout.mode != 0o600 or result.stderr.mode != 0o600:
             raise TerminalPolicyError("terminal result log mode mismatch")
         if result.return_code == 0:
@@ -1748,9 +2094,9 @@ def verify_signed_receipt(path: Path | str, public_key_path: Path | str) -> Veri
         elif result.validated_artifacts or result.sealed_artifacts:
             raise TerminalPolicyError("failed result claims validated artifacts")
 
-    claim_path = receipt_path.parent / publication.claim
-    claim_info, claim_digest, _claim_size, claim_bytes = _regular_file(
-        claim_path,
+    claim_info, claim_digest, _claim_size, claim_bytes = _regular_file_at(
+        evidence_root_fd,
+        publication.claim,
         "terminal claim",
         capture=True,
     )
@@ -1776,11 +2122,11 @@ def verify_signed_receipt(path: Path | str, public_key_path: Path | str) -> Veri
         or evidence_root.path != str(receipt_path.parent)
     ):
         raise TerminalPolicyError("terminal claim binding mismatch")
-    _utc_value(claim["created_utc"], "claim timestamp")
-    _read_directory(evidence_root, "terminal evidence root")
-    journal_path = receipt_path.parent / publication.journal
-    _journal_info, journal_digest, _journal_size, journal_bytes = _regular_file(
-        journal_path,
+    parse_utc_second(claim["created_utc"], "claim timestamp")
+    _validate_directory_fd(evidence_root_fd, evidence_root, "terminal evidence root")
+    _journal_info, journal_digest, _journal_size, journal_bytes = _regular_file_at(
+        evidence_root_fd,
+        publication.journal,
         "terminal journal",
         capture=True,
     )
@@ -1797,10 +2143,7 @@ def verify_signed_receipt(path: Path | str, public_key_path: Path | str) -> Veri
     verify_message("authorization", authorization, authority)
     if authorization["schema"] != WIRE_SCHEMA or authorization["type"] != "authorization":
         raise TerminalPolicyError("invalid journal authorization")
-    not_before = _utc_value(authorization["not_before_utc"], "authorization not-before")
-    expires = _utc_value(authorization["expires_utc"], "authorization expiry")
-    if not not_before < expires or (expires - not_before).total_seconds() > 300:
-        raise TerminalPolicyError("invalid authorization window")
+    authorization_epoch_window(authorization)
     for key in (
         "authority_key_id",
         "authorization_id",
@@ -1819,7 +2162,7 @@ def verify_signed_receipt(path: Path | str, public_key_path: Path | str) -> Veri
             raise TerminalPolicyError("journal authorization binding mismatch")
     if authorization["observer_uid"] != claim["observer_uid"]:
         raise TerminalPolicyError("journal authorization claim mismatch")
-    _digest(authorization["observer_source_sha256"], "authorization observer source sha256")
+    validate_sha256(authorization["observer_source_sha256"], "authorization observer source sha256")
     events = records[1:]
     for sequence, event in enumerate(events):
         if (
@@ -1833,7 +2176,7 @@ def verify_signed_receipt(path: Path | str, public_key_path: Path | str) -> Veri
             raise TerminalPolicyError("terminal event journal mismatch")
     if hashlib.sha256(canonical_bytes(events)).hexdigest() != receipt["events_sha256"]:
         raise TerminalPolicyError("terminal event journal mismatch")
-    return VerifiedTerminalReceipt(receipt, key_id)
+    return VerifiedTerminalReceipt(receipt, key_id, authorization, tuple(events))
 
 
 def _parse_target_result(value: Any) -> TargetResult:
@@ -1861,7 +2204,7 @@ def _parse_target_result(value: Any) -> TargetResult:
     ):
         raise TerminalPolicyError("invalid target result")
     completed_utc = value["completed_utc"]
-    _utc_value(completed_utc, "target result timestamp")
+    parse_utc_second(completed_utc, "target result timestamp")
     stdout = _parse_validated(value["stdout"])
     stderr = _parse_validated(value["stderr"])
     validated = tuple(_parse_validated(item) for item in value["validated_artifacts"])
@@ -1876,8 +2219,8 @@ def _parse_target_result(value: Any) -> TargetResult:
         raise TerminalPolicyError("invalid target artifact contract")
     return TargetResult(
         value["command_index"],
-        _digest(value["argv_sha256"], "argv sha256"),
-        _digest(value["environment_sha256"], "environment sha256"),
+        validate_sha256(value["argv_sha256"], "argv sha256"),
+        validate_sha256(value["environment_sha256"], "environment sha256"),
         value["return_code"],
         stdout,
         stderr,
@@ -1887,20 +2230,11 @@ def _parse_target_result(value: Any) -> TargetResult:
     )
 
 
-def _snapshot_digest(root: Path) -> str:
-    try:
-        resolved = root.resolve(strict=True)
-    except OSError as exc:
-        raise TerminalPolicyError("snapshot root is missing") from exc
-    if resolved != root or root.is_symlink():
-        raise TerminalPolicyError("snapshot root identity is invalid")
+def _snapshot_digest_at(
+    root_fd: int, label: str, tree: list[tuple[str, os.stat_result]] | None = None
+) -> str:
     rows: list[list[Any]] = []
-    paths = (root, *sorted(root.rglob("*"), key=lambda item: str(item.relative_to(root))))
-    for path in paths:
-        info = path.lstat()
-        relative = "." if path == root else path.relative_to(root).as_posix()
-        if stat.S_ISLNK(info.st_mode):
-            raise TerminalPolicyError("snapshot contains symlink")
+    for relative, info in _walk_tree_at(root_fd, label) if tree is None else tree:
         if stat.S_ISDIR(info.st_mode):
             rows.append(
                 [
@@ -1915,7 +2249,11 @@ def _snapshot_digest(root: Path) -> str:
             continue
         if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
             raise TerminalPolicyError("snapshot contains unsafe entry")
-        stable, digest, byte_count, _payload = _regular_file(path, f"snapshot file {relative}")
+        stable, digest, byte_count, _payload = _regular_file_at(
+            root_fd, relative, f"{label} file {relative}"
+        )
+        if (stable.st_dev, stable.st_ino) != (info.st_dev, info.st_ino):
+            raise TerminalPolicyError("snapshot tree identity changed")
         rows.append(
             [
                 relative,
@@ -1933,85 +2271,699 @@ def _snapshot_digest(root: Path) -> str:
     ).hexdigest()
 
 
-def _inventory(root: Path, entries: Any, label: str) -> dict[str, tuple[str, int]]:
+def _snapshot_digest(root: Path) -> str:
+    root_fd = open_directory_fd(root, "snapshot root")
+    try:
+        return _snapshot_digest_at(root_fd, "snapshot")
+    finally:
+        os.close(root_fd)
+
+
+def _inventory_at(
+    root_fd: int, entries: Any, label: str, tree: list[tuple[str, os.stat_result]] | None = None
+) -> dict[str, tuple[str, int]]:
     if not isinstance(entries, list):
         raise TerminalPolicyError(f"{label} inventory is invalid")
     declared: dict[str, tuple[str, int]] = {}
     for entry in entries:
         _exact(entry, {"byte_count", "relative_path", "sha256"}, f"{label} inventory entry")
         relative = entry["relative_path"]
-        if (
-            not isinstance(relative, str)
-            or not relative
-            or relative.startswith("/")
-            or ".." in Path(relative).parts
-            or relative in declared
-        ):
+        try:
+            _relative_parts(relative, f"{label} inventory")
+        except TerminalPolicyError as exc:
+            raise TerminalPolicyError(f"{label} inventory path is invalid") from exc
+        if relative in declared:
             raise TerminalPolicyError(f"{label} inventory path is invalid")
         declared[relative] = (
-            _digest(entry["sha256"], f"{label} inventory sha256"),
+            validate_sha256(entry["sha256"], f"{label} inventory sha256"),
             _integer(entry["byte_count"], f"{label} inventory byte count"),
         )
     if list(declared) != sorted(declared):
         raise TerminalPolicyError(f"{label} inventory is not canonically sorted")
-    actual: set[str] = set()
-    for path in root.rglob("*"):
-        info = path.lstat()
-        if stat.S_ISLNK(info.st_mode):
-            raise TerminalPolicyError(f"{label} inventory contains a symlink")
-        if stat.S_ISDIR(info.st_mode):
-            continue
-        if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
-            raise TerminalPolicyError(f"{label} inventory contains an unsafe object")
-        if path.name != "SEALED.json":
-            actual.add(path.relative_to(root).as_posix())
+    tree = _walk_tree_at(root_fd, label) if tree is None else tree
+    actual = {
+        relative
+        for relative, info in tree
+        if relative != "."
+        and not stat.S_ISDIR(info.st_mode)
+        and stat.S_ISREG(info.st_mode)
+        and info.st_nlink == 1
+        and relative != "SEALED.json"
+    }
+    if any(
+        relative != "."
+        and not stat.S_ISDIR(info.st_mode)
+        and (not stat.S_ISREG(info.st_mode) or info.st_nlink != 1)
+        for relative, info in tree
+    ):
+        raise TerminalPolicyError(f"{label} inventory contains an unsafe object")
     if actual != set(declared):
         raise TerminalPolicyError(f"{label} inventory does not cover tree")
+    enumerated = dict(tree)
     for relative, (digest, size) in declared.items():
-        path = root / relative
-        info, actual_digest, byte_count, _payload = _regular_file(
-            path,
-            f"{label} inventory file {relative}",
+        info, actual_digest, byte_count, _payload = _regular_file_at(
+            root_fd, relative, f"{label} inventory file {relative}"
         )
-        if stat.S_IMODE(info.st_mode) != 0o444 or byte_count != size or actual_digest != digest:
+        known = enumerated[relative]
+        if (
+            (info.st_dev, info.st_ino) != (known.st_dev, known.st_ino)
+            or stat.S_IMODE(info.st_mode) != 0o444
+            or byte_count != size
+            or actual_digest != digest
+        ):
             raise TerminalPolicyError(f"{label} inventory identity drift")
     return declared
 
 
-def _safe_tree_files(root: Path, label: str) -> set[str]:
+def _inventory(root: Path, entries: Any, label: str) -> dict[str, tuple[str, int]]:
+    root_fd = open_directory_fd(root, label)
     try:
-        if root.resolve(strict=True) != root:
-            raise TerminalPolicyError(f"{label} root identity is invalid")
-        root_info = root.lstat()
-    except OSError as exc:
-        raise TerminalPolicyError(f"{label} root is missing") from exc
-    if (
-        not stat.S_ISDIR(root_info.st_mode)
-        or stat.S_ISLNK(root_info.st_mode)
-        or root_info.st_uid != os.getuid()
-        or root_info.st_mode & (stat.S_IWGRP | stat.S_IWOTH)
-    ):
+        return _inventory_at(root_fd, entries, label)
+    finally:
+        os.close(root_fd)
+
+
+def _safe_tree_files_at(
+    root_fd: int, label: str, tree: list[tuple[str, os.stat_result]] | None = None
+) -> set[str]:
+    tree = _walk_tree_at(root_fd, label) if tree is None else tree
+    root_info = tree[0][1]
+    if root_info.st_uid != os.getuid() or root_info.st_mode & (stat.S_IWGRP | stat.S_IWOTH):
         raise TerminalPolicyError(f"{label} root is unsafe")
     files: set[str] = set()
-    for path in root.rglob("*"):
-        info = path.lstat()
-        if stat.S_ISLNK(info.st_mode):
-            raise TerminalPolicyError(f"{label} tree contains a symlink")
+    for relative, info in tree[1:]:
         if stat.S_ISDIR(info.st_mode):
             continue
         if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
             raise TerminalPolicyError(f"{label} tree contains an unsafe object")
-        files.add(path.relative_to(root).as_posix())
+        files.add(relative)
     return files
 
 
-def _validate_acquisition(records: AcquisitionRecords) -> tuple[ValidatedArtifact, ...]:
-    report_root = Path(records.report_root.path)
-    source_root = Path(records.source_root.path)
-    source_files = _safe_tree_files(source_root, "source")
-    report_files = _safe_tree_files(report_root, "source report")
+def _safe_tree_files(root: Path, label: str) -> set[str]:
+    root_fd = open_directory_fd(root, label)
+    try:
+        return _safe_tree_files_at(root_fd, label)
+    finally:
+        os.close(root_fd)
 
-    plan = _canonical_object(report_root / "plan.json")
+
+@dataclass(frozen=True)
+class _AcquisitionContract:
+    symbol: str
+    raw_start: int
+    raw_end: int
+    feature_start: int
+    feature_end: int
+    raw_start_utc: str
+    raw_end_utc: str
+    feature_start_utc: str
+    feature_end_utc: str
+
+
+def _acquisition_utc_ms(value: Any, label: str) -> int:
+    if type(value) is not str or not value.endswith("Z"):
+        raise TerminalPolicyError(f"source acquisition {label} mismatch")
+    try:
+        parsed = datetime.fromisoformat(value[:-1] + "+00:00")
+    except ValueError as exc:
+        raise TerminalPolicyError(f"source acquisition {label} mismatch") from exc
+    if parsed.tzinfo != UTC or parsed.isoformat().replace("+00:00", "Z") != value:
+        raise TerminalPolicyError(f"source acquisition {label} mismatch")
+    return int(parsed.timestamp() * 1000)
+
+
+def _acquisition_contract(
+    records: AcquisitionRecords | PhaseRecords | OneTouchRecords,
+) -> tuple[_AcquisitionContract, ...]:
+    info, digest, size, payload = _regular_file(
+        records.contract_manifest.path, "source contract", capture=True
+    )
+    identity = records.contract_manifest
+    if (digest, size, info.st_dev, info.st_ino, stat.S_IMODE(info.st_mode), info.st_nlink) != (
+        identity.sha256,
+        identity.byte_count,
+        identity.st_dev,
+        identity.st_ino,
+        identity.mode,
+        identity.nlink,
+    ):
+        raise TerminalPolicyError("source contract identity drift")
+    if payload is None:
+        raise AssertionError("captured source contract is missing")
+    try:
+        value = parse_canonical_object(payload, "source acquisition contract")
+    except TerminalPolicyError as exc:
+        raise TerminalPolicyError("source acquisition contract mismatch") from exc
+    if (
+        value.get("schema_version") != "alpha_max_contract_manifest.v2"
+        or value.get("exchange") != "binance"
+    ):
+        raise TerminalPolicyError("source acquisition contract mismatch")
+    rows = value.get("records")
+    if not isinstance(rows, list) or [x.get("symbol") for x in rows if isinstance(x, dict)] != list(
+        _SYMBOLS
+    ):
+        raise TerminalPolicyError("source acquisition contract mismatch")
+    required = {
+        "market_type": "perpetual",
+        "linear": True,
+        "inverse": False,
+        "quote_asset": "USDT",
+        "margin_asset": "USDT",
+        "settle_asset": "USDT",
+        "volume_unit": "base_asset",
+        "contract_multiplier": 1.0,
+    }
+    result = []
+    for row in rows:
+        if not isinstance(row, dict) or any(
+            row.get(key) != expected for key, expected in required.items()
+        ):
+            raise TerminalPolicyError("source acquisition contract mismatch")
+        contract = _AcquisitionContract(
+            row["symbol"],
+            _acquisition_utc_ms(row.get("raw_availability_start_utc"), "contract"),
+            _acquisition_utc_ms(row.get("raw_availability_end_utc"), "contract"),
+            _acquisition_utc_ms(row.get("feature_availability_start_utc"), "contract"),
+            _acquisition_utc_ms(row.get("feature_availability_end_utc"), "contract"),
+            row["raw_availability_start_utc"],
+            row["raw_availability_end_utc"],
+            row["feature_availability_start_utc"],
+            row["feature_availability_end_utc"],
+        )
+        if contract.raw_end <= contract.raw_start or contract.feature_end <= contract.feature_start:
+            raise TerminalPolicyError("source acquisition contract mismatch")
+        result.append(contract)
+    return tuple(result)
+
+
+def _acquisition_months(start: int, end: int) -> list[datetime]:
+    current = datetime.fromtimestamp(start / 1000, UTC).replace(
+        day=1, hour=0, minute=0, second=0, microsecond=0
+    )
+    result = []
+    while int(current.timestamp() * 1000) < end:
+        result.append(current)
+        current = (current.replace(day=28) + timedelta(days=4)).replace(day=1)
+    return result
+
+
+def _acquisition_receipt(
+    report_fd: int,
+    enumerated: dict[str, os.stat_result],
+    path: str,
+    requested_url: str,
+    query: dict[str, str] | None = None,
+) -> str:
+    _info, payload_sha, payload_size, _payload = _regular_file_at_enumerated(
+        report_fd, path, "official payload", enumerated
+    )
+    receipt = _canonical_object_at_enumerated(
+        report_fd, path + ".receipt.json", "official request receipt", enumerated
+    )
+    expected_query = query or {}
+    expected = {
+        "schema": "official_request_receipt.v1",
+        "requested_url": requested_url,
+        "final_url": requested_url,
+        "final_host": urllib.parse.urlsplit(requested_url).hostname,
+        "query": expected_query,
+        "retrieved_at_utc": receipt.get("retrieved_at_utc"),
+        "byte_count": payload_size,
+        "sha256": payload_sha,
+    }
+    retrieved = expected["retrieved_at_utc"]
+    if (
+        urllib.parse.urlsplit(requested_url).scheme != "https"
+        or urllib.parse.urlsplit(requested_url).hostname
+        not in {"fapi.binance.com", "data.binance.vision"}
+        or not isinstance(retrieved, str)
+    ):
+        raise TerminalPolicyError("source official report coverage mismatch")
+    _acquisition_utc_ms(retrieved, "retrieval time")
+    if receipt != expected or any(type(value) is not str for value in expected_query.values()):
+        raise TerminalPolicyError("source official report coverage mismatch")
+    return payload_sha
+
+
+def _acquisition_json_value(
+    report_fd: int,
+    enumerated: dict[str, os.stat_result],
+    path: str,
+) -> Any:
+    known = enumerated.get(path)
+    if known is None or known.st_size > 64 << 20:
+        raise TerminalPolicyError("source official report coverage mismatch")
+    _info, _digest_value, _byte_count, payload = _regular_file_at_enumerated(
+        report_fd,
+        path,
+        "official JSON payload",
+        enumerated,
+        capture=True,
+    )
+    if payload is None:
+        raise AssertionError("captured official payload is missing")
+
+    def reject_constant(_value: str) -> None:
+        raise ValueError("non-finite JSON constant")
+
+    def reject_duplicate(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("duplicate JSON key")
+            result[key] = value
+        return result
+
+    try:
+        return json.loads(
+            payload,
+            parse_constant=reject_constant,
+            object_pairs_hook=reject_duplicate,
+        )
+    except (
+        UnicodeDecodeError,
+        json.JSONDecodeError,
+        RecursionError,
+        TypeError,
+        ValueError,
+    ) as exc:
+        raise TerminalPolicyError("source official report coverage mismatch") from exc
+
+
+def _acquisition_partition_path(relative: str) -> str:
+    return "partitions/" + hashlib.sha256(relative.encode("utf-8")).hexdigest() + ".json"
+
+
+def _acquisition_partition(
+    report_fd: int,
+    enumerated: dict[str, os.stat_result],
+    relative: str,
+    source_sha: str,
+    output_sha: str,
+    rows: int,
+    start: int,
+    end: int,
+    input_carry: float | None,
+    output_carry: float | None,
+    code_sha: str,
+    page_hashes: list[str],
+) -> None:
+    receipt = _canonical_object_at_enumerated(
+        report_fd,
+        _acquisition_partition_path(relative),
+        "source partition receipt",
+        enumerated,
+    )
+    expected = {
+        "schema": "alpha_max_partition_receipt.v2",
+        "path": relative,
+        "source_sha256": source_sha,
+        "output_sha256": output_sha,
+        "rows": rows,
+        "start_ms": start,
+        "end_ms": end,
+        "input_carry_close": input_carry,
+        "output_carry_close": output_carry,
+        "derivation_version": "alpha-max-binance-ohlcv-v4",
+        "code_sha256": code_sha,
+        "page_hashes": page_hashes,
+    }
+    if receipt != expected:
+        if receipt.get("derivation_version") != "alpha-max-binance-ohlcv-v4":
+            raise TerminalPolicyError("source derivation version mismatch")
+        raise TerminalPolicyError("source partition receipt mismatch")
+
+
+def _acquisition_raw_partition(
+    report_fd: int,
+    enumerated: dict[str, os.stat_result],
+    relative: str,
+    source_sha: str,
+    output_sha: str,
+    rows: int,
+    start: int,
+    end: int,
+    input_carry: float | None,
+    code_sha: str,
+    page_hashes: list[str],
+) -> float:
+    receipt = _canonical_object_at_enumerated(
+        report_fd,
+        _acquisition_partition_path(relative),
+        "source partition receipt",
+        enumerated,
+    )
+    output_carry = receipt.get("output_carry_close")
+    if type(output_carry) not in (int, float) or not math.isfinite(output_carry):
+        raise TerminalPolicyError("source partition receipt mismatch")
+    _acquisition_partition(
+        report_fd,
+        enumerated,
+        relative,
+        source_sha,
+        output_sha,
+        rows,
+        start,
+        end,
+        input_carry,
+        output_carry,
+        code_sha,
+        page_hashes,
+    )
+    return float(output_carry)
+
+
+def _expected_tree_directories(files: set[str]) -> set[str]:
+    directories: set[str] = set()
+    for relative in files:
+        parent = Path(relative).parent
+        while parent != Path("."):
+            directories.add(parent.as_posix())
+            parent = parent.parent
+    return directories
+
+
+def _observed_tree_directories(
+    enumerated: dict[str, os.stat_result],
+) -> set[str]:
+    return {
+        relative
+        for relative, info in enumerated.items()
+        if relative != "." and stat.S_ISDIR(info.st_mode)
+    }
+
+
+def _acquisition_oracle(
+    records: AcquisitionRecords | PhaseRecords,
+    source_fd: int,
+    report_fd: int,
+    source_files: set[str],
+    report_files: set[str],
+    source_enumerated: dict[str, os.stat_result],
+    report_enumerated: dict[str, os.stat_result],
+) -> tuple[list[str], list[str], int, int, str]:
+    required_output: set[str] = set()
+    required_report: set[str] = {
+        "provenance/contract_manifest.json",
+        "provenance/availability_evidence.json",
+        "provenance/exchangeInfo.json",
+        "provenance/exchangeInfo.json.receipt.json",
+        "acquisition.journal.jsonl",
+    }
+    for relative, identity in (
+        ("provenance/contract_manifest.json", records.contract_manifest),
+        ("provenance/availability_evidence.json", records.availability_evidence),
+    ):
+        _info, digest, size, _payload = _regular_file_at_enumerated(
+            report_fd, relative, "source provenance", report_enumerated
+        )
+        if (digest, size) != (identity.sha256, identity.byte_count):
+            raise TerminalPolicyError("source official report coverage mismatch")
+    contracts = _acquisition_contract(records)
+    exchange_sha = _acquisition_receipt(
+        report_fd,
+        report_enumerated,
+        "provenance/exchangeInfo.json",
+        "https://fapi.binance.com/fapi/v1/exchangeInfo",
+    )
+    exchange = _acquisition_json_value(
+        report_fd,
+        report_enumerated,
+        "provenance/exchangeInfo.json",
+    )
+    if not isinstance(exchange, dict) or not isinstance(exchange.get("symbols"), list):
+        raise TerminalPolicyError("source official report coverage mismatch")
+    current_symbols = {item.get("symbol") for item in exchange["symbols"] if isinstance(item, dict)}
+    if any(
+        contract.symbol != "TONUSDT" and contract.symbol not in current_symbols
+        for contract in contracts
+    ):
+        raise TerminalPolicyError("source official report coverage mismatch")
+    raw_total = funding_total = 0
+    for contract in contracts:
+        carry: float | None = None
+        for month in _acquisition_months(contract.raw_start, contract.raw_end):
+            label = month.strftime("%Y-%m")
+            nominal_start = int(month.timestamp() * 1000)
+            nominal_end = int(
+                ((month.replace(day=28) + timedelta(days=4)).replace(day=1)).timestamp() * 1000
+            )
+            start, end = max(nominal_start, contract.raw_start), min(nominal_end, contract.raw_end)
+            relative = f"market_ohlcv_1s/binance/{contract.symbol}/{label}.parquet"
+            filename = f"{contract.symbol}-aggTrades-{label}.zip"
+            archive = f"provenance/archives/{contract.symbol}/{filename}"
+            checksum = archive + ".CHECKSUM"
+            base = f"https://data.binance.vision/data/futures/um/monthly/aggTrades/{contract.symbol}/{filename}"
+            checksum_sha = _acquisition_receipt(
+                report_fd, report_enumerated, checksum, base + ".CHECKSUM"
+            )
+            archive_sha = _acquisition_receipt(report_fd, report_enumerated, archive, base)
+            _info, _digest, _size, checksum_payload = _regular_file_at_enumerated(
+                report_fd, checksum, "archive checksum", report_enumerated, capture=True
+            )
+            try:
+                fields = checksum_payload.decode("utf-8", "strict").strip().split()
+            except UnicodeDecodeError as exc:
+                raise TerminalPolicyError("source official report coverage mismatch") from exc
+            if (
+                len(fields) not in (1, 2)
+                or fields[0].lower() != archive_sha
+                or (len(fields) == 2 and fields[1].lstrip("*") != filename)
+            ):
+                raise TerminalPolicyError("source official report coverage mismatch")
+            _info, output_sha, _size, _payload = _regular_file_at_enumerated(
+                source_fd, relative, "raw output", source_enumerated
+            )
+            rows = (end - start) // 1000
+            carry = _acquisition_raw_partition(
+                report_fd,
+                report_enumerated,
+                relative,
+                fields[0].lower(),
+                output_sha,
+                rows,
+                start,
+                end,
+                carry,
+                records.acquirer.sha256,
+                [checksum_sha, archive_sha],
+            )
+            required_output.add(relative)
+            required_report.update(
+                {
+                    archive,
+                    archive + ".receipt.json",
+                    checksum,
+                    checksum + ".receipt.json",
+                    _acquisition_partition_path(relative),
+                }
+            )
+            raw_total += rows
+        interval = 14_400_000 if contract.symbol == "TONUSDT" else 28_800_000
+        cursor = (
+            max(0, contract.feature_start - 2 * interval)
+            if contract.symbol == "TONUSDT"
+            else contract.feature_start
+        )
+        page_rows: list[dict[str, Any]] = []
+        page_hashes: list[str] = []
+        number = 0
+        while cursor < contract.feature_end:
+            number += 1
+            page = f"provenance/funding_pages/{contract.symbol}/{number:06d}.json"
+            query = {
+                "symbol": contract.symbol,
+                "startTime": str(cursor),
+                "endTime": str(contract.feature_end - 1),
+                "limit": "1000",
+            }
+            page_hashes.append(
+                _acquisition_receipt(
+                    report_fd,
+                    report_enumerated,
+                    page,
+                    "https://fapi.binance.com/fapi/v1/fundingRate?" + urllib.parse.urlencode(query),
+                    query,
+                )
+            )
+            value = _acquisition_json_value(
+                report_fd,
+                report_enumerated,
+                page,
+            )
+            if not isinstance(value, list):
+                raise TerminalPolicyError("source official report coverage mismatch")
+            times = [
+                row["fundingTime"]
+                for row in value
+                if isinstance(row, dict)
+                and row.get("symbol") == contract.symbol
+                and type(row.get("fundingTime")) is int
+            ]
+            if (
+                len(value) > 1000
+                or len(times) != len(value)
+                or any(b <= a for a, b in itertools.pairwise(times))
+                or any(time < cursor or time >= contract.feature_end for time in times)
+            ):
+                raise TerminalPolicyError("source official report coverage mismatch")
+            page_rows.extend(value)
+            required_report.update({page, page + ".receipt.json"})
+            if not value or len(value) < 1000:
+                break
+            cursor = times[-1] + 1
+        prefix = f"provenance/funding_pages/{contract.symbol}/"
+        if {path for path in report_files if path.startswith(prefix)} != {
+            path for path in required_report if path.startswith(prefix)
+        }:
+            raise TerminalPolicyError("source official report coverage mismatch")
+        values: dict[int, dict[str, Any]] = {}
+        previous = -1
+        proof = (
+            contract.feature_start // interval * interval - 2 * interval
+            if contract.symbol == "TONUSDT"
+            else None
+        )
+        for row in page_rows:
+            source = row["fundingTime"]
+            try:
+                rate = float(row.get("fundingRate"))
+            except (TypeError, ValueError) as exc:
+                raise TerminalPolicyError("source official report coverage mismatch") from exc
+            settlement = source // interval * interval
+            if (
+                source <= previous
+                or source - settlement not in range(1001)
+                or not math.isfinite(rate)
+                or settlement in values
+            ):
+                raise TerminalPolicyError("source official report coverage mismatch")
+            previous = source
+            values[settlement] = {
+                "timestamp_ms": source,
+                "source_timestamp_ms": source,
+                "exchange": "binance",
+                "symbol": contract.symbol,
+                "funding_rate": rate,
+            }
+        if proof is not None:
+            if proof not in values or proof + interval in values:
+                raise TerminalPolicyError("source official report coverage mismatch")
+            del values[proof]
+        first = ((contract.feature_start + interval - 1) // interval) * interval
+        owned_keys = list(range(first, contract.feature_end, interval))
+        if sorted(values) != owned_keys:
+            raise TerminalPolicyError("source official report coverage mismatch")
+        for day_ms in range(
+            (contract.feature_start // 86_400_000) * 86_400_000, contract.feature_end, 86_400_000
+        ):
+            owned = [values[key] for key in owned_keys if day_ms <= key < day_ms + 86_400_000]
+            if not owned:
+                continue
+            day = datetime.fromtimestamp(day_ms / 1000, UTC).strftime("%Y-%m-%d")
+            relative = f"feature_points/exchange=binance/symbol={contract.symbol}/date={day}/funding.parquet"
+            _info, output_sha, _size, _payload = _regular_file_at_enumerated(
+                source_fd, relative, "funding output", source_enumerated
+            )
+            _acquisition_partition(
+                report_fd,
+                report_enumerated,
+                relative,
+                hashlib.sha256(canonical_bytes(owned)).hexdigest(),
+                output_sha,
+                len(owned),
+                day_ms,
+                day_ms + 86_400_000,
+                None,
+                None,
+                records.acquirer.sha256,
+                page_hashes,
+            )
+            required_output.add(relative)
+            required_report.add(_acquisition_partition_path(relative))
+            funding_total += len(owned)
+    expected_source_files = required_output | {".alpha_max_owner.json"}
+    if source_files != expected_source_files or _observed_tree_directories(
+        source_enumerated
+    ) != _expected_tree_directories(expected_source_files):
+        raise TerminalPolicyError("source acquisition coverage mismatch")
+    return sorted(required_output), sorted(required_report), raw_total, funding_total, exchange_sha
+
+
+def _validate_acquisition(
+    records: AcquisitionRecords, *, include_snapshots: bool = False
+) -> tuple[ValidatedArtifact, ...] | tuple[tuple[ValidatedArtifact, ...], tuple[str, str]]:
+    with ExitStack() as descriptors:
+        return _validate_acquired_source_report_at(
+            records, descriptors, include_snapshots=include_snapshots
+        )
+
+
+def _validate_acquired_source_report_at(
+    records: AcquisitionRecords | PhaseRecords,
+    descriptors: ExitStack,
+    *,
+    source_parent_fd: int | None = None,
+    report_parent_fd: int | None = None,
+    source_fd: int | None = None,
+    report_fd: int | None = None,
+    include_snapshots: bool = False,
+) -> tuple[ValidatedArtifact, ...] | tuple[tuple[ValidatedArtifact, ...], tuple[str, str]]:
+    source_root_path = validate_lexical_control_path(records.source_root.path)
+    report_root_path = validate_lexical_control_path(
+        records.report_root.path
+        if isinstance(records, AcquisitionRecords)
+        else records.source_report.path
+    )
+    source_root = Path(source_root_path)
+    report_root = Path(report_root_path)
+    if isinstance(records, AcquisitionRecords):
+        if (
+            str(source_root.parent) != records.source_root.parent.path
+            or source_root.name != records.source_root.leaf
+            or str(report_root.parent) != records.report_root.parent.path
+            or report_root.name != records.report_root.leaf
+        ):
+            raise TerminalPolicyError("source root parent binding mismatch")
+        source_parent_fd = _open_registered_directory(
+            descriptors, records.source_root.parent.path, "source parent"
+        )
+        report_parent_fd = _open_registered_directory(
+            descriptors, records.report_root.parent.path, "source report parent"
+        )
+        _validate_directory_fd(source_parent_fd, records.source_root.parent, "source parent")
+        _validate_directory_fd(report_parent_fd, records.report_root.parent, "source report parent")
+        source_fd = _open_registered_child(
+            descriptors,
+            source_parent_fd,
+            records.source_root.leaf,
+            os.O_RDONLY | os.O_DIRECTORY,
+            "source",
+        )
+        report_fd = _open_registered_child(
+            descriptors,
+            report_parent_fd,
+            records.report_root.leaf,
+            os.O_RDONLY | os.O_DIRECTORY,
+            "source report",
+        )
+    if (
+        source_parent_fd is None
+        or report_parent_fd is None
+        or source_fd is None
+        or report_fd is None
+    ):
+        raise TerminalPolicyError("acquired source descriptors are required")
+    source_tree = _walk_tree_at(source_fd, "source")
+    report_tree = _walk_tree_at(report_fd, "source report")
+    source_files = _safe_tree_files_at(source_fd, "source", source_tree)
+    report_files = _safe_tree_files_at(report_fd, "source report", report_tree)
+    source_enumerated = dict(source_tree)
+    report_enumerated = dict(report_tree)
+
+    plan = _canonical_object_at_enumerated(report_fd, "plan.json", "source plan", report_enumerated)
     expected_plan = {
         "schema": "alpha_max_official_acquisition_plan.v3",
         "source_eligible": False,
@@ -2039,14 +2991,26 @@ def _validate_acquisition(records: AcquisitionRecords) -> tuple[ValidatedArtifac
         "derivation_version",
         "code_sha256",
     }
-    source_owner = _canonical_object(source_root / ".alpha_max_owner.json")
-    report_owner = _canonical_object(report_root / ".alpha_max_owner.json")
+    source_owner = _canonical_object_at_enumerated(
+        source_fd, ".alpha_max_owner.json", "source owner", source_enumerated
+    )
+    report_owner = _canonical_object_at_enumerated(
+        report_fd, ".alpha_max_owner.json", "source report owner", report_enumerated
+    )
     _exact(source_owner, owner_fields, "source owner")
     _exact(report_owner, owner_fields, "source report owner")
-    source_info = source_root.lstat()
-    report_info = report_root.lstat()
-    source_parent_info = source_root.parent.lstat()
-    report_parent_info = report_root.parent.lstat()
+    source_info = _validate_directory_fd(source_fd, None, "source")
+    report_info = _validate_directory_fd(report_fd, None, "source report")
+    source_parent_info = _validate_directory_fd(
+        source_parent_fd,
+        records.source_root.parent if isinstance(records, AcquisitionRecords) else None,
+        "source parent",
+    )
+    report_parent_info = _validate_directory_fd(
+        report_parent_fd,
+        records.report_root.parent if isinstance(records, AcquisitionRecords) else None,
+        "source report parent",
+    )
     owner_expected = {
         "schema": "alpha_max_owned_roots.v2",
         "run_id": run_id,
@@ -2061,45 +3025,25 @@ def _validate_acquisition(records: AcquisitionRecords) -> tuple[ValidatedArtifac
         "availability_evidence_sha256": records.availability_evidence.sha256,
         "code_sha256": records.acquirer.sha256,
     }
-    if (
-        source_owner != report_owner
-        or any(source_owner.get(key) != expected for key, expected in owner_expected.items())
-        or not isinstance(source_owner["derivation_version"], str)
-        or not source_owner["derivation_version"]
+    if source_owner.get("derivation_version") != "alpha-max-binance-ohlcv-v4":
+        raise TerminalPolicyError("source derivation version mismatch")
+    if source_owner != report_owner or any(
+        source_owner.get(key) != expected for key, expected in owner_expected.items()
     ):
         raise TerminalPolicyError("source ownership binding mismatch")
 
-    receipt = _canonical_object(report_root / "source_eligible_receipt.json")
-    fields = {
-        "schema",
-        "source_eligible",
-        "raw_rows",
-        "funding_rows",
-        "contract_sha256",
-        "availability_evidence_sha256",
-        "derivation_version",
-        "code_sha256",
-        "exchange_info_sha256",
-        "inventory_sha256",
-        "source_manifest_sha256",
-        "acquisition_journal_sha256",
-    }
-    _exact(receipt, fields, "source receipt")
-    if (
-        receipt["schema"] != "alpha_max_official_source_receipt.v3"
-        or receipt["source_eligible"] is not True
-        or receipt["raw_rows"] != 1_066_681_730
-        or receipt["funding_rows"] != 39_569
-        or receipt["contract_sha256"] != records.contract_manifest.sha256
-        or receipt["availability_evidence_sha256"] != records.availability_evidence.sha256
-        or receipt["code_sha256"] != records.acquirer.sha256
-        or receipt["derivation_version"] != source_owner["derivation_version"]
-    ):
-        raise TerminalPolicyError("source receipt binding mismatch")
-
-    manifest_path = report_root / "source_manifest.json"
-    journal_path = report_root / "acquisition.journal.jsonl"
-    manifest = _canonical_object(manifest_path)
+    output_inventory, required_report, raw_total, funding_total, exchange_sha = _acquisition_oracle(
+        records,
+        source_fd,
+        report_fd,
+        source_files,
+        report_files,
+        source_enumerated,
+        report_enumerated,
+    )
+    manifest = _canonical_object_at_enumerated(
+        report_fd, "source_manifest.json", "source manifest", report_enumerated
+    )
     _exact(
         manifest,
         {
@@ -2111,81 +3055,109 @@ def _validate_acquisition(records: AcquisitionRecords) -> tuple[ValidatedArtifac
         },
         "source manifest",
     )
-    if (
-        manifest["schema"] != "alpha_max_official_source_manifest.v4"
-        or manifest["contract_sha256"] != records.contract_manifest.sha256
-        or manifest["availability_evidence_sha256"] != records.availability_evidence.sha256
-        or manifest["derivation_version"] != receipt["derivation_version"]
-        or not isinstance(manifest["artifacts"], list)
+    if manifest.get("derivation_version") != "alpha-max-binance-ohlcv-v4":
+        raise TerminalPolicyError("source derivation version mismatch")
+    expected_artifacts = []
+    for prefix, files, fd, enumerated in (
+        ("output", output_inventory, source_fd, source_enumerated),
+        ("report", sorted(required_report), report_fd, report_enumerated),
     ):
-        raise TerminalPolicyError("source manifest binding mismatch")
-
-    seen: set[str] = set()
-    output_inventory: list[str] = []
-    report_inventory: list[str] = []
-    artifact_paths: list[str] = []
-    exchange_info_sha256: str | None = None
-    for entry in manifest["artifacts"]:
-        _exact(entry, {"path", "sha256"}, "source manifest artifact")
-        relative = entry["path"]
-        if (
-            not isinstance(relative, str)
-            or relative in seen
-            or relative.startswith("/")
-            or ".." in Path(relative).parts
-            or not (relative.startswith("output/") or relative.startswith("report/"))
-        ):
-            raise TerminalPolicyError("source manifest path is invalid")
-        seen.add(relative)
-        artifact_paths.append(relative)
-        prefix, leaf = relative.split("/", 1)
-        target_root = source_root if prefix == "output" else report_root
-        _info, digest, _byte_count, _payload = _regular_file(
-            target_root / leaf,
-            f"source manifest artifact {relative}",
-        )
-        if digest != _digest(entry["sha256"], "source artifact sha256"):
-            raise TerminalPolicyError("source manifest artifact drift")
-        if prefix == "output":
-            output_inventory.append(leaf)
-        else:
-            report_inventory.append(leaf)
-            if leaf == "provenance/exchangeInfo.json":
-                exchange_info_sha256 = digest
-    if artifact_paths != sorted(artifact_paths):
-        raise TerminalPolicyError("source manifest is not canonically sorted")
-
-    expected_source_files = set(output_inventory) | {".alpha_max_owner.json"}
-    expected_report_files = set(report_inventory) | {
+        for relative in files:
+            _info, digest, _size, _payload = _regular_file_at_enumerated(
+                fd, relative, f"source manifest artifact {prefix}/{relative}", enumerated
+            )
+            expected_artifacts.append({"path": f"{prefix}/{relative}", "sha256": digest})
+    expected_manifest = {
+        "schema": "alpha_max_official_source_manifest.v4",
+        "contract_sha256": records.contract_manifest.sha256,
+        "availability_evidence_sha256": records.availability_evidence.sha256,
+        "derivation_version": "alpha-max-binance-ohlcv-v4",
+        "artifacts": expected_artifacts,
+    }
+    if manifest != expected_manifest:
+        raise TerminalPolicyError("source official report coverage mismatch")
+    expected_report_files = set(required_report) | {
         ".alpha_max_owner.json",
         "plan.json",
         "source_manifest.json",
         "source_eligible_receipt.json",
     }
-    if source_files != expected_source_files or report_files != expected_report_files:
-        raise TerminalPolicyError("source manifest does not cover both trees")
-    expected_inventory_sha256 = hashlib.sha256(
-        canonical_bytes(sorted(output_inventory))
-    ).hexdigest()
-    if receipt["inventory_sha256"] != expected_inventory_sha256:
-        raise TerminalPolicyError("source inventory hash mismatch")
-    for key, path in (
-        ("source_manifest_sha256", manifest_path),
-        ("acquisition_journal_sha256", journal_path),
-    ):
-        _info, digest, _byte_count, _payload = _regular_file(path, key)
-        if receipt[key] != digest:
-            raise TerminalPolicyError("source receipt cross-hash mismatch")
-    if exchange_info_sha256 is None or receipt["exchange_info_sha256"] != exchange_info_sha256:
-        raise TerminalPolicyError("source exchange-info binding mismatch")
-    return tuple(
-        _artifact_from_path(str(report_root), name, kind)
+    if report_files != expected_report_files or _observed_tree_directories(
+        report_enumerated
+    ) != _expected_tree_directories(expected_report_files):
+        raise TerminalPolicyError("source official report coverage mismatch")
+    receipt = _canonical_object_at_enumerated(
+        report_fd, "source_eligible_receipt.json", "source receipt", report_enumerated
+    )
+    _info, manifest_sha, _size, _payload = _regular_file_at_enumerated(
+        report_fd, "source_manifest.json", "source manifest", report_enumerated
+    )
+    _info, journal_sha, _size, _payload = _regular_file_at_enumerated(
+        report_fd, "acquisition.journal.jsonl", "source journal", report_enumerated
+    )
+    expected_receipt = {
+        "schema": "alpha_max_official_source_receipt.v3",
+        "source_eligible": True,
+        "raw_rows": raw_total,
+        "funding_rows": funding_total,
+        "contract_sha256": records.contract_manifest.sha256,
+        "availability_evidence_sha256": records.availability_evidence.sha256,
+        "derivation_version": "alpha-max-binance-ohlcv-v4",
+        "code_sha256": records.acquirer.sha256,
+        "exchange_info_sha256": exchange_sha,
+        "inventory_sha256": hashlib.sha256(canonical_bytes(output_inventory)).hexdigest(),
+        "source_manifest_sha256": manifest_sha,
+        "acquisition_journal_sha256": journal_sha,
+    }
+    if receipt.get("derivation_version") != "alpha-max-binance-ohlcv-v4":
+        raise TerminalPolicyError("source derivation version mismatch")
+    if receipt != expected_receipt:
+        raise TerminalPolicyError("source acquisition coverage mismatch")
+    artifacts = tuple(
+        _artifact_from_at_enumerated(report_fd, report_root_path, name, kind, report_enumerated)
         for name, kind in (
             ("source_eligible_receipt.json", "source_eligible_receipt"),
             ("source_manifest.json", "source_manifest"),
             ("acquisition.journal.jsonl", "source_journal"),
         )
     )
+    root_snapshots = (
+        _snapshot_digest_at(source_fd, "source", source_tree),
+        _snapshot_digest_at(report_fd, "source report", report_tree),
+    )
+    if include_snapshots:
+        return artifacts, root_snapshots
+    return artifacts
+
+
+def _require_current_prerequisite(
+    request: ScopeRequest, artifact: ValidatedArtifact, kind: str
+) -> None:
+    try:
+        prerequisite = next(item for item in request.prerequisites if item.kind == kind)
+    except StopIteration as exc:
+        raise TerminalPolicyError(f"missing {kind} prerequisite") from exc
+    if (
+        artifact.kind != kind
+        or artifact.path != prerequisite.path
+        or (
+            artifact.sha256,
+            artifact.byte_count,
+            artifact.st_dev,
+            artifact.st_ino,
+            artifact.mode,
+            artifact.nlink,
+        )
+        != (
+            prerequisite.sha256,
+            prerequisite.byte_count,
+            prerequisite.st_dev,
+            prerequisite.st_ino,
+            prerequisite.mode,
+            prerequisite.nlink,
+        )
+    ):
+        raise TerminalPolicyError(f"{kind} prerequisite drift")
 
 
 def validate_completed_command(
@@ -2206,61 +3178,49 @@ def validate_completed_command(
         raise TerminalPolicyError("command evidence chain is invalid")
     validated: tuple[ValidatedArtifact, ...] = ()
     sealed: tuple[SealedArtifact, ...] = ()
-    roots: tuple[Path, ...] = ()
     if request.scope == "acquisition":
         record = request.records
-        roots = (Path(record.source_root.path), Path(record.report_root.path))
-        validated = _validate_acquisition(record)
+        acquisition = _validate_acquisition(record, include_snapshots=True)
+        validated, root_snapshots = acquisition
     elif request.scope == "phase_preparation":
-        record = request.records
-        roots = (Path(record.phase_output.path),)
-        _validate_preparation_manifest(request)
-        validated = (
-            _artifact_from_path(
-                str(roots[0].parent),
-                f".{roots[0].name}.alpha_max_phase_preparation.handoff.json",
-                "phase_handoff_receipt",
-            ),
-            _artifact_from_path(str(roots[0]), "preparation_manifest.json", "preparation_manifest"),
-        )
+        validated, root_snapshots = _validate_preparation_manifest(request)
     else:
         record = request.records
         if not isinstance(record, OneTouchRecords):
             raise TerminalPolicyError("one-touch records are required")
-        _validate_preparation_manifest(request)
+        _phase_validated, phase_snapshots = _validate_preparation_manifest(request)
         if index == 0:
-            sealed = (_sealed_tree(record.prelock_output.path, "prelock_bundle", "artifacts"),)
-            validated = (
-                _artifact_from_path(
-                    record.prelock_output.path,
-                    "run/prelock_result.json",
-                    "prelock_readback",
-                ),
-                _artifact_from_path(
-                    record.prelock_output.path,
-                    "diagnostics/validation/trend_liquidity_falsifier.json",
-                    "prelock_observability",
-                ),
-                _artifact_from_path(
-                    record.prelock_output.path,
-                    "SEALED.json",
-                    "prelock_inventory_before",
-                ),
-                _artifact_from_path(
-                    record.prelock_output.path,
-                    "admission/train_liquidity_buckets.json",
-                    "input_inventory_before",
-                ),
-            )
-            roots = (Path(record.phase_output.path), Path(record.prelock_output.path))
+            with ExitStack() as descriptors:
+                _prelock_parent_fd, prelock_fd = _open_output_child(
+                    descriptors, record.prelock_output, "prelock bundle root"
+                )
+                prelock, prelock_tree, _prelock_seal = _sealed_tree_at(
+                    prelock_fd, record.prelock_output.path, "prelock_bundle", "artifacts"
+                )
+                prelock_enumerated = dict(prelock_tree)
+                sealed = (prelock,)
+                validated = tuple(
+                    _artifact_from_at_enumerated(
+                        prelock_fd, record.prelock_output.path, relative, kind, prelock_enumerated
+                    )
+                    for relative, kind in (
+                        ("run/prelock_result.json", "prelock_readback"),
+                        (
+                            "diagnostics/validation/trend_liquidity_falsifier.json",
+                            "prelock_observability",
+                        ),
+                        ("SEALED.json", "prelock_inventory_before"),
+                        ("admission/train_liquidity_buckets.json", "input_inventory_before"),
+                    )
+                )
+                bundle_snapshots = (
+                    _snapshot_digest_at(prelock_fd, "prelock bundle", prelock_tree),
+                )
         else:
-            validated, sealed = _one_touch_second_command_artifacts(request, index)
-            roots = (
-                Path(record.phase_output.path),
-                Path(record.prelock_output.path),
-                Path(record.historical_output.path),
+            validated, sealed, bundle_snapshots = _one_touch_second_command_artifacts(
+                request, index, prior_evidence
             )
-    root_snapshots = tuple(_snapshot_digest(root) for root in roots)
+        root_snapshots = phase_snapshots + bundle_snapshots
     if (
         prior_evidence is not None
         and request.scope == "acquisition"
@@ -2273,7 +3233,7 @@ def validate_completed_command(
     if (
         prior_evidence is not None
         and request.scope == "one_touch"
-        and root_snapshots[:2] != prior_evidence.root_snapshot_sha256s[:2]
+        and root_snapshots[:-1] != prior_evidence.root_snapshot_sha256s
     ):
         raise TerminalPolicyError("historical execution changed authenticated phase inputs")
     digest = hashlib.sha256(
@@ -2326,14 +3286,28 @@ def validate_terminal_state(value: Any) -> None:
     _terminal_state(value)
 
 
-def _utc_value(value: Any, label: str) -> datetime:
-    if not isinstance(value, str):
+def parse_utc_second(value: Any, label: str) -> datetime:
+    """Parse one canonical UTC timestamp with exact-second precision."""
+    if type(value) is not str or len(value) != 20:
         raise TerminalPolicyError(f"invalid {label}")
     try:
         parsed = datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
     except ValueError as exc:
         raise TerminalPolicyError(f"invalid {label}") from exc
+    if parsed.strftime("%Y-%m-%dT%H:%M:%SZ") != value:
+        raise TerminalPolicyError(f"invalid {label}")
     return parsed
+
+
+def authorization_epoch_window(value: Mapping[str, Any]) -> tuple[int, int]:
+    """Validate an authorization window without making a freshness decision."""
+    if not isinstance(value, Mapping):
+        raise TerminalPolicyError("invalid authorization window")
+    not_before = parse_utc_second(value.get("not_before_utc"), "authorization not-before")
+    expires = parse_utc_second(value.get("expires_utc"), "authorization expiry")
+    if not not_before < expires or (expires - not_before).total_seconds() > 300:
+        raise TerminalPolicyError("invalid authorization window")
+    return int(not_before.timestamp()), int(expires.timestamp())
 
 
 def _stream_identity(value: Any, label: str, expected_path: str) -> dict[str, Any]:
@@ -2389,11 +3363,11 @@ def _validate_clearance(
         or value["next_command_index"] != completed_index + 1
     ):
         raise TerminalPolicyError("command clearance binding mismatch")
-    _digest(
+    validate_sha256(
         value["validated_artifact_snapshot_sha256"],
         "validated artifact snapshot sha256",
     )
-    _utc_value(value["issued_utc"], "clearance timestamp")
+    parse_utc_second(value["issued_utc"], "clearance timestamp")
     return value
 
 
@@ -2402,6 +3376,30 @@ def validate_scope_artifacts(
     request: ScopeRequest,
     events: Any,
     evidence: tuple[CommandEvidence, ...] | None = None,
+    *,
+    allow_incomplete: bool = False,
+) -> tuple[TargetResult, ...]:
+    with ExitStack() as descriptors:
+        evidence_root_fd = _open_registered_directory(
+            descriptors, request.evidence_root.path, "scope evidence root"
+        )
+        _validate_directory_fd(evidence_root_fd, request.evidence_root, "scope evidence root")
+        return _validate_scope_artifacts_at(
+            envelope,
+            request,
+            events,
+            evidence,
+            evidence_root_fd,
+            allow_incomplete=allow_incomplete,
+        )
+
+
+def _validate_scope_artifacts_at(
+    envelope: LaunchEnvelope,
+    request: ScopeRequest,
+    events: Any,
+    evidence: tuple[CommandEvidence, ...] | None,
+    evidence_root_fd: int,
     *,
     allow_incomplete: bool = False,
 ) -> tuple[TargetResult, ...]:
@@ -2454,7 +3452,7 @@ def validate_scope_artifacts(
         verify_message("process_event", event, public)
         index = event["command_index"]
         if authorization_id is None:
-            authorization_id = _digest(event["authorization_id"], "authorization id")
+            authorization_id = validate_sha256(event["authorization_id"], "authorization id")
         if (
             event["schema"] != WIRE_SCHEMA
             or event["type"] != "process_event"
@@ -2467,7 +3465,7 @@ def validate_scope_artifacts(
             != hashlib.sha256(canonical_bytes(request.environment)).hexdigest()
         ):
             raise TerminalPolicyError("event command binding mismatch")
-        _utc_value(event["observed_utc"], "event timestamp")
+        parse_utc_second(event["observed_utc"], "event timestamp")
         state = states[index]
         kind = event["event"]
         if kind == "launch_intent":
@@ -2532,7 +3530,7 @@ def validate_scope_artifacts(
             ):
                 raise TerminalPolicyError("invalid child exit")
             for digest_key in ("stdout_sha256", "stderr_sha256"):
-                _digest(event[digest_key], digest_key)
+                validate_sha256(event[digest_key], digest_key)
             for count_key in ("stdout_byte_count", "stderr_byte_count"):
                 _integer(event[count_key], count_key)
             exits[index] = event
@@ -2567,12 +3565,14 @@ def validate_scope_artifacts(
     command_evidence: list[CommandEvidence] = []
     results: list[TargetResult] = []
     for index, event in sorted(exits.items()):
-        stdout = _artifact_from_path(
+        stdout = _artifact_from_at(
+            evidence_root_fd,
             request.evidence_root.path,
             request.publication.stdout[index],
             "stdout",
         )
-        stderr = _artifact_from_path(
+        stderr = _artifact_from_at(
+            evidence_root_fd,
             request.evidence_root.path,
             request.publication.stderr[index],
             "stderr",
@@ -2639,14 +3639,13 @@ def validate_scope_artifacts(
     return tuple(results)
 
 
-def _artifact_from_path(parent: str, leaf: str, kind: str) -> ValidatedArtifact:
-    path = Path(parent) / leaf
-    info, digest, byte_count, _payload = _regular_file(path, f"{kind} artifact")
+def _artifact_from_at(root_fd: int, root_path: str, relative: str, kind: str) -> ValidatedArtifact:
+    info, digest, byte_count, _payload = _regular_file_at(root_fd, relative, f"{kind} artifact")
     if info.st_uid != os.getuid() or info.st_gid != os.getgid():
         raise TerminalPolicyError(f"{kind} artifact owner mismatch")
     return ValidatedArtifact(
         kind,
-        str(path),
+        str(Path(root_path) / relative),
         digest,
         byte_count,
         info.st_dev,
@@ -2657,245 +3656,358 @@ def _artifact_from_path(parent: str, leaf: str, kind: str) -> ValidatedArtifact:
 
 
 def _one_touch_second_command_artifacts(
-    request: ScopeRequest, index: int
-) -> tuple[tuple[ValidatedArtifact, ...], tuple[SealedArtifact, ...]]:
+    request: ScopeRequest, index: int, prior_evidence: CommandEvidence
+) -> tuple[tuple[ValidatedArtifact, ...], tuple[SealedArtifact, ...], tuple[str, ...]]:
     if not isinstance(request.records, OneTouchRecords):
         raise TerminalPolicyError("one-touch records are required")
     if type(index) is not int or index != 1:
         raise TerminalPolicyError("one-touch second command index is invalid")
     record = request.records
-    prelock = _sealed_tree(record.prelock_output.path, "prelock_bundle", "artifacts")
-    historical = _sealed_tree(
-        record.historical_output.path,
-        "historical_bundle",
-        "historical_artifacts",
-    )
-    historical_root = Path(record.historical_output.path)
-    historical_seal = _canonical_object(historical_root / "SEALED.json")
-    if historical_seal["prelock_seal_sha256"] != prelock.sha256 or historical_seal[
-        "prelock_snapshot_sha256"
-    ] != _snapshot_digest(Path(record.prelock_output.path)):
-        raise TerminalPolicyError("historical prelock binding mismatch")
-    before_seal = _regular_file(
-        Path(record.prelock_output.path) / "SEALED.json",
-        "prelock seal before historical",
-    )
-    after_seal = _regular_file(
-        historical_root / "binding/prelock_seal.json",
-        "prelock seal after historical",
-    )
-    before_inputs = _regular_file(
-        Path(record.prelock_output.path) / "admission/train_liquidity_buckets.json",
-        "prelock inputs before historical",
-    )
-    after_inputs = _regular_file(
-        historical_root / "admission/train_liquidity_buckets.json",
-        "prelock inputs after historical",
-    )
-    if before_seal[1:3] != after_seal[1:3] or before_inputs[1:3] != after_inputs[1:3]:
-        raise TerminalPolicyError("historical immutable input comparison failed")
-    validated = (
-        _artifact_from_path(
-            record.historical_output.path,
-            "report/historical_result.json",
-            "historical_readback",
-        ),
-        _artifact_from_path(
-            record.historical_output.path,
-            "diagnostics/historical_exposed_evaluation/trend_liquidity_falsifier.json",
-            "historical_observability",
-        ),
-        _artifact_from_path(
-            record.historical_output.path,
-            "binding/prelock_seal.json",
-            "prelock_inventory_after",
-        ),
-        _artifact_from_path(
-            record.historical_output.path,
-            "admission/train_liquidity_buckets.json",
-            "input_inventory_after",
-        ),
-    )
-    return validated, (historical,)
-
-
-def _validate_preparation_manifest(request: ScopeRequest) -> None:
-    if not isinstance(request.records, (PhaseRecords, OneTouchRecords)):
-        raise TerminalPolicyError("phase preparation records are required")
-    records = request.records
-    output = Path(records.phase_output.path)
-    if isinstance(records, OneTouchRecords):
-        _read_directory(records.phase_output, "one-touch phase output")
-    manifest = output / "preparation_manifest.json"
-    value = _canonical_object(manifest)
-    _exact(
-        value,
-        {
-            "availability",
-            "availability_sha256_by_root_kind",
-            "contract_manifest_schema_version",
-            "contract_manifest_sha256",
-            "exchange",
-            "file_count",
-            "files",
-            "phase_intervals",
-            "schema_version",
-            "symbols",
-        },
-        "preparation manifest",
-    )
-    expected_intervals = [
-        {"phase_id": phase, "start_utc": start, "end_utc": end}
-        for phase, start, end in _PHASE_INTERVALS
-    ]
-    if (
-        value["schema_version"] != "alpha_max_phase_root_preparation_manifest.v1"
-        or value["exchange"] != "binance"
-        or value["contract_manifest_sha256"] != records.contract_manifest.sha256
-        or value["contract_manifest_schema_version"] != "alpha_max_contract_manifest.v2"
-        or value["symbols"] != list(_SYMBOLS)
-        or value["phase_intervals"] != expected_intervals
-    ):
-        raise TerminalPolicyError("preparation manifest semantic mismatch")
-
-    availability = value["availability"]
-    availability_hashes = value["availability_sha256_by_root_kind"]
-    _exact(availability, {"raw", "feature"}, "preparation availability")
-    _exact(availability_hashes, {"raw", "feature"}, "preparation availability hashes")
-    for root_kind in ("raw", "feature"):
-        section = availability[root_kind]
-        _exact(
-            section,
-            {"availability_start_by_symbol", "availability_end_by_symbol"},
-            f"{root_kind} availability",
+    with ExitStack() as descriptors:
+        _prelock_parent_fd, prelock_fd = _open_output_child(
+            descriptors, record.prelock_output, "prelock bundle root"
         )
-        starts = section["availability_start_by_symbol"]
-        ends = section["availability_end_by_symbol"]
-        if (
-            not isinstance(starts, dict)
-            or not isinstance(ends, dict)
-            or tuple(starts) != _SYMBOLS
-            or tuple(ends) != _SYMBOLS
-            or any(
-                not isinstance(starts[symbol], str)
-                or not isinstance(ends[symbol], str)
-                or starts[symbol] >= ends[symbol]
-                for symbol in _SYMBOLS
+        _historical_parent_fd, historical_fd = _open_output_child(
+            descriptors, record.historical_output, "historical bundle root"
+        )
+        try:
+            prior_prelock = next(
+                item for item in prior_evidence.sealed_artifacts if item.kind == "prelock_bundle"
             )
-            or availability_hashes[root_kind]
-            != hashlib.sha256(canonical_bytes(section)).hexdigest()
+        except StopIteration as exc:
+            raise TerminalPolicyError("prior prelock evidence is missing") from exc
+        prelock, prelock_tree, _prelock_seal = _sealed_tree_at(
+            prelock_fd, record.prelock_output.path, "prelock_bundle", "artifacts"
+        )
+        if prelock != prior_prelock:
+            raise TerminalPolicyError("prelock sealed receipt changed")
+        historical, historical_tree, historical_seal = _sealed_tree_at(
+            historical_fd,
+            record.historical_output.path,
+            "historical_bundle",
+            "historical_artifacts",
+        )
+        prelock_enumerated = dict(prelock_tree)
+        historical_enumerated = dict(historical_tree)
+        prelock_snapshot = _snapshot_digest_at(prelock_fd, "prelock bundle", prelock_tree)
+        if (
+            historical_seal["prelock_seal_sha256"] != prelock.sha256
+            or historical_seal["prelock_snapshot_sha256"] != prelock_snapshot
         ):
-            raise TerminalPolicyError("preparation availability mismatch")
+            raise TerminalPolicyError("historical prelock binding mismatch")
+        before_seal = _regular_file_at_enumerated(
+            prelock_fd, "SEALED.json", "prelock seal before historical", prelock_enumerated
+        )
+        after_seal = _regular_file_at_enumerated(
+            historical_fd,
+            "binding/prelock_seal.json",
+            "prelock seal after historical",
+            historical_enumerated,
+        )
+        before_inputs = _regular_file_at_enumerated(
+            prelock_fd,
+            "admission/train_liquidity_buckets.json",
+            "prelock inputs before historical",
+            prelock_enumerated,
+        )
+        after_inputs = _regular_file_at_enumerated(
+            historical_fd,
+            "admission/train_liquidity_buckets.json",
+            "prelock inputs after historical",
+            historical_enumerated,
+        )
+        if before_seal[1:3] != after_seal[1:3] or before_inputs[1:3] != after_inputs[1:3]:
+            raise TerminalPolicyError("historical immutable input comparison failed")
+        validated = tuple(
+            _artifact_from_at_enumerated(
+                historical_fd, record.historical_output.path, relative, kind, historical_enumerated
+            )
+            for relative, kind in (
+                ("report/historical_result.json", "historical_readback"),
+                (
+                    "diagnostics/historical_exposed_evaluation/trend_liquidity_falsifier.json",
+                    "historical_observability",
+                ),
+                ("binding/prelock_seal.json", "prelock_inventory_after"),
+                ("admission/train_liquidity_buckets.json", "input_inventory_after"),
+            )
+        )
+        snapshots = (
+            prelock_snapshot,
+            _snapshot_digest_at(historical_fd, "historical bundle", historical_tree),
+        )
+        return validated, (historical,), snapshots
 
-    files = value["files"]
-    if type(value["file_count"]) is not int or not isinstance(files, list):
-        raise TerminalPolicyError("preparation file count is invalid")
-    if value["file_count"] != len(files):
-        raise TerminalPolicyError("preparation file count mismatch")
-    phase_bounds = {phase: (start, end) for phase, start, end in _PHASE_INTERVALS}
-    declared: list[str] = []
-    source_file_facts: dict[str, tuple[str, int, int, int]] = {}
-    for entry in files:
+
+def _phase_utc(value: int) -> str:
+    return datetime.fromtimestamp(value / 1000, UTC).isoformat().replace("+00:00", "Z")
+
+
+def _phase_source_map_at(
+    source_fd: int,
+    source_enumerated: dict[str, os.stat_result],
+) -> dict[str, tuple[str, int, int, int]]:
+    result: dict[str, tuple[str, int, int, int]] = {}
+    for relative in _safe_tree_files_at(
+        source_fd,
+        "phase source",
+        list(source_enumerated.items()),
+    ):
+        if not (relative.startswith("market_ohlcv_1s/") or relative.startswith("feature_points/")):
+            continue
+        if not relative.endswith(".parquet"):
+            raise TerminalPolicyError("preparation manifest entry set mismatch")
+        info, digest, byte_count, _payload = _regular_file_at_enumerated(
+            source_fd,
+            relative,
+            f"phase source {relative}",
+            source_enumerated,
+        )
+        result[relative] = (digest, byte_count, info.st_dev, info.st_ino)
+    return result
+
+
+def _phase_expected_layout(
+    records: PhaseRecords | OneTouchRecords,
+    source_map: dict[str, tuple[str, int, int, int]],
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    availability = {
+        kind: {
+            "availability_start_by_symbol": {},
+            "availability_end_by_symbol": {},
+        }
+        for kind in ("raw", "feature")
+    }
+    expected: list[dict[str, Any]] = []
+    for contract in _acquisition_contract(records):
+        for root_kind, start, end, start_text, end_text, monthly in (
+            (
+                "raw",
+                contract.raw_start,
+                contract.raw_end,
+                contract.raw_start_utc,
+                contract.raw_end_utc,
+                True,
+            ),
+            (
+                "feature",
+                contract.feature_start,
+                contract.feature_end,
+                contract.feature_start_utc,
+                contract.feature_end_utc,
+                False,
+            ),
+        ):
+            availability[root_kind]["availability_start_by_symbol"][contract.symbol] = start_text
+            availability[root_kind]["availability_end_by_symbol"][contract.symbol] = end_text
+            for phase_id, phase_start_text, phase_end_text in _PHASE_INTERVALS:
+                phase_start = _acquisition_utc_ms(phase_start_text, "phase")
+                phase_end = _acquisition_utc_ms(phase_end_text, "phase")
+                effective_start = max(start, phase_start)
+                effective_end = min(end, phase_end)
+                if effective_start >= effective_end:
+                    continue
+                cursor = datetime.fromtimestamp(effective_start / 1000, UTC)
+                cursor = (
+                    cursor.replace(
+                        day=1,
+                        hour=0,
+                        minute=0,
+                        second=0,
+                        microsecond=0,
+                    )
+                    if monthly
+                    else cursor.replace(hour=0, minute=0, second=0, microsecond=0)
+                )
+                while int(cursor.timestamp() * 1000) < effective_end:
+                    following = (
+                        (cursor.replace(day=28) + timedelta(days=4)).replace(day=1)
+                        if monthly
+                        else cursor + timedelta(days=1)
+                    )
+                    cursor_ms = int(cursor.timestamp() * 1000)
+                    following_ms = int(following.timestamp() * 1000)
+                    owned_start = max(effective_start, cursor_ms)
+                    owned_end = min(effective_end, following_ms)
+                    if monthly:
+                        source_relative = (
+                            f"market_ohlcv_1s/binance/{contract.symbol}/{cursor:%Y-%m}.parquet"
+                        )
+                        output_relative = f"{phase_id}/raw/{source_relative}"
+                    else:
+                        prefix = (
+                            "feature_points/exchange=binance/"
+                            f"symbol={contract.symbol}/date={cursor:%Y-%m-%d}/"
+                        )
+                        matches = sorted(
+                            relative
+                            for relative in source_map
+                            if relative.startswith(prefix) and relative.endswith(".parquet")
+                        )
+                        if len(matches) != 1:
+                            raise TerminalPolicyError("preparation manifest entry set mismatch")
+                        source_relative = matches[0]
+                        output_relative = f"{phase_id}/feature/{prefix}part-0.parquet"
+                    source = source_map.get(source_relative)
+                    if source is None:
+                        raise TerminalPolicyError("preparation manifest entry set mismatch")
+                    expected.append(
+                        {
+                            "phase_id": phase_id,
+                            "root_kind": root_kind,
+                            "symbol": contract.symbol,
+                            "owned_start_utc": _phase_utc(owned_start),
+                            "owned_end_utc": _phase_utc(owned_end),
+                            "output_relative_path": output_relative,
+                            "source_relative_path": source_relative,
+                            "source_sha256": source[0],
+                            "source_byte_count": source[1],
+                        }
+                    )
+                    cursor = following
+    if {entry["source_relative_path"] for entry in expected} != set(source_map):
+        raise TerminalPolicyError("preparation manifest entry set mismatch")
+    expected.sort(key=lambda entry: entry["output_relative_path"])
+    if len({entry["output_relative_path"] for entry in expected}) != len(expected):
+        raise TerminalPolicyError("preparation manifest entry set mismatch")
+    return expected, availability
+
+
+def _phase_snapshot_source_map_at(
+    descriptors: ExitStack,
+    output_parent_fd: int,
+    output: Path,
+) -> tuple[
+    int,
+    dict[str, os.stat_result],
+    dict[str, tuple[str, int, int, int]],
+    os.stat_result,
+]:
+    snapshot_leaf = f".{output.name}.alpha_max_phase_preparation.source-snapshot"
+    snapshot_fd = _open_registered_child(
+        descriptors,
+        output_parent_fd,
+        snapshot_leaf,
+        os.O_RDONLY | os.O_DIRECTORY,
+        "phase source snapshot",
+    )
+    snapshot_info = _validate_directory_fd(
+        snapshot_fd,
+        None,
+        "phase source snapshot",
+    )
+    snapshot_tree = _walk_tree_at(snapshot_fd, "phase source snapshot")
+    snapshot_enumerated = dict(snapshot_tree)
+    snapshot_manifest = _canonical_object_at_enumerated(
+        snapshot_fd,
+        "snapshot-manifest.json",
+        "phase snapshot manifest",
+        snapshot_enumerated,
+    )
+    _exact(
+        snapshot_manifest,
+        {"schema", "descriptor_sha256", "source_manifest_sha256", "entries"},
+        "phase snapshot manifest",
+    )
+    if snapshot_manifest[
+        "schema"
+    ] != "alpha_max_phase_preparation_source_snapshot.v1" or not isinstance(
+        snapshot_manifest["entries"], list
+    ):
+        raise TerminalPolicyError("phase snapshot inventory mismatch")
+    validate_sha256(
+        snapshot_manifest["descriptor_sha256"],
+        "phase snapshot descriptor sha256",
+    )
+    validate_sha256(
+        snapshot_manifest["source_manifest_sha256"],
+        "phase snapshot source manifest sha256",
+    )
+    source_map: dict[str, tuple[str, int, int, int]] = {}
+    declared_paths: list[str] = []
+    for entry in snapshot_manifest["entries"]:
         _exact(
             entry,
-            {
-                "output_byte_count",
-                "output_relative_path",
-                "output_row_count",
-                "output_sha256",
-                "owned_end_utc",
-                "owned_start_utc",
-                "phase_id",
-                "root_kind",
-                "source_byte_count",
-                "source_relative_path",
-                "source_sha256",
-                "symbol",
-            },
-            "preparation manifest entry",
+            {"source_relative_path", "sha256", "byte_count"},
+            "phase snapshot entry",
         )
-        relative = entry["output_relative_path"]
-        source_relative = entry["source_relative_path"]
-        phase = entry["phase_id"]
-        root_kind = entry["root_kind"]
-        symbol = entry["symbol"]
+        relative = entry["source_relative_path"]
         if (
             not isinstance(relative, str)
-            or not isinstance(source_relative, str)
-            or not relative
-            or not source_relative
             or relative.startswith("/")
-            or source_relative.startswith("/")
             or ".." in Path(relative).parts
-            or ".." in Path(source_relative).parts
-            or phase not in phase_bounds
-            or root_kind not in {"raw", "feature"}
-            or symbol not in _SYMBOLS
-            or not relative.startswith(f"{phase}/{root_kind}/")
+            or not relative.endswith(".parquet")
+            or not (
+                relative.startswith("market_ohlcv_1s/") or relative.startswith("feature_points/")
+            )
         ):
-            raise TerminalPolicyError("preparation manifest entry is invalid")
-        phase_start, phase_end = phase_bounds[phase]
-        available_start = availability[root_kind]["availability_start_by_symbol"][symbol]
-        available_end = availability[root_kind]["availability_end_by_symbol"][symbol]
-        expected_start = max(phase_start, available_start)
-        expected_end = min(phase_end, available_end)
-        if (
-            expected_start >= expected_end
-            or entry["owned_start_utc"] != expected_start
-            or entry["owned_end_utc"] != expected_end
-        ):
-            raise TerminalPolicyError("preparation manifest ownership mismatch")
-        output_path = output / relative
-        output_info, output_digest, output_size, _output_payload = _regular_file(
-            output_path,
-            f"preparation output {relative}",
+            raise TerminalPolicyError("phase snapshot inventory mismatch")
+        expected_sha = validate_sha256(
+            entry["sha256"],
+            "phase snapshot entry sha256",
+        )
+        expected_size = _integer(
+            entry["byte_count"],
+            "phase snapshot entry byte count",
+        )
+        info, digest, byte_count, _payload = _regular_file_at_enumerated(
+            snapshot_fd,
+            relative,
+            f"phase snapshot clone {relative}",
+            snapshot_enumerated,
         )
         if (
-            stat.S_IMODE(output_info.st_mode) != 0o444
-            or output_size != _integer(entry["output_byte_count"], "preparation output byte count")
-            or output_digest != _digest(entry["output_sha256"], "preparation output sha256")
+            stat.S_IMODE(info.st_mode) != 0o444
+            or digest != expected_sha
+            or byte_count != expected_size
         ):
-            raise TerminalPolicyError("preparation output identity drift")
-        if isinstance(records, PhaseRecords):
-            source_path = Path(records.source_root.path) / source_relative
-            source_info, source_digest, source_size, _source_payload = _regular_file(
-                source_path,
-                f"preparation source {source_relative}",
-            )
-            source_file_facts[source_relative] = (
-                source_digest,
-                source_size,
-                source_info.st_dev,
-                source_info.st_ino,
-            )
-            if source_size != _integer(
-                entry["source_byte_count"], "preparation source byte count"
-            ) or source_digest != _digest(entry["source_sha256"], "preparation source sha256"):
-                raise TerminalPolicyError("preparation source identity drift")
-        else:
-            _integer(entry["source_byte_count"], "preparation source byte count")
-            _digest(entry["source_sha256"], "preparation source sha256")
-        _integer(entry["output_row_count"], "preparation output row count", positive=True)
-        declared.append(relative)
-    if declared != sorted(set(declared)):
-        raise TerminalPolicyError("preparation manifest paths are not canonical")
-    actual_files = _safe_tree_files(output, "phase output")
-    top_level_directories = {
-        path.name for path in output.iterdir() if stat.S_ISDIR(path.lstat().st_mode)
-    }
-    if top_level_directories != set(_PHASES):
-        raise TerminalPolicyError("preparation phase tree mismatch")
-    for path in (
-        output,
-        *(item for item in output.rglob("*") if stat.S_ISDIR(item.lstat().st_mode)),
+            raise TerminalPolicyError("phase snapshot clone mismatch")
+        source_map[relative] = (digest, byte_count, info.st_dev, info.st_ino)
+        declared_paths.append(relative)
+    if declared_paths != sorted(source_map) or len(declared_paths) != len(source_map):
+        raise TerminalPolicyError("phase snapshot inventory mismatch")
+    completion = _canonical_object_at_enumerated(
+        snapshot_fd,
+        ".complete.json",
+        "phase snapshot completion marker",
+        snapshot_enumerated,
+    )
+    _info, manifest_sha, _size, _payload = _regular_file_at_enumerated(
+        snapshot_fd,
+        "snapshot-manifest.json",
+        "phase snapshot manifest",
+        snapshot_enumerated,
+    )
+    if completion != {
+        "schema": "alpha_max_phase_preparation_source_snapshot.v1",
+        "snapshot_manifest_sha256": manifest_sha,
+    }:
+        raise TerminalPolicyError("phase snapshot completion marker mismatch")
+    expected_files = set(source_map) | {"snapshot-manifest.json", ".complete.json"}
+    if (
+        _safe_tree_files_at(snapshot_fd, "phase source snapshot", snapshot_tree) != expected_files
+        or _observed_tree_directories(snapshot_enumerated)
+        != _expected_tree_directories(expected_files)
+        or any(
+            stat.S_ISDIR(info.st_mode) and stat.S_IMODE(info.st_mode) != 0o555
+            for _relative, info in snapshot_tree
+        )
     ):
-        if stat.S_IMODE(path.lstat().st_mode) != 0o555:
-            raise TerminalPolicyError("phase output directory is not immutable")
-    if actual_files != set(declared) | {"preparation_manifest.json"}:
-        raise TerminalPolicyError("preparation manifest does not cover output tree")
+        raise TerminalPolicyError("phase snapshot inventory mismatch")
+    return snapshot_fd, snapshot_enumerated, source_map, snapshot_info
 
-    handoff = output.parent / f".{output.name}.alpha_max_phase_preparation.handoff.json"
-    receipt = _canonical_object(handoff)
+
+def _validate_phase_handoff_at(
+    request: ScopeRequest,
+    output_parent_fd: int,
+    output_fd: int,
+    output: Path,
+    output_info: os.stat_result,
+    manifest_digest: str,
+    file_count: int,
+) -> ValidatedArtifact:
+    handoff_leaf = f".{output.name}.alpha_max_phase_preparation.handoff.json"
+    receipt = _canonical_object_at(output_parent_fd, handoff_leaf, "phase handoff receipt")
     _exact(
         receipt,
         {
@@ -2918,74 +4030,6 @@ def _validate_preparation_manifest(request: ScopeRequest) -> None:
         {"file_count", "output_root", "preparation_manifest_sha256"},
         "phase preparer result",
     )
-    output_info = output.lstat()
-    manifest_digest = _regular_file(manifest, "preparation manifest")[1]
-    if (
-        receipt["schema"] != "alpha_max_phase_preparation_eligible_source_receipt.v2"
-        or receipt["output_manifest_sha256"] != manifest_digest
-        or preparer_result["file_count"] != len(files)
-        or preparer_result["output_root"] != str(output)
-        or preparer_result["preparation_manifest_sha256"] != receipt["output_manifest_sha256"]
-        or receipt["output_root_identity"]
-        != {"st_dev": output_info.st_dev, "st_ino": output_info.st_ino}
-    ):
-        raise TerminalPolicyError("phase handoff receipt mismatch")
-    for key in (
-        "invocation_descriptor_sha256",
-        "verifier_argv_sha256",
-        "preparer_argv_sha256",
-        "source_snapshot_manifest_sha256",
-    ):
-        _digest(receipt[key], f"phase handoff {key}")
-    if isinstance(records, OneTouchRecords):
-        handoff_info = _regular_file(handoff, "phase handoff receipt")[0]
-        manifest_info = _regular_file(manifest, "preparation manifest")[0]
-        if (
-            stat.S_IMODE(handoff_info.st_mode) != 0o444
-            or stat.S_IMODE(manifest_info.st_mode) != 0o444
-        ):
-            raise TerminalPolicyError("phase receipts are not immutable")
-        _read_identity(records.contract_manifest, "one-touch contract manifest")
-        return
-    source_root = Path(records.source_root.path)
-
-    source_report = Path(records.source_report.path)
-    source_manifest_path = source_report / "source_manifest.json"
-    source_manifest = _canonical_object(source_manifest_path)
-    _exact(
-        source_manifest,
-        {
-            "schema",
-            "contract_sha256",
-            "availability_evidence_sha256",
-            "derivation_version",
-            "artifacts",
-        },
-        "phase source manifest",
-    )
-    if (
-        source_manifest["schema"] != "alpha_max_official_source_manifest.v4"
-        or source_manifest["contract_sha256"] != records.contract_manifest.sha256
-        or source_manifest["availability_evidence_sha256"] != records.availability_evidence.sha256
-        or not isinstance(source_manifest["artifacts"], list)
-    ):
-        raise TerminalPolicyError("phase source manifest mismatch")
-    artifact_map: dict[str, str] = {}
-    for entry in source_manifest["artifacts"]:
-        _exact(entry, {"path", "sha256"}, "phase source artifact")
-        relative = entry["path"]
-        if (
-            not isinstance(relative, str)
-            or relative in artifact_map
-            or relative.startswith("/")
-            or ".." in Path(relative).parts
-            or not (relative.startswith("output/") or relative.startswith("report/"))
-        ):
-            raise TerminalPolicyError("phase source artifact path is invalid")
-        artifact_map[relative] = _digest(entry["sha256"], "phase source artifact sha256")
-    if list(artifact_map) != sorted(artifact_map):
-        raise TerminalPolicyError("phase source artifact map is not canonical")
-
     source_snapshot = receipt["source_eligibility_snapshot"]
     _exact(
         source_snapshot,
@@ -3002,263 +4046,795 @@ def _validate_preparation_manifest(request: ScopeRequest) -> None:
         },
         "phase source eligibility snapshot",
     )
-    expected_source_snapshot = {
-        "source_root_identity": {
-            "st_dev": records.source_root.st_dev,
-            "st_ino": records.source_root.st_ino,
-        },
-        "source_report_identity": {
-            "st_dev": records.source_report.st_dev,
-            "st_ino": records.source_report.st_ino,
-        },
-        "source_eligible_receipt_sha256": _regular_file(
-            source_report / "source_eligible_receipt.json",
-            "phase source eligible receipt",
-        )[1],
-        "source_manifest_sha256": _regular_file(
-            source_manifest_path,
-            "phase source manifest",
-        )[1],
-        "acquisition_journal_sha256": _regular_file(
-            source_report / "acquisition.journal.jsonl",
-            "phase source journal",
-        )[1],
-        "plan_sha256": _regular_file(
-            source_report / "plan.json",
-            "phase source plan",
-        )[1],
-        "source_owner_sha256": _regular_file(
-            source_root / ".alpha_max_owner.json",
-            "phase source owner",
-        )[1],
-        "report_owner_sha256": _regular_file(
-            source_report / ".alpha_max_owner.json",
-            "phase source report owner",
-        )[1],
-        "source_manifest_artifact_map_sha256": hashlib.sha256(
-            canonical_bytes(artifact_map)
-        ).hexdigest(),
-    }
-    if source_snapshot != expected_source_snapshot:
-        raise TerminalPolicyError("phase source eligibility snapshot mismatch")
-
-    base = output.parent / f".{output.name}.alpha_max_phase_preparation"
-    descriptor_path = Path(f"{base}.invocation.json")
-    descriptor_stage = Path(f"{base}.invocation.stage.json")
-    handoff_stage = Path(f"{base}.handoff.stage.json")
-    snapshot_root = Path(f"{base}.source-snapshot")
-    invocation_inputs = Path(f"{base}.invocation-inputs")
-    invocation_lock = Path(f"{base}.lock")
-    snapshot_manifest_path = snapshot_root / "snapshot-manifest.json"
-    snapshot_complete_path = snapshot_root / ".complete.json"
-    descriptor = _canonical_object(descriptor_path)
-    _exact(
-        descriptor,
-        {
-            "schema",
-            "paths",
-            "forbidden_roots",
-            "frozen_sha256",
-            "invocation_lock_identity",
-            "source_eligibility_snapshot",
-            "verifier_argv",
-            "preparer_argv",
-        },
-        "phase invocation descriptor",
+    for key in (
+        "invocation_descriptor_sha256",
+        "verifier_argv_sha256",
+        "preparer_argv_sha256",
+        "source_snapshot_manifest_sha256",
+        "output_manifest_sha256",
+    ):
+        validate_sha256(receipt[key], f"phase handoff {key}")
+    snapshot_identity = _snapshot_identity(
+        receipt["source_snapshot_identity"],
+        "phase handoff source snapshot identity",
     )
-    paths = descriptor["paths"]
-    expected_paths = {
-        "acquirer": records.acquirer.path,
-        "source_root": records.source_root.path,
-        "source_report": records.source_report.path,
-        "contract_manifest": records.contract_manifest.path,
-        "availability_evidence": records.availability_evidence.path,
-        "preparer": records.preparer.path,
-        "output_root": records.phase_output.path,
-        "raw_root": str(snapshot_root / "market_ohlcv_1s"),
-        "feature_root": str(snapshot_root / "feature_points"),
-        "invocation_descriptor": str(descriptor_path),
-        "invocation_descriptor_stage": str(descriptor_stage),
-        "handoff_receipt": str(handoff),
-        "handoff_receipt_stage": str(handoff_stage),
-        "source_snapshot": str(snapshot_root),
-        "source_snapshot_manifest": str(snapshot_manifest_path),
-        "source_snapshot_complete": str(snapshot_complete_path),
-        "invocation_inputs": str(invocation_inputs),
-        "invocation_input_acquirer": str(invocation_inputs / "acquirer.py"),
-        "invocation_input_contract_manifest": str(invocation_inputs / "contract_manifest.json"),
-        "invocation_input_availability_evidence": str(
-            invocation_inputs / "availability_evidence.json"
-        ),
-        "invocation_input_preparer": str(invocation_inputs / "preparer.py"),
-        "invocation_lock": str(invocation_lock),
-    }
-    if paths != expected_paths:
-        raise TerminalPolicyError("phase invocation paths mismatch")
-    expected_frozen = {
-        "acquirer": records.acquirer.sha256,
-        "contract_manifest": records.contract_manifest.sha256,
-        "availability_evidence": records.availability_evidence.sha256,
-        "preparer": records.preparer.sha256,
-        "wrapper": records.phase_wrapper.sha256,
-    }
-    if (
-        descriptor["schema"] != "alpha_max_phase_preparation_invocation.v1"
-        or descriptor["forbidden_roots"] != list(request.forbidden_roots)
-        or descriptor["frozen_sha256"] != expected_frozen
-        or descriptor["source_eligibility_snapshot"] != source_snapshot
+    snapshot_leaf = f".{output.name}.alpha_max_phase_preparation.source-snapshot"
+    try:
+        snapshot_fd = _open_child_fd(
+            output_parent_fd,
+            snapshot_leaf,
+            os.O_RDONLY | os.O_DIRECTORY,
+            "phase handoff source snapshot",
+        )
+    except TerminalPolicyError as exc:
+        raise TerminalPolicyError("phase handoff source snapshot identity mismatch") from exc
+    try:
+        snapshot_info = _validate_directory_fd(
+            snapshot_fd,
+            None,
+            "phase handoff source snapshot",
+        )
+        _info, snapshot_manifest_sha, _size, _payload = _regular_file_at(
+            snapshot_fd,
+            "snapshot-manifest.json",
+            "phase handoff source snapshot manifest",
+        )
+    finally:
+        os.close(snapshot_fd)
+    if snapshot_identity != {
+        "st_dev": snapshot_info.st_dev,
+        "st_ino": snapshot_info.st_ino,
+    }:
+        raise TerminalPolicyError("phase handoff source snapshot identity mismatch")
+    if receipt["source_snapshot_manifest_sha256"] != snapshot_manifest_sha:
+        raise TerminalPolicyError("phase handoff receipt mismatch")
+    for key in (
+        "source_eligible_receipt_sha256",
+        "source_manifest_sha256",
+        "acquisition_journal_sha256",
+        "plan_sha256",
+        "source_owner_sha256",
+        "report_owner_sha256",
+        "source_manifest_artifact_map_sha256",
     ):
-        raise TerminalPolicyError("phase invocation binding mismatch")
-    verifier_argv = [
-        request.interpreter.path,
-        records.acquirer.path,
-        "--contract-manifest",
-        records.contract_manifest.path,
-        "--availability-evidence",
-        records.availability_evidence.path,
-        "--output-root",
-        records.source_root.path,
-        "--report-dir",
-        records.source_report.path,
-    ]
-    for forbidden_root in request.forbidden_roots:
-        verifier_argv.extend(("--forbidden-root", forbidden_root))
-    verifier_argv.append("--verify-eligible")
-    preparer_argv = [
-        request.interpreter.path,
-        records.preparer.path,
-        "--raw-root",
-        str(snapshot_root / "market_ohlcv_1s"),
-        "--feature-root",
-        str(snapshot_root / "feature_points"),
-        "--contract-manifest",
-        records.contract_manifest.path,
-        "--output-root",
-        records.phase_output.path,
-    ]
+        validate_sha256(source_snapshot[key], f"phase source eligibility {key}")
     if (
-        descriptor["verifier_argv"] != verifier_argv
-        or descriptor["preparer_argv"] != preparer_argv
-        or receipt["verifier_argv_sha256"]
-        != hashlib.sha256(canonical_bytes(verifier_argv)).hexdigest()
-        or receipt["preparer_argv_sha256"]
-        != hashlib.sha256(canonical_bytes(preparer_argv)).hexdigest()
-        or receipt["invocation_descriptor_sha256"]
-        != _regular_file(descriptor_path, "phase invocation descriptor")[1]
+        receipt["schema"] != "alpha_max_phase_preparation_eligible_source_receipt.v2"
+        or receipt["output_manifest_sha256"] != manifest_digest
+        or preparer_result["file_count"] != file_count
+        or preparer_result["output_root"] != str(output)
+        or preparer_result["preparation_manifest_sha256"] != manifest_digest
+        or receipt["output_root_identity"]
+        != {"st_dev": output_info.st_dev, "st_ino": output_info.st_ino}
+        or not all(
+            isinstance(source_snapshot[key], dict)
+            and set(source_snapshot[key]) == {"st_dev", "st_ino"}
+            and all(type(value) is int and value >= 0 for value in source_snapshot[key].values())
+            for key in ("source_root_identity", "source_report_identity")
+        )
     ):
-        raise TerminalPolicyError("phase invocation argv mismatch")
-    lock_info, _lock_digest, lock_size, _lock_payload = _regular_file(
-        invocation_lock,
-        "phase invocation lock",
+        raise TerminalPolicyError("phase handoff receipt mismatch")
+    return _artifact_from_at(
+        output_parent_fd, str(output.parent), handoff_leaf, "phase_handoff_receipt"
     )
-    expected_lock_identity = [
-        lock_info.st_dev,
-        lock_info.st_ino,
-        stat.S_IFMT(lock_info.st_mode),
-        lock_info.st_nlink,
-        lock_size,
-        lock_info.st_mtime_ns,
-        lock_info.st_ctime_ns,
-    ]
-    if (
-        descriptor["invocation_lock_identity"] != expected_lock_identity
-        or stat.S_IMODE(lock_info.st_mode) != 0o600
-    ):
-        raise TerminalPolicyError("phase invocation lock identity mismatch")
 
-    expected_snapshot_entries: list[dict[str, Any]] = []
-    for relative, digest in artifact_map.items():
-        path = Path(relative)
-        if path.parts[:2] not in {
-            ("output", "market_ohlcv_1s"),
-            ("output", "feature_points"),
-        }:
-            continue
-        source_relative = Path(*path.parts[1:]).as_posix()
-        facts = source_file_facts.get(source_relative)
-        if facts is None:
-            source_info, source_digest, source_size, _source_payload = _regular_file(
-                source_root / source_relative,
-                f"phase snapshot source {source_relative}",
+
+def _validate_preparation_manifest(
+    request: ScopeRequest,
+) -> tuple[tuple[ValidatedArtifact, ...], tuple[str, ...]]:
+    if not isinstance(request.records, (PhaseRecords, OneTouchRecords)):
+        raise TerminalPolicyError("phase preparation records are required")
+    records = request.records
+    output = Path(records.phase_output.path)
+    with ExitStack() as descriptors:
+        if isinstance(records, OneTouchRecords):
+            output_parent_fd = open_directory_fd(output.parent, "one-touch phase output parent")
+            descriptors.callback(os.close, output_parent_fd)
+            output_fd = _open_child_fd(
+                output_parent_fd,
+                output.name,
+                os.O_RDONLY | os.O_DIRECTORY,
+                "one-touch phase output",
             )
-            facts = (
+            descriptors.callback(os.close, output_fd)
+            output_info = _validate_directory_fd(
+                output_fd, records.phase_output, "one-touch phase output"
+            )
+            parent_path = str(output.parent)
+        else:
+            output_parent_fd, output_fd = _open_output_child(
+                descriptors, records.phase_output, "phase output"
+            )
+            output_info = _validate_directory_fd(output_fd, None, "phase output")
+            parent_path = str(output.parent)
+
+        output_tree = _walk_tree_at(output_fd, "phase output")
+        output_enumerated = dict(output_tree)
+        manifest = _canonical_object_at_enumerated(
+            output_fd, "preparation_manifest.json", "preparation manifest", output_enumerated
+        )
+        _exact(
+            manifest,
+            {
+                "availability",
+                "availability_sha256_by_root_kind",
+                "contract_manifest_schema_version",
+                "contract_manifest_sha256",
+                "exchange",
+                "file_count",
+                "files",
+                "phase_intervals",
+                "schema_version",
+                "symbols",
+            },
+            "preparation manifest",
+        )
+        expected_intervals = [
+            {"phase_id": phase, "start_utc": start, "end_utc": end}
+            for phase, start, end in _PHASE_INTERVALS
+        ]
+        if (
+            manifest["schema_version"] != "alpha_max_phase_root_preparation_manifest.v1"
+            or manifest["exchange"] != "binance"
+            or manifest["contract_manifest_sha256"] != records.contract_manifest.sha256
+            or manifest["contract_manifest_schema_version"] != "alpha_max_contract_manifest.v2"
+            or manifest["symbols"] != list(_SYMBOLS)
+            or manifest["phase_intervals"] != expected_intervals
+        ):
+            raise TerminalPolicyError("preparation manifest semantic mismatch")
+        availability = manifest["availability"]
+        availability_hashes = manifest["availability_sha256_by_root_kind"]
+        _exact(availability, {"raw", "feature"}, "preparation availability")
+        _exact(availability_hashes, {"raw", "feature"}, "preparation availability hashes")
+        for root_kind in ("raw", "feature"):
+            section = availability[root_kind]
+            _exact(
+                section,
+                {"availability_start_by_symbol", "availability_end_by_symbol"},
+                f"{root_kind} availability",
+            )
+            starts = section["availability_start_by_symbol"]
+            ends = section["availability_end_by_symbol"]
+            if (
+                not isinstance(starts, dict)
+                or not isinstance(ends, dict)
+                or tuple(starts) != _SYMBOLS
+                or tuple(ends) != _SYMBOLS
+                or any(
+                    not isinstance(starts[symbol], str)
+                    or not isinstance(ends[symbol], str)
+                    or starts[symbol] >= ends[symbol]
+                    for symbol in _SYMBOLS
+                )
+                or availability_hashes[root_kind]
+                != hashlib.sha256(canonical_bytes(section)).hexdigest()
+            ):
+                raise TerminalPolicyError("preparation availability mismatch")
+
+        files = manifest["files"]
+        if (
+            type(manifest["file_count"]) is not int
+            or not isinstance(files, list)
+            or manifest["file_count"] <= 0
+            or manifest["file_count"] != len(files)
+        ):
+            raise TerminalPolicyError("preparation manifest entry set mismatch")
+        declared: list[str] = []
+        source_file_facts: dict[str, tuple[str, int, int, int]] = {}
+
+        source_fd: int
+        report_fd: int | None = None
+        source_enumerated: dict[str, os.stat_result]
+        report_enumerated: dict[str, os.stat_result] = {}
+        if isinstance(records, PhaseRecords):
+            source_parent = Path(records.source_root.path).parent
+            source_parent_fd = open_directory_fd(source_parent, "phase source parent")
+            descriptors.callback(os.close, source_parent_fd)
+            source_fd = _open_child_fd(
+                source_parent_fd,
+                Path(records.source_root.path).name,
+                os.O_RDONLY | os.O_DIRECTORY,
+                "phase source root",
+            )
+            descriptors.callback(os.close, source_fd)
+            _validate_directory_fd(source_fd, records.source_root, "phase source root")
+            report_parent = Path(records.source_report.path).parent
+            report_parent_fd = open_directory_fd(report_parent, "phase source report parent")
+            descriptors.callback(os.close, report_parent_fd)
+            report_fd = _open_child_fd(
+                report_parent_fd,
+                Path(records.source_report.path).name,
+                os.O_RDONLY | os.O_DIRECTORY,
+                "phase source report",
+            )
+            descriptors.callback(os.close, report_fd)
+            _validate_directory_fd(report_fd, records.source_report, "phase source report")
+            acquired_artifacts, _acquired_snapshots = _validate_acquired_source_report_at(
+                records,
+                descriptors,
+                source_parent_fd=source_parent_fd,
+                report_parent_fd=report_parent_fd,
+                source_fd=source_fd,
+                report_fd=report_fd,
+                include_snapshots=True,
+            )
+            for artifact in acquired_artifacts:
+                _require_current_prerequisite(request, artifact, artifact.kind)
+            source_enumerated = dict(_walk_tree_at(source_fd, "phase source root"))
+            report_enumerated = dict(_walk_tree_at(report_fd, "phase source report"))
+            source_map = _phase_source_map_at(source_fd, source_enumerated)
+            (
+                _snapshot_fd,
+                _snapshot_enumerated,
+                snapshot_source_map,
+                _snapshot_info,
+            ) = _phase_snapshot_source_map_at(
+                descriptors,
+                output_parent_fd,
+                output,
+            )
+            if {relative: facts[:2] for relative, facts in snapshot_source_map.items()} != {
+                relative: facts[:2] for relative, facts in source_map.items()
+            }:
+                raise TerminalPolicyError("phase snapshot inventory mismatch")
+        else:
+            (
+                source_fd,
+                source_enumerated,
+                source_map,
+                _snapshot_info,
+            ) = _phase_snapshot_source_map_at(
+                descriptors,
+                output_parent_fd,
+                output,
+            )
+
+        expected_layout, expected_availability = _phase_expected_layout(
+            records,
+            source_map,
+        )
+        expected_by_path = {entry["output_relative_path"]: entry for entry in expected_layout}
+        declared_paths = [
+            entry.get("output_relative_path") if isinstance(entry, dict) else None
+            for entry in files
+        ]
+        if (
+            availability != expected_availability
+            or availability_hashes
+            != {
+                kind: hashlib.sha256(canonical_bytes(expected_availability[kind])).hexdigest()
+                for kind in ("raw", "feature")
+            }
+            or declared_paths != sorted(expected_by_path)
+            or len(files) != len(expected_layout)
+        ):
+            raise TerminalPolicyError("preparation manifest entry set mismatch")
+        for entry in files:
+            _exact(
+                entry,
+                {
+                    "output_byte_count",
+                    "output_relative_path",
+                    "output_row_count",
+                    "output_sha256",
+                    "owned_end_utc",
+                    "owned_start_utc",
+                    "phase_id",
+                    "root_kind",
+                    "source_byte_count",
+                    "source_relative_path",
+                    "source_sha256",
+                    "symbol",
+                },
+                "preparation manifest entry",
+            )
+            relative = entry["output_relative_path"]
+            source_relative = entry["source_relative_path"]
+            phase = entry["phase_id"]
+            root_kind = entry["root_kind"]
+            symbol = entry["symbol"]
+            expected = expected_by_path.get(relative)
+            if (
+                not isinstance(relative, str)
+                or not isinstance(source_relative, str)
+                or not relative
+                or not source_relative
+                or relative.startswith("/")
+                or source_relative.startswith("/")
+                or ".." in Path(relative).parts
+                or ".." in Path(source_relative).parts
+                or root_kind not in {"raw", "feature"}
+                or symbol not in _SYMBOLS
+                or not relative.startswith(f"{phase}/{root_kind}/")
+                or expected is None
+                or any(
+                    entry[field] != expected[field]
+                    for field in (
+                        "phase_id",
+                        "root_kind",
+                        "symbol",
+                        "owned_start_utc",
+                        "owned_end_utc",
+                        "source_relative_path",
+                        "source_sha256",
+                        "source_byte_count",
+                    )
+                )
+            ):
+                raise TerminalPolicyError("preparation manifest entry set mismatch")
+            output_info_file, output_digest, output_size, _ = _regular_file_at_enumerated(
+                output_fd, relative, f"preparation output {relative}", output_enumerated
+            )
+            if (
+                stat.S_IMODE(output_info_file.st_mode) != 0o444
+                or output_size
+                != _integer(entry["output_byte_count"], "preparation output byte count")
+                or output_digest
+                != validate_sha256(entry["output_sha256"], "preparation output sha256")
+            ):
+                raise TerminalPolicyError("preparation output identity drift")
+            source_info, source_digest, source_size, _ = _regular_file_at_enumerated(
+                source_fd,
+                source_relative,
+                f"preparation source {source_relative}",
+                source_enumerated,
+            )
+            source_file_facts[source_relative] = (
                 source_digest,
                 source_size,
                 source_info.st_dev,
                 source_info.st_ino,
             )
-            source_file_facts[source_relative] = facts
-        if facts[0] != digest:
-            raise TerminalPolicyError("phase snapshot source digest mismatch")
-        expected_snapshot_entries.append(
-            {
-                "source_relative_path": source_relative,
-                "sha256": digest,
-                "byte_count": facts[1],
-            }
+            if source_size != _integer(
+                entry["source_byte_count"], "preparation source byte count"
+            ) or source_digest != validate_sha256(
+                entry["source_sha256"], "preparation source sha256"
+            ):
+                raise TerminalPolicyError("preparation source identity drift")
+            _integer(entry["output_row_count"], "preparation output row count", positive=True)
+            declared.append(relative)
+        if declared != sorted(set(declared)):
+            raise TerminalPolicyError("preparation manifest paths are not canonical")
+        actual_files = _safe_tree_files_at(output_fd, "phase output", output_tree)
+        expected_output_files = set(declared) | {"preparation_manifest.json"}
+        expected_output_directories = _expected_tree_directories(expected_output_files) | set(
+            _PHASES
         )
-    expected_snapshot_entries.sort(key=lambda item: item["source_relative_path"])
-    snapshot_manifest = _canonical_object(snapshot_manifest_path)
-    expected_snapshot_manifest = {
-        "schema": "alpha_max_phase_preparation_source_snapshot.v1",
-        "descriptor_sha256": receipt["invocation_descriptor_sha256"],
-        "source_manifest_sha256": expected_source_snapshot["source_manifest_sha256"],
-        "entries": expected_snapshot_entries,
-    }
-    if (
-        snapshot_manifest != expected_snapshot_manifest
-        or receipt["source_snapshot_manifest_sha256"]
-        != _regular_file(snapshot_manifest_path, "phase snapshot manifest")[1]
-    ):
-        raise TerminalPolicyError("phase snapshot manifest mismatch")
-    snapshot_info = snapshot_root.lstat()
-    if receipt["source_snapshot_identity"] != {
-        "st_dev": snapshot_info.st_dev,
-        "st_ino": snapshot_info.st_ino,
-    }:
-        raise TerminalPolicyError("phase snapshot root identity mismatch")
-    expected_complete = {
-        "schema": "alpha_max_phase_preparation_source_snapshot.v1",
-        "snapshot_manifest_sha256": receipt["source_snapshot_manifest_sha256"],
-    }
-    if _canonical_object(snapshot_complete_path) != expected_complete:
-        raise TerminalPolicyError("phase snapshot completion marker mismatch")
-    snapshot_files = _safe_tree_files(snapshot_root, "phase source snapshot")
-    expected_snapshot_files = {
-        item["source_relative_path"] for item in expected_snapshot_entries
-    } | {"snapshot-manifest.json", ".complete.json"}
-    if snapshot_files != expected_snapshot_files:
-        raise TerminalPolicyError("phase snapshot inventory mismatch")
-    for path in (
-        snapshot_root,
-        *(item for item in snapshot_root.rglob("*") if stat.S_ISDIR(item.lstat().st_mode)),
-    ):
-        if stat.S_IMODE(path.lstat().st_mode) != 0o555:
-            raise TerminalPolicyError("phase snapshot directory is not immutable")
-    for entry in expected_snapshot_entries:
-        relative = entry["source_relative_path"]
-        info, digest, byte_count, _payload = _regular_file(
-            snapshot_root / relative,
-            f"phase snapshot clone {relative}",
-        )
-        source_facts = source_file_facts[relative]
         if (
-            stat.S_IMODE(info.st_mode) != 0o444
-            or (info.st_dev, info.st_ino) == (source_facts[2], source_facts[3])
-            or digest != entry["sha256"]
-            or byte_count != entry["byte_count"]
+            actual_files != expected_output_files
+            or _observed_tree_directories(output_enumerated) != expected_output_directories
         ):
-            raise TerminalPolicyError("phase snapshot clone mismatch")
-    handoff_info = _regular_file(handoff, "phase handoff receipt")[0]
-    if (
-        stat.S_IMODE(handoff_info.st_mode) != 0o444
-        or stat.S_IMODE(_regular_file(manifest, "preparation manifest")[0].st_mode) != 0o444
-    ):
-        raise TerminalPolicyError("phase receipts are not immutable")
+            raise TerminalPolicyError("preparation manifest entry set mismatch")
+        if any(
+            stat.S_ISDIR(info.st_mode) and stat.S_IMODE(info.st_mode) != 0o555
+            for _relative, info in output_tree
+        ):
+            raise TerminalPolicyError("phase output directory is not immutable")
+
+        manifest_info, manifest_digest, _manifest_size, _ = _regular_file_at_enumerated(
+            output_fd, "preparation_manifest.json", "preparation manifest", output_enumerated
+        )
+        if isinstance(records, OneTouchRecords):
+            if stat.S_IMODE(manifest_info.st_mode) != 0o444:
+                raise TerminalPolicyError("phase receipts are not immutable")
+            _read_identity(records.contract_manifest, "one-touch contract manifest")
+            artifact = _artifact_from_at_enumerated(
+                output_fd,
+                str(output),
+                "preparation_manifest.json",
+                "preparation_manifest",
+                output_enumerated,
+            )
+            _require_current_prerequisite(request, artifact, "preparation_manifest")
+            handoff = _validate_phase_handoff_at(
+                request,
+                output_parent_fd,
+                output_fd,
+                output,
+                output_info,
+                manifest_digest,
+                len(files),
+            )
+            _require_current_prerequisite(request, handoff, "phase_handoff_receipt")
+            return (handoff, artifact), (
+                _snapshot_digest_at(output_fd, "phase output", output_tree),
+            )
+
+        _validate_phase_handoff_at(
+            request,
+            output_parent_fd,
+            output_fd,
+            output,
+            output_info,
+            manifest_digest,
+            len(files),
+        )
+        assert output_parent_fd is not None and source_fd is not None and report_fd is not None
+        prefix = f".{output.name}.alpha_max_phase_preparation"
+        handoff_leaf = f"{prefix}.handoff.json"
+        receipt = _canonical_object_at(output_parent_fd, handoff_leaf, "phase handoff receipt")
+        _exact(
+            receipt,
+            {
+                "schema",
+                "invocation_descriptor_sha256",
+                "source_eligibility_snapshot",
+                "verifier_argv_sha256",
+                "preparer_argv_sha256",
+                "preparer_result",
+                "output_root_identity",
+                "source_snapshot_manifest_sha256",
+                "source_snapshot_identity",
+                "output_manifest_sha256",
+            },
+            "phase handoff receipt",
+        )
+        preparer_result = receipt["preparer_result"]
+        _exact(
+            preparer_result,
+            {"file_count", "output_root", "preparation_manifest_sha256"},
+            "phase preparer result",
+        )
+        if (
+            receipt["schema"] != "alpha_max_phase_preparation_eligible_source_receipt.v2"
+            or receipt["output_manifest_sha256"] != manifest_digest
+            or preparer_result["file_count"] != len(files)
+            or preparer_result["output_root"] != str(output)
+            or preparer_result["preparation_manifest_sha256"] != receipt["output_manifest_sha256"]
+            or receipt["output_root_identity"]
+            != {"st_dev": output_info.st_dev, "st_ino": output_info.st_ino}
+        ):
+            raise TerminalPolicyError("phase handoff receipt mismatch")
+        for key in (
+            "invocation_descriptor_sha256",
+            "verifier_argv_sha256",
+            "preparer_argv_sha256",
+            "source_snapshot_manifest_sha256",
+        ):
+            validate_sha256(receipt[key], f"phase handoff {key}")
+
+        source_manifest = _canonical_object_at_enumerated(
+            report_fd, "source_manifest.json", "phase source manifest", report_enumerated
+        )
+        _exact(
+            source_manifest,
+            {
+                "schema",
+                "contract_sha256",
+                "availability_evidence_sha256",
+                "derivation_version",
+                "artifacts",
+            },
+            "phase source manifest",
+        )
+        if (
+            source_manifest["schema"] != "alpha_max_official_source_manifest.v4"
+            or source_manifest["contract_sha256"] != records.contract_manifest.sha256
+            or source_manifest["availability_evidence_sha256"]
+            != records.availability_evidence.sha256
+            or not isinstance(source_manifest["artifacts"], list)
+        ):
+            raise TerminalPolicyError("phase source manifest mismatch")
+        artifact_map: dict[str, str] = {}
+        for entry in source_manifest["artifacts"]:
+            _exact(entry, {"path", "sha256"}, "phase source artifact")
+            relative = entry["path"]
+            if (
+                not isinstance(relative, str)
+                or relative in artifact_map
+                or relative.startswith("/")
+                or ".." in Path(relative).parts
+                or not (relative.startswith("output/") or relative.startswith("report/"))
+            ):
+                raise TerminalPolicyError("phase source artifact path is invalid")
+            artifact_map[relative] = validate_sha256(
+                entry["sha256"], "phase source artifact sha256"
+            )
+        if list(artifact_map) != sorted(artifact_map):
+            raise TerminalPolicyError("phase source artifact map is not canonical")
+        source_snapshot = receipt["source_eligibility_snapshot"]
+        _exact(
+            source_snapshot,
+            {
+                "source_root_identity",
+                "source_report_identity",
+                "source_eligible_receipt_sha256",
+                "source_manifest_sha256",
+                "acquisition_journal_sha256",
+                "plan_sha256",
+                "source_owner_sha256",
+                "report_owner_sha256",
+                "source_manifest_artifact_map_sha256",
+            },
+            "phase source eligibility snapshot",
+        )
+        expected_source_snapshot = {
+            "source_root_identity": {
+                "st_dev": records.source_root.st_dev,
+                "st_ino": records.source_root.st_ino,
+            },
+            "source_report_identity": {
+                "st_dev": records.source_report.st_dev,
+                "st_ino": records.source_report.st_ino,
+            },
+            "source_eligible_receipt_sha256": _regular_file_at_enumerated(
+                report_fd,
+                "source_eligible_receipt.json",
+                "phase source eligible receipt",
+                report_enumerated,
+            )[1],
+            "source_manifest_sha256": _regular_file_at_enumerated(
+                report_fd, "source_manifest.json", "phase source manifest", report_enumerated
+            )[1],
+            "acquisition_journal_sha256": _regular_file_at_enumerated(
+                report_fd, "acquisition.journal.jsonl", "phase source journal", report_enumerated
+            )[1],
+            "plan_sha256": _regular_file_at_enumerated(
+                report_fd, "plan.json", "phase source plan", report_enumerated
+            )[1],
+            "source_owner_sha256": _regular_file_at_enumerated(
+                source_fd, ".alpha_max_owner.json", "phase source owner", source_enumerated
+            )[1],
+            "report_owner_sha256": _regular_file_at_enumerated(
+                report_fd, ".alpha_max_owner.json", "phase source report owner", report_enumerated
+            )[1],
+            "source_manifest_artifact_map_sha256": hashlib.sha256(
+                canonical_bytes(artifact_map)
+            ).hexdigest(),
+        }
+        if source_snapshot != expected_source_snapshot:
+            raise TerminalPolicyError("phase source eligibility snapshot mismatch")
+
+        descriptor_leaf = f"{prefix}.invocation.json"
+        lock_leaf = f"{prefix}.lock"
+        snapshot_leaf = f"{prefix}.source-snapshot"
+        descriptor = _canonical_object_at(
+            output_parent_fd, descriptor_leaf, "phase invocation descriptor"
+        )
+        _exact(
+            descriptor,
+            {
+                "schema",
+                "paths",
+                "forbidden_roots",
+                "frozen_sha256",
+                "invocation_lock_identity",
+                "source_eligibility_snapshot",
+                "verifier_argv",
+                "preparer_argv",
+            },
+            "phase invocation descriptor",
+        )
+        snapshot_root = Path(parent_path) / snapshot_leaf
+        descriptor_path = Path(parent_path) / descriptor_leaf
+        invocation_inputs = Path(parent_path) / f"{prefix}.invocation-inputs"
+        expected_paths = {
+            "acquirer": records.acquirer.path,
+            "source_root": records.source_root.path,
+            "source_report": records.source_report.path,
+            "contract_manifest": records.contract_manifest.path,
+            "availability_evidence": records.availability_evidence.path,
+            "preparer": records.preparer.path,
+            "output_root": records.phase_output.path,
+            "raw_root": str(snapshot_root / "market_ohlcv_1s"),
+            "feature_root": str(snapshot_root / "feature_points"),
+            "invocation_descriptor": str(descriptor_path),
+            "invocation_descriptor_stage": str(
+                Path(parent_path) / f"{prefix}.invocation.stage.json"
+            ),
+            "handoff_receipt": str(Path(parent_path) / handoff_leaf),
+            "handoff_receipt_stage": str(Path(parent_path) / f"{prefix}.handoff.stage.json"),
+            "source_snapshot": str(snapshot_root),
+            "source_snapshot_manifest": str(snapshot_root / "snapshot-manifest.json"),
+            "source_snapshot_complete": str(snapshot_root / ".complete.json"),
+            "invocation_inputs": str(invocation_inputs),
+            "invocation_input_acquirer": str(invocation_inputs / "acquirer.py"),
+            "invocation_input_contract_manifest": str(invocation_inputs / "contract_manifest.json"),
+            "invocation_input_availability_evidence": str(
+                invocation_inputs / "availability_evidence.json"
+            ),
+            "invocation_input_preparer": str(invocation_inputs / "preparer.py"),
+            "invocation_lock": str(Path(parent_path) / lock_leaf),
+        }
+        if descriptor["paths"] != expected_paths:
+            raise TerminalPolicyError("phase invocation paths mismatch")
+        expected_frozen = {
+            "acquirer": records.acquirer.sha256,
+            "contract_manifest": records.contract_manifest.sha256,
+            "availability_evidence": records.availability_evidence.sha256,
+            "preparer": records.preparer.sha256,
+            "wrapper": records.phase_wrapper.sha256,
+        }
+        if (
+            descriptor["schema"] != "alpha_max_phase_preparation_invocation.v1"
+            or descriptor["forbidden_roots"] != list(request.forbidden_roots)
+            or descriptor["frozen_sha256"] != expected_frozen
+            or descriptor["source_eligibility_snapshot"] != source_snapshot
+        ):
+            raise TerminalPolicyError("phase invocation binding mismatch")
+        verifier_argv = [
+            request.interpreter.path,
+            records.acquirer.path,
+            "--contract-manifest",
+            records.contract_manifest.path,
+            "--availability-evidence",
+            records.availability_evidence.path,
+            "--output-root",
+            records.source_root.path,
+            "--report-dir",
+            records.source_report.path,
+        ]
+        for forbidden_root in request.forbidden_roots:
+            verifier_argv.extend(("--forbidden-root", forbidden_root))
+        verifier_argv.append("--verify-eligible")
+        preparer_argv = [
+            request.interpreter.path,
+            records.preparer.path,
+            "--raw-root",
+            str(snapshot_root / "market_ohlcv_1s"),
+            "--feature-root",
+            str(snapshot_root / "feature_points"),
+            "--contract-manifest",
+            records.contract_manifest.path,
+            "--output-root",
+            records.phase_output.path,
+        ]
+        if (
+            descriptor["verifier_argv"] != verifier_argv
+            or descriptor["preparer_argv"] != preparer_argv
+            or receipt["verifier_argv_sha256"]
+            != hashlib.sha256(canonical_bytes(verifier_argv)).hexdigest()
+            or receipt["preparer_argv_sha256"]
+            != hashlib.sha256(canonical_bytes(preparer_argv)).hexdigest()
+            or receipt["invocation_descriptor_sha256"]
+            != _regular_file_at(output_parent_fd, descriptor_leaf, "phase invocation descriptor")[1]
+        ):
+            raise TerminalPolicyError("phase invocation argv mismatch")
+        lock_info, _lock_digest, lock_size, _ = _regular_file_at(
+            output_parent_fd, lock_leaf, "phase invocation lock"
+        )
+        expected_lock_identity = [
+            lock_info.st_dev,
+            lock_info.st_ino,
+            stat.S_IFMT(lock_info.st_mode),
+            lock_info.st_nlink,
+            lock_size,
+            lock_info.st_mtime_ns,
+            lock_info.st_ctime_ns,
+        ]
+        if (
+            descriptor["invocation_lock_identity"] != expected_lock_identity
+            or stat.S_IMODE(lock_info.st_mode) != 0o600
+        ):
+            raise TerminalPolicyError("phase invocation lock identity mismatch")
+
+        snapshot_fd = _open_child_fd(
+            output_parent_fd, snapshot_leaf, os.O_RDONLY | os.O_DIRECTORY, "phase source snapshot"
+        )
+        descriptors.callback(os.close, snapshot_fd)
+        snapshot_tree = _walk_tree_at(snapshot_fd, "phase source snapshot")
+        snapshot_enumerated = dict(snapshot_tree)
+        snapshot_info = _validate_directory_fd(snapshot_fd, None, "phase source snapshot")
+        expected_snapshot_entries: list[dict[str, Any]] = []
+        for relative, digest in artifact_map.items():
+            path = Path(relative)
+            if path.parts[:2] not in {
+                ("output", "market_ohlcv_1s"),
+                ("output", "feature_points"),
+            }:
+                continue
+            source_relative = Path(*path.parts[1:]).as_posix()
+            facts = source_file_facts.get(source_relative)
+            if facts is None:
+                source_info, source_digest, source_size, _ = _regular_file_at_enumerated(
+                    source_fd,
+                    source_relative,
+                    f"phase snapshot source {source_relative}",
+                    source_enumerated,
+                )
+                facts = (source_digest, source_size, source_info.st_dev, source_info.st_ino)
+                source_file_facts[source_relative] = facts
+            if facts[0] != digest:
+                raise TerminalPolicyError("phase snapshot source digest mismatch")
+            expected_snapshot_entries.append(
+                {"source_relative_path": source_relative, "sha256": digest, "byte_count": facts[1]}
+            )
+        expected_snapshot_entries.sort(key=lambda item: item["source_relative_path"])
+        snapshot_manifest = _canonical_object_at_enumerated(
+            snapshot_fd, "snapshot-manifest.json", "phase snapshot manifest", snapshot_enumerated
+        )
+        expected_snapshot_manifest = {
+            "schema": "alpha_max_phase_preparation_source_snapshot.v1",
+            "descriptor_sha256": receipt["invocation_descriptor_sha256"],
+            "source_manifest_sha256": expected_source_snapshot["source_manifest_sha256"],
+            "entries": expected_snapshot_entries,
+        }
+        if (
+            snapshot_manifest != expected_snapshot_manifest
+            or receipt["source_snapshot_manifest_sha256"]
+            != _regular_file_at_enumerated(
+                snapshot_fd,
+                "snapshot-manifest.json",
+                "phase snapshot manifest",
+                snapshot_enumerated,
+            )[1]
+        ):
+            raise TerminalPolicyError("phase snapshot manifest mismatch")
+        if _snapshot_identity(
+            receipt["source_snapshot_identity"], "phase handoff source snapshot identity"
+        ) != {"st_dev": snapshot_info.st_dev, "st_ino": snapshot_info.st_ino}:
+            raise TerminalPolicyError("phase handoff source snapshot identity mismatch")
+        expected_complete = {
+            "schema": "alpha_max_phase_preparation_source_snapshot.v1",
+            "snapshot_manifest_sha256": receipt["source_snapshot_manifest_sha256"],
+        }
+        if (
+            _canonical_object_at_enumerated(
+                snapshot_fd,
+                ".complete.json",
+                "phase snapshot completion marker",
+                snapshot_enumerated,
+            )
+            != expected_complete
+        ):
+            raise TerminalPolicyError("phase snapshot completion marker mismatch")
+        snapshot_files = _safe_tree_files_at(snapshot_fd, "phase source snapshot", snapshot_tree)
+        expected_snapshot_files = {
+            item["source_relative_path"] for item in expected_snapshot_entries
+        } | {"snapshot-manifest.json", ".complete.json"}
+        if snapshot_files != expected_snapshot_files:
+            raise TerminalPolicyError("phase snapshot inventory mismatch")
+        if any(
+            stat.S_ISDIR(info.st_mode) and stat.S_IMODE(info.st_mode) != 0o555
+            for _relative, info in snapshot_tree
+        ):
+            raise TerminalPolicyError("phase snapshot directory is not immutable")
+        for entry in expected_snapshot_entries:
+            relative = entry["source_relative_path"]
+            info, digest, byte_count, _ = _regular_file_at_enumerated(
+                snapshot_fd, relative, f"phase snapshot clone {relative}", snapshot_enumerated
+            )
+            source_facts = source_file_facts[relative]
+            if (
+                stat.S_IMODE(info.st_mode) != 0o444
+                or (info.st_dev, info.st_ino) == (source_facts[2], source_facts[3])
+                or digest != entry["sha256"]
+                or byte_count != entry["byte_count"]
+            ):
+                raise TerminalPolicyError("phase snapshot clone mismatch")
+        handoff_info, _handoff_digest, _handoff_size, _ = _regular_file_at(
+            output_parent_fd, handoff_leaf, "phase handoff receipt"
+        )
+        if (
+            stat.S_IMODE(handoff_info.st_mode) != 0o444
+            or stat.S_IMODE(manifest_info.st_mode) != 0o444
+        ):
+            raise TerminalPolicyError("phase receipts are not immutable")
+        artifacts = (
+            _artifact_from_at(
+                output_parent_fd,
+                parent_path,
+                handoff_leaf,
+                "phase_handoff_receipt",
+            ),
+            _artifact_from_at(
+                output_fd,
+                str(output),
+                "preparation_manifest.json",
+                "preparation_manifest",
+            ),
+        )
+        return artifacts, (_snapshot_digest_at(output_fd, "phase output", output_tree),)
 
 
-def _selection_payload(directory: Path, relative: str, *, role: str) -> dict[str, Any]:
-    value = _canonical_object(directory / relative)
+def _selection_payload(
+    root_fd: int,
+    relative: str,
+    *,
+    role: str,
+    enumerated: dict[str, os.stat_result],
+) -> dict[str, Any]:
+    value = _canonical_object_at_enumerated(root_fd, relative, f"{role} selection", enumerated)
     _exact(
         value,
         {
@@ -3299,8 +4875,10 @@ def _selection_payload(directory: Path, relative: str, *, role: str) -> dict[str
     return value
 
 
-def _terminal_payload(directory: Path, relative: str, label: str) -> dict[str, Any]:
-    value = _canonical_object(directory / relative)
+def _terminal_payload(
+    root_fd: int, relative: str, label: str, enumerated: dict[str, os.stat_result]
+) -> dict[str, Any]:
+    value = _canonical_object_at_enumerated(root_fd, relative, label, enumerated)
     _exact(
         value,
         {
@@ -3328,13 +4906,16 @@ def _terminal_payload(directory: Path, relative: str, label: str) -> dict[str, A
 
 
 def _matrix_and_observability(
-    directory: Path,
+    root_fd: int,
     *,
     domain: str,
     physical_fold_run_count: int,
     diagnostic_relative: str,
+    enumerated: dict[str, os.stat_result],
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    matrix = _canonical_object(directory / "status/matrix.json")
+    matrix = _canonical_object_at_enumerated(
+        root_fd, "status/matrix.json", f"{domain} matrix", enumerated
+    )
     _exact(
         matrix,
         {
@@ -3363,7 +4944,9 @@ def _matrix_and_observability(
         != 68
     ):
         raise TerminalPolicyError(f"{domain} matrix mismatch")
-    diagnostic = _canonical_object(directory / diagnostic_relative)
+    diagnostic = _canonical_object_at_enumerated(
+        root_fd, diagnostic_relative, f"{domain} observability", enumerated
+    )
     _exact(
         diagnostic,
         {
@@ -3385,10 +4968,12 @@ def _matrix_and_observability(
         f"{domain} observability",
     )
     expected_fold_count = 12 if domain == "validation" else 10
-    bucket_digest = _regular_file(
-        directory / "admission/train_liquidity_buckets.json",
-        f"{domain} liquidity buckets",
+    bucket_digest = _regular_file_at_enumerated(
+        root_fd, "admission/train_liquidity_buckets.json", f"{domain} liquidity buckets", enumerated
     )[1]
+    if isinstance(diagnostic["fold_run_sha256s"], list):
+        for index, item in enumerate(diagnostic["fold_run_sha256s"]):
+            validate_sha256(item, f"{domain} fold run {index}")
     if (
         diagnostic["artifact_kind"] != "alpha_max_trend_liquidity_falsifier.v1"
         or diagnostic["domain"] != domain
@@ -3398,19 +4983,23 @@ def _matrix_and_observability(
         or diagnostic["row_id"] != "component_trend_1x"
         or not isinstance(diagnostic["fold_run_sha256s"], list)
         or len(diagnostic["fold_run_sha256s"]) != expected_fold_count
-        or any(
-            not isinstance(item, str) or not _DIGEST.fullmatch(item)
-            for item in diagnostic["fold_run_sha256s"]
-        )
         or diagnostic["train_liquidity_buckets_sha256"] != bucket_digest
     ):
         raise TerminalPolicyError(f"{domain} observability mismatch")
     return matrix, diagnostic
 
 
-def _semantic_bundle_readback(directory: Path, kind: str, seal: dict[str, Any]) -> str:
+def _semantic_bundle_readback(
+    root_fd: int,
+    root_path: str,
+    kind: str,
+    seal: dict[str, Any],
+    enumerated: dict[str, os.stat_result],
+) -> str:
     if kind == "prelock_bundle":
-        run = _canonical_object(directory / "run/prelock_result.json")
+        run = _canonical_object_at_enumerated(
+            root_fd, "run/prelock_result.json", "prelock result", enumerated
+        )
         _exact(
             run,
             {
@@ -3426,16 +5015,17 @@ def _semantic_bundle_readback(directory: Path, kind: str, seal: dict[str, Any]) 
             "prelock result",
         )
         selection = _selection_payload(
-            directory,
-            "selection/prelock.json",
-            role="prelock_selection",
+            root_fd, "selection/prelock.json", role="prelock_selection", enumerated=enumerated
         )
-        terminal = _terminal_payload(directory, "terminal/prelock.json", "prelock terminal")
+        terminal = _terminal_payload(
+            root_fd, "terminal/prelock.json", "prelock terminal", enumerated
+        )
         matrix, diagnostic = _matrix_and_observability(
-            directory,
+            root_fd,
             domain="validation",
             physical_fold_run_count=816,
             diagnostic_relative="diagnostics/validation/trend_liquidity_falsifier.json",
+            enumerated=enumerated,
         )
         champion = seal["prelock_champion"]
         if (
@@ -3459,7 +5049,9 @@ def _semantic_bundle_readback(directory: Path, kind: str, seal: dict[str, Any]) 
             "observability": diagnostic,
         }
     else:
-        report = _canonical_object(directory / "report/historical_result.json")
+        report = _canonical_object_at_enumerated(
+            root_fd, "report/historical_result.json", "historical result", enumerated
+        )
         _exact(
             report,
             {
@@ -3479,22 +5071,20 @@ def _semantic_bundle_readback(directory: Path, kind: str, seal: dict[str, Any]) 
             "historical result",
         )
         ranking = _selection_payload(
-            directory,
+            root_fd,
             "selection/historical_ranking.json",
             role="historical_report",
+            enumerated=enumerated,
         )
         terminal = _terminal_payload(
-            directory,
-            "terminal/historical.json",
-            "historical terminal",
+            root_fd, "terminal/historical.json", "historical terminal", enumerated
         )
         matrix, diagnostic = _matrix_and_observability(
-            directory,
+            root_fd,
             domain="historical_exposed_evaluation",
             physical_fold_run_count=680,
-            diagnostic_relative=(
-                "diagnostics/historical_exposed_evaluation/trend_liquidity_falsifier.json"
-            ),
+            diagnostic_relative="diagnostics/historical_exposed_evaluation/trend_liquidity_falsifier.json",
+            enumerated=enumerated,
         )
         if (
             report["artifact_kind"] != "alpha_max_historical_process_result.v1"
@@ -3523,10 +5113,12 @@ def _semantic_bundle_readback(directory: Path, kind: str, seal: dict[str, Any]) 
     return hashlib.sha256(canonical_bytes(readback)).hexdigest()
 
 
-def _sealed_tree(root: str, kind: str, inventory_key: str) -> SealedArtifact:
-    directory = Path(root)
-    sealed_path = directory / "SEALED.json"
-    value = _canonical_object(sealed_path)
+def _sealed_tree_at(
+    root_fd: int, root_path: str, kind: str, inventory_key: str
+) -> tuple[SealedArtifact, list[tuple[str, os.stat_result]], dict[str, Any]]:
+    tree = _walk_tree_at(root_fd, kind)
+    enumerated = dict(tree)
+    value = _canonical_object_at_enumerated(root_fd, "SEALED.json", "sealed bundle", enumerated)
     fields = (
         {
             "artifact_count",
@@ -3552,7 +5144,7 @@ def _sealed_tree(root: str, kind: str, inventory_key: str) -> SealedArtifact:
     if value["immutable"] is not True:
         raise TerminalPolicyError("sealed bundle is mutable")
     entries = value[inventory_key]
-    declared = _inventory(directory, entries, kind)
+    declared = _inventory_at(root_fd, entries, kind, tree)
     if kind == "prelock_bundle":
         if (
             value["artifact_kind"] != "alpha_max_immutable_prelock_seal.v1"
@@ -3567,25 +5159,42 @@ def _sealed_tree(root: str, kind: str, inventory_key: str) -> SealedArtifact:
             or value["artifact_kind"] != "alpha_max_append_only_historical_package.v1"
         ):
             raise TerminalPolicyError("historical seal binding mismatch")
-        _digest(value["prelock_seal_sha256"], "historical prelock seal sha256")
-        _digest(value["prelock_snapshot_sha256"], "historical prelock snapshot sha256")
+        validate_sha256(value["prelock_seal_sha256"], "historical prelock seal sha256")
+        validate_sha256(value["prelock_snapshot_sha256"], "historical prelock snapshot sha256")
     required_counts = (
         (
-            ("manifests/validation_train_fit/*.json", 17),
-            ("manifests/prelock_final_refit/*.json", 17),
-            ("capsules/validation_train_fit/*/*.json", 204),
-            ("capsules/prelock_final_refit/*/*.json", 17),
-            ("evidence/validation/cells/*/*.json", 68),
-            ("evidence/validation/rows/*.json", 816),
+            (("manifests", "validation_train_fit"), 3, 17),
+            (("manifests", "prelock_final_refit"), 3, 17),
+            (("capsules", "validation_train_fit"), 4, 204),
+            (("capsules", "prelock_final_refit"), 4, 17),
+            (("evidence", "validation", "cells"), 5, 68),
+            (("evidence", "validation", "rows"), 4, 816),
         )
         if kind == "prelock_bundle"
         else (
-            ("capsules/prelock_final_refit/*/*.json", 153),
-            ("evidence/historical_exposed_evaluation/cells/*/*.json", 68),
-            ("evidence/historical_exposed_evaluation/rows/*.json", 680),
+            (("capsules", "prelock_final_refit"), 4, 153),
+            (("evidence", "historical_exposed_evaluation", "cells"), 5, 68),
+            (("evidence", "historical_exposed_evaluation", "rows"), 4, 680),
         )
     )
-    if any(len(list(directory.glob(pattern))) != count for pattern, count in required_counts):
+    for prefix, depth, expected_count in required_counts:
+        count = sum(
+            len(parts) == depth and parts[: len(prefix)] == prefix and parts[-1].endswith(".json")
+            for relative in declared
+            for parts in (tuple(relative.split("/")),)
+        )
+        if count != expected_count:
+            raise TerminalPolicyError("sealed artifact cardinality mismatch")
+    cardinality_roots = {prefix[0] for prefix, _depth, _count in required_counts}
+    if any(
+        parts[0] in cardinality_roots
+        and not any(
+            len(parts) == depth and parts[: len(prefix)] == prefix and parts[-1].endswith(".json")
+            for prefix, depth, _count in required_counts
+        )
+        for relative in declared
+        for parts in (tuple(relative.split("/")),)
+    ):
         raise TerminalPolicyError("sealed artifact cardinality mismatch")
     required = (
         (
@@ -3617,32 +5226,46 @@ def _sealed_tree(root: str, kind: str, inventory_key: str) -> SealedArtifact:
     )
     if not set(required) <= set(declared):
         raise TerminalPolicyError("required sealed artifact is absent")
-    for path in (directory, *directory.rglob("*")):
-        info = path.lstat()
-        if stat.S_ISLNK(info.st_mode) or (
-            stat.S_ISDIR(info.st_mode) and stat.S_IMODE(info.st_mode) != 0o555
-        ):
-            raise TerminalPolicyError("unsafe sealed tree identity")
+    if any(
+        stat.S_ISDIR(info.st_mode) and stat.S_IMODE(info.st_mode) != 0o555
+        for _relative, info in tree
+    ):
+        raise TerminalPolicyError("unsafe sealed tree identity")
     inventory_sha256 = hashlib.sha256(canonical_bytes(entries)).hexdigest()
     if kind == "prelock_bundle" and value["inventory_sha256"] != inventory_sha256:
         raise TerminalPolicyError("prelock inventory hash mismatch")
-    readback_sha256 = _semantic_bundle_readback(directory, kind, value)
-    info, digest, byte_count, _payload = _regular_file(sealed_path, "sealed receipt")
+    readback_sha256 = _semantic_bundle_readback(root_fd, root_path, kind, value, enumerated)
+    info, digest, byte_count, _payload = _regular_file_at_enumerated(
+        root_fd, "SEALED.json", "sealed receipt", enumerated
+    )
     if stat.S_IMODE(info.st_mode) != 0o444:
         raise TerminalPolicyError("sealed receipt identity drift")
-    return SealedArtifact(
-        kind,
-        str(sealed_path),
-        digest,
-        byte_count,
-        info.st_dev,
-        info.st_ino,
-        stat.S_IMODE(info.st_mode),
-        info.st_nlink,
-        digest,
-        inventory_sha256,
-        readback_sha256,
+    return (
+        SealedArtifact(
+            kind,
+            str(Path(root_path) / "SEALED.json"),
+            digest,
+            byte_count,
+            info.st_dev,
+            info.st_ino,
+            stat.S_IMODE(info.st_mode),
+            info.st_nlink,
+            digest,
+            inventory_sha256,
+            readback_sha256,
+        ),
+        tree,
+        value,
     )
+
+
+def _sealed_tree(root: str, kind: str, inventory_key: str) -> SealedArtifact:
+    root_fd = open_directory_fd(root, f"{kind} root")
+    try:
+        sealed, _tree, _seal = _sealed_tree_at(root_fd, root, kind, inventory_key)
+        return sealed
+    finally:
+        os.close(root_fd)
 
 
 MAX_PACKET_BYTES = 1_048_576

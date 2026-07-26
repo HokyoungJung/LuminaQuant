@@ -4,13 +4,14 @@
 from __future__ import annotations
 
 import argparse
-import calendar
 import base64
 import hashlib
+import fcntl
 import os
 import socket
 import stat
 import struct
+import sys
 import time
 from pathlib import Path
 from typing import Any
@@ -127,6 +128,17 @@ def _challenge(
     )
 
 
+def _raise_with_cleanup(
+    primary: BaseException, label: str, cleanup_errors: list[BaseException]
+) -> None:
+    if cleanup_errors:
+        cleanup = BaseExceptionGroup(f"{label} cleanup failed", cleanup_errors)
+        raise BaseExceptionGroup(
+            f"{label} failed and cleanup failed", [primary, cleanup]
+        ) from primary
+    raise primary
+
+
 def _read_claim(root_fd: int, request: Any) -> tuple[dict[str, Any], bytes]:
     fd = os.open(
         request.publication.claim,
@@ -161,7 +173,14 @@ def _read_claim(root_fd: int, request: Any) -> tuple[dict[str, Any], bytes]:
             after.st_mtime_ns,
         ) or byte_count != after.st_size:
             raise ValueError("terminal claim changed while read")
-    finally:
+    except BaseException as primary:
+        cleanup_errors: list[BaseException] = []
+        try:
+            os.close(fd)
+        except BaseException as cleanup_error:
+            cleanup_errors.append(cleanup_error)
+        _raise_with_cleanup(primary, "terminal claim read", cleanup_errors)
+    else:
         os.close(fd)
     data = b"".join(chunks)
     return policy.parse_canonical_object(data, "claim"), data
@@ -197,9 +216,8 @@ def _validate_proof(
         raise ValueError("observer peer credentials mismatch")
     if message["observer_source_sha256"] != envelope.observer_source_sha256:
         raise ValueError("observer source binding mismatch")
-    for key in ("claim_sha256", "observer_source_sha256"):
-        if not isinstance(message[key], str) or len(message[key]) != 64:
-            raise ValueError("invalid observer proof digest")
+    policy.validate_sha256(message["claim_sha256"], "observer proof claim digest")
+    policy.validate_sha256(message["observer_source_sha256"], "observer proof source digest")
     claim, claim_bytes = _read_claim(root_fd, request)
     _exact(claim, set(policy.CLAIM_FIELDS))
     if (
@@ -223,7 +241,7 @@ def _authorization(
     commands: Any,
     proof: Mapping[str, Any],
 ) -> dict[str, Any]:
-    now = _utc()
+    epoch = int(time.time())
     return policy.sign_message(
         "authorization",
         {
@@ -243,11 +261,61 @@ def _authorization(
             "observer_uid": proof["observer_uid"],
             "observer_start_ticks": proof["observer_start_ticks"],
             "observer_source_sha256": proof["observer_source_sha256"],
-            "not_before_utc": now,
-            "expires_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() + 300)),
+            "not_before_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(epoch)),
+            "expires_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(epoch + 300)),
         },
         private,
     )
+
+
+def _authorization_window(authorization: Mapping[str, Any]) -> tuple[int, int]:
+    return policy.authorization_epoch_window(authorization)
+
+
+def _validate_launch_intent_window(
+    event: Mapping[str, Any],
+    authorization: Mapping[str, Any],
+    prior_clearance: Mapping[str, Any] | None,
+    received_before: int,
+    received_after: int,
+) -> None:
+    if event.get("event") != "launch_intent":
+        return
+    observed_at = int(
+        policy.parse_utc_second(
+            event.get("observed_utc"), "launch intent observation time"
+        ).timestamp()
+    )
+    if event.get("command_index") == 0:
+        not_before, expires = _authorization_window(authorization)
+        if (
+            received_before <= received_after
+            and not_before <= observed_at < expires
+            and not_before <= received_before < expires
+            and not_before <= received_after < expires
+        ):
+            return
+        raise ValueError("launch intent is outside authorization window")
+    if (
+        not isinstance(prior_clearance, Mapping)
+        or event.get("prior_clearance") != prior_clearance
+        or event.get("command_index") != prior_clearance.get("next_command_index")
+    ):
+        raise ValueError("launch intent clearance mismatch")
+    issued_at = int(
+        policy.parse_utc_second(
+            prior_clearance.get("issued_utc"), "command clearance issued time"
+        ).timestamp()
+    )
+    expires_at = issued_at + 60
+    if (
+        received_before <= received_after
+        and issued_at <= observed_at <= expires_at
+        and issued_at <= received_before <= expires_at
+        and issued_at <= received_after <= expires_at
+    ):
+        return
+    raise ValueError("launch intent is outside clearance window")
 
 
 def _validate_stored_authorization(
@@ -278,13 +346,8 @@ def _validate_stored_authorization(
     }
     if any(authorization[key] != value for key, value in expected.items()):
         raise ValueError("authorization binding mismatch")
-    for key in ("authorization_id", "claim_sha256"):
-        try:
-            if len(authorization[key]) != 64:
-                raise ValueError
-            bytes.fromhex(authorization[key])
-        except (TypeError, ValueError) as exc:
-            raise ValueError(f"invalid authorization {key}") from exc
+    policy.validate_sha256(authorization["authorization_id"], "authorization id")
+    policy.validate_sha256(authorization["claim_sha256"], "authorization claim digest")
     if (
         type(authorization["observer_pid"]) is not int
         or authorization["observer_pid"] <= 0
@@ -292,15 +355,7 @@ def _validate_stored_authorization(
         or authorization["observer_start_ticks"] <= 0
     ):
         raise ValueError("invalid authorization observer identity")
-    try:
-        not_before = calendar.timegm(
-            time.strptime(authorization["not_before_utc"], "%Y-%m-%dT%H:%M:%SZ")
-        )
-        expires = calendar.timegm(time.strptime(authorization["expires_utc"], "%Y-%m-%dT%H:%M:%SZ"))
-    except (TypeError, ValueError) as exc:
-        raise ValueError("invalid authorization window") from exc
-    if not not_before < expires or expires - not_before > 300:
-        raise ValueError("invalid authorization window")
+    _authorization_window(authorization)
     claim, claim_bytes = _read_claim(root_fd, request)
     _exact(claim, set(policy.CLAIM_FIELDS))
     if (
@@ -342,30 +397,46 @@ def _clearance(
     )
 
 
-def _open_root(request: Any) -> int:
+def _open_root(request: Any, *, exclusive: bool = False) -> int:
     root_fd = policy.open_directory_fd(request.evidence_root.path, "evidence root")
-    info = os.fstat(root_fd)
-    expected = (
-        request.evidence_root.st_dev,
-        request.evidence_root.st_ino,
-        request.evidence_root.st_uid,
-        request.evidence_root.st_gid,
-        request.evidence_root.mode,
-    )
-    actual = (
-        info.st_dev,
-        info.st_ino,
-        info.st_uid,
-        info.st_gid,
-        stat.S_IMODE(info.st_mode),
-    )
-    if actual != expected:
-        os.close(root_fd)
-        raise ValueError("evidence root identity drift")
+    try:
+        info = os.fstat(root_fd)
+        expected = (
+            request.evidence_root.st_dev,
+            request.evidence_root.st_ino,
+            request.evidence_root.st_uid,
+            request.evidence_root.st_gid,
+            request.evidence_root.mode,
+        )
+        actual = (
+            info.st_dev,
+            info.st_ino,
+            info.st_uid,
+            info.st_gid,
+            stat.S_IMODE(info.st_mode),
+        )
+        if actual != expected:
+            raise ValueError("evidence root identity drift")
+        try:
+            fcntl.flock(
+                root_fd,
+                (fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH) | fcntl.LOCK_NB,
+            )
+        except BlockingIOError as exc:
+            raise ValueError("terminal evidence root is active") from exc
+    except BaseException as primary:
+        cleanup_errors: list[BaseException] = []
+        try:
+            os.close(root_fd)
+        except BaseException as cleanup_error:
+            cleanup_errors.append(cleanup_error)
+        _raise_with_cleanup(primary, "evidence root open", cleanup_errors)
     return root_fd
 
 
-def _read_at(root_fd: int, name: str, label: str, *, limit: int = 64 * 1024 * 1024) -> bytes:
+def _read_at_identity(
+    root_fd: int, name: str, label: str, *, limit: int = 64 * 1024 * 1024
+) -> tuple[bytes, tuple[int, int]]:
     fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC, dir_fd=root_fd)
     try:
         before = os.fstat(fd)
@@ -395,9 +466,58 @@ def _read_at(root_fd: int, name: str, label: str, *, limit: int = 64 * 1024 * 10
             after.st_mtime_ns,
         ) or byte_count != after.st_size:
             raise ValueError(f"{label} changed while read")
-    finally:
+    except BaseException as primary:
+        cleanup_errors: list[BaseException] = []
+        try:
+            os.close(fd)
+        except BaseException as cleanup_error:
+            cleanup_errors.append(cleanup_error)
+        _raise_with_cleanup(primary, f"{label} read", cleanup_errors)
+    else:
         os.close(fd)
-    return b"".join(chunks)
+    return b"".join(chunks), (before.st_dev, before.st_ino)
+
+
+def _read_at(root_fd: int, name: str, label: str, *, limit: int = 64 * 1024 * 1024) -> bytes:
+    data, _identity = _read_at_identity(root_fd, name, label, limit=limit)
+    return data
+
+
+def _cleanup_failed_new_publication(
+    root_fd: int,
+    name: str,
+    fd: int,
+    identity: tuple[int, int] | None,
+    *,
+    fd_open: bool,
+) -> list[BaseException]:
+    errors: list[BaseException] = []
+    if identity is None and fd_open:
+        try:
+            info = os.fstat(fd)
+            identity = (info.st_dev, info.st_ino)
+        except BaseException as error:
+            errors.append(error)
+    if fd_open:
+        try:
+            os.close(fd)
+        except BaseException as error:
+            errors.append(error)
+    if identity is None:
+        errors.append(ValueError("cannot verify failed publication identity"))
+    else:
+        try:
+            info = os.stat(name, dir_fd=root_fd, follow_symlinks=False)
+            if (info.st_dev, info.st_ino) != identity or not stat.S_ISREG(info.st_mode):
+                raise ValueError("failed publication identity changed")
+            os.unlink(name, dir_fd=root_fd)
+        except BaseException as error:
+            errors.append(error)
+    try:
+        os.fsync(root_fd)
+    except BaseException as error:
+        errors.append(error)
+    return errors
 
 
 def _write_new(root_fd: int, name: str, data: bytes) -> None:
@@ -407,7 +527,11 @@ def _write_new(root_fd: int, name: str, data: bytes) -> None:
         0o600,
         dir_fd=root_fd,
     )
+    identity: tuple[int, int] | None = None
+    fd_open = True
     try:
+        info = os.fstat(fd)
+        identity = (info.st_dev, info.st_ino)
         os.fchmod(fd, 0o600)
         info = os.fstat(fd)
         if (
@@ -425,35 +549,53 @@ def _write_new(root_fd: int, name: str, data: bytes) -> None:
                 raise OSError("short receipt write")
             view = view[written:]
         os.fsync(fd)
-    finally:
+        fd_open = False
         os.close(fd)
-    os.fsync(root_fd)
-
-
-def _append_at(root_fd: int, name: str, data: bytes) -> None:
-    try:
-        fd = os.open(
-            name,
-            os.O_WRONLY | os.O_APPEND | os.O_NOFOLLOW | os.O_CLOEXEC,
-            dir_fd=root_fd,
+        os.fsync(root_fd)
+    except BaseException as primary:
+        cleanup_errors = _cleanup_failed_new_publication(
+            root_fd, name, fd, identity, fd_open=fd_open
         )
-    except FileNotFoundError:
+        _raise_with_cleanup(primary, "new publication", cleanup_errors)
+
+
+def _validate_journal_fd(fd: int, expected_identity: tuple[int, int]) -> None:
+    info = os.fstat(fd)
+    if (
+        (info.st_dev, info.st_ino) != expected_identity
+        or not stat.S_ISREG(info.st_mode)
+        or info.st_nlink != 1
+        or info.st_uid != os.getuid()
+        or info.st_gid != os.getgid()
+        or stat.S_IMODE(info.st_mode) != 0o600
+    ):
+        raise ValueError("unsafe terminal journal")
+
+
+def _append_at(
+    root_fd: int,
+    name: str,
+    data: bytes,
+    expected_identity: tuple[int, int] | None,
+) -> tuple[int, int]:
+    if expected_identity is None:
         fd = os.open(
             name,
             os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_APPEND | os.O_NOFOLLOW | os.O_CLOEXEC,
             0o600,
             dir_fd=root_fd,
         )
+    else:
+        fd = os.open(
+            name,
+            os.O_WRONLY | os.O_APPEND | os.O_NOFOLLOW | os.O_CLOEXEC,
+            dir_fd=root_fd,
+        )
     try:
-        info = os.fstat(fd)
-        if (
-            not stat.S_ISREG(info.st_mode)
-            or info.st_nlink != 1
-            or info.st_uid != os.getuid()
-            or info.st_gid != os.getgid()
-            or stat.S_IMODE(info.st_mode) != 0o600
-        ):
-            raise ValueError("unsafe terminal journal")
+        if expected_identity is None:
+            info = os.fstat(fd)
+            expected_identity = (info.st_dev, info.st_ino)
+        _validate_journal_fd(fd, expected_identity)
         view = memoryview(data)
         while view:
             written = os.write(fd, view)
@@ -461,34 +603,59 @@ def _append_at(root_fd: int, name: str, data: bytes) -> None:
                 raise OSError("short journal write")
             view = view[written:]
         os.fsync(fd)
-    finally:
-        os.close(fd)
-    os.fsync(root_fd)
+    except BaseException as primary:
+        cleanup_errors: list[BaseException] = []
+        try:
+            os.close(fd)
+        except BaseException as cleanup_error:
+            cleanup_errors.append(cleanup_error)
+        _raise_with_cleanup(primary, "terminal journal append", cleanup_errors)
+    else:
+        try:
+            os.close(fd)
+        except BaseException as primary:
+            cleanup_errors: list[BaseException] = []
+            try:
+                os.fsync(root_fd)
+            except BaseException as cleanup_error:
+                cleanup_errors.append(cleanup_error)
+            _raise_with_cleanup(primary, "terminal journal append", cleanup_errors)
+        os.fsync(root_fd)
+    return expected_identity
 
 
-def _truncate_at(root_fd: int, name: str, size: int) -> None:
+def _truncate_at(root_fd: int, name: str, size: int, expected_identity: tuple[int, int]) -> None:
     fd = os.open(
         name,
         os.O_WRONLY | os.O_NOFOLLOW | os.O_CLOEXEC,
         dir_fd=root_fd,
     )
     try:
-        info = os.fstat(fd)
-        if (
-            not stat.S_ISREG(info.st_mode)
-            or info.st_nlink != 1
-            or info.st_uid != os.getuid()
-            or info.st_gid != os.getgid()
-            or stat.S_IMODE(info.st_mode) != 0o600
-        ):
-            raise ValueError("unsafe terminal journal")
+        _validate_journal_fd(fd, expected_identity)
         os.ftruncate(fd, size)
         os.fsync(fd)
-    finally:
+    except BaseException as primary:
+        cleanup_errors: list[BaseException] = []
+        try:
+            os.close(fd)
+        except BaseException as cleanup_error:
+            cleanup_errors.append(cleanup_error)
+        _raise_with_cleanup(primary, "terminal journal truncate", cleanup_errors)
+    else:
         os.close(fd)
 
 
-def _unlink_at(root_fd: int, name: str) -> None:
+def _unlink_at(root_fd: int, name: str, expected_identity: tuple[int, int]) -> None:
+    info = os.stat(name, dir_fd=root_fd, follow_symlinks=False)
+    if (
+        (info.st_dev, info.st_ino) != expected_identity
+        or not stat.S_ISREG(info.st_mode)
+        or info.st_nlink != 1
+        or info.st_uid != os.getuid()
+        or info.st_gid != os.getgid()
+        or stat.S_IMODE(info.st_mode) != 0o600
+    ):
+        raise ValueError("terminal journal identity changed")
     os.unlink(name, dir_fd=root_fd)
     os.fsync(root_fd)
 
@@ -502,15 +669,18 @@ def _bind_server(root_fd: int, name: str) -> tuple[socket.socket, tuple[int, int
         raise FileExistsError("authority socket already exists")
     server = socket.socket(socket.AF_UNIX, socket.SOCK_SEQPACKET)
     identity: tuple[int, int] | None = None
+    bound = False
     try:
-        server.bind(f"/proc/self/fd/{root_fd}/{name}")
+        old_umask = os.umask(0o177)
+        try:
+            server.bind(f"/proc/self/fd/{root_fd}/{name}")
+            bound = True
+        finally:
+            os.umask(old_umask)
         info = os.stat(name, dir_fd=root_fd, follow_symlinks=False)
         identity = (info.st_dev, info.st_ino)
-        os.chmod(name, 0o600, dir_fd=root_fd, follow_symlinks=False)
-        info = os.stat(name, dir_fd=root_fd, follow_symlinks=False)
         if (
             not stat.S_ISSOCK(info.st_mode)
-            or (info.st_dev, info.st_ino) != identity
             or info.st_uid != os.getuid()
             or info.st_gid != os.getgid()
             or stat.S_IMODE(info.st_mode) != 0o600
@@ -519,11 +689,20 @@ def _bind_server(root_fd: int, name: str) -> tuple[socket.socket, tuple[int, int
         os.fsync(root_fd)
         server.listen(1)
         return server, identity
-    except BaseException:
-        server.close()
+    except BaseException as bind_error:
+        cleanup_errors: list[BaseException] = []
+        try:
+            server.close()
+        except BaseException as cleanup_error:
+            cleanup_errors.append(cleanup_error)
+        if bound and identity is None:
+            cleanup_errors.append(ValueError("bound authority socket identity is unknown"))
         if identity is not None:
-            _remove_socket(root_fd, name, identity)
-        raise
+            try:
+                _remove_socket(root_fd, name, identity)
+            except BaseException as cleanup_error:
+                cleanup_errors.append(cleanup_error)
+        _raise_with_cleanup(bind_error, "authority socket bind", cleanup_errors)
 
 
 def _remove_socket(root_fd: int, name: str, identity: tuple[int, int]) -> None:
@@ -598,10 +777,16 @@ def serve(args: argparse.Namespace) -> int:
     socket_name = Path(request.authority_socket).name
     server: socket.socket | None = None
     socket_identity: tuple[int, int] | None = None
+    connection: socket.socket | None = None
     try:
+        policy.validate_prelaunch(
+            envelope,
+            request,
+            require_outputs_absent=True,
+        )
         server, socket_identity = _bind_server(root_fd, socket_name)
         connection, _ = server.accept()
-        with connection:
+        if connection is not None:
             peer = peer_credentials(connection)
             challenge = _challenge(private, checkpoint, envelope, request, commands)
             policy.send_packet(connection, challenge)
@@ -617,11 +802,21 @@ def serve(args: argparse.Namespace) -> int:
             )
             policy.send_packet(connection, authorization)
             events: list[dict[str, Any]] = []
+            prior_clearance: dict[str, Any] | None = None
             evidence: list[Any] = []
             while True:
+                received_before = int(time.time())
                 event = policy.receive_packet(connection)
+                received_after = int(time.time())
                 if event.get("authorization_id") != authorization["authorization_id"]:
                     raise ValueError("event authorization mismatch")
+                _validate_launch_intent_window(
+                    event,
+                    authorization,
+                    prior_clearance,
+                    received_before,
+                    received_after,
+                )
                 candidate = (*events, event)
                 policy.validate_scope_artifacts(
                     envelope,
@@ -676,16 +871,15 @@ def serve(args: argparse.Namespace) -> int:
                     )
                     evidence.append(checked)
                     if index + 1 < len(commands):
-                        policy.send_packet(
-                            connection,
-                            _clearance(
-                                private,
-                                authorization,
-                                request,
-                                index,
-                                checked,
-                            ),
+                        clearance = _clearance(
+                            private,
+                            authorization,
+                            request,
+                            index,
+                            checked,
                         )
+                        policy.send_packet(connection, clearance)
+                        prior_clearance = clearance
                     else:
                         receipt = _receipt(
                             private,
@@ -705,11 +899,38 @@ def serve(args: argparse.Namespace) -> int:
                         policy.send_packet(connection, receipt)
                         return 0
     finally:
+        cleanup_errors: list[BaseException] = []
+        if connection is not None:
+            try:
+                connection.close()
+            except BaseException as cleanup_error:
+                cleanup_errors.append(cleanup_error)
         if server is not None:
-            server.close()
+            try:
+                server.close()
+            except BaseException as cleanup_error:
+                cleanup_errors.append(cleanup_error)
         if socket_identity is not None:
-            _remove_socket(root_fd, socket_name, socket_identity)
-        os.close(root_fd)
+            try:
+                _remove_socket(root_fd, socket_name, socket_identity)
+            except BaseException as cleanup_error:
+                cleanup_errors.append(cleanup_error)
+        try:
+            os.close(root_fd)
+        except BaseException as cleanup_error:
+            cleanup_errors.append(cleanup_error)
+        primary_error = sys.exception()
+        if primary_error is not None:
+            if cleanup_errors:
+                cleanup_error = BaseExceptionGroup(
+                    "authority server cleanup failed", cleanup_errors
+                )
+                raise BaseExceptionGroup(
+                    "authority server failed and cleanup failed",
+                    [primary_error, cleanup_error],
+                ) from primary_error
+        elif cleanup_errors:
+            raise BaseExceptionGroup("authority server cleanup failed", cleanup_errors)
 
 
 def _journal_records(data: bytes) -> list[dict[str, Any]]:
@@ -728,43 +949,49 @@ def _reconcile_pending(
     request: Any,
     commands: Any,
 ) -> list[dict[str, Any]]:
+    pending_identity: tuple[int, int] | None
     try:
-        pending = _read_at(root_fd, PENDING_NAME, "terminal pending record")
+        pending, pending_identity = _read_at_identity(
+            root_fd, PENDING_NAME, "terminal pending record"
+        )
     except FileNotFoundError:
         pending = None
-    if pending is not None:
+        pending_identity = None
+        pending_record = None
+    else:
         pending_record = policy.parse_canonical_object(pending, "pending journal record")
+
+    journal_identity: tuple[int, int] | None
     try:
-        journal_bytes = _read_at(
+        journal_bytes, journal_identity = _read_at_identity(
             root_fd,
             request.publication.journal,
             "terminal journal",
         )
     except FileNotFoundError:
         journal_bytes = b""
-    if pending is None:
-        return _journal_records(journal_bytes) if journal_bytes else []
+        journal_identity = None
 
     boundary = journal_bytes.rfind(b"\n") + 1
     complete_journal = journal_bytes[:boundary]
     trailing = journal_bytes[boundary:]
-    if trailing and (trailing == pending or not pending.startswith(trailing)):
-        raise ValueError("terminal journal tail does not match pending record")
+    if trailing and (pending is None or trailing == pending or not pending.startswith(trailing)):
+        raise ValueError("terminal journal tail does not match pending authorization")
+
     records = _journal_records(complete_journal) if complete_journal else []
-    if not trailing and journal_bytes.endswith(pending):
-        _unlink_at(root_fd, PENDING_NAME)
-        return records
-    if not records:
-        _validate_stored_authorization(
-            pending_record,
-            checkpoint,
-            envelope,
-            request,
-            commands,
-            root_fd,
+    if (
+        len(records) > 1
+        or (records and records[0].get("type") != "authorization")
+        or any("event" in record for record in records)
+        or (
+            pending_record is not None
+            and (pending_record.get("type") != "authorization" or "event" in pending_record)
         )
-    else:
-        authorization = records[0]
+    ):
+        raise ValueError("recovery cannot prove authorization-only history")
+
+    authorization = records[0] if records else pending_record
+    if authorization is not None:
         _validate_stored_authorization(
             authorization,
             checkpoint,
@@ -773,21 +1000,62 @@ def _reconcile_pending(
             commands,
             root_fd,
         )
-        events = records[1:]
-        if pending_record.get("authorization_id") != authorization["authorization_id"]:
-            raise ValueError("pending event authorization mismatch")
-        candidate = (*events, pending_record)
-        policy.validate_scope_artifacts(
-            envelope,
-            request,
-            candidate,
-            allow_incomplete=True,
+
+    if pending is None:
+        if trailing:
+            raise ValueError("terminal journal has an incomplete record")
+        return records
+
+    if pending_identity is None or pending_record is None:
+        raise ValueError("pending authorization identity is missing")
+    fully_appended = bool(records)
+    if fully_appended and (trailing or journal_bytes != pending or pending_record != records[0]):
+        raise ValueError("pending authorization does not match terminal journal")
+
+    current_pending, current_pending_identity = _read_at_identity(
+        root_fd, PENDING_NAME, "terminal pending record"
+    )
+    if current_pending != pending or current_pending_identity != pending_identity:
+        raise ValueError("pending journal identity changed")
+    if journal_identity is not None:
+        current_journal, current_journal_identity = _read_at_identity(
+            root_fd,
+            request.publication.journal,
+            "terminal journal",
         )
+        if current_journal != journal_bytes or current_journal_identity != journal_identity:
+            raise ValueError("terminal journal changed before recovery mutation")
+
+    if fully_appended:
+        _unlink_at(root_fd, PENDING_NAME, pending_identity)
+        return records
     if trailing:
-        _truncate_at(root_fd, request.publication.journal, boundary)
-    _append_at(root_fd, request.publication.journal, pending)
-    _unlink_at(root_fd, PENDING_NAME)
-    return _journal_records(_read_at(root_fd, request.publication.journal, "terminal journal"))
+        if journal_identity is None:
+            raise ValueError("terminal journal identity is missing")
+        _truncate_at(root_fd, request.publication.journal, boundary, journal_identity)
+    journal_identity = _append_at(
+        root_fd,
+        request.publication.journal,
+        pending,
+        journal_identity,
+    )
+    repaired_journal, repaired_identity = _read_at_identity(
+        root_fd,
+        request.publication.journal,
+        "terminal journal",
+    )
+    current_pending, current_pending_identity = _read_at_identity(
+        root_fd, PENDING_NAME, "terminal pending record"
+    )
+    if (
+        repaired_journal != pending
+        or repaired_identity != journal_identity
+        or current_pending != pending
+        or current_pending_identity != pending_identity
+    ):
+        raise ValueError("recovered authorization changed before pending unlink")
+    _unlink_at(root_fd, PENDING_NAME, pending_identity)
+    return [pending_record]
 
 
 def recover(args: argparse.Namespace) -> int:
@@ -798,8 +1066,13 @@ def recover(args: argparse.Namespace) -> int:
     private = policy.secure_private_key(args.private_key)
     if policy.public_key_id(private.public_key()) != envelope.authority_key.key_id:
         raise ValueError("authority key mismatch")
-    root_fd = _open_root(request)
+    root_fd = _open_root(request, exclusive=True)
     try:
+        policy.validate_prelaunch(
+            envelope,
+            request,
+            require_outputs_absent=False,
+        )
         records = _reconcile_pending(
             root_fd,
             checkpoint,
@@ -807,8 +1080,8 @@ def recover(args: argparse.Namespace) -> int:
             request,
             commands,
         )
-        if not records:
-            raise ValueError("missing authenticated authorization")
+        if len(records) != 1:
+            raise ValueError("recovery requires exactly one authenticated authorization")
         authorization = records[0]
         _validate_stored_authorization(
             authorization,
@@ -818,18 +1091,17 @@ def recover(args: argparse.Namespace) -> int:
             commands,
             root_fd,
         )
-        events = records[1:]
-        if any(
-            event.get("authorization_id") != authorization["authorization_id"] for event in events
-        ):
-            raise ValueError("journal event authorization mismatch")
+        events: list[dict[str, Any]] = []
         policy.validate_scope_artifacts(
             envelope,
             request,
             tuple(events),
             allow_incomplete=True,
         )
-        state = recovery_state(events, len(commands))
+        state = {
+            "kind": "UNAUTHENTICATED_TERMINAL",
+            "last_authenticated_sequence": 0,
+        }
         receipt = _receipt(
             private,
             checkpoint,
@@ -840,14 +1112,27 @@ def recover(args: argparse.Namespace) -> int:
             state,
             root_fd,
         )
+        if (
+            receipt["terminal_state"] != state
+            or receipt["events_sha256"] != _sha(policy.canonical_bytes(events))
+            or receipt["target_results"] != []
+        ):
+            raise ValueError("authorization-only recovery receipt mismatch")
         _write_new(
             root_fd,
             request.publication.receipt,
             policy.canonical_bytes(receipt),
         )
-    finally:
+    except BaseException as primary:
+        cleanup_errors: list[BaseException] = []
+        try:
+            os.close(root_fd)
+        except BaseException as cleanup_error:
+            cleanup_errors.append(cleanup_error)
+        _raise_with_cleanup(primary, "recovery", cleanup_errors)
+    else:
         os.close(root_fd)
-    return 0 if state["kind"] == "SUCCEEDED" else 2
+    return 2
 
 
 def recovery_state(events: list[dict[str, Any]], command_count: int) -> dict[str, Any]:
@@ -909,18 +1194,45 @@ def verify_receipt(args: argparse.Namespace) -> int:
         request,
         require_outputs_absent=False,
     )
+    commands = policy.derive_scope_commands(envelope, request)
+    expected_receipt = Path(request.evidence_root.path) / request.publication.receipt
+    if args.receipt != expected_receipt:
+        raise ValueError("terminal receipt context mismatch")
+    _observer_public, observer_binding = _observer(envelope, request.scope)
     verified = policy.verify_signed_receipt(args.receipt, args.public_key)
     message = verified.message
+    authorization = verified.authorization
+    _exact(message, RECEIPT)
+    _exact(authorization, AUTHORIZATION)
+    context = {
+        "authority_key_id": envelope.authority_key.key_id,
+        "scope": request.scope,
+        "request_id": request.request_id,
+        "checkpoint_pin_sha256": checkpoint.sha256,
+        "envelope_sha256": envelope.sha256,
+        "request_sha256": request.sha256,
+        "command_bundle_sha256": _bundle(request, commands),
+        "observer_key_id": observer_binding.key_id,
+    }
     if (
         verified.key_id != envelope.authority_key.key_id
-        or message["scope"] != request.scope
-        or message["request_id"] != request.request_id
-        or message["checkpoint_pin_sha256"] != checkpoint.sha256
-        or message["envelope_sha256"] != envelope.sha256
-        or message["request_sha256"] != request.sha256
-        or args.receipt != Path(request.evidence_root.path) / request.publication.receipt
+        or any(message[key] != value for key, value in context.items())
+        or any(authorization[key] != value for key, value in context.items())
+        or authorization["observer_source_sha256"] != envelope.observer_source_sha256
+        or message["authorization_id"] != authorization["authorization_id"]
+        or message["claim_sha256"] != authorization["claim_sha256"]
+        or message["publication"] != policy.plain(request.publication)
+        or message["prerequisites"] != [policy.plain(item) for item in request.prerequisites]
+        or args.receipt != expected_receipt
     ):
         raise ValueError("terminal receipt context mismatch")
+    results = policy.validate_scope_artifacts(
+        envelope, request, verified.events, allow_incomplete=True
+    )
+    if message["target_results"] != policy.plain(results) or message[
+        "terminal_state"
+    ] != recovery_state(list(verified.events), len(commands)):
+        raise ValueError("terminal receipt result mismatch")
     return 0
 
 

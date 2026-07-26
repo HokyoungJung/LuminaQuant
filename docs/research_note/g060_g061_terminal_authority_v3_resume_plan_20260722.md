@@ -76,6 +76,12 @@ Exact policy pins:
 
 The checkpoint is the one-way trust anchor: `checkpoint.authority_manifest_sha256` equals the SHA-256 of the canonical external launch-envelope bytes. The envelope contains no self-hash. Current-repository HEAD is not hardcoded in policy; the envelope and external clean receipt pin the final current HEAD, which must descend from the historical implementation/handoff ancestry.
 
+## Trust and identity boundary
+
+The terminal pipeline has one fully trusted leader UID. Distinct authority and observer keys separate signed claims for audit, but they do not create operating-system isolation between processes running as that same UID. The pinned acquisition and phase-preparation child scripts are trusted derivation components; policy authenticates their fixed identities, complete artifact relationships, and published coverage, but this design makes no sandbox claim.
+
+Any previously signed policy, authority, or observer identity and its receipts are historical evidence only. Any future control-plane byte change requires a fresh external v3 launch envelope and v1 checkpoint that pin the new identities while retaining the existing target and runbook pins.
+
 ## Typed closed schemas
 
 All JSON is UTF-8, sorted-key, compact-separator, `allow_nan=False`, LF-terminated canonical JSON. Missing, extra, duplicate, non-canonical, unsafe path, non-finite, and wrong-type values fail closed.
@@ -372,6 +378,26 @@ Earlier cleaner blockers were implemented and focused-tested: complete cleanup e
 
 If any official archive fails ordering, preserve the current v5 evidence and create an explicit evidence-backed replacement subgoal. Never broaden canonical sorting automatically.
 
+## G064 prelaunch addendum
+
+G062 completed the strict terminal-authority gate and superseded G061/G060. Before any target or network launch, read-only prelaunch review 189 found that the original 300-second authorization was incorrectly reused as the live-time authority for command 1 after a potentially hours-long acquisition command 0. G056 is review-blocked by G064 until the following unchanged-wire semantics are independently clean:
+
+- command 0 requires the original authorization to be current immediately before its intent and `Popen`;
+- every later command carries the exact most recently issued signed command clearance in `prior_clearance`;
+- the observer revalidates that clearance's signature, authorization/request/index/snapshot bindings, and existing 60-second freshness immediately before intent and again immediately before `Popen`;
+- the authority requires the later intent to carry the exact clearance object it issued and brackets both the observer's `observed_utc` and authority receive-before/receive-after seconds within the same 60-second window;
+- missing, future, stale, replayed, mismatched, wrong-index, or differently signed clearance fails closed.
+
+No wire field, CLI, target argv, environment, accepted pin, acquirer byte, or phase-wrapper byte changes for this repair.
+
+Recovery remains deliberately authorization-only and no-launch. It rejects any intent/process-event history because a post-crash process event cannot reconstruct the original live receive bracket without weakening authorization. A host/process crash after durable intent therefore makes that source/report/evidence set terminal and ineligible: preserve it byte-for-byte, create an explicit replacement subgoal and fresh roots, and never relaunch or advance it through `recover`.
+
+The fixed envelope field named `clean_receipt` may bind a truthful reviewed-overlay receipt when the no-commit constraint prevents a porcelain-empty current checkout. That receipt is valid only when it records the actual HEAD/branch/ancestry, every porcelain path and exact SHA-256, an empty index, `git diff --check` PASS, zero unexpected tracked or untracked paths, the final quality-gate/adversarial-report hashes, and the separately envelope-bound ignored interpreter/package files. It must state `git_porcelain_empty:false` and `decision:"PASS_REVIEWED_OVERLAY"` rather than claim Git cleanliness. The accepted Alpha repository must remain genuinely porcelain-empty at the pinned accepted commit. A fresh independent architect must approve the exact receipt and envelope before launch.
+
 ## Market-cap-index scope clarification
 
 The exact repository `HokyoungJung/Market-Cap-Weighted-Indices` is not directly imported or implemented in this checkpoint. LuminaQuant already contains adjacent TopCap-universe and turnover/flow-share index concepts, but those are not equivalent to a point-in-time daily market-cap-weighted index. A future inclusion must be an explicit research candidate using point-in-time constituent and capitalization evidence; current CoinGecko/current-universe data must not be backfilled as historical membership. It must remain research/shadow-only until clean walk-forward and cost/funding gates pass. The terminal pipeline work above improves correctness and provenance; it must never be used to tune headline performance.
+
+## 2026-07-26 cross-session continuation
+
+The current G070/G071/G072 recovery state, v8 acquisition safeguards, and canonical shared-DB continuation plan are recorded in [`g070_v8_and_canonical_db_cross_session_handoff_20260726.md`](g070_v8_and_canonical_db_cross_session_handoff_20260726.md). That handoff supersedes this file as the operational resume entry point while preserving all earlier scientific and safety constraints.

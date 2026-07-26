@@ -69,6 +69,10 @@ CANONICAL_ORDER_ARCHIVES = {
         "d3fe5fa477d68d6730248d634e1bd37ae4838839d78709ef355d9d9c6749fea4",
         492720741,
     ),
+    ("SOLUSDT", "2023-11"): (
+        "188c3145ecaab1cf546318c293fb4fef0e320a6dc05b14eea013a46209ebbd73",
+        535864305,
+    ),
 }
 ORDER_RECORD = struct.Struct(">qqdd")
 ORDER_CHUNK_RECORDS = 250_000

@@ -46,6 +46,7 @@ def archive(
             output.writestr(extra, "")
     return path
 
+
 def may_2023_archive(tmp_path: Path, rows: list[list[str]], name: str = "may-2023.zip") -> Path:
     path = tmp_path / name
     with zipfile.ZipFile(path, "w") as output:
@@ -64,15 +65,34 @@ def parquet_bytes(frame: subject.pl.DataFrame) -> bytes:
 def aggtrades_scratch_entries(root: Path) -> list[Path]:
     scratch = subject.scratch_path(root)
     return sorted(scratch.glob(".aggtrades-*")) if scratch.exists() else []
+
+
 MAY_2023_START_MS = 1_682_899_200_000
 
 
-def allow_may_2023_order(
-    monkeypatch: pytest.MonkeyPatch, source: Path
-) -> tuple[str, int]:
+def allow_may_2023_order(monkeypatch: pytest.MonkeyPatch, source: Path) -> tuple[str, int]:
     identity = (subject.file_sha256(source), source.stat().st_size)
     monkeypatch.setitem(subject.CANONICAL_ORDER_ARCHIVES, ("BTCUSDT", "2023-05"), identity)
     return identity
+
+SOL_NOVEMBER_2023_START_MS = 1_698_796_800_000
+
+
+def sol_november_2023_archive(tmp_path: Path, rows: list[list[str]]) -> Path:
+    return archive(
+        tmp_path,
+        rows,
+        member="SOLUSDT-aggTrades-2023-11.csv",
+    )
+
+
+def allow_sol_november_2023_order(
+    monkeypatch: pytest.MonkeyPatch, source: Path
+) -> tuple[str, int]:
+    identity = (subject.file_sha256(source), source.stat().st_size)
+    monkeypatch.setitem(subject.CANONICAL_ORDER_ARCHIVES, ("SOLUSDT", "2023-11"), identity)
+    return identity
+
 
 def authenticated_archive_receipt(source: Path) -> dict[str, int | str]:
     return {"sha256": subject.file_sha256(source), "byte_count": source.stat().st_size}
@@ -364,6 +384,8 @@ def test_production_parser_streams_without_filesystem_scratch(tmp_path: Path) ->
     assert frame["volume"].to_list() == [5.0, 0.0, 4.0]
     assert facts["first_trade"] == (1704067200000, 1)
     assert _tree_snapshot(tmp_path) == before
+
+
 def test_allowlisted_may_2023_interleaving_matches_ordered_frame_and_parquet(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -414,16 +436,157 @@ def test_allowlisted_may_2023_interleaving_matches_ordered_frame_and_parquet(
     assert aggtrades_scratch_entries(scratch) == []
     assert archive_opens == 1
 
-def test_standard_archive_parsing_authenticates_and_parses_the_same_open_inode(
+
+def test_sol_november_2023_production_identity_is_exact() -> None:
+    assert subject.CANONICAL_ORDER_ARCHIVES[("SOLUSDT", "2023-11")] == (
+        "188c3145ecaab1cf546318c293fb4fef0e320a6dc05b14eea013a46209ebbd73",
+        535864305,
+    )
+
+
+def test_authenticated_sol_november_2023_identity_canonicalizes_interleaving(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    scratch = tmp_path / "scratch"
+    scratch.mkdir()
+    source = sol_november_2023_archive(
+        tmp_path,
+        [
+            ["2", "11", "2", "2", "2", str(SOL_NOVEMBER_2023_START_MS + 100), "TRUE"],
+            ["1", "10", "1", "1", "1", str(SOL_NOVEMBER_2023_START_MS), "FALSE"],
+            ["3", "12", "3", "3", "3", str(SOL_NOVEMBER_2023_START_MS + 1000), "FALSE"],
+        ],
+    )
+    allow_sol_november_2023_order(monkeypatch, source)
+    frame, _ = subject.frame_from_archive(
+        source,
+        "SOLUSDT",
+        SOL_NOVEMBER_2023_START_MS,
+        SOL_NOVEMBER_2023_START_MS + 2000,
+        None,
+        "2023-11",
+        scratch,
+        authenticated_archive_receipt(source),
+    )
+    assert frame["open"].to_list() == [10.0, 12.0]
+    assert frame["high"].to_list() == [11.0, 12.0]
+    assert frame["low"].to_list() == [10.0, 12.0]
+    assert frame["close"].to_list() == [11.0, 12.0]
+    assert frame["volume"].to_list() == [3.0, 3.0]
+
+
+@pytest.mark.parametrize(
+    ("symbol", "month", "receipt", "identity"),
+    [
+        ("SOLUSDT", "2023-11", None, None),
+        ("SOLUSDT", "2023-11", {"sha256": "0" * 64, "byte_count": 0}, None),
+        ("SOLUSDT", "2023-11", {"sha256": "0" * 64}, None),
+        ("BTCUSDT", "2023-11", None, None),
+        ("SOLUSDT", "2023-10", None, None),
+        ("SOLUSDT", "2023-11", None, ("0" * 64, 0)),
+    ],
+)
+def test_sol_november_2023_unauthenticated_or_wrong_scope_cannot_canonicalize(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    symbol: str,
+    month: str,
+    receipt: dict[str, int | str] | None,
+    identity: tuple[str, int] | None,
+) -> None:
+    scratch = tmp_path / "scratch"
+    scratch.mkdir()
+    source = sol_november_2023_archive(
+        tmp_path,
+        [
+            ["2", "11", "2", "2", "2", str(SOL_NOVEMBER_2023_START_MS + 1), "FALSE"],
+            ["1", "10", "1", "1", "1", str(SOL_NOVEMBER_2023_START_MS), "FALSE"],
+        ],
+    )
+    allow_sol_november_2023_order(monkeypatch, source)
+    if identity is not None:
+        monkeypatch.setitem(subject.CANONICAL_ORDER_ARCHIVES, ("SOLUSDT", "2023-11"), identity)
+    with pytest.raises(subject.AcquisitionError):
+        subject.frame_from_archive(
+            source,
+            symbol,
+            SOL_NOVEMBER_2023_START_MS,
+            SOL_NOVEMBER_2023_START_MS + 1000,
+            None,
+            month,
+            scratch,
+            receipt,
+        )
+
+def test_sol_november_2023_wrong_byte_count_receipt_cannot_canonicalize(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    scratch = tmp_path / "scratch"
+    scratch.mkdir()
+    source = sol_november_2023_archive(
+        tmp_path,
+        [
+            ["2", "11", "11", "11", "2", str(SOL_NOVEMBER_2023_START_MS + 1), "FALSE"],
+            ["1", "10", "10", "10", "1", str(SOL_NOVEMBER_2023_START_MS), "FALSE"],
+        ],
+    )
+    allow_sol_november_2023_order(monkeypatch, source)
+    receipt = authenticated_archive_receipt(source)
+    receipt["byte_count"] += 1
+    with pytest.raises(subject.AcquisitionError, match=r"^archive_receipt_invalid$"):
+        subject.frame_from_archive(
+            source,
+            "SOLUSDT",
+            SOL_NOVEMBER_2023_START_MS,
+            SOL_NOVEMBER_2023_START_MS + 1000,
+            None,
+            "2023-11",
+            scratch,
+            receipt,
+        )
+
+@pytest.mark.parametrize(
+    "rows",
+    [
+        [
+            ["2", "11", "2", "2", "2", str(SOL_NOVEMBER_2023_START_MS + 1), "FALSE"],
+            ["1", "10", "1", "1", "1", str(SOL_NOVEMBER_2023_START_MS), "FALSE"],
+            ["1", "12", "3", "3", "3", str(SOL_NOVEMBER_2023_START_MS + 2), "FALSE"],
+        ],
+        [
+            ["2", "11", "2", "2", "2", str(SOL_NOVEMBER_2023_START_MS), "FALSE"],
+            ["1", "10", "1", "1", "1", str(SOL_NOVEMBER_2023_START_MS + 1), "FALSE"],
+        ],
+    ],
+)
+def test_sol_november_2023_canonicalization_rejects_duplicate_ids_and_timestamp_regression(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, rows: list[list[str]]
+) -> None:
+    scratch = tmp_path / "scratch"
+    scratch.mkdir()
+    source = sol_november_2023_archive(tmp_path, rows)
+    allow_sol_november_2023_order(monkeypatch, source)
+    with pytest.raises(subject.AcquisitionError, match=r"^archive_trade_order_invalid$"):
+        subject.frame_from_archive(
+            source,
+            "SOLUSDT",
+            SOL_NOVEMBER_2023_START_MS,
+            SOL_NOVEMBER_2023_START_MS + 1000,
+            None,
+            "2023-11",
+            scratch,
+            authenticated_archive_receipt(source),
+        )
+
+
+def test_standard_archive_parsing_never_uses_path_replacement_after_authentication(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     replacement = archive(
         tmp_path,
         [["1", "99", "1", "1", "1", "1704067200000", "False"]],
     ).rename(tmp_path / "replacement.zip")
-    source = archive(
-        tmp_path, [["1", "10", "1", "1", "1", "1704067200000", "False"]]
-    )
+    source = archive(tmp_path, [["1", "10", "1", "1", "1", "1704067200000", "False"]])
     receipt = authenticated_archive_receipt(source)
     backup = tmp_path / "authenticated.zip"
     original_identity = subject.opened_file_identity
@@ -435,19 +598,29 @@ def test_standard_archive_parsing_authenticates_and_parses_the_same_open_inode(
         return identity
 
     monkeypatch.setattr(subject, "opened_file_identity", replace_after_hash)
-    frame, _ = subject.frame_from_archive(
-        source, "BTCUSDT", 1704067200000, 1704067201000, None, "2024-01", None, receipt
-    )
-    assert frame["open"].to_list() == [10.0]
+    try:
+        frame, _ = subject.frame_from_archive(
+            source, "BTCUSDT", 1704067200000, 1704067201000, None, "2024-01", None, receipt
+        )
+    except subject.AcquisitionError as exc:
+        assert str(exc) == "unsafe_file"
+    else:
+        assert frame["open"].to_list() == [10.0]
+    assert subject.file_sha256(backup) == receipt["sha256"]
+    assert subject.file_sha256(source) != receipt["sha256"]
 
 
 def test_invalid_supplied_archive_receipt_fails_closed(tmp_path: Path) -> None:
-    source = archive(
-        tmp_path, [["1", "1", "1", "1", "1", "1704067200000", "False"]]
-    )
+    source = archive(tmp_path, [["1", "1", "1", "1", "1", "1704067200000", "False"]])
     with pytest.raises(subject.AcquisitionError, match=r"^archive_receipt_invalid$"):
         subject.frame_from_archive(
-            source, "BTCUSDT", 1704067200000, 1704067201000, None, "2024-01", None,
+            source,
+            "BTCUSDT",
+            1704067200000,
+            1704067201000,
+            None,
+            "2024-01",
+            None,
             {"sha256": "0" * 64, "byte_count": 0},
         )
 
@@ -477,6 +650,8 @@ def test_may_2023_interleaving_without_exact_identity_rejects_without_scratch(
             authenticated_archive_receipt(source),
         )
     assert _tree_snapshot(tmp_path) == before
+
+
 def test_allowlisted_identity_without_receipt_stays_strict_without_scratch(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -520,6 +695,7 @@ def test_allowlisted_identity_with_receipt_requires_scratch_root(
             archive_receipt=authenticated_archive_receipt(source),
         )
 
+
 def test_ordered_archive_with_explicit_scratch_root_stays_on_zero_scratch_streaming_path(
     tmp_path: Path,
 ) -> None:
@@ -547,6 +723,7 @@ def test_ordered_archive_with_explicit_scratch_root_stays_on_zero_scratch_stream
     assert frame["open"].to_list() == [10.0]
     assert frame["close"].to_list() == [11.0]
     assert _tree_snapshot(tmp_path) == before
+
 
 @pytest.mark.parametrize(
     "rows",
@@ -584,13 +761,22 @@ def test_allowlisted_may_2023_rejects_duplicate_ids_and_post_sort_timestamp_regr
         )
     assert _tree_snapshot(tmp_path) == before
 
+
 def test_allowlisted_external_merge_uses_packed_bounded_chunks_and_fan_in(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     scratch = tmp_path / "scratch"
     scratch.mkdir()
     rows = [
-        [str(index), str(index + 10), "1", str(index), str(index), str(MAY_2023_START_MS + index), "FALSE"]
+        [
+            str(index),
+            str(index + 10),
+            "1",
+            str(index),
+            str(index),
+            str(MAY_2023_START_MS + index),
+            "FALSE",
+        ]
         for index in (5, 4, 3, 2, 1)
     ]
     source = may_2023_archive(tmp_path, rows)
@@ -605,8 +791,7 @@ def test_allowlisted_external_merge_uses_packed_bounded_chunks_and_fan_in(
     def observe_fsync(path: Path) -> None:
         original_fsync(path)
         observed_chunk_sizes.extend(
-            item.stat().st_size
-            for item in subject.scratch_path(scratch).glob(".aggtrades-chunk-*")
+            item.stat().st_size for item in subject.scratch_path(scratch).glob(".aggtrades-chunk-*")
         )
 
     def observe_heapify(values: list[object]) -> None:
@@ -657,10 +842,18 @@ def test_canonical_merge_failure_and_stale_direct_file_leave_no_owned_residue(
     monkeypatch.setattr(subject.heapq, "heappop", merge_failure)
     with pytest.raises(subject.AcquisitionError, match=r"^archive_order_canonicalization_failed$"):
         subject.frame_from_archive(
-            source, "BTCUSDT", MAY_2023_START_MS, MAY_2023_START_MS + 1000, None,
-            "2023-05", scratch, authenticated_archive_receipt(source),
+            source,
+            "BTCUSDT",
+            MAY_2023_START_MS,
+            MAY_2023_START_MS + 1000,
+            None,
+            "2023-05",
+            scratch,
+            authenticated_archive_receipt(source),
         )
     assert aggtrades_scratch_entries(scratch) == []
+
+
 def test_canonical_primary_failure_keeps_cleanup_failure_note(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -703,6 +896,7 @@ def test_canonical_primary_failure_keeps_cleanup_failure_note(
         for note in getattr(raised.value, "__notes__", ())
     )
 
+
 def test_canonical_merge_removal_failure_is_retried_by_finalizer(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -730,9 +924,7 @@ def test_canonical_merge_removal_failure_is_retried_by_finalizer(
             tracked.add(path)
         return identity
 
-    def fail_first_removal(
-        path: Path, identity: tuple[int, int] | None = None
-    ) -> None:
+    def fail_first_removal(path: Path, identity: tuple[int, int] | None = None) -> None:
         nonlocal failed
         attempts[path] = attempts.get(path, 0) + 1
         if not failed:
@@ -744,8 +936,14 @@ def test_canonical_merge_removal_failure_is_retried_by_finalizer(
     monkeypatch.setattr(subject, "remove_aggtrades_file", fail_first_removal)
     with pytest.raises(subject.AcquisitionError, match=r"^archive_order_canonicalization_failed$"):
         subject.frame_from_archive(
-            source, "BTCUSDT", MAY_2023_START_MS, MAY_2023_START_MS + 1000, None,
-            "2023-05", scratch, authenticated_archive_receipt(source),
+            source,
+            "BTCUSDT",
+            MAY_2023_START_MS,
+            MAY_2023_START_MS + 1000,
+            None,
+            "2023-05",
+            scratch,
+            authenticated_archive_receipt(source),
         )
     assert failed
     assert set(attempts) == tracked
@@ -772,19 +970,32 @@ def test_pre_sink_identity_failure_closes_descriptor_and_is_stale_cleaned(
 
     def descriptor_count() -> int:
         return len(list(Path("/proc/self/fd").iterdir()))
+
     before = descriptor_count()
     monkeypatch.setattr(subject, "scratch_file_identity", pre_sink_identity)
     with pytest.raises(subject.AcquisitionError, match=r"^injected_identity_failure$"):
         subject.frame_from_archive(
-            source, "BTCUSDT", MAY_2023_START_MS, MAY_2023_START_MS + 1000, None,
-            "2023-05", scratch, authenticated_archive_receipt(source),
+            source,
+            "BTCUSDT",
+            MAY_2023_START_MS,
+            MAY_2023_START_MS + 1000,
+            None,
+            "2023-05",
+            scratch,
+            authenticated_archive_receipt(source),
         )
     assert descriptor_count() == before
     assert aggtrades_scratch_entries(scratch)
     monkeypatch.setattr(subject, "scratch_file_identity", original_identity)
     subject.frame_from_archive(
-        source, "BTCUSDT", MAY_2023_START_MS, MAY_2023_START_MS + 1000, None,
-        "2023-05", scratch, authenticated_archive_receipt(source),
+        source,
+        "BTCUSDT",
+        MAY_2023_START_MS,
+        MAY_2023_START_MS + 1000,
+        None,
+        "2023-05",
+        scratch,
+        authenticated_archive_receipt(source),
     )
     assert aggtrades_scratch_entries(scratch) == []
 
@@ -808,24 +1019,35 @@ def test_cleanup_failure_is_recovered_before_the_next_authenticated_canonicaliza
     )
     with pytest.raises(subject.AcquisitionError, match=r"^archive_order_canonicalization_failed$"):
         subject.frame_from_archive(
-            source, "BTCUSDT", MAY_2023_START_MS, MAY_2023_START_MS + 1000, None,
-            "2023-05", scratch, authenticated_archive_receipt(source),
+            source,
+            "BTCUSDT",
+            MAY_2023_START_MS,
+            MAY_2023_START_MS + 1000,
+            None,
+            "2023-05",
+            scratch,
+            authenticated_archive_receipt(source),
         )
     assert aggtrades_scratch_entries(scratch)
     monkeypatch.setattr(subject, "remove_aggtrades_file", original_remove)
     subject.frame_from_archive(
-        source, "BTCUSDT", MAY_2023_START_MS, MAY_2023_START_MS + 1000, None,
-        "2023-05", scratch, authenticated_archive_receipt(source),
+        source,
+        "BTCUSDT",
+        MAY_2023_START_MS,
+        MAY_2023_START_MS + 1000,
+        None,
+        "2023-05",
+        scratch,
+        authenticated_archive_receipt(source),
     )
     assert aggtrades_scratch_entries(scratch) == []
+
 
 @pytest.mark.parametrize(
     "kind",
     ("directory", "wrong_mode", "special_mode", "hardlink"),
 )
-def test_unsafe_aggtrades_scratch_entry_rejects_without_mutation(
-    tmp_path: Path, kind: str
-) -> None:
+def test_unsafe_aggtrades_scratch_entry_rejects_without_mutation(tmp_path: Path, kind: str) -> None:
     scratch = tmp_path / "scratch"
     scratch.mkdir()
     owned_scratch = subject.scratch_directory(scratch)
@@ -846,6 +1068,7 @@ def test_unsafe_aggtrades_scratch_entry_rejects_without_mutation(
     with pytest.raises(subject.AcquisitionError, match=r"^unsafe_scratch_entry$"):
         subject.scratch_directory(scratch)
     assert _lstat_tree_snapshot(tmp_path) == before
+
 
 @pytest.mark.parametrize(
     ("source_factory", "error"),
@@ -906,6 +1129,8 @@ def test_allowlisted_branch_preserves_parse_precedence_and_cleans_order_scratch(
         )
     assert aggtrades_scratch_entries(scratch) == []
     assert _tree_snapshot(tmp_path) == before
+
+
 def test_validate_complete_propagates_authenticated_archive_identity(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -925,6 +1150,7 @@ def test_validate_complete_propagates_authenticated_archive_identity(
     archive_path = report / "provenance/archives/BTCUSDT/BTCUSDT-aggTrades-2024-01.zip"
     assert len(calls) == 1
     assert calls[0][7] == subject.read_json(archive_path.with_suffix(".zip.receipt.json"))
+
 
 @pytest.mark.parametrize(
     "member,extra_members,mode",
@@ -1147,10 +1373,7 @@ def test_production_parser_rejects_unicode_integer_tokens(tmp_path: Path, index:
     row[index] = (
         "\u0661"
         if index != 5
-        else (
-            "\u0661\u0667\u0660\u0664\u0660\u0666\u0667\u0662"
-            "\u0660\u0660\u0660\u0660\u0660"
-        )
+        else ("\u0661\u0667\u0660\u0664\u0660\u0666\u0667\u0662\u0660\u0660\u0660\u0660\u0660")
     )
     with pytest.raises(subject.AcquisitionError, match="value_or_month_bounds"):
         subject.frame_from_archive(
@@ -1161,15 +1384,15 @@ def test_production_parser_rejects_unicode_integer_tokens(tmp_path: Path, index:
             None,
             "2024-01",
         )
+
+
 @pytest.mark.parametrize("index", range(7))
 def test_production_parser_empty_fields_take_null_schema_precedence(
     tmp_path: Path, index: int
 ) -> None:
     row = ["1", "1", "1", "1", "1", "1704067200000", "FALSE"]
     row[index] = ""
-    with pytest.raises(
-        subject.AcquisitionError, match=r"^archive_csv_null_or_schema_invalid$"
-    ):
+    with pytest.raises(subject.AcquisitionError, match=r"^archive_csv_null_or_schema_invalid$"):
         subject.frame_from_archive(
             archive(tmp_path, [row]),
             "BTCUSDT",
@@ -1178,7 +1401,6 @@ def test_production_parser_empty_fields_take_null_schema_precedence(
             None,
             "2024-01",
         )
-
 
 
 @pytest.mark.parametrize(
@@ -2529,9 +2751,7 @@ def test_manifest_rejects_same_inode_same_size_mutation_during_hash(
     def mutate_during_hash(source: io.BufferedReader, algorithm: str) -> object:
         before = artifact.stat()
         artifact.write_bytes(b"after!")
-        os.utime(
-            artifact, ns=(before.st_atime_ns, before.st_mtime_ns + 1_000_000_000)
-        )
+        os.utime(artifact, ns=(before.st_atime_ns, before.st_mtime_ns + 1_000_000_000))
         after = artifact.stat()
         assert (after.st_dev, after.st_ino, after.st_size) == (
             before.st_dev,
@@ -2580,13 +2800,14 @@ def test_main_preserves_ambient_plan_and_verify_locks(
             "--output-root",
             str(tmp_path / "output"),
         ]
-        assert subject.main(
-            [*common, "--report-dir", str(tmp_path / "plan-report")]
-        ) == 0
+        assert subject.main([*common, "--report-dir", str(tmp_path / "plan-report")]) == 0
         assert subject._ACTIVE_EXECUTE_LOCK.get() is ambient
-        assert subject.main(
-            [*common, "--report-dir", str(tmp_path / "verify-report"), "--verify-eligible"]
-        ) == 0
+        assert (
+            subject.main(
+                [*common, "--report-dir", str(tmp_path / "verify-report"), "--verify-eligible"]
+            )
+            == 0
+        )
         assert subject._ACTIVE_EXECUTE_LOCK.get() is ambient
         assert ambient.close_count == 0
     finally:
@@ -2605,6 +2826,7 @@ def test_release_execute_lock_closes_nested_execute_lock_once() -> None:
     local = Lock()
     token = subject._ACTIVE_EXECUTE_LOCK.set(ambient)
     try:
+
         @subject.release_execute_lock
         def nested_execute() -> None:
             assert subject._ACTIVE_EXECUTE_LOCK.get() is None
@@ -2661,6 +2883,7 @@ def test_main_isolates_verifier_context_through_deep_execute_path(
         subject._VERIFIER_CODE_FD.reset(token)
         os.close(descriptor)
 
+
 def test_code_hash_uses_inherited_verifier_descriptor() -> None:
     descriptor = os.open(_MODULE, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
     token = subject._VERIFIER_CODE_FD.set(descriptor)
@@ -2681,9 +2904,7 @@ def test_stable_file_rejects_same_size_in_place_mutation(tmp_path: Path) -> None
         subject.stable_file(target) as source,
     ):
         target.write_bytes(b"after!")
-        os.utime(
-            target, ns=(original_stat.st_atime_ns, original_stat.st_mtime_ns + 1)
-        )
+        os.utime(target, ns=(original_stat.st_atime_ns, original_stat.st_mtime_ns + 1))
         assert source.read() == b"after!"
 
 
