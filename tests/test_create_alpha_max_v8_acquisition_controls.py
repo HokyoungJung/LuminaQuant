@@ -65,6 +65,7 @@ def test_stable_regular_read_rejects_symlink_and_accepts_exact_file(tmp_path: Pa
     assert content == b"content"
     assert info.st_size == len(content)
 
+
 def test_freeze_executes_pinned_fd_and_rejects_replaced_pathname(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
@@ -75,11 +76,7 @@ def test_freeze_executes_pinned_fd_and_rejects_replaced_pathname(
     shutil.copyfile(sys.executable, interpreter)
     interpreter.chmod(0o500)
     expected = module._file(interpreter)
-    replacement.write_text(
-        "#!/bin/sh\n"
-        f"printf replacement > {replacement_marker!s}\n"
-        "exit 1\n"
-    )
+    replacement.write_text(f"#!/bin/sh\nprintf replacement > {replacement_marker!s}\nexit 1\n")
     replacement.chmod(0o500)
     real_run = module.subprocess.run
     calls = 0
@@ -99,8 +96,9 @@ def test_freeze_executes_pinned_fd_and_rejects_replaced_pathname(
     assert not replacement_marker.exists()
 
 
-
-def test_durable_writer_handles_partial_writes_and_removes_failed_leaf(tmp_path: Path, monkeypatch):
+def test_durable_writer_handles_partial_writes_and_preserves_failed_leaf(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     module = _module()
     original_write = module.os.write
     calls = 0
@@ -115,7 +113,120 @@ def test_durable_writer_handles_partial_writes_and_removes_failed_leaf(tmp_path:
     monkeypatch.setattr(module.os, "write", partial)
     with pytest.raises(OSError):
         module._write_bytes_new(tmp_path / "failure.bin", b"long value")
-    assert not (tmp_path / "failure.bin").exists()
+    assert (tmp_path / "failure.bin").read_bytes() == b"l"
+
+
+def test_durable_writer_preserves_preexisting_leaf(tmp_path: Path):
+    module = _module()
+    path = tmp_path / "existing.bin"
+    path.write_bytes(b"original")
+    before = (path.stat().st_dev, path.stat().st_ino, path.read_bytes())
+    with pytest.raises(FileExistsError):
+        module._write_bytes_new(path, b"replacement")
+    assert (path.stat().st_dev, path.stat().st_ino, path.read_bytes()) == before
+
+
+def test_complete_publication_is_atomic_and_no_replace(tmp_path: Path):
+    module = _module()
+    control = tmp_path / "control"
+    control.mkdir(mode=0o700)
+    first = {
+        "schema": "alpha_max_v8_acquisition_complete.v3",
+        "launch_performed": False,
+        "manifest_sha256": "a" * 64,
+    }
+    identity = module._publish_complete(control, first)
+    complete = control / "COMPLETE.json"
+    pending = control / ".COMPLETE.json.pending"
+    assert module._load_canonical(complete) == first
+    assert module._file(complete) == identity
+    assert not pending.exists()
+
+    second = {**first, "manifest_sha256": "b" * 64}
+    before = (complete.stat().st_dev, complete.stat().st_ino, complete.read_bytes())
+    with pytest.raises(FileExistsError):
+        module._publish_complete(control, second)
+    assert (complete.stat().st_dev, complete.stat().st_ino, complete.read_bytes()) == before
+    assert module._load_canonical(pending) == second
+
+
+def test_complete_prepublication_failure_never_creates_final_marker(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    module = _module()
+    control = tmp_path / "control"
+    control.mkdir(mode=0o700)
+    real_write = module._write_new
+
+    def fail_pending(path: Path, value: object):
+        if path.name == ".COMPLETE.json.pending":
+            path.write_bytes(b"{")
+            path.chmod(0o600)
+            raise OSError("injected pending write failure")
+        return real_write(path, value)
+
+    monkeypatch.setattr(module, "_write_new", fail_pending)
+    with pytest.raises(OSError, match="pending write failure"):
+        module._publish_complete(
+            control,
+            {
+                "schema": "alpha_max_v8_acquisition_complete.v3",
+                "launch_performed": False,
+                "manifest_sha256": "a" * 64,
+            },
+        )
+    assert not (control / "COMPLETE.json").exists()
+    assert (control / ".COMPLETE.json.pending").read_bytes() == b"{"
+
+
+def test_quarantine_truthfully_records_present_completion_marker(tmp_path: Path):
+    module = _module()
+    control = tmp_path / "control"
+    control.mkdir(mode=0o700)
+    (control / "COMPLETE.json").write_bytes(b"{")
+    module._quarantine(
+        control,
+        {"control_root": module._directory(control, private=True)},
+        RuntimeError("injected terminal publication failure"),
+    )
+    failure = module._load_canonical(control / "FAILED.json")
+    assert failure["complete_absent"] is False
+
+
+def test_key_bindings_use_one_snapshot_and_reject_late_replacement(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    module = _module()
+    root = tmp_path / "keys"
+    root.mkdir(mode=0o700)
+    originals = {}
+    for name in ("authority", *module._SCOPES):
+        for kind in ("private", "public"):
+            data = f"{name}-{kind}".encode().ljust(32, b"_")
+            path = root / f"{name}.{kind}"
+            path.write_bytes(data)
+            path.chmod(0o400)
+            originals[(name, kind)] = data
+    replacement = tmp_path / "replacement.public"
+    replacement.write_bytes(b"replacement-public".ljust(32, b"_"))
+    replacement.chmod(0o400)
+    real_read = module._read_regular
+    replaced = False
+
+    def replace_after_snapshot(path: Path):
+        nonlocal replaced
+        info, data = real_read(path)
+        if Path(path).name == "authority.public" and not replaced:
+            replaced = True
+            os.replace(replacement, path)
+        return info, data
+
+    monkeypatch.setattr(module, "_read_regular", replace_after_snapshot)
+    authority, _, summary, key_files = module._key_bindings(root)
+    assert authority["key_id"] == module._sha(originals[("authority", "public")])
+    assert summary["keys"][0]["public"] == key_files[0]["public"]
+    with pytest.raises(ValueError, match="terminal key identity drift"):
+        module._revalidate_key_files(key_files)
 
 
 def test_inventory_includes_untracked_content_type_mode_and_size(tmp_path: Path, monkeypatch):
@@ -232,14 +343,15 @@ def test_import_is_stdlib_only_and_policy_constants_are_local():
     assert module.G067_IDENTITY["checksum_sha256"] != module.G067_IDENTITY["archive_sha256"]
 
 
-def test_authenticated_policy_load_registers_module_for_dataclasses_and_rejects_existing_name(
-    tmp_path: Path,
+def test_authenticated_policy_and_key_creator_use_only_captured_modules(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
     module = _module()
     policy = tmp_path / "policy.py"
     policy.write_text(
         "from dataclasses import dataclass\n"
         "@dataclass\nclass Value:\n    value: int\n"
+        "source_sha256='verified-policy'\n"
         "_SCOPES=('acquisition','phase_preparation','one_touch')\n"
         f"_FILE_ROLES={module._FILE_ROLES!r}\n"
         f"_FORBIDDEN_ROOTS={module._FORBIDDEN_ROOTS!r}\n"
@@ -250,14 +362,46 @@ def test_authenticated_policy_load_registers_module_for_dataclasses_and_rejects_
     assert sys.modules["alpha_max_v8_verified_policy"] is loaded
     with pytest.raises(ValueError, match="already registered"):
         module._load_policy(policy, module._file(policy))
-    sys.modules.pop("alpha_max_v8_verified_policy", None)
+
+    ambient = tmp_path / "ambient" / "lumina_quant"
+    ambient.mkdir(parents=True)
+    malicious_marker = tmp_path / "ambient-policy-executed"
+    (ambient / "__init__.py").write_text(
+        f"from pathlib import Path\nPath({str(malicious_marker)!r}).write_text('bad')\n"
+    )
+    monkeypatch.syspath_prepend(str(ambient.parent))
+    monkeypatch.delitem(sys.modules, "lumina_quant", raising=False)
+    monkeypatch.delitem(sys.modules, "lumina_quant.alpha_max_terminal_policy", raising=False)
     creator_file = tmp_path / "creator.py"
-    creator_file.write_text("def create_keys(root):\n    (root / 'created').write_text('yes')\n")
+    creator_file.write_text(
+        "from lumina_quant import alpha_max_terminal_policy as policy\n"
+        "def create_keys(root):\n"
+        "    (root / 'created').write_text(policy.source_sha256)\n"
+    )
     sys.modules.pop("alpha_max_v8_verified_key_creator", None)
-    creator = module._load_key_creator(creator_file, module._file(creator_file))
+    creator = module._load_key_creator(creator_file, module._file(creator_file), loaded)
     creator(tmp_path)
-    assert (tmp_path / "created").read_text() == "yes"
+    assert (tmp_path / "created").read_text() == "verified-policy"
+    assert not malicious_marker.exists()
+    assert "lumina_quant" not in sys.modules
+    assert "lumina_quant.alpha_max_terminal_policy" not in sys.modules
     sys.modules.pop("alpha_max_v8_verified_key_creator", None)
+    sys.modules.pop("alpha_max_v8_verified_policy", None)
+
+
+def test_authenticated_key_creator_rejects_ambient_dependency(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    module = _module()
+    creator_file = tmp_path / "creator.py"
+    creator_file.write_text(
+        "from lumina_quant import alpha_max_terminal_policy as policy\n"
+        "def create_keys(root):\n    pass\n"
+    )
+    monkeypatch.setitem(sys.modules, "lumina_quant", SimpleNamespace())
+    with pytest.raises(ValueError, match="dependency already registered"):
+        module._load_key_creator(creator_file, module._file(creator_file), SimpleNamespace())
+    assert "alpha_max_v8_verified_key_creator" not in sys.modules
 
 
 def test_authenticated_module_is_removed_after_execution_failure(tmp_path: Path):
@@ -267,6 +411,20 @@ def test_authenticated_module_is_removed_after_execution_failure(tmp_path: Path)
     sys.modules.pop("alpha_max_v8_verified_policy", None)
     with pytest.raises(RuntimeError, match="boom"):
         module._load_policy(broken, module._file(broken))
+    assert "alpha_max_v8_verified_policy" not in sys.modules
+
+
+def test_policy_semantic_rejection_removes_authenticated_alias(tmp_path: Path):
+    module = _module()
+    policy = tmp_path / "bad-policy.py"
+    policy.write_text(
+        "_SCOPES=()\n"
+        f"_FILE_ROLES={module._FILE_ROLES!r}\n"
+        f"_FORBIDDEN_ROOTS={module._FORBIDDEN_ROOTS!r}\n"
+    )
+    sys.modules.pop("alpha_max_v8_verified_policy", None)
+    with pytest.raises(ValueError, match="constants mismatch"):
+        module._load_policy(policy, module._file(policy))
     assert "alpha_max_v8_verified_policy" not in sys.modules
 
 
@@ -415,6 +573,7 @@ def test_build_assembles_private_artifacts_without_launching(
             "packages": [],
         },
     )
+
     def executable_pin(name: str, path: Path, freeze: dict[str, object] | None = None):
         identity = module._file(path)
         pin = {
@@ -444,7 +603,7 @@ def test_build_assembles_private_artifacts_without_launching(
                 path.write_bytes(f"{name}-{kind}".encode().ljust(32, b"_"))
                 path.chmod(0o400)
 
-    monkeypatch.setattr(module, "_load_key_creator", lambda path, identity: create_keys)
+    monkeypatch.setattr(module, "_load_key_creator", lambda path, identity, policy: create_keys)
     policy = SimpleNamespace(source_sha256="policy-source")
 
     def load_checkpoint(path, loaded_policy):
@@ -573,30 +732,28 @@ def test_build_assembles_private_artifacts_without_launching(
     assert authority["InaccessiblePaths"] == [str(key_root)]
     assert observer["InaccessiblePaths"] == [str(key_root)]
     assert telemetry["InaccessiblePaths"] == [str(key_root)]
-    assert authority["LoadCredential"] == [
-        f"authority.private:{key_root / 'authority.private'}"
-    ]
-    assert observer["LoadCredential"] == [
-        f"acquisition.private:{key_root / 'acquisition.private'}"
-    ]
-    assert telemetry["LoadCredential"] == [
-        f"authority.public:{key_root / 'authority.public'}"
-    ]
+    assert authority["LoadCredential"] == [f"authority.private:{key_root / 'authority.private'}"]
+    assert observer["LoadCredential"] == [f"acquisition.private:{key_root / 'acquisition.private'}"]
+    assert telemetry["LoadCredential"] == [f"authority.public:{key_root / 'authority.public'}"]
     assert authority["ExecStart"][authority["ExecStart"].index("--private-key") + 1] == (
         "%d/authority.private"
     )
-    assert observer["ExecStart"][
-        observer["ExecStart"].index("--observer-private-key") + 1
-    ] == "%d/acquisition.private"
-    assert telemetry["ExecStart"][
-        telemetry["ExecStart"].index("--authority-public-key") + 1
-    ] == "%d/authority.public"
-    assert documents["manifest.json"]["executable_inputs"] == plan["executable_inputs"]
-    assert plan["executable_inputs"]["current_python"]["package_freeze_sha256"] == (
-        module.EXECUTABLE_PINS["current_python"]["package_freeze_sha256"]
+    assert (
+        observer["ExecStart"][observer["ExecStart"].index("--observer-private-key") + 1]
+        == "%d/acquisition.private"
     )
-    assert plan["executable_inputs"]["accepted_python"]["package_freeze_sha256"] == (
-        module.EXECUTABLE_PINS["accepted_python"]["package_freeze_sha256"]
+    assert (
+        telemetry["ExecStart"][telemetry["ExecStart"].index("--authority-public-key") + 1]
+        == "%d/authority.public"
+    )
+    assert documents["manifest.json"]["executable_inputs"] == plan["executable_inputs"]
+    assert (
+        plan["executable_inputs"]["current_python"]["package_freeze_sha256"]
+        == (module.EXECUTABLE_PINS["current_python"]["package_freeze_sha256"])
+    )
+    assert (
+        plan["executable_inputs"]["accepted_python"]["package_freeze_sha256"]
+        == (module.EXECUTABLE_PINS["accepted_python"]["package_freeze_sha256"])
     )
     assert launches == []
     substituted = make_args("e" * 64)

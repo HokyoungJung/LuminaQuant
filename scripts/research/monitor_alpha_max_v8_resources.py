@@ -692,6 +692,7 @@ def monitor(args, *, clock=time.monotonic, sleep=time.sleep) -> int:
                 except Exception as exc:
                     terminal_error = str(exc)
                     sample["terminal_state"] = "invalid"
+                    sample["reason"] = terminal_error
                 else:
                     sample["terminal_state"] = "valid"
                 _append(fd, sample)

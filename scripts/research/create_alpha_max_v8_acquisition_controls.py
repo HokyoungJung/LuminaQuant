@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import ctypes
 import hashlib
 import importlib.machinery
 import json
@@ -78,8 +79,8 @@ EXECUTABLE_PINS = {
     },
     "telemetry_script": {
         "path": "/home/hoky/Quants-agent/LuminaQuant/scripts/research/monitor_alpha_max_v8_resources.py",
-        "sha256": "17db931cd816e8ab46bb1db9d62eb9b207b147cbac99475196197684c205b383",
-        "byte_count": 28410,
+        "sha256": "66d8539bfc2f415690c89d44ebc3a396ad4b3f6c71da8e84e8670d20f4bb845a",
+        "byte_count": 28464,
         "mode": 0o600,
     },
 }
@@ -280,8 +281,7 @@ def _directory(path: Path, *, private: bool = False) -> dict[str, Any]:
     }
 
 
-def _file(path: Path) -> FileIdentity:
-    info, data = _read_regular(path)
+def _identity(path: Path, info: os.stat_result, data: bytes) -> FileIdentity:
     return {
         "path": str(path),
         "sha256": _sha(data),
@@ -293,6 +293,11 @@ def _file(path: Path) -> FileIdentity:
         "mode": stat.S_IMODE(info.st_mode),
         "nlink": info.st_nlink,
     }
+
+
+def _file(path: Path) -> FileIdentity:
+    info, data = _read_regular(path)
+    return _identity(path, info, data)
 
 
 def _absent(path: Path) -> dict[str, Any]:
@@ -550,7 +555,9 @@ def _validated_freeze(
     return freeze
 
 
-def _key_bindings(root: Path) -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, Any]]:
+def _key_bindings(
+    root: Path,
+) -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, Any], list[dict[str, Any]]]:
     expected = {
         f"{name}.{kind}" for name in ("authority", *_SCOPES) for kind in ("private", "public")
     }
@@ -562,20 +569,22 @@ def _key_bindings(root: Path) -> tuple[dict[str, Any], list[dict[str, Any]], dic
         os.close(fd)
     bindings = []
     public_files = []
+    key_files = []
     for name in ("authority", *_SCOPES):
         private = _file(root / f"{name}.private")
-        public_info, public = _read_regular(root / f"{name}.public")
-        public_file = _file(root / f"{name}.public")
+        public_path = root / f"{name}.public"
+        public_info, public = _read_regular(public_path)
+        public_file = _identity(public_path, public_info, public)
         if (private["mode"], private["st_uid"], private["nlink"], private["byte_count"]) != (
             0o400,
             os.getuid(),
             1,
             32,
         ) or (
-            stat.S_IMODE(public_info.st_mode),
-            public_info.st_uid,
-            public_info.st_nlink,
-            len(public),
+            public_file["mode"],
+            public_file["st_uid"],
+            public_file["nlink"],
+            public_file["byte_count"],
         ) != (0o400, os.getuid(), 1, 32):
             _fail("unsafe terminal key")
         digest = _sha(public)
@@ -587,6 +596,7 @@ def _key_bindings(root: Path) -> tuple[dict[str, Any], list[dict[str, Any]], dic
             }
         )
         public_files.append({"name": name, "public": public_file, "key_id": digest})
+        key_files.append({"name": name, "private": private, "public": public_file})
     if len({item["key_id"] for item in bindings}) != 4:
         _fail("duplicate keys")
     summary = {"schema": "alpha_max_v8_public_key_summary.v1", "keys": public_files}
@@ -594,7 +604,16 @@ def _key_bindings(root: Path) -> tuple[dict[str, Any], list[dict[str, Any]], dic
         bindings[0],
         [{"scope": scope, **item} for scope, item in zip(_SCOPES, bindings[1:])],
         summary,
+        key_files,
     )
+
+
+def _revalidate_key_files(key_files: list[dict[str, Any]]) -> None:
+    for item in key_files:
+        for kind in ("private", "public"):
+            identity = item[kind]
+            if _file(Path(identity["path"])) != identity:
+                _fail(f"terminal key identity drift: {item['name']}.{kind}")
 
 
 def _load_authenticated(path: Path, expected: FileIdentity, name: str):
@@ -631,8 +650,40 @@ def _load_authenticated(path: Path, expected: FileIdentity, name: str):
     return module
 
 
-def _load_key_creator(path: Path, expected: FileIdentity):
-    return _load_authenticated(path, expected, "alpha_max_v8_verified_key_creator").create_keys
+def _load_key_creator(path: Path, expected: FileIdentity, policy):
+    package_name = "lumina_quant"
+    policy_name = f"{package_name}.alpha_max_terminal_policy"
+    module_name = "alpha_max_v8_verified_key_creator"
+    if package_name in sys.modules or policy_name in sys.modules:
+        _fail("authenticated key-creator dependency already registered")
+    package_spec = importlib.machinery.ModuleSpec(package_name, loader=None, is_package=True)
+    package = types.ModuleType(package_name)
+    package.__package__ = package_name
+    package.__path__ = []
+    package.__spec__ = package_spec
+    package.alpha_max_terminal_policy = policy
+    sys.modules[package_name] = package
+    sys.modules[policy_name] = policy
+    try:
+        module = _load_authenticated(path, expected, module_name)
+        creator = getattr(module, "create_keys", None)
+        if (
+            module.__dict__.get("policy") is not policy
+            or not callable(creator)
+            or sys.modules.get(package_name) is not package
+            or sys.modules.get(policy_name) is not policy
+        ):
+            _fail("authenticated key-creator dependency drift")
+    except BaseException:
+        sys.modules.pop(module_name, None)
+        raise
+    finally:
+        policy_entry = sys.modules.pop(policy_name, None)
+        package_entry = sys.modules.pop(package_name, None)
+    if policy_entry is not policy or package_entry is not package:
+        sys.modules.pop(module_name, None)
+        _fail("authenticated key-creator dependency drift")
+    return creator
 
 
 def _unit(
@@ -686,13 +737,19 @@ def _unit(
 
 
 def _load_policy(path: Path, expected: FileIdentity):
-    module = _load_authenticated(path, expected, "alpha_max_v8_verified_policy")
-    if (
-        tuple(module._SCOPES) != _SCOPES
-        or tuple(module._FILE_ROLES) != _FILE_ROLES
-        or tuple(module._FORBIDDEN_ROOTS) != _FORBIDDEN_ROOTS
-    ):
-        _fail("authenticated policy constants mismatch")
+    name = "alpha_max_v8_verified_policy"
+    module = _load_authenticated(path, expected, name)
+    try:
+        if (
+            tuple(module._SCOPES) != _SCOPES
+            or tuple(module._FILE_ROLES) != _FILE_ROLES
+            or tuple(module._FORBIDDEN_ROOTS) != _FORBIDDEN_ROOTS
+        ):
+            _fail("authenticated policy constants mismatch")
+    except BaseException:
+        if sys.modules.get(name) is module:
+            sys.modules.pop(name)
+        raise
     return module
 
 
@@ -710,22 +767,80 @@ def _write_bytes_new(path: Path, data: bytes) -> dict[str, Any]:
         )
         _write_all(fd, data)
         os.fsync(fd)
+        written = os.fstat(fd)
+        identity = _identity(path, written, data)
         os.close(fd)
         fd = -1
         os.fsync(parent_fd)
-    except BaseException:
+        if _file(path) != identity:
+            _fail("created artifact identity drift")
+    except BaseException as primary:
+        cleanup_errors: list[BaseException] = []
         if fd >= 0:
-            os.close(fd)
+            try:
+                os.close(fd)
+            except BaseException as error:
+                cleanup_errors.append(error)
         try:
-            os.unlink(path.name, dir_fd=parent_fd)
-            os.fsync(parent_fd)
-        except FileNotFoundError:
-            pass
-        finally:
             os.close(parent_fd)
+        except BaseException as error:
+            cleanup_errors.append(error)
+        if cleanup_errors:
+            raise BaseExceptionGroup(
+                "artifact creation failed and descriptor cleanup failed",
+                [primary, *cleanup_errors],
+            ) from primary
         raise
     os.close(parent_fd)
-    return _file(path)
+    return identity
+
+
+def _rename_noreplace(directory_fd: int, source: str, destination: str) -> None:
+    if not source or not destination or "/" in source or "/" in destination:
+        _fail("invalid atomic publication leaf")
+    libc = ctypes.CDLL(None, use_errno=True)
+    try:
+        renameat2 = libc.renameat2
+    except AttributeError as exc:
+        raise RuntimeError("renameat2 is required for no-replace publication") from exc
+    renameat2.argtypes = (
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_uint,
+    )
+    renameat2.restype = ctypes.c_int
+    if (
+        renameat2(
+            directory_fd,
+            os.fsencode(source),
+            directory_fd,
+            os.fsencode(destination),
+            1,
+        )
+        != 0
+    ):
+        error = ctypes.get_errno()
+        raise OSError(error, os.strerror(error), destination)
+
+
+def _publish_complete(control: Path, value: dict[str, Any]) -> FileIdentity:
+    pending = control / ".COMPLETE.json.pending"
+    complete = control / "COMPLETE.json"
+    identity = _write_new(pending, value)
+    if _file(pending) != identity:
+        _fail("pending completion identity drift")
+    directory_fd = _open_directory(control)
+    try:
+        _rename_noreplace(directory_fd, pending.name, complete.name)
+        os.fsync(directory_fd)
+    finally:
+        os.close(directory_fd)
+    published = {**identity, "path": str(complete)}
+    if _file(complete) != published:
+        _fail("published completion identity drift")
+    return published
 
 
 _SERVICE_DIRECTIVES = frozenset(
@@ -849,6 +964,16 @@ def _quarantine(
         info = _directory(Path(identity["path"]), private=True)
         if (info["st_dev"], info["st_ino"]) == (identity["st_dev"], identity["st_ino"]):
             owned[name] = info
+    complete_fd = _open_directory(control)
+    try:
+        try:
+            os.stat("COMPLETE.json", dir_fd=complete_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            complete_absent = True
+        else:
+            complete_absent = False
+    finally:
+        os.close(complete_fd)
     failed = control / "FAILED.json"
     if not failed.exists():
         _write_new(
@@ -857,7 +982,7 @@ def _quarantine(
                 "schema": "alpha_max_v8_acquisition_failed.v1",
                 "error": type(error).__name__,
                 "created_roots": owned,
-                "complete_absent": True,
+                "complete_absent": complete_absent,
             },
         )
 
@@ -985,7 +1110,9 @@ def build(args: argparse.Namespace) -> dict[str, str]:
     telemetry_preflight = executable_inputs["telemetry_script"]
     role_files = {item["role"]: item["file"] for item in files}
     policy = _load_policy(Path(role_files["policy_module"]["path"]), role_files["policy_module"])
-    creator = _load_key_creator(Path(role_files["key_creator"]["path"]), role_files["key_creator"])
+    creator = _load_key_creator(
+        Path(role_files["key_creator"]["path"]), role_files["key_creator"], policy
+    )
     created: dict[str, dict[str, Any]] = {}
     try:
         for name in (
@@ -1000,7 +1127,7 @@ def build(args: argparse.Namespace) -> dict[str, str]:
         source, report = paths["output_parent"] / "source", paths["output_parent"] / "report"
         source_absence, report_absence = _absent(source), _absent(report)
         creator(paths["key_root"])
-        authority, observers, key_summary = _key_bindings(paths["key_root"])
+        authority, observers, key_summary, key_files = _key_bindings(paths["key_root"])
         if args.run_id in {
             authority["key_id"],
             *(item["key_id"] for item in observers),
@@ -1407,7 +1534,11 @@ def build(args: argparse.Namespace) -> dict[str, str]:
                     name: {
                         "file": identity,
                         **(
-                            {"package_freeze_sha256": EXECUTABLE_PINS[name]["package_freeze_sha256"]}
+                            {
+                                "package_freeze_sha256": EXECUTABLE_PINS[name][
+                                    "package_freeze_sha256"
+                                ]
+                            }
                             if "package_freeze_sha256" in EXECUTABLE_PINS[name]
                             else {}
                         ),
@@ -1491,6 +1622,7 @@ def build(args: argparse.Namespace) -> dict[str, str]:
                 _fail("interpreter identity revalidation failed")
         if _file(paths["telemetry_script"]) != telemetry_preflight:
             _fail("telemetry identity revalidation failed")
+        _revalidate_key_files(key_files)
         policy.load_policy(policy_path)
         policy.load_checkpoint(checkpoint_path, loaded_policy)
         policy.load_envelope(envelope_path, loaded_policy, loaded_checkpoint)
@@ -1503,15 +1635,7 @@ def build(args: argparse.Namespace) -> dict[str, str]:
         )
         _absent(source)
         _absent(report)
-        _write_new(
-            paths["control_root"] / "COMPLETE.json",
-            {
-                "schema": "alpha_max_v8_acquisition_complete.v3",
-                "launch_performed": False,
-                "manifest_sha256": _file(manifest)["sha256"],
-            },
-        )
-        return {
+        result = {
             "policy": str(policy_path),
             "checkpoint": str(checkpoint_path),
             "envelope": str(envelope_path),
@@ -1519,6 +1643,13 @@ def build(args: argparse.Namespace) -> dict[str, str]:
             "launch_plan": str(plan),
             "manifest": str(manifest),
         }
+        complete = {
+            "schema": "alpha_max_v8_acquisition_complete.v3",
+            "launch_performed": False,
+            "manifest_sha256": _file(manifest)["sha256"],
+        }
+        _publish_complete(paths["control_root"], complete)
+        return result
     except BaseException as error:
         _quarantine_or_reraise(
             paths["control_root"] if "control_root" in created else None, created, error

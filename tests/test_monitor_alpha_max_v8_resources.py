@@ -458,7 +458,10 @@ def test_monitor_pending_leaves_and_malformed_terminal_are_durable(tmp_path):
         v8.monitor(_monitor_args(root2, cg, acquisition2), clock=lambda: 0, sleep=lambda _: None)
         == 1
     )
-    assert json.loads((root2 / "stream").read_text().splitlines()[-1])["outcome"] == "failure"
+    malformed = [json.loads(line) for line in (root2 / "stream").read_text().splitlines()]
+    assert malformed[0]["terminal_state"] == "invalid"
+    assert malformed[0]["reason"] == malformed[-1]["reason"]
+    assert malformed[-1]["outcome"] == "failure"
     after = {
         path: (
             path.stat().st_dev,
