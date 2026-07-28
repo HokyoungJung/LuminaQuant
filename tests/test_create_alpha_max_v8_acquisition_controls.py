@@ -703,6 +703,20 @@ def test_build_assembles_private_artifacts_without_launching(
     assert documents["checkpoint.json"]["schema"] == "alpha_max_terminal_checkpoint.v1"
     assert documents["envelope.json"]["schema"] == "alpha_max_terminal_launch_envelope.v3"
     assert documents["acquisition-request.json"]["scope"] == "acquisition"
+    prerequisite_fields = {
+        "kind",
+        "path",
+        "sha256",
+        "byte_count",
+        "st_dev",
+        "st_ino",
+        "mode",
+        "nlink",
+    }
+    assert all(
+        set(item) == prerequisite_fields
+        for item in documents["acquisition-request.json"]["prerequisites"]
+    )
     assert documents["manifest.json"]["launch_performed"] is False
     assert not (Path(args.output_parent) / "source").exists()
     assert not (Path(args.output_parent) / "report").exists()

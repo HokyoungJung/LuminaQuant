@@ -326,6 +326,11 @@ def _file(path: Path) -> FileIdentity:
     return _identity(path, info, data)
 
 
+def _prerequisite(kind: str, item: FileIdentity) -> dict[str, Any]:
+    fields = ("path", "sha256", "byte_count", "st_dev", "st_ino", "mode", "nlink")
+    return {"kind": kind, **{field: item[field] for field in fields}}
+
+
 def _absent(path: Path) -> dict[str, Any]:
     path = _absolute(str(path))
     parent = _directory(path.parent)
@@ -1310,8 +1315,8 @@ def build(args: argparse.Namespace) -> dict[str, str]:
                 "receipt": "terminal-authority.receipt.json",
             },
             "prerequisites": [
-                {"kind": "checkpoint_pin", **_file(checkpoint_path)},
-                {"kind": "alignment_receipt", **alignment},
+                _prerequisite("checkpoint_pin", _file(checkpoint_path)),
+                _prerequisite("alignment_receipt", alignment),
             ],
             "acquirer": by_role["acquirer"]["file"],
             "contract_manifest": by_role["contract_manifest"]["file"],
