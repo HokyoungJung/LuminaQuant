@@ -4,6 +4,16 @@
 
 This section supersedes the older stop-state, hashes, and continuation status below. The historical sections remain for audit context.
 
+### Terminal G073 result (2026-07-28)
+
+- The storage-bounded acquisition and atomic shared-root publication implementation is frozen at commit `3b0cc6be253e29ae3ca11fbb92a456bafa0eee8a`. Its final verification passed 158 compact-acquirer tests, 340 control/policy tests plus 41 subtests, 19 publication/funding/WAL tests, 171 broader storage tests, Ruff, format, and `git diff --check`.
+- Compact capacity was sufficient only for a fail-closed attempt, not guaranteed completion: the final audit kept the 20 GiB `/mnt/c` reserve, one live ZIP, per-write admission, temporary cleanup, and double-derivation retirement. Audit v3 SHA-256 is `ed4d5d59e061d700321ae6b3b8d1de0a981cd253c0f5a337e38da6b059c6e971`.
+- Fresh run `cd0f446dd0e7a47c2698538a528ec30142d536da87fd9b0c532e9479cabebd86` failed before authority startup because transient `systemd-run` escaped the generated `%d` credential specifier. Observer, telemetry, network acquisition, source, report, and canonical publication never started. Failure receipt SHA-256: `f11a99aa4512f39daccbc40f209dcb3038d865bb6033e362580f0d2aad00b3f5`; the roots are terminal and reuse-forbidden.
+- One explicitly authorized replacement used statically rendered and `systemd-analyze`-verified units with literal `%d`, `UMask=0077`, exact cgroup/sandbox directives, and per-role credentials. Run `85be5b266630adc6105456f7c3bbfd8a72630f5e1a4f25b6f3492687c5189b71` nevertheless failed in systemd credential setup with status `243/CREDENTIALS` and `ENOENT`, before `ExecStart`.
+- Replacement terminal receipt SHA-256 is `3d9de04c55efb3a413daa5446925113f243ac5fee6f85e43ec17ff4861244d22`. It proves: no authority socket, no signed terminal receipt, no network acquisition, source/report absent, telemetry empty, phase/one-touch/publication absent, canonical root unchanged, and no active or linked Alpha-Max v8 units after containment.
+- The independent replacement authorization explicitly prohibited another retry or review loop. In addition, canonical publication remains blocked by independent HIGH findings on prepared-resume link-count assumptions, merge reserve accounting, long-lived reader generation pinning, read-side swap races, and WAL writers outside the generation lock.
+- Final data status: **zero fresh v8 rows collected and zero canonical DB writes**. G073 is terminal-blocked. Continuing requires a new user-authorized story that first resolves and proves the systemd credential-launch contract and the publication HIGH findings; this session must not retry, reuse either failed run, or claim collection success.
+
 ### Durable state and bounded execution
 
 - Durable session remains `019f603a-0e73-7000-88a7-c94f42950c09`.
