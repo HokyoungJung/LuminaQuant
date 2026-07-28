@@ -229,13 +229,17 @@ def test_key_bindings_use_one_snapshot_and_reject_late_replacement(
         module._revalidate_key_files(key_files)
 
 
-def test_inventory_includes_untracked_content_type_mode_and_size(tmp_path: Path, monkeypatch):
+def test_inventory_includes_untracked_content_type_mode_and_size(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     module = _module()
     tracked = tmp_path / "tracked"
     untracked = tmp_path / "untracked"
+    link = tmp_path / "link"
     tracked.write_bytes(b"a")
     untracked.write_bytes(b"bc")
-    monkeypatch.setattr(module, "_git", lambda root, *args: b"tracked\0untracked\0")
+    link.symlink_to("tracked")
+    monkeypatch.setattr(module, "_git", lambda root, *args: b"tracked\0untracked\0link\0")
     inventory = json.loads(module._inventory(tmp_path))
     assert inventory == [
         {
@@ -251,6 +255,13 @@ def test_inventory_includes_untracked_content_type_mode_and_size(tmp_path: Path,
             "sha256": module._sha(b"bc"),
             "size": 2,
             "type": "regular",
+        },
+        {
+            "mode": os.lstat(link).st_mode & 0o7777,
+            "path": "link",
+            "sha256": module._sha(b"tracked"),
+            "size": len(b"tracked"),
+            "type": "symlink",
         },
     ]
 

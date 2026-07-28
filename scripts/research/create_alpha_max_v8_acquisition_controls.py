@@ -257,6 +257,23 @@ def _read_regular(path: Path) -> tuple[os.stat_result, bytes]:
     return opened, data
 
 
+def _read_symlink(path: Path) -> tuple[os.stat_result, bytes]:
+    path = _absolute(str(path))
+    parent_fd = _open_directory(path.parent)
+    try:
+        before = os.stat(path.name, dir_fd=parent_fd, follow_symlinks=False)
+        if not stat.S_ISLNK(before.st_mode) or before.st_nlink != 1 or before.st_uid != os.getuid():
+            _fail(f"unsafe symlink: {path}")
+        target = os.readlink(path.name, dir_fd=parent_fd)
+        after = os.stat(path.name, dir_fd=parent_fd, follow_symlinks=False)
+    finally:
+        os.close(parent_fd)
+    data = os.fsencode(target)
+    if not _same(before, after) or len(data) != after.st_size:
+        _fail(f"unstable symlink: {path}")
+    return after, data
+
+
 def _directory(path: Path, *, private: bool = False) -> dict[str, Any]:
     fd = _open_directory(path)
     try:
@@ -362,11 +379,19 @@ def _inventory(root: Path) -> bytes:
         if not name or name.startswith("/") or ".." in Path(name).parts:
             _fail("unsafe inventory path")
         path = root / name
-        info, content = _read_regular(path)
+        info = os.stat(path, follow_symlinks=False)
+        if stat.S_ISREG(info.st_mode):
+            info, content = _read_regular(path)
+            kind = "regular"
+        elif stat.S_ISLNK(info.st_mode):
+            info, content = _read_symlink(path)
+            kind = "symlink"
+        else:
+            _fail(f"unsupported inventory entry: {path}")
         records.append(
             {
                 "path": name,
-                "type": "regular",
+                "type": kind,
                 "mode": stat.S_IMODE(info.st_mode),
                 "size": len(content),
                 "sha256": _sha(content),
