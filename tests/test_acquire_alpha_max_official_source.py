@@ -10,6 +10,7 @@ import sys
 import zipfile
 from datetime import UTC, datetime
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -75,6 +76,7 @@ def allow_may_2023_order(monkeypatch: pytest.MonkeyPatch, source: Path) -> tuple
     monkeypatch.setitem(subject.CANONICAL_ORDER_ARCHIVES, ("BTCUSDT", "2023-05"), identity)
     return identity
 
+
 SOL_NOVEMBER_2023_START_MS = 1_698_796_800_000
 
 
@@ -86,9 +88,7 @@ def sol_november_2023_archive(tmp_path: Path, rows: list[list[str]]) -> Path:
     )
 
 
-def allow_sol_november_2023_order(
-    monkeypatch: pytest.MonkeyPatch, source: Path
-) -> tuple[str, int]:
+def allow_sol_november_2023_order(monkeypatch: pytest.MonkeyPatch, source: Path) -> tuple[str, int]:
     identity = (subject.file_sha256(source), source.stat().st_size)
     monkeypatch.setitem(subject.CANONICAL_ORDER_ARCHIVES, ("SOLUSDT", "2023-11"), identity)
     return identity
@@ -316,6 +316,34 @@ def _eligible_fixture(
         ],
     }
     subject.immutable_json(subject.partition_path(report, raw_relative), receipt, report)
+    evidence_paths = subject.archive_evidence_paths(report, contract.symbol, "2024-01")
+    archive_receipt = subject.request_receipt(archive_path, archive_url)
+    derivation = subject.expected_archive_derivation(
+        archive_path,
+        archive_path.with_suffix(".zip.receipt.json"),
+        archive_url,
+        target,
+        receipt,
+        None,
+        archive_receipt,
+    )
+    subject.immutable_json(evidence_paths["derivation"], derivation, report)
+    intent = subject.expected_archive_intent(archive_path, derivation)
+    subject.immutable_json(evidence_paths["retirement-intent"], intent, report)
+    archive_path.unlink()
+    subject.immutable_json(
+        evidence_paths["deletion"],
+        {
+            "schema": "alpha_max_archive_deletion_receipt.v1",
+            "retirement_intent_sha256": subject.sha256(subject.canonical_bytes(intent)),
+            "derivation_receipt_sha256": subject.sha256(subject.canonical_bytes(derivation)),
+            "archive_relative_path": str(archive_path.relative_to(report)),
+            "archive_sha256": archive_receipt["sha256"],
+            "archive_byte_count": archive_receipt["byte_count"],
+            "archive_absent": True,
+        },
+        report,
+    )
     funding_receipt = {
         "schema": "alpha_max_partition_receipt.v2",
         "path": funding_relative,
@@ -518,6 +546,7 @@ def test_sol_november_2023_unauthenticated_or_wrong_scope_cannot_canonicalize(
             receipt,
         )
 
+
 def test_sol_november_2023_wrong_byte_count_receipt_cannot_canonicalize(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -544,6 +573,7 @@ def test_sol_november_2023_wrong_byte_count_receipt_cannot_canonicalize(
             scratch,
             receipt,
         )
+
 
 @pytest.mark.parametrize(
     "rows",
@@ -1131,25 +1161,20 @@ def test_allowlisted_branch_preserves_parse_precedence_and_cleans_order_scratch(
     assert _tree_snapshot(tmp_path) == before
 
 
-def test_validate_complete_propagates_authenticated_archive_identity(
+def test_validate_complete_never_reopens_a_retired_archive(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _args, output, report = _eligible_fixture(tmp_path, monkeypatch)
-    calls: list[tuple[object, ...]] = []
-    original = subject.frame_from_archive
-
-    def observe_frame(*args: object) -> tuple[_RawFrame, dict[str, object]]:
-        calls.append(args)
-        return original(*args)
-
-    monkeypatch.setattr(subject, "frame_from_archive", observe_frame)
+    monkeypatch.setattr(
+        subject,
+        "frame_from_archive",
+        lambda *args: pytest.fail("offline validation reopened a retired ZIP"),
+    )
     contract = subject.Contract(
         "BTCUSDT", 1704067200000, 1704067201000, 1704067200000, 1704067200001
     )
     subject.validate_complete(output, [contract], report / "provenance", report)
-    archive_path = report / "provenance/archives/BTCUSDT/BTCUSDT-aggTrades-2024-01.zip"
-    assert len(calls) == 1
-    assert calls[0][7] == subject.read_json(archive_path.with_suffix(".zip.receipt.json"))
+    assert not list((report / "provenance" / "archives").glob("**/*.zip"))
 
 
 @pytest.mark.parametrize(
@@ -1842,12 +1867,9 @@ def test_noncontiguous_month_selectors_are_forwarded_as_an_exact_set(
     )
     assert chosen == [{"2024-01", "2024-03"}]
     assert subject.read_json(report / "plan.json") == {
-        "schema": "alpha_max_official_acquisition_plan.v3",
-        "source_eligible": False,
+        **subject.full_plan(),
         "symbols": ["BTCUSDT"],
         "months": ["2024-01", "2024-03"],
-        "contract_sha256": subject.CONTRACT_SHA256,
-        "availability_evidence_sha256": subject.EVIDENCE_SHA256,
     }
     assert (output / ".alpha_max_owner.json").exists()
 
@@ -2003,19 +2025,34 @@ def test_acquire_archive_resets_carry_across_selected_month_gap(
             {},
         )
 
-    def cached(_: str, destination: Path, **__: object) -> dict[str, str]:
+    def cached(url: str, destination: Path, **__: object) -> dict[str, object]:
+        payload = b"source"
+        digest = subject.sha256(payload)
         destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.write_bytes(b"source")
-        return {"sha256": "source"}
+        destination.write_bytes(payload)
+        receipt = {
+            "schema": "official_request_receipt.v1",
+            "requested_url": url,
+            "final_url": url,
+            "final_host": subject.urllib.parse.urlsplit(url).hostname,
+            "query": dict(subject.urllib.parse.parse_qsl(subject.urllib.parse.urlsplit(url).query)),
+            "retrieved_at_utc": "2026-01-01T00:00:00Z",
+            "byte_count": len(payload),
+            "sha256": digest,
+        }
+        destination.with_suffix(destination.suffix + ".receipt.json").write_bytes(
+            subject.canonical_bytes(receipt)
+        )
+        return receipt
 
     monkeypatch.setattr(subject, "fetch_receipt", cached)
-    monkeypatch.setattr(subject, "parse_checksum", lambda *_: "source")
+    monkeypatch.setattr(subject, "parse_checksum", lambda *_: subject.sha256(b"source"))
     monkeypatch.setattr(subject, "frame_from_archive", frame)
     output, report = tmp_path / "output", tmp_path / "report"
     output.mkdir()
     report.mkdir()
     subject.acquire_archive(contract, output, report, {"2024-01", "2024-03"})
-    assert carries == [None, None]
+    assert carries == [None, None, None, None]
 
 
 def test_roots_reject_symlink_leaves_before_target_content_access(
@@ -2937,3 +2974,92 @@ def test_main_restores_verifier_context_after_non_verifier_call(
     finally:
         subject._VERIFIER_CODE_FD.reset(token)
         os.close(descriptor)
+
+
+def test_compact_plan_binds_host_storage_contract() -> None:
+    plan = subject.full_plan()
+    assert plan["schema"] == "alpha_max_official_acquisition_plan.v4"
+    assert plan["storage_contract"] == {
+        "host_reserve_path": "/mnt/c",
+        "host_reserve_bytes": 21_474_836_480,
+        "max_live_archives": 1,
+        "archive_retention": "retired_after_double_derivation",
+    }
+
+
+def test_completed_evidence_rejects_noncanonical_retained_receipt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _args, output, report = _eligible_fixture(tmp_path, monkeypatch)
+    receipt = report / "provenance/archives/BTCUSDT/BTCUSDT-aggTrades-2024-01.zip.receipt.json"
+    receipt.write_text(json.dumps(subject.read_json(receipt), indent=2) + "\n")
+    contract = subject.Contract(
+        "BTCUSDT", 1704067200000, 1704067201000, 1704067200000, 1704067200001
+    )
+    with pytest.raises(subject.AcquisitionError, match="retired_archive_request_receipt_invalid"):
+        subject.validate_complete(output, [contract], report / "provenance", report)
+
+
+def test_completed_evidence_rejects_retired_body_reappearance(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _args, output, report = _eligible_fixture(tmp_path, monkeypatch)
+    archive_path = report / "provenance/archives/BTCUSDT/BTCUSDT-aggTrades-2024-01.zip"
+    archive_path.write_bytes(b"body-must-remain-retired")
+    contract = subject.Contract(
+        "BTCUSDT", 1704067200000, 1704067201000, 1704067200000, 1704067200001
+    )
+    with pytest.raises(subject.AcquisitionError, match="retired_archive_body_present"):
+        subject.validate_complete(output, [contract], report / "provenance", report)
+
+
+def test_completed_evidence_rejects_derivation_chain_tampering(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _args, output, report = _eligible_fixture(tmp_path, monkeypatch)
+    derivation = report / "provenance/archive-evidence/BTCUSDT/2024-01.derivation.json"
+    value = subject.read_json(derivation)
+    value["prior_derivation_receipt_sha256"] = "0" * 64
+    subject.atomic_write(
+        derivation, subject.canonical_bytes(value), replace=True, scratch_root=report
+    )
+    contract = subject.Contract(
+        "BTCUSDT", 1704067200000, 1704067201000, 1704067200000, 1704067200001
+    )
+    with pytest.raises(subject.AcquisitionError, match="archive_derivation_receipt_invalid"):
+        subject.validate_complete(output, [contract], report / "provenance", report)
+
+
+@pytest.mark.parametrize("required_bytes", (-1, True))
+def test_host_reserve_rejects_invalid_requirement(required_bytes: object) -> None:
+    with pytest.raises(subject.AcquisitionError, match="host_reserve_requirement_invalid"):
+        subject.assert_host_reserve(required_bytes)
+
+
+def test_host_reserve_accounts_for_the_pending_write(monkeypatch: pytest.MonkeyPatch) -> None:
+    required = 4096
+    monkeypatch.setattr(
+        subject.shutil,
+        "disk_usage",
+        lambda _path: SimpleNamespace(free=subject.HOST_RESERVE_BYTES + required),
+    )
+    with pytest.raises(subject.AcquisitionError, match="host_reserve_exhausted"):
+        subject.assert_host_reserve(required)
+
+    monkeypatch.setattr(
+        subject.shutil,
+        "disk_usage",
+        lambda _path: SimpleNamespace(free=subject.HOST_RESERVE_BYTES + required + 1),
+    )
+    subject.assert_host_reserve(required)
+
+
+def test_atomic_write_charges_exact_payload_bytes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    charged: list[int] = []
+    monkeypatch.setattr(subject, "assert_host_reserve", charged.append)
+    target = tmp_path / "receipt.json"
+    subject.atomic_write(target, b"payload", scratch_root=tmp_path)
+    assert charged == [7]
+    assert target.read_bytes() == b"payload"

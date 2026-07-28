@@ -20,7 +20,7 @@ from typing import Any
 import polars as pl
 
 CONTRACT_SHA256 = "ae272f70f65797b4c8a87c29b7f8e64511617f8e0f2d4bd841b2d1addb7d1220"
-ACQUIRER_SHA256 = "300a85442f03db193efff9d7b7725aee0533bb75c8939821ae6548d30328bdbd"
+ACQUIRER_SHA256 = "12737ea26e55166d82518f70e9cff249c46b2a77c02a5d323650d8c77219e365"
 EVIDENCE_SHA256 = "214e5da198307d8d32b30f69fb6b1f09002e0b31888dc476ed16060f79de9719"
 PREPARER_SHA256 = "ea26b902bcec4458340e4c345fa648a3db9104e1b337fd42460d9a9461a738ac"
 MAX_CAPTURE_BYTES = 65_536
@@ -162,9 +162,7 @@ def _open_authenticated_root(path: Path, label: str) -> tuple[int, dict[str, int
     """Open and identify an authentication root while retaining descriptor ownership."""
     descriptor: int | None = None
     try:
-        descriptor = os.open(
-            path, os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0)
-        )
+        descriptor = os.open(path, os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0))
         item = os.fstat(descriptor)
     except OSError as exc:
         if descriptor is not None:
@@ -257,7 +255,7 @@ def _canonical_artifact_map(source_root: Path, source_report: Path) -> tuple[str
         raise PreparationError("source_manifest_invalid") from exc
     if (
         not isinstance(manifest, dict)
-        or manifest.get("schema") != "alpha_max_official_source_manifest.v4"
+        or manifest.get("schema") != "alpha_max_official_source_manifest.v5"
         or not isinstance(manifest.get("artifacts"), list)
     ):
         raise PreparationError("source_manifest_invalid")
@@ -1171,9 +1169,7 @@ def _parse_utc(value: Any, label: str) -> datetime:
     return parsed
 
 
-def _read_pinned_parquet(
-    descriptor: int, before: os.stat_result, label: str
-) -> pl.DataFrame:
+def _read_pinned_parquet(descriptor: int, before: os.stat_result, label: str) -> pl.DataFrame:
     try:
         os.lseek(descriptor, 0, os.SEEK_SET)
         with io.FileIO(os.dup(descriptor), "rb", closefd=True) as stream:
@@ -1362,9 +1358,7 @@ def _authenticate_output_inner(
             root_fd, "preparation_manifest.json", "preparation_manifest"
         )
         cleanup.callback(os.close, manifest_descriptor)
-        manifest_bytes = _pinned_bytes(
-            manifest_descriptor, manifest_item, "preparation_manifest"
-        )
+        manifest_bytes = _pinned_bytes(manifest_descriptor, manifest_item, "preparation_manifest")
         try:
             manifest = json.loads(manifest_bytes)
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
@@ -1472,6 +1466,7 @@ def _authenticate_output_inner(
         cleanup.close()
         raise
     try:
+
         def walk(directory_fd: int, relative_path: str) -> None:
             children_fd = os.dup(directory_fd)
             try:
@@ -1555,9 +1550,8 @@ def _authenticate_output_inner(
             expected_size, expected_sha = source_declarations[relative]
             if (
                 source_item.st_size != expected_size
-                or _pinned_file_sha256(
-                    source_descriptor, source_item, "snapshot_parquet"
-                ) != expected_sha
+                or _pinned_file_sha256(source_descriptor, source_item, "snapshot_parquet")
+                != expected_sha
             ):
                 raise PreparationError("snapshot_parquet_mismatch")
         for relative in sorted(actual):
@@ -1566,17 +1560,12 @@ def _authenticate_output_inner(
             source_descriptor, source_item = pinned_sources[entry["source_relative_path"]]
             if (
                 output_item.st_size != entry["output_byte_count"]
-                or _pinned_file_sha256(
-                    output_descriptor, output_item, "output_parquet"
-                ) != entry["output_sha256"]
+                or _pinned_file_sha256(output_descriptor, output_item, "output_parquet")
+                != entry["output_sha256"]
             ):
                 raise PreparationError("preparation_manifest_mismatch")
-            source_frame = _read_pinned_parquet(
-                source_descriptor, source_item, "snapshot_parquet"
-            )
-            output_frame = _read_pinned_parquet(
-                output_descriptor, output_item, "output_parquet"
-            )
+            source_frame = _read_pinned_parquet(source_descriptor, source_item, "snapshot_parquet")
+            output_frame = _read_pinned_parquet(output_descriptor, output_item, "output_parquet")
             start = _parse_utc(entry["owned_start_utc"], "owned_interval")
             end = _parse_utc(entry["owned_end_utc"], "owned_interval")
             if entry["root_kind"] == "raw":
@@ -1604,7 +1593,9 @@ def _authenticate_output_inner(
                         for name in ("open", "high", "low", "close", "volume")
                     ]
                 )
-                if any(series.null_count() or not bool(series.is_finite().all()) for series in numeric):
+                if any(
+                    series.null_count() or not bool(series.is_finite().all()) for series in numeric
+                ):
                     raise PreparationError("output_raw_values_invalid")
                 if bool(
                     output_frame.select(
@@ -1627,7 +1618,13 @@ def _authenticate_output_inner(
                 ).is_empty():
                     raise PreparationError("output_raw_values_invalid")
             else:
-                required = ["timestamp_ms", "source_timestamp_ms", "exchange", "symbol", "funding_rate"]
+                required = [
+                    "timestamp_ms",
+                    "source_timestamp_ms",
+                    "exchange",
+                    "symbol",
+                    "funding_rate",
+                ]
                 if output_frame.columns != required:
                     raise PreparationError("output_feature_schema_invalid")
                 if (
@@ -1637,7 +1634,10 @@ def _authenticate_output_inner(
                     raise PreparationError("output_feature_source_schema_invalid")
                 if "exchange" in source_frame.schema and (
                     source_frame.get_column("exchange").null_count()
-                    or {str(value).lower() for value in source_frame.get_column("exchange").to_list()}
+                    or {
+                        str(value).lower()
+                        for value in source_frame.get_column("exchange").to_list()
+                    }
                     != {"binance"}
                 ):
                     raise PreparationError("output_feature_source_exchange_invalid")
@@ -1687,7 +1687,8 @@ def _authenticate_output_inner(
                 )
                 if (
                     output_frame.get_column("timestamp_ms").to_list() != expected_grid
-                    or output_frame.get_column("exchange").to_list() != ["binance"] * len(expected_grid)
+                    or output_frame.get_column("exchange").to_list()
+                    != ["binance"] * len(expected_grid)
                     or output_frame.get_column("symbol").to_list()
                     != [entry["symbol"]] * len(expected_grid)
                 ):
@@ -1764,13 +1765,13 @@ def _authenticate_output(
         output_root, contract, contract_sha, snapshot, snapshot_root
     )
     return preparer_value
+
+
 def _open_generation_root(
     path: Path, expected: dict[str, int], label: str
 ) -> tuple[int, dict[str, int]]:
     try:
-        descriptor = os.open(
-            path, os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0)
-        )
+        descriptor = os.open(path, os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0))
     except OSError as exc:
         raise PreparationError(f"{label}_namespace_unavailable") from exc
     try:
@@ -1963,7 +1964,9 @@ def _assert_generation_inventory(
                         raise PreparationError(f"{label}_generation_inventory_mismatch")
                     child_fd = os.open(child.name, flags, dir_fd=directory_fd)
                     try:
-                        if _stable_file_identity(os.fstat(child_fd)) != _stable_file_identity(observed):
+                        if _stable_file_identity(os.fstat(child_fd)) != _stable_file_identity(
+                            observed
+                        ):
                             raise PreparationError(f"{label}_generation_inventory_mismatch")
                         if stat.S_ISDIR(observed.st_mode):
                             actual_directories.add(child_relative)
@@ -1989,7 +1992,10 @@ def _assert_public_generation_unchanged(
     output_root: Path, snapshot_root: Path, snapshot_value: dict[str, Any], token: dict[str, Any]
 ) -> None:
     """Rewalk public names from pinned roots; path replacement cannot satisfy this token."""
-    for label, descriptor in (("output_root", token["output_fd"]), ("snapshot_root", token["snapshot_fd"])):
+    for label, descriptor in (
+        ("output_root", token["output_fd"]),
+        ("snapshot_root", token["snapshot_fd"]),
+    ):
         try:
             os.fstat(descriptor)
         except OSError as exc:
@@ -2288,9 +2294,7 @@ def _main_with_lock_inner(
         }
         _assert_materialized_inputs_unchanged(inputs, materialized)
         _assert_pinned_files_unchanged(pinned)
-        _assert_directory_identity(
-            output_root, authenticated_roots["output_root"], "output_root"
-        )
+        _assert_directory_identity(output_root, authenticated_roots["output_root"], "output_root")
         _assert_directory_identity(
             sidecars["snapshot"], authenticated_roots["snapshot_root"], "snapshot_root"
         )

@@ -2,7 +2,14 @@
 
 from __future__ import annotations
 
+import fcntl
+import hashlib
+import math
 import os
+import stat
+import uuid
+import json
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -805,119 +812,519 @@ def _load_feature_points(
     )
 
 
-def _upsert_feature_points(
+def _load_feature_points_day(root: Path, *, exchange: str, symbol: str, day: str) -> pl.DataFrame:
+    """Load exactly one feature-date partition while its generation is pinned."""
+    try:
+        parsed_day = datetime.strptime(day, "%Y-%m-%d").date()
+    except ValueError as exc:
+        raise ValueError("feature day is invalid") from exc
+    if parsed_day.isoformat() != day:
+        raise ValueError("feature day is not canonical")
+    date_path = (
+        root
+        / "feature_points"
+        / f"exchange={_normalize_exchange(exchange)}"
+        / f"symbol={normalize_symbol(symbol).replace('/', '')}"
+        / f"date={day}"
+    )
+    paths = sorted(date_path.glob("*.parquet"))
+    if not paths:
+        return pl.DataFrame(schema=_FEATURE_SCHEMA)
+    try:
+        frame = pl.concat(
+            [_align_feature_frame(pl.read_parquet(path)) for path in paths],
+            how="vertical_relaxed",
+        )
+    except Exception:
+        return pl.DataFrame(schema=_FEATURE_SCHEMA)
+    return (
+        _align_feature_frame(frame)
+        .sort("timestamp_ms")
+        .unique(subset=["timestamp_ms"], keep="last")
+        .sort("timestamp_ms")
+    )
+
+
+@contextmanager
+def _generation_lock(logical_root: Path):
+    """Hold the one lock which pins a logical root to one generation."""
+    lock = logical_root.parent / f".{logical_root.name}.generation.lock"
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    fd = os.open(lock, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+    try:
+        info, named = os.fstat(fd), os.lstat(lock)
+        if (
+            not stat.S_ISREG(info.st_mode)
+            or info.st_nlink != 1
+            or stat.S_IMODE(info.st_mode) != 0o600
+            or (info.st_dev, info.st_ino) != (named.st_dev, named.st_ino)
+        ):
+            raise ValueError("unsafe generation lock")
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        if (info.st_dev, info.st_ino) != (os.lstat(lock).st_dev, os.lstat(lock).st_ino):
+            raise ValueError("generation lock changed")
+        yield logical_root.resolve()
+    finally:
+        fcntl.flock(fd, fcntl.LOCK_UN)
+        os.close(fd)
+
+
+@contextmanager
+def _feature_partition_lock(root: Path, *, exchange: str, symbol: str, day: str):
+    """Serialize all writers for one canonical feature partition."""
+    lock = (
+        root
+        / "feature_points"
+        / f"exchange={_normalize_exchange(exchange)}"
+        / f"symbol={normalize_symbol(symbol).replace('/', '')}"
+        / f"date={day}"
+        / ".writer.lock"
+    )
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    fd = os.open(lock, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+    try:
+        info, named = os.fstat(fd), os.lstat(lock)
+        if (
+            not stat.S_ISREG(info.st_mode)
+            or info.st_nlink != 1
+            or stat.S_IMODE(info.st_mode) != 0o600
+            or (info.st_dev, info.st_ino) != (named.st_dev, named.st_ino)
+        ):
+            raise ValueError("unsafe feature partition lock")
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        if (info.st_dev, info.st_ino) != (os.lstat(lock).st_dev, os.lstat(lock).st_ino):
+            raise ValueError("feature partition lock changed")
+        yield
+    finally:
+        fcntl.flock(fd, fcntl.LOCK_UN)
+        os.close(fd)
+
+
+_FEATURE_SCHEMA = {
+    "exchange": pl.Utf8,
+    "symbol": pl.Utf8,
+    "timestamp_ms": pl.Int64,
+    "datetime": pl.Utf8,
+    "source": pl.Utf8,
+    **dict.fromkeys(_FEATURE_COLUMNS, pl.Float64),
+}
+_FEATURE_CANONICAL_COLUMNS = list(_FEATURE_SCHEMA)
+
+
+def _align_feature_frame(frame: pl.DataFrame) -> pl.DataFrame:
+    out = frame
+    for column in _FEATURE_CANONICAL_COLUMNS:
+        if column not in out.columns:
+            out = out.with_columns(pl.lit(None).alias(column))
+    return out.select(_FEATURE_CANONICAL_COLUMNS).cast(_FEATURE_SCHEMA, strict=False)
+
+
+def _atomic_feature_write(date_path: Path, output_path: Path, frame: pl.DataFrame) -> None:
+    """Durably replace the compact file without touching control-plane files."""
+    tmp = date_path / f".{output_path.name}.{uuid.uuid4().hex}.tmp"
+    obsolete = [path for path in date_path.glob("*.parquet") if path != output_path]
+    for path in obsolete:
+        info = os.lstat(path)
+        if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+            raise ValueError("unsafe obsolete feature parquet")
+    errors: list[BaseException] = []
+    try:
+        frame.write_parquet(tmp, compression="zstd", statistics=True)
+        fd = os.open(tmp, os.O_RDONLY | os.O_NOFOLLOW)
+        try:
+            info = os.fstat(fd)
+            if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+                raise ValueError("unsafe feature temporary parquet")
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+        os.replace(tmp, output_path)
+        directory = os.open(date_path, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            os.fsync(directory)
+            for path in obsolete:
+                info = os.lstat(path)
+                if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+                    raise ValueError("unsafe obsolete feature parquet")
+                try:
+                    path.unlink()
+                except BaseException as exc:
+                    errors.append(exc)
+            os.fsync(directory)
+        finally:
+            os.close(directory)
+    except BaseException as exc:
+        errors.insert(0, exc)
+    finally:
+        try:
+            tmp.unlink()
+        except FileNotFoundError:
+            pass
+        except BaseException as exc:
+            errors.append(exc)
+    if errors:
+        if len(errors) == 1:
+            raise errors[0]
+        raise ExceptionGroup("feature write and cleanup failures", errors)
+
+
+def _sha256_path(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        while chunk := stream.read(1024 * 1024):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _seal_write(path: Path, payload: dict[str, Any]) -> None:
+    tmp = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        with open(tmp, "x", encoding="utf-8") as stream:
+            json.dump(payload, stream, sort_keys=True, separators=(",", ":"))
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(tmp, path)
+        directory = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            os.fsync(directory)
+        finally:
+            os.close(directory)
+        if json.loads(path.read_text(encoding="utf-8")) != payload:
+            raise ValueError("official funding seal readback failed")
+    finally:
+        try:
+            tmp.unlink()
+        except FileNotFoundError:
+            pass
+
+
+def _feature_digest(frame: pl.DataFrame) -> str:
+    data = json.dumps(
+        _align_feature_frame(frame).sort("timestamp_ms").to_dicts(),
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    )
+    return hashlib.sha256(data.encode()).hexdigest()
+
+
+def _publish_official_funding_day(
     root: Path,
     *,
     exchange: str,
     symbol: str,
-    rows: list[dict[str, Any]],
+    day: str,
+    source: Path,
+    expected_sha256: str,
+    expected_byte_count: int,
+    expected_row_count: int,
+    provenance_receipt_sha256: str,
+) -> Path:
+    """Merge a receipt-authenticated funding day as one sealed transaction."""
+    if (
+        isinstance(expected_byte_count, bool)
+        or isinstance(expected_row_count, bool)
+        or not isinstance(expected_byte_count, int)
+        or not isinstance(expected_row_count, int)
+        or expected_byte_count < 0
+        or expected_row_count <= 0
+    ):
+        raise ValueError("funding receipt count is invalid")
+    if not all(
+        isinstance(value, str)
+        and len(value) == 64
+        and all(char in "0123456789abcdef" for char in value)
+        for value in (expected_sha256, provenance_receipt_sha256)
+    ):
+        raise ValueError("funding receipt hash is invalid")
+    exchange, symbol = _normalize_exchange(exchange), normalize_symbol(symbol)
+    try:
+        parsed_day = datetime.strptime(day, "%Y-%m-%d").date()
+    except ValueError as exc:
+        raise ValueError("funding day is invalid") from exc
+    if parsed_day.isoformat() != day:
+        raise ValueError("funding day is not canonical")
+    fd = os.open(source, os.O_RDONLY | os.O_NOFOLLOW)
+    try:
+        before = os.fstat(fd)
+        if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1:
+            raise ValueError("funding source is unsafe")
+        digest = hashlib.sha256()
+        while chunk := os.read(fd, 1024 * 1024):
+            digest.update(chunk)
+        if digest.hexdigest() != expected_sha256 or before.st_size != expected_byte_count:
+            raise ValueError("funding source bytes do not match receipt")
+        os.lseek(fd, 0, os.SEEK_SET)
+        with os.fdopen(os.dup(fd), "rb") as stream:
+            official = pl.read_parquet(stream)
+        after, named = os.fstat(fd), os.lstat(source)
+
+        def identity(info: os.stat_result) -> tuple[int, ...]:
+            return (
+                info.st_dev,
+                info.st_ino,
+                info.st_mode,
+                info.st_size,
+                info.st_mtime_ns,
+                info.st_ctime_ns,
+                info.st_nlink,
+                info.st_uid,
+                info.st_gid,
+            )
+
+        if identity(before) != identity(after) or (before.st_dev, before.st_ino) != (
+            named.st_dev,
+            named.st_ino,
+        ):
+            raise ValueError("funding source identity drift")
+    finally:
+        os.close(fd)
+    required = ("timestamp_ms", "source_timestamp_ms", "exchange", "symbol", "funding_rate")
+    expected_schema = {
+        "timestamp_ms": pl.Int64,
+        "source_timestamp_ms": pl.Int64,
+        "exchange": pl.Utf8,
+        "symbol": pl.Utf8,
+        "funding_rate": pl.Float64,
+    }
+    if (
+        tuple(official.columns) != required
+        or official.schema != expected_schema
+        or official.height != expected_row_count
+    ):
+        raise ValueError("funding source schema or count is invalid")
+    prior = None
+    for row in official.iter_rows(named=True):
+        ts, source_ts, rate = row["timestamp_ms"], row["source_timestamp_ms"], row["funding_rate"]
+        if (
+            isinstance(ts, bool)
+            or isinstance(source_ts, bool)
+            or not isinstance(ts, int)
+            or not isinstance(source_ts, int)
+            or source_ts != ts
+            or row["exchange"] != exchange
+            or row["symbol"] != symbol
+            or (prior is not None and ts <= prior)
+            or _timestamp_ms_to_datetime(ts).date() != parsed_day
+            or not isinstance(rate, float)
+            or not math.isfinite(rate)
+        ):
+            raise ValueError("funding source semantic validation failed")
+        prior = ts
+    seal_fields = (
+        "schema",
+        "state",
+        "source_sha256",
+        "source_byte_count",
+        "source_row_count",
+        "provenance_receipt_sha256",
+        "exchange",
+        "symbol",
+        "day",
+        "output_sha256",
+        "output_byte_count",
+        "output_row_count",
+        "semantic_digest",
+    )
+    with _generation_lock(root) as physical_root:
+        date_path = (
+            physical_root
+            / "feature_points"
+            / f"exchange={exchange}"
+            / f"symbol={symbol.replace('/', '')}"
+            / f"date={day}"
+        )
+        output = date_path / f"compact-{day}.parquet"
+        seal = date_path / "alpha_max_official_funding_seal.v1"
+        if seal.exists():
+            preliminary = json.loads(seal.read_text(encoding="utf-8"))
+            expected_identity = {
+                "schema": "alpha_max_official_funding_seal.v1",
+                "source_sha256": expected_sha256,
+                "source_byte_count": expected_byte_count,
+                "source_row_count": expected_row_count,
+                "provenance_receipt_sha256": provenance_receipt_sha256,
+                "exchange": exchange,
+                "symbol": symbol,
+                "day": day,
+            }
+            if any(preliminary.get(key) != value for key, value in expected_identity.items()):
+                raise ValueError("official funding seal conflicts with target")
+        with _feature_partition_lock(physical_root, exchange=exchange, symbol=symbol, day=day):
+            date_path.mkdir(parents=True, exist_ok=True)
+            existing = _load_feature_points_day(
+                physical_root, exchange=exchange, symbol=symbol, day=day
+            )
+            incoming = _align_feature_frame(
+                official.with_columns(
+                    pl.col("timestamp_ms")
+                    .map_elements(_utc_iso_from_ms, return_dtype=pl.Utf8)
+                    .alias("datetime"),
+                    pl.lit("alpha_max_official").alias("source"),
+                )
+            )
+            overlap = _align_feature_frame(existing).join(
+                incoming.select("timestamp_ms", pl.col("funding_rate").alias("_official")),
+                on="timestamp_ms",
+                how="inner",
+            )
+            if not overlap.filter(
+                pl.col("funding_rate").is_not_null()
+                & pl.col("_official").is_not_null()
+                & (pl.col("funding_rate") != pl.col("_official"))
+            ).is_empty():
+                raise ValueError("official funding conflicts with existing funding")
+            expressions = [
+                pl.col(column).drop_nulls().last().alias(column)
+                for column in _FEATURE_CANONICAL_COLUMNS
+                if column != "timestamp_ms"
+            ]
+            merged = _align_feature_frame(
+                pl.concat([incoming, _align_feature_frame(existing)], how="vertical_relaxed")
+                .group_by("timestamp_ms")
+                .agg(expressions)
+                .sort("timestamp_ms")
+            )
+            target = {
+                "schema": "alpha_max_official_funding_seal.v1",
+                "source_sha256": expected_sha256,
+                "source_byte_count": expected_byte_count,
+                "source_row_count": expected_row_count,
+                "provenance_receipt_sha256": provenance_receipt_sha256,
+                "exchange": exchange,
+                "symbol": symbol,
+                "day": day,
+                "output_row_count": merged.height,
+                "semantic_digest": _feature_digest(merged),
+            }
+            stored = None
+            if seal.exists():
+                stored = json.loads(seal.read_text(encoding="utf-8"))
+                if set(stored) != set(seal_fields) or stored.get("schema") != target["schema"]:
+                    raise ValueError("official funding seal is invalid")
+                identity_fields = (
+                    "source_sha256",
+                    "source_byte_count",
+                    "source_row_count",
+                    "provenance_receipt_sha256",
+                    "exchange",
+                    "symbol",
+                    "day",
+                    "semantic_digest",
+                )
+                if not all(stored.get(key) == target[key] for key in identity_fields):
+                    raise ValueError("official funding seal conflicts with target")
+                if stored.get("state") not in {"pending", "final"}:
+                    raise ValueError("official funding seal state is invalid")
+            if stored is not None and stored["state"] == "final":
+                if not output.exists():
+                    raise ValueError("official funding seal conflicts with target")
+                actual = {
+                    "output_sha256": _sha256_path(output),
+                    "output_byte_count": output.stat().st_size,
+                    "output_row_count": _align_feature_frame(pl.read_parquet(output)).height,
+                    "semantic_digest": _feature_digest(pl.read_parquet(output)),
+                }
+                if not all(stored.get(key) == actual[key] for key in actual):
+                    raise ValueError("official funding seal conflicts with target")
+                return output
+            if stored is None:
+                _seal_write(
+                    seal,
+                    {
+                        **target,
+                        "state": "pending",
+                        "output_sha256": "",
+                        "output_byte_count": 0,
+                    },
+                )
+            if stored is not None and output.exists():
+                current = _align_feature_frame(pl.read_parquet(output))
+                if _feature_digest(current) != target["semantic_digest"]:
+                    raise ValueError("pending official funding target conflicts")
+            else:
+                _atomic_feature_write(date_path, output, merged)
+            final = {
+                **target,
+                "state": "final",
+                "output_sha256": _sha256_path(output),
+                "output_byte_count": output.stat().st_size,
+                "output_row_count": _align_feature_frame(pl.read_parquet(output)).height,
+                "semantic_digest": _feature_digest(pl.read_parquet(output)),
+            }
+            if (
+                final["output_row_count"] != target["output_row_count"]
+                or final["semantic_digest"] != target["semantic_digest"]
+            ):
+                raise ValueError("official funding output readback conflicts")
+            _seal_write(seal, final)
+            return output
+
+
+def _upsert_feature_points(
+    root: Path, *, exchange: str, symbol: str, rows: list[dict[str, Any]]
 ) -> int:
     if not rows:
         return 0
-
     normalized_symbol = normalize_symbol(symbol)
-    existing = _load_feature_points(root, exchange=exchange, symbol=normalized_symbol)
-    incoming_records: list[dict[str, Any]] = []
+    records: list[dict[str, Any]] = []
     for row in rows:
         ts = _coerce_timestamp_ms(row.get("timestamp_ms"))
-        if ts is None:
-            continue
-        record: dict[str, Any] = {
-            "exchange": _normalize_exchange(exchange),
-            "symbol": normalized_symbol,
-            "timestamp_ms": int(ts),
-            "datetime": _utc_iso_from_ms(int(ts)),
-            "source": str(row.get("source") or "binance_futures_api"),
-        }
-        for col in _FEATURE_COLUMNS:
-            value = row.get(col)
-            record[col] = float(value) if value is not None else None
-        incoming_records.append(record)
-
-    if not incoming_records:
+        if ts is not None:
+            records.append(
+                {
+                    "exchange": _normalize_exchange(exchange),
+                    "symbol": normalized_symbol,
+                    "timestamp_ms": int(ts),
+                    "datetime": _utc_iso_from_ms(int(ts)),
+                    "source": str(row.get("source") or "binance_futures_api"),
+                    **{
+                        col: (float(row[col]) if row.get(col) is not None else None)
+                        for col in _FEATURE_COLUMNS
+                    },
+                }
+            )
+    if not records:
         return 0
-
-    incoming = pl.DataFrame(
-        incoming_records,
-        schema={
-            "exchange": pl.Utf8,
-            "symbol": pl.Utf8,
-            "timestamp_ms": pl.Int64,
-            "datetime": pl.Utf8,
-            "source": pl.Utf8,
-            **dict.fromkeys(_FEATURE_COLUMNS, pl.Float64),
-        },
-        strict=False,
-    )
-    canonical_columns = [
-        "exchange",
-        "symbol",
-        "timestamp_ms",
-        "datetime",
-        "source",
-        *_FEATURE_COLUMNS,
-    ]
-
-    def _align_columns(frame: pl.DataFrame) -> pl.DataFrame:
-        out = frame
-        for column in canonical_columns:
-            if column not in out.columns:
-                out = out.with_columns(pl.lit(None).alias(column))
-        return out.select(canonical_columns)
-
-    incoming = _align_columns(incoming)
-    frames = [incoming]
-    if not existing.is_empty():
-        frames.append(_align_columns(existing))
-
-    merged = pl.concat(frames, how="vertical_relaxed").sort("timestamp_ms")
-    grouped_expr = [
-        pl.col("exchange").drop_nulls().last().alias("exchange"),
-        pl.col("symbol").drop_nulls().last().alias("symbol"),
-        pl.col("datetime").drop_nulls().last().alias("datetime"),
-        pl.col("source").drop_nulls().last().alias("source"),
-    ]
-    grouped_expr.extend([pl.col(col).drop_nulls().last().alias(col) for col in _FEATURE_COLUMNS])
-
-    compacted = merged.group_by("timestamp_ms").agg(grouped_expr).sort("timestamp_ms")
-    compacted = compacted.with_columns(
+    incoming = _align_feature_frame(pl.DataFrame(records, schema=_FEATURE_SCHEMA, strict=False))
+    incoming = incoming.with_columns(
         pl.col("timestamp_ms")
-        .cast(pl.Int64)
         .map_elements(lambda value: _timestamp_ms_to_datetime(value).date(), return_dtype=pl.Date)
-        .alias("partition_date")
+        .alias("_day")
     )
-
-    partitions = compacted.partition_by("partition_date", maintain_order=True)
-    for partition in partitions:
-        if partition.is_empty():
-            continue
-        partition_date = partition["partition_date"][0]
-        if partition_date is None:
-            continue
-        date_path = (
-            root
-            / "feature_points"
-            / f"exchange={_normalize_exchange(exchange)}"
-            / f"symbol={normalized_symbol.replace('/', '')}"
-            / f"date={partition_date.isoformat()}"
-        )
-        date_path.mkdir(parents=True, exist_ok=True)
-
-        payload = partition.drop("partition_date")
-        output_path = date_path / f"compact-{partition_date.isoformat()}.parquet"
-        tmp_path = output_path.with_suffix(".tmp.parquet")
-        payload.write_parquet(tmp_path, compression="zstd", statistics=True)
-        tmp_path.replace(output_path)
-
-        for file_path in list(date_path.glob("*.parquet")):
-            if file_path == output_path:
-                continue
-            try:
-                file_path.unlink()
-            except FileNotFoundError:
-                pass
-
-    return len(incoming_records)
+    with _generation_lock(root) as physical_root:
+        for partition in incoming.partition_by("_day", maintain_order=True):
+            day = partition["_day"][0].isoformat()
+            date_path = (
+                physical_root
+                / "feature_points"
+                / f"exchange={_normalize_exchange(exchange)}"
+                / f"symbol={normalized_symbol.replace('/', '')}"
+                / f"date={day}"
+            )
+            output = date_path / f"compact-{day}.parquet"
+            with _feature_partition_lock(
+                physical_root, exchange=exchange, symbol=normalized_symbol, day=day
+            ):
+                date_path.mkdir(parents=True, exist_ok=True)
+                if (date_path / "alpha_max_official_funding_seal.v1").exists():
+                    raise ValueError("cannot modify sealed official funding day")
+                current = _load_feature_points_day(
+                    physical_root, exchange=exchange, symbol=normalized_symbol, day=day
+                )
+                merged = pl.concat(
+                    [_align_feature_frame(current), partition.drop("_day")], how="vertical_relaxed"
+                )
+                expressions = [
+                    pl.col(column).drop_nulls().last().alias(column)
+                    for column in _FEATURE_CANONICAL_COLUMNS
+                    if column != "timestamp_ms"
+                ]
+                compacted = _align_feature_frame(
+                    merged.group_by("timestamp_ms").agg(expressions).sort("timestamp_ms")
+                )
+                _atomic_feature_write(date_path, output, compacted)
+    return len(records)
 
 
 class MarketDataRepository:
@@ -925,9 +1332,10 @@ class MarketDataRepository:
 
     def __init__(self, db_path: str):
         self.db_path = str(db_path)
-        self.root_path = _resolve_market_root_path(self.db_path)
-        self.root_path.mkdir(parents=True, exist_ok=True)
-        self._parquet_repo = _parquet_repo(self.root_path)
+        self.logical_root_path = _resolve_market_root_path(self.db_path)
+        self.root_path = self.logical_root_path
+        self.logical_root_path.mkdir(parents=True, exist_ok=True)
+        self._parquet_repo = _parquet_repo(self.logical_root_path)
         self._prefer_1s_derived = str(
             os.getenv("LQ_PREFER_1S_DERIVED", "1")
         ).strip().lower() not in {
@@ -1099,6 +1507,30 @@ class MarketDataRepository:
             exchange=exchange,
             symbol=symbol,
             rows=rows,
+        )
+
+    def publish_official_funding_day(
+        self,
+        *,
+        exchange: str,
+        symbol: str,
+        day: str,
+        source: Path,
+        expected_sha256: str,
+        expected_byte_count: int,
+        expected_row_count: int,
+        provenance_receipt_sha256: str,
+    ) -> Path:
+        return _publish_official_funding_day(
+            self.root_path,
+            exchange=exchange,
+            symbol=symbol,
+            day=day,
+            source=source,
+            expected_sha256=expected_sha256,
+            expected_byte_count=expected_byte_count,
+            expected_row_count=expected_row_count,
+            provenance_receipt_sha256=provenance_receipt_sha256,
         )
 
     def load_futures_feature_points(

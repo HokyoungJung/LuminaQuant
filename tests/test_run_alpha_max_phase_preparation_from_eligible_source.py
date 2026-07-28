@@ -107,6 +107,7 @@ class EligiblePhasePreparationTests(unittest.TestCase):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(data)
         return path
+
     def _replace_read_only_leaf(self, path: Path, data: bytes) -> None:
         parent = path.parent
         parent_mode = parent.stat().st_mode & 0o777
@@ -223,7 +224,7 @@ class EligiblePhasePreparationTests(unittest.TestCase):
         self._file(
             "report/source_manifest.json",
             wrapper.canonical_bytes(
-                {"schema": "alpha_max_official_source_manifest.v4", "artifacts": artifacts}
+                {"schema": "alpha_max_official_source_manifest.v5", "artifacts": artifacts}
             ),
         )
 
@@ -350,7 +351,9 @@ class EligiblePhasePreparationTests(unittest.TestCase):
         with self.assertRaisesRegex(wrapper.PreparationError, "^snapshot_parquet_mismatch$"):
             wrapper._authenticate_output(self.output, self.contract, snapshot, self.source)
 
-    def test_authenticator_uses_pinned_output_leaves_after_nested_directory_replacement(self) -> None:
+    def test_authenticator_uses_pinned_output_leaves_after_nested_directory_replacement(
+        self,
+    ) -> None:
         self._publish_output()
         target = self._output_entry("raw")
         replacement = self.root / "replacement-output-subtree"
@@ -389,7 +392,9 @@ class EligiblePhasePreparationTests(unittest.TestCase):
         self.assertEqual(value["file_count"], 20)
         self.assertEqual(hash_descriptors, read_descriptors)
 
-    def test_authenticator_uses_pinned_source_leaves_after_nested_directory_replacement(self) -> None:
+    def test_authenticator_uses_pinned_source_leaves_after_nested_directory_replacement(
+        self,
+    ) -> None:
         self._publish_output()
         target = self.source_artifact
         target_identity = (target.stat().st_dev, target.stat().st_ino)
@@ -430,7 +435,9 @@ class EligiblePhasePreparationTests(unittest.TestCase):
             {identity for _, identity in source_descriptors},
         )
 
-    def test_authenticator_uses_pinned_output_root_after_root_replacement_during_inventory(self) -> None:
+    def test_authenticator_uses_pinned_output_root_after_root_replacement_during_inventory(
+        self,
+    ) -> None:
         self._publish_output()
         replacement = self.root / "replacement"
         shutil.copytree(self.output, replacement)
@@ -1131,7 +1138,9 @@ class EligiblePhasePreparationTests(unittest.TestCase):
         descriptor = json.loads(
             (self.output.parent / ".output.alpha_max_phase_preparation.invocation.json").read_text()
         )
-        self.assertEqual(receipt["source_eligibility_snapshot"], descriptor["source_eligibility_snapshot"])
+        self.assertEqual(
+            receipt["source_eligibility_snapshot"], descriptor["source_eligibility_snapshot"]
+        )
         self.assertEqual(
             descriptor["frozen_sha256"]["wrapper"],
             hashlib.sha256(SCRIPT.read_bytes()).hexdigest(),
@@ -1167,6 +1176,7 @@ class EligiblePhasePreparationTests(unittest.TestCase):
             receipt["output_manifest_sha256"],
             hashlib.sha256((self.output / "preparation_manifest.json").read_bytes()).hexdigest(),
         )
+
     def test_tampered_snapshot_leaf_prevents_receipt_publication(self) -> None:
         def fake_run(argv, **kwargs):
             if "--verify-eligible" in argv:
@@ -1192,6 +1202,7 @@ class EligiblePhasePreparationTests(unittest.TestCase):
         self.assertEqual(stdout.getvalue(), "")
         self._remove_read_only_tree(self.output)
         self._remove_read_only_tree(wrapper._sidecars(self.output)["snapshot"])
+
     def test_successful_preparer_root_authentication_failures_leave_no_receipt(self) -> None:
         original_open = wrapper.os.open
         original_fstat = wrapper.os.fstat
@@ -1261,6 +1272,7 @@ class EligiblePhasePreparationTests(unittest.TestCase):
             ("snapshot_race", wrapper._sidecars(self.output)["snapshot"]),
         ):
             assert_root_failure(label, root)
+
     def test_output_root_replacement_before_receipt_publication_leaves_no_receipt(self) -> None:
         def fake_run(argv, **kwargs):
             if "--verify-eligible" in argv:
@@ -1296,7 +1308,10 @@ class EligiblePhasePreparationTests(unittest.TestCase):
         self.assertEqual(stdout.getvalue(), "")
         self._remove_read_only_tree(self.root / "parked-output")
         self._remove_read_only_tree(wrapper._sidecars(self.output)["snapshot"])
-    def test_public_generation_rewalk_rejects_same_root_replacements_without_publication(self) -> None:
+
+    def test_public_generation_rewalk_rejects_same_root_replacements_without_publication(
+        self,
+    ) -> None:
         def fake_run(argv, **kwargs):
             if "--verify-eligible" in argv:
                 return subprocess.CompletedProcess(argv, 0, b"verified", b"")
@@ -1319,6 +1334,7 @@ class EligiblePhasePreparationTests(unittest.TestCase):
         for name, mutate in mutations.items():
             with self.subTest(name=name):
                 try:
+
                     def replace_before_rewalk(*args, _mutate=mutate, **kwargs):
                         _mutate()
                         return original_rewalk(*args, **kwargs)
@@ -1345,7 +1361,9 @@ class EligiblePhasePreparationTests(unittest.TestCase):
                     self._remove_read_only_tree(self.output)
                     self._remove_read_only_tree(wrapper._sidecars(self.output)["snapshot"])
 
-    def test_public_generation_rewalk_rejects_unlisted_output_entry_without_publication(self) -> None:
+    def test_public_generation_rewalk_rejects_unlisted_output_entry_without_publication(
+        self,
+    ) -> None:
         def fake_run(argv, **kwargs):
             if "--verify-eligible" in argv:
                 return subprocess.CompletedProcess(argv, 0, b"verified", b"")
@@ -1408,9 +1426,7 @@ class EligiblePhasePreparationTests(unittest.TestCase):
             ),
             mock.patch.object(wrapper.os, "fstat", side_effect=fail_final_fstat),
             contextlib.redirect_stdout(stdout),
-            self.assertRaisesRegex(
-                wrapper.PreparationError, "^output_root_namespace_unavailable$"
-            ),
+            self.assertRaisesRegex(wrapper.PreparationError, "^output_root_namespace_unavailable$"),
         ):
             wrapper.main(self._args())
 
@@ -1431,6 +1447,7 @@ class EligiblePhasePreparationTests(unittest.TestCase):
             ("stability", "output_generation_namespace_unavailable"),
         ):
             with self.subTest(name=name):
+
                 def fail_reopen(root_fd, relative, digest, size, label):
                     if label == "output_generation":
                         raise OSError("leaf reopen race")
@@ -1451,9 +1468,7 @@ class EligiblePhasePreparationTests(unittest.TestCase):
                         side_effect=original_rewalk,
                     ),
                     (
-                        mock.patch.object(
-                            wrapper, "_open_generation_file", side_effect=fail_reopen
-                        )
+                        mock.patch.object(wrapper, "_open_generation_file", side_effect=fail_reopen)
                         if name == "reopen"
                         else mock.patch.object(
                             wrapper, "_assert_stable_file", side_effect=fail_stability
@@ -1479,6 +1494,7 @@ class EligiblePhasePreparationTests(unittest.TestCase):
         ):
             wrapper.main(self._args())
         run.assert_not_called()
+
     def test_pin_validation_failure_closes_all_pinned_descriptors(self) -> None:
         original_open = wrapper._open_pinned_file
         pinned: list[int] = []
@@ -2455,6 +2471,7 @@ class EligiblePhasePreparationTests(unittest.TestCase):
                 os.close(descriptor)
             for descriptor, _, _ in pinned.values():
                 os.close(descriptor)
+
     def test_materialized_input_open_failure_closes_prior_descriptors(self) -> None:
         files = {
             "acquirer": self.acquirer,

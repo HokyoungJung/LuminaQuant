@@ -1,5 +1,70 @@
 # G070 v8 acquisition and canonical DB cross-session handoff (2026-07-26)
 
+## Authoritative resume update (2026-07-28)
+
+This section supersedes the older stop-state, hashes, and continuation status below. The historical sections remain for audit context.
+
+### Durable state and bounded execution
+
+- Durable session remains `019f603a-0e73-7000-88a7-c94f42950c09`.
+- `G071` and `G072` are complete. `G073` is the only active/final story. Do not create more goals; use ledger annotations for runtime facts.
+- V6 and v7 remain crash-terminal/ineligible and must stay byte-for-byte preserved and unread.
+- No fresh v8 network acquisition has started and G073 has made zero writes to `data/market_parquet`.
+- The only attempted fresh control generation was run `d999226083feb7431cfabcd4e4405e22abb0622cdd83b6190a6940fb1385e5e4`; it failed before launch because the request prerequisites had extra `st_uid`/`st_gid` fields. Its five roots were quarantined, `COMPLETE.json` is absent, and no network/service/source/report action occurred. The schema defect was fixed at commit `d6d79788221951d3ddf21f614cf863054d973497`.
+- WSL containment is active: `init.scope` has `MemoryHigh=5G`, `MemoryMax=7G`, `MemorySwapMax=2G`; `gjc-memory-guard-4933-v2.service` is active. Heavy verification uses separate user-systemd cgroups with zero swap.
+- Do not iterate review stories indefinitely. One bounded implementation/review pass plus one concrete repair pass is the operational ceiling; unresolved safety failures are recorded as failures rather than hidden behind new goals.
+
+### Capacity and actual data state
+
+- Durable audit: `/home/hoky/quants-recovery-runs/g065-oom-safety-20260726/g073-data-capacity-audit-v1.json`, SHA-256 `a44429445c1031fe527b7926a7790818ce8b8630685ab74a47b16120ba7169d0`.
+- Canonical `data/market_parquet` logical bytes: `26,909,667,462`; topology audit: 48,136 regular files, 45,865 directories, zero symlinks/special files, all files `nlink=1`.
+- Existing presence is not source eligibility: 182 of 415 required symbol-months exist; 233 are missing. Eight symbols have 18/43 months, BTC has 20/43, and TON has 18/28.
+- Windows C free space has fluctuated around 35-38 GB; the hard emergency reserve is 20 GiB and `/mnt/c` is monitored. The Ubuntu VHDX is non-sparse, about 350 GB, so WSL logical free space is not the controlling capacity signal.
+- Safe cache cleanup removed 28.7 GiB from the uv cache and cleaned npm cache without touching data, venvs, Git, or v6/v7. Those freed ext4 blocks are reusable inside the non-sparse VHDX even though Windows host free space did not immediately increase.
+- Full archive retention is prohibited at current capacity. Acquisition now permits at most one live official ZIP, performs two independent derivations, durably records derivation/retirement/deletion evidence, deletes the ZIP body, and enforces the 20 GiB host reserve before writes.
+
+### Integrated acquisition and shared-DB contract
+
+- Acquisition schemas are now plan v4, source manifest v5, eligible receipt v4, and partition receipt v2.
+- Manifest and eligible receipt bind the same canonical archive-evidence digest. Offline resume authenticates retained checksum/request/derivation/retirement/deletion evidence and never needs retired ZIP bodies.
+- The permanent target is still the existing `data/market_parquet`; there is no permanent Alpha-Max database.
+- `publish_alpha_max_eligible_source.py` accepts only a native-verified signed `SUCCEEDED` acquisition receipt and exact v5/v4 source, contract/listing, and partition evidence.
+- Publication builds a hidden same-filesystem generation. Existing canonical files are hardlink-cloned without duplicating data; signed source partitions are independently copied/merged one month/day at a time. OHLCV conflicts are checked by canonical timestamp/value, funding preserves unrelated feature columns and rejects differing non-null values, and listing records are committed with the same generation.
+- The visibility point is one Linux `renameat2(RENAME_EXCHANGE)` of the top-level `data/market_parquet` pathname to a trusted sibling generation symlink. Direct-path and repository consumers therefore resolve either the complete old root or complete new root, never a per-partition prefix. Post-exchange validation rolls back on failure; prepared candidates resume; an already-active exact generation is idempotent.
+- Accepted 1-second data remains the common base. Existing UTC-aligned loaders derive 1m, 30m, and higher intervals. Nothing synthesizes 1-second data from coarse bars.
+- Reflink/FICLONE was probed and is unsupported (`errno 95`). Directory↔symlink `RENAME_EXCHANGE` was live-proven. The hardlink generation is capacity-safe because old roots are removed only after exact activation readback, returning active files to `nlink=1`.
+- A crash during an incomplete generation before `prepared.json` is fail-closed and requires bounded operator recovery of that transaction-owned candidate; it cannot expose partial canonical data.
+
+### Current frozen role hashes before commit
+
+- terminal policy JSON: `10065c762baa9281015715f5db1305dcc2175637ee909a5b91037a3f2451495c`
+- acquirer: `12737ea26e55166d82518f70e9cff249c46b2a77c02a5d323650d8c77219e365`
+- phase wrapper: `125a3e6d08debd6d2a7ce3d414e33807586265b3a4153349d2bc4a1f1e6aaa47`
+- v8 control builder: `0a19901838833500173110e0db3035264bb4a310c99945bd86e80a06b7fc63cd`
+- terminal policy module: `0c3c5da07ca446cab160bfcd053ce2d890e8cafb55e8be22b0812020f46e3523`
+- canonical publisher: `b1ab3352843b6546c9b030834464229f6bd2791eed37bd55536c39ddd5763c71`
+- market-data facade: `049ab7431d967c0ef7f817930226d445d06b42144dd9b598ae5f0ce146435fef`
+- parquet repository: `783580b5501de27886ccd890a075c14f2fd3e648a599c6ebf5e7e4d177ec5313`
+
+### Current verification
+
+All commands ran in bounded user-systemd services with `UMask=0077` and `MemorySwapMax=0`:
+
+- compact acquirer: 158 passed;
+- terminal policy, external envelope, v8 controls/telemetry, and phase wrapper: 340 passed plus 41 subtests;
+- canonical generation/funding/WAL stack: 19 passed, including live tmp-root root exchange, injected post-exchange rollback, prepared resume, and idempotent replay;
+- broader parquet/raw lineage and collector regressions: 171 passed;
+- Ruff check passed; all 14 changed Python files are formatted.
+
+### Remaining G073 sequence
+
+1. Commit this frozen implementation and note.
+2. Generate a new canonical current-state approval against that clean HEAD and obtain one independent bounded exact-hash review.
+3. Generate exactly one fresh no-launch v8 control/key/evidence/telemetry/output package under new IDs and roots; inspect `COMPLETE.json`, native readback, unit properties, capacity contract, and source/report absence.
+4. Launch only authority → telemetry → observer/acquirer under the existing cgroup limits. Monitor the signed terminal receipt and `/mnt/c`; do not launch phase preparation or one-touch.
+5. After signed `SUCCEEDED` and native source eligibility, run the atomic shared-root publisher. Keep staging/report immutable through publication and verify all canonical targets before old-root cleanup.
+6. Run the mandatory cleaner, full verification rerun, Architect review, Executor red-team QA, and terminal Critic once. Checkpoint G073 and complete the aggregate goal only after the durable final receipt exists.
+
 ## Stop boundary
 
 - Work was stopped at `2026-07-26T14:43:17Z` (`2026-07-26T23:43:17+09:00`) at the user's request.

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import errno
 import fcntl
 import json
 import math
@@ -10,6 +11,7 @@ import re
 import stat
 import time
 import uuid
+from contextlib import contextmanager
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
@@ -117,6 +119,8 @@ _RAW_WAL_TAIL_VERSION = 1
 _RAW_WAL_RECORD_VERSION = 2
 _RAW_COMPONENT_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
 _RAW_DATE_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_MONTH_TOKEN_PATTERN = re.compile(r"^\d{4}-\d{2}$")
+_CANONICAL_PARTITION_SEAL_SCHEMA = "alpha_max_canonical_partition_seal.v1"
 
 
 @dataclass
@@ -153,6 +157,10 @@ class RawPartitionBusyError(RuntimeError):
     """Raised when a raw partition cannot acquire its writer lock in time."""
 
 
+class SealedMonthlyPartitionConflictError(RuntimeError):
+    """Raised when a monthly partition is sealed or conflicts with a seal transaction."""
+
+
 def normalize_symbol(symbol: str) -> str:
     """Normalize symbol format into BASE/QUOTE uppercase."""
     return canonical_symbol(symbol)
@@ -184,7 +192,60 @@ class ParquetMarketDataRepository:
     """
 
     def __init__(self, root_path: str | Path):
-        self.root_path = Path(root_path)
+        self.logical_root_path = Path(root_path)
+        try:
+            root_info = os.lstat(self.logical_root_path)
+        except FileNotFoundError:
+            # Legacy callers construct a repository before creating an ordinary root.
+            self.root_path = self.logical_root_path
+        else:
+            if stat.S_ISLNK(root_info.st_mode):
+                target = os.readlink(self.logical_root_path)
+                generation_base = f".{self.logical_root_path.name}.generations"
+                target_parts = Path(target).parts
+                if (
+                    os.path.isabs(target)
+                    or len(target_parts) != 2
+                    or target_parts[0] != generation_base
+                    or target_parts[1] in {"", ".", ".."}
+                ):
+                    raise ValueError("Canonical root symlink must name an owned sibling generation")
+                resolved = self.logical_root_path.parent / target
+                resolved_info = os.lstat(resolved)
+                if not stat.S_ISDIR(resolved_info.st_mode):
+                    raise ValueError("Canonical root symlink target must be a directory")
+                self.root_path = resolved
+            elif stat.S_ISDIR(root_info.st_mode):
+                self.root_path = self.logical_root_path
+            else:
+                raise ValueError("Canonical root must be a directory or trusted sibling symlink")
+        self._generation_lock_path = self.logical_root_path.parent / (
+            f".{self.logical_root_path.name}.generation.lock"
+        )
+
+    @contextmanager
+    def generation_lock(self, exclusive: bool):
+        """Coordinate ordinary writers with an atomic whole-root generation publisher."""
+        self._generation_lock_path.parent.mkdir(parents=True, exist_ok=True)
+        fd = os.open(self._generation_lock_path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+        try:
+            info = os.fstat(fd)
+            path_info = os.lstat(self._generation_lock_path)
+            if (
+                not stat.S_ISREG(info.st_mode)
+                or info.st_nlink != 1
+                or info.st_uid != os.getuid()
+                or stat.S_IMODE(info.st_mode) != 0o600
+                or (info.st_dev, info.st_ino) != (path_info.st_dev, path_info.st_ino)
+            ):
+                raise SealedMonthlyPartitionConflictError(
+                    "Generation lock is not a stable owned 0600 regular file"
+                )
+            fcntl.flock(fd, fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH)
+            yield
+        finally:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+            os.close(fd)
 
     @staticmethod
     def _normalize_exchange(exchange: str) -> str:
@@ -345,6 +406,557 @@ class ParquetMarketDataRepository:
 
     def _wal_path(self, *, exchange: str, symbol: str) -> Path:
         return self._symbol_root(exchange=exchange, symbol=symbol) / "wal.bin"
+
+    @staticmethod
+    def _strict_month_token(month: str) -> str:
+        if not isinstance(month, str) or not _MONTH_TOKEN_PATTERN.fullmatch(month):
+            raise ValueError("Month must be strict YYYY-MM")
+        try:
+            if datetime.strptime(month, "%Y-%m").strftime("%Y-%m") != month:
+                raise ValueError
+        except ValueError as exc:
+            raise ValueError("Month must be a valid calendar month") from exc
+        return month
+
+    def _monthly_lock_path(self, *, exchange: str, symbol: str, month_token: str) -> Path:
+        return self._monthly_path(
+            exchange=exchange, symbol=symbol, month_token=month_token
+        ).with_suffix(".lock")
+
+    def _monthly_pending_path(self, *, exchange: str, symbol: str, month_token: str) -> Path:
+        return self._monthly_path(
+            exchange=exchange, symbol=symbol, month_token=month_token
+        ).with_suffix(".pending.json")
+
+    def _monthly_seal_path(self, *, exchange: str, symbol: str, month_token: str) -> Path:
+        return self._monthly_path(
+            exchange=exchange, symbol=symbol, month_token=month_token
+        ).with_suffix(".seal.json")
+
+    @contextmanager
+    def _monthly_lock(self, *, exchange: str, symbol: str, month_token: str):
+        """Acquire the stable advisory lock for one canonical monthly partition."""
+        lock_path = self._monthly_lock_path(
+            exchange=exchange, symbol=symbol, month_token=month_token
+        )
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        fd = os.open(lock_path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+        try:
+            info = os.fstat(fd)
+            path_info = os.lstat(lock_path)
+            if (
+                not stat.S_ISREG(info.st_mode)
+                or info.st_nlink != 1
+                or info.st_uid != os.getuid()
+                or stat.S_IMODE(info.st_mode) != 0o600
+                or (info.st_dev, info.st_ino) != (path_info.st_dev, path_info.st_ino)
+            ):
+                raise SealedMonthlyPartitionConflictError(
+                    "Monthly lock is not a stable owned 0600 regular file"
+                )
+            fcntl.flock(fd, fcntl.LOCK_EX)
+            path_info = os.lstat(lock_path)
+            if (info.st_dev, info.st_ino) != (path_info.st_dev, path_info.st_ino):
+                raise SealedMonthlyPartitionConflictError("Monthly lock pathname changed")
+            yield
+        finally:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+            os.close(fd)
+
+    @staticmethod
+    def _file_identity(info: os.stat_result) -> tuple[int, int, int, int, int, int]:
+        return (
+            info.st_dev,
+            info.st_ino,
+            info.st_size,
+            info.st_mtime_ns,
+            info.st_ctime_ns,
+            info.st_nlink,
+        )
+
+    @classmethod
+    def _assert_stable_regular_path(
+        cls, path: Path, fd: int, *, owned: bool = False
+    ) -> os.stat_result:
+        info = os.fstat(fd)
+        path_info = os.lstat(path)
+        if (
+            not stat.S_ISREG(info.st_mode)
+            or info.st_nlink != 1
+            or (owned and info.st_uid != os.getuid())
+            or (info.st_dev, info.st_ino) != (path_info.st_dev, path_info.st_ino)
+        ):
+            raise SealedMonthlyPartitionConflictError(
+                f"{path.name} is not a stable owned regular file"
+            )
+        return info
+
+    @staticmethod
+    def _sha256_fd(fd: int) -> str:
+        digest = sha256()
+        os.lseek(fd, 0, os.SEEK_SET)
+        while chunk := os.read(fd, 1024 * 1024):
+            digest.update(chunk)
+        os.lseek(fd, 0, os.SEEK_SET)
+        return digest.hexdigest()
+
+    @staticmethod
+    def _canonical_json_bytes(payload: Mapping[str, Any]) -> bytes:
+        return (
+            json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False) + "\n"
+        ).encode()
+
+    @staticmethod
+    def _validate_sha256(value: str, *, name: str) -> str:
+        if not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value):
+            raise ValueError(f"{name} must be a lowercase SHA-256 hex digest")
+        return value
+
+    @classmethod
+    def _read_canonical_json(cls, path: Path) -> dict[str, Any]:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+        try:
+            info = cls._assert_stable_regular_path(path, fd, owned=True)
+            if info.st_size > 64 * 1024:
+                raise SealedMonthlyPartitionConflictError(f"{path.name} is too large")
+            raw = bytearray()
+            while len(raw) < info.st_size:
+                chunk = os.read(fd, min(8192, info.st_size - len(raw)))
+                if not chunk:
+                    raise SealedMonthlyPartitionConflictError(f"{path.name} was truncated")
+                raw.extend(chunk)
+            if os.read(fd, 1) or cls._file_identity(info) != cls._file_identity(
+                cls._assert_stable_regular_path(path, fd, owned=True)
+            ):
+                raise SealedMonthlyPartitionConflictError(f"{path.name} changed while read")
+        finally:
+            os.close(fd)
+        try:
+            payload = json.loads(
+                bytes(raw).decode("utf-8"),
+                object_pairs_hook=ParquetMarketDataRepository._json_object_no_duplicates,
+                parse_constant=lambda value: (_ for _ in ()).throw(ValueError(value)),
+            )
+        except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
+            raise SealedMonthlyPartitionConflictError(f"{path.name} is malformed") from exc
+        if not isinstance(payload, dict) or bytes(raw) != cls._canonical_json_bytes(payload):
+            raise SealedMonthlyPartitionConflictError(f"{path.name} is not canonical")
+        return payload
+
+    @staticmethod
+    def _write_all(fd: int, payload: bytes | memoryview) -> None:
+        view = memoryview(payload)
+        while view:
+            written = os.write(fd, view)
+            if written <= 0:
+                raise OSError(errno.EIO, "short write")
+            view = view[written:]
+
+    @classmethod
+    def _create_noreplace_file(cls, path: Path, payload: bytes) -> None:
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        try:
+            cls._write_all(fd, payload)
+            os.fsync(fd)
+            cls._assert_stable_regular_path(path, fd, owned=True)
+        finally:
+            os.close(fd)
+        cls._fsync_dir(path.parent)
+
+    @classmethod
+    def _copy_fd_to_new_file(cls, source_fd: int, destination: Path) -> None:
+        fd = os.open(destination, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        try:
+            os.lseek(source_fd, 0, os.SEEK_SET)
+            while chunk := os.read(source_fd, 1024 * 1024):
+                cls._write_all(fd, chunk)
+            os.fsync(fd)
+            cls._assert_stable_regular_path(destination, fd, owned=True)
+        finally:
+            os.close(fd)
+        cls._fsync_dir(destination.parent)
+
+    @staticmethod
+    def _rename_noreplace(source: Path, destination: Path) -> None:
+        """Use Linux renameat2 so a concurrent writer can never be overwritten."""
+        import ctypes
+
+        libc = ctypes.CDLL(None, use_errno=True)
+        try:
+            renameat2 = libc.renameat2
+        except AttributeError as exc:
+            raise OSError(errno.ENOSYS, "renameat2 unavailable") from exc
+        renameat2.argtypes = [
+            ctypes.c_int,
+            ctypes.c_char_p,
+            ctypes.c_int,
+            ctypes.c_char_p,
+            ctypes.c_uint,
+        ]
+        renameat2.restype = ctypes.c_int
+        if renameat2(-100, os.fsencode(source), -100, os.fsencode(destination), 1) != 0:
+            error = ctypes.get_errno()
+            if error == errno.EEXIST:
+                raise FileExistsError(destination)
+            raise OSError(error, os.strerror(error), destination)
+
+    def _validate_canonical_monthly_frame(self, frame: pl.DataFrame, *, month: str) -> None:
+        if tuple(frame.columns) != tuple(_OHLCV_COLUMNS) or any(
+            frame.schema[name] != _DEFAULT_SCHEMA[name] for name in _OHLCV_COLUMNS
+        ):
+            raise ValueError("Canonical monthly parquet schema is invalid")
+        if frame.is_empty():
+            raise ValueError("Canonical monthly parquet may not be empty")
+        rows = frame.select(_OHLCV_COLUMNS).iter_rows(named=True)
+        previous: datetime | None = None
+        for row in rows:
+            timestamp = row["datetime"]
+            values = (row["open"], row["high"], row["low"], row["close"], row["volume"])
+            if timestamp is None or any(
+                value is None or not math.isfinite(value) for value in values
+            ):
+                raise ValueError("Canonical monthly parquet contains null or non-finite values")
+            if timestamp.tzinfo is not None or timestamp.microsecond % 1_000 != 0:
+                raise ValueError("Canonical monthly timestamps must be UTC whole seconds")
+            if self._month_token(timestamp) != month or timestamp.microsecond != 0:
+                raise ValueError(
+                    "Canonical monthly parquet rows must be UTC-second rows in the requested month"
+                )
+            if previous is not None and timestamp <= previous:
+                raise ValueError("Canonical monthly parquet timestamps must be strictly increasing")
+            if row["low"] > min(row["open"], row["close"]) or row["high"] < max(
+                row["open"], row["close"]
+            ):
+                raise ValueError("Canonical monthly parquet violates OHLC invariants")
+            if row["volume"] < 0:
+                raise ValueError("Canonical monthly parquet volume must be non-negative")
+            previous = timestamp
+
+    def publish_sealed_monthly_partition(
+        self,
+        *,
+        exchange: str,
+        symbol: str,
+        month: str,
+        source: Path,
+        expected_sha256: str,
+        expected_byte_count: int,
+        expected_row_count: int,
+        provenance_receipt_sha256: str,
+    ) -> Path:
+        """Publish one verified staging partition into the canonical immutable monthly store."""
+        exchange_token = self._normalize_exchange(exchange)
+        symbol_token = self._normalize_symbol_token(symbol)
+        month = self._strict_month_token(month)
+        expected_sha256 = self._validate_sha256(expected_sha256, name="expected_sha256")
+        provenance_receipt_sha256 = self._validate_sha256(
+            provenance_receipt_sha256, name="provenance_receipt_sha256"
+        )
+        if isinstance(expected_byte_count, bool) or expected_byte_count < 0:
+            raise ValueError("expected_byte_count must be non-negative")
+        if isinstance(expected_row_count, bool) or expected_row_count <= 0:
+            raise ValueError("expected_row_count must be positive")
+        source = Path(source)
+        source_fd = os.open(source, os.O_RDONLY | os.O_NOFOLLOW)
+        try:
+            source_stat = self._assert_stable_regular_path(source, source_fd)
+            source_identity = self._file_identity(source_stat)
+            if (
+                source_stat.st_size != expected_byte_count
+                or self._sha256_fd(source_fd) != expected_sha256
+            ):
+                raise ValueError("Staging source does not match expected bytes or SHA-256")
+            with os.fdopen(os.dup(source_fd), "rb") as source_handle:
+                source_frame = pl.read_parquet(source_handle)
+            self._validate_canonical_monthly_frame(source_frame, month=month)
+            if source_frame.height != expected_row_count:
+                raise ValueError("Staging source row count does not match expectation")
+
+            target = self._monthly_path(
+                exchange=exchange_token, symbol=symbol_token, month_token=month
+            )
+            pending = self._monthly_pending_path(
+                exchange=exchange_token, symbol=symbol_token, month_token=month
+            )
+            seal = self._monthly_seal_path(
+                exchange=exchange_token, symbol=symbol_token, month_token=month
+            )
+            relative_path = str(target.relative_to(self.root_path))
+            fields = {
+                "schema": _CANONICAL_PARTITION_SEAL_SCHEMA,
+                "relative_partition_path": relative_path,
+                "sha256": expected_sha256,
+                "byte_count": expected_byte_count,
+                "row_count": expected_row_count,
+                "month": month,
+                "exchange": exchange_token,
+                "symbol": symbol_token,
+                "provenance_receipt_sha256": provenance_receipt_sha256,
+            }
+            pending_payload = {**fields, "status": "pending"}
+            seal_payload = {**fields, "status": "sealed"}
+            with self._monthly_lock(
+                exchange=exchange_token, symbol=symbol_token, month_token=month
+            ):
+                if (
+                    os.path.lexists(pending)
+                    and self._read_canonical_json(pending) != pending_payload
+                ):
+                    raise SealedMonthlyPartitionConflictError(
+                        "Monthly pending seal conflicts with publication"
+                    )
+                if os.path.lexists(seal) and self._read_canonical_json(seal) != seal_payload:
+                    raise SealedMonthlyPartitionConflictError(
+                        "Monthly final seal conflicts with publication"
+                    )
+                if not os.path.lexists(seal) and not os.path.lexists(pending):
+                    self._create_noreplace_file(
+                        pending, self._canonical_json_bytes(pending_payload)
+                    )
+                current_source_stat = self._assert_stable_regular_path(source, source_fd)
+                if (
+                    self._file_identity(current_source_stat) != source_identity
+                    or self._sha256_fd(source_fd) != expected_sha256
+                ):
+                    raise SealedMonthlyPartitionConflictError(
+                        "Staging source changed during publication"
+                    )
+                if os.path.lexists(target):
+                    target_fd = os.open(target, os.O_RDONLY | os.O_NOFOLLOW)
+                    try:
+                        target_stat = self._assert_stable_regular_path(target, target_fd)
+                        if (
+                            target_stat.st_size != expected_byte_count
+                            or self._sha256_fd(target_fd) != expected_sha256
+                        ):
+                            raise SealedMonthlyPartitionConflictError(
+                                "Existing monthly target conflicts with publication"
+                            )
+                        with os.fdopen(os.dup(target_fd), "rb") as target_handle:
+                            target_frame = pl.read_parquet(target_handle)
+                        self._validate_canonical_monthly_frame(target_frame, month=month)
+                        if target_frame.height != expected_row_count:
+                            raise SealedMonthlyPartitionConflictError(
+                                "Existing monthly target row count conflicts"
+                            )
+                    finally:
+                        os.close(target_fd)
+                else:
+                    if os.path.lexists(seal):
+                        raise SealedMonthlyPartitionConflictError(
+                            "Final seal exists without monthly target"
+                        )
+                    temporary = target.with_name(f".{target.name}.{uuid.uuid4().hex}.publish.tmp")
+                    try:
+                        self._copy_fd_to_new_file(source_fd, temporary)
+                        self._rename_noreplace(temporary, target)
+                        self._fsync_dir(target.parent)
+                    except Exception as exc:
+                        try:
+                            if temporary.exists():
+                                temp_info = os.lstat(temporary)
+                                if not stat.S_ISREG(temp_info.st_mode) or temp_info.st_nlink != 1:
+                                    raise SealedMonthlyPartitionConflictError(
+                                        "Publication temporary became unsafe"
+                                    )
+                                temporary.unlink()
+                                self._fsync_dir(temporary.parent)
+                        except Exception as cleanup_exc:
+                            exc.add_note(f"publication temporary cleanup failed: {cleanup_exc!r}")
+                        raise
+                    target_fd = os.open(target, os.O_RDONLY | os.O_NOFOLLOW)
+                    try:
+                        target_stat = self._assert_stable_regular_path(target, target_fd)
+                        if (
+                            target_stat.st_size != expected_byte_count
+                            or self._sha256_fd(target_fd) != expected_sha256
+                        ):
+                            raise SealedMonthlyPartitionConflictError(
+                                "Published monthly target failed stable hash validation"
+                            )
+                    finally:
+                        os.close(target_fd)
+                current_source_stat = self._assert_stable_regular_path(source, source_fd)
+                if (
+                    self._file_identity(current_source_stat) != source_identity
+                    or self._sha256_fd(source_fd) != expected_sha256
+                ):
+                    raise SealedMonthlyPartitionConflictError(
+                        "Staging source changed during publication"
+                    )
+                if not os.path.lexists(seal):
+                    self._create_noreplace_file(seal, self._canonical_json_bytes(seal_payload))
+                if os.path.lexists(pending):
+                    if self._read_canonical_json(pending) != pending_payload:
+                        raise SealedMonthlyPartitionConflictError(
+                            "Monthly pending seal changed during publication"
+                        )
+                    pending.unlink()
+                    self._fsync_dir(pending.parent)
+            return target
+        finally:
+            os.close(source_fd)
+
+    def merge_signed_month_into_candidate(
+        self,
+        *,
+        exchange: str,
+        symbol: str,
+        month: str,
+        source: Path,
+        expected_sha256: str,
+        expected_byte_count: int,
+        expected_row_count: int,
+        provenance_receipt_sha256: str,
+    ) -> Path:
+        """Merge a signed month using only the two monthly dataframes."""
+        exchange_token = self._normalize_exchange(exchange)
+        symbol_token = self._normalize_symbol_token(symbol)
+        month = self._strict_month_token(month)
+        expected_sha256 = self._validate_sha256(expected_sha256, name="expected_sha256")
+        provenance_receipt_sha256 = self._validate_sha256(
+            provenance_receipt_sha256, name="provenance_receipt_sha256"
+        )
+        target = self._monthly_path(exchange=exchange_token, symbol=symbol_token, month_token=month)
+        if not target.exists():
+            return self.publish_sealed_monthly_partition(
+                exchange=exchange,
+                symbol=symbol,
+                month=month,
+                source=source,
+                expected_sha256=expected_sha256,
+                expected_byte_count=expected_byte_count,
+                expected_row_count=expected_row_count,
+                provenance_receipt_sha256=provenance_receipt_sha256,
+            )
+        source_fd = os.open(source, os.O_RDONLY | os.O_NOFOLLOW)
+        target_fd = os.open(target, os.O_RDONLY | os.O_NOFOLLOW)
+        temporary: Path | None = None
+        try:
+            source_stat = self._assert_stable_regular_path(source, source_fd)
+            source_identity = self._file_identity(source_stat)
+            target_stat, target_path_stat = os.fstat(target_fd), os.lstat(target)
+            if (
+                not stat.S_ISREG(target_stat.st_mode)
+                or target_stat.st_nlink != 2
+                or (target_stat.st_dev, target_stat.st_ino)
+                != (target_path_stat.st_dev, target_path_stat.st_ino)
+            ):
+                raise SealedMonthlyPartitionConflictError(
+                    "Candidate monthly target is not the bound clone hardlink"
+                )
+            target_identity = self._file_identity(target_stat)
+            if (
+                source_stat.st_size != expected_byte_count
+                or self._sha256_fd(source_fd) != expected_sha256
+            ):
+                raise ValueError("Staging source does not match expected bytes or SHA-256")
+            with os.fdopen(os.dup(source_fd), "rb") as handle:
+                incoming = pl.read_parquet(handle)
+            with os.fdopen(os.dup(target_fd), "rb") as handle:
+                existing = pl.read_parquet(handle)
+            self._validate_canonical_monthly_frame(incoming, month=month)
+            self._validate_canonical_monthly_frame(existing, month=month)
+            if incoming.height != expected_row_count:
+                raise ValueError("Staging source row count does not match expectation")
+            start = datetime.strptime(month + "-01", "%Y-%m-%d")
+            end = (start.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(
+                milliseconds=1
+            )
+            if not self._load_wal_frame(
+                exchange=exchange_token, symbol=symbol_token, start_date=start, end_date=end
+            ).is_empty():
+                raise SealedMonthlyPartitionConflictError(
+                    f"WAL overlaps managed monthly partition {month}"
+                )
+            overlap = existing.join(incoming, on="datetime", how="inner", suffix="_incoming")
+            if any(
+                overlap.filter(pl.col(column) != pl.col(f"{column}_incoming")).height
+                for column in _OHLCV_COLUMNS[1:]
+            ):
+                raise SealedMonthlyPartitionConflictError(
+                    "Signed monthly source conflicts with canonical OHLCV values"
+                )
+            merged = pl.concat(
+                [existing, incoming.join(existing.select("datetime"), on="datetime", how="anti")],
+                how="vertical",
+            ).sort("datetime")
+            self._validate_canonical_monthly_frame(merged, month=month)
+            pending = self._monthly_pending_path(
+                exchange=exchange_token, symbol=symbol_token, month_token=month
+            )
+            seal = self._monthly_seal_path(
+                exchange=exchange_token, symbol=symbol_token, month_token=month
+            )
+            fields = {
+                "schema": _CANONICAL_PARTITION_SEAL_SCHEMA,
+                "relative_partition_path": str(target.relative_to(self.root_path)),
+                "month": month,
+                "exchange": exchange_token,
+                "symbol": symbol_token,
+                "provenance_receipt_sha256": provenance_receipt_sha256,
+            }
+            with self._monthly_lock(
+                exchange=exchange_token, symbol=symbol_token, month_token=month
+            ):
+                if os.path.lexists(pending):
+                    raise SealedMonthlyPartitionConflictError(
+                        "Monthly pending seal conflicts with candidate merge"
+                    )
+                if os.path.lexists(seal):
+                    seal_info = os.lstat(seal)
+                    if not stat.S_ISREG(seal_info.st_mode) or seal_info.st_nlink != 2:
+                        raise SealedMonthlyPartitionConflictError(
+                            "Candidate final seal is not the bound clone hardlink"
+                        )
+                    seal.unlink()
+                    self._fsync_dir(seal.parent)
+                self._create_noreplace_file(
+                    pending, self._canonical_json_bytes({**fields, "status": "pending"})
+                )
+                if (
+                    self._file_identity(self._assert_stable_regular_path(source, source_fd))
+                    != source_identity
+                    or self._file_identity(os.fstat(target_fd)) != target_identity
+                    or (os.lstat(target).st_dev, os.lstat(target).st_ino) != target_identity[:2]
+                ):
+                    raise SealedMonthlyPartitionConflictError(
+                        "Candidate merge source or target changed"
+                    )
+                temporary = target.with_name(f".{target.name}.{uuid.uuid4().hex}.candidate.tmp")
+                merged.write_parquet(temporary, compression="zstd", statistics=True)
+                self._fsync_file(temporary)
+                os.replace(temporary, target)
+                temporary = None
+                self._fsync_dir(target.parent)
+                result_fd = os.open(target, os.O_RDONLY | os.O_NOFOLLOW)
+                try:
+                    result_stat = self._assert_stable_regular_path(target, result_fd)
+                    result_sha = self._sha256_fd(result_fd)
+                finally:
+                    os.close(result_fd)
+                self._create_noreplace_file(
+                    seal,
+                    self._canonical_json_bytes(
+                        {
+                            **fields,
+                            "status": "sealed",
+                            "sha256": result_sha,
+                            "byte_count": result_stat.st_size,
+                            "row_count": merged.height,
+                        }
+                    ),
+                )
+                pending.unlink()
+                self._fsync_dir(pending.parent)
+            return target
+        finally:
+            if temporary is not None and os.path.lexists(temporary):
+                info = os.lstat(temporary)
+                if stat.S_ISREG(info.st_mode) and info.st_nlink == 1:
+                    temporary.unlink()
+            os.close(target_fd)
+            os.close(source_fd)
 
     def _meta_path(self, *, exchange: str, symbol: str) -> Path:
         return self._symbol_root(exchange=exchange, symbol=symbol) / "compaction.meta.json"
@@ -4257,32 +4869,45 @@ class ParquetMarketDataRepository:
         if frame.is_empty():
             return 0
 
-        wal_path = self._wal_path(exchange=exchange, symbol=symbol)
-        fsync_n = max(1, int(os.getenv("LQ_WAL_FSYNC_EVERY_N_BATCHES", "1") or "1"))
-        wal = BinaryWAL(wal_path, fsync_every_n_batches=fsync_n, auto_repair=True)
-
-        native_appended = append_ohlcv_frame_native(
-            wal.path,
-            frame,
-            fsync_after_write=fsync_n <= 1,
-        )
-        if native_appended is not None:
-            appended = int(native_appended)
-        else:
-            records = [
-                WALRecord(
-                    ts_ms=self._datetime_to_ms(item[0]) or 0,
-                    open=float(item[1]),
-                    high=float(item[2]),
-                    low=float(item[3]),
-                    close=float(item[4]),
-                    volume=float(item[5]),
-                )
-                for item in frame.iter_rows(named=False)
-            ]
-            appended = int(wal.append(records))
-        self._enforce_wal_growth_controls(exchange=exchange, symbol=symbol)
-        return appended
+        exchange_token = self._normalize_exchange(exchange)
+        symbol_token = self._normalize_symbol_token(symbol)
+        months = {self._month_token(value) for value in frame.get_column("datetime").to_list()}
+        with self.generation_lock(exclusive=False):
+            for month in months:
+                if (
+                    self._monthly_pending_path(
+                        exchange=exchange_token, symbol=symbol_token, month_token=month
+                    ).exists()
+                    or self._monthly_seal_path(
+                        exchange=exchange_token, symbol=symbol_token, month_token=month
+                    ).exists()
+                ):
+                    raise SealedMonthlyPartitionConflictError(
+                        f"Cannot append WAL rows for sealed monthly partition {month}"
+                    )
+            wal_path = self._wal_path(exchange=exchange_token, symbol=symbol_token)
+            fsync_n = max(1, int(os.getenv("LQ_WAL_FSYNC_EVERY_N_BATCHES", "1") or "1"))
+            wal = BinaryWAL(wal_path, fsync_every_n_batches=fsync_n, auto_repair=True)
+            native_appended = append_ohlcv_frame_native(
+                wal.path, frame, fsync_after_write=fsync_n <= 1
+            )
+            if native_appended is not None:
+                appended = int(native_appended)
+            else:
+                records = [
+                    WALRecord(
+                        ts_ms=self._datetime_to_ms(item[0]) or 0,
+                        open=float(item[1]),
+                        high=float(item[2]),
+                        low=float(item[3]),
+                        close=float(item[4]),
+                        volume=float(item[5]),
+                    )
+                    for item in frame.iter_rows(named=False)
+                ]
+                appended = int(wal.append(records))
+            self._enforce_wal_growth_controls(exchange=exchange_token, symbol=symbol_token)
+            return appended
 
     def _load_ohlcv_1s_merged(
         self,
@@ -4745,43 +5370,52 @@ class ParquetMarketDataRepository:
             monthly_path = self._monthly_path(
                 exchange=exchange, symbol=symbol, month_token=month_token
             )
-            monthly_path.parent.mkdir(parents=True, exist_ok=True)
-
-            existing = (
-                pl.read_parquet(monthly_path)
-                if monthly_path.exists()
-                else self._empty_ohlcv_frame()
+            pending = self._monthly_pending_path(
+                exchange=exchange, symbol=symbol, month_token=month_token
             )
-            incoming_rows = by_month[month_token]
-            incoming = pl.DataFrame(
-                {
-                    "datetime": [self._ms_to_datetime(item.ts_ms) for item in incoming_rows],
-                    "open": [item.open for item in incoming_rows],
-                    "high": [item.high for item in incoming_rows],
-                    "low": [item.low for item in incoming_rows],
-                    "close": [item.close for item in incoming_rows],
-                    "volume": [item.volume for item in incoming_rows],
-                    "_seq": list(range(len(incoming_rows))),
-                }
-            ).with_columns(pl.col("datetime").cast(pl.Datetime(time_unit="ms")))
-
-            merged = self._merge_monthly_and_wal(monthly=existing, wal=incoming)
-
-            tmp_path = monthly_path.with_suffix(".tmp.parquet")
-            merged.write_parquet(tmp_path, compression="zstd", statistics=True)
-            self._fsync_file(tmp_path)
-            tmp_path.replace(monthly_path)
-            self._fsync_dir(monthly_path.parent)
-
-            results.append(
-                CompactionResult(
-                    partition=str(monthly_path),
-                    files_before=1 if existing.height > 0 else 0,
-                    files_after=1,
-                    rows_before=int(existing.height + incoming.height),
-                    rows_after=int(merged.height),
+            seal = self._monthly_seal_path(
+                exchange=exchange, symbol=symbol, month_token=month_token
+            )
+            with self._monthly_lock(exchange=exchange, symbol=symbol, month_token=month_token):
+                if pending.exists() or seal.exists():
+                    raise SealedMonthlyPartitionConflictError(
+                        f"Cannot compact WAL into sealed monthly partition {month_token}"
+                    )
+                monthly_path.parent.mkdir(parents=True, exist_ok=True)
+                existing = (
+                    pl.read_parquet(monthly_path)
+                    if monthly_path.exists()
+                    else self._empty_ohlcv_frame()
                 )
-            )
+                incoming_rows = by_month[month_token]
+                incoming = pl.DataFrame(
+                    {
+                        "datetime": [self._ms_to_datetime(item.ts_ms) for item in incoming_rows],
+                        "open": [item.open for item in incoming_rows],
+                        "high": [item.high for item in incoming_rows],
+                        "low": [item.low for item in incoming_rows],
+                        "close": [item.close for item in incoming_rows],
+                        "volume": [item.volume for item in incoming_rows],
+                        "_seq": list(range(len(incoming_rows))),
+                    }
+                ).with_columns(pl.col("datetime").cast(pl.Datetime(time_unit="ms")))
+
+                merged = self._merge_monthly_and_wal(monthly=existing, wal=incoming)
+                tmp_path = monthly_path.with_suffix(".tmp.parquet")
+                merged.write_parquet(tmp_path, compression="zstd", statistics=True)
+                self._fsync_file(tmp_path)
+                tmp_path.replace(monthly_path)
+                self._fsync_dir(monthly_path.parent)
+
+                results.append(
+                    CompactionResult(
+                        partition=str(monthly_path),
+                        files_before=1 if existing.height > 0 else 0,
+                        files_after=1,
+                        rows_before=int(existing.height + incoming.height),
+                        rows_after=int(merged.height),
+                    )
+                )
 
         if remove_sources:
             wal.truncate()

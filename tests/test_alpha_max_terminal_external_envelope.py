@@ -61,6 +61,7 @@ def test_descriptor_tree_walk_remains_anchored_after_descendant_replacement(
     root = tmp_path / "output"
     nested = root / "nested"
     nested.mkdir(parents=True)
+    root.chmod(0o700)
     (nested / "evidence.json").write_text("{}")
     sentinel = tmp_path / "sentinel"
     sentinel.mkdir()
@@ -1800,12 +1801,18 @@ def _phase_records_fixture(
     contract_digest = hashlib.sha256(files["contract.json"].read_bytes()).hexdigest()
     availability_digest = hashlib.sha256(files["availability.json"].read_bytes()).hexdigest()
     plan = {
-        "schema": "alpha_max_official_acquisition_plan.v3",
+        "schema": "alpha_max_official_acquisition_plan.v4",
         "source_eligible": False,
         "symbols": list(_FIXTURE_SYMBOLS),
         "months": [],
         "contract_sha256": contract_digest,
         "availability_evidence_sha256": availability_digest,
+        "storage_contract": {
+            "host_reserve_path": "/mnt/c",
+            "host_reserve_bytes": 21_474_836_480,
+            "max_live_archives": 1,
+            "archive_retention": "retired_after_double_derivation",
+        },
     }
     _fixture_write_canonical(report / "plan.json", plan)
     run_id = hashlib.sha256(canonical_bytes(plan)).hexdigest()
@@ -1852,6 +1859,7 @@ def _phase_records_fixture(
         "provenance/exchangeInfo.json.receipt.json",
         "acquisition.journal.jsonl",
     }
+    storage_contract = plan["storage_contract"]
     raw_total = funding_total = 0
     for symbol in _FIXTURE_SYMBOLS:
         raw_relative = f"market_ohlcv_1s/binance/{symbol}/2025-06.parquet"
@@ -1866,30 +1874,87 @@ def _phase_records_fixture(
             "https://data.binance.vision/data/futures/um/monthly/aggTrades/"
             f"{symbol}/{symbol}-aggTrades-2025-06.zip"
         )
-        archive_sha = _fixture_official_receipt(archive, archive_url)
+        _fixture_official_receipt(archive, archive_url)
+        archive_receipt_path = archive.with_name(archive.name + ".receipt.json")
+        archive_receipt_sha = hashlib.sha256(archive_receipt_path.read_bytes()).hexdigest()
+        archive_receipt = json.loads(archive_receipt_path.read_text())
+        archive.unlink()
         checksum = archive.with_name(archive.name + ".CHECKSUM")
-        checksum.write_text(f"{archive_sha}  {archive.name}\n")
-        checksum_sha = _fixture_official_receipt(checksum, archive_url + ".CHECKSUM")
+        checksum.write_text(f"{archive_receipt['sha256']}  {archive.name}\n")
+        checksum_payload_sha = _fixture_official_receipt(checksum, archive_url + ".CHECKSUM")
+        checksum_receipt_sha = hashlib.sha256(
+            checksum.with_name(checksum.name + ".receipt.json").read_bytes()
+        ).hexdigest()
         _fixture_write_partition(
             report,
             raw_relative,
-            archive_sha,
+            archive_receipt["sha256"],
             hashlib.sha256(raw_output.read_bytes()).hexdigest(),
             (end_ms - start_ms) // 1000,
             start_ms,
             end_ms,
             owner["code_sha256"],
-            [checksum_sha, archive_sha],
+            [checksum_payload_sha, archive_receipt["sha256"]],
             output_carry_close=1.0,
         )
+        partition = json.loads((report / _fixture_partition_path(raw_relative)).read_text())
+        evidence_root = provenance / "archive-evidence" / symbol
+        evidence_prefix = evidence_root / "2025-06"
+        derivation = {
+            "schema": "alpha_max_archive_derivation_receipt.v1",
+            "output_path": raw_relative,
+            "output_sha256": partition["output_sha256"],
+            "output_byte_count": raw_output.stat().st_size,
+            "rows": partition["rows"],
+            "start_ms": start_ms,
+            "end_ms": end_ms,
+            "input_carry_close": None,
+            "output_carry_close": 1.0,
+            "archive_url": archive_url,
+            "archive_member": f"{symbol}-aggTrades-2025-06.csv",
+            "archive_sha256": archive_receipt["sha256"],
+            "archive_byte_count": archive_receipt["byte_count"],
+            "archive_request_receipt_sha256": archive_receipt_sha,
+            "checksum_payload_sha256": partition["source_sha256"],
+            "checksum_request_receipt_sha256": checksum_receipt_sha,
+            "partition_receipt_sha256": hashlib.sha256(canonical_bytes(partition)).hexdigest(),
+            "prior_derivation_receipt_sha256": None,
+            "derivation_version": "alpha-max-binance-ohlcv-v4",
+            "code_sha256": owner["code_sha256"],
+        }
+        intent = {
+            "schema": "alpha_max_archive_retirement_intent.v1",
+            "derivation_receipt_sha256": hashlib.sha256(canonical_bytes(derivation)).hexdigest(),
+            "partition_receipt_sha256": derivation["partition_receipt_sha256"],
+            "archive_request_receipt_sha256": archive_receipt_sha,
+            "archive_relative_path": archive_relative,
+            "archive_sha256": archive_receipt["sha256"],
+            "archive_byte_count": archive_receipt["byte_count"],
+            "output_path": raw_relative,
+            "output_sha256": partition["output_sha256"],
+        }
+        deletion = {
+            "schema": "alpha_max_archive_deletion_receipt.v1",
+            "retirement_intent_sha256": hashlib.sha256(canonical_bytes(intent)).hexdigest(),
+            "derivation_receipt_sha256": intent["derivation_receipt_sha256"],
+            "archive_relative_path": archive_relative,
+            "archive_sha256": archive_receipt["sha256"],
+            "archive_byte_count": archive_receipt["byte_count"],
+            "archive_absent": True,
+        }
+        _fixture_write_canonical(evidence_prefix.with_suffix(".derivation.json"), derivation)
+        _fixture_write_canonical(evidence_prefix.with_suffix(".retirement-intent.json"), intent)
+        _fixture_write_canonical(evidence_prefix.with_suffix(".deletion.json"), deletion)
         output_inventory.append(raw_relative)
         required_report.update(
             {
-                archive_relative,
                 archive_relative + ".receipt.json",
                 archive_relative + ".CHECKSUM",
                 archive_relative + ".CHECKSUM.receipt.json",
                 _fixture_partition_path(raw_relative),
+                f"provenance/archive-evidence/{symbol}/2025-06.derivation.json",
+                f"provenance/archive-evidence/{symbol}/2025-06.retirement-intent.json",
+                f"provenance/archive-evidence/{symbol}/2025-06.deletion.json",
             }
         )
         interval = 14_400_000 if symbol == "TONUSDT" else 28_800_000
@@ -1979,29 +2044,44 @@ def _phase_records_fixture(
         *(f"output/{relative}" for relative in output_inventory),
         *(f"report/{relative}" for relative in sorted(required_report)),
     ]
+    artifacts = [
+        {
+            "path": relative,
+            "sha256": hashlib.sha256(
+                (
+                    (source if relative.startswith("output/") else report)
+                    / relative.split("/", 1)[1]
+                ).read_bytes()
+            ).hexdigest(),
+        }
+        for relative in artifact_paths
+    ]
+    archive_evidence_sha256 = hashlib.sha256(
+        canonical_bytes(
+            sorted(
+                (
+                    artifact
+                    for artifact in artifacts
+                    if artifact["path"].startswith("report/provenance/archive-evidence/")
+                ),
+                key=lambda artifact: artifact["path"],
+            )
+        )
+    ).hexdigest()
     manifest = {
-        "schema": "alpha_max_official_source_manifest.v4",
+        "schema": "alpha_max_official_source_manifest.v5",
         "contract_sha256": contract_digest,
         "availability_evidence_sha256": availability_digest,
         "derivation_version": "alpha-max-binance-ohlcv-v4",
-        "artifacts": [
-            {
-                "path": relative,
-                "sha256": hashlib.sha256(
-                    (
-                        (source if relative.startswith("output/") else report)
-                        / relative.split("/", 1)[1]
-                    ).read_bytes()
-                ).hexdigest(),
-            }
-            for relative in artifact_paths
-        ],
+        "storage_contract": storage_contract,
+        "archive_evidence_sha256": archive_evidence_sha256,
+        "artifacts": artifacts,
     }
     manifest_path = report / "source_manifest.json"
     _fixture_write_canonical(manifest_path, manifest)
     receipt_path = report / "source_eligible_receipt.json"
     receipt = {
-        "schema": "alpha_max_official_source_receipt.v3",
+        "schema": "alpha_max_official_source_receipt.v4",
         "source_eligible": True,
         "raw_rows": raw_total,
         "funding_rows": funding_total,
@@ -2009,6 +2089,8 @@ def _phase_records_fixture(
         "availability_evidence_sha256": availability_digest,
         "derivation_version": "alpha-max-binance-ohlcv-v4",
         "code_sha256": owner["code_sha256"],
+        "storage_contract": storage_contract,
+        "archive_evidence_sha256": archive_evidence_sha256,
         "exchange_info_sha256": exchange_digest,
         "inventory_sha256": hashlib.sha256(canonical_bytes(output_inventory)).hexdigest(),
         "source_manifest_sha256": hashlib.sha256(manifest_path.read_bytes()).hexdigest(),
@@ -3346,6 +3428,103 @@ def test_phase_records_acquisition_adversarial_matrix(
             directory.chmod(0o555)
     mutate(paths)
     with pytest.raises(TerminalPolicyError, match=message):
+        terminal_policy._validate_acquisition(_adversarial_acquisition_records(request.records))
+
+
+@pytest.mark.parametrize(
+    "case",
+    (
+        "old-plan",
+        "old-manifest",
+        "old-receipt",
+        "intent-tamper",
+        "deletion-tamper",
+        "retained-zip",
+        "retained-zip-symlink",
+        "retained-zip-hardlink",
+        "missing-evidence",
+        "archive-receipt-tamper",
+        "derivation-chain-tamper",
+        "storage-contract-tamper",
+        "evidence-digest-tamper",
+    ),
+)
+def test_compact_archive_proof_adversarial_envelope(tmp_path: Path, case: str) -> None:
+    _envelope, request, paths = _phase_records_fixture(tmp_path / case)
+    report = paths["report"]
+    symbol = _FIXTURE_SYMBOLS[0]
+    archive = report / f"provenance/archives/{symbol}/{symbol}-aggTrades-2025-06.zip"
+    evidence = report / f"provenance/archive-evidence/{symbol}/2025-06"
+    if case == "old-plan":
+        _adversarial_write(
+            paths["plan"],
+            {
+                **json.loads(paths["plan"].read_text()),
+                "schema": "alpha_max_official_acquisition_plan.v3",
+            },
+        )
+    elif case == "old-manifest":
+        _adversarial_write(
+            paths["manifest"],
+            {
+                **json.loads(paths["manifest"].read_text()),
+                "schema": "alpha_max_official_source_manifest.v4",
+            },
+        )
+    elif case == "old-receipt":
+        _adversarial_write(
+            paths["receipt"],
+            {
+                **json.loads(paths["receipt"].read_text()),
+                "schema": "alpha_max_official_source_receipt.v3",
+            },
+        )
+    elif case == "retained-zip":
+        _adversarial_add_file(archive)
+    elif case == "retained-zip-symlink":
+        _adversarial_add_symlink(archive, paths["receipt"])
+    elif case == "retained-zip-hardlink":
+        _adversarial_add_hard_link(archive, paths["receipt"])
+    elif case == "missing-evidence":
+        _adversarial_remove(evidence.with_suffix(".deletion.json"))
+    elif case == "archive-receipt-tamper":
+        receipt = archive.with_name(archive.name + ".receipt.json")
+        _adversarial_write(receipt, {**json.loads(receipt.read_text()), "byte_count": 0})
+    elif case == "derivation-chain-tamper":
+        derivation = evidence.with_suffix(".derivation.json")
+        _adversarial_write(
+            derivation,
+            {
+                **json.loads(derivation.read_text()),
+                "prior_derivation_receipt_sha256": _digest("wrong-prior"),
+            },
+        )
+    elif case == "intent-tamper":
+        intent = evidence.with_suffix(".retirement-intent.json")
+        _adversarial_write(intent, {**json.loads(intent.read_text()), "archive_absent": True})
+    elif case == "deletion-tamper":
+        deletion = evidence.with_suffix(".deletion.json")
+        _adversarial_write(deletion, {**json.loads(deletion.read_text()), "archive_absent": False})
+    elif case == "storage-contract-tamper":
+        _adversarial_write(
+            paths["receipt"],
+            {
+                **json.loads(paths["receipt"].read_text()),
+                "storage_contract": {
+                    **json.loads(paths["receipt"].read_text())["storage_contract"],
+                    "max_live_archives": 2,
+                },
+            },
+        )
+    else:
+        _adversarial_write(
+            paths["manifest"],
+            {
+                **json.loads(paths["manifest"].read_text()),
+                "archive_evidence_sha256": _digest("wrong-evidence"),
+            },
+        )
+    with pytest.raises(TerminalPolicyError):
         terminal_policy._validate_acquisition(_adversarial_acquisition_records(request.records))
 
 

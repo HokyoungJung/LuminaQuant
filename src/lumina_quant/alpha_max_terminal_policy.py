@@ -2655,6 +2655,138 @@ def _observed_tree_directories(
     }
 
 
+_STORAGE_CONTRACT = {
+    "host_reserve_path": "/mnt/c",
+    "host_reserve_bytes": 21_474_836_480,
+    "max_live_archives": 1,
+    "archive_retention": "retired_after_double_derivation",
+}
+
+
+def _acquisition_detached_archive_receipt(
+    report_fd: int,
+    enumerated: dict[str, os.stat_result],
+    path: str,
+    requested_url: str,
+) -> tuple[dict[str, Any], str]:
+    _info, receipt_sha, _size, payload = _regular_file_at_enumerated(
+        report_fd, path, "retired archive request receipt", enumerated, capture=True
+    )
+    if payload is None:
+        raise AssertionError("captured archive receipt is missing")
+    receipt = _canonical_object_at_enumerated(
+        report_fd, path, "retired archive request receipt", enumerated
+    )
+    expected = {
+        "schema": "official_request_receipt.v1",
+        "requested_url": requested_url,
+        "final_url": requested_url,
+        "final_host": "data.binance.vision",
+        "query": {},
+        "retrieved_at_utc": receipt.get("retrieved_at_utc"),
+        "byte_count": receipt.get("byte_count"),
+        "sha256": receipt.get("sha256"),
+    }
+    if (
+        payload != canonical_bytes(receipt)
+        or receipt != expected
+        or not isinstance(expected["retrieved_at_utc"], str)
+        or type(expected["byte_count"]) is not int
+        or expected["byte_count"] < 0
+    ):
+        raise TerminalPolicyError("source retired archive receipt mismatch")
+    _acquisition_utc_ms(expected["retrieved_at_utc"], "retrieval time")
+    validate_sha256(expected["sha256"], "retired archive sha256")
+    return receipt, receipt_sha
+
+
+def _acquisition_archive_evidence(
+    report_fd: int,
+    enumerated: dict[str, os.stat_result],
+    symbol: str,
+    label: str,
+    archive: str,
+    archive_url: str,
+    relative: str,
+    output_sha: str,
+    output_size: int,
+    rows: int,
+    start: int,
+    end: int,
+    input_carry: float | None,
+    output_carry: float,
+    archive_receipt: dict[str, Any],
+    archive_receipt_sha: str,
+    checksum_sha: str,
+    partition: dict[str, Any],
+    prior_derivation: str | None,
+    code_sha: str,
+) -> str:
+    prefix = f"provenance/archive-evidence/{symbol}/{label}"
+    derivation_path = prefix + ".derivation.json"
+    intent_path = prefix + ".retirement-intent.json"
+    deletion_path = prefix + ".deletion.json"
+    derivation = _canonical_object_at_enumerated(
+        report_fd, derivation_path, "archive derivation receipt", enumerated
+    )
+    expected_derivation = {
+        "schema": "alpha_max_archive_derivation_receipt.v1",
+        "output_path": relative,
+        "output_sha256": output_sha,
+        "output_byte_count": output_size,
+        "rows": rows,
+        "start_ms": start,
+        "end_ms": end,
+        "input_carry_close": input_carry,
+        "output_carry_close": output_carry,
+        "archive_url": archive_url,
+        "archive_member": archive.rsplit("/", 1)[-1].removesuffix(".zip") + ".csv",
+        "archive_sha256": archive_receipt["sha256"],
+        "archive_byte_count": archive_receipt["byte_count"],
+        "archive_request_receipt_sha256": archive_receipt_sha,
+        "checksum_payload_sha256": partition["source_sha256"],
+        "checksum_request_receipt_sha256": checksum_sha,
+        "partition_receipt_sha256": hashlib.sha256(canonical_bytes(partition)).hexdigest(),
+        "prior_derivation_receipt_sha256": prior_derivation,
+        "derivation_version": "alpha-max-binance-ohlcv-v4",
+        "code_sha256": code_sha,
+    }
+    if derivation != expected_derivation:
+        raise TerminalPolicyError("source archive derivation receipt mismatch")
+    derivation_sha = hashlib.sha256(canonical_bytes(derivation)).hexdigest()
+    intent = _canonical_object_at_enumerated(
+        report_fd, intent_path, "archive retirement intent", enumerated
+    )
+    expected_intent = {
+        "schema": "alpha_max_archive_retirement_intent.v1",
+        "derivation_receipt_sha256": derivation_sha,
+        "partition_receipt_sha256": expected_derivation["partition_receipt_sha256"],
+        "archive_request_receipt_sha256": archive_receipt_sha,
+        "archive_relative_path": archive,
+        "archive_sha256": archive_receipt["sha256"],
+        "archive_byte_count": archive_receipt["byte_count"],
+        "output_path": relative,
+        "output_sha256": output_sha,
+    }
+    if intent != expected_intent:
+        raise TerminalPolicyError("source archive retirement intent mismatch")
+    deletion = _canonical_object_at_enumerated(
+        report_fd, deletion_path, "archive deletion receipt", enumerated
+    )
+    expected_deletion = {
+        "schema": "alpha_max_archive_deletion_receipt.v1",
+        "retirement_intent_sha256": hashlib.sha256(canonical_bytes(intent)).hexdigest(),
+        "derivation_receipt_sha256": derivation_sha,
+        "archive_relative_path": archive,
+        "archive_sha256": archive_receipt["sha256"],
+        "archive_byte_count": archive_receipt["byte_count"],
+        "archive_absent": True,
+    }
+    if deletion != expected_deletion:
+        raise TerminalPolicyError("source archive deletion receipt mismatch")
+    return derivation_sha
+
+
 def _acquisition_oracle(
     records: AcquisitionRecords | PhaseRecords,
     source_fd: int,
@@ -2704,6 +2836,7 @@ def _acquisition_oracle(
     raw_total = funding_total = 0
     for contract in contracts:
         carry: float | None = None
+        prior_derivation: str | None = None
         for month in _acquisition_months(contract.raw_start, contract.raw_end):
             label = month.strftime("%Y-%m")
             nominal_start = int(month.timestamp() * 1000)
@@ -2714,12 +2847,21 @@ def _acquisition_oracle(
             relative = f"market_ohlcv_1s/binance/{contract.symbol}/{label}.parquet"
             filename = f"{contract.symbol}-aggTrades-{label}.zip"
             archive = f"provenance/archives/{contract.symbol}/{filename}"
+            archive_receipt_path = archive + ".receipt.json"
             checksum = archive + ".CHECKSUM"
             base = f"https://data.binance.vision/data/futures/um/monthly/aggTrades/{contract.symbol}/{filename}"
-            checksum_sha = _acquisition_receipt(
+            checksum_payload_sha = _acquisition_receipt(
                 report_fd, report_enumerated, checksum, base + ".CHECKSUM"
             )
-            archive_sha = _acquisition_receipt(report_fd, report_enumerated, archive, base)
+            _info, checksum_receipt_sha, _size, _payload = _regular_file_at_enumerated(
+                report_fd,
+                checksum + ".receipt.json",
+                "archive checksum receipt",
+                report_enumerated,
+            )
+            archive_receipt, archive_receipt_sha = _acquisition_detached_archive_receipt(
+                report_fd, report_enumerated, archive_receipt_path, base
+            )
             _info, _digest, _size, checksum_payload = _regular_file_at_enumerated(
                 report_fd, checksum, "archive checksum", report_enumerated, capture=True
             )
@@ -2729,15 +2871,15 @@ def _acquisition_oracle(
                 raise TerminalPolicyError("source official report coverage mismatch") from exc
             if (
                 len(fields) not in (1, 2)
-                or fields[0].lower() != archive_sha
+                or fields[0].lower() != archive_receipt["sha256"]
                 or (len(fields) == 2 and fields[1].lstrip("*") != filename)
             ):
                 raise TerminalPolicyError("source official report coverage mismatch")
-            _info, output_sha, _size, _payload = _regular_file_at_enumerated(
+            _info, output_sha, output_size, _payload = _regular_file_at_enumerated(
                 source_fd, relative, "raw output", source_enumerated
             )
             rows = (end - start) // 1000
-            carry = _acquisition_raw_partition(
+            output_carry = _acquisition_raw_partition(
                 report_fd,
                 report_enumerated,
                 relative,
@@ -2748,16 +2890,48 @@ def _acquisition_oracle(
                 end,
                 carry,
                 records.acquirer.sha256,
-                [checksum_sha, archive_sha],
+                [checksum_payload_sha, archive_receipt["sha256"]],
             )
+            partition = _canonical_object_at_enumerated(
+                report_fd,
+                _acquisition_partition_path(relative),
+                "source partition receipt",
+                report_enumerated,
+            )
+            prior_derivation = _acquisition_archive_evidence(
+                report_fd,
+                report_enumerated,
+                contract.symbol,
+                label,
+                archive,
+                base,
+                relative,
+                output_sha,
+                output_size,
+                rows,
+                start,
+                end,
+                carry,
+                output_carry,
+                archive_receipt,
+                archive_receipt_sha,
+                checksum_receipt_sha,
+                partition,
+                prior_derivation,
+                records.acquirer.sha256,
+            )
+            carry = output_carry
             required_output.add(relative)
+            evidence_prefix = f"provenance/archive-evidence/{contract.symbol}/{label}"
             required_report.update(
                 {
-                    archive,
-                    archive + ".receipt.json",
+                    archive_receipt_path,
                     checksum,
                     checksum + ".receipt.json",
                     _acquisition_partition_path(relative),
+                    evidence_prefix + ".derivation.json",
+                    evidence_prefix + ".retirement-intent.json",
+                    evidence_prefix + ".deletion.json",
                 }
             )
             raw_total += rows
@@ -2965,12 +3139,13 @@ def _validate_acquired_source_report_at(
 
     plan = _canonical_object_at_enumerated(report_fd, "plan.json", "source plan", report_enumerated)
     expected_plan = {
-        "schema": "alpha_max_official_acquisition_plan.v3",
+        "schema": "alpha_max_official_acquisition_plan.v4",
         "source_eligible": False,
         "symbols": list(_SYMBOLS),
         "months": [],
         "contract_sha256": records.contract_manifest.sha256,
         "availability_evidence_sha256": records.availability_evidence.sha256,
+        "storage_contract": _STORAGE_CONTRACT,
     }
     if plan != expected_plan:
         raise TerminalPolicyError("source acquisition plan mismatch")
@@ -3051,6 +3226,8 @@ def _validate_acquired_source_report_at(
             "contract_sha256",
             "availability_evidence_sha256",
             "derivation_version",
+            "storage_contract",
+            "archive_evidence_sha256",
             "artifacts",
         },
         "source manifest",
@@ -3067,11 +3244,21 @@ def _validate_acquired_source_report_at(
                 fd, relative, f"source manifest artifact {prefix}/{relative}", enumerated
             )
             expected_artifacts.append({"path": f"{prefix}/{relative}", "sha256": digest})
+    evidence_artifacts = sorted(
+        (
+            artifact
+            for artifact in expected_artifacts
+            if artifact["path"].startswith("report/provenance/archive-evidence/")
+        ),
+        key=lambda artifact: artifact["path"],
+    )
     expected_manifest = {
-        "schema": "alpha_max_official_source_manifest.v4",
+        "schema": "alpha_max_official_source_manifest.v5",
         "contract_sha256": records.contract_manifest.sha256,
         "availability_evidence_sha256": records.availability_evidence.sha256,
         "derivation_version": "alpha-max-binance-ohlcv-v4",
+        "storage_contract": _STORAGE_CONTRACT,
+        "archive_evidence_sha256": hashlib.sha256(canonical_bytes(evidence_artifacts)).hexdigest(),
         "artifacts": expected_artifacts,
     }
     if manifest != expected_manifest:
@@ -3096,7 +3283,7 @@ def _validate_acquired_source_report_at(
         report_fd, "acquisition.journal.jsonl", "source journal", report_enumerated
     )
     expected_receipt = {
-        "schema": "alpha_max_official_source_receipt.v3",
+        "schema": "alpha_max_official_source_receipt.v4",
         "source_eligible": True,
         "raw_rows": raw_total,
         "funding_rows": funding_total,
@@ -3104,6 +3291,8 @@ def _validate_acquired_source_report_at(
         "availability_evidence_sha256": records.availability_evidence.sha256,
         "derivation_version": "alpha-max-binance-ohlcv-v4",
         "code_sha256": records.acquirer.sha256,
+        "storage_contract": _STORAGE_CONTRACT,
+        "archive_evidence_sha256": expected_manifest["archive_evidence_sha256"],
         "exchange_info_sha256": exchange_sha,
         "inventory_sha256": hashlib.sha256(canonical_bytes(output_inventory)).hexdigest(),
         "source_manifest_sha256": manifest_sha,
@@ -4503,12 +4692,14 @@ def _validate_preparation_manifest(
                 "contract_sha256",
                 "availability_evidence_sha256",
                 "derivation_version",
+                "storage_contract",
+                "archive_evidence_sha256",
                 "artifacts",
             },
             "phase source manifest",
         )
         if (
-            source_manifest["schema"] != "alpha_max_official_source_manifest.v4"
+            source_manifest["schema"] != "alpha_max_official_source_manifest.v5"
             or source_manifest["contract_sha256"] != records.contract_manifest.sha256
             or source_manifest["availability_evidence_sha256"]
             != records.availability_evidence.sha256

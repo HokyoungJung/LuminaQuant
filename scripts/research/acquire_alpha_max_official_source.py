@@ -18,6 +18,7 @@ import io
 import itertools
 import json
 import math
+import shutil
 import os
 from pathlib import Path
 import re
@@ -59,6 +60,10 @@ RAW_COLUMNS = ["datetime", "open", "high", "low", "close", "volume"]
 FUNDING_COLUMNS = ["timestamp_ms", "source_timestamp_ms", "exchange", "symbol", "funding_rate"]
 DOWNLOAD_CHUNK = 1 << 20
 DOWNLOAD_ATTEMPTS = 3
+HOST_RESERVE_PATH = Path("/mnt/c")
+HOST_RESERVE_BYTES = 21_474_836_480
+MAX_LIVE_ARCHIVES = 1
+ARCHIVE_RETENTION = "retired_after_double_derivation"
 
 CANONICAL_ORDER_ARCHIVES = {
     ("BTCUSDT", "2023-05"): (
@@ -190,6 +195,7 @@ def file_sha256(path: Path) -> str:
             digest.update(block)
     return digest.hexdigest()
 
+
 def opened_file_identity(source: io.BufferedReader) -> tuple[str, int]:
     digest = hashlib.sha256()
     byte_count = 0
@@ -212,7 +218,6 @@ def authenticated_archive_identity(
     ):
         raise AcquisitionError("archive_receipt_invalid")
     return identity
-
 
 
 def safe_file_bytes(path: Path) -> bytes:
@@ -247,12 +252,25 @@ def fsync_directory(path: Path) -> None:
         os.close(fd)
 
 
+def assert_host_reserve(required_bytes: int = 0) -> None:
+    """Fail before a write can consume the WSL host's reserved capacity."""
+    if isinstance(required_bytes, bool) or required_bytes < 0:
+        raise AcquisitionError("host_reserve_requirement_invalid")
+    try:
+        free = shutil.disk_usage(HOST_RESERVE_PATH).free
+    except OSError as exc:
+        raise AcquisitionError("host_reserve_unavailable") from exc
+    if free - required_bytes <= HOST_RESERVE_BYTES:
+        raise AcquisitionError("host_reserve_exhausted")
+
+
 def mkdir_durable(path: Path) -> None:
     if path.exists():
         return
     mkdir_durable(path.parent)
     path.mkdir(mode=0o700)
     fsync_directory(path.parent)
+
 
 def scratch_file_identity(path: Path) -> tuple[int, int]:
     item = path.lstat()
@@ -279,7 +297,6 @@ def remove_aggtrades_file(path: Path, identity: tuple[int, int] | None = None) -
         raise AcquisitionError("unsafe_scratch_entry")
     path.unlink()
     fsync_directory(path.parent)
-
 
 
 def scratch_directory(root: Path) -> Path:
@@ -310,9 +327,7 @@ def scratch_directory(root: Path) -> Path:
         if candidate.name.startswith(".aggtrades-"):
             stale_aggtrades.append((candidate, scratch_file_identity(candidate)))
             continue
-        if not candidate.name.startswith(
-            (".acquire-", ".derive-", ".partial-", ".recovery-")
-        ):
+        if not candidate.name.startswith((".acquire-", ".derive-", ".partial-", ".recovery-")):
             raise AcquisitionError("unsafe_scratch_entry")
         if not stat.S_ISREG(item.st_mode) or item.st_uid != os.getuid():
             raise AcquisitionError("unsafe_scratch_entry")
@@ -338,6 +353,7 @@ def scratch_file(root: Path, prefix: str, suffix: str = "") -> tuple[int, str]:
 def atomic_write(
     path: Path, data: bytes, replace: bool = False, scratch_root: Path | None = None
 ) -> None:
+    assert_host_reserve(len(data))
     mkdir_durable(path.parent)
     fsync_directory(path.parent)
     if not replace and (path.exists() or path.is_symlink()):
@@ -583,6 +599,7 @@ def parse_checksum(data: bytes, filename: str) -> str:
         raise AcquisitionError("archive_checksum_filename_invalid")
     return fields[0].lower()
 
+
 def archive_trades(
     archive_source: io.BufferedReader, expected_member: str, nominal_start: int, nominal_end: int
 ) -> Iterable[tuple[int, int, float, float]]:
@@ -757,6 +774,7 @@ def canonical_frame_from_archive(
         if not records:
             return
         records.sort(key=lambda value: ORDER_RECORD.unpack(value)[0])
+        assert_host_reserve(len(records) * ORDER_RECORD.size)
         fd, name = tempfile.mkstemp(prefix=".aggtrades-chunk-", suffix=".bin", dir=scratch)
         target = Path(name)
         with os.fdopen(fd, "wb") as sink:
@@ -790,6 +808,7 @@ def canonical_frame_from_archive(
             merged: list[Path] = []
             for offset in range(0, len(chunks), ORDER_MERGE_FAN_IN):
                 group = chunks[offset : offset + ORDER_MERGE_FAN_IN]
+                assert_host_reserve(sum(stable_file_stat(item).st_size for item in group))
                 fd, name = tempfile.mkstemp(prefix=".aggtrades-merge-", suffix=".bin", dir=scratch)
                 target = Path(name)
                 with os.fdopen(fd, "wb") as sink:
@@ -828,7 +847,7 @@ def canonical_frame_from_archive(
         for item, identity in list(identities.items()):
             try:
                 remove_aggtrades_file(item, identity)
-            except (OSError, AcquisitionError):
+            except OSError, AcquisitionError:
                 cleanup_failures += 1
         if cleanup_failures:
             if primary is None:
@@ -896,6 +915,7 @@ def frame_from_archive(
             end_ms,
             carry,
         )
+
 
 def root_identity(path: Path) -> list[int]:
     try:
@@ -1362,7 +1382,8 @@ def canonical_utc(value: object) -> str:
 def request_receipt(
     path: Path, requested_url: str, query: dict[str, Any] | None = None
 ) -> dict[str, Any]:
-    receipt = read_json(path.with_suffix(path.suffix + ".receipt.json"))
+    receipt_path = path.with_suffix(path.suffix + ".receipt.json")
+    receipt = read_json(receipt_path)
     requested, expected_query = _request_fields(requested_url, query)
     required = {
         "schema": "official_request_receipt.v1",
@@ -1374,7 +1395,11 @@ def request_receipt(
         "byte_count": stable_file_stat(path).st_size,
         "sha256": file_sha256(path),
     }
-    if set(receipt) != set(required) or receipt != required:
+    if (
+        stable_file_bytes(receipt_path) != canonical_bytes(receipt)
+        or set(receipt) != set(required)
+        or receipt != required
+    ):
         raise AcquisitionError("cached_request_receipt_invalid")
     checked_url(requested)
     return receipt
@@ -1430,6 +1455,7 @@ def fetch_receipt(
                 if final != requested:
                     raise AcquisitionError("official_redirect_identity_invalid")
                 while block := response.read(DOWNLOAD_CHUNK):
+                    assert_host_reserve(len(block))
                     digest.update(block)
                     count += len(block)
                     sink.write(block)
@@ -1465,15 +1491,26 @@ def fetch_receipt(
 def publish_frame(path: Path, frame: pl.DataFrame, scratch_root: Path | None = None) -> str:
     if path.exists() or path.is_symlink():
         raise AcquisitionError("preseeded_output_rejected")
+    assert_host_reserve(max(int(frame.estimated_size()), 1 << 20))
     mkdir_durable(path.parent)
     fsync_directory(path.parent)
     fd, temp = scratch_file(scratch_root or path.parent, ".acquire-", ".parquet")
     os.close(fd)
     try:
         frame.write_parquet(temp)
+        # The inode must be durable before its no-replace hard-link publication.
+        with stable_file(Path(temp)) as source:
+            source.flush()
+            os.fsync(source.fileno())
         digest = file_sha256(Path(temp))
+        assert_host_reserve()
         os.link(temp, path)
         fsync_directory(path.parent)
+        os.unlink(temp)
+        fsync_directory(Path(temp).parent)
+        # Reopen only after the temporary hard link is gone, so the target is singly linked.
+        if file_sha256(path) != digest:
+            raise AcquisitionError("published_parquet_identity_invalid")
         return digest
     finally:
         try:
@@ -1484,6 +1521,7 @@ def publish_frame(path: Path, frame: pl.DataFrame, scratch_root: Path | None = N
 
 
 def frame_sha256(frame: pl.DataFrame, directory: Path, scratch_root: Path | None = None) -> str:
+    assert_host_reserve(max(int(frame.estimated_size()), 1 << 20))
     fd, temporary = scratch_file(scratch_root or directory, ".derive-", ".parquet")
     os.close(fd)
     try:
@@ -1563,14 +1601,144 @@ def verified_partition(
     return True
 
 
+def archive_evidence_paths(report: Path, symbol: str, label: str) -> dict[str, Path]:
+    root = report / "provenance" / "archive-evidence" / symbol
+    return {
+        kind: root / f"{label}.{kind}.json"
+        for kind in ("derivation", "retirement-intent", "deletion")
+    }
+
+
+def detached_archive_receipt(path: Path, url: str) -> dict[str, Any]:
+    """Validate a retained canonical request receipt without requiring its retired body."""
+    try:
+        raw = stable_file_bytes(path)
+        receipt = read_json(path)
+        requested, query = _request_fields(url, None)
+        required = {
+            "schema": "official_request_receipt.v1",
+            "requested_url": requested,
+            "final_url": requested,
+            "final_host": urllib.parse.urlsplit(requested).hostname,
+            "query": query,
+            "retrieved_at_utc": canonical_utc(receipt.get("retrieved_at_utc")),
+            "byte_count": receipt.get("byte_count"),
+            "sha256": receipt.get("sha256"),
+        }
+        if (
+            raw != canonical_bytes(receipt)
+            or set(receipt) != set(required)
+            or receipt != required
+            or not isinstance(receipt["byte_count"], int)
+            or receipt["byte_count"] < 0
+            or not isinstance(receipt["sha256"], str)
+            or not re.fullmatch(r"[0-9a-f]{64}", receipt["sha256"])
+        ):
+            raise AcquisitionError("retired_archive_request_receipt_invalid")
+    except (AcquisitionError, KeyError, TypeError, ValueError) as exc:
+        if str(exc) == "retired_archive_request_receipt_invalid":
+            raise
+        raise AcquisitionError("retired_archive_request_receipt_invalid") from exc
+    return receipt
+
+
+def expected_archive_derivation(
+    archive: Path,
+    archive_receipt_path: Path,
+    archive_url: str,
+    target: Path,
+    partition: dict[str, Any],
+    prior: str | None,
+    receipt: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "schema": "alpha_max_archive_derivation_receipt.v1",
+        "output_path": partition["path"],
+        "output_sha256": file_sha256(target),
+        "output_byte_count": stable_file_stat(target).st_size,
+        "rows": partition["rows"],
+        "start_ms": partition["start_ms"],
+        "end_ms": partition["end_ms"],
+        "input_carry_close": partition["input_carry_close"],
+        "output_carry_close": partition["output_carry_close"],
+        "archive_url": archive_url,
+        "archive_member": archive.name.removesuffix(".zip") + ".csv",
+        "archive_sha256": receipt["sha256"],
+        "archive_byte_count": receipt["byte_count"],
+        "archive_request_receipt_sha256": sha256(stable_file_bytes(archive_receipt_path)),
+        "checksum_payload_sha256": partition["source_sha256"],
+        "checksum_request_receipt_sha256": sha256(
+            stable_file_bytes(archive.with_name(archive.name + ".CHECKSUM.receipt.json"))
+        ),
+        "partition_receipt_sha256": sha256(canonical_bytes(partition)),
+        "prior_derivation_receipt_sha256": prior,
+        "derivation_version": DERIVATION_VERSION,
+        "code_sha256": code_hash(),
+    }
+
+
+def expected_archive_intent(archive: Path, derivation: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "schema": "alpha_max_archive_retirement_intent.v1",
+        "derivation_receipt_sha256": sha256(canonical_bytes(derivation)),
+        "partition_receipt_sha256": derivation["partition_receipt_sha256"],
+        "archive_request_receipt_sha256": derivation["archive_request_receipt_sha256"],
+        "archive_relative_path": str(archive.relative_to(archive.parents[3])),
+        "archive_sha256": derivation["archive_sha256"],
+        "archive_byte_count": derivation["archive_byte_count"],
+        "output_path": derivation["output_path"],
+        "output_sha256": derivation["output_sha256"],
+    }
+
+
+def archive_evidence(
+    report: Path,
+    symbol: str,
+    label: str,
+    archive: Path,
+    archive_receipt_path: Path,
+    archive_url: str,
+    target: Path,
+    partition: dict[str, Any],
+    prior: str | None,
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    paths = archive_evidence_paths(report, symbol, label)
+    derivation, intent, deletion = (read_json(paths[kind]) for kind in paths)
+    receipt = detached_archive_receipt(archive_receipt_path, archive_url)
+    required_derivation = expected_archive_derivation(
+        archive, archive_receipt_path, archive_url, target, partition, prior, receipt
+    )
+    if derivation != required_derivation:
+        raise AcquisitionError("archive_derivation_receipt_invalid")
+    required_intent = expected_archive_intent(archive, derivation)
+    if intent != required_intent:
+        raise AcquisitionError("archive_retirement_intent_invalid")
+    if archive.exists() or archive.is_symlink():
+        raise AcquisitionError("retired_archive_body_present")
+    required_deletion = {
+        "schema": "alpha_max_archive_deletion_receipt.v1",
+        "retirement_intent_sha256": sha256(canonical_bytes(intent)),
+        "derivation_receipt_sha256": sha256(canonical_bytes(derivation)),
+        "archive_relative_path": str(archive.relative_to(report)),
+        "archive_sha256": receipt["sha256"],
+        "archive_byte_count": receipt["byte_count"],
+        "archive_absent": True,
+    }
+    if deletion != required_deletion:
+        raise AcquisitionError("archive_deletion_receipt_invalid")
+    return derivation, intent, deletion
+
+
 def acquire_archive(
     contract: Contract, output: Path, report: Path, chosen_months: set[str] | None = None
 ) -> None:
     carry: float | None = None
+    prior_derivation: str | None = None
     for month in month_starts(contract.raw_start_ms, contract.raw_end_ms):
         label = month.strftime("%Y-%m")
         if chosen_months is not None and label not in chosen_months:
             carry = None
+            prior_derivation = None
             continue
         nominal_start, nominal_end = month_bounds(month)
         start, end = (
@@ -1580,16 +1748,111 @@ def acquire_archive(
         filename = f"{contract.symbol}-aggTrades-{label}.zip"
         url = f"{ARCHIVE_BASE}/{contract.symbol}/{filename}"
         archive = report / "provenance" / "archives" / contract.symbol / filename
+        archive_receipt_path = archive.with_suffix(".zip.receipt.json")
         checksum = archive.with_name(filename + ".CHECKSUM")
+        relative = str(Path("market_ohlcv_1s") / EXCHANGE / contract.symbol / f"{label}.parquet")
+        target = output / relative
+        paths = archive_evidence_paths(report, contract.symbol, label)
+
+        # A completed prefix is entirely offline: never redownload or open a retired ZIP.
+        if paths["deletion"].exists():
+            partition = read_json(partition_path(report, relative))
+            derivation, _intent, _deletion = archive_evidence(
+                report,
+                contract.symbol,
+                label,
+                archive,
+                archive_receipt_path,
+                url,
+                target,
+                partition,
+                prior_derivation,
+            )
+            carry = partition["output_carry_close"]
+            prior_derivation = sha256(canonical_bytes(derivation))
+            continue
+        if paths["derivation"].exists() or paths["retirement-intent"].exists():
+            # A durable derivation is resumed without redownloading; an
+            # intent-authorized missing body is recoverable before deletion evidence.
+            if archive.is_symlink() or (
+                not archive.exists() and not paths["retirement-intent"].exists()
+            ):
+                raise AcquisitionError("archive_retirement_absence_invalid")
+            archive_receipt = (
+                request_receipt(archive, url)
+                if archive.exists()
+                else detached_archive_receipt(archive_receipt_path, url)
+            )
+            checksum_receipt = request_receipt(checksum, url + ".CHECKSUM")
+            expected = parse_checksum(stable_file_bytes(checksum), filename)
+            if archive_receipt["sha256"] != expected:
+                raise AcquisitionError("archive_checksum_mismatch")
+            partition = read_json(partition_path(report, relative))
+            actual = parquet_frame(target)
+            assert_raw_frame(actual, start, end)
+            output_carry = float(actual["close"][-1])
+            required_partition = expected_partition_receipt(
+                relative,
+                expected,
+                target,
+                actual.height,
+                start,
+                end,
+                carry,
+                output_carry,
+                [checksum_receipt["sha256"], archive_receipt["sha256"]],
+            )
+            if partition != required_partition:
+                raise AcquisitionError("partition_resume_receipt_invalid")
+            expected_derivation = expected_archive_derivation(
+                archive,
+                archive_receipt_path,
+                url,
+                target,
+                partition,
+                prior_derivation,
+                archive_receipt,
+            )
+            if (
+                not paths["derivation"].exists()
+                or read_json(paths["derivation"]) != expected_derivation
+            ):
+                raise AcquisitionError("archive_derivation_receipt_invalid")
+            derivation = expected_derivation
+            intent = expected_archive_intent(archive, derivation)
+            if paths["retirement-intent"].exists():
+                if read_json(paths["retirement-intent"]) != intent:
+                    raise AcquisitionError("archive_retirement_intent_invalid")
+            else:
+                immutable_json(paths["retirement-intent"], intent, report)
+            if archive.exists():
+                remove_aggtrades_file(archive)
+            if archive.exists() or archive.is_symlink():
+                raise AcquisitionError("archive_retirement_absence_invalid")
+            deletion = {
+                "schema": "alpha_max_archive_deletion_receipt.v1",
+                "retirement_intent_sha256": sha256(canonical_bytes(intent)),
+                "derivation_receipt_sha256": sha256(canonical_bytes(derivation)),
+                "archive_relative_path": str(archive.relative_to(report)),
+                "archive_sha256": archive_receipt["sha256"],
+                "archive_byte_count": archive_receipt["byte_count"],
+                "archive_absent": True,
+            }
+            immutable_json(paths["deletion"], deletion, report)
+            carry = output_carry
+            prior_derivation = sha256(canonical_bytes(derivation))
+            continue
+        if not target.exists() and partition_path(report, relative).exists():
+            raise AcquisitionError("partition_resume_receipt_invalid")
+        live = list((report / "provenance" / "archives").glob("**/*.zip"))
+        if archive not in live and len(live) >= MAX_LIVE_ARCHIVES:
+            raise AcquisitionError("max_live_archives_exceeded")
+
         checksum_receipt = fetch_receipt(url + ".CHECKSUM", checksum, scratch_root=report)
         expected = parse_checksum(stable_file_bytes(checksum), filename)
         archive_receipt = fetch_receipt(url, archive, scratch_root=report)
         if archive_receipt["sha256"] != expected:
             raise AcquisitionError("archive_checksum_mismatch")
-        relative = str(Path("market_ohlcv_1s") / EXCHANGE / contract.symbol / f"{label}.parquet")
-        target = output / relative
-        if not target.exists() and partition_path(report, relative).exists():
-            raise AcquisitionError("partition_resume_receipt_invalid")
         frame, _facts = frame_from_archive(
             archive, contract.symbol, start, end, carry, label, report, archive_receipt
         )
@@ -1606,28 +1869,49 @@ def acquire_archive(
                 output_carry,
                 [checksum_receipt["sha256"], archive_receipt["sha256"]],
             )
-            if verified_partition(report, relative, target, receipt, frame):
-                carry = output_carry
-                continue
-            if file_sha256(target) != frame_sha256(
-                frame, target.parent, output
-            ) or not parquet_frame(target).equals(frame):
+            if not verified_partition(report, relative, target, receipt, frame):
                 raise AcquisitionError("preseeded_output_rejected")
         else:
             publish_frame(target, frame, output)
-        partition_receipt(
-            report,
-            relative,
-            expected,
-            target,
-            frame.height,
-            start,
-            end,
-            carry,
-            output_carry,
-            [checksum_receipt["sha256"], archive_receipt["sha256"]],
+            receipt = partition_receipt(
+                report,
+                relative,
+                expected,
+                target,
+                frame.height,
+                start,
+                end,
+                carry,
+                output_carry,
+                [checksum_receipt["sha256"], archive_receipt["sha256"]],
+            )
+        # Independently reopen the still-authenticated body before it can be retired.
+        second, _facts = frame_from_archive(
+            archive, contract.symbol, start, end, carry, label, report, archive_receipt
         )
+        if not second.equals(frame) or not parquet_frame(target).equals(frame):
+            raise AcquisitionError("archive_double_derivation_mismatch")
+        derivation = expected_archive_derivation(
+            archive, archive_receipt_path, url, target, receipt, prior_derivation, archive_receipt
+        )
+        immutable_json(paths["derivation"], derivation, report)
+        intent = expected_archive_intent(archive, derivation)
+        immutable_json(paths["retirement-intent"], intent, report)
+        remove_aggtrades_file(archive)
+        if archive.exists() or archive.is_symlink():
+            raise AcquisitionError("archive_retirement_absence_invalid")
+        deletion = {
+            "schema": "alpha_max_archive_deletion_receipt.v1",
+            "retirement_intent_sha256": sha256(canonical_bytes(intent)),
+            "derivation_receipt_sha256": sha256(canonical_bytes(derivation)),
+            "archive_relative_path": str(archive.relative_to(report)),
+            "archive_sha256": archive_receipt["sha256"],
+            "archive_byte_count": archive_receipt["byte_count"],
+            "archive_absent": True,
+        }
+        immutable_json(paths["deletion"], deletion, report)
         carry = output_carry
+        prior_derivation = sha256(canonical_bytes(derivation))
         journal(
             report,
             {"event": "raw_partition", "path": relative, "output_sha256": file_sha256(target)},
@@ -1832,7 +2116,9 @@ def funding_pages_from_provenance(
     return rows, hashes, paths
 
 
-def stable_tree(root: Path, file_digests: dict[str, str] | None = None) -> tuple[set[str], set[str]]:
+def stable_tree(
+    root: Path, file_digests: dict[str, str] | None = None
+) -> tuple[set[str], set[str]]:
     """Walk a root through directory descriptors without following components."""
     root = lexical(root)
     files: set[str] = set()
@@ -1880,7 +2166,9 @@ def stable_tree(root: Path, file_digests: dict[str, str] | None = None) -> tuple
                                 raise AcquisitionError("complete_inventory_unsafe_object")
                             with os.fdopen(os.dup(file_fd), "rb") as source:
                                 before = os.fstat(file_fd)
-                                file_digests[name] = hashlib.file_digest(source, "sha256").hexdigest()
+                                file_digests[name] = hashlib.file_digest(
+                                    source, "sha256"
+                                ).hexdigest()
                                 after = os.fstat(file_fd)
                                 if (
                                     before.st_dev,
@@ -1937,11 +2225,23 @@ def manifest_value(output: Path, report: Path) -> dict[str, Any]:
         for relative in sorted(tree_files):
             if Path(relative).name not in excluded:
                 files.append({"path": f"{prefix}/{relative}", "sha256": tree_digests[relative]})
+    evidence_files = [
+        artifact
+        for artifact in files
+        if artifact["path"].startswith("report/provenance/archive-evidence/")
+    ]
     return {
-        "schema": "alpha_max_official_source_manifest.v4",
+        "schema": "alpha_max_official_source_manifest.v5",
         "contract_sha256": CONTRACT_SHA256,
         "availability_evidence_sha256": EVIDENCE_SHA256,
         "derivation_version": DERIVATION_VERSION,
+        "storage_contract": {
+            "host_reserve_path": str(HOST_RESERVE_PATH),
+            "host_reserve_bytes": HOST_RESERVE_BYTES,
+            "max_live_archives": MAX_LIVE_ARCHIVES,
+            "archive_retention": ARCHIVE_RETENTION,
+        },
+        "archive_evidence_sha256": sha256(canonical_bytes(evidence_files)),
         "artifacts": files,
     }
 
@@ -1967,12 +2267,19 @@ def checked_tree(root: Path, expected_files: set[str]) -> None:
 
 def full_plan() -> dict[str, Any]:
     return {
-        "schema": "alpha_max_official_acquisition_plan.v3",
+        "schema": "alpha_max_official_acquisition_plan.v4",
         "source_eligible": False,
         "symbols": list(SYMBOLS),
         "months": [],
         "contract_sha256": CONTRACT_SHA256,
         "availability_evidence_sha256": EVIDENCE_SHA256,
+        # ponytail: /mnt/c is the deliberate WSL ceiling; upgrade only through a signed CLI/platform capacity probe.
+        "storage_contract": {
+            "host_reserve_path": str(HOST_RESERVE_PATH),
+            "host_reserve_bytes": HOST_RESERVE_BYTES,
+            "max_live_archives": MAX_LIVE_ARCHIVES,
+            "archive_retention": ARCHIVE_RETENTION,
+        },
     }
 
 
@@ -2045,6 +2352,7 @@ def validate_complete(
     raw_total = funding_total = 0
     for contract in contracts:
         carry: float | None = None
+        prior_derivation: str | None = None
         for month in month_starts(contract.raw_start_ms, contract.raw_end_ms):
             label = month.strftime("%Y-%m")
             nominal_start, nominal_end = month_bounds(month)
@@ -2062,13 +2370,14 @@ def validate_complete(
             checksum = archive.with_name(filename + ".CHECKSUM")
             archive_url = f"{ARCHIVE_BASE}/{contract.symbol}/{filename}"
             checksum_receipt = request_receipt(checksum, archive_url + ".CHECKSUM")
-            archive_receipt = request_receipt(archive, archive_url)
+            archive_receipt_path = archive.with_suffix(".zip.receipt.json")
+            archive_receipt = detached_archive_receipt(archive_receipt_path, archive_url)
             expected_report.update(
                 (
-                    archive,
-                    archive.with_suffix(".zip.receipt.json"),
+                    archive_receipt_path,
                     checksum,
                     checksum.with_suffix(".CHECKSUM.receipt.json"),
+                    *archive_evidence_paths(report, contract.symbol, label).values(),
                 )
             )
             source_hash = parse_checksum(stable_file_bytes(checksum), filename)
@@ -2076,16 +2385,10 @@ def validate_complete(
                 raise AcquisitionError("archive_checksum_mismatch")
             receipt = read_json(partition_path(report, relative))
             expected_report.add(partition_path(report, relative))
-            expected_frame, _facts = frame_from_archive(
-                archive, contract.symbol, start, end, carry, label, report, archive_receipt
-            )
-            assert_raw_frame(expected_frame, start, end)
             if not target.exists():
                 raise AcquisitionError("complete_inventory_missing")
             actual = parquet_frame(target)
             assert_raw_frame(actual, start, end)
-            if not actual.equals(expected_frame):
-                raise AcquisitionError("complete_raw_rederivation_mismatch")
             output_hash = file_sha256(target)
             output_carry = float(actual["close"][-1])
             expected_receipt = {
@@ -2104,7 +2407,19 @@ def validate_complete(
             }
             if receipt != expected_receipt:
                 raise AcquisitionError("complete_raw_partition_receipt_invalid")
+            derivation, _intent, _deletion = archive_evidence(
+                report,
+                contract.symbol,
+                label,
+                archive,
+                archive_receipt_path,
+                archive_url,
+                target,
+                receipt,
+                prior_derivation,
+            )
             carry = output_carry
+            prior_derivation = sha256(canonical_bytes(derivation))
             raw_total += actual.height
         pages, page_hashes, page_paths = funding_pages_from_provenance(contract, report)
         expected_report.update(page_paths)
@@ -2190,8 +2505,27 @@ def validate_complete(
     if raw_total != 1_066_681_730 or funding_total != 39_569:
         raise AcquisitionError("complete_row_totals_invalid")
     inventory_sha = sha256(canonical_bytes(sorted(required)))
+    archive_evidence_digest = sha256(
+        canonical_bytes(
+            sorted(
+                (
+                    {
+                        "path": f"report/{path.relative_to(report)}",
+                        "sha256": file_sha256(path),
+                    }
+                    for contract in contracts
+                    for label in (
+                        month.strftime("%Y-%m")
+                        for month in month_starts(contract.raw_start_ms, contract.raw_end_ms)
+                    )
+                    for path in archive_evidence_paths(report, contract.symbol, label).values()
+                ),
+                key=lambda artifact: artifact["path"],
+            )
+        )
+    )
     return {
-        "schema": "alpha_max_official_source_receipt.v3",
+        "schema": "alpha_max_official_source_receipt.v4",
         "source_eligible": True,
         "raw_rows": raw_total,
         "funding_rows": funding_total,
@@ -2199,6 +2533,13 @@ def validate_complete(
         "availability_evidence_sha256": EVIDENCE_SHA256,
         "derivation_version": DERIVATION_VERSION,
         "code_sha256": code_hash(),
+        "storage_contract": {
+            "host_reserve_path": str(HOST_RESERVE_PATH),
+            "host_reserve_bytes": HOST_RESERVE_BYTES,
+            "max_live_archives": MAX_LIVE_ARCHIVES,
+            "archive_retention": ARCHIVE_RETENTION,
+        },
+        "archive_evidence_sha256": archive_evidence_digest,
         "exchange_info_sha256": file_sha256(exchange),
         "inventory_sha256": inventory_sha,
     }
@@ -2274,12 +2615,9 @@ def main(args: argparse.Namespace) -> int:
     ):
         raise AcquisitionError("month_selector_invalid")
     plan = {
-        "schema": "alpha_max_official_acquisition_plan.v3",
-        "source_eligible": False,
+        **full_plan(),
         "symbols": sorted(selected_symbols),
         "months": sorted(selected_months),
-        "contract_sha256": CONTRACT_SHA256,
-        "availability_evidence_sha256": EVIDENCE_SHA256,
     }
     plan_data = canonical_bytes(plan)
     run_id = sha256(plan_data)
