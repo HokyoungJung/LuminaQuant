@@ -177,18 +177,27 @@ def _json_constant(value: str) -> None:
     raise ValueError(f"nonfinite JSON value: {value}")
 
 
-def _absolute(value: str) -> Path:
+def _validated_absolute(value: str, *, reject_legacy_name: bool) -> Path:
     if not isinstance(value, str):
         _fail("path is not a string")
     path = Path(value)
     if not path.is_absolute() or str(path) != value or "/../" in value or value.endswith("/."):
         _fail("path is not canonically absolute")
     # This is lexical and occurs before every filesystem operation.
-    if any(value == root or value.startswith(root + "/") for root in _FORBIDDEN_ROOTS) or re.search(
-        r"(^|[-_/])v[67]($|[-_/])", value, re.I
+    if any(value == root or value.startswith(root + "/") for root in _FORBIDDEN_ROOTS) or (
+        reject_legacy_name and re.search(r"(^|[-_/])v[67]($|[-_/])", value, re.I)
     ):
         _fail("legacy or forbidden path")
     return path
+
+
+def _absolute(value: str) -> Path:
+    return _validated_absolute(value, reject_legacy_name=True)
+
+
+def _inventory_absolute(value: str) -> Path:
+    # Git may track unrelated versioned research names; exact forbidden roots remain rejected.
+    return _validated_absolute(value, reject_legacy_name=False)
 
 
 def _same(a: os.stat_result, b: os.stat_result) -> bool:
@@ -215,8 +224,8 @@ def _read_all(fd: int, size: int) -> bytes:
     return b"".join(parts)
 
 
-def _open_directory(path: Path) -> int:
-    path = _absolute(str(path))
+def _open_directory(path: Path, *, inventory_entry: bool = False) -> int:
+    path = (_inventory_absolute if inventory_entry else _absolute)(str(path))
     fd = os.open("/", os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC)
     try:
         for part in path.parts[1:]:
@@ -231,9 +240,9 @@ def _open_directory(path: Path) -> int:
         raise
 
 
-def _read_regular(path: Path) -> tuple[os.stat_result, bytes]:
-    path = _absolute(str(path))
-    parent_fd = _open_directory(path.parent)
+def _read_regular(path: Path, *, inventory_entry: bool = False) -> tuple[os.stat_result, bytes]:
+    path = (_inventory_absolute if inventory_entry else _absolute)(str(path))
+    parent_fd = _open_directory(path.parent, inventory_entry=inventory_entry)
     try:
         before = os.stat(path.name, dir_fd=parent_fd, follow_symlinks=False)
         if (
@@ -257,9 +266,9 @@ def _read_regular(path: Path) -> tuple[os.stat_result, bytes]:
     return opened, data
 
 
-def _read_symlink(path: Path) -> tuple[os.stat_result, bytes]:
-    path = _absolute(str(path))
-    parent_fd = _open_directory(path.parent)
+def _read_symlink(path: Path, *, inventory_entry: bool = False) -> tuple[os.stat_result, bytes]:
+    path = (_inventory_absolute if inventory_entry else _absolute)(str(path))
+    parent_fd = _open_directory(path.parent, inventory_entry=inventory_entry)
     try:
         before = os.stat(path.name, dir_fd=parent_fd, follow_symlinks=False)
         if not stat.S_ISLNK(before.st_mode) or before.st_nlink != 1 or before.st_uid != os.getuid():
@@ -381,10 +390,10 @@ def _inventory(root: Path) -> bytes:
         path = root / name
         info = os.stat(path, follow_symlinks=False)
         if stat.S_ISREG(info.st_mode):
-            info, content = _read_regular(path)
+            info, content = _read_regular(path, inventory_entry=True)
             kind = "regular"
         elif stat.S_ISLNK(info.st_mode):
-            info, content = _read_symlink(path)
+            info, content = _read_symlink(path, inventory_entry=True)
             kind = "symlink"
         else:
             _fail(f"unsupported inventory entry: {path}")

@@ -233,18 +233,24 @@ def test_inventory_includes_untracked_content_type_mode_and_size(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
     module = _module()
-    tracked = tmp_path / "tracked"
+    versioned = tmp_path / "mode_v6"
+    versioned.mkdir()
+    tracked = versioned / "tracked"
     untracked = tmp_path / "untracked"
     link = tmp_path / "link"
     tracked.write_bytes(b"a")
     untracked.write_bytes(b"bc")
-    link.symlink_to("tracked")
-    monkeypatch.setattr(module, "_git", lambda root, *args: b"tracked\0untracked\0link\0")
+    link.symlink_to("mode_v6/tracked")
+    monkeypatch.setattr(
+        module,
+        "_git",
+        lambda root, *args: b"mode_v6/tracked\0untracked\0link\0",
+    )
     inventory = json.loads(module._inventory(tmp_path))
     assert inventory == [
         {
             "mode": os.stat(tracked).st_mode & 0o7777,
-            "path": "tracked",
+            "path": "mode_v6/tracked",
             "sha256": module._sha(b"a"),
             "size": 1,
             "type": "regular",
@@ -259,8 +265,8 @@ def test_inventory_includes_untracked_content_type_mode_and_size(
         {
             "mode": os.lstat(link).st_mode & 0o7777,
             "path": "link",
-            "sha256": module._sha(b"tracked"),
-            "size": len(b"tracked"),
+            "sha256": module._sha(b"mode_v6/tracked"),
+            "size": len(b"mode_v6/tracked"),
             "type": "symlink",
         },
     ]
