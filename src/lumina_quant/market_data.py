@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import fcntl
 import hashlib
+import io
 import math
 import os
 import stat
@@ -17,7 +18,7 @@ from time import perf_counter
 from typing import Any
 
 import polars as pl
-from lumina_quant.backtesting.cli_contract import RawFirstDataMissingError, normalize_data_mode
+from lumina_quant.backtesting.cli_contract import normalize_data_mode
 from lumina_quant.symbols import canonical_symbol
 
 MARKET_OHLCV_TABLE = "market_ohlcv"
@@ -88,14 +89,12 @@ class ParquetMarketDataConnection:
         if token.startswith("select 1"):
             return _QueryResult([(1,)])
         if token.startswith("select") and "from futures_feature_points" in token:
-            root = Path(self.db_path)
-            pattern = str(
-                root / "feature_points" / "exchange=*" / "symbol=*" / "date=*" / "*.parquet"
-            )
-            try:
-                frame = pl.scan_parquet(pattern).sort("timestamp_ms").collect()
-            except Exception:
-                return _QueryResult([])
+            repo = _parquet_repo(Path(self.db_path))
+            with repo.generation_lock(exclusive=False) as root:
+                paths = sorted(root.glob("feature_points/exchange=*/symbol=*/date=*/*.parquet"))
+                if not paths:
+                    return _QueryResult([])
+                frame = pl.scan_parquet(paths).sort("timestamp_ms").collect()
             if frame.is_empty():
                 return _QueryResult([])
             try:
@@ -196,71 +195,22 @@ def load_data_dict_from_parquet(
     staleness_threshold_seconds: int | None = None,
 ) -> dict[str, pl.DataFrame]:
     """Owner entrypoint for parquet data loading contract."""
-    from lumina_quant.storage.parquet import ParquetMarketDataRepository
+    from lumina_quant.storage.parquet.ohlcv_repo import (
+        load_data_dict_from_parquet as _load,
+    )
 
-    repo = ParquetMarketDataRepository(root_path)
-    resolved_mode = _normalize_data_mode(data_mode, default="legacy")
-    out: dict[str, pl.DataFrame] = {}
-    missing_symbols: list[str] = []
-    for symbol in list(symbol_list or []):
-        if resolved_mode == "raw-first":
-            try:
-                frame = repo.load_committed_ohlcv_chunked(
-                    exchange=exchange,
-                    symbol=symbol,
-                    timeframe=timeframe,
-                    start_date=start_date,
-                    end_date=end_date,
-                    chunk_days=chunk_days,
-                    warmup_bars=warmup_bars,
-                    staleness_threshold_seconds=staleness_threshold_seconds,
-                )
-            except RawFirstDataMissingError:
-                from lumina_quant.services.materialize_from_raw import (
-                    materialize_raw_aggtrades_bundle,
-                )
-
-                materialize_raw_aggtrades_bundle(
-                    root_path=root_path,
-                    exchange=exchange,
-                    symbol=str(symbol),
-                    timeframes=[str(timeframe)],
-                    start_date=start_date,
-                    end_date=end_date,
-                    producer="load_data_dict_from_parquet",
-                    require_complete=True,
-                )
-                frame = repo.load_committed_ohlcv_chunked(
-                    exchange=exchange,
-                    symbol=symbol,
-                    timeframe=timeframe,
-                    start_date=start_date,
-                    end_date=end_date,
-                    chunk_days=chunk_days,
-                    warmup_bars=warmup_bars,
-                    staleness_threshold_seconds=staleness_threshold_seconds,
-                )
-        else:
-            frame = repo.load_ohlcv_chunked(
-                exchange=exchange,
-                symbol=symbol,
-                timeframe=timeframe,
-                start_date=start_date,
-                end_date=end_date,
-                chunk_days=chunk_days,
-                warmup_bars=warmup_bars,
-            )
-
-        if frame is None or frame.is_empty():
-            missing_symbols.append(str(symbol))
-            continue
-        out[str(symbol)] = frame
-
-    if resolved_mode == "raw-first" and missing_symbols:
-        raise RawFirstDataMissingError(
-            "Raw-first committed data missing for symbols: " + ", ".join(missing_symbols)
-        )
-    return out
+    return _load(
+        root_path,
+        exchange=exchange,
+        symbol_list=symbol_list,
+        timeframe=timeframe,
+        start_date=start_date,
+        end_date=end_date,
+        chunk_days=chunk_days,
+        warmup_bars=warmup_bars,
+        data_mode=data_mode,
+        staleness_threshold_seconds=staleness_threshold_seconds,
+    )
 
 
 def normalize_symbol(symbol: str) -> str:
@@ -399,10 +349,8 @@ def normalize_timeframe_token(timeframe: str) -> str:
 
 
 def connect_market_data_db(db_path: str) -> ParquetMarketDataConnection:
-    """Open a compatibility connection for parquet-backed market storage."""
-    root = _resolve_market_root_path(db_path)
-    root.mkdir(parents=True, exist_ok=True)
-    return ParquetMarketDataConnection(str(root))
+    """Open a read-only compatibility handle; locked writers create storage."""
+    return ParquetMarketDataConnection(str(_resolve_market_root_path(db_path)))
 
 
 def resolve_1s_db_path(db_path: str) -> str:
@@ -414,10 +362,8 @@ def resolve_1s_db_path(db_path: str) -> str:
 
 
 def connect_market_data_1s_db(db_path: str) -> ParquetMarketDataConnection:
-    """Open a compatibility connection for 1-second parquet bars."""
-    root = Path(resolve_1s_db_path(db_path))
-    root.mkdir(parents=True, exist_ok=True)
-    return ParquetMarketDataConnection(str(root))
+    """Open a read-only 1-second compatibility handle."""
+    return ParquetMarketDataConnection(str(Path(resolve_1s_db_path(db_path))))
 
 
 def ensure_market_ohlcv_schema(conn: ParquetMarketDataConnection) -> None:
@@ -580,20 +526,21 @@ def load_strict_ohlcv_route(
     """Read one explicitly declared local OHLCV layout without fallback."""
     if storage_route != "partitioned_ohlcv":
         raise ValueError(f"unsupported OHLCV storage route: {storage_route!r}")
-    root = Path(db_path)
-    if not root.is_dir():
-        raise ValueError("market-data root must already exist")
-    base = _series_path(root, exchange=exchange, symbol=symbol, timeframe=timeframe)
-    if not base.is_dir():
-        raise FileNotFoundError(f"partitioned OHLCV series is missing: {base}")
-    return _load_direct_ohlcv(
-        root,
-        exchange=exchange,
-        symbol=symbol,
-        timeframe=timeframe,
-        start_date=start_date,
-        end_date=end_date,
-    )
+    repo = _parquet_repo(Path(db_path))
+    with repo.generation_lock(exclusive=False) as root:
+        if not root.is_dir():
+            raise ValueError("market-data root must already exist")
+        base = _series_path(root, exchange=exchange, symbol=symbol, timeframe=timeframe)
+        if not base.is_dir():
+            raise FileNotFoundError(f"partitioned OHLCV series is missing: {base}")
+        return _load_direct_ohlcv(
+            root,
+            exchange=exchange,
+            symbol=symbol,
+            timeframe=timeframe,
+            start_date=start_date,
+            end_date=end_date,
+        )
 
 
 def _ensure_ohlcv_frame(rows: Any) -> pl.DataFrame:
@@ -703,10 +650,7 @@ def _upsert_ohlcv_frame(
         existing_files = sorted(date_path.glob("*.parquet"))
         frames = [incoming]
         for file_path in existing_files:
-            try:
-                frames.append(pl.read_parquet(file_path))
-            except Exception:
-                continue
+            frames.append(pl.read_parquet(file_path))
 
         merged = (
             pl.concat(frames, how="vertical")
@@ -768,10 +712,7 @@ def _load_feature_points(
         )
     if not parquet_paths:
         return pl.DataFrame()
-    try:
-        lazy = pl.scan_parquet(parquet_paths)
-    except Exception:
-        return pl.DataFrame()
+    lazy = pl.scan_parquet(parquet_paths)
 
     start_ms = _coerce_timestamp_ms(start_date)
     end_ms = _coerce_timestamp_ms(end_date)
@@ -789,10 +730,7 @@ def _load_feature_points(
             },
         )
     collect_started_at = perf_counter()
-    try:
-        frame = lazy.collect()
-    except Exception:
-        return pl.DataFrame()
+    frame = lazy.collect()
     if progress_callback is not None:
         progress_callback(
             "resource_feature_collect_completed",
@@ -830,13 +768,10 @@ def _load_feature_points_day(root: Path, *, exchange: str, symbol: str, day: str
     paths = sorted(date_path.glob("*.parquet"))
     if not paths:
         return pl.DataFrame(schema=_FEATURE_SCHEMA)
-    try:
-        frame = pl.concat(
-            [_align_feature_frame(pl.read_parquet(path)) for path in paths],
-            how="vertical_relaxed",
-        )
-    except Exception:
-        return pl.DataFrame(schema=_FEATURE_SCHEMA)
+    frame = pl.concat(
+        [_align_feature_frame(pl.read_parquet(path)) for path in paths],
+        how="vertical_relaxed",
+    )
     return (
         _align_feature_frame(frame)
         .sort("timestamp_ms")
@@ -846,27 +781,11 @@ def _load_feature_points_day(root: Path, *, exchange: str, symbol: str, day: str
 
 
 @contextmanager
-def _generation_lock(logical_root: Path):
-    """Hold the one lock which pins a logical root to one generation."""
-    lock = logical_root.parent / f".{logical_root.name}.generation.lock"
-    lock.parent.mkdir(parents=True, exist_ok=True)
-    fd = os.open(lock, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
-    try:
-        info, named = os.fstat(fd), os.lstat(lock)
-        if (
-            not stat.S_ISREG(info.st_mode)
-            or info.st_nlink != 1
-            or stat.S_IMODE(info.st_mode) != 0o600
-            or (info.st_dev, info.st_ino) != (named.st_dev, named.st_ino)
-        ):
-            raise ValueError("unsafe generation lock")
-        fcntl.flock(fd, fcntl.LOCK_EX)
-        if (info.st_dev, info.st_ino) != (os.lstat(lock).st_dev, os.lstat(lock).st_ino):
-            raise ValueError("generation lock changed")
-        yield logical_root.resolve()
-    finally:
-        fcntl.flock(fd, fcntl.LOCK_UN)
-        os.close(fd)
+def _generation_lock(logical_root: Path, *, exclusive: bool):
+    """Resolve and pin the logical root through the shared storage contract."""
+    repo = _parquet_repo(logical_root)
+    with repo.generation_lock(exclusive=exclusive) as physical_root:
+        yield physical_root
 
 
 @contextmanager
@@ -919,7 +838,13 @@ def _align_feature_frame(frame: pl.DataFrame) -> pl.DataFrame:
     return out.select(_FEATURE_CANONICAL_COLUMNS).cast(_FEATURE_SCHEMA, strict=False)
 
 
-def _atomic_feature_write(date_path: Path, output_path: Path, frame: pl.DataFrame) -> None:
+def _atomic_feature_write(
+    date_path: Path,
+    output_path: Path,
+    frame: pl.DataFrame,
+    *,
+    max_output_bytes: int | None = None,
+) -> None:
     """Durably replace the compact file without touching control-plane files."""
     tmp = date_path / f".{output_path.name}.{uuid.uuid4().hex}.tmp"
     obsolete = [path for path in date_path.glob("*.parquet") if path != output_path]
@@ -929,7 +854,29 @@ def _atomic_feature_write(date_path: Path, output_path: Path, frame: pl.DataFram
             raise ValueError("unsafe obsolete feature parquet")
     errors: list[BaseException] = []
     try:
-        frame.write_parquet(tmp, compression="zstd", statistics=True)
+        if max_output_bytes is None:
+            frame.write_parquet(tmp, compression="zstd", statistics=True)
+        else:
+            buffer = io.BytesIO()
+            frame.write_parquet(buffer, compression="zstd", statistics=True)
+            payload = buffer.getvalue()
+            if len(payload) > max_output_bytes:
+                raise ValueError("feature parquet exceeds publication quota")
+            output_fd = os.open(
+                tmp,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                0o600,
+            )
+            try:
+                view = memoryview(payload)
+                while view:
+                    written = os.write(output_fd, view)
+                    if written <= 0:
+                        raise OSError("short feature parquet write")
+                    view = view[written:]
+                os.fsync(output_fd)
+            finally:
+                os.close(output_fd)
         fd = os.open(tmp, os.O_RDONLY | os.O_NOFOLLOW)
         try:
             info = os.fstat(fd)
@@ -1019,6 +966,7 @@ def _publish_official_funding_day(
     expected_byte_count: int,
     expected_row_count: int,
     provenance_receipt_sha256: str,
+    max_output_bytes: int | None = None,
 ) -> Path:
     """Merge a receipt-authenticated funding day as one sealed transaction."""
     if (
@@ -1030,6 +978,12 @@ def _publish_official_funding_day(
         or expected_row_count <= 0
     ):
         raise ValueError("funding receipt count is invalid")
+    if max_output_bytes is not None and (
+        isinstance(max_output_bytes, bool)
+        or not isinstance(max_output_bytes, int)
+        or max_output_bytes <= 0
+    ):
+        raise ValueError("max_output_bytes must be a positive integer")
     if not all(
         isinstance(value, str)
         and len(value) == 64
@@ -1126,7 +1080,7 @@ def _publish_official_funding_day(
         "output_row_count",
         "semantic_digest",
     )
-    with _generation_lock(root) as physical_root:
+    with _generation_lock(root, exclusive=True) as physical_root:
         date_path = (
             physical_root
             / "feature_points"
@@ -1243,7 +1197,12 @@ def _publish_official_funding_day(
                 if _feature_digest(current) != target["semantic_digest"]:
                     raise ValueError("pending official funding target conflicts")
             else:
-                _atomic_feature_write(date_path, output, merged)
+                _atomic_feature_write(
+                    date_path,
+                    output,
+                    merged,
+                    max_output_bytes=max_output_bytes,
+                )
             final = {
                 **target,
                 "state": "final",
@@ -1292,7 +1251,7 @@ def _upsert_feature_points(
         .map_elements(lambda value: _timestamp_ms_to_datetime(value).date(), return_dtype=pl.Date)
         .alias("_day")
     )
-    with _generation_lock(root) as physical_root:
+    with _generation_lock(root, exclusive=True) as physical_root:
         for partition in incoming.partition_by("_day", maintain_order=True):
             day = partition["_day"][0].isoformat()
             date_path = (
@@ -1334,7 +1293,6 @@ class MarketDataRepository:
         self.db_path = str(db_path)
         self.logical_root_path = _resolve_market_root_path(self.db_path)
         self.root_path = self.logical_root_path
-        self.logical_root_path.mkdir(parents=True, exist_ok=True)
         self._parquet_repo = _parquet_repo(self.logical_root_path)
         self._prefer_1s_derived = str(
             os.getenv("LQ_PREFER_1S_DERIVED", "1")
@@ -1383,7 +1341,7 @@ class MarketDataRepository:
         timeframe_token = normalize_timeframe_token(timeframe)
         normalized_exchange = _normalize_exchange(exchange)
         normalized_symbol = normalize_symbol(symbol)
-        try:
+        with self._parquet_repo.generation_lock(exclusive=False) as physical_root:
             merged = self._parquet_repo.load_ohlcv(
                 exchange=normalized_exchange,
                 symbol=normalized_symbol,
@@ -1391,24 +1349,16 @@ class MarketDataRepository:
                 start_date=start_date,
                 end_date=end_date,
             )
-        except Exception:
-            merged = _empty_ohlcv_frame()
-
-        if not merged.is_empty():
-            return merged
-
-        direct = _load_direct_ohlcv(
-            self.root_path,
-            exchange=normalized_exchange,
-            symbol=normalized_symbol,
-            timeframe=timeframe_token,
-            start_date=start_date,
-            end_date=end_date,
-        )
-        if not direct.is_empty() or timeframe_token == "1s" or not self._prefer_1s_derived:
-            return direct
-
-        return direct
+            if not merged.is_empty():
+                return merged
+            return _load_direct_ohlcv(
+                physical_root,
+                exchange=normalized_exchange,
+                symbol=normalized_symbol,
+                timeframe=timeframe_token,
+                start_date=start_date,
+                end_date=end_date,
+            )
 
     def load_ohlcv_1s(
         self,
@@ -1436,16 +1386,17 @@ class MarketDataRepository:
         end_date: Any = None,
     ) -> dict[str, pl.DataFrame]:
         out: dict[str, pl.DataFrame] = {}
-        for symbol in symbol_list:
-            df = self.load_ohlcv(
-                exchange=exchange,
-                symbol=symbol,
-                timeframe=timeframe,
-                start_date=start_date,
-                end_date=end_date,
-            )
-            if not df.is_empty():
-                out[symbol] = df
+        with self._parquet_repo.generation_lock(exclusive=False):
+            for symbol in symbol_list:
+                df = self.load_ohlcv(
+                    exchange=exchange,
+                    symbol=symbol,
+                    timeframe=timeframe,
+                    start_date=start_date,
+                    end_date=end_date,
+                )
+                if not df.is_empty():
+                    out[symbol] = df
         return out
 
     def export_ohlcv_to_csv(
@@ -1487,13 +1438,14 @@ class MarketDataRepository:
                 symbol=normalize_symbol(symbol),
                 rows=frame,
             )
-        return _upsert_ohlcv_frame(
-            self.root_path,
-            exchange=exchange,
-            symbol=symbol,
-            timeframe=timeframe_token,
-            frame=frame,
-        )
+        with _generation_lock(self.logical_root_path, exclusive=True) as physical_root:
+            return _upsert_ohlcv_frame(
+                physical_root,
+                exchange=exchange,
+                symbol=symbol,
+                timeframe=timeframe_token,
+                frame=frame,
+            )
 
     def upsert_futures_feature_points(
         self,
@@ -1503,7 +1455,7 @@ class MarketDataRepository:
         rows: list[dict[str, Any]],
     ) -> int:
         return _upsert_feature_points(
-            self.root_path,
+            self.logical_root_path,
             exchange=exchange,
             symbol=symbol,
             rows=rows,
@@ -1520,9 +1472,10 @@ class MarketDataRepository:
         expected_byte_count: int,
         expected_row_count: int,
         provenance_receipt_sha256: str,
+        max_output_bytes: int | None = None,
     ) -> Path:
         return _publish_official_funding_day(
-            self.root_path,
+            self.logical_root_path,
             exchange=exchange,
             symbol=symbol,
             day=day,
@@ -1531,6 +1484,7 @@ class MarketDataRepository:
             expected_byte_count=expected_byte_count,
             expected_row_count=expected_row_count,
             provenance_receipt_sha256=provenance_receipt_sha256,
+            max_output_bytes=max_output_bytes,
         )
 
     def load_futures_feature_points(
@@ -1542,14 +1496,15 @@ class MarketDataRepository:
         end_date: Any = None,
         progress_callback: Any = None,
     ) -> pl.DataFrame:
-        return _load_feature_points(
-            self.root_path,
-            exchange=exchange,
-            symbol=symbol,
-            start_date=start_date,
-            end_date=end_date,
-            progress_callback=progress_callback,
-        )
+        with _generation_lock(self.logical_root_path, exclusive=False) as physical_root:
+            return _load_feature_points(
+                physical_root,
+                exchange=exchange,
+                symbol=symbol,
+                start_date=start_date,
+                end_date=end_date,
+                progress_callback=progress_callback,
+            )
 
 
 def get_last_ohlcv_timestamp_ms(

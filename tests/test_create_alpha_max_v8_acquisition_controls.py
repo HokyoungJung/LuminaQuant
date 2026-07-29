@@ -290,6 +290,7 @@ def test_supported_systemd_plan_contract_is_fixed():
         service["MemoryHigh"] == 1 and service["MemoryMax"] == 2 and service["MemorySwapMax"] == 3
     )
     assert service["OOMPolicy"] == "kill"
+    assert service["UMask"] == "0077"
     assert "CGroupExpectation" not in unit
     assert set(unit) == module._UNIT_DIRECTIVES
     assert set(service) <= module._SERVICE_DIRECTIVES
@@ -324,6 +325,11 @@ def test_supported_systemd_plan_contract_is_fixed():
     service["ExecStart"][-1] = "%d/authority.private"
     service["LoadCredential"] = "authority.private:/keys/authority.private"
     module._validate_unit(unit)
+    rendered = module._render_systemd_unit(unit)
+    assert rendered == module._render_systemd_unit(unit)
+    assert b"\nUMask=0077\n" in rendered
+    assert b'"%d/authority.private"' in rendered
+    assert b"%%d" not in rendered
     observer = module._unit(
         "observer",
         ["python", "observer", "--observer-private-key", "%d/acquisition.private"],
@@ -350,6 +356,51 @@ def test_supported_systemd_plan_contract_is_fixed():
         load_credential="authority.public:/keys/authority.public",
     )["Service"]
     assert "ExecStopPost" not in telemetry
+
+
+def test_credential_binding_requires_exact_owned_source_identity(tmp_path: Path):
+    module = _module()
+    key_root = tmp_path / "keys"
+    key_root.mkdir(mode=0o700)
+    private = key_root / "authority.private"
+    public = key_root / "authority.public"
+    private.write_bytes(b"p" * 32)
+    public.write_bytes(b"q" * 32)
+    private.chmod(0o400)
+    public.chmod(0o400)
+    key_files = [
+        {
+            "name": "authority",
+            "private": module._file(private),
+            "public": module._file(public),
+        }
+    ]
+    unit = module._unit(
+        "probe",
+        ["python", "worker", "--private-key", "%d/authority.private"],
+        {"HOME": "/safe"},
+        {"high": 1, "max": 2, "swap": 3},
+        None,
+        read_paths=[str(tmp_path / "control")],
+        write_paths=[str(tmp_path / "evidence")],
+        inaccessible_paths=[str(key_root)],
+        load_credential=f"authority.private:{private}",
+    )
+    binding = module._credential_binding(unit, key_files)
+    assert binding == {
+        "name": "authority.private",
+        "source": key_files[0]["private"],
+        "target": "%d/authority.private",
+    }
+
+    private.chmod(0o600)
+    with pytest.raises(ValueError, match="identity drift"):
+        module._credential_binding(unit, key_files)
+    private.chmod(0o400)
+    sibling = key_root / "linked.private"
+    os.link(private, sibling)
+    with pytest.raises(ValueError, match=r"unsafe file|identity drift"):
+        module._credential_binding(unit, key_files)
 
 
 def test_import_is_stdlib_only_and_policy_constants_are_local():
@@ -777,6 +828,19 @@ def test_build_assembles_private_artifacts_without_launching(
         telemetry["ExecStart"][telemetry["ExecStart"].index("--authority-public-key") + 1]
         == "%d/authority.public"
     )
+    rendered_units = plan["rendered_systemd_units"]
+    assert documents["manifest.json"]["rendered_systemd_units"] == rendered_units
+    for role, item in rendered_units.items():
+        unit = {key: value for key, value in plan["systemd_units"][role].items() if key != "name"}
+        unit_path = Path(item["file"]["path"])
+        assert unit_path.read_bytes() == module._render_systemd_unit(unit)
+        assert module._file(unit_path) == item["file"]
+        assert item["credential"]["target"].startswith("%d/")
+        assert (
+            item["credential"]["source"]["sha256"]
+            == module._file(Path(item["credential"]["source"]["path"]))["sha256"]
+        )
+        assert b"%%d" not in unit_path.read_bytes()
     assert documents["manifest.json"]["executable_inputs"] == plan["executable_inputs"]
     assert (
         plan["executable_inputs"]["current_python"]["package_freeze_sha256"]

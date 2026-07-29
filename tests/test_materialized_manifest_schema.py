@@ -98,3 +98,71 @@ def test_manifest_missing_required_field_raises(tmp_path):
             symbol="BTC/USDT",
             timeframe="1s",
         )
+
+
+@pytest.mark.parametrize(
+    "data_file",
+    [
+        "../outside.parquet",
+        "/tmp/outside.parquet",
+        "commit=other/part-0000.parquet",
+    ],
+)
+def test_manifest_rejects_data_files_outside_bound_commit(tmp_path, data_file):
+    repo = _write_committed_partition(tmp_path)
+    manifest_path = repo.materialized_manifest_path(
+        exchange="binance",
+        symbol="BTC/USDT",
+        timeframe="1s",
+        partition_date="2026-03-01",
+    )
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    payload["data_files"] = [data_file]
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(RawFirstManifestInvalidError):
+        repo.load_committed_ohlcv_chunked(
+            exchange="binance",
+            symbol="BTC/USDT",
+            timeframe="1s",
+        )
+
+
+def test_manifest_rejects_invalid_watermark_without_staleness_check(tmp_path):
+    repo = _write_committed_partition(tmp_path)
+    manifest_path = repo.materialized_manifest_path(
+        exchange="binance",
+        symbol="BTC/USDT",
+        timeframe="1s",
+        partition_date="2026-03-01",
+    )
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    payload["event_time_watermark_ms"] = "invalid"
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(RawFirstManifestInvalidError):
+        repo.load_committed_ohlcv_chunked(
+            exchange="binance",
+            symbol="BTC/USDT",
+            timeframe="1s",
+        )
+
+
+def test_bounded_manifest_scan_rejects_invalid_partition_date(tmp_path):
+    repo = _write_committed_partition(tmp_path)
+    manifest_path = repo.materialized_manifest_path(
+        exchange="binance",
+        symbol="BTC/USDT",
+        timeframe="1s",
+        partition_date="2026-03-01",
+    )
+    manifest_path.parent.rename(manifest_path.parent.with_name("date=invalid"))
+
+    with pytest.raises(RawFirstManifestInvalidError):
+        repo.load_committed_ohlcv_chunked(
+            exchange="binance",
+            symbol="BTC/USDT",
+            timeframe="1s",
+            start_date=datetime(2026, 3, 1, tzinfo=UTC),
+            end_date=datetime(2026, 3, 2, tzinfo=UTC),
+        )

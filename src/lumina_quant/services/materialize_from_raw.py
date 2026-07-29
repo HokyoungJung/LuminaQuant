@@ -125,7 +125,7 @@ def _load_raw_and_1s(
     return raw, bars_1s, int(complete_through_ms)
 
 
-def _write_materialized_frame(
+def _write_materialized_frame_unlocked(
     *,
     repo: ParquetMarketDataRepository,
     raw: pl.DataFrame,
@@ -169,6 +169,11 @@ def _write_materialized_frame(
             tmp_data_file = data_file.with_suffix(".tmp.parquet")
             payload.write_parquet(tmp_data_file, compression="zstd", statistics=True)
             tmp_data_file.replace(data_file)
+        persisted = pl.read_parquet(data_file)
+        if persisted.height != payload.height or repo.canonical_row_checksum(persisted) != checksum:
+            raise RawFirstDataMissingError(f"Materialized commit readback failed for {data_file}.")
+        repo._fsync_file(data_file)
+        repo._fsync_dir(commit_dir)
 
         dt_min = payload["datetime"].min()
         dt_max = payload["datetime"].max()
@@ -228,9 +233,35 @@ def _write_materialized_frame(
     return commits
 
 
-def materialize_raw_aggtrades_bundle(
+def _write_materialized_frame(
     *,
-    root_path: str,
+    repo: ParquetMarketDataRepository,
+    raw: pl.DataFrame,
+    materialized: pl.DataFrame,
+    exchange: str,
+    symbol: str,
+    timeframe: str,
+    producer: str,
+    bundle_boundary_id: str,
+    complete_through_ms: int,
+) -> list[MaterializedCommit]:
+    with repo.generation_lock(exclusive=True):
+        return _write_materialized_frame_unlocked(
+            repo=repo,
+            raw=raw,
+            materialized=materialized,
+            exchange=exchange,
+            symbol=symbol,
+            timeframe=timeframe,
+            producer=producer,
+            bundle_boundary_id=bundle_boundary_id,
+            complete_through_ms=complete_through_ms,
+        )
+
+
+def _materialize_raw_aggtrades_bundle_unlocked(
+    *,
+    repo: ParquetMarketDataRepository,
     exchange: str,
     symbol: str,
     timeframes: list[str],
@@ -240,7 +271,6 @@ def materialize_raw_aggtrades_bundle(
     require_complete: bool = True,
 ) -> MaterializedBundleResult:
     """Materialize required timeframe bundle from one raw load + one commit boundary."""
-    repo = ParquetMarketDataRepository(root_path)
     raw, bars_1s, complete_through_ms = _load_raw_and_1s(
         repo=repo,
         exchange=exchange,
@@ -304,6 +334,32 @@ def materialize_raw_aggtrades_bundle(
         commits_by_timeframe=commits_by_timeframe,
         missing_timeframes=tuple(missing),
     )
+
+
+def materialize_raw_aggtrades_bundle(
+    *,
+    root_path: str,
+    exchange: str,
+    symbol: str,
+    timeframes: list[str],
+    start_date: Any = None,
+    end_date: Any = None,
+    producer: str = "materialize_from_raw",
+    require_complete: bool = True,
+) -> MaterializedBundleResult:
+    """Materialize and commit one bundle while its source generation is pinned."""
+    repo = ParquetMarketDataRepository(root_path)
+    with repo.generation_lock(exclusive=True):
+        return _materialize_raw_aggtrades_bundle_unlocked(
+            repo=repo,
+            exchange=exchange,
+            symbol=symbol,
+            timeframes=timeframes,
+            start_date=start_date,
+            end_date=end_date,
+            producer=producer,
+            require_complete=require_complete,
+        )
 
 
 def materialize_raw_aggtrades(

@@ -5,6 +5,7 @@ from __future__ import annotations
 import errno
 import fcntl
 import json
+import io
 import math
 import os
 import re
@@ -12,11 +13,13 @@ import stat
 import time
 import uuid
 from contextlib import contextmanager
+from contextvars import ContextVar
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
+from functools import wraps
 from hashlib import sha256
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 import polars as pl
@@ -124,11 +127,19 @@ _CANONICAL_PARTITION_SEAL_SCHEMA = "alpha_max_canonical_partition_seal.v1"
 
 
 @dataclass
+class _GenerationPin:
+    root: Path
+    exclusive: bool
+    active: bool = True
+
+
+@dataclass
 class _RawStreamLease:
     """Small, process-safe raw-stream lease backed by an owned flock file."""
 
     lock_path: Path
     _fd: int
+    _generation_lock: Any | None = None
     _released: bool = False
 
     def release(self) -> None:
@@ -137,8 +148,14 @@ class _RawStreamLease:
         try:
             fcntl.flock(self._fd, fcntl.LOCK_UN)
         finally:
-            os.close(self._fd)
-            self._released = True
+            try:
+                os.close(self._fd)
+            finally:
+                try:
+                    if self._generation_lock is not None:
+                        self._generation_lock.__exit__(None, None, None)
+                finally:
+                    self._released = True
 
 
 @dataclass(frozen=True)
@@ -159,6 +176,18 @@ class RawPartitionBusyError(RuntimeError):
 
 class SealedMonthlyPartitionConflictError(RuntimeError):
     """Raised when a monthly partition is sealed or conflicts with a seal transaction."""
+
+
+def _generation_guard(*, exclusive: bool):
+    def decorate(method):
+        @wraps(method)
+        def guarded(self, *args, **kwargs):
+            with self.generation_lock(exclusive=exclusive):
+                return method(self, *args, **kwargs)
+
+        return guarded
+
+    return decorate
 
 
 def normalize_symbol(symbol: str) -> str:
@@ -193,41 +222,112 @@ class ParquetMarketDataRepository:
 
     def __init__(self, root_path: str | Path):
         self.logical_root_path = Path(root_path)
-        try:
-            root_info = os.lstat(self.logical_root_path)
-        except FileNotFoundError:
-            # Legacy callers construct a repository before creating an ordinary root.
-            self.root_path = self.logical_root_path
-        else:
-            if stat.S_ISLNK(root_info.st_mode):
-                target = os.readlink(self.logical_root_path)
-                generation_base = f".{self.logical_root_path.name}.generations"
-                target_parts = Path(target).parts
-                if (
-                    os.path.isabs(target)
-                    or len(target_parts) != 2
-                    or target_parts[0] != generation_base
-                    or target_parts[1] in {"", ".", ".."}
-                ):
-                    raise ValueError("Canonical root symlink must name an owned sibling generation")
-                resolved = self.logical_root_path.parent / target
-                resolved_info = os.lstat(resolved)
-                if not stat.S_ISDIR(resolved_info.st_mode):
-                    raise ValueError("Canonical root symlink target must be a directory")
-                self.root_path = resolved
-            elif stat.S_ISDIR(root_info.st_mode):
-                self.root_path = self.logical_root_path
-            else:
-                raise ValueError("Canonical root must be a directory or trusted sibling symlink")
         self._generation_lock_path = self.logical_root_path.parent / (
             f".{self.logical_root_path.name}.generation.lock"
         )
+        self._generation_context: ContextVar[_GenerationPin | None] = ContextVar(
+            f"lumina_quant_generation_{id(self)}", default=None
+        )
+        self._resolve_logical_root()
+
+    def _resolve_logical_root(self) -> Path:
+        try:
+            root_info = os.lstat(self.logical_root_path)
+        except FileNotFoundError:
+            # Legacy writers may construct the repository before bootstrap.
+            return self.logical_root_path
+        if stat.S_ISDIR(root_info.st_mode):
+            return self.logical_root_path
+        if not stat.S_ISLNK(root_info.st_mode):
+            raise ValueError("Canonical root must be a directory or trusted sibling symlink")
+        target = os.readlink(self.logical_root_path)
+        generation_base = f".{self.logical_root_path.name}.generations"
+        target_parts = Path(target).parts
+        if (
+            os.path.isabs(target)
+            or len(target_parts) != 2
+            or target_parts[0] != generation_base
+            or target_parts[1] in {"", ".", ".."}
+        ):
+            raise ValueError("Canonical root symlink must name an owned sibling generation")
+        resolved = self.logical_root_path.parent / target
+        resolved_info = os.lstat(resolved)
+        if not stat.S_ISDIR(resolved_info.st_mode):
+            raise ValueError("Canonical root symlink target must be a directory")
+        root_after = os.lstat(self.logical_root_path)
+        if (root_info.st_dev, root_info.st_ino) != (
+            root_after.st_dev,
+            root_after.st_ino,
+        ) or os.readlink(self.logical_root_path) != target:
+            raise ValueError("Canonical root symlink identity changed during resolution")
+        return resolved
+
+    @property
+    def root_path(self) -> Path:
+        pinned = self._generation_context.get()
+        if pinned is not None and pinned.active:
+            return pinned.root
+        return self.logical_root_path
+
+    @staticmethod
+    def _ensure_generation_lock_parent(path: Path) -> None:
+        missing: list[Path] = []
+        cursor = path
+        while True:
+            try:
+                info = os.lstat(cursor)
+            except FileNotFoundError:
+                missing.append(cursor)
+                parent = cursor.parent
+                if parent == cursor:
+                    raise
+                cursor = parent
+                continue
+            if not stat.S_ISDIR(info.st_mode):
+                raise SealedMonthlyPartitionConflictError(
+                    "Generation lock parent is not a directory"
+                )
+            break
+        for directory in reversed(missing):
+            os.mkdir(directory)
+            parent_fd = os.open(
+                directory.parent,
+                os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+            )
+            try:
+                os.fsync(parent_fd)
+            finally:
+                os.close(parent_fd)
 
     @contextmanager
-    def generation_lock(self, exclusive: bool):
-        """Coordinate ordinary writers with an atomic whole-root generation publisher."""
-        self._generation_lock_path.parent.mkdir(parents=True, exist_ok=True)
+    def generation_lock(
+        self,
+        exclusive: bool,
+        *,
+        timeout_seconds: float | None = None,
+        poll_seconds: float = 0.05,
+        allow_incomplete_bootstrap: bool = False,
+    ):
+        """Pin one physical generation under the shared global lock."""
+        pinned = self._generation_context.get()
+        if pinned is not None and pinned.active:
+            if exclusive and not pinned.exclusive:
+                raise SealedMonthlyPartitionConflictError(
+                    "Cannot upgrade a shared generation lock to exclusive"
+                )
+            yield pinned.root
+            return
+
+        if not self._generation_lock_path.parent.exists():
+            self._ensure_generation_lock_parent(self._generation_lock_path.parent)
+        parent_info = os.lstat(self._generation_lock_path.parent)
+        if not stat.S_ISDIR(parent_info.st_mode):
+            raise SealedMonthlyPartitionConflictError(
+                "Generation lock parent is not a stable directory"
+            )
         fd = os.open(self._generation_lock_path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+        token = None
+        pin: _GenerationPin | None = None
         try:
             info = os.fstat(fd)
             path_info = os.lstat(self._generation_lock_path)
@@ -235,17 +335,80 @@ class ParquetMarketDataRepository:
                 not stat.S_ISREG(info.st_mode)
                 or info.st_nlink != 1
                 or info.st_uid != os.getuid()
+                or info.st_gid != os.getgid()
                 or stat.S_IMODE(info.st_mode) != 0o600
                 or (info.st_dev, info.st_ino) != (path_info.st_dev, path_info.st_ino)
             ):
                 raise SealedMonthlyPartitionConflictError(
                     "Generation lock is not a stable owned 0600 regular file"
                 )
-            fcntl.flock(fd, fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH)
-            yield
+            lock_mode = fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH
+            if timeout_seconds is None:
+                fcntl.flock(fd, lock_mode)
+            else:
+                deadline = time.monotonic() + max(0.0, float(timeout_seconds))
+                while True:
+                    try:
+                        fcntl.flock(fd, lock_mode | fcntl.LOCK_NB)
+                        break
+                    except BlockingIOError:
+                        if time.monotonic() >= deadline:
+                            raise RawPartitionBusyError(
+                                f"Canonical generation is busy: {self.logical_root_path}"
+                            ) from None
+                        time.sleep(max(0.001, float(poll_seconds)))
+            locked_path_info = os.lstat(self._generation_lock_path)
+            if (info.st_dev, info.st_ino) != (
+                locked_path_info.st_dev,
+                locked_path_info.st_ino,
+            ):
+                raise SealedMonthlyPartitionConflictError("Generation lock identity changed")
+            physical_root = self._resolve_logical_root()
+            try:
+                physical_info = os.stat(physical_root, follow_symlinks=False)
+            except FileNotFoundError:
+                physical_info = None
+            if physical_info is not None:
+                if (
+                    not stat.S_ISDIR(physical_info.st_mode)
+                    or self._resolve_logical_root() != physical_root
+                ):
+                    raise SealedMonthlyPartitionConflictError(
+                        "Canonical generation changed during lock acquisition"
+                    )
+                repeated_info = os.stat(physical_root, follow_symlinks=False)
+                if (physical_info.st_dev, physical_info.st_ino) != (
+                    repeated_info.st_dev,
+                    repeated_info.st_ino,
+                ):
+                    raise SealedMonthlyPartitionConflictError(
+                        "Canonical generation identity changed during lock acquisition"
+                    )
+                if (
+                    os.path.lexists(physical_root / ".bootstrap-incomplete")
+                    and not allow_incomplete_bootstrap
+                ):
+                    raise SealedMonthlyPartitionConflictError(
+                        "Canonical generation bootstrap is incomplete"
+                    )
+            pin = _GenerationPin(root=physical_root, exclusive=exclusive)
+            token = self._generation_context.set(pin)
+            yield physical_root
         finally:
-            fcntl.flock(fd, fcntl.LOCK_UN)
-            os.close(fd)
+            if pin is not None:
+                pin.active = False
+            try:
+                if token is not None:
+                    try:
+                        self._generation_context.reset(token)
+                    except ValueError:
+                        # A deferred raw lease may be released by another context.
+                        pass
+            finally:
+                try:
+                    fcntl.flock(fd, fcntl.LOCK_UN)
+                finally:
+                    os.close(fd)
 
     @staticmethod
     def _normalize_exchange(exchange: str) -> str:
@@ -632,6 +795,7 @@ class ParquetMarketDataRepository:
                 raise ValueError("Canonical monthly parquet volume must be non-negative")
             previous = timestamp
 
+    @_generation_guard(exclusive=True)
     def publish_sealed_monthly_partition(
         self,
         *,
@@ -797,6 +961,7 @@ class ParquetMarketDataRepository:
         finally:
             os.close(source_fd)
 
+    @_generation_guard(exclusive=True)
     def merge_signed_month_into_candidate(
         self,
         *,
@@ -808,6 +973,7 @@ class ParquetMarketDataRepository:
         expected_byte_count: int,
         expected_row_count: int,
         provenance_receipt_sha256: str,
+        max_output_bytes: int | None = None,
     ) -> Path:
         """Merge a signed month using only the two monthly dataframes."""
         exchange_token = self._normalize_exchange(exchange)
@@ -817,6 +983,12 @@ class ParquetMarketDataRepository:
         provenance_receipt_sha256 = self._validate_sha256(
             provenance_receipt_sha256, name="provenance_receipt_sha256"
         )
+        if max_output_bytes is not None and (
+            isinstance(max_output_bytes, bool)
+            or not isinstance(max_output_bytes, int)
+            or max_output_bytes <= 0
+        ):
+            raise ValueError("max_output_bytes must be a positive integer")
         target = self._monthly_path(exchange=exchange_token, symbol=symbol_token, month_token=month)
         if not target.exists():
             return self.publish_sealed_monthly_partition(
@@ -924,7 +1096,26 @@ class ParquetMarketDataRepository:
                         "Candidate merge source or target changed"
                     )
                 temporary = target.with_name(f".{target.name}.{uuid.uuid4().hex}.candidate.tmp")
-                merged.write_parquet(temporary, compression="zstd", statistics=True)
+                if max_output_bytes is None:
+                    merged.write_parquet(temporary, compression="zstd", statistics=True)
+                else:
+                    buffer = io.BytesIO()
+                    merged.write_parquet(buffer, compression="zstd", statistics=True)
+                    payload = buffer.getvalue()
+                    if len(payload) > max_output_bytes:
+                        raise SealedMonthlyPartitionConflictError(
+                            "Merged monthly parquet exceeds publication quota"
+                        )
+                    temporary_fd = os.open(
+                        temporary,
+                        os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                        0o600,
+                    )
+                    try:
+                        self._write_all(temporary_fd, payload)
+                        os.fsync(temporary_fd)
+                    finally:
+                        os.close(temporary_fd)
                 self._fsync_file(temporary)
                 os.replace(temporary, target)
                 temporary = None
@@ -3985,13 +4176,10 @@ class ParquetMarketDataRepository:
 
     @staticmethod
     def _read_json_file(path: Path) -> dict[str, Any]:
-        try:
-            payload = json.loads(path.read_text(encoding="utf-8"))
-            if isinstance(payload, dict):
-                return payload
-        except Exception:
-            return {}
-        return {}
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(payload, dict):
+            raise RawFirstManifestInvalidError(f"Manifest JSON must contain an object at {path}.")
+        return payload
 
     @staticmethod
     def _normalize_manifest_data_files(value: Any) -> list[str]:
@@ -4014,6 +4202,11 @@ class ParquetMarketDataRepository:
         timeframe: str | None = None,
         staleness_threshold_seconds: int | None = None,
     ) -> None:
+        manifest_info = os.lstat(manifest_path)
+        if not stat.S_ISREG(manifest_info.st_mode):
+            raise RawFirstManifestInvalidError(
+                f"Manifest path is not a regular file: {manifest_path}"
+            )
         missing = [name for name in _MATERIALIZED_REQUIRED_MANIFEST_FIELDS if name not in manifest]
         if missing:
             raise RawFirstManifestInvalidError(
@@ -4053,26 +4246,37 @@ class ParquetMarketDataRepository:
                 )
 
         try:
-            row_count = int(manifest.get("row_count", 0))
-        except Exception as exc:
+            row_count = int(manifest["row_count"])
+            watermark_ms = int(manifest["event_time_watermark_ms"])
+            source_checkpoint_start = int(manifest["source_checkpoint_start"])
+            source_checkpoint_end = int(manifest["source_checkpoint_end"])
+            window_start_ms = int(manifest["window_start_ms"])
+            window_end_ms = int(manifest["window_end_ms"])
+        except (KeyError, TypeError, ValueError) as exc:
             raise RawFirstManifestInvalidError(
-                f"Manifest row_count must be int: {manifest_path}"
+                f"Manifest generation metadata is invalid: {manifest_path}"
             ) from exc
-        if row_count < 0:
-            raise RawFirstManifestInvalidError(f"Manifest row_count must be >= 0: {manifest_path}")
-
+        if (
+            row_count < 0
+            or watermark_ms <= 0
+            or source_checkpoint_start < 0
+            or source_checkpoint_end < source_checkpoint_start
+            or window_start_ms < 0
+            or window_end_ms < window_start_ms
+        ):
+            raise RawFirstManifestInvalidError(
+                f"Manifest generation bounds are invalid: {manifest_path}"
+            )
+        commit_id = str(manifest.get("commit_id", ""))
+        checksum = str(manifest.get("canonical_row_checksum", ""))
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", commit_id) or not re.fullmatch(
+            r"[0-9a-f]{64}", checksum
+        ):
+            raise RawFirstManifestInvalidError(
+                f"Manifest commit/checksum identity is invalid: {manifest_path}"
+            )
         if staleness_threshold_seconds is None:
             return
-        try:
-            watermark_ms = int(manifest.get("event_time_watermark_ms", 0))
-        except Exception as exc:
-            raise RawFirstManifestInvalidError(
-                f"Manifest event_time_watermark_ms invalid: {manifest_path}"
-            ) from exc
-        if watermark_ms <= 0:
-            raise RawFirstManifestInvalidError(
-                f"Manifest watermark must be positive: {manifest_path}"
-            )
         now_ms = int(datetime.now(tz=UTC).timestamp() * 1000)
         lag_ms = max(0, now_ms - watermark_ms)
         if lag_ms > int(staleness_threshold_seconds) * 1000:
@@ -4091,17 +4295,11 @@ class ParquetMarketDataRepository:
         manifest: dict[str, Any],
         manifest_path: Path,
     ) -> pl.DataFrame:
-        data_files = self._normalize_manifest_data_files(manifest.get("data_files"))
-        date_root = manifest_path.parent
         frames: list[pl.DataFrame] = []
-        for file_token in data_files:
-            data_path = Path(file_token)
-            if not data_path.is_absolute():
-                data_path = date_root / file_token
-            if not data_path.exists():
-                raise RawFirstManifestInvalidError(
-                    f"Manifest referenced data file does not exist: {data_path}"
-                )
+        for data_path in self._resolve_manifest_data_paths(
+            manifest=manifest,
+            manifest_path=manifest_path,
+        ):
             loaded = pl.read_parquet(data_path)
             missing = [
                 name for name in _MATERIALIZED_REQUIRED_COLUMNS if name not in loaded.columns
@@ -4148,6 +4346,7 @@ class ParquetMarketDataRepository:
             )
         return merged
 
+    @_generation_guard(exclusive=True)
     def write_materialized_manifest(
         self,
         *,
@@ -4173,6 +4372,7 @@ class ParquetMarketDataRepository:
         self._fsync_dir(manifest_path.parent)
         return manifest_path
 
+    @_generation_guard(exclusive=False)
     def read_latest_materialized_manifest(
         self,
         *,
@@ -4190,22 +4390,23 @@ class ParquetMarketDataRepository:
         latest_key: tuple[int, int, str, str] | None = None
 
         for manifest_path in manifests:
-            try:
-                payload = self._read_json_file(manifest_path)
-            except Exception:
-                continue
+            payload = self._read_json_file(manifest_path)
             if not isinstance(payload, dict):
-                continue
-
+                raise RawFirstManifestInvalidError(
+                    f"Manifest payload must be an object at {manifest_path}."
+                )
             try:
-                checkpoint_end = int(payload.get("source_checkpoint_end", 0) or 0)
-            except Exception:
-                checkpoint_end = 0
-            try:
-                watermark_ms = int(payload.get("event_time_watermark_ms", 0) or 0)
-            except Exception:
-                watermark_ms = 0
+                checkpoint_end = int(payload["source_checkpoint_end"])
+                watermark_ms = int(payload["event_time_watermark_ms"])
+            except (KeyError, TypeError, ValueError) as exc:
+                raise RawFirstManifestInvalidError(
+                    f"Manifest generation metadata is invalid at {manifest_path}."
+                ) from exc
             commit_id = str(payload.get("commit_id", "") or "")
+            if not commit_id:
+                raise RawFirstManifestInvalidError(
+                    f"Manifest commit_id is missing at {manifest_path}."
+                )
             key = (
                 int(checkpoint_end),
                 int(watermark_ms),
@@ -4355,10 +4556,10 @@ class ParquetMarketDataRepository:
         path = self._meta_path(exchange=exchange, symbol=symbol)
         if not path.exists():
             return {}
-        try:
-            return json.loads(path.read_text(encoding="utf-8"))
-        except Exception:
-            return {}
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(payload, dict):
+            raise ValueError(f"Compaction metadata must be an object: {path}")
+        return payload
 
     def _write_meta(self, *, exchange: str, symbol: str, payload: dict[str, Any]) -> None:
         path = self._meta_path(exchange=exchange, symbol=symbol)
@@ -4549,28 +4750,41 @@ class ParquetMarketDataRepository:
         return float(timeout_seconds), float(poll_seconds)
 
     def acquire_raw_symbol_stream_lease(self, *, exchange: str, symbol: str) -> _RawStreamLease:
-        root = self._raw_symbol_root(exchange=exchange, symbol=symbol)
-        root_fd = self._raw_dir_fd(root, create=True)
-        lock_path = root / ".raw-stream.lock"
+        timeout_seconds, poll_seconds = self._resolve_raw_partition_lock_controls()
+        generation = self.generation_lock(
+            exclusive=True,
+            timeout_seconds=timeout_seconds,
+            poll_seconds=poll_seconds,
+        )
+        generation.__enter__()
+        fd = -1
         try:
-            fd = self._raw_open_regular(
-                root_fd, lock_path.name, os.O_RDWR | os.O_CREAT, path=lock_path
-            )
-        finally:
-            os.close(root_fd)
-        try:
-            timeout_seconds, poll_seconds = self._resolve_raw_partition_lock_controls()
+            root = self._raw_symbol_root(exchange=exchange, symbol=symbol)
+            root_fd = self._raw_dir_fd(root, create=True)
+            lock_path = root / ".raw-stream.lock"
+            try:
+                fd = self._raw_open_regular(
+                    root_fd, lock_path.name, os.O_RDWR | os.O_CREAT, path=lock_path
+                )
+            finally:
+                os.close(root_fd)
             deadline = time.monotonic() + timeout_seconds
             while True:
                 try:
                     fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                    return _RawStreamLease(lock_path=lock_path, _fd=fd)
+                    return _RawStreamLease(
+                        lock_path=lock_path,
+                        _fd=fd,
+                        _generation_lock=generation,
+                    )
                 except BlockingIOError:
                     if time.monotonic() >= deadline:
                         raise RawPartitionBusyError(f"Raw symbol stream is busy: {root}") from None
                     time.sleep(poll_seconds)
-        except Exception:
-            os.close(fd)
+        except BaseException as exc:
+            if fd >= 0:
+                os.close(fd)
+            generation.__exit__(type(exc), exc, exc.__traceback__)
             raise
 
     def _raw_stream_lease(
@@ -4857,6 +5071,7 @@ class ParquetMarketDataRepository:
             return self._empty_ohlcv_frame()
         return merged.select(["datetime", "open", "high", "low", "close", "volume"])
 
+    @_generation_guard(exclusive=True)
     def upsert_1s(
         self,
         *,
@@ -4872,7 +5087,7 @@ class ParquetMarketDataRepository:
         exchange_token = self._normalize_exchange(exchange)
         symbol_token = self._normalize_symbol_token(symbol)
         months = {self._month_token(value) for value in frame.get_column("datetime").to_list()}
-        with self.generation_lock(exclusive=False):
+        with self.generation_lock(exclusive=True):
             for month in months:
                 if (
                     self._monthly_pending_path(
@@ -4934,6 +5149,7 @@ class ParquetMarketDataRepository:
         )
         return self._merge_monthly_and_wal(monthly=monthly, wal=wal)
 
+    @_generation_guard(exclusive=False)
     def load_ohlcv(
         self,
         *,
@@ -5000,6 +5216,7 @@ class ParquetMarketDataRepository:
             cursor = chunk_end + timedelta(microseconds=1)
         return windows
 
+    @_generation_guard(exclusive=False)
     def load_ohlcv_chunked(
         self,
         *,
@@ -5087,67 +5304,51 @@ class ParquetMarketDataRepository:
             .sort("datetime")
         )
 
-    def _iter_committed_manifest_paths(
-        self,
-        *,
-        exchange: str,
-        symbol: str,
-        timeframe: str,
-        start_date: datetime | None,
-        end_date: datetime | None,
-    ) -> list[Path]:
-        root = (
-            self._materialized_symbol_root(exchange=exchange, symbol=symbol)
-            / f"timeframe={normalize_timeframe_token(timeframe)}"
-        )
-        if not root.exists():
-            return []
-
-        manifests = sorted(root.glob("date=*/manifest.json"))
-        if start_date is None and end_date is None:
-            return manifests
-
-        if start_date is None:
-            start_date = datetime(1970, 1, 1)
-        if end_date is None:
-            end_date = datetime(3000, 1, 1)
-        start_day = start_date.date()
-        end_day = end_date.date()
-
-        filtered: list[Path] = []
-        for path in manifests:
-            token = str(path.parent.name).strip()
-            if not token.startswith("date="):
-                continue
-            try:
-                part_date = date.fromisoformat(token.split("=", 1)[1])
-            except Exception:
-                continue
-            if start_day <= part_date <= end_day:
-                filtered.append(path)
-        return filtered
-
     def _resolve_manifest_data_paths(
         self,
         *,
         manifest: dict[str, Any],
         manifest_path: Path,
     ) -> list[Path]:
+        raw_files = manifest.get("data_files")
+        commit_id = str(manifest.get("commit_id", ""))
+        if (
+            not isinstance(raw_files, list)
+            or not raw_files
+            or any(not isinstance(item, str) for item in raw_files)
+            or len(set(raw_files)) != len(raw_files)
+        ):
+            raise RawFirstManifestInvalidError(
+                f"Manifest data_files must be a unique non-empty list: {manifest_path}"
+            )
         out: list[Path] = []
-        for item in list(manifest.get("data_files") or []):
-            raw = str(item or "").strip()
-            if not raw:
-                continue
-            candidate = Path(raw)
-            if not candidate.is_absolute():
-                candidate = (manifest_path.parent / candidate).resolve()
-            if not candidate.exists():
-                raise RawFirstDataMissingError(
-                    f"Manifest referenced data file missing: {candidate} (manifest={manifest_path})"
+        for raw in raw_files:
+            if not isinstance(raw, str):
+                raise RawFirstManifestInvalidError(
+                    f"Manifest data file token is not text: {manifest_path}"
                 )
-            out.append(candidate)
-        if not out:
-            raise RawFirstDataMissingError(f"Manifest has no readable data files: {manifest_path}")
+            relative = PurePosixPath(raw)
+            if (
+                relative.is_absolute()
+                or len(relative.parts) != 2
+                or relative.parts[0] != f"commit={commit_id}"
+                or not re.fullmatch(r"part-[0-9]+\.parquet", relative.parts[1])
+            ):
+                raise RawFirstManifestInvalidError(f"Manifest data file escapes its commit: {raw}")
+            commit_root = manifest_path.parent / relative.parts[0]
+            try:
+                commit_info = os.lstat(commit_root)
+                data_path = commit_root / relative.parts[1]
+                data_info = os.lstat(data_path)
+            except FileNotFoundError as exc:
+                raise RawFirstDataMissingError(
+                    f"Manifest referenced data file missing: {raw}"
+                ) from exc
+            if not stat.S_ISDIR(commit_info.st_mode) or not stat.S_ISREG(data_info.st_mode):
+                raise RawFirstManifestInvalidError(
+                    f"Manifest data path is not a regular committed file: {raw}"
+                )
+            out.append(data_path)
         return out
 
     def _load_manifest_json(self, path: Path) -> dict[str, Any]:
@@ -5161,6 +5362,7 @@ class ParquetMarketDataRepository:
             raise RawFirstManifestInvalidError(f"Manifest payload must be an object at {path}.")
         return payload
 
+    @_generation_guard(exclusive=False)
     def load_committed_ohlcv_chunked(
         self,
         *,
@@ -5198,11 +5400,15 @@ class ParquetMarketDataRepository:
             for path in manifests:
                 parent = str(path.parent.name)
                 if not parent.startswith("date="):
-                    continue
+                    raise RawFirstManifestInvalidError(
+                        f"Materialized partition name is invalid: {path.parent}"
+                    )
                 try:
                     part_date = date.fromisoformat(parent.split("=", 1)[1])
-                except Exception:
-                    continue
+                except ValueError as exc:
+                    raise RawFirstManifestInvalidError(
+                        f"Materialized partition date is invalid: {path.parent}"
+                    ) from exc
                 if lower <= part_date <= upper:
                     bounded.append(path)
             manifests = bounded
@@ -5285,10 +5491,7 @@ class ParquetMarketDataRepository:
                 )
             if not frame.is_empty():
                 frames.append(frame)
-            try:
-                watermark_ms = int(manifest.get("event_time_watermark_ms", 0))
-            except Exception:
-                watermark_ms = 0
+            watermark_ms = int(manifest["event_time_watermark_ms"])
             if watermark_ms > 0 and (
                 newest_watermark_ms is None or watermark_ms >= newest_watermark_ms
             ):
@@ -5337,6 +5540,7 @@ class ParquetMarketDataRepository:
 
         return merged.select(_OHLCV_COLUMNS)
 
+    @_generation_guard(exclusive=True)
     def compact_wal_to_monthly_parquet(
         self,
         *,
@@ -5437,6 +5641,7 @@ class ParquetMarketDataRepository:
         )
         return results
 
+    @_generation_guard(exclusive=True)
     def compact_partition(
         self,
         *,
@@ -5464,6 +5669,7 @@ class ParquetMarketDataRepository:
         monthly_path = self._monthly_path(exchange=exchange, symbol=symbol, month_token=month_token)
         return CompactionResult(str(monthly_path), 0, int(monthly_path.exists()), 0, 0)
 
+    @_generation_guard(exclusive=True)
     def compact_all(
         self,
         *,
@@ -5481,6 +5687,7 @@ class ParquetMarketDataRepository:
             remove_sources=remove_sources,
         )
 
+    @_generation_guard(exclusive=False)
     def get_symbol_time_range(
         self,
         *,
@@ -5499,25 +5706,22 @@ class ParquetMarketDataRepository:
         max_dt: datetime | None = None
 
         if monthly_files:
-            try:
-                first = (
-                    pl.scan_parquet(str(monthly_files[0]))
-                    .select(pl.col("datetime").min().alias("min_dt"))
-                    .collect()
-                )
-                last = (
-                    pl.scan_parquet(str(monthly_files[-1]))
-                    .select(pl.col("datetime").max().alias("max_dt"))
-                    .collect()
-                )
-                left = first["min_dt"][0]
-                right = last["max_dt"][0]
-                if left is not None:
-                    min_dt = left
-                if right is not None:
-                    max_dt = right
-            except Exception:
-                pass
+            first = (
+                pl.scan_parquet(str(monthly_files[0]))
+                .select(pl.col("datetime").min().alias("min_dt"))
+                .collect()
+            )
+            last = (
+                pl.scan_parquet(str(monthly_files[-1]))
+                .select(pl.col("datetime").max().alias("max_dt"))
+                .collect()
+            )
+            left = first["min_dt"][0]
+            right = last["max_dt"][0]
+            if left is not None:
+                min_dt = left
+            if right is not None:
+                max_dt = right
 
         wal_path = self._wal_path(exchange=exchange, symbol=symbol)
         if wal_path.exists():
@@ -5552,21 +5756,24 @@ def is_parquet_market_data_store(path: str, *, backend: str | None = None) -> bo
         return True
     if "parquet" in Path(raw).name.lower():
         return True
-    root = Path(raw)
-    if not root.exists():
-        return False
-    return bool(
-        any(root.glob("market_ohlcv_1s/*/*/*.parquet"))
-        or any(root.glob("market_ohlcv_1s/*/*/wal.bin"))
-        or any(root.glob("market_data_raw_aggtrades/*/*/date=*/part-*.parquet"))
-        or any(root.glob("market_data_materialized/*/*/timeframe=*/date=*/manifest.json"))
-        or any(root.glob("exchange=*/symbol=*/timeframe=*/date=*/*.parquet"))
-    )
+    repo = ParquetMarketDataRepository(Path(raw))
+    with repo.generation_lock(exclusive=False):
+        root = repo.root_path
+        if not root.exists():
+            return False
+        return bool(
+            any(root.glob("market_ohlcv_1s/*/*/*.parquet"))
+            or any(root.glob("market_ohlcv_1s/*/*/wal.bin"))
+            or any(root.glob("market_data_raw_aggtrades/*/*/date=*/part-*.parquet"))
+            or any(root.glob("market_data_materialized/*/*/timeframe=*/date=*/manifest.json"))
+            or any(root.glob("exchange=*/symbol=*/timeframe=*/date=*/*.parquet"))
+        )
 
 
-def load_data_dict_from_parquet(
-    root_path: str,
+def _load_data_dict_from_parquet_pinned(
     *,
+    repo: ParquetMarketDataRepository,
+    resolved_mode: str,
     exchange: str,
     symbol_list: list[str],
     timeframe: str,
@@ -5574,13 +5781,10 @@ def load_data_dict_from_parquet(
     end_date: Any = None,
     chunk_days: int = 7,
     warmup_bars: int = 0,
-    data_mode: str = "legacy",
     staleness_threshold_seconds: int | None = None,
     progress_callback: Callable[[str, Mapping[str, Any]], None] | None = None,
 ) -> dict[str, pl.DataFrame]:
     """Compatibility entrypoint retained for legacy import sites."""
-    repo = ParquetMarketDataRepository(root_path)
-    resolved_mode = normalize_data_mode(data_mode, default="legacy")
     out: dict[str, pl.DataFrame] = {}
     missing_symbols: list[str] = []
 
@@ -5616,11 +5820,11 @@ def load_data_dict_from_parquet(
                 )
             except RawFirstDataMissingError:
                 from lumina_quant.services.materialize_from_raw import (
-                    materialize_raw_aggtrades_bundle,
+                    _materialize_raw_aggtrades_bundle_unlocked,
                 )
 
-                materialize_raw_aggtrades_bundle(
-                    root_path=root_path,
+                _materialize_raw_aggtrades_bundle_unlocked(
+                    repo=repo,
                     exchange=exchange,
                     symbol=str(symbol),
                     timeframes=[str(timeframe)],
@@ -5678,3 +5882,36 @@ def load_data_dict_from_parquet(
             "Raw-first committed data missing for symbols: " + ", ".join(missing_symbols)
         )
     return out
+
+
+def load_data_dict_from_parquet(
+    root_path: str,
+    *,
+    exchange: str,
+    symbol_list: list[str],
+    timeframe: str,
+    start_date: Any = None,
+    end_date: Any = None,
+    chunk_days: int = 7,
+    warmup_bars: int = 0,
+    data_mode: str = "legacy",
+    staleness_threshold_seconds: int | None = None,
+    progress_callback: Callable[[str, Mapping[str, Any]], None] | None = None,
+) -> dict[str, pl.DataFrame]:
+    """Load one logical generation for the complete multi-symbol request."""
+    repo = ParquetMarketDataRepository(root_path)
+    resolved_mode = normalize_data_mode(data_mode, default="legacy")
+    with repo.generation_lock(exclusive=resolved_mode == "raw-first"):
+        return _load_data_dict_from_parquet_pinned(
+            repo=repo,
+            resolved_mode=resolved_mode,
+            exchange=exchange,
+            symbol_list=symbol_list,
+            timeframe=timeframe,
+            start_date=start_date,
+            end_date=end_date,
+            chunk_days=chunk_days,
+            warmup_bars=warmup_bars,
+            staleness_threshold_seconds=staleness_threshold_seconds,
+            progress_callback=progress_callback,
+        )

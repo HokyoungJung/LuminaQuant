@@ -55,7 +55,8 @@ G067_APPROVAL = (
     "/home/hoky/quants-recovery-runs/g065-oom-safety-20260726/g067-solusdt-202311-approval.json"
 )
 CURRENT_APPROVAL = (
-    "/home/hoky/quants-recovery-runs/g065-oom-safety-20260726/g070-current-state-approval.json"
+    "/home/hoky/quants-recovery-runs/luminaquant-recovery-631242a65e5d9732/"
+    "current-state-approval-v1.json"
 )
 ALIGNMENT = (
     "/home/hoky/quants-recovery-runs/20260714T105113Z/alpha-max-rev515-alignment-receipt-v5.json"
@@ -614,17 +615,19 @@ def _key_bindings(
         public_path = root / f"{name}.public"
         public_info, public = _read_regular(public_path)
         public_file = _identity(public_path, public_info, public)
-        if (private["mode"], private["st_uid"], private["nlink"], private["byte_count"]) != (
-            0o400,
-            os.getuid(),
-            1,
-            32,
-        ) or (
+        if (
+            private["mode"],
+            private["st_uid"],
+            private["st_gid"],
+            private["nlink"],
+            private["byte_count"],
+        ) != (0o400, os.getuid(), os.getgid(), 1, 32) or (
             public_file["mode"],
             public_file["st_uid"],
+            public_file["st_gid"],
             public_file["nlink"],
             public_file["byte_count"],
-        ) != (0o400, os.getuid(), 1, 32):
+        ) != (0o400, os.getuid(), os.getgid(), 1, 32):
             _fail("unsafe terminal key")
         digest = _sha(public)
         bindings.append(
@@ -739,6 +742,7 @@ def _unit(
     observer: bool = False,
 ) -> dict[str, Any]:
     service = {
+        "UMask": "0077",
         "Type": "exec",
         "ExecStart": argv,
         "Environment": [f"{k}={v}" for k, v in env.items()],
@@ -882,9 +886,121 @@ def _publish_complete(control: Path, value: dict[str, Any]) -> FileIdentity:
     return published
 
 
+_UNIT_RENDER_ORDER = ("Description", "After", "Wants")
+_SERVICE_RENDER_ORDER = (
+    "Type",
+    "UMask",
+    "ExecStart",
+    "ExecStopPost",
+    "Environment",
+    "WorkingDirectory",
+    "NoNewPrivileges",
+    "PrivateTmp",
+    "PrivateDevices",
+    "ProtectSystem",
+    "ProtectHome",
+    "ReadOnlyPaths",
+    "InaccessiblePaths",
+    "LoadCredential",
+    "ReadWritePaths",
+    "ProtectKernelTunables",
+    "ProtectKernelModules",
+    "ProtectControlGroups",
+    "RestrictAddressFamilies",
+    "IPAddressDeny",
+    "MemoryHigh",
+    "MemoryMax",
+    "MemorySwapMax",
+    "OOMPolicy",
+    "TimeoutStartSec",
+    "TimeoutStopSec",
+)
+
+
+def _systemd_word(value: str) -> str:
+    if (
+        not isinstance(value, str)
+        or not value
+        or any(ord(character) < 32 or ord(character) == 127 for character in value)
+    ):
+        _fail("systemd unit contains an invalid word")
+    return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def _render_systemd_value(name: str, value: Any) -> str:
+    if isinstance(value, bool):
+        return "yes" if value else "no"
+    if isinstance(value, int) and not isinstance(value, bool):
+        return str(value)
+    if name == "UMask":
+        if value != "0077":
+            _fail("systemd UMask must be 0077")
+        return value
+    if isinstance(value, str):
+        _systemd_word(value)
+        if name != "Description" and any(character.isspace() for character in value):
+            _fail(f"systemd directive requires one atom: {name}")
+        return value
+    if isinstance(value, list) and value and all(isinstance(item, str) for item in value):
+        if name in {"ExecStart", "ExecStopPost", "Environment"}:
+            return " ".join(_systemd_word(item) for item in value)
+        if any(any(character.isspace() for character in item) for item in value):
+            _fail(f"systemd directive contains a non-atomic list value: {name}")
+        return " ".join(value)
+    _fail(f"unsupported systemd directive value: {name}")
+
+
+def _render_systemd_unit(unit: dict[str, Any]) -> bytes:
+    """Render the validated production unit without a shell or a second contract."""
+    _validate_unit(unit)
+    if set(unit) != set(_UNIT_RENDER_ORDER) | {"Service"}:
+        _fail("unsupported systemd unit directive")
+    service = unit["Service"]
+    if set(service) - set(_SERVICE_RENDER_ORDER):
+        _fail("unsupported systemd service directive")
+    lines = ["[Unit]"]
+    for name in _UNIT_RENDER_ORDER:
+        lines.append(f"{name}={_render_systemd_value(name, unit[name])}")
+    lines.extend(("", "[Service]"))
+    for name in _SERVICE_RENDER_ORDER:
+        if name in service:
+            lines.append(f"{name}={_render_systemd_value(name, service[name])}")
+    return ("\n".join(lines) + "\n").encode()
+
+
+def _credential_binding(unit: dict[str, Any], key_files: list[dict[str, Any]]) -> dict[str, Any]:
+    """Bind one stable source credential to the `%d` target used by ExecStart."""
+    _validate_unit(unit)
+    service = unit["Service"]
+    credential = service["LoadCredential"][0]
+    name, _, source_value = credential.partition(":")
+    source = Path(source_value)
+    identities = {
+        item[kind]["path"]: item[kind] for item in key_files for kind in ("private", "public")
+    }
+    expected = identities.get(str(source))
+    if expected is None:
+        _fail("systemd credential source is not an approved terminal key")
+    actual = _file(source)
+    if actual != expected:
+        _fail("systemd credential source identity drift")
+    if (
+        actual["st_uid"],
+        actual["st_gid"],
+        actual["mode"],
+        actual["nlink"],
+    ) != (os.getuid(), os.getgid(), 0o400, 1):
+        _fail("systemd credential source permissions are unsafe")
+    target = f"%d/{name}"
+    if service["ExecStart"].count(target) != 1:
+        _fail("systemd credential target is not exact")
+    return {"name": name, "source": actual, "target": target}
+
+
 _SERVICE_DIRECTIVES = frozenset(
     {
         "Type",
+        "UMask",
         "ExecStart",
         "Environment",
         "WorkingDirectory",
@@ -921,6 +1037,8 @@ def _validate_unit(unit: dict[str, Any]) -> None:
     if unknown:
         _fail(f"unsupported systemd service directive: {sorted(unknown)!r}")
     service = unit["Service"]
+    if service.get("UMask") != "0077":
+        _fail("systemd UMask must be 0077")
     path_directives = ("ReadOnlyPaths", "ReadWritePaths", "InaccessiblePaths")
     if any(not isinstance(service[key], list) for key in path_directives):
         _fail("invalid systemd path directives")
@@ -1549,8 +1667,19 @@ def build(args: argparse.Namespace) -> dict[str, str]:
                 "monitor": monitor,
             },
         }
-        for unit in plan_value["systemd_units"].values():
-            _validate_unit({key: value for key, value in unit.items() if key != "name"})
+        systemd_root = paths["control_root"] / "systemd"
+        _create_root(systemd_root)
+        rendered_units: dict[str, dict[str, Any]] = {}
+        for role, item in plan_value["systemd_units"].items():
+            unit = {key: value for key, value in item.items() if key != "name"}
+            _validate_unit(unit)
+            unit_file = _write_bytes_new(systemd_root / item["name"], _render_systemd_unit(unit))
+            rendered_units[role] = {
+                "name": item["name"],
+                "file": unit_file,
+                "credential": _credential_binding(unit, key_files),
+            }
+        plan_value["rendered_systemd_units"] = rendered_units
         _write_new(plan, plan_value)
         manifest = paths["control_root"] / "manifest.json"
         _write_new(
@@ -1586,6 +1715,7 @@ def build(args: argparse.Namespace) -> dict[str, str]:
                 },
                 "public_key_summary": key_summary_file,
                 "telemetry": telemetry,
+                "rendered_systemd_units": rendered_units,
             },
         )
         if (
@@ -1603,6 +1733,7 @@ def build(args: argparse.Namespace) -> dict[str, str]:
             plan,
             manifest,
             key_summary_file["path"],
+            *[item["file"]["path"] for item in rendered_units.values()],
             *[item["package_freeze"]["path"] for item in freezes],
             current_receipt["path"],
             accepted_receipt["path"],
@@ -1619,6 +1750,8 @@ def build(args: argparse.Namespace) -> dict[str, str]:
             or manifest_value["public_key_summary"] != key_summary_file
             or manifest_value["repository_receipts"] != [current_receipt, accepted_receipt]
             or manifest_value["executable_inputs"] != plan_value["executable_inputs"]
+            or manifest_value["rendered_systemd_units"] != plan_value["rendered_systemd_units"]
+            or plan_value["rendered_systemd_units"] != rendered_units
             or plan_value["executable_inputs"]
             != {
                 name: {
@@ -1662,6 +1795,15 @@ def build(args: argparse.Namespace) -> dict[str, str]:
         if _file(paths["telemetry_script"]) != telemetry_preflight:
             _fail("telemetry identity revalidation failed")
         _revalidate_key_files(key_files)
+        for role, item in plan_value["systemd_units"].items():
+            unit = {key: value for key, value in item.items() if key != "name"}
+            rendered = rendered_units[role]
+            if (
+                _file(Path(rendered["file"]["path"])) != rendered["file"]
+                or _sha(_render_systemd_unit(unit)) != rendered["file"]["sha256"]
+                or _credential_binding(unit, key_files) != rendered["credential"]
+            ):
+                _fail("rendered systemd unit binding revalidation failed")
         policy.load_policy(policy_path)
         policy.load_checkpoint(checkpoint_path, loaded_policy)
         policy.load_envelope(envelope_path, loaded_policy, loaded_checkpoint)
