@@ -169,6 +169,14 @@ def test_terminal_requires_exact_success_complete_counters_and_strict_limits(tmp
         os.close(fd)
 
 
+def test_capture_default_uses_numeric_proc_pid_path():
+    args = v8.parser().parse_args(
+        ["capture", "--expected-unit", "u.service", "--output", "/tmp/terminal.json"]
+    )
+
+    assert args.proc_cgroup == f"/proc/{os.getpid()}/cgroup"
+
+
 def test_capture_binds_actual_proc_cgroup_and_is_durable(tmp_path, monkeypatch):
     root = tmp_path / "cg"
     root.mkdir()

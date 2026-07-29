@@ -126,10 +126,16 @@ def stable_file(path: Path) -> Iterable[io.BufferedReader]:
     if not components:
         raise AcquisitionError("required_file_missing")
     current_fd = os.open("/", os.O_RDONLY | os.O_DIRECTORY)
+    namespace_root_uid = os.fstat(current_fd).st_uid
     fd = -1
     try:
+        trusted_parent_directory(
+            os.fstat(current_fd),
+            False,
+            namespace_root=True,
+            namespace_root_uid=namespace_root_uid,
+        )
         for index, component in enumerate(components[:-1]):
-            trusted_parent_directory(os.fstat(current_fd), index == len(components) - 2)
             try:
                 next_fd = os.open(
                     component,
@@ -140,6 +146,11 @@ def stable_file(path: Path) -> Iterable[io.BufferedReader]:
                 raise AcquisitionError("unsafe_root_parent") from exc
             os.close(current_fd)
             current_fd = next_fd
+            trusted_parent_directory(
+                os.fstat(current_fd),
+                index == len(components) - 2,
+                namespace_root_uid=namespace_root_uid,
+            )
         try:
             fd = os.open(
                 components[-1], os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0), dir_fd=current_fd
@@ -937,22 +948,43 @@ def lexical(path: Path) -> Path:
     return Path(os.path.normpath(str(path)))
 
 
-def trusted_parent_directory(item: os.stat_result, immediate: bool) -> None:
+def trusted_parent_directory(
+    item: os.stat_result,
+    immediate: bool,
+    *,
+    namespace_root: bool = False,
+    namespace_root_uid: int | None = None,
+) -> None:
     if not stat.S_ISDIR(item.st_mode):
         raise AcquisitionError("unsafe_root_parent")
     writable = item.st_mode & (stat.S_IWGRP | stat.S_IWOTH)
-    if immediate:
+    if namespace_root:
+        # A user-manager mount namespace maps host root ownership to an overflow ID.
+        # The opened "/" anchor is safe when it is not group/other writable.
+        if writable:
+            raise AcquisitionError("unsafe_root_parent")
+    elif immediate:
         if item.st_uid != os.getuid() or writable:
             raise AcquisitionError("unsafe_root_parent")
-    elif item.st_uid not in {0, os.getuid()} or (writable and not (item.st_mode & stat.S_ISVTX)):
-        raise AcquisitionError("unsafe_root_parent")
+    else:
+        trusted_uids = {0, os.getuid()}
+        if namespace_root_uid is not None:
+            trusted_uids.add(namespace_root_uid)
+        if item.st_uid not in trusted_uids or (writable and not (item.st_mode & stat.S_ISVTX)):
+            raise AcquisitionError("unsafe_root_parent")
 
 
 def safe_existing_directory(path: Path) -> list[int]:
     """Open a trusted parent chain without following any path component."""
     current_fd = os.open("/", os.O_RDONLY | os.O_DIRECTORY)
+    namespace_root_uid = os.fstat(current_fd).st_uid
     try:
-        trusted_parent_directory(os.fstat(current_fd), not path.parts[1:])
+        trusted_parent_directory(
+            os.fstat(current_fd),
+            not path.parts[1:],
+            namespace_root=True,
+            namespace_root_uid=namespace_root_uid,
+        )
         components = path.parts[1:]
         for index, component in enumerate(components):
             try:
@@ -965,7 +997,11 @@ def safe_existing_directory(path: Path) -> list[int]:
                 raise AcquisitionError("unsafe_root_parent") from exc
             os.close(current_fd)
             current_fd = next_fd
-            trusted_parent_directory(os.fstat(current_fd), index == len(components) - 1)
+            trusted_parent_directory(
+                os.fstat(current_fd),
+                index == len(components) - 1,
+                namespace_root_uid=namespace_root_uid,
+            )
         item = os.fstat(current_fd)
         return [item.st_dev, item.st_ino]
     finally:

@@ -773,7 +773,9 @@ def parser() -> argparse.ArgumentParser:
     capture_parser.add_argument("--expected-unit", required=True)
     capture_parser.add_argument("--output", required=True)
     capture_parser.set_defaults(
-        proc_cgroup="/proc/self/cgroup", cgroup_root="/sys/fs/cgroup", handler=capture
+        proc_cgroup=f"/proc/{os.getpid()}/cgroup",
+        cgroup_root="/sys/fs/cgroup",
+        handler=capture,
     )
     monitor_parser = commands.add_parser("monitor")
     for name in (

@@ -56,7 +56,7 @@ G067_APPROVAL = (
 )
 CURRENT_APPROVAL = (
     "/home/hoky/quants-recovery-runs/luminaquant-recovery-631242a65e5d9732/"
-    "current-state-approval-v1.json"
+    "current-state-approval-v2.json"
 )
 ALIGNMENT = (
     "/home/hoky/quants-recovery-runs/20260714T105113Z/alpha-max-rev515-alignment-receipt-v5.json"
@@ -80,8 +80,8 @@ EXECUTABLE_PINS = {
     },
     "telemetry_script": {
         "path": "/home/hoky/Quants-agent/LuminaQuant/scripts/research/monitor_alpha_max_v8_resources.py",
-        "sha256": "66d8539bfc2f415690c89d44ebc3a396ad4b3f6c71da8e84e8670d20f4bb845a",
-        "byte_count": 28464,
+        "sha256": "5d3e7eedea70102c6aa182e153139131bdbcd3ffc904499184aecc55eee54d4f",
+        "byte_count": 28491,
         "mode": 0o600,
     },
 }
@@ -147,12 +147,12 @@ ROLE_PINS = {
     "acquirer": (
         CURRENT,
         "scripts/research/acquire_alpha_max_official_source.py",
-        "12737ea26e55166d82518f70e9cff249c46b2a77c02a5d323650d8c77219e365",
+        "5e34949d55c96eaaade6b7336a2114394410bfd11a31c5a284ce615b1fd9741d",
     ),
     "phase_wrapper": (
         CURRENT,
         "scripts/research/run_alpha_max_phase_preparation_from_eligible_source.py",
-        "125a3e6d08debd6d2a7ce3d414e33807586265b3a4153349d2bc4a1f1e6aaa47",
+        "da8696bb9e4cb120ec5f81363cec272108a5583103ed9204807737408fcbf868",
     ),
 }
 

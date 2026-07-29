@@ -2030,6 +2030,7 @@ def test_acquire_archive_resets_carry_across_selected_month_gap(
         digest = subject.sha256(payload)
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_bytes(payload)
+        destination.chmod(0o600)
         receipt = {
             "schema": "official_request_receipt.v1",
             "requested_url": url,
@@ -2166,6 +2167,14 @@ def test_trusted_parent_allows_root_owned_and_sticky_ancestors(
     subject.trusted_parent_directory(
         item(subject.stat.S_IFDIR | subject.stat.S_ISVTX | 0o777, 0), False
     )
+    subject.trusted_parent_directory(
+        item(subject.stat.S_IFDIR | 0o755, 65534), False, namespace_root=True
+    )
+    subject.trusted_parent_directory(
+        item(subject.stat.S_IFDIR | 0o755, 65534),
+        False,
+        namespace_root_uid=65534,
+    )
     assert subject.safe_existing_directory(tmp_path) == [
         tmp_path.stat().st_dev,
         tmp_path.stat().st_ino,
@@ -2182,6 +2191,16 @@ def test_trusted_parent_rejects_writable_or_untrusted_paths() -> None:
         subject.trusted_parent_directory(item(subject.stat.S_IFDIR | 0o777, os.getuid()), True)
     with pytest.raises(subject.AcquisitionError, match="unsafe_root_parent"):
         subject.trusted_parent_directory(item(subject.stat.S_IFDIR | 0o700, os.getuid() + 1), False)
+    with pytest.raises(subject.AcquisitionError, match="unsafe_root_parent"):
+        subject.trusted_parent_directory(
+            item(subject.stat.S_IFDIR | 0o777, 65534), False, namespace_root=True
+        )
+    with pytest.raises(subject.AcquisitionError, match="unsafe_root_parent"):
+        subject.trusted_parent_directory(
+            item(subject.stat.S_IFDIR | 0o755, 65534),
+            True,
+            namespace_root_uid=65534,
+        )
 
 
 @pytest.mark.parametrize("prefix", ["empty_output", "output_owner", "report_owner"])
