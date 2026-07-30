@@ -325,6 +325,11 @@ def test_main_atomically_activates_shared_root_and_is_idempotent(
     assert listing_value["records"] == listing
     assert hashlib.sha256(listing_bytes).hexdigest() == commit["listing_metadata_sha256"]
 
+    active_lock = (
+        canonical / "market_data_raw_aggtrades" / "binance" / "BTCUSDT" / ".raw-stream.lock"
+    )
+    active_lock.parent.mkdir(parents=True, exist_ok=True)
+    active_lock.touch(mode=0o600)
     assert subject.main(argv) == 0
     assert target.exists()
     assert source.read_bytes() == source_before
