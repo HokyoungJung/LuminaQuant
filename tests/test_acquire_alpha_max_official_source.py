@@ -94,6 +94,23 @@ def allow_sol_november_2023_order(monkeypatch: pytest.MonkeyPatch, source: Path)
     return identity
 
 
+SOL_DECEMBER_2023_START_MS = 1_701_388_800_000
+
+
+def sol_december_2023_archive(tmp_path: Path, rows: list[list[str]]) -> Path:
+    return archive(
+        tmp_path,
+        rows,
+        member="SOLUSDT-aggTrades-2023-12.csv",
+    )
+
+
+def allow_sol_december_2023_order(monkeypatch: pytest.MonkeyPatch, source: Path) -> tuple[str, int]:
+    identity = (subject.file_sha256(source), source.stat().st_size)
+    monkeypatch.setitem(subject.CANONICAL_ORDER_ARCHIVES, ("SOLUSDT", "2023-12"), identity)
+    return identity
+
+
 def authenticated_archive_receipt(source: Path) -> dict[str, int | str]:
     return {"sha256": subject.file_sha256(source), "byte_count": source.stat().st_size}
 
@@ -493,6 +510,44 @@ def test_authenticated_sol_november_2023_identity_canonicalizes_interleaving(
         SOL_NOVEMBER_2023_START_MS + 2000,
         None,
         "2023-11",
+        scratch,
+        authenticated_archive_receipt(source),
+    )
+    assert frame["open"].to_list() == [10.0, 12.0]
+    assert frame["high"].to_list() == [11.0, 12.0]
+    assert frame["low"].to_list() == [10.0, 12.0]
+    assert frame["close"].to_list() == [11.0, 12.0]
+    assert frame["volume"].to_list() == [3.0, 3.0]
+
+
+def test_sol_december_2023_production_identity_is_exact() -> None:
+    assert subject.CANONICAL_ORDER_ARCHIVES[("SOLUSDT", "2023-12")] == (
+        "c12bc6707c8fb6ab5f3fe712ad6c8b816053a27c6c6ead4f7dc98df7a098b70c",
+        558456557,
+    )
+
+
+def test_authenticated_sol_december_2023_identity_canonicalizes_interleaving(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    scratch = tmp_path / "scratch"
+    scratch.mkdir()
+    source = sol_december_2023_archive(
+        tmp_path,
+        [
+            ["2", "11", "2", "2", "2", str(SOL_DECEMBER_2023_START_MS + 100), "TRUE"],
+            ["1", "10", "1", "1", "1", str(SOL_DECEMBER_2023_START_MS), "FALSE"],
+            ["3", "12", "3", "3", "3", str(SOL_DECEMBER_2023_START_MS + 1000), "FALSE"],
+        ],
+    )
+    allow_sol_december_2023_order(monkeypatch, source)
+    frame, _ = subject.frame_from_archive(
+        source,
+        "SOLUSDT",
+        SOL_DECEMBER_2023_START_MS,
+        SOL_DECEMBER_2023_START_MS + 2000,
+        None,
+        "2023-12",
         scratch,
         authenticated_archive_receipt(source),
     )
