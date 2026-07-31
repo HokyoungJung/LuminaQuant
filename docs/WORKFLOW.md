@@ -39,7 +39,7 @@ Public branch policy:
 - Keep DB **read-only** workflows (consume existing Postgres/Parquet/CSV artifacts).
 - Do not include exchange OHLCV bootstrap/sync pipelines.
 - Do not include tuned strategy-factory research metadata (candidate libraries, research runners, article-pipeline/deployment generators, strategy-specific metadata tests, exact-window evaluation/reporting/dashboard surfaces, or research candidate/optimization orchestration).
-- Keep private-only CI/workflow files out of the public branch; public `ci.yml` must stay sanitized while `.github/workflows/private-ci.yml` remains private.
+- GitHub Actions is disabled for the private repository to avoid hosted-runner billing. Run the required lint, test, architecture, and packaging gates locally before each push.
 - Keep runtime DB/data artifacts out of git.
 
 ## 3. Automation Scripts
