@@ -56,7 +56,7 @@ G067_APPROVAL = (
 )
 CURRENT_APPROVAL = (
     "/home/hoky/quants-recovery-runs/luminaquant-recovery-631242a65e5d9732/"
-    "current-state-approval-v2.json"
+    "current-state-approval-v4.json"
 )
 ALIGNMENT = (
     "/home/hoky/quants-recovery-runs/20260714T105113Z/alpha-max-rev515-alignment-receipt-v5.json"
