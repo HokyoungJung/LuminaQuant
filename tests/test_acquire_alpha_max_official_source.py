@@ -111,6 +111,31 @@ def allow_sol_december_2023_order(monkeypatch: pytest.MonkeyPatch, source: Path)
     return identity
 
 
+SOL_JULY_2025_START_MS = 1_751_328_000_000
+
+
+def sol_july_2025_archive(tmp_path: Path, rows: list[list[str]]) -> Path:
+    return archive(
+        tmp_path,
+        rows,
+        member="SOLUSDT-aggTrades-2025-07.csv",
+    )
+
+
+def allow_sol_july_2025_duplicate(
+    monkeypatch: pytest.MonkeyPatch,
+    source: Path,
+    duplicate_ids: frozenset[int] = frozenset({2}),
+) -> tuple[str, int, frozenset[int]]:
+    identity = (subject.file_sha256(source), source.stat().st_size, duplicate_ids)
+    monkeypatch.setitem(
+        subject.AUTHENTICATED_DUPLICATE_AGGREGATE_ARCHIVES,
+        ("SOLUSDT", "2025-07"),
+        identity,
+    )
+    return identity
+
+
 def authenticated_archive_receipt(source: Path) -> dict[str, int | str]:
     return {"sha256": subject.file_sha256(source), "byte_count": source.stat().st_size}
 
@@ -556,6 +581,165 @@ def test_authenticated_sol_december_2023_identity_canonicalizes_interleaving(
     assert frame["low"].to_list() == [10.0, 12.0]
     assert frame["close"].to_list() == [11.0, 12.0]
     assert frame["volume"].to_list() == [3.0, 3.0]
+
+
+def test_sol_july_2025_production_identity_and_duplicate_are_exact() -> None:
+    assert subject.AUTHENTICATED_DUPLICATE_AGGREGATE_ARCHIVES[("SOLUSDT", "2025-07")] == (
+        "07842c476aab159f008ffc4e95e421e181f75348610c23baeae1dc3799d4e89b",
+        208568498,
+        frozenset({926014272}),
+    )
+
+
+def test_authenticated_sol_july_2025_preserves_pinned_duplicate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = sol_july_2025_archive(
+        tmp_path,
+        [
+            ["1", "10", "1", "1", "1", str(SOL_JULY_2025_START_MS), "FALSE"],
+            ["2", "11", "2", "2", "2", str(SOL_JULY_2025_START_MS + 100), "TRUE"],
+            ["2", "12", "3", "3", "3", str(SOL_JULY_2025_START_MS + 200), "FALSE"],
+            ["3", "13", "4", "4", "4", str(SOL_JULY_2025_START_MS + 1000), "TRUE"],
+        ],
+    )
+    allow_sol_july_2025_duplicate(monkeypatch, source)
+
+    frame, facts = subject.frame_from_archive(
+        source,
+        "SOLUSDT",
+        SOL_JULY_2025_START_MS,
+        SOL_JULY_2025_START_MS + 2000,
+        None,
+        "2025-07",
+        archive_receipt=authenticated_archive_receipt(source),
+    )
+
+    assert frame["open"].to_list() == [10.0, 13.0]
+    assert frame["high"].to_list() == [12.0, 13.0]
+    assert frame["low"].to_list() == [10.0, 13.0]
+    assert frame["close"].to_list() == [12.0, 13.0]
+    assert frame["volume"].to_list() == [6.0, 4.0]
+    assert facts["trade_count"] == 4
+
+
+@pytest.mark.parametrize(
+    ("symbol", "month", "receipt"),
+    [
+        ("SOLUSDT", "2025-07", None),
+        ("SOLUSDT", "2025-07", {"sha256": "0" * 64, "byte_count": 0}),
+        ("BTCUSDT", "2025-07", None),
+        ("SOLUSDT", "2025-06", None),
+    ],
+)
+def test_sol_july_2025_unscoped_duplicate_stays_rejected(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    symbol: str,
+    month: str,
+    receipt: dict[str, int | str] | None,
+) -> None:
+    source = sol_july_2025_archive(
+        tmp_path,
+        [
+            ["1", "10", "1", "1", "1", str(SOL_JULY_2025_START_MS), "FALSE"],
+            ["2", "11", "2", "2", "2", str(SOL_JULY_2025_START_MS + 100), "TRUE"],
+            ["2", "12", "3", "3", "3", str(SOL_JULY_2025_START_MS + 200), "FALSE"],
+        ],
+    )
+    allow_sol_july_2025_duplicate(monkeypatch, source)
+
+    with pytest.raises(subject.AcquisitionError):
+        subject.frame_from_archive(
+            source,
+            symbol,
+            SOL_JULY_2025_START_MS,
+            SOL_JULY_2025_START_MS + 1000,
+            None,
+            month,
+            archive_receipt=receipt,
+        )
+
+
+def test_sol_july_2025_self_authenticated_wrong_production_identity_stays_strict(
+    tmp_path: Path,
+) -> None:
+    source = sol_july_2025_archive(
+        tmp_path,
+        [
+            ["1", "10", "1", "1", "1", str(SOL_JULY_2025_START_MS), "FALSE"],
+            ["2", "11", "2", "2", "2", str(SOL_JULY_2025_START_MS + 100), "TRUE"],
+            ["2", "12", "3", "3", "3", str(SOL_JULY_2025_START_MS + 200), "FALSE"],
+        ],
+    )
+
+    with pytest.raises(subject.AcquisitionError, match=r"^archive_trade_order_invalid$"):
+        subject.frame_from_archive(
+            source,
+            "SOLUSDT",
+            SOL_JULY_2025_START_MS,
+            SOL_JULY_2025_START_MS + 1000,
+            None,
+            "2025-07",
+            archive_receipt=authenticated_archive_receipt(source),
+        )
+
+
+@pytest.mark.parametrize(
+    "rows",
+    [
+        [
+            ["1", "10", "1", "1", "1", str(SOL_JULY_2025_START_MS), "FALSE"],
+            ["2", "11", "2", "2", "2", str(SOL_JULY_2025_START_MS + 100), "TRUE"],
+            ["2", "12", "3", "3", "3", str(SOL_JULY_2025_START_MS + 100), "FALSE"],
+        ],
+        [
+            ["1", "10", "1", "1", "1", str(SOL_JULY_2025_START_MS), "FALSE"],
+            ["2", "11", "2", "2", "2", str(SOL_JULY_2025_START_MS + 100), "TRUE"],
+            ["2", "12", "3", "3", "3", str(SOL_JULY_2025_START_MS + 200), "FALSE"],
+            ["2", "13", "4", "4", "4", str(SOL_JULY_2025_START_MS + 300), "TRUE"],
+        ],
+        [
+            ["1", "10", "1", "1", "1", str(SOL_JULY_2025_START_MS), "FALSE"],
+            ["2", "11", "2", "2", "2", str(SOL_JULY_2025_START_MS + 100), "TRUE"],
+            ["3", "12", "3", "3", "3", str(SOL_JULY_2025_START_MS + 200), "FALSE"],
+        ],
+        [
+            ["1", "10", "1", "1", "1", str(SOL_JULY_2025_START_MS), "FALSE"],
+            ["2", "11", "2", "2", "2", str(SOL_JULY_2025_START_MS + 200), "TRUE"],
+            ["2", "12", "3", "3", "3", str(SOL_JULY_2025_START_MS + 100), "FALSE"],
+        ],
+        [
+            ["1", "10", "1", "1", "1", str(SOL_JULY_2025_START_MS), "FALSE"],
+            ["2", "11", "2", "2", "2", str(SOL_JULY_2025_START_MS + 100), "TRUE"],
+            ["2", "12", "3", "3", "3", str(SOL_JULY_2025_START_MS + 200), "FALSE"],
+            ["3", "13", "4", "4", "4", str(SOL_JULY_2025_START_MS + 300), "TRUE"],
+            ["3", "14", "5", "5", "5", str(SOL_JULY_2025_START_MS + 400), "FALSE"],
+        ],
+        [
+            ["1", "10", "1", "1", "1", str(SOL_JULY_2025_START_MS), "FALSE"],
+            ["2", "11", "2", "2", "2", str(SOL_JULY_2025_START_MS + 100), "TRUE"],
+            ["2", "12", "3", "3", "3", str(SOL_JULY_2025_START_MS + 200), "FALSE"],
+            ["1", "13", "4", "4", "4", str(SOL_JULY_2025_START_MS + 300), "TRUE"],
+        ],
+    ],
+)
+def test_sol_july_2025_pin_rejects_unmatched_duplicate_shape(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, rows: list[list[str]]
+) -> None:
+    source = sol_july_2025_archive(tmp_path, rows)
+    allow_sol_july_2025_duplicate(monkeypatch, source)
+
+    with pytest.raises(subject.AcquisitionError, match=r"^archive_trade_order_invalid$"):
+        subject.frame_from_archive(
+            source,
+            "SOLUSDT",
+            SOL_JULY_2025_START_MS,
+            SOL_JULY_2025_START_MS + 1000,
+            None,
+            "2025-07",
+            archive_receipt=authenticated_archive_receipt(source),
+        )
 
 
 @pytest.mark.parametrize(

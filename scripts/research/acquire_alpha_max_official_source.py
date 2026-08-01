@@ -83,6 +83,13 @@ CANONICAL_ORDER_ARCHIVES = {
         558456557,
     ),
 }
+AUTHENTICATED_DUPLICATE_AGGREGATE_ARCHIVES = {
+    ("SOLUSDT", "2025-07"): (
+        "07842c476aab159f008ffc4e95e421e181f75348610c23baeae1dc3799d4e89b",
+        208568498,
+        frozenset({926014272}),
+    ),
+}
 ORDER_RECORD = struct.Struct(">qqdd")
 ORDER_CHUNK_RECORDS = 250_000
 ORDER_MERGE_FAN_IN = 64
@@ -707,19 +714,34 @@ def replay_archive_trades(
     start_ms: int,
     end_ms: int,
     carry: float | None,
+    duplicate_aggregate_ids: frozenset[int] = frozenset(),
 ) -> tuple[pl.DataFrame, dict[str, Any]]:
-    """Replay strictly ordered trades into the owned OHLCV seconds."""
+    """Replay ordered trades into the owned OHLCV seconds."""
     size = (end_ms - start_ms) // 1000
     op, hi, lo, cl = (array("d", [math.nan]) * size for _ in range(4))
     vol = array("d", [0.0]) * size
     first = last = None
     last_aggregate = last_timestamp = None
+    observed_duplicate_aggregate_ids: set[int] = set()
     count = 0
     for aggregate_id, timestamp, price, quantity in trades:
-        if (last_aggregate is not None and aggregate_id <= last_aggregate) or (
-            last_timestamp is not None and timestamp < last_timestamp
+        duplicate = last_aggregate is not None and aggregate_id == last_aggregate
+        if (
+            (last_aggregate is not None and aggregate_id < last_aggregate)
+            or (
+                duplicate
+                and (
+                    aggregate_id not in duplicate_aggregate_ids
+                    or aggregate_id in observed_duplicate_aggregate_ids
+                    or last_timestamp is None
+                    or timestamp <= last_timestamp
+                )
+            )
+            or (last_timestamp is not None and timestamp < last_timestamp)
         ):
             raise AcquisitionError("archive_trade_order_invalid")
+        if duplicate:
+            observed_duplicate_aggregate_ids.add(aggregate_id)
         last_aggregate, last_timestamp = aggregate_id, timestamp
         first = first or (timestamp, aggregate_id)
         last = (timestamp, aggregate_id)
@@ -733,6 +755,8 @@ def replay_archive_trades(
             else:
                 hi[second], lo[second] = max(hi[second], price), min(lo[second], price)
             cl[second], vol[second] = price, vol[second] + quantity
+    if observed_duplicate_aggregate_ids != set(duplicate_aggregate_ids):
+        raise AcquisitionError("archive_trade_order_invalid")
     if not count:
         raise AcquisitionError("archive_trade_empty")
     if math.isnan(op[0]) and carry is None:
@@ -896,8 +920,13 @@ def frame_from_archive(
     expected_member = f"{symbol}-aggTrades-{month}.csv"
     nominal_end = month_bounds(datetime.fromtimestamp(nominal_start / 1000, UTC))[1]
     allowlisted = CANONICAL_ORDER_ARCHIVES.get((symbol, month))
+    duplicate_allowlisted = AUTHENTICATED_DUPLICATE_AGGREGATE_ARCHIVES.get((symbol, month))
     with stable_file(path) as archive_source:
-        if archive_receipt is not None or allowlisted is not None:
+        if (
+            archive_receipt is not None
+            or allowlisted is not None
+            or duplicate_allowlisted is not None
+        ):
             actual_digest, actual_byte_count = authenticated_archive_identity(
                 archive_source, archive_receipt
             )
@@ -923,6 +952,22 @@ def frame_from_archive(
                     nominal_start,
                     nominal_end,
                     scratch_root,
+                )
+        if duplicate_allowlisted is not None:
+            digest, byte_count, duplicate_aggregate_ids = duplicate_allowlisted
+            if (
+                actual_byte_count == byte_count
+                and actual_digest == digest
+                and isinstance(archive_receipt, dict)
+                and archive_receipt.get("sha256") == digest
+                and archive_receipt.get("byte_count") == byte_count
+            ):
+                return replay_archive_trades(
+                    archive_trades(archive_source, expected_member, nominal_start, nominal_end),
+                    start_ms,
+                    end_ms,
+                    carry,
+                    duplicate_aggregate_ids,
                 )
         return replay_archive_trades(
             archive_trades(archive_source, expected_member, nominal_start, nominal_end),

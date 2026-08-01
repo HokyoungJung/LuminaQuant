@@ -147,12 +147,12 @@ ROLE_PINS = {
     "acquirer": (
         CURRENT,
         "scripts/research/acquire_alpha_max_official_source.py",
-        "458a38a4bf54a3739b74eb908897b89db114e05512b928413cd7d5976c08c5ed",
+        "d3c674ecf28c5869eab43f9903b4479185b36faca108919868c2f2c31662db70",
     ),
     "phase_wrapper": (
         CURRENT,
         "scripts/research/run_alpha_max_phase_preparation_from_eligible_source.py",
-        "fa5d4028b62edb9978bef97db8d78d7d5010f462d561a91792433bb34b32b756",
+        "0db198af0b743df0bdb6d3700ed8f0bc53cc28373846ba890e1ac70edc287ce1",
     ),
 }
 
