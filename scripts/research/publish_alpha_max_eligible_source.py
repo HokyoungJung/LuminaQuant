@@ -13,6 +13,9 @@ import stat
 import uuid
 from pathlib import Path, PurePosixPath
 from typing import Any
+import base64
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 import polars as pl
 
 from lumina_quant.alpha_max_terminal_policy import verify_signed_receipt
@@ -26,6 +29,7 @@ _STORAGE = {
     "archive_retention": "retired_after_double_derivation",
 }
 _MAX_JSON = 64 * 1024 * 1024
+_CONFLICT_AUTH_MAX_JSON = 4 * 1024 * 1024
 _PUBLICATION_CONTROL_RESERVE_BYTES = 64 * 1024 * 1024
 _PARQUET_ENCODING_RESERVE_BYTES = 64 * 1024 * 1024
 _HEX = set("0123456789abcdef")
@@ -107,8 +111,32 @@ def _regular_bytes(path: Path, label: str, limit: int = _MAX_JSON) -> bytes:
         os.close(fd)
 
 
-def _json(path: Path, label: str) -> tuple[dict[str, Any], bytes]:
-    raw = _regular_bytes(path, label)
+def _conflict_public_key(path: Path) -> bytes:
+    label = "conflict authority public key"
+    fd, identity = _private_regular(path, label)
+    try:
+        if (
+            identity[3] != 32
+            or stat.S_IMODE(identity[2]) not in {0o400, 0o444}
+            or identity[7] != os.getuid()
+        ):
+            raise PublicationError(
+                "conflict authority public key must be an owned 32-byte 0400 or 0444 file"
+            )
+        data = bytearray()
+        while len(data) < 32:
+            chunk = os.read(fd, 32 - len(data))
+            if not chunk:
+                raise PublicationError("conflict authority public key was truncated")
+            data.extend(chunk)
+        _revalidate(path, fd, identity, label)
+        return bytes(data)
+    finally:
+        os.close(fd)
+
+
+def _json(path: Path, label: str, *, limit: int = _MAX_JSON) -> tuple[dict[str, Any], bytes]:
+    raw = _regular_bytes(path, label, limit=limit)
     try:
         value = json.loads(raw)
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
@@ -146,6 +174,20 @@ def _inside(root: Path, relative: str, label: str) -> Path:
         if not stat.S_ISDIR(info.st_mode) or stat.S_ISLNK(info.st_mode):
             raise PublicationError(f"{label} has unsafe parent")
     return current / pure.parts[-1]
+
+
+def _authorized_ohlcv_relative(value: Any) -> bool:
+    if not isinstance(value, str):
+        return False
+    path = PurePosixPath(value)
+    return (
+        len(path.parts) == 4
+        and not path.is_absolute()
+        and ".." not in path.parts
+        and all(component not in {"", "."} for component in path.parts)
+        and path.parts[:2] == ("market_ohlcv_1s", "binance")
+        and path.parts[3].endswith(".parquet")
+    )
 
 
 def _receipt_path(report: Path, relative: str) -> Path:
@@ -267,6 +309,369 @@ def _terminal(args: argparse.Namespace) -> tuple[dict[str, Any], str, dict[str, 
     if command_bindings[0] != command_bindings[1]:
         raise PublicationError("terminal command artifact bindings diverge")
     return message, verified.key_id, command_bindings[1]
+
+
+def _conflict_authorization(
+    args: argparse.Namespace,
+    *,
+    terminal_sha256: str,
+    request_id: str,
+    hashes: dict[str, str],
+    predecessor: Path,
+    predecessor_inventory: list[dict[str, Any]],
+    parts: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    receipt_path = args.conflict_authorization_receipt
+    key_path = args.conflict_authority_public_key
+    if receipt_path is None and key_path is None:
+        return None
+    if receipt_path is None or key_path is None:
+        raise PublicationError("conflict authorization receipt and public key must be paired")
+    receipt, receipt_bytes = _json(
+        receipt_path,
+        "conflict authorization receipt",
+        limit=_CONFLICT_AUTH_MAX_JSON,
+    )
+    receipt_info = os.lstat(receipt_path)
+    if receipt_info.st_uid != os.getuid() or stat.S_IMODE(receipt_info.st_mode) != 0o600:
+        raise PublicationError("conflict authorization receipt is not private")
+    raw_key = _conflict_public_key(key_path)
+    try:
+        authority = Ed25519PublicKey.from_public_bytes(raw_key)
+    except ValueError as exc:
+        raise PublicationError("conflict authority public key is invalid") from exc
+    outer_fields = {"schema", "type", "authority_key_id", "message", "signature"}
+    if (
+        set(receipt) != outer_fields
+        or receipt["schema"] != "alpha_max_canonical_conflict_authorization_receipt.v1"
+        or receipt["type"] != "canonical_conflict_authorization"
+        or receipt["authority_key_id"] != hashlib.sha256(raw_key).hexdigest()
+        or not isinstance(receipt["message"], dict)
+        or not isinstance(receipt["signature"], str)
+    ):
+        raise PublicationError("conflict authorization receipt schema is invalid")
+    unsigned = {key: value for key, value in receipt.items() if key != "signature"}
+    try:
+        authority.verify(
+            base64.b64decode(receipt["signature"], validate=True),
+            b"luminaquant.alpha_max.canonical_conflict_authorization.v1\0"
+            + canonical_bytes(unsigned),
+        )
+    except (ValueError, InvalidSignature) as exc:
+        raise PublicationError("conflict authorization signature is invalid") from exc
+    message = receipt["message"]
+    message_fields = {
+        "schema",
+        "scope",
+        "decision",
+        "canonical_root",
+        "acquisition_request_id",
+        "terminal_receipt_sha256",
+        "source_manifest_sha256",
+        "source_eligible_receipt_sha256",
+        "predecessor_path",
+        "predecessor_identity",
+        "predecessor_inventory_sha256",
+        "entries",
+    }
+    if (
+        set(message) != message_fields
+        or message["schema"] != "alpha_max_canonical_conflict_authorization_message.v1"
+        or message["scope"] != "canonical_conflict_reconciliation"
+        or message["decision"] != "approve_exact_effects"
+        or message["canonical_root"] != str(args.canonical_root)
+        or message["acquisition_request_id"] != request_id
+        or message["terminal_receipt_sha256"] != terminal_sha256
+        or message["source_manifest_sha256"] != hashes["manifest"]
+        or message["source_eligible_receipt_sha256"] != hashes["eligible"]
+        or message["predecessor_path"] != str(predecessor)
+        or message["predecessor_identity"]
+        != [os.stat(predecessor).st_dev, os.stat(predecessor).st_ino]
+        or message["predecessor_inventory_sha256"] != _inventory_digest(predecessor_inventory)
+        or not isinstance(message["entries"], list)
+    ):
+        raise PublicationError("conflict authorization message binding is invalid")
+    eligible = {item["relative"]: item for item in parts}
+    entry_fields = {
+        "relative",
+        "source_sha256",
+        "source_byte_count",
+        "source_row_count",
+        "provenance_receipt_sha256",
+        "predecessor_identity",
+        "predecessor_sha256",
+        "predecessor_byte_count",
+        "predecessor_row_count",
+        "effects",
+    }
+    entries: dict[str, dict[str, Any]] = {}
+    for entry in message["entries"]:
+        if not isinstance(entry, dict) or set(entry) != entry_fields:
+            raise PublicationError("conflict authorization entry schema is invalid")
+        relative = entry["relative"]
+        if (
+            not _authorized_ohlcv_relative(relative)
+            or relative in entries
+            or relative not in eligible
+        ):
+            raise PublicationError("conflict authorization entry path is invalid")
+        part = eligible[relative]
+        if (
+            entry["source_sha256"] != part["sha256"]
+            or entry["source_byte_count"] != os.stat(part["source"]).st_size
+            or entry["source_row_count"] != part["rows"]
+            or entry["provenance_receipt_sha256"] != part["provenance"]
+            or any(
+                isinstance(entry[field], bool)
+                or not isinstance(entry[field], int)
+                or entry[field] < 0
+                for field in (
+                    "source_byte_count",
+                    "source_row_count",
+                    "predecessor_byte_count",
+                    "predecessor_row_count",
+                )
+            )
+            or not isinstance(entry["predecessor_identity"], list)
+            or len(entry["predecessor_identity"]) != 9
+            or any(
+                isinstance(value, bool) or not isinstance(value, int)
+                for value in entry["predecessor_identity"]
+            )
+            or not isinstance(entry["effects"], dict)
+            or set(entry["effects"])
+            != {
+                "conflict_rows",
+                "conflict_sha256",
+                "canonical_only_rows",
+                "canonical_only_sha256",
+                "source_only_rows",
+                "source_only_sha256",
+            }
+            or any(
+                isinstance(entry["effects"][field], bool)
+                or not isinstance(entry["effects"][field], int)
+                or entry["effects"][field] < 0
+                for field in ("conflict_rows", "canonical_only_rows", "source_only_rows")
+            )
+            or entry["effects"]["conflict_rows"] == 0
+        ):
+            raise PublicationError("conflict authorization source binding is invalid")
+        for field in (
+            "source_sha256",
+            "provenance_receipt_sha256",
+            "predecessor_sha256",
+        ):
+            _sha(entry[field], f"conflict authorization {field}")
+        for field in (
+            "conflict_sha256",
+            "canonical_only_sha256",
+            "source_only_sha256",
+        ):
+            _sha(entry["effects"][field], f"conflict authorization effects {field}")
+        target = _inside(predecessor, relative, "authorization predecessor")
+        size, digest = _file_sha(target)
+        target_info = os.stat(target)
+        if (
+            entry["predecessor_identity"] != list(_identity(target_info))
+            or entry["predecessor_sha256"] != digest
+            or entry["predecessor_byte_count"] != size
+            or entry["predecessor_row_count"] != _parquet_rows(target)
+        ):
+            raise PublicationError("conflict authorization predecessor binding is invalid")
+        entries[relative] = entry
+    if not entries or list(entries) != sorted(entries):
+        raise PublicationError(
+            "conflict authorization entries must be nonempty and uniquely sorted"
+        )
+    return {
+        "receipt": receipt,
+        "receipt_sha256": hashlib.sha256(receipt_bytes).hexdigest(),
+        "key_id": receipt["authority_key_id"],
+        "public_key": raw_key,
+        "message": message,
+        "message_sha256": hashlib.sha256(canonical_bytes(message)).hexdigest(),
+        "entries": entries,
+    }
+
+
+def _replay_conflict_authorization(
+    args: argparse.Namespace,
+    *,
+    final: dict[str, Any],
+    terminal_sha256: str,
+    request_id: str,
+    hashes: dict[str, str],
+    parts: list[dict[str, Any]],
+) -> None:
+    paired = args.conflict_authorization_receipt is not None
+    is_v3 = final.get("schema") == "alpha_max_canonical_publication_receipt.v3"
+    if not is_v3:
+        if paired:
+            raise PublicationError("V2 publication cannot accept conflict authorization")
+        return
+    if not paired:
+        raise PublicationError("V3 replay requires conflict authorization receipt and public key")
+    predecessor = Path(final["predecessor_path"])
+    predecessor_available = (
+        predecessor.exists()
+        and not predecessor.is_symlink()
+        and [os.stat(predecessor).st_dev, os.stat(predecessor).st_ino]
+        == final["predecessor_identity"]
+    )
+    if not predecessor_available:
+        receipt, receipt_bytes = _json(
+            args.conflict_authorization_receipt,
+            "conflict authorization receipt",
+            limit=_CONFLICT_AUTH_MAX_JSON,
+        )
+        receipt_info = os.lstat(args.conflict_authorization_receipt)
+        raw_key = _conflict_public_key(args.conflict_authority_public_key)
+        unsigned = {key: value for key, value in receipt.items() if key != "signature"}
+        try:
+            Ed25519PublicKey.from_public_bytes(raw_key).verify(
+                base64.b64decode(receipt["signature"], validate=True),
+                b"luminaquant.alpha_max.canonical_conflict_authorization.v1\0"
+                + canonical_bytes(unsigned),
+            )
+        except (KeyError, TypeError, ValueError, InvalidSignature) as exc:
+            raise PublicationError("replay conflict authorization signature is invalid") from exc
+        message = receipt.get("message")
+        message_entries = message.get("entries") if isinstance(message, dict) else None
+        eligible = {item["relative"]: item for item in parts}
+        entry_fields = {
+            "relative",
+            "source_sha256",
+            "source_byte_count",
+            "source_row_count",
+            "provenance_receipt_sha256",
+            "predecessor_identity",
+            "predecessor_sha256",
+            "predecessor_byte_count",
+            "predecessor_row_count",
+            "effects",
+        }
+        entries_valid = isinstance(message_entries, list) and all(
+            isinstance(entry, dict)
+            and set(entry) == entry_fields
+            and _authorized_ohlcv_relative(entry.get("relative"))
+            and entry["relative"] in eligible
+            and entry["source_sha256"] == eligible[entry["relative"]]["sha256"]
+            and entry["source_byte_count"] == os.stat(eligible[entry["relative"]]["source"]).st_size
+            and entry["source_row_count"] == eligible[entry["relative"]]["rows"]
+            and entry["provenance_receipt_sha256"] == eligible[entry["relative"]]["provenance"]
+            and all(
+                type(entry[field]) is int and entry[field] >= 0
+                for field in (
+                    "source_byte_count",
+                    "source_row_count",
+                    "predecessor_byte_count",
+                    "predecessor_row_count",
+                )
+            )
+            and isinstance(entry["predecessor_identity"], list)
+            and len(entry["predecessor_identity"]) == 9
+            and all(type(value) is int for value in entry["predecessor_identity"])
+            and all(
+                isinstance(entry[field], str)
+                and re.fullmatch(r"[0-9a-f]{64}", entry[field]) is not None
+                for field in (
+                    "source_sha256",
+                    "provenance_receipt_sha256",
+                    "predecessor_sha256",
+                )
+            )
+            and isinstance(entry["effects"], dict)
+            and set(entry["effects"])
+            == {
+                "conflict_rows",
+                "conflict_sha256",
+                "canonical_only_rows",
+                "canonical_only_sha256",
+                "source_only_rows",
+                "source_only_sha256",
+            }
+            and all(
+                type(entry["effects"][field]) is int and entry["effects"][field] >= 0
+                for field in ("conflict_rows", "canonical_only_rows", "source_only_rows")
+            )
+            and entry["effects"]["conflict_rows"] > 0
+            and all(
+                isinstance(entry["effects"][field], str)
+                and re.fullmatch(r"[0-9a-f]{64}", entry["effects"][field]) is not None
+                for field in (
+                    "conflict_sha256",
+                    "canonical_only_sha256",
+                    "source_only_sha256",
+                )
+            )
+            for entry in message_entries or []
+        )
+        entry_relatives = [entry["relative"] for entry in message_entries] if entries_valid else []
+        if (
+            receipt_info.st_uid != os.getuid()
+            or stat.S_IMODE(receipt_info.st_mode) != 0o600
+            or set(receipt) != {"schema", "type", "authority_key_id", "message", "signature"}
+            or receipt.get("schema") != "alpha_max_canonical_conflict_authorization_receipt.v1"
+            or receipt.get("type") != "canonical_conflict_authorization"
+            or receipt.get("authority_key_id") != hashlib.sha256(raw_key).hexdigest()
+            or not isinstance(message, dict)
+            or set(message)
+            != {
+                "schema",
+                "scope",
+                "decision",
+                "canonical_root",
+                "acquisition_request_id",
+                "terminal_receipt_sha256",
+                "source_manifest_sha256",
+                "source_eligible_receipt_sha256",
+                "predecessor_path",
+                "predecessor_identity",
+                "predecessor_inventory_sha256",
+                "entries",
+            }
+            or message.get("schema") != "alpha_max_canonical_conflict_authorization_message.v1"
+            or message.get("scope") != "canonical_conflict_reconciliation"
+            or message.get("decision") != "approve_exact_effects"
+            or message.get("canonical_root") != str(args.canonical_root)
+            or message.get("acquisition_request_id") != request_id
+            or message.get("terminal_receipt_sha256") != terminal_sha256
+            or message.get("source_manifest_sha256") != hashes["manifest"]
+            or message.get("source_eligible_receipt_sha256") != hashes["eligible"]
+            or message.get("predecessor_path") != str(predecessor)
+            or message.get("predecessor_identity") != final["predecessor_identity"]
+            or message.get("predecessor_inventory_sha256") != final["old_inventory_sha256"]
+            or not entries_valid
+            or not entry_relatives
+            or entry_relatives != sorted(set(entry_relatives))
+            or hashlib.sha256(receipt_bytes).hexdigest()
+            != final["conflict_authorization_receipt_sha256"]
+            or receipt["authority_key_id"] != final["conflict_authority_key_id"]
+            or hashlib.sha256(canonical_bytes(message)).hexdigest()
+            != final["conflict_authorization_message_sha256"]
+            or message["predecessor_inventory_sha256"]
+            != final["conflict_authorization_predecessor_inventory_sha256"]
+        ):
+            raise PublicationError("replay conflict authorization binding mismatch")
+        return
+    authorization = _conflict_authorization(
+        args,
+        terminal_sha256=terminal_sha256,
+        request_id=request_id,
+        hashes=hashes,
+        predecessor=predecessor,
+        predecessor_inventory=final["old_inventory"],
+        parts=parts,
+    )
+    if authorization is None or (
+        authorization["receipt_sha256"] != final["conflict_authorization_receipt_sha256"]
+        or authorization["key_id"] != final["conflict_authority_key_id"]
+        or authorization["message_sha256"] != final["conflict_authorization_message_sha256"]
+        or authorization["message"]["predecessor_inventory_sha256"]
+        != final["conflict_authorization_predecessor_inventory_sha256"]
+    ):
+        raise PublicationError("replay conflict authorization binding mismatch")
 
 
 def _file_binding(path: Path, label: str, expected: tuple[str, int]) -> bytes:
@@ -854,10 +1259,24 @@ def _validate_prepared_commit(
         "listing_count",
         "rows",
     }
+    is_v3 = final.get("schema") == "alpha_max_canonical_publication_receipt.v3"
+    if is_v3:
+        expected_final_fields |= {
+            "conflict_authorization_receipt_sha256",
+            "conflict_authority_key_id",
+            "conflict_authorization_message_sha256",
+            "conflict_authorization_predecessor_inventory_sha256",
+            "authorized_conflict_partition_count",
+            "authorized_replaced_row_count",
+        }
     if set(final) != expected_final_fields:
         raise PublicationError("prepared commit schema mismatch")
     if (
-        final.get("schema") != "alpha_max_canonical_publication_receipt.v2"
+        final.get("schema")
+        not in {
+            "alpha_max_canonical_publication_receipt.v2",
+            "alpha_max_canonical_publication_receipt.v3",
+        }
         or final.get("request_id") != request_id
         or final.get("terminal_receipt_sha256") != terminal_sha256
         or final.get("authority_key_id") != key_id
@@ -976,7 +1395,7 @@ def _validate_prepared_commit(
     if set(expected) != {item.get("relative") for item in published if isinstance(item, dict)}:
         raise PublicationError("prepared commit partition inventory mismatch")
     for record in published:
-        if set(record) != {
+        expected_record_fields = {
             "relative",
             "target",
             "source_sha256",
@@ -990,7 +1409,10 @@ def _validate_prepared_commit(
             "rows",
             "target_rows",
             "provenance_receipt_sha256",
-        }:
+        }
+        if is_v3:
+            expected_record_fields |= {"publication_mode", "conflict_effects"}
+        if set(record) != expected_record_fields:
             raise PublicationError("prepared target record shape is invalid")
         source = expected[record["relative"]]
         if allow_active_mutation:
@@ -1046,6 +1468,18 @@ def _validate_prepared_commit(
         )
         if partition_receipt != record:
             raise PublicationError("prepared partition receipt binding mismatch")
+        if is_v3 and (
+            record["publication_mode"] not in {"strict_merge", "authorized_reconciliation"}
+            or (
+                record["publication_mode"] == "strict_merge"
+                and record["conflict_effects"] is not None
+            )
+            or (
+                record["publication_mode"] == "authorized_reconciliation"
+                and not isinstance(record["conflict_effects"], dict)
+            )
+        ):
+            raise PublicationError("prepared conflict partition binding is invalid")
     canonical_receipt, _ = _json(
         candidate / ".alpha_max_publication" / request_id / "canonical_publication_receipt.json",
         "canonical publication receipt",
@@ -1056,6 +1490,145 @@ def _validate_prepared_commit(
         "candidate_data_inventory_sha256"
     ):
         raise PublicationError("prepared candidate data inventory digest mismatch")
+    if is_v3:
+        publication = candidate / ".alpha_max_publication" / request_id
+        receipt, receipt_bytes = _json(
+            publication / "conflict_authorization_receipt.json",
+            "prepared conflict authorization receipt",
+        )
+        message, _ = _json(
+            publication / "conflict_authorization_message.json",
+            "prepared conflict authorization message",
+        )
+        message_fields = {
+            "schema",
+            "scope",
+            "decision",
+            "canonical_root",
+            "acquisition_request_id",
+            "terminal_receipt_sha256",
+            "source_manifest_sha256",
+            "source_eligible_receipt_sha256",
+            "predecessor_path",
+            "predecessor_identity",
+            "predecessor_inventory_sha256",
+            "entries",
+        }
+        entry_fields = {
+            "relative",
+            "source_sha256",
+            "source_byte_count",
+            "source_row_count",
+            "provenance_receipt_sha256",
+            "predecessor_identity",
+            "predecessor_sha256",
+            "predecessor_byte_count",
+            "predecessor_row_count",
+            "effects",
+        }
+        effect_fields = {
+            "conflict_rows",
+            "conflict_sha256",
+            "canonical_only_rows",
+            "canonical_only_sha256",
+            "source_only_rows",
+            "source_only_sha256",
+        }
+        message_entries = message.get("entries")
+        if not isinstance(message_entries, list) or any(
+            not isinstance(entry, dict)
+            or set(entry) != entry_fields
+            or not _authorized_ohlcv_relative(entry.get("relative"))
+            or any(
+                type(entry[field]) is not int or entry[field] < 0
+                for field in (
+                    "source_byte_count",
+                    "source_row_count",
+                    "predecessor_byte_count",
+                    "predecessor_row_count",
+                )
+            )
+            or not isinstance(entry["predecessor_identity"], list)
+            or len(entry["predecessor_identity"]) != 9
+            or any(type(value) is not int for value in entry["predecessor_identity"])
+            or any(
+                not isinstance(entry[field], str)
+                or re.fullmatch(r"[0-9a-f]{64}", entry[field]) is None
+                for field in (
+                    "source_sha256",
+                    "provenance_receipt_sha256",
+                    "predecessor_sha256",
+                )
+            )
+            or not isinstance(entry.get("effects"), dict)
+            or set(entry["effects"]) != effect_fields
+            or any(
+                isinstance(entry["effects"][field], bool)
+                or not isinstance(entry["effects"][field], int)
+                or entry["effects"][field] < 0
+                for field in ("conflict_rows", "canonical_only_rows", "source_only_rows")
+            )
+            or entry["effects"]["conflict_rows"] == 0
+            or any(
+                not isinstance(entry["effects"][field], str)
+                or re.fullmatch(r"[0-9a-f]{64}", entry["effects"][field]) is None
+                for field in (
+                    "conflict_sha256",
+                    "canonical_only_sha256",
+                    "source_only_sha256",
+                )
+            )
+            for entry in message_entries
+        ):
+            raise PublicationError("prepared conflict authorization binding mismatch")
+        authorization_entries = {entry["relative"]: entry for entry in message_entries}
+        authorized_records = {
+            record["relative"]: record
+            for record in published
+            if record.get("publication_mode") == "authorized_reconciliation"
+        }
+        if (
+            set(receipt) != {"schema", "type", "authority_key_id", "message", "signature"}
+            or receipt.get("schema") != "alpha_max_canonical_conflict_authorization_receipt.v1"
+            or receipt.get("type") != "canonical_conflict_authorization"
+            or set(message) != message_fields
+            or message.get("schema") != "alpha_max_canonical_conflict_authorization_message.v1"
+            or message.get("scope") != "canonical_conflict_reconciliation"
+            or message.get("decision") != "approve_exact_effects"
+            or message.get("canonical_root") != final["canonical_root"]
+            or message.get("acquisition_request_id") != request_id
+            or message.get("terminal_receipt_sha256") != terminal_sha256
+            or message.get("source_manifest_sha256") != hashes["manifest"]
+            or message.get("source_eligible_receipt_sha256") != hashes["eligible"]
+            or message.get("predecessor_path") != final["predecessor_path"]
+            or message.get("predecessor_identity") != final["predecessor_identity"]
+            or message.get("predecessor_inventory_sha256") != final["old_inventory_sha256"]
+            or len(authorization_entries) != len(message_entries)
+            or list(authorization_entries) != sorted(authorization_entries)
+            or set(authorization_entries) != set(authorized_records)
+            or any(
+                record["source_sha256"] != authorization_entries[relative]["source_sha256"]
+                or record["bytes"] != authorization_entries[relative]["source_byte_count"]
+                or record["rows"] != authorization_entries[relative]["source_row_count"]
+                or record["provenance_receipt_sha256"]
+                != authorization_entries[relative]["provenance_receipt_sha256"]
+                or record["conflict_effects"] != authorization_entries[relative]["effects"]
+                for relative, record in authorized_records.items()
+            )
+            or receipt.get("message") != message
+            or hashlib.sha256(receipt_bytes).hexdigest()
+            != final["conflict_authorization_receipt_sha256"]
+            or hashlib.sha256(canonical_bytes(message)).hexdigest()
+            != final["conflict_authorization_message_sha256"]
+            or receipt.get("authority_key_id") != final["conflict_authority_key_id"]
+            or final["conflict_authority_key_id"] == final["authority_key_id"]
+            or message["predecessor_inventory_sha256"]
+            != final["conflict_authorization_predecessor_inventory_sha256"]
+            or final["authorized_conflict_partition_count"] != len(authorization_entries)
+            or final["authorized_replaced_row_count"]
+            != sum(entry["effects"]["conflict_rows"] for entry in authorization_entries.values())
+        ):
+            raise PublicationError("prepared conflict authorization binding mismatch")
     return published
 
 
@@ -1196,6 +1769,8 @@ def main(argv: list[str] | None = None) -> int:
         "canonical-root",
     ):
         parser.add_argument("--" + name, required=True)
+    parser.add_argument("--conflict-authorization-receipt")
+    parser.add_argument("--conflict-authority-public-key")
     args = parser.parse_args(argv)
     for name in (
         "source_root",
@@ -1205,6 +1780,14 @@ def main(argv: list[str] | None = None) -> int:
         "canonical_root",
     ):
         setattr(args, name, _absolute(getattr(args, name), name))
+    for name in ("conflict_authorization_receipt", "conflict_authority_public_key"):
+        value = getattr(args, name)
+        if value is not None:
+            setattr(args, name, _absolute(value, name))
+    if (args.conflict_authorization_receipt is None) != (
+        args.conflict_authority_public_key is None
+    ):
+        raise PublicationError("conflict authorization receipt and public key must be paired")
     terminal, key_id, bound = _terminal(args)
     parts, hashes, listing = _partitions(args.source_root, args.source_report, bound)
     request_id = _sha(terminal.get("request_id"), "terminal request identity")
@@ -1241,6 +1824,14 @@ def main(argv: list[str] | None = None) -> int:
                 )
                 raise PublicationError("unready active generation was rolled back")
             final, _ = _json(candidate / "commit.json", "active commit")
+            _replay_conflict_authorization(
+                args,
+                final=final,
+                terminal_sha256=terminal_sha256,
+                request_id=request_id,
+                hashes=hashes,
+                parts=parts,
+            )
             _validate_prepared_commit(
                 candidate,
                 final,
@@ -1274,6 +1865,14 @@ def main(argv: list[str] | None = None) -> int:
             )
             if not canonical_receipt_path.exists():
                 _write_noreplace(canonical_receipt_path, final)
+            _replay_conflict_authorization(
+                args,
+                final=final,
+                terminal_sha256=terminal_sha256,
+                request_id=request_id,
+                hashes=hashes,
+                parts=parts,
+            )
             published = _validate_prepared_commit(
                 candidate,
                 final,
@@ -1320,6 +1919,19 @@ def main(argv: list[str] | None = None) -> int:
                 old = active
             old_identity = (os.stat(old).st_dev, os.stat(old).st_ino)
             old_inventory = _inventory(old)
+            authorization = _conflict_authorization(
+                args,
+                terminal_sha256=terminal_sha256,
+                request_id=request_id,
+                hashes=hashes,
+                predecessor=old,
+                predecessor_inventory=old_inventory,
+                parts=parts,
+            )
+            if authorization is not None and authorization["key_id"] == key_id:
+                raise PublicationError(
+                    "conflict authorization must use a distinct repair authority"
+                )
             _write_noreplace(
                 control / "cloning.json",
                 {"request_id": request_id, "phase": "cloning"},
@@ -1334,6 +1946,14 @@ def main(argv: list[str] | None = None) -> int:
                     "old_inventory_sha256": _inventory_digest(old_inventory),
                 },
             )
+            if authorization is not None:
+                publication = candidate / ".alpha_max_publication" / request_id
+                _write_noreplace(
+                    publication / "conflict_authorization_receipt.json", authorization["receipt"]
+                )
+                _write_noreplace(
+                    publication / "conflict_authorization_message.json", authorization["message"]
+                )
             repo = ParquetMarketDataRepository(candidate)
             feature_repo = MarketDataRepository(str(candidate))
             published = []
@@ -1358,7 +1978,27 @@ def main(argv: list[str] | None = None) -> int:
                 if pinned_count != byte_count:
                     raise PublicationError("immutable source pin size mismatch")
                 path = PurePosixPath(item["relative"])
-                if path.parts[0] == "market_ohlcv_1s":
+                authorized_entry = (
+                    authorization["entries"].get(item["relative"])
+                    if authorization is not None
+                    else None
+                )
+                if path.parts[0] == "market_ohlcv_1s" and authorized_entry is not None:
+                    target = repo.reconcile_authorized_signed_month_into_candidate(
+                        exchange="binance",
+                        symbol=path.parts[2],
+                        month=path.parts[3][:-8],
+                        source=pin,
+                        expected_sha256=item["sha256"],
+                        expected_byte_count=byte_count,
+                        expected_row_count=item["rows"],
+                        provenance_receipt_sha256=item["provenance"],
+                        conflict_authorization_receipt=authorization["receipt"],
+                        conflict_authority_public_key=authorization["public_key"],
+                        authorization_entry=authorized_entry,
+                        max_output_bytes=admission["enforced_output_quota_bytes"],
+                    )
+                elif path.parts[0] == "market_ohlcv_1s":
                     target = repo.merge_signed_month_into_candidate(
                         exchange="binance",
                         symbol=path.parts[2],
@@ -1413,6 +2053,15 @@ def main(argv: list[str] | None = None) -> int:
                     "target_rows": _parquet_rows(target),
                     "provenance_receipt_sha256": item["provenance"],
                 }
+                if authorization is not None:
+                    record["publication_mode"] = (
+                        "authorized_reconciliation"
+                        if authorized_entry is not None
+                        else "strict_merge"
+                    )
+                    record["conflict_effects"] = (
+                        authorized_entry["effects"] if authorized_entry is not None else None
+                    )
                 _write_noreplace(
                     candidate
                     / ".alpha_max_publication"
@@ -1436,8 +2085,16 @@ def main(argv: list[str] | None = None) -> int:
                 old, candidate, old_inventory, published
             )
             candidate_data_digest = _data_inventory_digest(candidate)
+            if authorization is not None and len(authorization["entries"]) != sum(
+                record["publication_mode"] == "authorized_reconciliation" for record in published
+            ):
+                raise PublicationError("conflict authorization entry was not consumed exactly once")
             final = {
-                "schema": "alpha_max_canonical_publication_receipt.v2",
+                "schema": (
+                    "alpha_max_canonical_publication_receipt.v3"
+                    if authorization is not None
+                    else "alpha_max_canonical_publication_receipt.v2"
+                ),
                 "request_id": request_id,
                 "terminal_receipt_sha256": terminal_sha256,
                 "authority_key_id": key_id,
@@ -1465,6 +2122,22 @@ def main(argv: list[str] | None = None) -> int:
                 "listing_count": len(listing),
                 "rows": sum(item["rows"] for item in published),
             }
+            if authorization is not None:
+                final.update(
+                    {
+                        "conflict_authorization_receipt_sha256": authorization["receipt_sha256"],
+                        "conflict_authority_key_id": authorization["key_id"],
+                        "conflict_authorization_message_sha256": authorization["message_sha256"],
+                        "conflict_authorization_predecessor_inventory_sha256": authorization[
+                            "message"
+                        ]["predecessor_inventory_sha256"],
+                        "authorized_conflict_partition_count": len(authorization["entries"]),
+                        "authorized_replaced_row_count": sum(
+                            entry["effects"]["conflict_rows"]
+                            for entry in authorization["entries"].values()
+                        ),
+                    }
+                )
             _write_noreplace(candidate / "commit.json", final)
             _write_noreplace(
                 candidate

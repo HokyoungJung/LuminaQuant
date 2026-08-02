@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import errno
 import fcntl
 import json
@@ -22,6 +23,8 @@ from hashlib import sha256
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 import polars as pl
 from lumina_quant.backtesting.cli_contract import (
     RawFirstDataMissingError,
@@ -45,6 +48,7 @@ _DEFAULT_SCHEMA: dict[str, pl.DataType] = {
 }
 _KNOWN_QUOTES = ("USDT", "USDC", "BUSD", "USD", "BTC", "ETH")
 _OHLCV_COLUMNS = ["datetime", "open", "high", "low", "close", "volume"]
+_CONFLICT_AUTHORIZATION_DOMAIN = b"luminaquant.alpha_max.canonical_conflict_authorization.v1\0"
 _MANIFEST_REQUIRED_FIELDS = (
     "manifest_version",
     "commit_id",
@@ -961,7 +965,138 @@ class ParquetMarketDataRepository:
         finally:
             os.close(source_fd)
 
-    @_generation_guard(exclusive=True)
+    def _signed_month_conflict_effects(
+        self, existing: pl.DataFrame, incoming: pl.DataFrame
+    ) -> dict[str, int | str]:
+        """Describe the exact signed rows an authorized reconciliation may change."""
+        columns = _OHLCV_COLUMNS[1:]
+        incoming_renamed = incoming.rename({column: f"{column}_incoming" for column in columns})
+        overlap = existing.join(incoming_renamed, on="datetime", how="inner")
+        conflict = overlap.filter(
+            pl.any_horizontal(
+                [pl.col(column) != pl.col(f"{column}_incoming") for column in columns]
+            )
+        )
+        canonical_only = existing.join(incoming.select("datetime"), on="datetime", how="anti")
+        source_only = incoming.join(existing.select("datetime"), on="datetime", how="anti")
+
+        def records(frame: pl.DataFrame, *, official: bool = False) -> list[dict[str, Any]]:
+            suffix = "_incoming" if official else ""
+            rows = (
+                frame.select(
+                    [
+                        pl.col("datetime").dt.epoch("ms").alias("timestamp_ms"),
+                        *[pl.col(f"{column}{suffix}").alias(column) for column in columns],
+                    ]
+                )
+                .sort("timestamp_ms")
+                .to_dicts()
+            )
+            result = []
+            for row in rows:
+                values = [float(row.pop(column)) for column in columns]
+                if not all(math.isfinite(value) for value in values):
+                    raise SealedMonthlyPartitionConflictError(
+                        "OHLCV effect contains non-finite value"
+                    )
+                result.append({"timestamp_ms": row["timestamp_ms"], "ohlcv": values})
+            return result
+
+        conflicts = []
+        for canonical, official in zip(records(conflict), records(conflict, official=True)):
+            conflicts.append(
+                {
+                    "timestamp_ms": canonical["timestamp_ms"],
+                    "canonical": canonical["ohlcv"],
+                    "official": official["ohlcv"],
+                }
+            )
+
+        def digest(records_value: list[dict[str, Any]]) -> str:
+            return sha256(self._canonical_json_bytes(records_value)).hexdigest()
+
+        canonical_only_records = records(canonical_only)
+        source_only_records = records(source_only)
+        return {
+            "conflict_rows": len(conflicts),
+            "conflict_sha256": digest(conflicts),
+            "canonical_only_rows": len(canonical_only_records),
+            "canonical_only_sha256": digest(canonical_only_records),
+            "source_only_rows": len(source_only_records),
+            "source_only_sha256": digest(source_only_records),
+        }
+
+    def _verified_signed_month_authorization(
+        self,
+        *,
+        receipt: Mapping[str, Any],
+        public_key: bytes,
+        entry: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        if not isinstance(public_key, bytes) or len(public_key) != 32:
+            raise SealedMonthlyPartitionConflictError("Conflict authority public key is invalid")
+        try:
+            receipt_value = json.loads(self._canonical_json_bytes(receipt))
+            entry_bytes = self._canonical_json_bytes(entry)
+        except (TypeError, ValueError) as exc:
+            raise SealedMonthlyPartitionConflictError(
+                "Conflict authorization is not canonical JSON"
+            ) from exc
+        if (
+            not isinstance(receipt_value, dict)
+            or set(receipt_value) != {"schema", "type", "authority_key_id", "message", "signature"}
+            or receipt_value.get("schema")
+            != "alpha_max_canonical_conflict_authorization_receipt.v1"
+            or receipt_value.get("type") != "canonical_conflict_authorization"
+            or receipt_value.get("authority_key_id") != sha256(public_key).hexdigest()
+            or not isinstance(receipt_value.get("message"), dict)
+            or not isinstance(receipt_value.get("signature"), str)
+        ):
+            raise SealedMonthlyPartitionConflictError("Conflict authorization envelope is invalid")
+        message = receipt_value["message"]
+        if (
+            set(message)
+            != {
+                "schema",
+                "scope",
+                "decision",
+                "canonical_root",
+                "acquisition_request_id",
+                "terminal_receipt_sha256",
+                "source_manifest_sha256",
+                "source_eligible_receipt_sha256",
+                "predecessor_path",
+                "predecessor_identity",
+                "predecessor_inventory_sha256",
+                "entries",
+            }
+            or message.get("schema") != "alpha_max_canonical_conflict_authorization_message.v1"
+            or message.get("scope") != "canonical_conflict_reconciliation"
+            or message.get("decision") != "approve_exact_effects"
+            or not isinstance(message.get("entries"), list)
+        ):
+            raise SealedMonthlyPartitionConflictError("Conflict authorization message is invalid")
+        unsigned = {key: value for key, value in receipt_value.items() if key != "signature"}
+        try:
+            Ed25519PublicKey.from_public_bytes(public_key).verify(
+                base64.b64decode(receipt_value["signature"], validate=True),
+                _CONFLICT_AUTHORIZATION_DOMAIN + self._canonical_json_bytes(unsigned),
+            )
+        except (TypeError, ValueError, InvalidSignature) as exc:
+            raise SealedMonthlyPartitionConflictError(
+                "Conflict authorization signature is invalid"
+            ) from exc
+        matches = [
+            candidate
+            for candidate in message["entries"]
+            if isinstance(candidate, dict) and self._canonical_json_bytes(candidate) == entry_bytes
+        ]
+        if len(matches) != 1:
+            raise SealedMonthlyPartitionConflictError(
+                "Conflict authorization entry is not signed exactly once"
+            )
+        return matches[0]
+
     def merge_signed_month_into_candidate(
         self,
         *,
@@ -974,6 +1109,70 @@ class ParquetMarketDataRepository:
         expected_row_count: int,
         provenance_receipt_sha256: str,
         max_output_bytes: int | None = None,
+    ) -> Path:
+        """Strictly merge a signed month without permitting differing overlaps."""
+        return self._merge_signed_month_into_candidate(
+            exchange=exchange,
+            symbol=symbol,
+            month=month,
+            source=source,
+            expected_sha256=expected_sha256,
+            expected_byte_count=expected_byte_count,
+            expected_row_count=expected_row_count,
+            provenance_receipt_sha256=provenance_receipt_sha256,
+            max_output_bytes=max_output_bytes,
+            authorization_entry=None,
+        )
+
+    def reconcile_authorized_signed_month_into_candidate(
+        self,
+        *,
+        exchange: str,
+        symbol: str,
+        month: str,
+        source: Path,
+        expected_sha256: str,
+        expected_byte_count: int,
+        expected_row_count: int,
+        provenance_receipt_sha256: str,
+        conflict_authorization_receipt: Mapping[str, Any],
+        conflict_authority_public_key: bytes,
+        authorization_entry: Mapping[str, Any],
+        max_output_bytes: int | None = None,
+    ) -> Path:
+        """Reconcile exact effects from one independently signed authorization entry."""
+        verified_entry = self._verified_signed_month_authorization(
+            receipt=conflict_authorization_receipt,
+            public_key=conflict_authority_public_key,
+            entry=authorization_entry,
+        )
+        return self._merge_signed_month_into_candidate(
+            exchange=exchange,
+            symbol=symbol,
+            month=month,
+            source=source,
+            expected_sha256=expected_sha256,
+            expected_byte_count=expected_byte_count,
+            expected_row_count=expected_row_count,
+            provenance_receipt_sha256=provenance_receipt_sha256,
+            max_output_bytes=max_output_bytes,
+            authorization_entry=verified_entry,
+        )
+
+    @_generation_guard(exclusive=True)
+    def _merge_signed_month_into_candidate(
+        self,
+        *,
+        exchange: str,
+        symbol: str,
+        month: str,
+        source: Path,
+        expected_sha256: str,
+        expected_byte_count: int,
+        expected_row_count: int,
+        provenance_receipt_sha256: str,
+        max_output_bytes: int | None = None,
+        authorization_entry: Mapping[str, Any] | None = None,
     ) -> Path:
         """Merge a signed month using only the two monthly dataframes."""
         exchange_token = self._normalize_exchange(exchange)
@@ -990,7 +1189,19 @@ class ParquetMarketDataRepository:
         ):
             raise ValueError("max_output_bytes must be a positive integer")
         target = self._monthly_path(exchange=exchange_token, symbol=symbol_token, month_token=month)
+        start = datetime.strptime(month + "-01", "%Y-%m-%d")
+        end = (start.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(milliseconds=1)
+        if not self._load_wal_frame(
+            exchange=exchange_token, symbol=symbol_token, start_date=start, end_date=end
+        ).is_empty():
+            raise SealedMonthlyPartitionConflictError(
+                f"WAL overlaps managed monthly partition {month}"
+            )
         if not target.exists():
+            if authorization_entry is not None:
+                raise SealedMonthlyPartitionConflictError(
+                    "Conflict authorization requires an existing canonical monthly partition"
+                )
             return self.publish_sealed_monthly_partition(
                 exchange=exchange,
                 symbol=symbol,
@@ -1031,28 +1242,130 @@ class ParquetMarketDataRepository:
             self._validate_canonical_monthly_frame(existing, month=month)
             if incoming.height != expected_row_count:
                 raise ValueError("Staging source row count does not match expectation")
-            start = datetime.strptime(month + "-01", "%Y-%m-%d")
-            end = (start.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(
-                milliseconds=1
-            )
-            if not self._load_wal_frame(
-                exchange=exchange_token, symbol=symbol_token, start_date=start, end_date=end
-            ).is_empty():
-                raise SealedMonthlyPartitionConflictError(
-                    f"WAL overlaps managed monthly partition {month}"
+            if authorization_entry is None:
+                overlap = existing.join(incoming, on="datetime", how="inner", suffix="_incoming")
+                if any(
+                    overlap.filter(pl.col(column) != pl.col(f"{column}_incoming")).height
+                    for column in _OHLCV_COLUMNS[1:]
+                ):
+                    raise SealedMonthlyPartitionConflictError(
+                        "Signed monthly source conflicts with canonical OHLCV values"
+                    )
+                merged = pl.concat(
+                    [
+                        existing,
+                        incoming.join(existing.select("datetime"), on="datetime", how="anti"),
+                    ],
+                    how="vertical",
+                ).sort("datetime")
+            else:
+                required_entry_fields = {
+                    "relative",
+                    "source_sha256",
+                    "source_byte_count",
+                    "source_row_count",
+                    "provenance_receipt_sha256",
+                    "predecessor_identity",
+                    "predecessor_sha256",
+                    "predecessor_byte_count",
+                    "predecessor_row_count",
+                    "effects",
+                }
+                required_effect_fields = {
+                    "conflict_rows",
+                    "conflict_sha256",
+                    "canonical_only_rows",
+                    "canonical_only_sha256",
+                    "source_only_rows",
+                    "source_only_sha256",
+                }
+                signed_identity = authorization_entry.get("predecessor_identity")
+                signed_effects = authorization_entry.get("effects")
+                if (
+                    set(authorization_entry) != required_entry_fields
+                    or any(
+                        type(authorization_entry[field]) is not int
+                        or authorization_entry[field] < 0
+                        for field in (
+                            "source_byte_count",
+                            "source_row_count",
+                            "predecessor_byte_count",
+                            "predecessor_row_count",
+                        )
+                    )
+                    or authorization_entry["relative"] != str(target.relative_to(self.root_path))
+                    or authorization_entry["source_sha256"] != expected_sha256
+                    or authorization_entry["source_byte_count"] != expected_byte_count
+                    or authorization_entry["source_row_count"] != expected_row_count
+                    or authorization_entry["provenance_receipt_sha256"] != provenance_receipt_sha256
+                    or not isinstance(signed_identity, list)
+                    or len(signed_identity) != 9
+                    or any(type(value) is not int for value in signed_identity)
+                    or signed_identity[6] != 1
+                    or (
+                        target_stat.st_dev,
+                        target_stat.st_ino,
+                        target_stat.st_mode,
+                        target_stat.st_size,
+                        target_stat.st_mtime_ns,
+                        target_stat.st_uid,
+                        target_stat.st_gid,
+                    )
+                    != tuple(signed_identity[index] for index in (0, 1, 2, 3, 4, 7, 8))
+                    or target_stat.st_nlink != signed_identity[6] + 1
+                    or authorization_entry["predecessor_byte_count"] != target_stat.st_size
+                    or authorization_entry["predecessor_row_count"] != existing.height
+                    or authorization_entry["predecessor_sha256"] != self._sha256_fd(target_fd)
+                    or not isinstance(signed_effects, dict)
+                    or set(signed_effects) != required_effect_fields
+                    or any(
+                        type(signed_effects[field]) is not int or signed_effects[field] < 0
+                        for field in (
+                            "conflict_rows",
+                            "canonical_only_rows",
+                            "source_only_rows",
+                        )
+                    )
+                    or signed_effects["conflict_rows"] == 0
+                    or any(
+                        not isinstance(signed_effects[field], str)
+                        or re.fullmatch(r"[0-9a-f]{64}", signed_effects[field]) is None
+                        for field in (
+                            "conflict_sha256",
+                            "canonical_only_sha256",
+                            "source_only_sha256",
+                        )
+                    )
+                ):
+                    raise SealedMonthlyPartitionConflictError(
+                        "Signed monthly conflict authorization entry is invalid"
+                    )
+                effects = self._signed_month_conflict_effects(existing, incoming)
+                if signed_effects != effects:
+                    raise SealedMonthlyPartitionConflictError(
+                        "Signed monthly conflict authorization effects do not match"
+                    )
+                columns = _OHLCV_COLUMNS[1:]
+                incoming_renamed = incoming.rename(
+                    {column: f"{column}_incoming" for column in columns}
                 )
-            overlap = existing.join(incoming, on="datetime", how="inner", suffix="_incoming")
-            if any(
-                overlap.filter(pl.col(column) != pl.col(f"{column}_incoming")).height
-                for column in _OHLCV_COLUMNS[1:]
-            ):
-                raise SealedMonthlyPartitionConflictError(
-                    "Signed monthly source conflicts with canonical OHLCV values"
+                conflict_times = (
+                    existing.join(incoming_renamed, on="datetime", how="inner")
+                    .filter(
+                        pl.any_horizontal(
+                            [pl.col(column) != pl.col(f"{column}_incoming") for column in columns]
+                        )
+                    )
+                    .select("datetime")
                 )
-            merged = pl.concat(
-                [existing, incoming.join(existing.select("datetime"), on="datetime", how="anti")],
-                how="vertical",
-            ).sort("datetime")
+                merged = pl.concat(
+                    [
+                        existing.join(conflict_times, on="datetime", how="anti"),
+                        incoming.join(existing.select("datetime"), on="datetime", how="anti"),
+                        incoming.join(conflict_times, on="datetime", how="inner"),
+                    ],
+                    how="vertical",
+                ).sort("datetime")
             self._validate_canonical_monthly_frame(merged, month=month)
             pending = self._monthly_pending_path(
                 exchange=exchange_token, symbol=symbol_token, month_token=month
