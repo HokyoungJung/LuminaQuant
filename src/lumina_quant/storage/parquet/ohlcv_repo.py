@@ -48,7 +48,7 @@ _DEFAULT_SCHEMA: dict[str, pl.DataType] = {
 }
 _KNOWN_QUOTES = ("USDT", "USDC", "BUSD", "USD", "BTC", "ETH")
 _OHLCV_COLUMNS = ["datetime", "open", "high", "low", "close", "volume"]
-_CONFLICT_AUTHORIZATION_DOMAIN = b"luminaquant.alpha_max.canonical_conflict_authorization.v1\0"
+_CONFLICT_AUTHORIZATION_DOMAIN = b"luminaquant.alpha_max.canonical_conflict_authorization.v2\0"
 _MANIFEST_REQUIRED_FIELDS = (
     "manifest_version",
     "commit_id",
@@ -1046,7 +1046,7 @@ class ParquetMarketDataRepository:
             not isinstance(receipt_value, dict)
             or set(receipt_value) != {"schema", "type", "authority_key_id", "message", "signature"}
             or receipt_value.get("schema")
-            != "alpha_max_canonical_conflict_authorization_receipt.v1"
+            != "alpha_max_canonical_conflict_authorization_receipt.v2"
             or receipt_value.get("type") != "canonical_conflict_authorization"
             or receipt_value.get("authority_key_id") != sha256(public_key).hexdigest()
             or not isinstance(receipt_value.get("message"), dict)
@@ -1068,12 +1068,31 @@ class ParquetMarketDataRepository:
                 "predecessor_path",
                 "predecessor_identity",
                 "predecessor_inventory_sha256",
+                "fresh_acquisition_audit_receipt_sha256",
+                "acquisition_run_id",
+                "composite_telemetry_sha256",
+                "wal_transition_receipt_sha256",
+                "wal_post_transition_inventory_sha256",
+                "signed_terminal_request_sha256",
                 "entries",
             }
-            or message.get("schema") != "alpha_max_canonical_conflict_authorization_message.v1"
+            or message.get("schema") != "alpha_max_canonical_conflict_authorization_message.v2"
             or message.get("scope") != "canonical_conflict_reconciliation"
             or message.get("decision") != "approve_exact_effects"
             or not isinstance(message.get("entries"), list)
+            or message.get("acquisition_run_id")
+            != "47eeac483e70d6af0784b873895024c8a2d01793a2447d3d3fbaa776d63bd2ad"
+            or any(
+                not isinstance(message.get(field), str)
+                or re.fullmatch(r"[0-9a-f]{64}", message[field]) is None
+                for field in (
+                    "fresh_acquisition_audit_receipt_sha256",
+                    "composite_telemetry_sha256",
+                    "wal_transition_receipt_sha256",
+                    "wal_post_transition_inventory_sha256",
+                    "signed_terminal_request_sha256",
+                )
+            )
         ):
             raise SealedMonthlyPartitionConflictError("Conflict authorization message is invalid")
         unsigned = {key: value for key, value in receipt_value.items() if key != "signature"}

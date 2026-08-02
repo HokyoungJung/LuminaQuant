@@ -481,6 +481,7 @@ def test_signed_failure_receipt_round_trips_real_claim_journal_and_artifacts(
     assert verified.key_id == authority_key_id
     assert verified.authorization == authorization
     assert verified.events == ()
+    assert verified.receipt_sha256 == hashlib.sha256(receipt_bytes).hexdigest()
 
     journal.write_bytes(journal.read_bytes() + canonical_bytes({"tampered": True}))
     with pytest.raises(TerminalPolicyError, match="journal hash"):

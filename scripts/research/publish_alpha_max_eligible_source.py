@@ -33,6 +33,8 @@ _CONFLICT_AUTH_MAX_JSON = 4 * 1024 * 1024
 _PUBLICATION_CONTROL_RESERVE_BYTES = 64 * 1024 * 1024
 _PARQUET_ENCODING_RESERVE_BYTES = 64 * 1024 * 1024
 _HEX = set("0123456789abcdef")
+_CONFLICT_AUTHORIZATION_DOMAIN = b"luminaquant.alpha_max.canonical_conflict_authorization.v2\0"
+_CONFLICT_RUN_ID = "47eeac483e70d6af0784b873895024c8a2d01793a2447d3d3fbaa776d63bd2ad"
 
 
 class PublicationError(ValueError):
@@ -274,7 +276,9 @@ def _positive_int(value: Any, label: str) -> int:
     return value
 
 
-def _terminal(args: argparse.Namespace) -> tuple[dict[str, Any], str, dict[str, tuple[str, int]]]:
+def _terminal(
+    args: argparse.Namespace,
+) -> tuple[dict[str, Any], str, dict[str, tuple[str, int]], str]:
     verified = verify_signed_receipt(args.terminal_receipt, args.authority_public_key)
     message = verified.message
     results = message.get("target_results")
@@ -308,7 +312,83 @@ def _terminal(args: argparse.Namespace) -> tuple[dict[str, Any], str, dict[str, 
         command_bindings.append(bound)
     if command_bindings[0] != command_bindings[1]:
         raise PublicationError("terminal command artifact bindings diverge")
-    return message, verified.key_id, command_bindings[1]
+    return message, verified.key_id, command_bindings[1], verified.receipt_sha256
+
+
+def _conflict_controls(
+    args: argparse.Namespace,
+    *,
+    terminal: dict[str, Any],
+    terminal_sha256: str,
+    request_id: str,
+    key_id: str,
+    predecessor_inventory: list[dict[str, Any]],
+) -> dict[str, str] | None:
+    values = (
+        args.conflict_authorization_receipt,
+        args.conflict_authority_public_key,
+        args.fresh_acquisition_audit_receipt,
+        args.wal_transition_receipt,
+    )
+    if all(value is None for value in values):
+        return None
+    if any(value is None for value in values):
+        raise PublicationError(
+            "conflict authorization, fresh audit, and WAL transition controls must be paired"
+        )
+    fresh, fresh_bytes = _json(
+        args.fresh_acquisition_audit_receipt,
+        "fresh acquisition audit receipt",
+        limit=_MAX_JSON,
+    )
+    wal, wal_bytes = _json(
+        args.wal_transition_receipt,
+        "WAL transition receipt",
+        limit=_MAX_JSON,
+    )
+    for path, label in (
+        (args.fresh_acquisition_audit_receipt, "fresh acquisition audit receipt"),
+        (args.wal_transition_receipt, "WAL transition receipt"),
+    ):
+        info = os.lstat(path)
+        if info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != 0o600:
+            raise PublicationError(f"{label} is not private")
+    telemetry = fresh.get("composite_telemetry")
+    if (
+        fresh.get("schema") != "luminaquant_fresh_acquisition_audit.v1"
+        or fresh.get("run_id") != _CONFLICT_RUN_ID
+        or fresh.get("request_id") != request_id
+        or fresh.get("sealed") is not True
+        or fresh.get("outcome") != "pass"
+        or fresh.get("terminal_receipt_sha256") != terminal_sha256
+        or fresh.get("authority_key_id") != key_id
+        or fresh.get("source_root") != str(args.source_root)
+        or fresh.get("source_report") != str(args.source_report)
+        or fresh.get("signed_terminal_request_sha256") != terminal.get("request_sha256")
+        or not isinstance(telemetry, dict)
+        or not isinstance(telemetry.get("sha256"), str)
+    ):
+        raise PublicationError("fresh acquisition audit receipt binding is invalid")
+    telemetry_digest = _sha(telemetry["sha256"], "fresh composite telemetry digest")
+    if (
+        wal.get("schema") != "luminaquant.canonical_wal_transition.v1"
+        or wal.get("mode") != "execute"
+        or wal.get("compaction_complete") is not True
+        or wal.get("run_id") != _CONFLICT_RUN_ID
+        or wal.get("request_id") != request_id
+        or wal.get("canonical_root") != str(args.canonical_root)
+        or wal.get("post_transition_inventory") != predecessor_inventory
+        or wal.get("post_transition_inventory_sha256") != _inventory_digest(predecessor_inventory)
+    ):
+        raise PublicationError("WAL transition receipt binding is invalid")
+    return {
+        "fresh_acquisition_audit_receipt_sha256": hashlib.sha256(fresh_bytes).hexdigest(),
+        "acquisition_run_id": _CONFLICT_RUN_ID,
+        "composite_telemetry_sha256": telemetry_digest,
+        "wal_transition_receipt_sha256": hashlib.sha256(wal_bytes).hexdigest(),
+        "wal_post_transition_inventory_sha256": wal["post_transition_inventory_sha256"],
+        "signed_terminal_request_sha256": fresh["signed_terminal_request_sha256"],
+    }
 
 
 def _conflict_authorization(
@@ -320,13 +400,15 @@ def _conflict_authorization(
     predecessor: Path,
     predecessor_inventory: list[dict[str, Any]],
     parts: list[dict[str, Any]],
+    controls: dict[str, str] | None = None,
+    terminal_public_key: bytes = b"",
 ) -> dict[str, Any] | None:
     receipt_path = args.conflict_authorization_receipt
     key_path = args.conflict_authority_public_key
-    if receipt_path is None and key_path is None:
+    if receipt_path is None and key_path is None and controls is None:
         return None
-    if receipt_path is None or key_path is None:
-        raise PublicationError("conflict authorization receipt and public key must be paired")
+    if receipt_path is None or key_path is None or controls is None:
+        raise PublicationError("conflict authorization controls must be complete")
     receipt, receipt_bytes = _json(
         receipt_path,
         "conflict authorization receipt",
@@ -336,6 +418,8 @@ def _conflict_authorization(
     if receipt_info.st_uid != os.getuid() or stat.S_IMODE(receipt_info.st_mode) != 0o600:
         raise PublicationError("conflict authorization receipt is not private")
     raw_key = _conflict_public_key(key_path)
+    if raw_key != terminal_public_key:
+        raise PublicationError("conflict authority must equal terminal authority")
     try:
         authority = Ed25519PublicKey.from_public_bytes(raw_key)
     except ValueError as exc:
@@ -343,7 +427,7 @@ def _conflict_authorization(
     outer_fields = {"schema", "type", "authority_key_id", "message", "signature"}
     if (
         set(receipt) != outer_fields
-        or receipt["schema"] != "alpha_max_canonical_conflict_authorization_receipt.v1"
+        or receipt["schema"] != "alpha_max_canonical_conflict_authorization_receipt.v2"
         or receipt["type"] != "canonical_conflict_authorization"
         or receipt["authority_key_id"] != hashlib.sha256(raw_key).hexdigest()
         or not isinstance(receipt["message"], dict)
@@ -354,8 +438,7 @@ def _conflict_authorization(
     try:
         authority.verify(
             base64.b64decode(receipt["signature"], validate=True),
-            b"luminaquant.alpha_max.canonical_conflict_authorization.v1\0"
-            + canonical_bytes(unsigned),
+            _CONFLICT_AUTHORIZATION_DOMAIN + canonical_bytes(unsigned),
         )
     except (ValueError, InvalidSignature) as exc:
         raise PublicationError("conflict authorization signature is invalid") from exc
@@ -372,11 +455,17 @@ def _conflict_authorization(
         "predecessor_path",
         "predecessor_identity",
         "predecessor_inventory_sha256",
+        "fresh_acquisition_audit_receipt_sha256",
+        "acquisition_run_id",
+        "composite_telemetry_sha256",
+        "wal_transition_receipt_sha256",
+        "wal_post_transition_inventory_sha256",
+        "signed_terminal_request_sha256",
         "entries",
     }
     if (
         set(message) != message_fields
-        or message["schema"] != "alpha_max_canonical_conflict_authorization_message.v1"
+        or message["schema"] != "alpha_max_canonical_conflict_authorization_message.v2"
         or message["scope"] != "canonical_conflict_reconciliation"
         or message["decision"] != "approve_exact_effects"
         or message["canonical_root"] != str(args.canonical_root)
@@ -388,6 +477,7 @@ def _conflict_authorization(
         or message["predecessor_identity"]
         != [os.stat(predecessor).st_dev, os.stat(predecessor).st_ino]
         or message["predecessor_inventory_sha256"] != _inventory_digest(predecessor_inventory)
+        or any(message.get(field) != value for field, value in controls.items())
         or not isinstance(message["entries"], list)
     ):
         raise PublicationError("conflict authorization message binding is invalid")
@@ -503,6 +593,9 @@ def _replay_conflict_authorization(
     request_id: str,
     hashes: dict[str, str],
     parts: list[dict[str, Any]],
+    terminal: dict[str, Any] | None = None,
+    key_id: str = "",
+    terminal_public_key: bytes = b"",
 ) -> None:
     paired = args.conflict_authorization_receipt is not None
     is_v3 = final.get("schema") == "alpha_max_canonical_publication_receipt.v3"
@@ -513,6 +606,16 @@ def _replay_conflict_authorization(
     if not paired:
         raise PublicationError("V3 replay requires conflict authorization receipt and public key")
     predecessor = Path(final["predecessor_path"])
+    controls = _conflict_controls(
+        args,
+        terminal=terminal or {},
+        terminal_sha256=terminal_sha256,
+        request_id=request_id,
+        key_id=key_id,
+        predecessor_inventory=final["old_inventory"],
+    )
+    if controls is None:
+        raise PublicationError("V3 replay requires fresh audit and WAL transition controls")
     predecessor_available = (
         predecessor.exists()
         and not predecessor.is_symlink()
@@ -527,12 +630,13 @@ def _replay_conflict_authorization(
         )
         receipt_info = os.lstat(args.conflict_authorization_receipt)
         raw_key = _conflict_public_key(args.conflict_authority_public_key)
+        if raw_key != _conflict_public_key(args.authority_public_key):
+            raise PublicationError("replay conflict authority must equal terminal authority")
         unsigned = {key: value for key, value in receipt.items() if key != "signature"}
         try:
             Ed25519PublicKey.from_public_bytes(raw_key).verify(
                 base64.b64decode(receipt["signature"], validate=True),
-                b"luminaquant.alpha_max.canonical_conflict_authorization.v1\0"
-                + canonical_bytes(unsigned),
+                _CONFLICT_AUTHORIZATION_DOMAIN + canonical_bytes(unsigned),
             )
         except (KeyError, TypeError, ValueError, InvalidSignature) as exc:
             raise PublicationError("replay conflict authorization signature is invalid") from exc
@@ -612,7 +716,7 @@ def _replay_conflict_authorization(
             receipt_info.st_uid != os.getuid()
             or stat.S_IMODE(receipt_info.st_mode) != 0o600
             or set(receipt) != {"schema", "type", "authority_key_id", "message", "signature"}
-            or receipt.get("schema") != "alpha_max_canonical_conflict_authorization_receipt.v1"
+            or receipt.get("schema") != "alpha_max_canonical_conflict_authorization_receipt.v2"
             or receipt.get("type") != "canonical_conflict_authorization"
             or receipt.get("authority_key_id") != hashlib.sha256(raw_key).hexdigest()
             or not isinstance(message, dict)
@@ -629,9 +733,15 @@ def _replay_conflict_authorization(
                 "predecessor_path",
                 "predecessor_identity",
                 "predecessor_inventory_sha256",
+                "fresh_acquisition_audit_receipt_sha256",
+                "acquisition_run_id",
+                "composite_telemetry_sha256",
+                "wal_transition_receipt_sha256",
+                "wal_post_transition_inventory_sha256",
+                "signed_terminal_request_sha256",
                 "entries",
             }
-            or message.get("schema") != "alpha_max_canonical_conflict_authorization_message.v1"
+            or message.get("schema") != "alpha_max_canonical_conflict_authorization_message.v2"
             or message.get("scope") != "canonical_conflict_reconciliation"
             or message.get("decision") != "approve_exact_effects"
             or message.get("canonical_root") != str(args.canonical_root)
@@ -648,6 +758,20 @@ def _replay_conflict_authorization(
             or hashlib.sha256(receipt_bytes).hexdigest()
             != final["conflict_authorization_receipt_sha256"]
             or receipt["authority_key_id"] != final["conflict_authority_key_id"]
+            or any(message.get(field) != controls[field] for field in controls)
+            or any(final.get(field) != controls[field] for field in controls)
+            or receipt["authority_key_id"] != key_id
+            or any(
+                message.get(field) != final.get(field)
+                for field in (
+                    "fresh_acquisition_audit_receipt_sha256",
+                    "acquisition_run_id",
+                    "composite_telemetry_sha256",
+                    "wal_transition_receipt_sha256",
+                    "wal_post_transition_inventory_sha256",
+                    "signed_terminal_request_sha256",
+                )
+            )
             or hashlib.sha256(canonical_bytes(message)).hexdigest()
             != final["conflict_authorization_message_sha256"]
             or message["predecessor_inventory_sha256"]
@@ -662,6 +786,8 @@ def _replay_conflict_authorization(
         hashes=hashes,
         predecessor=predecessor,
         predecessor_inventory=final["old_inventory"],
+        controls=controls,
+        terminal_public_key=terminal_public_key,
         parts=parts,
     )
     if authorization is None or (
@@ -670,6 +796,8 @@ def _replay_conflict_authorization(
         or authorization["message_sha256"] != final["conflict_authorization_message_sha256"]
         or authorization["message"]["predecessor_inventory_sha256"]
         != final["conflict_authorization_predecessor_inventory_sha256"]
+        or any(authorization["message"].get(field) != controls[field] for field in controls)
+        or any(final.get(field) != controls[field] for field in controls)
     ):
         raise PublicationError("replay conflict authorization binding mismatch")
 
@@ -1268,6 +1396,12 @@ def _validate_prepared_commit(
             "conflict_authorization_predecessor_inventory_sha256",
             "authorized_conflict_partition_count",
             "authorized_replaced_row_count",
+            "fresh_acquisition_audit_receipt_sha256",
+            "acquisition_run_id",
+            "composite_telemetry_sha256",
+            "wal_transition_receipt_sha256",
+            "wal_post_transition_inventory_sha256",
+            "signed_terminal_request_sha256",
         }
     if set(final) != expected_final_fields:
         raise PublicationError("prepared commit schema mismatch")
@@ -1512,6 +1646,12 @@ def _validate_prepared_commit(
             "predecessor_path",
             "predecessor_identity",
             "predecessor_inventory_sha256",
+            "fresh_acquisition_audit_receipt_sha256",
+            "acquisition_run_id",
+            "composite_telemetry_sha256",
+            "wal_transition_receipt_sha256",
+            "wal_post_transition_inventory_sha256",
+            "signed_terminal_request_sha256",
             "entries",
         }
         entry_fields = {
@@ -1589,10 +1729,10 @@ def _validate_prepared_commit(
         }
         if (
             set(receipt) != {"schema", "type", "authority_key_id", "message", "signature"}
-            or receipt.get("schema") != "alpha_max_canonical_conflict_authorization_receipt.v1"
+            or receipt.get("schema") != "alpha_max_canonical_conflict_authorization_receipt.v2"
             or receipt.get("type") != "canonical_conflict_authorization"
             or set(message) != message_fields
-            or message.get("schema") != "alpha_max_canonical_conflict_authorization_message.v1"
+            or message.get("schema") != "alpha_max_canonical_conflict_authorization_message.v2"
             or message.get("scope") != "canonical_conflict_reconciliation"
             or message.get("decision") != "approve_exact_effects"
             or message.get("canonical_root") != final["canonical_root"]
@@ -1621,7 +1761,18 @@ def _validate_prepared_commit(
             or hashlib.sha256(canonical_bytes(message)).hexdigest()
             != final["conflict_authorization_message_sha256"]
             or receipt.get("authority_key_id") != final["conflict_authority_key_id"]
-            or final["conflict_authority_key_id"] == final["authority_key_id"]
+            or final["conflict_authority_key_id"] != final["authority_key_id"]
+            or any(
+                message.get(field) != final.get(field)
+                for field in (
+                    "fresh_acquisition_audit_receipt_sha256",
+                    "acquisition_run_id",
+                    "composite_telemetry_sha256",
+                    "wal_transition_receipt_sha256",
+                    "wal_post_transition_inventory_sha256",
+                    "signed_terminal_request_sha256",
+                )
+            )
             or message["predecessor_inventory_sha256"]
             != final["conflict_authorization_predecessor_inventory_sha256"]
             or final["authorized_conflict_partition_count"] != len(authorization_entries)
@@ -1771,6 +1922,8 @@ def main(argv: list[str] | None = None) -> int:
         parser.add_argument("--" + name, required=True)
     parser.add_argument("--conflict-authorization-receipt")
     parser.add_argument("--conflict-authority-public-key")
+    parser.add_argument("--fresh-acquisition-audit-receipt")
+    parser.add_argument("--wal-transition-receipt")
     args = parser.parse_args(argv)
     for name in (
         "source_root",
@@ -1780,20 +1933,35 @@ def main(argv: list[str] | None = None) -> int:
         "canonical_root",
     ):
         setattr(args, name, _absolute(getattr(args, name), name))
-    for name in ("conflict_authorization_receipt", "conflict_authority_public_key"):
+    for name in (
+        "conflict_authorization_receipt",
+        "conflict_authority_public_key",
+        "fresh_acquisition_audit_receipt",
+        "wal_transition_receipt",
+    ):
         value = getattr(args, name)
         if value is not None:
             setattr(args, name, _absolute(value, name))
-    if (args.conflict_authorization_receipt is None) != (
-        args.conflict_authority_public_key is None
+    controls_present = (
+        args.conflict_authorization_receipt,
+        args.conflict_authority_public_key,
+        args.fresh_acquisition_audit_receipt,
+        args.wal_transition_receipt,
+    )
+    if any(value is not None for value in controls_present) and any(
+        value is None for value in controls_present
     ):
-        raise PublicationError("conflict authorization receipt and public key must be paired")
-    terminal, key_id, bound = _terminal(args)
+        raise PublicationError(
+            "conflict authorization, fresh audit, and WAL transition controls must be paired"
+        )
+    terminal, key_id, bound, terminal_sha256 = _terminal(args)
+    terminal_public_key = b""
+    if all(value is not None for value in controls_present):
+        terminal_public_key = _conflict_public_key(args.authority_public_key)
+        if hashlib.sha256(terminal_public_key).hexdigest() != key_id:
+            raise PublicationError("terminal authority public key binding is invalid")
     parts, hashes, listing = _partitions(args.source_root, args.source_report, bound)
     request_id = _sha(terminal.get("request_id"), "terminal request identity")
-    terminal_sha256 = hashlib.sha256(
-        _regular_bytes(args.terminal_receipt, "terminal receipt")
-    ).hexdigest()
     generations = args.canonical_root.parent / f".{args.canonical_root.name}.generations"
     control = args.canonical_root.parent / f".{args.canonical_root.name}.transactions" / request_id
     candidate = generations / request_id
@@ -1831,6 +1999,9 @@ def main(argv: list[str] | None = None) -> int:
                 request_id=request_id,
                 hashes=hashes,
                 parts=parts,
+                terminal=terminal,
+                key_id=key_id,
+                terminal_public_key=terminal_public_key,
             )
             _validate_prepared_commit(
                 candidate,
@@ -1872,6 +2043,9 @@ def main(argv: list[str] | None = None) -> int:
                 request_id=request_id,
                 hashes=hashes,
                 parts=parts,
+                terminal=terminal,
+                key_id=key_id,
+                terminal_public_key=terminal_public_key,
             )
             published = _validate_prepared_commit(
                 candidate,
@@ -1919,6 +2093,14 @@ def main(argv: list[str] | None = None) -> int:
                 old = active
             old_identity = (os.stat(old).st_dev, os.stat(old).st_ino)
             old_inventory = _inventory(old)
+            controls = _conflict_controls(
+                args,
+                terminal=terminal,
+                terminal_sha256=terminal_sha256,
+                request_id=request_id,
+                key_id=key_id,
+                predecessor_inventory=old_inventory,
+            )
             authorization = _conflict_authorization(
                 args,
                 terminal_sha256=terminal_sha256,
@@ -1927,11 +2109,11 @@ def main(argv: list[str] | None = None) -> int:
                 predecessor=old,
                 predecessor_inventory=old_inventory,
                 parts=parts,
+                controls=controls,
+                terminal_public_key=terminal_public_key,
             )
-            if authorization is not None and authorization["key_id"] == key_id:
-                raise PublicationError(
-                    "conflict authorization must use a distinct repair authority"
-                )
+            if authorization is not None and authorization["key_id"] != key_id:
+                raise PublicationError("conflict authority must equal terminal authority")
             _write_noreplace(
                 control / "cloning.json",
                 {"request_id": request_id, "phase": "cloning"},
@@ -2136,6 +2318,17 @@ def main(argv: list[str] | None = None) -> int:
                             entry["effects"]["conflict_rows"]
                             for entry in authorization["entries"].values()
                         ),
+                        **{
+                            field: authorization["message"][field]
+                            for field in (
+                                "fresh_acquisition_audit_receipt_sha256",
+                                "acquisition_run_id",
+                                "composite_telemetry_sha256",
+                                "wal_transition_receipt_sha256",
+                                "wal_post_transition_inventory_sha256",
+                                "signed_terminal_request_sha256",
+                            )
+                        },
                     }
                 )
             _write_noreplace(candidate / "commit.json", final)

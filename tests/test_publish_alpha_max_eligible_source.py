@@ -280,7 +280,12 @@ def test_main_atomically_activates_shared_root_and_is_idempotent(
     monkeypatch.setattr(
         subject,
         "_terminal",
-        lambda _args: ({"request_id": request_id}, "7" * 64, {}),
+        lambda _args: (
+            {"request_id": request_id},
+            "7" * 64,
+            {},
+            hashlib.sha256(terminal_receipt.read_bytes()).hexdigest(),
+        ),
     )
     monkeypatch.setattr(
         subject,
@@ -604,7 +609,7 @@ def test_conflict_authorization_rejects_wrong_effects_and_key(tmp_path: Path):
     public_path.chmod(0o400)
     receipt_path = tmp_path / "authorization.json"
     message = {
-        "schema": "alpha_max_canonical_conflict_authorization_message.v1",
+        "schema": "alpha_max_canonical_conflict_authorization_message.v2",
         "scope": "canonical_conflict_reconciliation",
         "decision": "approve_exact_effects",
         "canonical_root": str(canonical),
@@ -615,6 +620,14 @@ def test_conflict_authorization_rejects_wrong_effects_and_key(tmp_path: Path):
         "predecessor_path": str(predecessor),
         "predecessor_identity": [predecessor.stat().st_dev, predecessor.stat().st_ino],
         "predecessor_inventory_sha256": subject._inventory_digest(subject._inventory(predecessor)),
+        "fresh_acquisition_audit_receipt_sha256": "5" * 64,
+        "acquisition_run_id": "47eeac483e70d6af0784b873895024c8a2d01793a2447d3d3fbaa776d63bd2ad",
+        "composite_telemetry_sha256": "6" * 64,
+        "wal_transition_receipt_sha256": "7" * 64,
+        "wal_post_transition_inventory_sha256": subject._inventory_digest(
+            subject._inventory(predecessor)
+        ),
+        "signed_terminal_request_sha256": "8" * 64,
         "entries": [
             {
                 "relative": relative,
@@ -631,7 +644,7 @@ def test_conflict_authorization_rejects_wrong_effects_and_key(tmp_path: Path):
         ],
     }
     unsigned = {
-        "schema": "alpha_max_canonical_conflict_authorization_receipt.v1",
+        "schema": "alpha_max_canonical_conflict_authorization_receipt.v2",
         "type": "canonical_conflict_authorization",
         "authority_key_id": hashlib.sha256(public).hexdigest(),
         "message": message,
@@ -640,7 +653,7 @@ def test_conflict_authorization_rejects_wrong_effects_and_key(tmp_path: Path):
         **unsigned,
         "signature": base64.b64encode(
             private.sign(
-                b"luminaquant.alpha_max.canonical_conflict_authorization.v1\0"
+                b"luminaquant.alpha_max.canonical_conflict_authorization.v2\0"
                 + subject.canonical_bytes(unsigned)
             )
         ).decode(),
@@ -653,6 +666,17 @@ def test_conflict_authorization_rejects_wrong_effects_and_key(tmp_path: Path):
         conflict_authority_public_key=public_path,
     )
     hashes = {"manifest": "3" * 64, "eligible": "4" * 64}
+    controls = {
+        field: message[field]
+        for field in (
+            "fresh_acquisition_audit_receipt_sha256",
+            "acquisition_run_id",
+            "composite_telemetry_sha256",
+            "wal_transition_receipt_sha256",
+            "wal_post_transition_inventory_sha256",
+            "signed_terminal_request_sha256",
+        )
+    }
     verified = subject._conflict_authorization(
         args,
         terminal_sha256="0" * 64,
@@ -661,6 +685,8 @@ def test_conflict_authorization_rejects_wrong_effects_and_key(tmp_path: Path):
         predecessor=predecessor,
         predecessor_inventory=subject._inventory(predecessor),
         parts=parts,
+        controls=controls,
+        terminal_public_key=public,
     )
     assert verified is not None
     wrong_public_path = tmp_path / "wrong-authority.pub"
@@ -671,7 +697,7 @@ def test_conflict_authorization_rejects_wrong_effects_and_key(tmp_path: Path):
     )
     wrong_public_path.chmod(0o400)
     args.conflict_authority_public_key = wrong_public_path
-    with pytest.raises(subject.PublicationError, match="schema"):
+    with pytest.raises(subject.PublicationError, match="equal terminal authority"):
         subject._conflict_authorization(
             args,
             terminal_sha256="0" * 64,
@@ -680,6 +706,8 @@ def test_conflict_authorization_rejects_wrong_effects_and_key(tmp_path: Path):
             predecessor=predecessor,
             predecessor_inventory=subject._inventory(predecessor),
             parts=parts,
+            controls=controls,
+            terminal_public_key=public,
         )
     args.conflict_authority_public_key = public_path
     message["entries"][0]["effects"]["conflict_rows"] = 2
@@ -693,12 +721,14 @@ def test_conflict_authorization_rejects_wrong_effects_and_key(tmp_path: Path):
             predecessor=predecessor,
             predecessor_inventory=subject._inventory(predecessor),
             parts=parts,
+            controls=controls,
+            terminal_public_key=public,
         )
     boolean_message = json.loads(json.dumps(message))
     boolean_message["entries"][0]["effects"]["conflict_rows"] = effects["conflict_rows"]
     boolean_message["entries"][0]["source_row_count"] = True
     boolean_unsigned = {
-        "schema": "alpha_max_canonical_conflict_authorization_receipt.v1",
+        "schema": "alpha_max_canonical_conflict_authorization_receipt.v2",
         "type": "canonical_conflict_authorization",
         "authority_key_id": hashlib.sha256(public).hexdigest(),
         "message": boolean_message,
@@ -707,7 +737,7 @@ def test_conflict_authorization_rejects_wrong_effects_and_key(tmp_path: Path):
         **boolean_unsigned,
         "signature": base64.b64encode(
             private.sign(
-                b"luminaquant.alpha_max.canonical_conflict_authorization.v1\0"
+                b"luminaquant.alpha_max.canonical_conflict_authorization.v2\0"
                 + subject.canonical_bytes(boolean_unsigned)
             )
         ).decode(),
@@ -722,6 +752,8 @@ def test_conflict_authorization_rejects_wrong_effects_and_key(tmp_path: Path):
             predecessor=predecessor,
             predecessor_inventory=subject._inventory(predecessor),
             parts=parts,
+            controls=controls,
+            terminal_public_key=public,
         )
 
 
@@ -802,7 +834,7 @@ def test_signed_month_authorization_reconciles_only_exact_effects(tmp_path: Path
 
     def signed_receipt(entry):
         message = {
-            "schema": "alpha_max_canonical_conflict_authorization_message.v1",
+            "schema": "alpha_max_canonical_conflict_authorization_message.v2",
             "scope": "canonical_conflict_reconciliation",
             "decision": "approve_exact_effects",
             "canonical_root": str(candidate),
@@ -813,10 +845,16 @@ def test_signed_month_authorization_reconciles_only_exact_effects(tmp_path: Path
             "predecessor_path": str(old),
             "predecessor_identity": [old.stat().st_dev, old.stat().st_ino],
             "predecessor_inventory_sha256": "6" * 64,
+            "fresh_acquisition_audit_receipt_sha256": "7" * 64,
+            "acquisition_run_id": "47eeac483e70d6af0784b873895024c8a2d01793a2447d3d3fbaa776d63bd2ad",
+            "composite_telemetry_sha256": "8" * 64,
+            "wal_transition_receipt_sha256": "9" * 64,
+            "wal_post_transition_inventory_sha256": "a" * 64,
+            "signed_terminal_request_sha256": "b" * 64,
             "entries": [entry],
         }
         unsigned = {
-            "schema": "alpha_max_canonical_conflict_authorization_receipt.v1",
+            "schema": "alpha_max_canonical_conflict_authorization_receipt.v2",
             "type": "canonical_conflict_authorization",
             "authority_key_id": hashlib.sha256(repair_public).hexdigest(),
             "message": message,
@@ -825,7 +863,7 @@ def test_signed_month_authorization_reconciles_only_exact_effects(tmp_path: Path
             **unsigned,
             "signature": base64.b64encode(
                 repair_private.sign(
-                    b"luminaquant.alpha_max.canonical_conflict_authorization.v1\0"
+                    b"luminaquant.alpha_max.canonical_conflict_authorization.v2\0"
                     + subject.canonical_bytes(unsigned)
                 )
             ).decode(),
@@ -990,16 +1028,30 @@ def test_main_authorized_reconciliation_is_atomic_and_idempotent(
         "journal": "5" * 64,
         "contract": "6" * 64,
     }
-    listing = [{"symbol": "BTCUSDT"}]
+    terminal_private = Ed25519PrivateKey.generate()
+    terminal_public = terminal_private.public_key().public_bytes(
+        serialization.Encoding.Raw, serialization.PublicFormat.Raw
+    )
+    terminal_request_sha256 = "8" * 64
+    terminal_receipt = tmp_path / "terminal-receipt.json"
+    authority_key = tmp_path / "authority.pub"
+    terminal_receipt.write_bytes(b"terminal\n")
+    authority_key.write_bytes(terminal_public)
+    authority_key.chmod(0o400)
     monkeypatch.setattr(
         subject,
         "_terminal",
-        lambda _args: ({"request_id": request_id}, "7" * 64, {}),
+        lambda _args: (
+            {"request_id": request_id, "request_sha256": terminal_request_sha256},
+            hashlib.sha256(terminal_public).hexdigest(),
+            {},
+            hashlib.sha256(terminal_receipt.read_bytes()).hexdigest(),
+        ),
     )
     monkeypatch.setattr(
         subject,
         "_partitions",
-        lambda _source, _report, _bound: (parts, hashes, listing),
+        lambda _source, _report, _bound: (parts, hashes, [{"symbol": "BTCUSDT"}]),
     )
     monkeypatch.setattr(
         subject,
@@ -1011,35 +1063,61 @@ def test_main_authorized_reconciliation_is_atomic_and_idempotent(
             "archive_retention": "retired_after_double_derivation",
         },
     )
-
-    terminal_receipt = tmp_path / "terminal-receipt.json"
-    authority_key = tmp_path / "authority.pub"
-    terminal_receipt.write_bytes(b"terminal\n")
-    authority_key.write_bytes(b"k" * 32)
-    repair_private = Ed25519PrivateKey.generate()
-    repair_public = repair_private.public_key().public_bytes(
-        serialization.Encoding.Raw,
-        serialization.PublicFormat.Raw,
-    )
-    repair_public_path = tmp_path / "conflict-authority.pub"
-    repair_public_path.write_bytes(repair_public)
-    repair_public_path.chmod(0o400)
+    repair_public_path = authority_key
     repair_receipt_path = tmp_path / "conflict-authorization.json"
     repository = ParquetMarketDataRepository(canonical)
     effects = repository._signed_month_conflict_effects(existing, incoming)
     old_inventory = subject._inventory(canonical)
+    old_digest = subject._inventory_digest(old_inventory)
+    fresh_path = tmp_path / "fresh-audit.json"
+    wal_path = tmp_path / "wal-transition.json"
+    fresh = {
+        "schema": "luminaquant_fresh_acquisition_audit.v1",
+        "run_id": "47eeac483e70d6af0784b873895024c8a2d01793a2447d3d3fbaa776d63bd2ad",
+        "request_id": request_id,
+        "sealed": True,
+        "outcome": "pass",
+        "terminal_receipt_sha256": hashlib.sha256(terminal_receipt.read_bytes()).hexdigest(),
+        "authority_key_id": hashlib.sha256(terminal_public).hexdigest(),
+        "source_root": str(source_root),
+        "source_report": str(report),
+        "signed_terminal_request_sha256": terminal_request_sha256,
+        "composite_telemetry": {"sha256": "4" * 64},
+    }
+    wal = {
+        "schema": "luminaquant.canonical_wal_transition.v1",
+        "mode": "execute",
+        "compaction_complete": True,
+        "run_id": fresh["run_id"],
+        "request_id": request_id,
+        "canonical_root": str(canonical),
+        "post_transition_inventory": old_inventory,
+        "post_transition_inventory_sha256": old_digest,
+    }
+    fresh_path.write_bytes(subject.canonical_bytes(fresh))
+    wal_path.write_bytes(subject.canonical_bytes(wal))
+    fresh_path.chmod(0o600)
+    wal_path.chmod(0o600)
     message = {
-        "schema": "alpha_max_canonical_conflict_authorization_message.v1",
+        "schema": "alpha_max_canonical_conflict_authorization_message.v2",
         "scope": "canonical_conflict_reconciliation",
         "decision": "approve_exact_effects",
         "canonical_root": str(canonical),
         "acquisition_request_id": request_id,
-        "terminal_receipt_sha256": hashlib.sha256(terminal_receipt.read_bytes()).hexdigest(),
+        "terminal_receipt_sha256": fresh["terminal_receipt_sha256"],
         "source_manifest_sha256": hashes["manifest"],
         "source_eligible_receipt_sha256": hashes["eligible"],
         "predecessor_path": str(canonical),
         "predecessor_identity": [canonical.stat().st_dev, canonical.stat().st_ino],
-        "predecessor_inventory_sha256": subject._inventory_digest(old_inventory),
+        "predecessor_inventory_sha256": old_digest,
+        "fresh_acquisition_audit_receipt_sha256": hashlib.sha256(
+            fresh_path.read_bytes()
+        ).hexdigest(),
+        "acquisition_run_id": fresh["run_id"],
+        "composite_telemetry_sha256": fresh["composite_telemetry"]["sha256"],
+        "wal_transition_receipt_sha256": hashlib.sha256(wal_path.read_bytes()).hexdigest(),
+        "wal_post_transition_inventory_sha256": old_digest,
+        "signed_terminal_request_sha256": terminal_request_sha256,
         "entries": [
             {
                 "relative": relative,
@@ -1056,16 +1134,16 @@ def test_main_authorized_reconciliation_is_atomic_and_idempotent(
         ],
     }
     unsigned = {
-        "schema": "alpha_max_canonical_conflict_authorization_receipt.v1",
+        "schema": "alpha_max_canonical_conflict_authorization_receipt.v2",
         "type": "canonical_conflict_authorization",
-        "authority_key_id": hashlib.sha256(repair_public).hexdigest(),
+        "authority_key_id": hashlib.sha256(terminal_public).hexdigest(),
         "message": message,
     }
     repair_receipt = {
         **unsigned,
         "signature": base64.b64encode(
-            repair_private.sign(
-                b"luminaquant.alpha_max.canonical_conflict_authorization.v1\0"
+            terminal_private.sign(
+                b"luminaquant.alpha_max.canonical_conflict_authorization.v2\0"
                 + subject.canonical_bytes(unsigned)
             )
         ).decode(),
@@ -1087,6 +1165,10 @@ def test_main_authorized_reconciliation_is_atomic_and_idempotent(
         str(repair_receipt_path),
         "--conflict-authority-public-key",
         str(repair_public_path),
+        "--fresh-acquisition-audit-receipt",
+        str(fresh_path),
+        "--wal-transition-receipt",
+        str(wal_path),
     ]
 
     assert subject.main(argv) == 0
@@ -1098,7 +1180,7 @@ def test_main_authorized_reconciliation_is_atomic_and_idempotent(
     assert (canonical / relative).stat().st_ino != source_identity[1]
     commit, _ = subject._json(canonical / "commit.json", "commit")
     assert commit["schema"] == "alpha_max_canonical_publication_receipt.v3"
-    assert commit["conflict_authority_key_id"] != commit["authority_key_id"]
+    assert commit["conflict_authority_key_id"] == commit["authority_key_id"]
     assert commit["authorized_conflict_partition_count"] == 1
     assert commit["authorized_replaced_row_count"] == 1
     assert commit["partitions"][0]["publication_mode"] == "authorized_reconciliation"
@@ -1110,8 +1192,8 @@ def test_main_authorized_reconciliation_is_atomic_and_idempotent(
     stale_receipt = {
         **stale_unsigned,
         "signature": base64.b64encode(
-            repair_private.sign(
-                b"luminaquant.alpha_max.canonical_conflict_authorization.v1\0"
+            terminal_private.sign(
+                b"luminaquant.alpha_max.canonical_conflict_authorization.v2\0"
                 + subject.canonical_bytes(stale_unsigned)
             )
         ).decode(),
@@ -1129,6 +1211,11 @@ def test_main_authorized_reconciliation_is_atomic_and_idempotent(
         canonical_root=canonical,
         conflict_authorization_receipt=repair_receipt_path,
         conflict_authority_public_key=repair_public_path,
+        fresh_acquisition_audit_receipt=fresh_path,
+        wal_transition_receipt=wal_path,
+        source_root=source_root,
+        source_report=report,
+        authority_public_key=authority_key,
     )
     with pytest.raises(subject.PublicationError, match="binding mismatch"):
         subject._replay_conflict_authorization(
@@ -1138,9 +1225,12 @@ def test_main_authorized_reconciliation_is_atomic_and_idempotent(
             request_id=request_id,
             hashes=hashes,
             parts=parts,
+            terminal={"request_id": request_id, "request_sha256": terminal_request_sha256},
+            key_id=hashlib.sha256(terminal_public).hexdigest(),
+            terminal_public_key=terminal_public,
         )
     repair_receipt_path.write_bytes(subject.canonical_bytes(repair_receipt))
-    with pytest.raises(subject.PublicationError, match="V3 replay requires"):
+    with pytest.raises(subject.PublicationError, match="controls must be paired"):
         subject.main(argv[:-4])
     tampered = json.loads(json.dumps(commit))
     tampered["partitions"][0]["conflict_effects"]["source_only_sha256"] = "f" * 64

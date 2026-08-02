@@ -442,6 +442,7 @@ class VerifiedTerminalReceipt:
     key_id: str
     authorization: dict[str, Any]
     events: tuple[dict[str, Any], ...]
+    receipt_sha256: str
 
 
 def _plain(value: Any) -> Any:
@@ -2176,7 +2177,13 @@ def _verify_signed_receipt_at(
             raise TerminalPolicyError("terminal event journal mismatch")
     if hashlib.sha256(canonical_bytes(events)).hexdigest() != receipt["events_sha256"]:
         raise TerminalPolicyError("terminal event journal mismatch")
-    return VerifiedTerminalReceipt(receipt, key_id, authorization, tuple(events))
+    return VerifiedTerminalReceipt(
+        receipt,
+        key_id,
+        authorization,
+        tuple(events),
+        hashlib.sha256(canonical_bytes(receipt)).hexdigest(),
+    )
 
 
 def _parse_target_result(value: Any) -> TargetResult:
