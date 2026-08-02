@@ -787,10 +787,13 @@ def test_build_assembles_private_artifacts_without_launching(
         module._validate_unit({key: value for key, value in unit.items() if key != "name"})
         assert not (set(unit["Service"]["ReadOnlyPaths"]) & set(unit["Service"]["ReadWritePaths"]))
     assert (authority["MemoryHigh"], authority["MemoryMax"], authority["MemorySwapMax"]) == (
-        268435456,
+        402653184,
         536870912,
-        67108864,
+        268435456,
     )
+    monitor = plan["telemetry_contract"]["monitor"]
+    assert monitor[monitor.index("--authority-memory-max") + 1] == str(authority["MemoryMax"])
+    assert monitor[monitor.index("--authority-swap-max") + 1] == str(authority["MemorySwapMax"])
     assert (observer["MemoryHigh"], observer["MemoryMax"], observer["MemorySwapMax"]) == (
         2147483648,
         3221225472,

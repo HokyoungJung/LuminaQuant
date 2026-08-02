@@ -56,12 +56,15 @@ G067_APPROVAL = (
 )
 CURRENT_APPROVAL = (
     "/home/hoky/quants-recovery-runs/luminaquant-recovery-631242a65e5d9732/"
-    "current-state-approval-v6.json"
+    "current-state-approval-v7.json"
 )
 ALIGNMENT = (
     "/home/hoky/quants-recovery-runs/20260714T105113Z/alpha-max-rev515-alignment-receipt-v5.json"
 )
 ALIGNMENT_SHA256 = "8687b52180502a11de9fbe317a19d00bb4492c464b3bf33d4eda2437683ca812"
+AUTHORITY_MEMORY_HIGH = 402653184
+AUTHORITY_MEMORY_MAX = 536870912
+AUTHORITY_SWAP_MAX = 268435456
 HEX = re.compile(r"^[0-9a-f]{64}$")
 EXECUTABLE_PINS = {
     "current_python": {
@@ -1531,9 +1534,9 @@ def build(args: argparse.Namespace) -> dict[str, str]:
             "--timeout-seconds",
             "86400",
             "--authority-memory-max",
-            "536870912",
+            str(AUTHORITY_MEMORY_MAX),
             "--authority-swap-max",
-            "67108864",
+            str(AUTHORITY_SWAP_MAX),
             "--observer-memory-max",
             "3221225472",
             "--observer-swap-max",
@@ -1609,7 +1612,11 @@ def build(args: argparse.Namespace) -> dict[str, str]:
                         "Alpha-Max v8 authority",
                         authority_argv,
                         env,
-                        {"high": 268435456, "max": 536870912, "swap": 67108864},
+                        {
+                            "high": AUTHORITY_MEMORY_HIGH,
+                            "max": AUTHORITY_MEMORY_MAX,
+                            "swap": AUTHORITY_SWAP_MAX,
+                        },
                         authority_stop,
                         read_paths=[str(paths["control_root"])],
                         write_paths=[str(paths["evidence_root"]), str(paths["telemetry_root"])],
