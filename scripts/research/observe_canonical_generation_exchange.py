@@ -40,11 +40,11 @@ from lumina_quant.alpha_max_terminal_policy import (
 from lumina_quant.market_data import MarketDataRepository
 from lumina_quant.storage.parquet.ohlcv_repo import ParquetMarketDataRepository
 
-RUN_ID = "0ea09388c6a3b52a722727e00135191c10a09b7652aaa3c31918a19f5ccea5db"
-APPROVAL_LEAF = "current-state-approval-v9.json"
+RUN_ID = "69ec878bb92644c6963d25ccebd1a11242801e8d5feeaaed144e5256037baafd"
+APPROVAL_LEAF = "current-state-approval-v10.json"
 DOMAIN = b"luminaquant.alpha_max.publication_stage_envelope.v1\0"
 MAX_JSON = 4 * 1024 * 1024
-ACQUISITION_REQUEST_ID = "7d11aa88513b3e2b649fac0dc517f8e13fab246b58d9c244f138d0a919a600f1"
+ACQUISITION_REQUEST_ID = "626f674063bac3cd81b37beba4973110e6ce7858179691e38cd032d385f99867"
 STAGE_ENVELOPE_SCHEMA = "alpha_max_publication_stage_envelope.v1"
 
 

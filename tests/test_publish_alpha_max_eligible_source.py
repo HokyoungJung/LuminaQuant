@@ -650,7 +650,7 @@ def test_conflict_authorization_rejects_wrong_effects_and_key(tmp_path: Path):
         "predecessor_identity": [predecessor.stat().st_dev, predecessor.stat().st_ino],
         "predecessor_inventory_sha256": subject._inventory_digest(subject._inventory(predecessor)),
         "fresh_acquisition_audit_receipt_sha256": "5" * 64,
-        "acquisition_run_id": "0ea09388c6a3b52a722727e00135191c10a09b7652aaa3c31918a19f5ccea5db",
+        "acquisition_run_id": "69ec878bb92644c6963d25ccebd1a11242801e8d5feeaaed144e5256037baafd",
         "composite_telemetry_sha256": "6" * 64,
         "wal_transition_receipt_sha256": "7" * 64,
         "wal_post_transition_inventory_sha256": subject._inventory_digest(
@@ -862,7 +862,7 @@ def test_signed_month_authorization_reconciles_only_exact_effects(tmp_path: Path
         serialization.Encoding.Raw,
         serialization.PublicFormat.Raw,
     )
-    expected_run_id = "0ea09388c6a3b52a722727e00135191c10a09b7652aaa3c31918a19f5ccea5db"
+    expected_run_id = "69ec878bb92644c6963d25ccebd1a11242801e8d5feeaaed144e5256037baafd"
     expected_approval_sha256 = "c" * 64
     authorization_context = {
         "expected_run_id": expected_run_id,
@@ -1167,7 +1167,7 @@ def test_main_authorized_reconciliation_is_atomic_and_idempotent(
     wal_path = tmp_path / "wal-transition.json"
     fresh = {
         "schema": "luminaquant_fresh_acquisition_audit.v1",
-        "run_id": "0ea09388c6a3b52a722727e00135191c10a09b7652aaa3c31918a19f5ccea5db",
+        "run_id": "69ec878bb92644c6963d25ccebd1a11242801e8d5feeaaed144e5256037baafd",
         "request_id": request_id,
         "sealed": True,
         "outcome": "pass",
@@ -1250,7 +1250,7 @@ def test_main_authorized_reconciliation_is_atomic_and_idempotent(
     }
     repair_receipt_path.write_bytes(subject.canonical_bytes(repair_receipt))
     repair_receipt_path.chmod(0o600)
-    approval_path = tmp_path / "current-state-approval-v9.json"
+    approval_path = tmp_path / "current-state-approval-v10.json"
     approval_path.write_bytes(b"approval\n")
     monkeypatch.setattr(subject, "_approval", lambda _path: ({}, fresh["approval_sha256"]))
     observer_private = (
@@ -1286,7 +1286,7 @@ def test_main_authorized_reconciliation_is_atomic_and_idempotent(
             "kind": "publication_observer_ready",
             "run_id": fresh["run_id"],
             "request_id": request_id,
-            "approval_leaf": "current-state-approval-v9.json",
+            "approval_leaf": "current-state-approval-v10.json",
             "approval_sha256": fresh["approval_sha256"],
             "canonical_root": str(canonical),
             "query_spec_sha256": "f" * 64,

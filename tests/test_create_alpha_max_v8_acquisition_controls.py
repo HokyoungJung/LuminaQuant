@@ -919,7 +919,7 @@ def test_import_is_stdlib_only_and_policy_constants_are_local():
     assert not hasattr(module, "policy")
     assert module._SCOPES == ("acquisition", "phase_preparation", "one_touch")
     assert module._FILE_ROLES[0] == "policy_json"
-    assert module.CURRENT_APPROVAL_LEAF == "current-state-approval-v9.json"
+    assert module.CURRENT_APPROVAL_LEAF == "current-state-approval-v10.json"
 
 
 def test_authenticated_policy_and_key_creator_use_only_captured_modules(
@@ -1480,16 +1480,16 @@ def test_quarantine_failure_preserves_primary_and_quarantine_errors(tmp_path: Pa
 
 def test_recovery_epoch_identifiers_and_approval_leaf_are_exact():
     module = _module()
-    assert module.CURRENT_APPROVAL_LEAF == "current-state-approval-v9.json"
-    assert module.RUN_ID == "0ea09388c6a3b52a722727e00135191c10a09b7652aaa3c31918a19f5ccea5db"
+    assert module.CURRENT_APPROVAL_LEAF == "current-state-approval-v10.json"
+    assert module.RUN_ID == "69ec878bb92644c6963d25ccebd1a11242801e8d5feeaaed144e5256037baafd"
     assert {
         "acquisition": module.ACQUISITION_REQUEST_ID,
         "phase_preparation": module.PHASE_PREPARATION_REQUEST_ID,
         "one_touch": module.ONE_TOUCH_REQUEST_ID,
     } == {
-        "acquisition": "7d11aa88513b3e2b649fac0dc517f8e13fab246b58d9c244f138d0a919a600f1",
-        "phase_preparation": "b4c2f5e8c954dc6aff5c757780c7aef8ff0ca1378fdd368e8fc8ea29491832ec",
-        "one_touch": "ec426deceeed57c9b22ac1772f3afe03f7ac6262a8028502cb843eb7e4e599bb",
+        "acquisition": "626f674063bac3cd81b37beba4973110e6ce7858179691e38cd032d385f99867",
+        "phase_preparation": "30b354feec5267be9fada8ec3bb22abb8bd8a50b821121cdc6a98992f304d1dd",
+        "one_touch": "e18c473266425f3886e4d3e19204bf28f4527b497e654e7f8be4ed81822508aa",
     }
 
 
@@ -1633,7 +1633,7 @@ def _run_mocked_persisted_probe(
         home,
     ):
         path.mkdir(parents=True)
-    approval = root / "current-state-approval-v9.json"
+    approval = root / "current-state-approval-v10.json"
     approval.write_text('{"approved":true}\n', encoding="utf-8")
     (control_root / "COMPLETE.json").write_text('{"complete":true}\n', encoding="utf-8")
     credential_path = key_root / "authority.private"
@@ -1643,14 +1643,16 @@ def _run_mocked_persisted_probe(
     wrapper_calls: list[dict[str, object]] = []
     probe_state: dict[str, object] = {}
     execution_alias = {"path": str(tmp_path / "execution-alias"), "target": str(root)}
+    pinned_probe_python = tmp_path / "pinned-current-python"
 
     class FakeControls:
         RUN_ID = run_id
         CURRENT = str(current)
         ACCEPTED = str(accepted)
         EXECUTABLE_PINS = {
-            name: {"path": sys.executable}
-            for name in ("current_python", "accepted_python", "telemetry_script")
+            "current_python": {"path": str(pinned_probe_python)},
+            "accepted_python": {"path": sys.executable},
+            "telemetry_script": {"path": sys.executable},
         }
         _RUNTIME_NAMES = ("current_python", "accepted_python", "telemetry_script")
         _MOUNT_IDENTITY_CODE = "verify-final-namespace"
@@ -1739,6 +1741,20 @@ def _run_mocked_persisted_probe(
                     "authority_public_b64": authority_public_b64,
                 }
             )
+            if "--marker" in argv:
+                probe_state.update(
+                    {
+                        "credential_name": argv[argv.index("--credential-name") + 1],
+                        "expected_sha256": argv[argv.index("--expected-sha256") + 1],
+                        "marker": Path(argv[argv.index("--marker") + 1]),
+                        "release": Path(argv[argv.index("--release") + 1]),
+                        "scope": argv[argv.index("--scope") + 1],
+                        "role": argv[argv.index("--role") + 1],
+                        "request": argv[argv.index("--request") + 1],
+                        "key_id": argv[argv.index("--key-id") + 1],
+                        "approval": Path(argv[argv.index("--approval") + 1]),
+                    }
+                )
             return ["/usr/bin/python3", "-I", "-S", "-c", "wrapped", *argv]
 
         @staticmethod
@@ -1888,34 +1904,6 @@ def _run_mocked_persisted_probe(
         probe._write_new(envelope_path, probe._canonical(envelope))
         return envelope
 
-    def fake_probe_execstart(
-        _controls,
-        credential_name: str,
-        _credential_target: str,
-        expected_sha256: str,
-        marker: Path,
-        release: Path,
-        requested_scope: str,
-        role: str,
-        request: str,
-        key_id: str,
-        approval_path: Path,
-    ) -> list[str]:
-        probe_state.update(
-            {
-                "credential_name": credential_name,
-                "expected_sha256": expected_sha256,
-                "marker": marker,
-                "release": release,
-                "scope": requested_scope,
-                "role": role,
-                "request": request,
-                "key_id": key_id,
-                "approval": approval_path,
-            }
-        )
-        return ["/usr/bin/true"]
-
     def fake_run(*args: str, check: bool = True) -> SimpleNamespace:
         command = tuple(args)
         if command[:3] == ("systemctl", "--user", "show"):
@@ -1996,7 +1984,6 @@ def _run_mocked_persisted_probe(
     monkeypatch.setattr(probe, "verify_persisted_topology", fake_verify)
     monkeypatch.setattr(probe, "_production_properties", fake_properties)
     monkeypatch.setattr(probe, "_sign_launch_admission", fake_sign)
-    monkeypatch.setattr(probe, "_persisted_probe_execstart", fake_probe_execstart)
     monkeypatch.setattr(probe, "_run", fake_run)
 
     if fail_probe:
@@ -2020,6 +2007,7 @@ def _run_mocked_persisted_probe(
         "final_receipt": final_receipt,
         "audit": evidence_root / "launch-admission-acquisition.audit.json",
         "definition": definition,
+        "pinned_probe_python": pinned_probe_python,
     }
 
 
@@ -2051,6 +2039,8 @@ def test_persisted_probe_bootstraps_then_revalidates_final_admission(
     assert isinstance(wrappers, list)
     assert len(wrappers) == 2
     assert {wrapper["receipt"] for wrapper in wrappers} == {str(probe_receipt)}
+    probe_wrapper = next(wrapper for wrapper in wrappers if "--marker" in wrapper["argv"])
+    assert probe_wrapper["argv"][0] == str(observed["pinned_probe_python"])
     definition = observed["definition"]
     assert isinstance(definition, dict)
     production_config = json.loads(definition["Service"]["ExecStart"][5])

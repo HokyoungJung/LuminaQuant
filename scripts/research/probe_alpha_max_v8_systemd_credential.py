@@ -15,7 +15,6 @@ from pathlib import Path
 import secrets
 import shutil
 import subprocess
-import sys
 import socket
 import time
 from typing import Any
@@ -472,7 +471,7 @@ def _persisted_probe_execstart(
     approval: Path,
 ) -> list[str]:
     return [
-        sys.executable,
+        controls.EXECUTABLE_PINS["current_python"]["path"],
         "-I",
         "-S",
         "-c",
