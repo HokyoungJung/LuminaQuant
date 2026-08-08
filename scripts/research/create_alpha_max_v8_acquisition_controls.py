@@ -2003,6 +2003,40 @@ def _command_read_paths(
     return list(dict.fromkeys(result))
 
 
+def _without_late_bound_read_paths(
+    argv_read_paths: list[str],
+    *,
+    read_paths: list[str],
+    late_bound_read_paths: list[str],
+) -> list[str]:
+    if not isinstance(late_bound_read_paths, list) or any(
+        not isinstance(path, str) for path in late_bound_read_paths
+    ):
+        _fail("late-bound read paths must be a list of strings")
+    if len(late_bound_read_paths) != len(set(late_bound_read_paths)):
+        _fail("late-bound read paths must be distinct")
+    retained = list(argv_read_paths)
+    for raw_candidate in late_bound_read_paths:
+        candidate = _absolute(raw_candidate)
+        if raw_candidate not in retained:
+            _fail("late-bound read path must be an absolute command input")
+        parents: list[Path] = []
+        for raw_parent in read_paths:
+            parent = _absolute(raw_parent)
+            try:
+                relative = candidate.relative_to(parent)
+            except ValueError:
+                continue
+            if relative == Path("."):
+                _fail("late-bound read path must be strictly beneath an explicit read directory")
+            _directory(parent)
+            parents.append(parent)
+        if not parents:
+            _fail("late-bound read path must be strictly beneath an explicit read directory")
+        retained.remove(raw_candidate)
+    return retained
+
+
 def _write_bind_paths(write_paths: list[str]) -> list[str]:
     bindings: list[str] = []
     seen: set[Path] = set()
@@ -2032,6 +2066,7 @@ def _unit(
     inaccessible_paths: list[str],
     load_credential: str,
     observer: bool = False,
+    late_bound_read_paths: list[str] | None = None,
     prestart: list[str] | None = None,
 ) -> dict[str, Any]:
     argv_read_paths = _command_read_paths(
@@ -2039,6 +2074,12 @@ def _unit(
         write_paths=write_paths,
         inaccessible_paths=inaccessible_paths,
     )
+    if late_bound_read_paths is not None:
+        argv_read_paths = _without_late_bound_read_paths(
+            argv_read_paths,
+            read_paths=read_paths,
+            late_bound_read_paths=late_bound_read_paths,
+        )
     if prestart is not None:
         if len(prestart) < 5 or not prestart[4].startswith("/"):
             _fail("production prestart lacks an absolute approval")
@@ -3224,6 +3265,9 @@ def build(args: argparse.Namespace) -> dict[str, str]:
                         load_credential=(
                             f"authority.public:{paths['key_root'] / 'authority.public'}"
                         ),
+                        late_bound_read_paths=[
+                            str(paths["evidence_root"] / "terminal-authority.receipt.json")
+                        ],
                         prestart=admission_prestart(telemetry_name),
                     ),
                 },
@@ -3855,6 +3899,7 @@ def _build_stage(args: argparse.Namespace, scope: str) -> dict[str, str]:
         write_paths=[str(paths["telemetry_root"])],
         inaccessible_paths=[str(keys)],
         load_credential=f"authority.public:{keys / 'authority.public'}",
+        late_bound_read_paths=[str(scope_evidence / "terminal-authority.receipt.json")],
         prestart=staged_prestart(telemetry_name),
     )
     _validate_unit(telemetry_unit)

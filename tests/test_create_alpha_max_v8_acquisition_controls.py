@@ -726,6 +726,68 @@ def test_unit_bind_contract_rejects_broad_roots_and_binds_absolute_commands():
         module._validate_unit(unit)
 
 
+@pytest.mark.parametrize("scope", ("acquisition", "phase_preparation", "one_touch"))
+def test_late_bound_read_path_exclusion_is_narrow(tmp_path: Path, scope: str):
+    module = _module()
+    recovery = tmp_path / "recovery"
+    evidence = recovery / scope
+    telemetry = recovery / "telemetry"
+    evidence.mkdir(parents=True)
+    telemetry.mkdir()
+    module.RECOVERY_ROOT = recovery
+    module.EXECUTION_ALIAS_ROOT = tmp_path / "execution-alias"
+    receipt = evidence / "terminal-authority.receipt.json"
+
+    def build(late_bound: Path, command_path: Path):
+        return module._unit(
+            f"{scope} telemetry",
+            [
+                "/runtime/current/bin/python",
+                "/code/monitor.py",
+                "--signed-terminal-receipt",
+                str(command_path),
+                "--authority-public-key",
+                "%d/authority.public",
+            ],
+            {"HOME": "/safe"},
+            {"high": 1, "max": 2, "swap": 3},
+            None,
+            read_paths=[str(evidence)],
+            write_paths=[str(telemetry)],
+            inaccessible_paths=["/keys"],
+            load_credential="authority.public:/keys/authority.public",
+            late_bound_read_paths=[str(late_bound)],
+        )
+
+    unit = build(receipt, receipt)
+    service = unit["Service"]
+    assert str(evidence) in service["BindReadOnlyPaths"]
+    assert str(receipt) not in service["BindReadOnlyPaths"]
+    assert "/runtime/current/bin/python" in service["BindReadOnlyPaths"]
+    assert "/code/monitor.py" in service["BindReadOnlyPaths"]
+    rendered = module._render_systemd_unit(unit).decode()
+    read_bind_lines = [
+        line for line in rendered.splitlines() if line.startswith("BindReadOnlyPaths=")
+    ]
+    assert any(str(evidence) in line for line in read_bind_lines)
+    assert all(str(receipt) not in line for line in read_bind_lines)
+    assert str(receipt) in rendered
+
+    with pytest.raises(ValueError, match="must be an absolute command input"):
+        build(evidence / "unreferenced.json", receipt)
+    outside = recovery / "outside" / "future.json"
+    with pytest.raises(ValueError, match="must be strictly beneath an explicit read directory"):
+        build(outside, outside)
+    with pytest.raises(ValueError, match="must be strictly beneath an explicit read directory"):
+        build(evidence, evidence)
+
+    if scope != "acquisition":
+        assert any(
+            isinstance(value, tuple) and "late_bound_read_paths" in value
+            for value in module._build_stage.__code__.co_consts
+        )
+
+
 def test_non_network_unit_shapes_are_unix_only_and_ip_denied():
     module = _module()
     module.RECOVERY_ROOT = Path("/")
@@ -1332,6 +1394,10 @@ def test_build_assembles_private_artifacts_without_launching(
     authority = plan["systemd_units"]["authority"]["Service"]
     observer = plan["systemd_units"]["observer"]["Service"]
     telemetry = plan["systemd_units"]["telemetry"]["Service"]
+    terminal_receipt = str(Path(args.evidence_root) / "terminal-authority.receipt.json")
+    assert str(Path(args.evidence_root)) in telemetry["BindReadOnlyPaths"]
+    assert terminal_receipt not in telemetry["BindReadOnlyPaths"]
+    assert any(terminal_receipt in argument for argument in telemetry["ExecStart"])
     for unit in plan["systemd_units"].values():
         service = unit["Service"]
         module._validate_unit({key: value for key, value in unit.items() if key != "name"})
@@ -1409,6 +1475,15 @@ def test_build_assembles_private_artifacts_without_launching(
         assert module._MOUNT_IDENTITY_CODE.encode() in rendered
         assert b"launch-admission-acquisition.json" in rendered
         assert b"\\n" not in module._MOUNT_IDENTITY_CODE.encode()
+    rendered_telemetry = Path(rendered_units["telemetry"]["file"]["path"]).read_text(
+        encoding="utf-8"
+    )
+    telemetry_read_bind_lines = [
+        line for line in rendered_telemetry.splitlines() if line.startswith("BindReadOnlyPaths=")
+    ]
+    assert any(str(Path(args.evidence_root)) in line for line in telemetry_read_bind_lines)
+    assert all(terminal_receipt not in line for line in telemetry_read_bind_lines)
+    assert terminal_receipt in rendered_telemetry
     assert documents["manifest.json"]["executable_inputs"] == plan["executable_inputs"]
     assert (
         plan["executable_inputs"]["current_python"]["package_freeze_sha256"]
