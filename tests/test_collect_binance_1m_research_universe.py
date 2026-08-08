@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import importlib.util
+import io
 import sys
+import zipfile
 from pathlib import Path
 from types import ModuleType
 
@@ -103,3 +105,82 @@ def test_default_universe_appends_new_tradfi_discovery() -> None:
     assert "NEWEQUSDT" in expanded_symbols
     assert discovery["new_tradfi_since_static_snapshot_symbols"] == ["NEWEQUSDT"]
     assert discovery["selected_new_tradfi_symbols"] == ["NEWEQUSDT"]
+
+
+def test_rows_to_frame_preserves_official_kline_taker_flow() -> None:
+    frame = MODULE.rows_to_frame(
+        [
+            [
+                1_786_060_800_000,
+                "100",
+                "101",
+                "99",
+                "100.5",
+                "12",
+                1_786_060_859_999,
+                "1206",
+                42,
+                "7",
+                "704",
+                "0",
+            ]
+        ]
+    )
+
+    assert frame.row(0, named=True) == {
+        "timestamp_ms": 1_786_060_800_000,
+        "open": 100.0,
+        "high": 101.0,
+        "low": 99.0,
+        "close": 100.5,
+        "volume": 12.0,
+        "quote_volume": 1206.0,
+        "taker_buy_base_volume": 7.0,
+        "taker_buy_quote_volume": 704.0,
+        "taker_sell_base_volume": 5.0,
+        "taker_sell_quote_volume": 502.0,
+    }
+    assert MODULE.taker_feature_rows(frame) == [
+        {
+            "timestamp_ms": 1_786_060_800_000,
+            "taker_buy_base_volume": 7.0,
+            "taker_sell_base_volume": 5.0,
+            "taker_buy_quote_volume": 704.0,
+            "taker_sell_quote_volume": 502.0,
+            "source": "binance_futures_kline",
+        }
+    ]
+
+
+def test_data_vision_zip_preserves_official_taker_flow_columns() -> None:
+    csv_bytes = (
+        b"open_time,open,high,low,close,volume,close_time,quote_volume,count,"
+        b"taker_buy_volume,taker_buy_quote_volume,ignore\n"
+        b"1786060800000,100,101,99,100.5,12,1786060859999,1206,42,7,704,0\n"
+        b"1786060860000,100.5,102,100,101,9,1786060919999,910,38,4,405,0\n"
+    )
+    archive_bytes = io.BytesIO()
+    with zipfile.ZipFile(archive_bytes, "w") as archive:
+        archive.writestr("BTCUSDT-1m.csv", csv_bytes)
+
+    frame = MODULE.data_vision_zip_to_frame(
+        archive_bytes.getvalue(),
+        since_ms=1_786_060_860_000,
+        until_ms=1_786_060_919_999,
+    )
+
+    assert frame.to_dicts() == [
+        {
+            "timestamp_ms": 1_786_060_860_000,
+            "open": 100.5,
+            "high": 102.0,
+            "low": 100.0,
+            "close": 101.0,
+            "volume": 9.0,
+            "quote_volume": 910.0,
+            "taker_buy_base_volume": 4.0,
+            "taker_buy_quote_volume": 405.0,
+            "taker_sell_base_volume": 5.0,
+            "taker_sell_quote_volume": 505.0,
+        }
+    ]

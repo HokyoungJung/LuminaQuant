@@ -148,3 +148,49 @@ def test_feature_audit_fails_when_required_features_are_only_null(monkeypatch):
     assert audit["status"] == "fail"
     assert audit["complete_feature_symbols"] == []
     assert audit["missing_features_by_symbol"] == {"BTC/USDT": ["funding_rate", "open_interest"]}
+
+
+def test_run_backtest_wires_feature_database_for_preloaded_frames(monkeypatch):
+    captured: dict[str, object] = {}
+
+    class FakePortfolio:
+        _metric_totals = [10_000.0]
+        current_holdings = {"total": 10_000.0}
+        trade_count = 0
+
+        @staticmethod
+        def output_summary_stats_fast():
+            return {}
+
+    class FakeBacktest:
+        market_events = 0
+        signals = 0
+        orders = 0
+        fills = 0
+
+        def __init__(self, *args, **kwargs):
+            captured.update(kwargs)
+            self.portfolio = FakePortfolio()
+
+        @staticmethod
+        def simulate_trading(*, output):
+            assert output is False
+
+    monkeypatch.setattr(subject, "Backtest", FakeBacktest)
+    monkeypatch.setattr(subject, "resolve_strategy_class", lambda _name: object)
+
+    subject._run_backtest(
+        strategy="FeatureStrategy",
+        symbols=("BTC/USDT",),
+        data={},
+        data_root="data/market_parquet",
+        exchange="binance",
+        start=datetime(2026, 5, 1),
+        end=datetime(2026, 5, 2),
+        annual_periods=365 * 24 * 60,
+    )
+
+    assert captured["data_handler_kwargs"] == {
+        "feature_db_path": "data/market_parquet",
+        "feature_exchange": "binance",
+    }

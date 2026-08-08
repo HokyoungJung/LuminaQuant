@@ -72,6 +72,7 @@ class SymbolResult:
     last_timestamp_ms: int | None
     source_files: int = 0
     missing_files: int = 0
+    feature_upserted_rows: int = 0
     error: str = ""
 
 
@@ -352,21 +353,49 @@ def request_klines(
             time.sleep(float(base_wait_sec) * (2 ** (attempt - 1)))
 
 
+def _with_taker_flow_columns(frame: pl.DataFrame) -> pl.DataFrame:
+    required = {
+        "volume",
+        "quote_volume",
+        "taker_buy_base_volume",
+        "taker_buy_quote_volume",
+    }
+    if frame.is_empty() or not required.issubset(frame.columns):
+        return frame
+    return frame.with_columns(
+        [
+            (pl.col("volume") - pl.col("taker_buy_base_volume"))
+            .clip(lower_bound=0.0)
+            .alias("taker_sell_base_volume"),
+            (pl.col("quote_volume") - pl.col("taker_buy_quote_volume"))
+            .clip(lower_bound=0.0)
+            .alias("taker_sell_quote_volume"),
+        ]
+    )
+
+
 def rows_to_frame(rows: list[list[Any]]) -> pl.DataFrame:
     records: list[dict[str, Any]] = []
     for row in rows:
         if not isinstance(row, list) or len(row) < 6:
             continue
-        records.append(
-            {
-                "timestamp_ms": int(row[0]),
-                "open": float(row[1]),
-                "high": float(row[2]),
-                "low": float(row[3]),
-                "close": float(row[4]),
-                "volume": float(row[5]),
-            }
-        )
+        record = {
+            "timestamp_ms": int(row[0]),
+            "open": float(row[1]),
+            "high": float(row[2]),
+            "low": float(row[3]),
+            "close": float(row[4]),
+            "volume": float(row[5]),
+        }
+        if len(row) >= 11:
+            record.update(
+                {
+                    "quote_volume": float(row[7]),
+                    "taker_buy_base_volume": float(row[9]),
+                    "taker_buy_quote_volume": float(row[10]),
+                }
+            )
+        records.append(record)
     if not records:
         return pl.DataFrame(
             schema={
@@ -378,7 +407,22 @@ def rows_to_frame(rows: list[list[Any]]) -> pl.DataFrame:
                 "volume": pl.Float64,
             }
         )
-    return pl.DataFrame(records)
+    return _with_taker_flow_columns(pl.DataFrame(records))
+
+
+def taker_feature_rows(frame: pl.DataFrame) -> list[dict[str, Any]]:
+    columns = [
+        "timestamp_ms",
+        "taker_buy_base_volume",
+        "taker_sell_base_volume",
+        "taker_buy_quote_volume",
+        "taker_sell_quote_volume",
+    ]
+    if frame.is_empty() or not set(columns).issubset(frame.columns):
+        return []
+    return frame.select(columns).with_columns(
+        pl.lit("binance_futures_kline").alias("source")
+    ).to_dicts()
 
 
 def floor_utc_day_ms(ms: int) -> int:
@@ -484,19 +528,41 @@ def data_vision_zip_to_frame(blob: bytes, *, since_ms: int, until_ms: int) -> pl
         if not names:
             return rows_to_frame([])
         csv_bytes = archive.read(names[0])
-    frame = pl.read_csv(
-        io.BytesIO(csv_bytes),
-        has_header=True,
-        columns=["open_time", "open", "high", "low", "close", "volume"],
-        schema_overrides={
-            "open_time": pl.Int64,
-            "open": pl.Float64,
-            "high": pl.Float64,
-            "low": pl.Float64,
-            "close": pl.Float64,
-            "volume": pl.Float64,
-        },
-    ).rename({"open_time": "timestamp_ms"})
+    frame = (
+        pl.read_csv(
+            io.BytesIO(csv_bytes),
+            has_header=True,
+            columns=[
+                "open_time",
+                "open",
+                "high",
+                "low",
+                "close",
+                "volume",
+                "quote_volume",
+                "taker_buy_volume",
+                "taker_buy_quote_volume",
+            ],
+            schema_overrides={
+                "open_time": pl.Int64,
+                "open": pl.Float64,
+                "high": pl.Float64,
+                "low": pl.Float64,
+                "close": pl.Float64,
+                "volume": pl.Float64,
+                "quote_volume": pl.Float64,
+                "taker_buy_volume": pl.Float64,
+                "taker_buy_quote_volume": pl.Float64,
+            },
+        )
+        .rename(
+            {
+                "open_time": "timestamp_ms",
+                "taker_buy_volume": "taker_buy_base_volume",
+            }
+        )
+        .pipe(_with_taker_flow_columns)
+    )
     return frame.filter(
         (pl.col("timestamp_ms") >= int(since_ms)) & (pl.col("timestamp_ms") <= int(until_ms))
     )
@@ -531,6 +597,7 @@ def collect_symbol_data_vision(
     missing_files = 0
     fetched = 0
     upserted = 0
+    feature_upserted = 0
     first_ts: int | None = None
     last_ts: int | None = None
     try:
@@ -563,6 +630,13 @@ def collect_symbol_data_vision(
                         rows=frame,
                     )
                 )
+                feature_upserted += int(
+                    repo.upsert_futures_feature_points(
+                        exchange=exchange,
+                        symbol=plan.symbol,
+                        rows=taker_feature_rows(frame),
+                    )
+                )
         status = "ok" if fetched else "empty"
         return SymbolResult(
             symbol=plan.symbol,
@@ -570,6 +644,7 @@ def collect_symbol_data_vision(
             request_count=requests,
             fetched_rows=fetched,
             upserted_rows=upserted,
+            feature_upserted_rows=feature_upserted,
             started_at_utc=started,
             completed_at_utc=utc_now_iso(),
             first_timestamp_ms=first_ts,
@@ -590,6 +665,7 @@ def collect_symbol_data_vision(
             last_timestamp_ms=last_ts,
             source_files=source_files,
             missing_files=missing_files,
+            feature_upserted_rows=feature_upserted,
             error=str(exc),
         )
 
@@ -624,6 +700,7 @@ def collect_symbol(
     requests = 0
     fetched = 0
     upserted = 0
+    feature_upserted = 0
     first_ts: int | None = None
     last_ts: int | None = None
     status = "ok"
@@ -661,6 +738,13 @@ def collect_symbol(
                             rows=frame,
                         )
                     )
+                    feature_upserted += int(
+                        repo.upsert_futures_feature_points(
+                            exchange=exchange,
+                            symbol=plan.symbol,
+                            rows=taker_feature_rows(frame),
+                        )
+                    )
                 cursor = max(batch_last + KLINE_INTERVAL_MS, batch_end + 1)
             else:
                 cursor = batch_end + 1
@@ -674,6 +758,7 @@ def collect_symbol(
             request_count=requests,
             fetched_rows=fetched,
             upserted_rows=upserted,
+            feature_upserted_rows=feature_upserted,
             started_at_utc=started,
             completed_at_utc=utc_now_iso(),
             first_timestamp_ms=first_ts,
@@ -686,6 +771,7 @@ def collect_symbol(
             request_count=requests,
             fetched_rows=fetched,
             upserted_rows=upserted,
+            feature_upserted_rows=feature_upserted,
             started_at_utc=started,
             completed_at_utc=utc_now_iso(),
             first_timestamp_ms=first_ts,
@@ -883,6 +969,9 @@ def main(argv: list[str] | None = None) -> int:
             "missing_files": sum(item.missing_files for item in results_sorted),
             "fetched_rows": sum(item.fetched_rows for item in results_sorted),
             "upserted_rows": sum(item.upserted_rows for item in results_sorted),
+            "feature_upserted_rows": sum(
+                item.feature_upserted_rows for item in results_sorted
+            ),
         },
         "symbols": [asdict(item) for item in results_sorted],
     }
