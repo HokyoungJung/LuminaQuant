@@ -919,7 +919,7 @@ def test_import_is_stdlib_only_and_policy_constants_are_local():
     assert not hasattr(module, "policy")
     assert module._SCOPES == ("acquisition", "phase_preparation", "one_touch")
     assert module._FILE_ROLES[0] == "policy_json"
-    assert module.CURRENT_APPROVAL_LEAF == "current-state-approval-v10.json"
+    assert module.CURRENT_APPROVAL_LEAF == "current-state-approval-v11.json"
 
 
 def test_authenticated_policy_and_key_creator_use_only_captured_modules(
@@ -1480,16 +1480,16 @@ def test_quarantine_failure_preserves_primary_and_quarantine_errors(tmp_path: Pa
 
 def test_recovery_epoch_identifiers_and_approval_leaf_are_exact():
     module = _module()
-    assert module.CURRENT_APPROVAL_LEAF == "current-state-approval-v10.json"
-    assert module.RUN_ID == "69ec878bb92644c6963d25ccebd1a11242801e8d5feeaaed144e5256037baafd"
+    assert module.CURRENT_APPROVAL_LEAF == "current-state-approval-v11.json"
+    assert module.RUN_ID == "86e406732b9f5fdef9eab49fab1ab993d5529ac5526b2fdcca6fc73dd7cae95f"
     assert {
         "acquisition": module.ACQUISITION_REQUEST_ID,
         "phase_preparation": module.PHASE_PREPARATION_REQUEST_ID,
         "one_touch": module.ONE_TOUCH_REQUEST_ID,
     } == {
-        "acquisition": "626f674063bac3cd81b37beba4973110e6ce7858179691e38cd032d385f99867",
-        "phase_preparation": "30b354feec5267be9fada8ec3bb22abb8bd8a50b821121cdc6a98992f304d1dd",
-        "one_touch": "e18c473266425f3886e4d3e19204bf28f4527b497e654e7f8be4ed81822508aa",
+        "acquisition": "cd176a532039742270e2ab573b8f26796ee20d36217636d932c3d0d3fab242e6",
+        "phase_preparation": "8a625bb27165f5b27cbc2caec129b1a64bfff0c04a13cf1f6534d1f5620d86f3",
+        "one_touch": "4a1bf1635ed967bd69866f7f8e4674332a1462944d352801f320fb416409b354",
     }
 
 
@@ -1633,7 +1633,7 @@ def _run_mocked_persisted_probe(
         home,
     ):
         path.mkdir(parents=True)
-    approval = root / "current-state-approval-v10.json"
+    approval = root / "current-state-approval-v11.json"
     approval.write_text('{"approved":true}\n', encoding="utf-8")
     (control_root / "COMPLETE.json").write_text('{"complete":true}\n', encoding="utf-8")
     credential_path = key_root / "authority.private"
@@ -1797,9 +1797,15 @@ def _run_mocked_persisted_probe(
                 "-I",
                 "-S",
                 "-c",
-                "cleanup",
-                "{}",
-                "/usr/bin/true",
+                controls._MOUNT_IDENTITY_CODE,
+                wrapper_config,
+                str(pinned_probe_python),
+                "/monitor.py",
+                "capture",
+                "--expected-unit",
+                "alpha-max-authority.service",
+                "--output",
+                str(tmp_path / "terminal.json"),
             ],
             "BindPaths": [f"{credential_path.parent}:/runtime-keys"],
             "WorkingDirectory": "/",
@@ -2041,6 +2047,11 @@ def test_persisted_probe_bootstraps_then_revalidates_final_admission(
     assert {wrapper["receipt"] for wrapper in wrappers} == {str(probe_receipt)}
     probe_wrapper = next(wrapper for wrapper in wrappers if "--marker" in wrapper["argv"])
     assert probe_wrapper["argv"][0] == str(observed["pinned_probe_python"])
+    stop_wrapper = next(wrapper for wrapper in wrappers if "--expected-unit" in wrapper["argv"])
+    expected_unit_index = stop_wrapper["argv"].index("--expected-unit") + 1
+    assert stop_wrapper["unit_name"] == "alpha-max-authority.service"
+    assert stop_wrapper["argv"][expected_unit_index].startswith("luminaquant-persisted-0-")
+    assert stop_wrapper["argv"][expected_unit_index].endswith(".service")
     definition = observed["definition"]
     assert isinstance(definition, dict)
     production_config = json.loads(definition["Service"]["ExecStart"][5])

@@ -704,6 +704,7 @@ def _execute_persisted_topology(
         source, credential_name = credential["source"], credential["name"]
         marker = evidence_root / f"{index:02d}-{scope}-{role}.json"
         release = evidence_root / f"{index:02d}-{scope}-{role}.release"
+        unit_name = f"luminaquant-persisted-{index}-{secrets.token_hex(12)}.service"
         substituted = copy.deepcopy(original)
         service = substituted["Service"]
         production_wrapper = original["Service"]["ExecStart"]
@@ -718,8 +719,25 @@ def _execute_persisted_topology(
         wrapper_config = json.loads(production_wrapper[5])
         stop = service.get("ExecStopPost")
         if stop is not None:
+            if (
+                stop[:5] != production_wrapper[:5]
+                or len(stop) <= 6
+                or json.loads(stop[5]) != wrapper_config
+            ):
+                raise RuntimeError("production ExecStopPost lacks final namespace verifier")
+            stop_argv = list(stop[6:])
+            try:
+                expected_unit_index = stop_argv.index("--expected-unit") + 1
+            except ValueError as error:
+                raise RuntimeError("production ExecStopPost lacks expected unit binding") from error
+            if (
+                expected_unit_index >= len(stop_argv)
+                or stop_argv[expected_unit_index] != production_name
+            ):
+                raise RuntimeError("production ExecStopPost unit binding mismatch")
+            stop_argv[expected_unit_index] = unit_name
             service["ExecStopPost"] = controls._wrap_execstart(
-                stop[-len(original["Service"]["ExecStopPost"][6:]) :],
+                stop_argv,
                 [binding.split(":", 1)[1] for binding in service.get("BindPaths", [])],
                 receipt=str(probe_receipt),
                 unit_name=wrapper_config["unit_name"],
@@ -764,7 +782,6 @@ def _execute_persisted_topology(
         probe_unit += (
             b"RestrictAddressFamilies=\nRestrictAddressFamilies=AF_UNIX\nIPAddressDeny=any\n"
         )
-        unit_name = f"luminaquant-persisted-{index}-{secrets.token_hex(12)}.service"
         transient, link = evidence_root / unit_name, unit_directory / unit_name
         _write_new(transient, probe_unit)
         properties: dict[str, str] = {}
