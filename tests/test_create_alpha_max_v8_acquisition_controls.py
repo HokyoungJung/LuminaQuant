@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import builtins
+import hashlib
 import importlib.util
 import json
 import os
@@ -695,7 +696,7 @@ def test_approval_and_persisted_topology_bind_accepted_and_control_artifacts():
     assert "authority_public_b64=prestart[9]" in source
     probe_source = PROBE_SCRIPT.read_text(encoding="utf-8")
     assert "production ExecStart lacks final namespace verifier" in probe_source
-    assert 'receipt=wrapper_config["receipt"]' in probe_source
+    assert "receipt=str(probe_receipt)" in probe_source
 
 
 def test_unit_bind_contract_rejects_broad_roots_and_binds_absolute_commands():
@@ -918,7 +919,7 @@ def test_import_is_stdlib_only_and_policy_constants_are_local():
     assert not hasattr(module, "policy")
     assert module._SCOPES == ("acquisition", "phase_preparation", "one_touch")
     assert module._FILE_ROLES[0] == "policy_json"
-    assert module.CURRENT_APPROVAL_LEAF == "current-state-approval-v8.json"
+    assert module.CURRENT_APPROVAL_LEAF == "current-state-approval-v9.json"
 
 
 def test_authenticated_policy_and_key_creator_use_only_captured_modules(
@@ -1479,16 +1480,16 @@ def test_quarantine_failure_preserves_primary_and_quarantine_errors(tmp_path: Pa
 
 def test_recovery_epoch_identifiers_and_approval_leaf_are_exact():
     module = _module()
-    assert module.CURRENT_APPROVAL_LEAF == "current-state-approval-v8.json"
-    assert module.RUN_ID == "41ed4e09bd7b4af1793d3138e5d55d22d217d5fd4bd9477493d885e42fae1602"
+    assert module.CURRENT_APPROVAL_LEAF == "current-state-approval-v9.json"
+    assert module.RUN_ID == "0ea09388c6a3b52a722727e00135191c10a09b7652aaa3c31918a19f5ccea5db"
     assert {
         "acquisition": module.ACQUISITION_REQUEST_ID,
         "phase_preparation": module.PHASE_PREPARATION_REQUEST_ID,
         "one_touch": module.ONE_TOUCH_REQUEST_ID,
     } == {
-        "acquisition": "3377aca77e4edead9454051883d015c15389ffb0da06d63ec9e76ee2573252ec",
-        "phase_preparation": "a89b7872357feaee131c9bdbf4d78312ad86e7d4da90c7d2441d2d9cd2b43bac",
-        "one_touch": "30f6eafb4f0023c602c54bab8719ce105b2c28d07c7511cb5d9db42936f49d5c",
+        "acquisition": "7d11aa88513b3e2b649fac0dc517f8e13fab246b58d9c244f138d0a919a600f1",
+        "phase_preparation": "b4c2f5e8c954dc6aff5c757780c7aef8ff0ca1378fdd368e8fc8ea29491832ec",
+        "one_touch": "ec426deceeed57c9b22ac1772f3afe03f7ac6262a8028502cb843eb7e4e599bb",
     }
 
 
@@ -1606,3 +1607,479 @@ def test_persisted_probe_scope_cleanup_and_live_property_contract_is_explicit():
     assert "production_properties" in source
     assert "if link.is_symlink()" in source
     assert "probe_omits_production_prestart" in source
+
+
+def _run_mocked_persisted_probe(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, fail_probe: bool
+) -> dict[str, object]:
+    probe = _probe_module()
+    run_id = "a" * 64
+    root = tmp_path / "runs"
+    control_root = root / f"g056v8-controls-{run_id}"
+    evidence_root = root / f"g056v8-acquisition-evidence-{run_id}"
+    key_root = root / f"g056v8-keys-{run_id}"
+    admission_root = control_root / "admissions"
+    probe_admission_root = admission_root / "probe"
+    current = tmp_path / "current"
+    accepted = tmp_path / "accepted"
+    home = tmp_path / "home"
+    for path in (
+        control_root,
+        evidence_root,
+        key_root,
+        admission_root,
+        current,
+        accepted,
+        home,
+    ):
+        path.mkdir(parents=True)
+    approval = root / "current-state-approval-v9.json"
+    approval.write_text('{"approved":true}\n', encoding="utf-8")
+    (control_root / "COMPLETE.json").write_text('{"complete":true}\n', encoding="utf-8")
+    credential_path = key_root / "authority.private"
+    credential_path.write_bytes(b"persisted-private-key")
+    events: list[str] = []
+    signing_payloads: dict[str, dict[str, object]] = {}
+    wrapper_calls: list[dict[str, object]] = []
+    probe_state: dict[str, object] = {}
+    execution_alias = {"path": str(tmp_path / "execution-alias"), "target": str(root)}
+
+    class FakeControls:
+        RUN_ID = run_id
+        CURRENT = str(current)
+        ACCEPTED = str(accepted)
+        EXECUTABLE_PINS = {
+            name: {"path": sys.executable}
+            for name in ("current_python", "accepted_python", "telemetry_script")
+        }
+        _RUNTIME_NAMES = ("current_python", "accepted_python", "telemetry_script")
+        _MOUNT_IDENTITY_CODE = "verify-final-namespace"
+
+        @staticmethod
+        def _file(path: Path) -> dict[str, object]:
+            resolved = Path(path)
+            payload = resolved.read_bytes()
+            return {
+                "path": str(resolved),
+                "sha256": hashlib.sha256(payload).hexdigest(),
+                "size": len(payload),
+            }
+
+        @staticmethod
+        def _directory(path: Path, private: bool = False) -> dict[str, object]:
+            return {"path": str(path), "private": private}
+
+        @staticmethod
+        def _execution_alias() -> dict[str, str]:
+            return execution_alias
+
+        @staticmethod
+        def _load_canonical(path: Path) -> object:
+            return json.loads(Path(path).read_text(encoding="utf-8"))
+
+        @staticmethod
+        def _key_bindings(_key_root: Path):
+            return (
+                {"key_id": "authority-key", "public_key_b64": "authority-public"},
+                [],
+                {},
+                {},
+            )
+
+        @staticmethod
+        def _preflight_executables(paths: dict[str, Path]) -> dict[str, dict[str, str]]:
+            return {
+                name: {"path": str(path), "sha256": hashlib.sha256(name.encode()).hexdigest()}
+                for name, path in paths.items()
+            }
+
+        @staticmethod
+        def _inventory(path: Path) -> dict[str, str]:
+            return {"root": str(path), "state": "stable"}
+
+        @staticmethod
+        def _ignored_source_inventory(path: Path) -> dict[str, str]:
+            return {"root": str(path), "state": "stable-ignored"}
+
+        @staticmethod
+        def _runtime_inventory(runtime: dict[str, str]) -> dict[str, str]:
+            return {"path": runtime["path"], "state": "stable-runtime"}
+
+        @staticmethod
+        def _record(value: object) -> object:
+            return value.decode("utf-8") if isinstance(value, bytes) else value
+
+        @staticmethod
+        def _git(_root: Path, *_args: str) -> bytes:
+            return b"accepted-head\n"
+
+        @staticmethod
+        def _source_git(_root: Path, *_args: str) -> bytes:
+            return b""
+
+        @staticmethod
+        def _create_root(path: Path) -> None:
+            path.mkdir(mode=0o700)
+
+        @staticmethod
+        def _wrap_execstart(
+            argv: list[str],
+            bind_paths: list[str],
+            *,
+            receipt: str,
+            unit_name: str,
+            authority_public_b64: str,
+        ) -> list[str]:
+            wrapper_calls.append(
+                {
+                    "argv": list(argv),
+                    "bind_paths": list(bind_paths),
+                    "receipt": receipt,
+                    "unit_name": unit_name,
+                    "authority_public_b64": authority_public_b64,
+                }
+            )
+            return ["/usr/bin/python3", "-I", "-S", "-c", "wrapped", *argv]
+
+        @staticmethod
+        def _validate_unit(_unit: dict[str, object]) -> None:
+            return None
+
+        @staticmethod
+        def _render_systemd_unit(unit: dict[str, object]) -> bytes:
+            return probe._canonical(unit)
+
+        @staticmethod
+        def _credential_argument(name: str) -> str:
+            return f"%d/{name}"
+
+    controls = FakeControls()
+    final_receipt = admission_root / "launch-admission-acquisition.json"
+    wrapper_config = json.dumps(
+        {
+            "receipt": str(final_receipt),
+            "unit_name": "alpha-max-authority.service",
+            "authority_public_b64": "authority-public",
+        },
+        sort_keys=True,
+    )
+    definition = {
+        "Unit": {"Description": "mock persisted authority"},
+        "Service": {
+            "ExecStartPre": ["/usr/bin/true"],
+            "ExecStart": [
+                "/usr/bin/python3",
+                "-I",
+                "-S",
+                "-c",
+                controls._MOUNT_IDENTITY_CODE,
+                wrapper_config,
+                "/usr/bin/true",
+            ],
+            "ExecStopPost": [
+                "/usr/bin/python3",
+                "-I",
+                "-S",
+                "-c",
+                "cleanup",
+                "{}",
+                "/usr/bin/true",
+            ],
+            "BindPaths": [f"{credential_path.parent}:/runtime-keys"],
+            "WorkingDirectory": "/",
+            "UMask": "0077",
+            "MemoryHigh": 1,
+            "MemoryMax": 2,
+            "MemorySwapMax": 3,
+            "OOMPolicy": "kill",
+        },
+    }
+    production_name = "alpha-max-authority.service"
+    unit_path = control_root / production_name
+    unit_path.write_bytes(controls._render_systemd_unit(definition))
+    credential = {
+        "name": "authority.private",
+        "target": "authority.private",
+        "source": controls._file(credential_path),
+    }
+    plan_path = control_root / "launch-plan.json"
+    plan = {
+        "rendered_systemd_units": {
+            "authority": {"file": controls._file(unit_path), "credential": credential}
+        },
+        "systemd_units": {"authority": {**definition, "name": production_name}},
+    }
+    plan_path.write_text(json.dumps(plan, sort_keys=True), encoding="utf-8")
+    manifest = {
+        "admission_root": controls._directory(admission_root, private=True),
+        "execution_alias": controls._execution_alias(),
+        "launch_plan": {"path": str(plan_path)},
+    }
+    (control_root / "manifest.json").write_text(
+        json.dumps(manifest, sort_keys=True), encoding="utf-8"
+    )
+    topology = {
+        "schema": "alpha_max_v8_persisted_unit_probe.v1",
+        "verdict": "PASS",
+        "requested_scope": "acquisition",
+        "stages": ["acquisition"],
+        "units": [
+            {
+                "scope": "acquisition",
+                "role": "authority",
+                "unit": controls._file(unit_path),
+                "credential": credential,
+                "definition": definition,
+                "production_unit": production_name,
+            }
+        ],
+        "control_artifacts": [controls._file(control_root / "COMPLETE.json")],
+    }
+    production_properties = {
+        "FragmentPath": str(unit_path),
+        "ExecStart": "configured",
+        "ExecStartPre": "configured",
+        "WorkingDirectory": "/",
+        "UMask": "0077",
+        "MemoryHigh": "1",
+        "MemoryMax": "2",
+        "MemorySwapMax": "3",
+        "OOMPolicy": "kill",
+    }
+    verify_calls = 0
+    property_calls = 0
+
+    def fake_verify(*_args, **_kwargs):
+        nonlocal verify_calls
+        verify_calls += 1
+        events.append(f"verify:{verify_calls}")
+        return json.loads(json.dumps(topology))
+
+    def fake_properties(unit_name: str) -> dict[str, str]:
+        nonlocal property_calls
+        assert unit_name == production_name
+        property_calls += 1
+        events.append(f"properties:{property_calls}")
+        return dict(production_properties)
+
+    def fake_sign(
+        controls_arg,
+        target_root: Path,
+        _evidence_root: Path,
+        _key_root: Path,
+        _authority: dict[str, object],
+        payload: dict[str, object],
+        requested_scope: str,
+    ) -> dict[str, object]:
+        assert controls_arg is controls
+        label = "probe" if target_root == probe_admission_root else "final"
+        events.append(f"sign:{label}")
+        signing_payloads[label] = json.loads(json.dumps(payload))
+        payload_path = target_root / f"launch-admission-{requested_scope}.payload.json"
+        signature_path = target_root / f"launch-admission-{requested_scope}.signature"
+        envelope_path = target_root / f"launch-admission-{requested_scope}.json"
+        probe._write_new(payload_path, probe._canonical(payload))
+        probe._write_new(signature_path, b"s" * 64)
+        envelope = {
+            "payload": payload,
+            "payload_file": controls._file(payload_path),
+            "signature_file": controls._file(signature_path),
+        }
+        probe._write_new(envelope_path, probe._canonical(envelope))
+        return envelope
+
+    def fake_probe_execstart(
+        _controls,
+        credential_name: str,
+        _credential_target: str,
+        expected_sha256: str,
+        marker: Path,
+        release: Path,
+        requested_scope: str,
+        role: str,
+        request: str,
+        key_id: str,
+        approval_path: Path,
+    ) -> list[str]:
+        probe_state.update(
+            {
+                "credential_name": credential_name,
+                "expected_sha256": expected_sha256,
+                "marker": marker,
+                "release": release,
+                "scope": requested_scope,
+                "role": role,
+                "request": request,
+                "key_id": key_id,
+                "approval": approval_path,
+            }
+        )
+        return ["/usr/bin/true"]
+
+    def fake_run(*args: str, check: bool = True) -> SimpleNamespace:
+        command = tuple(args)
+        if command[:3] == ("systemctl", "--user", "show"):
+            unit_name = command[3]
+            if unit_name == production_name:
+                return SimpleNamespace(stdout="ActiveState=inactive\n")
+            release = probe_state.get("release")
+            if isinstance(release, Path) and release.exists():
+                return SimpleNamespace(
+                    stdout="Result=success\nExecMainStatus=0\nActiveState=inactive\n"
+                )
+            return SimpleNamespace(
+                stdout=(
+                    "Result=success\n"
+                    "ExecMainStatus=0\n"
+                    "ActiveState=active\n"
+                    "MemoryHigh=1\n"
+                    "MemoryMax=2\n"
+                    "MemorySwapMax=3\n"
+                    "OOMPolicy=kill\n"
+                    "LoadCredential=authority.private\n"
+                    "ExecStart=configured\n"
+                    "RestrictAddressFamilies=AF_UNIX\n"
+                    "IPAddressDeny=any\n"
+                    "ControlGroup=/fake\n"
+                )
+            )
+        if command[:3] == ("systemctl", "--user", "start"):
+            events.append("start:probe")
+            if fail_probe:
+                raise RuntimeError("injected probe start failure")
+            marker = probe_state["marker"]
+            assert isinstance(marker, Path)
+            marker.write_text(
+                json.dumps(
+                    {
+                        "credential_sha256": probe_state["expected_sha256"],
+                        "scope": probe_state["scope"],
+                        "role": probe_state["role"],
+                        "credential_mode": 0o400,
+                        "request": probe_state["request"],
+                        "approval": str(probe_state["approval"]),
+                        "key_id": probe_state["key_id"],
+                        "credential_path": (
+                            f"/run/credentials/{command[3]}/{probe_state['credential_name']}"
+                        ),
+                    }
+                ),
+                encoding="utf-8",
+            )
+        return SimpleNamespace(stdout="")
+
+    cgroup_content = {
+        "/sys/fs/cgroup/fake/cgroup.events": "populated 1\n",
+        "/sys/fs/cgroup/fake/memory.events": (
+            "high 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\n"
+        ),
+        "/sys/fs/cgroup/fake/memory.high": "1\n",
+        "/sys/fs/cgroup/fake/memory.max": "2\n",
+        "/sys/fs/cgroup/fake/memory.swap.max": "3\n",
+        "/sys/fs/cgroup/fake/memory.oom.group": "1\n",
+    }
+    real_is_file = Path.is_file
+    real_read_text = Path.read_text
+
+    def fake_is_file(path: Path) -> bool:
+        return str(path) in cgroup_content or real_is_file(path)
+
+    def fake_read_text(path: Path, *args, **kwargs) -> str:
+        if str(path) in cgroup_content:
+            return cgroup_content[str(path)]
+        return real_read_text(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: home))
+    monkeypatch.setattr(Path, "is_file", fake_is_file)
+    monkeypatch.setattr(Path, "read_text", fake_read_text)
+    monkeypatch.setattr(probe, "_controls", lambda: controls)
+    monkeypatch.setattr(probe, "verify_persisted_topology", fake_verify)
+    monkeypatch.setattr(probe, "_production_properties", fake_properties)
+    monkeypatch.setattr(probe, "_sign_launch_admission", fake_sign)
+    monkeypatch.setattr(probe, "_persisted_probe_execstart", fake_probe_execstart)
+    monkeypatch.setattr(probe, "_run", fake_run)
+
+    if fail_probe:
+        with pytest.raises(RuntimeError, match="injected probe start failure"):
+            probe.execute_persisted_topology(
+                control_root, key_root, approval, evidence_root, "acquisition"
+            )
+        result = None
+    else:
+        result = probe.execute_persisted_topology(
+            control_root, key_root, approval, evidence_root, "acquisition"
+        )
+    return {
+        "result": result,
+        "events": events,
+        "signing_payloads": signing_payloads,
+        "wrapper_calls": wrapper_calls,
+        "topology": topology,
+        "production_properties": production_properties,
+        "probe_receipt": probe_admission_root / "launch-admission-acquisition.json",
+        "final_receipt": final_receipt,
+        "audit": evidence_root / "launch-admission-acquisition.audit.json",
+        "definition": definition,
+    }
+
+
+def test_persisted_probe_bootstraps_then_revalidates_final_admission(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    observed = _run_mocked_persisted_probe(tmp_path, monkeypatch, fail_probe=False)
+    events = observed["events"]
+    assert isinstance(events, list)
+    assert events.index("sign:probe") < events.index("start:probe")
+    assert events.index("start:probe") < events.index("verify:2")
+    assert events.index("verify:2") < events.index("properties:2")
+    assert events.index("properties:2") < events.index("sign:final")
+
+    payloads = observed["signing_payloads"]
+    assert isinstance(payloads, dict)
+    provisional = payloads["probe"]
+    final = payloads["final"]
+    assert provisional["schema"] == "alpha_max_v8_persisted_probe_preflight_admission.v1"
+    assert provisional["verdict"] == "PROBE_ONLY"
+    assert provisional["requested_scope"] == "acquisition"
+    assert provisional["units"] == []
+    assert provisional["topology"]["units"]
+    assert provisional["control_artifacts"]
+
+    probe_receipt = observed["probe_receipt"]
+    assert isinstance(probe_receipt, Path)
+    wrappers = observed["wrapper_calls"]
+    assert isinstance(wrappers, list)
+    assert len(wrappers) == 2
+    assert {wrapper["receipt"] for wrapper in wrappers} == {str(probe_receipt)}
+    definition = observed["definition"]
+    assert isinstance(definition, dict)
+    production_config = json.loads(definition["Service"]["ExecStart"][5])
+    assert production_config["receipt"] == str(observed["final_receipt"])
+
+    assert final["schema"] == "alpha_max_v8_persisted_probe_launch_admission.v1"
+    assert final["verdict"] == "PASS"
+    assert final["topology"] == observed["topology"]
+    assert final["production_properties"] == {
+        "alpha-max-authority.service": observed["production_properties"]
+    }
+    assert final["units"][0]["probe_omits_production_prestart"] is True
+    assert set(final["probe_admission"]) == {"payload", "signature", "envelope"}
+    assert all(
+        identity in final["control_artifacts"] for identity in final["probe_admission"].values()
+    )
+    assert observed["result"]["payload"] == final
+    assert observed["final_receipt"].is_file()
+    assert observed["audit"].is_file()
+
+
+def test_persisted_probe_failure_never_publishes_final_admission(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    observed = _run_mocked_persisted_probe(tmp_path, monkeypatch, fail_probe=True)
+    assert observed["events"].count("sign:probe") == 1
+    assert "sign:final" not in observed["events"]
+    assert "verify:2" not in observed["events"]
+    assert list(observed["signing_payloads"]) == ["probe"]
+    assert observed["probe_receipt"].is_file()
+    assert not observed["final_receipt"].exists()
+    assert not observed["audit"].exists()

@@ -522,6 +522,7 @@ def _execute_persisted_topology(
     expected_evidence = control_root.parent / f"g056v8-acquisition-evidence-{controls.RUN_ID}"
     manifest = controls._load_canonical(control_root / "manifest.json")
     admission_root = control_root / "admissions"
+    probe_admission_root = admission_root / "probe"
     admission_paths = [
         admission_root / f"launch-admission-{requested_scope}{suffix}"
         for suffix in (".payload.json", ".signature", ".json")
@@ -535,6 +536,8 @@ def _execute_persisted_topology(
         or manifest.get("admission_root") != controls._directory(admission_root, private=True)
         or manifest.get("execution_alias") != controls._execution_alias()
         or any(path.exists() or path.is_symlink() for path in [*admission_paths, audit_path])
+        or probe_admission_root.exists()
+        or probe_admission_root.is_symlink()
     ):
         raise ValueError(
             "persisted probe roots must be the declared fresh production evidence and admission paths"
@@ -610,6 +613,85 @@ def _execute_persisted_topology(
                 link.unlink()
         _run("systemctl", "--user", "daemon-reload", check=False)
         raise
+
+    def admission_snapshot(
+        topology: dict[str, Any], properties: dict[str, dict[str, str]]
+    ) -> dict[str, Any]:
+        runtime_inputs = controls._preflight_executables(
+            {
+                "current_python": Path(controls.EXECUTABLE_PINS["current_python"]["path"]),
+                "accepted_python": Path(controls.EXECUTABLE_PINS["accepted_python"]["path"]),
+                "telemetry_script": Path(controls.EXECUTABLE_PINS["telemetry_script"]["path"]),
+            }
+        )
+        accepted_root = Path(controls.ACCEPTED)
+        return {
+            "approval": controls._file(approval),
+            "complete": controls._file(control_root / "COMPLETE.json"),
+            "manifest": controls._file(control_root / "manifest.json"),
+            "requested_scope": requested_scope,
+            "stages": list(selected),
+            "topology": topology,
+            "control_artifacts": topology["control_artifacts"],
+            "source_inventory": controls._record(controls._inventory(Path(controls.CURRENT))),
+            "ignored_source_inventory": controls._record(
+                controls._ignored_source_inventory(Path(controls.CURRENT))
+            ),
+            "accepted_source_state": {
+                "root": controls.ACCEPTED,
+                "head": controls._git(accepted_root, "rev-parse", "HEAD").decode().strip(),
+                "porcelain": controls._record(
+                    controls._source_git(accepted_root, "status", "--porcelain=v1", "-z")
+                ),
+                "source_inventory": controls._record(controls._inventory(accepted_root)),
+                "ignored_source_inventory": controls._record(
+                    controls._ignored_source_inventory(accepted_root)
+                ),
+            },
+            "runtime_inventories": {
+                name: controls._record(controls._runtime_inventory(runtime_inputs[name]))
+                for name in controls._RUNTIME_NAMES
+            },
+            "execution_alias": controls._execution_alias(),
+            "production_properties": properties,
+            "runtime_bindings": {
+                name: {
+                    "interpreter": runtime_inputs[name],
+                    "root": str(Path(controls.EXECUTABLE_PINS[name]["path"]).parent.parent),
+                }
+                for name in controls._RUNTIME_NAMES
+            },
+        }
+
+    common_admission = admission_snapshot(verified, production_properties)
+    controls._create_root(probe_admission_root)
+    probe_payload = {
+        "schema": "alpha_max_v8_persisted_probe_preflight_admission.v1",
+        "verdict": "PROBE_ONLY",
+        **common_admission,
+        "units": [],
+    }
+    signed_probe_admission = _sign_launch_admission(
+        controls,
+        probe_admission_root,
+        evidence_root,
+        key_root,
+        authority,
+        probe_payload,
+        requested_scope,
+    )
+    if signed_probe_admission.get("payload") != probe_payload:
+        raise RuntimeError("probe launch-admission signer readback mismatch")
+    probe_receipt = probe_admission_root / f"launch-admission-{requested_scope}.json"
+    probe_artifacts = {
+        "payload": controls._file(
+            probe_admission_root / f"launch-admission-{requested_scope}.payload.json"
+        ),
+        "signature": controls._file(
+            probe_admission_root / f"launch-admission-{requested_scope}.signature"
+        ),
+        "envelope": controls._file(probe_receipt),
+    }
     for index, (scope, role, original, credential, request, production_name) in enumerate(
         definitions
     ):
@@ -640,7 +722,7 @@ def _execute_persisted_topology(
             service["ExecStopPost"] = controls._wrap_execstart(
                 stop[-len(original["Service"]["ExecStopPost"][6:]) :],
                 [binding.split(":", 1)[1] for binding in service.get("BindPaths", [])],
-                receipt=wrapper_config["receipt"],
+                receipt=str(probe_receipt),
                 unit_name=wrapper_config["unit_name"],
                 authority_public_b64=wrapper_config["authority_public_b64"],
             )
@@ -667,7 +749,7 @@ def _execute_persisted_topology(
         service["ExecStart"] = controls._wrap_execstart(
             probe_argv,
             [binding.split(":", 1)[1] for binding in service.get("BindPaths", [])],
-            receipt=wrapper_config["receipt"],
+            receipt=str(probe_receipt),
             unit_name=wrapper_config["unit_name"],
             authority_public_b64=wrapper_config["authority_public_b64"],
         )
@@ -836,71 +918,26 @@ def _execute_persisted_topology(
                 "probe_unit_sha256": hashlib.sha256(probe_unit).hexdigest(),
             }
         )
+    final_verified = verify_persisted_topology(control_root, key_root, approval, requested_scope)
+    final_properties = {
+        entry["unit"]["path"].rsplit("/", 1)[-1]: _production_properties(
+            entry["unit"]["path"].rsplit("/", 1)[-1]
+        )
+        for entry in final_verified["units"]
+    }
+    final_common_admission = admission_snapshot(final_verified, final_properties)
+    if final_verified != verified or final_common_admission != common_admission:
+        raise RuntimeError("launch-admission state drifted during persisted probes")
     aggregate = {
         "schema": "alpha_max_v8_persisted_probe_launch_admission.v1",
         "verdict": "PASS",
-        "approval": controls._file(approval),
-        "complete": controls._file(control_root / "COMPLETE.json"),
-        "manifest": controls._file(control_root / "manifest.json"),
-        "requested_scope": requested_scope,
-        "stages": list(selected),
-        "topology": verified,
-        "control_artifacts": verified["control_artifacts"],
+        **final_common_admission,
+        "control_artifacts": [
+            *final_common_admission["control_artifacts"],
+            *probe_artifacts.values(),
+        ],
         "units": receipts,
-        "source_inventory": controls._record(controls._inventory(Path(controls.CURRENT))),
-        "ignored_source_inventory": controls._record(
-            controls._ignored_source_inventory(Path(controls.CURRENT))
-        ),
-        "accepted_source_state": {
-            "root": controls.ACCEPTED,
-            "head": controls._git(Path(controls.ACCEPTED), "rev-parse", "HEAD").decode().strip(),
-            "porcelain": controls._record(
-                controls._source_git(Path(controls.ACCEPTED), "status", "--porcelain=v1", "-z")
-            ),
-            "source_inventory": controls._record(controls._inventory(Path(controls.ACCEPTED))),
-            "ignored_source_inventory": controls._record(
-                controls._ignored_source_inventory(Path(controls.ACCEPTED))
-            ),
-        },
-        "runtime_inventories": {
-            name: controls._record(
-                controls._runtime_inventory(
-                    controls._preflight_executables(
-                        {
-                            "current_python": Path(
-                                controls.EXECUTABLE_PINS["current_python"]["path"]
-                            ),
-                            "accepted_python": Path(
-                                controls.EXECUTABLE_PINS["accepted_python"]["path"]
-                            ),
-                            "telemetry_script": Path(
-                                controls.EXECUTABLE_PINS["telemetry_script"]["path"]
-                            ),
-                        }
-                    )[name]
-                )
-            )
-            for name in controls._RUNTIME_NAMES
-        },
-        "execution_alias": controls._execution_alias(),
-        "production_properties": production_properties,
-        "runtime_bindings": {
-            name: {
-                "interpreter": controls._preflight_executables(
-                    {
-                        "current_python": Path(controls.EXECUTABLE_PINS["current_python"]["path"]),
-                        "accepted_python": Path(
-                            controls.EXECUTABLE_PINS["accepted_python"]["path"]
-                        ),
-                        "telemetry_script": Path(
-                            controls.EXECUTABLE_PINS["telemetry_script"]["path"]
-                        ),
-                    }
-                )[name],
-                "root": str(Path(controls.EXECUTABLE_PINS[name]["path"]).parent.parent),
-            }
-            for name in controls._RUNTIME_NAMES
-        },
+        "probe_admission": probe_artifacts,
     }
     _write_new(audit_path, _canonical(aggregate), 0o600)
     signed = _sign_launch_admission(
