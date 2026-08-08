@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 import polars as pl
 import pytest
 from lumina_quant.backtesting.cli_contract import RawFirstDataMissingError
-from lumina_quant.market_data import load_data_dict_from_parquet
+from lumina_quant.market_data import MarketDataRepository, load_data_dict_from_parquet
 from lumina_quant.storage.parquet import ParquetMarketDataRepository
 
 
@@ -110,3 +110,57 @@ def test_raw_first_missing_symbol_is_fail_fast(tmp_path):
             timeframe="1s",
             data_mode="raw-first",
         )
+
+
+def test_facade_merges_direct_bars_into_partial_resampled_data(tmp_path):
+    start = datetime(2026, 6, 1, 0, 0, tzinfo=UTC)
+    second_minute = datetime(2026, 6, 1, 0, 1, tzinfo=UTC)
+    facade = MarketDataRepository(str(tmp_path))
+    facade.upsert_ohlcv(
+        exchange="binance",
+        symbol="BTC/USDT",
+        timeframe="1m",
+        rows=[
+            {
+                "timestamp_ms": int(start.timestamp() * 1000),
+                "open": 100.0,
+                "high": 101.0,
+                "low": 99.0,
+                "close": 100.5,
+                "volume": 10.0,
+            },
+            {
+                "timestamp_ms": int(second_minute.timestamp() * 1000),
+                "open": 101.0,
+                "high": 102.0,
+                "low": 100.0,
+                "close": 101.5,
+                "volume": 12.0,
+            },
+        ],
+    )
+    ParquetMarketDataRepository(str(tmp_path)).upsert_1s(
+        exchange="binance",
+        symbol="BTC/USDT",
+        rows=[
+            {
+                "datetime": start,
+                "open": 110.0,
+                "high": 111.0,
+                "low": 109.0,
+                "close": 110.5,
+                "volume": 2.0,
+            }
+        ],
+    )
+
+    loaded = facade.load_ohlcv(
+        exchange="binance",
+        symbol="BTC/USDT",
+        timeframe="1m",
+        start_date=start,
+        end_date=second_minute,
+    )
+
+    assert loaded.height == 2
+    assert loaded["close"].to_list() == [110.5, 101.5]

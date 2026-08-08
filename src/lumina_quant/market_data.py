@@ -1342,22 +1342,29 @@ class MarketDataRepository:
         normalized_exchange = _normalize_exchange(exchange)
         normalized_symbol = normalize_symbol(symbol)
         with self._parquet_repo.generation_lock(exclusive=False) as physical_root:
-            merged = self._parquet_repo.load_ohlcv(
+            resampled = self._parquet_repo.load_ohlcv(
                 exchange=normalized_exchange,
                 symbol=normalized_symbol,
                 timeframe=timeframe_token,
                 start_date=start_date,
                 end_date=end_date,
             )
-            if not merged.is_empty():
-                return merged
-            return _load_direct_ohlcv(
+            direct = _load_direct_ohlcv(
                 physical_root,
                 exchange=normalized_exchange,
                 symbol=normalized_symbol,
                 timeframe=timeframe_token,
                 start_date=start_date,
                 end_date=end_date,
+            )
+            if resampled.is_empty():
+                return direct
+            if direct.is_empty():
+                return resampled
+            return (
+                pl.concat([direct, resampled], how="vertical")
+                .unique(subset=["datetime"], keep="last", maintain_order=True)
+                .sort("datetime")
             )
 
     def load_ohlcv_1s(
