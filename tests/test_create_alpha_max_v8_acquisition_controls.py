@@ -981,7 +981,7 @@ def test_import_is_stdlib_only_and_policy_constants_are_local():
     assert not hasattr(module, "policy")
     assert module._SCOPES == ("acquisition", "phase_preparation", "one_touch")
     assert module._FILE_ROLES[0] == "policy_json"
-    assert module.CURRENT_APPROVAL_LEAF == "current-state-approval-v13.json"
+    assert module.CURRENT_APPROVAL_LEAF == "current-state-approval-v14.json"
 
 
 def test_authenticated_policy_and_key_creator_use_only_captured_modules(
@@ -1555,16 +1555,16 @@ def test_quarantine_failure_preserves_primary_and_quarantine_errors(tmp_path: Pa
 
 def test_recovery_epoch_identifiers_and_approval_leaf_are_exact():
     module = _module()
-    assert module.CURRENT_APPROVAL_LEAF == "current-state-approval-v13.json"
-    assert module.RUN_ID == "482f9e03e246eda50641d06d81dcf17084799e7815656361bb62663dd1f149ea"
+    assert module.CURRENT_APPROVAL_LEAF == "current-state-approval-v14.json"
+    assert module.RUN_ID == "7359f1a8bc9f658d6778e152de1664199f517d069c30f4fae9866b76ddca3de4"
     assert {
         "acquisition": module.ACQUISITION_REQUEST_ID,
         "phase_preparation": module.PHASE_PREPARATION_REQUEST_ID,
         "one_touch": module.ONE_TOUCH_REQUEST_ID,
     } == {
-        "acquisition": "4d55958bf9387a63f1ce77f38e7e063909a550fce66aff873fc1d3b85851d152",
-        "phase_preparation": "2e1d21418d6e1a24ffbc9ebcc6f042ab5a9a5743f0512a11704f8a43782a765d",
-        "one_touch": "bd12f06acde927fa1284d92b1efe2e1cbd4606a7cf1f1f9fb1a0cab933b8e514",
+        "acquisition": "7420631e32720073838a1b838b5e9a6df37dee9ba14583487e801a9a21bf736f",
+        "phase_preparation": "d55e5232b72540e0e3480841ad982c1e8fc2a07fe461c612bd10b1a9a19b1955",
+        "one_touch": "baf8c6a6204991629fd101985c8bc98bdc08ae97dde0d25fd06550db7d3fdeca",
     }
 
 
@@ -1718,7 +1718,7 @@ def _run_mocked_persisted_probe(
         home,
     ):
         path.mkdir(parents=True)
-    approval = root / "current-state-approval-v13.json"
+    approval = root / "current-state-approval-v14.json"
     approval.write_text('{"approved":true}\n', encoding="utf-8")
     (control_root / "COMPLETE.json").write_text('{"complete":true}\n', encoding="utf-8")
     credential_path = key_root / "authority.private"
