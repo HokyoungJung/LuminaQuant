@@ -57,6 +57,7 @@ TEST_SCOPE_CONTRACT = {
             "source_eligible_receipt",
             "source_manifest",
             "source_journal",
+            "canonical_finalize_receipt",
         ),
         "commands": (("phase_handoff_receipt", "preparation_manifest"),),
     },
@@ -134,6 +135,7 @@ def test_public_wire_domain_shapes_and_verifier_signature_are_frozen() -> None:
     assert terminal_policy.MESSAGE_SIGNATURE_FIELDS == {
         "challenge": "authority_signature_b64",
         "observer_proof": "observer_signature_b64",
+        "publication_observer_ready": "observer_signature_b64",
         "authorization": "authority_signature_b64",
         "command_clearance": "authority_signature_b64",
         "process_event": "observer_signature_b64",
@@ -974,3 +976,286 @@ def test_authorization_epoch_window_is_structural_and_bounded(expires: str) -> N
         authorization_epoch_window(
             {"not_before_utc": "2026-07-24T01:00:00Z", "expires_utc": expires}
         )
+
+
+def test_three_scope_contracts_are_distinct_and_fail_closed() -> None:
+    acquisition = terminal_policy.scope_contract("acquisition")
+    phase = terminal_policy.scope_contract("phase_preparation")
+    one_touch = terminal_policy.scope_contract("one_touch")
+    assert acquisition[0] == ("checkpoint_pin", "alignment_receipt")
+    assert phase[0][-4:] == (
+        "source_eligible_receipt",
+        "source_manifest",
+        "source_journal",
+        "canonical_finalize_receipt",
+    )
+    assert one_touch[0][-2:] == ("phase_handoff_receipt", "preparation_manifest")
+    assert len({acquisition, phase, one_touch}) == 3
+    with pytest.raises(TerminalPolicyError, match="unknown scope"):
+        terminal_policy.scope_contract("stale")
+
+
+def test_canonical_inventory_ignores_only_mutable_publication_controls(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "generation"
+    data = root / "market_ohlcv_1s/binance/BTCUSDT/2026-04.parquet"
+    data.parent.mkdir(parents=True)
+    data.write_bytes(b"parquet")
+    baseline = terminal_policy.alpha_max_canonical_inventory_sha256(root)
+
+    evidence = root / ".alpha_max_publication/request/evidence.json"
+    evidence.parent.mkdir(parents=True)
+    evidence.write_bytes(b"evidence")
+    (root / "commit.json").write_bytes(b"commit")
+    lock = root / "market_data_raw_aggtrades/binance/BTCUSDT/.raw-stream.lock"
+    lock.parent.mkdir(parents=True)
+    lock.touch()
+    os.link(data, tmp_path / "retained-hardlink")
+
+    assert terminal_policy.alpha_max_canonical_inventory_sha256(root) == baseline
+
+    unapproved_lock = data.parent / "not-a-month.lock"
+    unapproved_lock.write_bytes(b"not coordination")
+    assert terminal_policy.alpha_max_canonical_inventory_sha256(root) != baseline
+
+
+def test_canonical_inventory_rechecks_retained_hardlink_content(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "generation"
+    data = root / "market_ohlcv_1s/binance/BTCUSDT/2026-04.parquet"
+    data.parent.mkdir(parents=True)
+    data.write_bytes(b"parquet")
+    external = tmp_path / "retained-hardlink"
+    os.link(data, external)
+    original_lseek = terminal_policy.os.lseek
+    mutated = False
+
+    def mutate_after_initial_hash(fd: int, offset: int, whence: int) -> int:
+        nonlocal mutated
+        if (
+            not mutated
+            and offset == 0
+            and whence == os.SEEK_SET
+            and terminal_policy.os.fstat(fd).st_ino == data.stat().st_ino
+        ):
+            mutated = True
+            external.write_bytes(b"PARQUET")
+        return original_lseek(fd, offset, whence)
+
+    monkeypatch.setattr(terminal_policy.os, "lseek", mutate_after_initial_hash)
+    with pytest.raises(TerminalPolicyError, match="canonical generation changed"):
+        terminal_policy.alpha_max_canonical_inventory_sha256(root)
+
+
+def test_canonical_inventory_fails_before_descriptor_exhaustion(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "generation"
+    data = root / "market_ohlcv_1s/binance/BTCUSDT/2026-04.parquet"
+    data.parent.mkdir(parents=True)
+    data.write_bytes(b"parquet")
+    monkeypatch.setattr(terminal_policy.resource, "getrlimit", lambda _resource: (257, 257))
+    with pytest.raises(TerminalPolicyError, match="descriptor budget is exhausted"):
+        terminal_policy.alpha_max_canonical_inventory_sha256(root)
+
+
+def test_canonical_inventory_rechecks_nested_directory_binding(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "generation"
+    nested = root / "market_ohlcv_1s/binance/BTCUSDT"
+    nested.mkdir(parents=True)
+    (nested / "2026-04.parquet").write_bytes(b"parquet")
+    original_lseek = terminal_policy.os.lseek
+    exchanged = False
+
+    def exchange_during_final_rehash(fd: int, offset: int, whence: int) -> int:
+        nonlocal exchanged
+        if not exchanged and offset == 0 and whence == os.SEEK_SET:
+            exchanged = True
+            nested.rename(root / "retired")
+            nested.mkdir()
+        return original_lseek(fd, offset, whence)
+
+    monkeypatch.setattr(terminal_policy.os, "lseek", exchange_during_final_rehash)
+    with pytest.raises(TerminalPolicyError, match="canonical generation changed"):
+        terminal_policy.alpha_max_canonical_inventory_sha256(root)
+
+
+def test_canonical_inventory_closes_file_fd_before_transfer(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "generation"
+    data = root / "market_ohlcv_1s/binance/BTCUSDT/2026-04.parquet"
+    data.parent.mkdir(parents=True)
+    data.write_bytes(b"parquet")
+    original_record = terminal_policy._canonical_regular_file_record
+    original_close = terminal_policy.os.close
+    opened: list[int] = []
+    closes: list[int] = []
+
+    def capture_record(*args: object) -> tuple[dict[str, object], int]:
+        record, fd = original_record(*args)
+        opened.append(fd)
+        return record, fd
+
+    def capture_close(fd: int) -> None:
+        if fd in opened:
+            closes.append(fd)
+        original_close(fd)
+
+    monkeypatch.setattr(terminal_policy, "_canonical_regular_file_record", capture_record)
+    monkeypatch.setattr(terminal_policy.os, "close", capture_close)
+    monkeypatch.setattr(
+        terminal_policy,
+        "is_alpha_max_coordination_lock",
+        lambda _path: (_ for _ in ()).throw(RuntimeError()),
+    )
+    with pytest.raises(RuntimeError):
+        terminal_policy.alpha_max_canonical_inventory_sha256(root)
+    assert closes == opened
+
+
+def test_canonical_inventory_outer_finally_owns_transferred_file_fd(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "generation"
+    data = root / "market_ohlcv_1s/binance/BTCUSDT/2026-04.parquet"
+    data.parent.mkdir(parents=True)
+    data.write_bytes(b"parquet")
+    os.symlink(tmp_path / "unsafe", root / "unsafe")
+    original_record = terminal_policy._canonical_regular_file_record
+    original_close = terminal_policy.os.close
+    opened: list[int] = []
+    closes: list[int] = []
+
+    def capture_record(*args: object) -> tuple[dict[str, object], int]:
+        record, fd = original_record(*args)
+        opened.append(fd)
+        return record, fd
+
+    def capture_close(fd: int) -> None:
+        if fd in opened:
+            closes.append(fd)
+        original_close(fd)
+
+    monkeypatch.setattr(terminal_policy, "_canonical_regular_file_record", capture_record)
+    monkeypatch.setattr(terminal_policy.os, "close", capture_close)
+    with pytest.raises(TerminalPolicyError, match="unsafe artifact"):
+        terminal_policy.alpha_max_canonical_inventory_sha256(root)
+    assert closes == opened
+
+
+def test_canonical_inventory_detects_same_size_content_mutation(tmp_path: Path) -> None:
+    root = tmp_path / "generation"
+    data = root / "market_ohlcv_1s/binance/BTCUSDT/2026-04.parquet"
+    data.parent.mkdir(parents=True)
+    data.write_bytes(b"parquet")
+    original_times = (data.stat().st_atime_ns, data.stat().st_mtime_ns)
+    baseline = terminal_policy.alpha_max_canonical_inventory_sha256(root)
+
+    data.write_bytes(b"PARQUET")
+    os.utime(data, ns=original_times)
+
+    assert terminal_policy.alpha_max_canonical_inventory_sha256(root) != baseline
+
+
+def test_canonical_inventory_rejects_symlinked_generation_entries(tmp_path: Path) -> None:
+    root = tmp_path / "generation"
+    root.mkdir()
+    os.symlink(tmp_path, root / "unsafe")
+    with pytest.raises(TerminalPolicyError, match="unsafe artifact"):
+        terminal_policy.alpha_max_canonical_inventory_sha256(root)
+
+
+@pytest.mark.parametrize(
+    "path",
+    (
+        "market_ohlcv_1s/binance/BTCUSDT/2026-04.lock",
+        "market_data_raw_aggtrades/binance/BTCUSDT/.raw-stream.lock",
+        "market_data_raw_aggtrades/binance/BTCUSDT/date=2024-02-29/.raw-partition.lock",
+        "feature_points/exchange=binance/symbol=BTCUSDT/date=2026-07-24/.writer.lock",
+    ),
+)
+def test_coordination_lock_grammar_accepts_only_writer_shapes(path: str) -> None:
+    assert terminal_policy.is_alpha_max_coordination_lock(path)
+
+
+@pytest.mark.parametrize(
+    "path",
+    (
+        "market_ohlcv_1s/binance/BTCUSDT/2026-00.lock",
+        "market_ohlcv_1s/binance/BTCUSDT/2026-13.lock",
+        "market_ohlcv_1s/-binance/BTCUSDT/2026-04.lock",
+        "market_ohlcv_1s/BINANCE/BTCUSDT/2026-04.lock",
+        "market_ohlcv_1s/binance/btcusdt/2026-04.lock",
+        "market_data_raw_aggtrades/binance/BTCUSDT/raw-stream.lock",
+        "market_data_raw_aggtrades/binance/BTCUSDT/date=/.raw-partition.lock",
+        "market_data_raw_aggtrades/binance/BTCUSDT/date=2026-02-30/.raw-partition.lock",
+        "feature_points/exchange=/symbol=BTCUSDT/date=2026-07-24/.writer.lock",
+        "feature_points/exchange=binance/symbol=/date=2026-07-24/.writer.lock",
+        "feature_points/exchange=binance/symbol=BTCUSDT/date=2026-07-32/.writer.lock",
+        "feature_points/exchange=binance/symbol=BTCUSDT/date=2026-07-24/writer.lock",
+    ),
+)
+def test_coordination_lock_grammar_rejects_adjacent_near_misses(path: str) -> None:
+    assert not terminal_policy.is_alpha_max_coordination_lock(path)
+
+
+def test_canonical_inventory_rejects_root_exchange_during_scan(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "generation"
+    replacement = tmp_path / "replacement"
+    for generation, payload in ((root, b"old"), (replacement, b"new")):
+        data = generation / "market_ohlcv_1s/binance/BTCUSDT/2026-04.parquet"
+        data.parent.mkdir(parents=True)
+        data.write_bytes(payload)
+    retired = tmp_path / "retired"
+    original = terminal_policy._canonical_regular_file_record
+    exchanged = False
+
+    def exchange_root(
+        directory_fd: int, name: str, before: os.stat_result, common: dict[str, object]
+    ) -> dict[str, object]:
+        nonlocal exchanged
+        if not exchanged:
+            exchanged = True
+            root.rename(retired)
+            replacement.rename(root)
+        return original(directory_fd, name, before, common)
+
+    monkeypatch.setattr(terminal_policy, "_canonical_regular_file_record", exchange_root)
+    with pytest.raises(TerminalPolicyError, match="changed during inventory"):
+        terminal_policy.alpha_max_canonical_inventory_sha256(root)
+
+
+def test_canonical_inventory_rejects_child_exchange_during_scan(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "generation"
+    child = root / "market_ohlcv_1s"
+    replacement = tmp_path / "replacement-market"
+    for generation, payload in ((child, b"old"), (replacement, b"new")):
+        data = generation / "binance/BTCUSDT/2026-04.parquet"
+        data.parent.mkdir(parents=True)
+        data.write_bytes(payload)
+    retired = tmp_path / "retired-market"
+    original = terminal_policy._canonical_regular_file_record
+    exchanged = False
+
+    def exchange_child(
+        directory_fd: int, name: str, before: os.stat_result, common: dict[str, object]
+    ) -> dict[str, object]:
+        nonlocal exchanged
+        if not exchanged:
+            exchanged = True
+            child.rename(retired)
+            replacement.rename(child)
+        return original(directory_fd, name, before, common)
+
+    monkeypatch.setattr(terminal_policy, "_canonical_regular_file_record", exchange_child)
+    with pytest.raises(TerminalPolicyError, match="changed during inventory"):
+        terminal_policy.alpha_max_canonical_inventory_sha256(root)

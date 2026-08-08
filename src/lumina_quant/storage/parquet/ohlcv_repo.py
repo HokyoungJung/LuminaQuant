@@ -1032,7 +1032,15 @@ class ParquetMarketDataRepository:
         receipt: Mapping[str, Any],
         public_key: bytes,
         entry: Mapping[str, Any],
+        expected_run_id: str,
+        expected_approval_sha256: str,
     ) -> dict[str, Any]:
+        for value, label in (
+            (expected_run_id, "trusted acquisition run ID"),
+            (expected_approval_sha256, "trusted approval digest"),
+        ):
+            if not isinstance(value, str) or re.fullmatch(r"[0-9a-f]{64}", value) is None:
+                raise SealedMonthlyPartitionConflictError(f"{label} is invalid")
         if not isinstance(public_key, bytes) or len(public_key) != 32:
             raise SealedMonthlyPartitionConflictError("Conflict authority public key is invalid")
         try:
@@ -1074,14 +1082,13 @@ class ParquetMarketDataRepository:
                 "wal_transition_receipt_sha256",
                 "wal_post_transition_inventory_sha256",
                 "signed_terminal_request_sha256",
+                "approval_sha256",
                 "entries",
             }
             or message.get("schema") != "alpha_max_canonical_conflict_authorization_message.v2"
             or message.get("scope") != "canonical_conflict_reconciliation"
             or message.get("decision") != "approve_exact_effects"
             or not isinstance(message.get("entries"), list)
-            or message.get("acquisition_run_id")
-            != "47eeac483e70d6af0784b873895024c8a2d01793a2447d3d3fbaa776d63bd2ad"
             or any(
                 not isinstance(message.get(field), str)
                 or re.fullmatch(r"[0-9a-f]{64}", message[field]) is None
@@ -1105,6 +1112,14 @@ class ParquetMarketDataRepository:
             raise SealedMonthlyPartitionConflictError(
                 "Conflict authorization signature is invalid"
             ) from exc
+        if message.get("acquisition_run_id") != expected_run_id:
+            raise SealedMonthlyPartitionConflictError(
+                "Conflict authorization acquisition run ID does not match trusted context"
+            )
+        if message.get("approval_sha256") != expected_approval_sha256:
+            raise SealedMonthlyPartitionConflictError(
+                "Conflict authorization approval digest does not match trusted context"
+            )
         matches = [
             candidate
             for candidate in message["entries"]
@@ -1157,6 +1172,8 @@ class ParquetMarketDataRepository:
         conflict_authorization_receipt: Mapping[str, Any],
         conflict_authority_public_key: bytes,
         authorization_entry: Mapping[str, Any],
+        expected_run_id: str,
+        expected_approval_sha256: str,
         max_output_bytes: int | None = None,
     ) -> Path:
         """Reconcile exact effects from one independently signed authorization entry."""
@@ -1164,6 +1181,8 @@ class ParquetMarketDataRepository:
             receipt=conflict_authorization_receipt,
             public_key=conflict_authority_public_key,
             entry=authorization_entry,
+            expected_run_id=expected_run_id,
+            expected_approval_sha256=expected_approval_sha256,
         )
         return self._merge_signed_month_into_candidate(
             exchange=exchange,

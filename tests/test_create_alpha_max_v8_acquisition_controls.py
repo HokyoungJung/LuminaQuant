@@ -15,10 +15,21 @@ from types import SimpleNamespace
 import pytest
 
 SCRIPT = Path(__file__).parents[1] / "scripts/research/create_alpha_max_v8_acquisition_controls.py"
+PROBE_SCRIPT = (
+    Path(__file__).parents[1] / "scripts/research/probe_alpha_max_v8_systemd_credential.py"
+)
 
 
 def _module():
     spec = importlib.util.spec_from_file_location("alpha_max_v8_controls", SCRIPT)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _probe_module():
+    spec = importlib.util.spec_from_file_location("alpha_max_v8_probe", PROBE_SCRIPT)
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -200,7 +211,7 @@ def test_key_bindings_use_one_snapshot_and_reject_late_replacement(
     root = tmp_path / "keys"
     root.mkdir(mode=0o700)
     originals = {}
-    for name in ("authority", *module._SCOPES):
+    for name in ("authority", "publication", *module._SCOPES):
         for kind in ("private", "public"):
             data = f"{name}-{kind}".encode().ljust(32, b"_")
             path = root / f"{name}.{kind}"
@@ -224,6 +235,7 @@ def test_key_bindings_use_one_snapshot_and_reject_late_replacement(
     monkeypatch.setattr(module, "_read_regular", replace_after_snapshot)
     authority, _, summary, key_files = module._key_bindings(root)
     assert authority["key_id"] == module._sha(originals[("authority", "public")])
+    assert summary["publication_key"]["key_id"] == module._sha(originals[("publication", "public")])
     assert summary["keys"][0]["public"] == key_files[0]["public"]
     with pytest.raises(ValueError, match="terminal key identity drift"):
         module._revalidate_key_files(key_files)
@@ -272,8 +284,147 @@ def test_inventory_includes_untracked_content_type_mode_and_size(
     ]
 
 
+def test_runtime_inventory_binds_regular_and_symlink_mutations(tmp_path: Path):
+    module = _module()
+    runtime = tmp_path / "venv"
+    executable = runtime / "bin" / "python"
+    package = runtime / "lib" / "package.py"
+    executable.parent.mkdir(parents=True)
+    package.parent.mkdir()
+    executable.write_bytes(b"python")
+    package.write_bytes(b"first")
+    link = runtime / "bin" / "package-link"
+    link.symlink_to("../lib/package.py")
+    identity = {"path": str(executable)}
+    initial = module._runtime_inventory(identity)
+    package.write_bytes(b"second")
+    assert module._runtime_inventory(identity) != initial
+    package.write_bytes(b"first")
+    link.unlink()
+    link.symlink_to("../lib/other.py")
+    with pytest.raises(ValueError, match="runtime symlink target is missing"):
+        module._runtime_inventory(identity)
+
+
+def test_ignored_importable_source_is_bound_by_approval_inventory(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    module = _module()
+    ignored = tmp_path / "src" / "ignored_import.py"
+    ignored.parent.mkdir()
+    ignored.write_text("value = 1\n")
+    monkeypatch.setattr(
+        module,
+        "_git",
+        lambda _root, *args: b"src/ignored_import.py\0" if "--ignored" in args else b"",
+    )
+    initial = module._ignored_source_inventory(tmp_path)
+    ignored.write_text("value = 2\n")
+    assert module._ignored_source_inventory(tmp_path) != initial
+    assert module._only_owner_session_runtime_changes(tmp_path)
+
+
+def test_source_approval_excludes_only_owner_session_runtime(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    module = _module()
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    source = repo / "source.py"
+    runtime = repo / module._OWNER_SESSION_RUNTIME_PATH / "state.json"
+    runtime.parent.mkdir(parents=True)
+    source.write_text("approved = True\n")
+    runtime.write_text('{"state":"initial"}\n')
+
+    def git(*args: str) -> str:
+        return module.subprocess.run(
+            ("git", *args),
+            cwd=repo,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+
+    git("init")
+    git("config", "user.name", "test")
+    git("config", "user.email", "test@example.com")
+    git("add", ".")
+    git("commit", "-m", "initial")
+    head = git("rev-parse", "HEAD")
+
+    recovery = tmp_path / "recovery"
+    recovery.mkdir()
+    approval_path = recovery / module.CURRENT_APPROVAL_LEAF
+    monkeypatch.setattr(module, "CURRENT", str(repo))
+    monkeypatch.setattr(module, "RECOVERY_ROOT", recovery)
+    monkeypatch.setattr(module, "CURRENT_APPROVAL", str(approval_path))
+    monkeypatch.setattr(module, "ACCEPTED_COMMIT", head)
+    monkeypatch.setattr(module, "BASELINE", head)
+    execution_alias = tmp_path / "execution-alias"
+    execution_alias.symlink_to(recovery, target_is_directory=True)
+    monkeypatch.setattr(module, "EXECUTION_ALIAS_ROOT", execution_alias)
+    monkeypatch.setattr(
+        module,
+        "_preflight_executables",
+        lambda _paths: {
+            "current_python": {"path": "/runtime/current/bin/python"},
+            "accepted_python": {"path": "/runtime/accepted/bin/python"},
+            "base_python": {"path": "/runtime/base/bin/python"},
+            "telemetry_script": {"path": "/runtime/telemetry"},
+        },
+    )
+    monkeypatch.setattr(module, "_runtime_inventory", lambda _interpreter: b"[]\n")
+    request_ids = {
+        "acquisition": "a" * 64,
+        "phase_preparation": "b" * 64,
+        "one_touch": "c" * 64,
+    }
+    approval = module._create_current_approval(
+        approval_path,
+        root=repo,
+        run_id="d" * 64,
+        request_ids=request_ids,
+        absent_paths={},
+    )
+
+    runtime.write_text('{"state":"active"}\n')
+    assert module._only_owner_session_runtime_changes(repo)
+    assert (
+        module._load_current_approval(
+            approval_path,
+            run_id="d" * 64,
+            request_ids=request_ids,
+            absent_paths={},
+        )
+        == approval
+    )
+
+    source.write_text("approved = False\n")
+    assert not module._only_owner_session_runtime_changes(repo)
+    with pytest.raises(ValueError, match="current approval mismatch"):
+        module._load_current_approval(
+            approval_path,
+            run_id="d" * 64,
+            request_ids=request_ids,
+            absent_paths={},
+        )
+
+    source.write_text("approved = True\n")
+    (repo / "untracked.py").write_text("unapproved = True\n")
+    assert not module._only_owner_session_runtime_changes(repo)
+    with pytest.raises(ValueError, match="current approval mismatch"):
+        module._load_current_approval(
+            approval_path,
+            run_id="d" * 64,
+            request_ids=request_ids,
+            absent_paths={},
+        )
+
+
 def test_supported_systemd_plan_contract_is_fixed():
     module = _module()
+    module.RECOVERY_ROOT = Path("/")
+    module.EXECUTION_ALIAS_ROOT = Path("/execution-alias")
     unit = module._unit(
         "test",
         ["python", "worker", "--private-key", "%d/authority.private"],
@@ -295,23 +446,26 @@ def test_supported_systemd_plan_contract_is_fixed():
     assert set(unit) == module._UNIT_DIRECTIVES
     assert set(service) <= module._SERVICE_DIRECTIVES
     assert "MemoryOOMGroup" not in service and "ExpectedMemoryOOMGroup" not in service
-    assert service["ProtectSystem"] == "strict" and service["ProtectHome"] == "read-only"
-    assert service["ReadWritePaths"] == ["/evidence", "/telemetry"]
-    assert service["InaccessiblePaths"] == ["/keys"]
+    assert service["ProtectSystem"] == "strict" and service["ProtectHome"] == "tmpfs"
+    assert service["BindPaths"] == [
+        "/execution-alias/evidence:/evidence",
+        "/execution-alias/telemetry:/telemetry",
+    ]
+    assert service["InaccessiblePaths"] == ["-/keys"]
     assert service["LoadCredential"] == ["authority.private:/keys/authority.private"]
     assert service["IPAddressDeny"] == "any" and service["RestrictAddressFamilies"] == ["AF_UNIX"]
-    service["ReadOnlyPaths"] = ["/evidence"]
-    with pytest.raises(ValueError, match="paths overlap"):
+    service["BindReadOnlyPaths"] = ["/evidence"]
+    with pytest.raises(ValueError, match="writable binds overlap"):
         module._validate_unit(unit)
-    service["ReadOnlyPaths"] = ["/control"]
+    service["BindReadOnlyPaths"] = ["/control"]
     service["LoadCredential"] = []
     with pytest.raises(ValueError, match="exactly one credential"):
         module._validate_unit(unit)
     service["LoadCredential"] = ["authority.private:/keys/authority.private"]
-    service["ReadOnlyPaths"] = ["/keys"]
+    service["BindReadOnlyPaths"] = ["/keys"]
     with pytest.raises(ValueError, match="key root must not be readable or writable"):
         module._validate_unit(unit)
-    service["ReadOnlyPaths"] = ["/control"]
+    service["BindReadOnlyPaths"] = ["/control"]
     service["LoadCredential"] = ["authority.private:/other/authority.private"]
     with pytest.raises(ValueError, match="directly under the inaccessible key root"):
         module._validate_unit(unit)
@@ -344,6 +498,16 @@ def test_supported_systemd_plan_contract_is_fixed():
     )["Service"]
     assert "IPAddressDeny" not in observer
     assert observer["RestrictAddressFamilies"] == ["AF_UNIX", "AF_INET", "AF_INET6"]
+    observer["RestrictAddressFamilies"] = ["AF_UNIX", "AF_INET"]
+    with pytest.raises(ValueError, match="must allow only Unix and Internet"):
+        module._validate_unit(
+            {
+                "Description": "observer",
+                "After": ["network-online.target"],
+                "Wants": ["network-online.target"],
+                "Service": observer,
+            }
+        )
     telemetry = module._unit(
         "telemetry",
         ["python", "monitor", "--authority-public-key", "%d/authority.public"],
@@ -358,8 +522,354 @@ def test_supported_systemd_plan_contract_is_fixed():
     assert "ExecStopPost" not in telemetry
 
 
+def test_persisted_probe_renders_and_consumes_role_specific_credential_flags(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    module = _module()
+    probe = _probe_module()
+    module.RECOVERY_ROOT = Path("/recovery")
+    module.EXECUTION_ALIAS_ROOT = Path("/execution-alias")
+    request = tmp_path / "request.json"
+    approval = tmp_path / "approval.json"
+    request.write_text("{}", encoding="utf-8")
+    approval.write_text("{}", encoding="utf-8")
+    roles = (
+        ("authority.private", "--private-key", False),
+        ("authority.public", "--authority-public-key", False),
+        ("acquisition.private", "--observer-private-key", True),
+        ("phase_preparation.private", "--observer-private-key", False),
+        ("one_touch.private", "--observer-private-key", False),
+    )
+    for credential, flag, observer in roles:
+        original = module._unit(
+            "probe",
+            ["worker", flag, f"%d/{credential}"],
+            {"HOME": "/safe"},
+            {"high": 1, "max": 2, "swap": 3},
+            None,
+            read_paths=["/control"],
+            write_paths=["/recovery/evidence"],
+            inaccessible_paths=["/keys"],
+            load_credential=f"{credential}:/keys/{credential}",
+            observer=observer,
+        )
+        credential_file = tmp_path / credential
+        credential_file.write_bytes(b"credential")
+        marker = tmp_path / f"{credential}.marker"
+        release = tmp_path / f"{credential}.release"
+        release.write_text("", encoding="utf-8")
+        command = probe._persisted_probe_execstart(
+            module,
+            credential,
+            f"%d/{credential}",
+            module._sha(b"credential"),
+            marker,
+            release,
+            "acquisition",
+            "probe",
+            str(request),
+            "0" * 64,
+            approval,
+        )
+        original["Service"]["ExecStart"] = command
+        module._validate_unit(original)
+        rendered = module._render_systemd_unit(original)
+        assert flag in command
+        assert "--credential" not in command
+        assert flag.encode() in rendered
+
+        argv = ["probe", *command[5:]]
+        credential_index = argv.index(f"%d/{credential}")
+        argv[credential_index] = str(credential_file)
+        monkeypatch.setattr(sys, "argv", argv)
+        exec(probe._PERSISTED_PROBE_CODE, {})
+        assert json.loads(marker.read_text(encoding="utf-8"))["credential_path"] == str(
+            credential_file
+        )
+
+        original["Service"]["ExecStart"][original["Service"]["ExecStart"].index(flag)] = (
+            "--credential"
+        )
+        with pytest.raises(ValueError, match="does not match unit role argv"):
+            module._validate_unit(original)
+        wrong_flag = "--private-key" if flag != "--private-key" else "--authority-public-key"
+        original["Service"]["ExecStart"][original["Service"]["ExecStart"].index("--credential")] = (
+            wrong_flag
+        )
+        with pytest.raises(ValueError, match="does not match unit role argv"):
+            module._validate_unit(original)
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            ["probe", wrong_flag, str(credential_file), "--credential-name", credential],
+        )
+        with pytest.raises(ValueError):
+            exec(probe._PERSISTED_PROBE_CODE, {})
+
+
+def test_writable_bind_rejects_every_non_normal_path_component():
+    module = _module()
+    module.RECOVERY_ROOT = Path("/recovery")
+    module.EXECUTION_ALIAS_ROOT = Path("/execution-alias")
+    unit = module._unit(
+        "test",
+        ["python", "worker", "--private-key", "%d/authority.private"],
+        {"HOME": "/safe"},
+        {"high": 1, "max": 2, "swap": 3},
+        None,
+        read_paths=["/control"],
+        write_paths=["/recovery/evidence"],
+        inaccessible_paths=["/keys"],
+        load_credential="authority.private:/keys/authority.private",
+    )
+    for source, destination in (
+        ("/execution-alias/..", "/recovery/.."),
+        ("/execution-alias/evidence/.", "/recovery/evidence/."),
+        (
+            "/execution-alias/evidence/../telemetry",
+            "/recovery/evidence/../telemetry",
+        ),
+    ):
+        unit["Service"]["BindPaths"] = [f"{source}:{destination}"]
+        with pytest.raises(ValueError, match="canonically absolute"):
+            module._validate_unit(unit)
+
+
+def test_execstart_mount_wrapper_binds_verified_scoped_admission(tmp_path: Path):
+    module = _module()
+    destination = tmp_path / "destination"
+    destination.mkdir(mode=0o700)
+    wrapped = module._wrap_execstart(
+        ["/bin/true"],
+        [str(destination)],
+        receipt="/control/admissions/launch-admission-acquisition.json",
+        unit_name="alpha-max-v8-acquisition-authority.service",
+        authority_public_b64="a" * 44,
+    )
+    assert wrapped[:5] == ["/usr/bin/python3", "-I", "-S", "-c", module._MOUNT_IDENTITY_CODE]
+    config = json.loads(wrapped[5])
+    assert config["receipt"] == "/control/admissions/launch-admission-acquisition.json"
+    assert config["scope"] == "acquisition"
+    assert config["unit_name"] == "alpha-max-v8-acquisition-authority.service"
+    assert "control_artifacts" in module._MOUNT_IDENTITY_SOURCE
+    assert "pkeyutl" in module._MOUNT_IDENTITY_SOURCE
+    assert "assert artifacts" in module._MOUNT_IDENTITY_SOURCE
+    assert "signed_payload_fd = os.memfd_create" in module._MOUNT_IDENTITY_SOURCE
+    assert 'f"/proc/self/fd/{signed_payload_fd}"' in module._MOUNT_IDENTITY_SOURCE
+    assert "os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC" in module._MOUNT_IDENTITY_SOURCE
+    assert "def stat_tuple(info):" in module._MOUNT_IDENTITY_SOURCE
+    assert "info.st_mtime_ns" in module._MOUNT_IDENTITY_SOURCE
+    assert "info.st_ctime_ns" in module._MOUNT_IDENTITY_SOURCE
+    assert "def check_snapshot(path, fd, expected, digest):" in module._MOUNT_IDENTITY_SOURCE
+    assert "for fd in fds" in module._MOUNT_IDENTITY_SOURCE
+    assert "\n" not in module._MOUNT_IDENTITY_CODE
+    compile(module._MOUNT_IDENTITY_CODE, "<final-namespace-bootstrap>", "exec")
+
+
+def test_final_wrapper_rechecks_retained_fd_after_same_size_hardlink_mutation(tmp_path: Path):
+    module = _module()
+    namespace: dict[str, object] = {}
+    exec(module._MOUNT_IDENTITY_SOURCE.split("fds = []", 1)[0], namespace)
+    artifact = tmp_path / "artifact"
+    artifact.write_bytes(b"same-size")
+    artifact.chmod(0o600)
+    namespace["fds"] = []
+    fd, expected, digest, _data = namespace["snapshot"](str(artifact))
+    (tmp_path / "artifact-link").hardlink_to(artifact)
+    with pytest.raises(AssertionError, match="retained fd drift"):
+        namespace["check_snapshot"](str(artifact), fd, expected, digest)
+    os.close(fd)
+
+
+def test_approval_and_persisted_topology_bind_accepted_and_control_artifacts():
+    probe = _probe_module()
+    source = SCRIPT.read_text(encoding="utf-8")
+    assert '"accepted_source_state": _accepted_source_state()' in source
+    assert 'approval["accepted_source_state"] != _accepted_source_state()' in source
+    assert 'approval.get("accepted_source_state") != accepted_actual' in source
+    assert "control_artifacts" in probe.verify_persisted_topology.__code__.co_consts
+    assert "control_artifacts" in probe._execute_persisted_topology.__code__.co_consts
+    assert "signed control artifact mismatch" in source
+    assert "receipt=prestart[5]" in source
+    assert "unit_name=prestart[7]" in source
+    assert "authority_public_b64=prestart[9]" in source
+    probe_source = PROBE_SCRIPT.read_text(encoding="utf-8")
+    assert "production ExecStart lacks final namespace verifier" in probe_source
+    assert 'receipt=wrapper_config["receipt"]' in probe_source
+
+
+def test_unit_bind_contract_rejects_broad_roots_and_binds_absolute_commands():
+    module = _module()
+    module.RECOVERY_ROOT = Path("/")
+    module.EXECUTION_ALIAS_ROOT = Path("/execution-alias")
+    unit = module._unit(
+        "test",
+        ["/runtime/current/bin/python", "/code/worker.py", "--private-key", "%d/authority.private"],
+        {"HOME": "/safe"},
+        {"high": 1, "max": 2, "swap": 3},
+        None,
+        read_paths=["/control"],
+        write_paths=["/evidence"],
+        inaccessible_paths=["/keys"],
+        load_credential="authority.private:/keys/authority.private",
+    )
+    service = unit["Service"]
+    assert "/runtime/current/bin/python" in service["BindReadOnlyPaths"]
+    assert "/code/worker.py" in service["BindReadOnlyPaths"]
+    service["BindReadOnlyPaths"].append(module.CURRENT)
+    with pytest.raises(ValueError, match="broad home path"):
+        module._validate_unit(unit)
+    service["BindReadOnlyPaths"].remove(module.CURRENT)
+    service["BindReadOnlyPaths"].append(module.ACCEPTED)
+    with pytest.raises(ValueError, match="broad home path"):
+        module._validate_unit(unit)
+
+
+def test_non_network_unit_shapes_are_unix_only_and_ip_denied():
+    module = _module()
+    module.RECOVERY_ROOT = Path("/")
+    module.EXECUTION_ALIAS_ROOT = Path("/execution-alias")
+    for credential, argument in (
+        ("authority.private", "--private-key"),
+        ("authority.public", "--authority-public-key"),
+        ("phase_preparation.private", "--observer-private-key"),
+        ("one_touch.private", "--observer-private-key"),
+    ):
+        unit = module._unit(
+            "non-network",
+            ["worker", argument, f"%d/{credential}"],
+            {"HOME": "/safe"},
+            {"high": 1, "max": 2, "swap": 3},
+            None,
+            read_paths=["/control"],
+            write_paths=["/evidence"],
+            inaccessible_paths=["/keys"],
+            load_credential=f"{credential}:/keys/{credential}",
+        )
+        assert unit["Service"]["RestrictAddressFamilies"] == ["AF_UNIX"]
+        assert unit["Service"]["IPAddressDeny"] == "any"
+
+
+def test_embedded_admission_sources_are_independently_compilable():
+    module = _module()
+    probe = _probe_module()
+    compile(module._ADMISSION_PRESTART_CODE, "<admission-prestart>", "exec")
+    compile(probe._ADMISSION_SIGN_CODE, "<admission-signer>", "exec")
+
+
+def test_execution_alias_identity_and_writable_mapping_are_exact(tmp_path: Path):
+    module = _module()
+    recovery = tmp_path / "recovery"
+    recovery.mkdir()
+    alias = tmp_path / "execution-alias"
+    alias.symlink_to(recovery, target_is_directory=True)
+    module.RECOVERY_ROOT = recovery
+    module.EXECUTION_ALIAS_ROOT = alias
+
+    identity = module._execution_alias()
+    assert identity["path"] == str(alias)
+    assert identity["target"] == str(recovery)
+    unit = module._unit(
+        "alias mapping",
+        ["/usr/bin/python3", "--private-key", "%d/authority.private"],
+        {"HOME": "/tmp"},
+        {"high": 1, "max": 2, "swap": 0},
+        None,
+        read_paths=["/usr/bin/python3"],
+        write_paths=[str(recovery / "evidence")],
+        inaccessible_paths=[str(tmp_path / "keys")],
+        load_credential=f"authority.private:{tmp_path / 'keys' / 'authority.private'}",
+    )
+    expected = f"{alias / 'evidence'}:{recovery / 'evidence'}"
+    assert unit["Service"]["BindPaths"] == [expected]
+    module._validate_unit(unit)
+
+    unit["Service"]["BindPaths"] = [f"{alias / 'other'}:{recovery / 'evidence'}"]
+    with pytest.raises(ValueError, match="mapping mismatch"):
+        module._validate_unit(unit)
+
+    alias.unlink()
+    wrong = tmp_path / "wrong"
+    wrong.mkdir()
+    alias.symlink_to(wrong, target_is_directory=True)
+    with pytest.raises(ValueError, match="target mismatch"):
+        module._execution_alias()
+
+
+def test_admission_signer_returns_exact_signature_over_abstract_socket(tmp_path: Path):
+    probe = _probe_module()
+    private_path = tmp_path / "authority.private"
+    payload_path = tmp_path / "payload.json"
+    private_path.write_bytes(
+        bytes.fromhex("9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60")
+    )
+    private_path.chmod(0o400)
+    payload = b'{"schema":"signer-selftest.v1"}\n'
+    payload_path.write_bytes(payload)
+    payload_path.chmod(0o600)
+    public = bytes.fromhex("d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a")
+    token = f"luminaquant-pytest-{os.getpid()}-{os.urandom(8).hex()}"
+    listener = probe.socket.socket(probe.socket.AF_UNIX, probe.socket.SOCK_STREAM)
+    listener.settimeout(30)
+    listener.bind("\0" + token)
+    listener.listen(1)
+    process = probe.subprocess.Popen(
+        [
+            "/usr/bin/python3",
+            "-I",
+            "-S",
+            "-c",
+            probe._ADMISSION_SIGN_CODE,
+            "--private-key",
+            str(private_path),
+            "--payload",
+            str(payload_path),
+            "--socket",
+            token,
+        ],
+        stdout=probe.subprocess.PIPE,
+        stderr=probe.subprocess.PIPE,
+    )
+    try:
+        connection, _ = listener.accept()
+        with connection:
+            chunks = []
+            total = 0
+            while total <= 64:
+                chunk = connection.recv(65 - total)
+                if not chunk:
+                    break
+                chunks.append(chunk)
+                total += len(chunk)
+        signature = b"".join(chunks)
+        stdout, stderr = process.communicate(timeout=30)
+    finally:
+        listener.close()
+        if process.poll() is None:
+            process.kill()
+            process.wait(timeout=30)
+    assert process.returncode == 0, stderr.decode()
+    assert stdout == b""
+    assert len(signature) == 64
+    probe.Ed25519PublicKey.from_public_bytes(public).verify(signature, payload)
+    assert "--output" not in probe._ADMISSION_SIGN_SOURCE
+
+
+def test_scoped_admission_and_output_capabilities_are_explicit():
+    module = _module()
+    source = SCRIPT.read_text(encoding="utf-8")
+    assert module._SCOPES == ("acquisition", "phase_preparation", "one_touch")
+    assert 'f"launch-admission-{scope}.json"' in source
+    assert 'phase_parent = stage_results / "phase_preparation"' in source
+    assert 'prelock_parent = stage_results / "prelock"' in source
+    assert 'historical_parent = stage_results / "historical"' in source
+    assert "else [str(prelock_parent), str(historical_parent)]" in source
+
+
 def test_credential_binding_requires_exact_owned_source_identity(tmp_path: Path):
     module = _module()
+    module.RECOVERY_ROOT = tmp_path
+    module.EXECUTION_ALIAS_ROOT = Path("/execution-alias")
     key_root = tmp_path / "keys"
     key_root.mkdir(mode=0o700)
     private = key_root / "authority.private"
@@ -408,7 +918,7 @@ def test_import_is_stdlib_only_and_policy_constants_are_local():
     assert not hasattr(module, "policy")
     assert module._SCOPES == ("acquisition", "phase_preparation", "one_touch")
     assert module._FILE_ROLES[0] == "policy_json"
-    assert module.G067_IDENTITY["checksum_sha256"] != module.G067_IDENTITY["archive_sha256"]
+    assert module.CURRENT_APPROVAL_LEAF == "current-state-approval-v8.json"
 
 
 def test_authenticated_policy_and_key_creator_use_only_captured_modules(
@@ -564,6 +1074,8 @@ def test_build_assembles_private_artifacts_without_launching(
     module = _module()
     recovery = tmp_path / "recovery"
     recovery.mkdir()
+    execution_alias = tmp_path / "execution-alias"
+    execution_alias.symlink_to(recovery, target_is_directory=True)
     inputs = tmp_path / "inputs"
     inputs.mkdir()
     current, accepted = inputs / "current", inputs / "accepted"
@@ -575,9 +1087,11 @@ def test_build_assembles_private_artifacts_without_launching(
     alignment.write_bytes(b"alignment")
     telemetry_script = inputs / "telemetry.py"
     telemetry_script.write_text("raise AssertionError('must not execute')\n")
-    current_python = inputs / "current-python"
-    accepted_python = inputs / "accepted-python"
-    for interpreter in (current_python, accepted_python):
+    current_python = current / ".venv" / "bin" / "python"
+    accepted_python = accepted / ".venv" / "bin" / "python"
+    base_python = inputs / "base-runtime" / "bin" / "python"
+    for interpreter in (current_python, accepted_python, base_python):
+        interpreter.parent.mkdir(parents=True)
         interpreter.write_bytes(b"synthetic interpreter")
     role_root = inputs / "roles"
     role_root.mkdir()
@@ -586,17 +1100,27 @@ def test_build_assembles_private_artifacts_without_launching(
         name = f"{role}.py"
         (role_root / name).write_text(f"# {role}\n")
         role_pins[role] = (str(role_root), name, None)
-    g067_approval, current_approval = inputs / "g067.json", inputs / "current.json"
-    g067_approval.write_text("{}\n")
-    current_approval.write_text("{}\n")
+    current_approval = recovery / module.CURRENT_APPROVAL_LEAF
     monkeypatch.setattr(module, "RECOVERY_ROOT", recovery)
+    monkeypatch.setattr(module, "EXECUTION_ALIAS_ROOT", execution_alias)
     monkeypatch.setattr(module, "CURRENT", str(current))
     monkeypatch.setattr(module, "ACCEPTED", str(accepted))
     monkeypatch.setattr(module, "ALIGNMENT", str(alignment))
     monkeypatch.setattr(module, "ALIGNMENT_SHA256", module._sha(b"alignment"))
-    monkeypatch.setattr(module, "G067_APPROVAL", str(g067_approval))
     monkeypatch.setattr(module, "CURRENT_APPROVAL", str(current_approval))
     monkeypatch.setattr(module, "ROLE_PINS", role_pins)
+    current_approval.write_bytes(b'{"approval":"fixture"}\n')
+    monkeypatch.setattr(
+        module,
+        "_load_current_approval",
+        lambda path, **kwargs: {
+            "head": module.ACCEPTED_COMMIT,
+            "repository_root": str(current),
+            "accepted_alpha_commit": module.ACCEPTED_COMMIT,
+            "baseline_ancestor": module.BASELINE,
+            "verdict": "PASS_REVIEWED_OVERLAY",
+        },
+    )
 
     def fake_git(root: Path, *args: str) -> bytes:
         if args == ("rev-parse", "HEAD"):
@@ -661,11 +1185,12 @@ def test_build_assembles_private_artifacts_without_launching(
         "accepted_python": executable_pin(
             "accepted_python", accepted_python, module._freeze(module._file(accepted_python))
         ),
+        "base_python": executable_pin("base_python", base_python),
         "telemetry_script": executable_pin("telemetry_script", telemetry_script),
     }
 
     def create_keys(root: Path) -> None:
-        for name in ("authority", *module._SCOPES):
+        for name in ("authority", "publication", *module._SCOPES):
             for kind in ("private", "public"):
                 path = root / f"{name}.{kind}"
                 path.write_bytes(f"{name}-{kind}".encode().ljust(32, b"_"))
@@ -673,6 +1198,26 @@ def test_build_assembles_private_artifacts_without_launching(
 
     monkeypatch.setattr(module, "_load_key_creator", lambda path, identity, policy: create_keys)
     policy = SimpleNamespace(source_sha256="policy-source")
+    policy.scope_contract = lambda scope: (
+        {
+            "acquisition": ("checkpoint_pin", "alignment_receipt"),
+            "phase_preparation": (
+                "checkpoint_pin",
+                "alignment_receipt",
+                "source_eligible_receipt",
+                "source_manifest",
+                "source_journal",
+                "canonical_finalize_receipt",
+            ),
+            "one_touch": (
+                "checkpoint_pin",
+                "alignment_receipt",
+                "phase_handoff_receipt",
+                "preparation_manifest",
+            ),
+        }[scope],
+        (),
+    )
 
     def load_checkpoint(path, loaded_policy):
         return SimpleNamespace(sha256=module._file(path)["sha256"])
@@ -717,15 +1262,16 @@ def test_build_assembles_private_artifacts_without_launching(
             telemetry_root=str(recovery / f"g056v8-telemetry-{run_id}"),
             output_parent=str(recovery / f"g056v8-acquisition-output-{run_id}"),
             telemetry_script=str(telemetry_script),
-            g067_approval=str(g067_approval),
             current_approval=str(current_approval),
             current_python=str(current_python),
             accepted_python=str(accepted_python),
             run_id=run_id,
-            request_id="b" * 64 if run_id == "a" * 64 else "d" * 64,
+            request_id=module.ACQUISITION_REQUEST_ID,
+            phase_request_id=module.PHASE_PREPARATION_REQUEST_ID,
+            one_touch_request_id=module.ONE_TOUCH_REQUEST_ID,
         )
 
-    args = make_args("a" * 64)
+    args = make_args(module.RUN_ID)
     artifacts = module.build(args)
     control = Path(args.control_root)
     for path in artifacts.values():
@@ -769,9 +1315,11 @@ def test_build_assembles_private_artifacts_without_launching(
         for item in documents["acquisition-request.json"]["prerequisites"]
     )
     assert documents["manifest.json"]["launch_performed"] is False
+    assert documents["manifest.json"]["execution_alias"] == module._execution_alias()
     assert not (Path(args.output_parent) / "source").exists()
     assert not (Path(args.output_parent) / "report").exists()
     plan = module._load_canonical(control / "launch-plan.json")
+    assert plan["scope_topology"]["execution_alias"] == module._execution_alias()
     assert plan["ordering"] == [
         f"alpha-max-v8-authority-{args.run_id}.service",
         f"alpha-max-v8-telemetry-{args.run_id}.service",
@@ -784,8 +1332,16 @@ def test_build_assembles_private_artifacts_without_launching(
     observer = plan["systemd_units"]["observer"]["Service"]
     telemetry = plan["systemd_units"]["telemetry"]["Service"]
     for unit in plan["systemd_units"].values():
+        service = unit["Service"]
         module._validate_unit({key: value for key, value in unit.items() if key != "name"})
-        assert not (set(unit["Service"]["ReadOnlyPaths"]) & set(unit["Service"]["ReadWritePaths"]))
+        destinations = [binding.split(":", 1)[1] for binding in service["BindPaths"]]
+        assert not any(
+            left == right or left.startswith(right + "/") or right.startswith(left + "/")
+            for left in service["BindReadOnlyPaths"]
+            for right in destinations
+        )
+        assert service["ProtectHome"] == "tmpfs"
+        assert service["WorkingDirectory"] == "/"
     assert (authority["MemoryHigh"], authority["MemoryMax"], authority["MemorySwapMax"]) == (
         402653184,
         536870912,
@@ -806,17 +1362,21 @@ def test_build_assembles_private_artifacts_without_launching(
     )
     assert authority["IPAddressDeny"] == "any"
     assert "IPAddressDeny" not in observer
-    assert authority["ExecStopPost"] == plan["telemetry_contract"]["authority_capture"]
-    assert observer["ExecStopPost"] == plan["telemetry_contract"]["observer_capture"]
+    for wrapped, capture in (
+        (authority["ExecStopPost"], plan["telemetry_contract"]["authority_capture"]),
+        (observer["ExecStopPost"], plan["telemetry_contract"]["observer_capture"]),
+    ):
+        assert wrapped[:5] == ["/usr/bin/python3", "-I", "-S", "-c", module._MOUNT_IDENTITY_CODE]
+        assert wrapped[6:] == capture
     key_root = Path(args.key_root)
     assert all(
         str(key_root) not in service[path_key]
         for service in (authority, observer, telemetry)
-        for path_key in ("ReadOnlyPaths", "ReadWritePaths")
+        for path_key in ("BindReadOnlyPaths", "BindPaths")
     )
-    assert authority["InaccessiblePaths"] == [str(key_root)]
-    assert observer["InaccessiblePaths"] == [str(key_root)]
-    assert telemetry["InaccessiblePaths"] == [str(key_root)]
+    assert authority["InaccessiblePaths"] == [f"-{key_root}"]
+    assert observer["InaccessiblePaths"] == [f"-{key_root}"]
+    assert telemetry["InaccessiblePaths"] == [f"-{key_root}"]
     assert authority["LoadCredential"] == [f"authority.private:{key_root / 'authority.private'}"]
     assert observer["LoadCredential"] == [f"acquisition.private:{key_root / 'acquisition.private'}"]
     assert telemetry["LoadCredential"] == [f"authority.public:{key_root / 'authority.public'}"]
@@ -844,6 +1404,10 @@ def test_build_assembles_private_artifacts_without_launching(
             == module._file(Path(item["credential"]["source"]["path"]))["sha256"]
         )
         assert b"%%d" not in unit_path.read_bytes()
+        rendered = unit_path.read_bytes()
+        assert module._MOUNT_IDENTITY_CODE.encode() in rendered
+        assert b"launch-admission-acquisition.json" in rendered
+        assert b"\\n" not in module._MOUNT_IDENTITY_CODE.encode()
     assert documents["manifest.json"]["executable_inputs"] == plan["executable_inputs"]
     assert (
         plan["executable_inputs"]["current_python"]["package_freeze_sha256"]
@@ -858,7 +1422,7 @@ def test_build_assembles_private_artifacts_without_launching(
     replacement = inputs / "replacement-python"
     replacement.write_bytes(b"substituted interpreter")
     substituted.current_python = str(replacement)
-    with pytest.raises(ValueError, match="executable path mismatch"):
+    with pytest.raises(ValueError, match="fresh recovery identity mismatch"):
         module.build(substituted)
     for root in (
         substituted.control_root,
@@ -871,7 +1435,7 @@ def test_build_assembles_private_artifacts_without_launching(
     original_freeze_pin = module.EXECUTABLE_PINS["current_python"]["package_freeze_sha256"]
     module.EXECUTABLE_PINS["current_python"]["package_freeze_sha256"] = "0" * 64
     freeze_substituted = make_args("f" * 64)
-    with pytest.raises(ValueError, match="interpreter freeze pin mismatch"):
+    with pytest.raises(ValueError, match="fresh recovery identity mismatch"):
         module.build(freeze_substituted)
     module.EXECUTABLE_PINS["current_python"]["package_freeze_sha256"] = original_freeze_pin
     for root in (
@@ -883,20 +1447,10 @@ def test_build_assembles_private_artifacts_without_launching(
     ):
         assert not Path(root).exists()
 
-    original_write = module._write_new
-
-    def late_failure(path: Path, value: object):
-        if path.name == "manifest.json":
-            raise RuntimeError("late injected failure")
-        return original_write(path, value)
-
-    monkeypatch.setattr(module, "_write_new", late_failure)
     failed_args = make_args("c" * 64)
-    with pytest.raises(RuntimeError, match="late injected failure"):
+    with pytest.raises(ValueError, match="fresh recovery identity mismatch"):
         module.build(failed_args)
-    failed_control = Path(failed_args.control_root)
-    assert (failed_control / "FAILED.json").is_file()
-    assert not (failed_control / "COMPLETE.json").exists()
+    assert not Path(failed_args.control_root).exists()
 
 
 def test_quarantine_failure_preserves_primary_and_quarantine_errors(tmp_path: Path, monkeypatch):
@@ -921,3 +1475,134 @@ def test_quarantine_failure_preserves_primary_and_quarantine_errors(tmp_path: Pa
         module._quarantine_or_reraise(control, identity, primary)
     assert raised.value.exceptions[0] is primary
     assert isinstance(raised.value.exceptions[1], OSError)
+
+
+def test_recovery_epoch_identifiers_and_approval_leaf_are_exact():
+    module = _module()
+    assert module.CURRENT_APPROVAL_LEAF == "current-state-approval-v8.json"
+    assert module.RUN_ID == "41ed4e09bd7b4af1793d3138e5d55d22d217d5fd4bd9477493d885e42fae1602"
+    assert {
+        "acquisition": module.ACQUISITION_REQUEST_ID,
+        "phase_preparation": module.PHASE_PREPARATION_REQUEST_ID,
+        "one_touch": module.ONE_TOUCH_REQUEST_ID,
+    } == {
+        "acquisition": "3377aca77e4edead9454051883d015c15389ffb0da06d63ec9e76ee2573252ec",
+        "phase_preparation": "a89b7872357feaee131c9bdbf4d78312ad86e7d4da90c7d2441d2d9cd2b43bac",
+        "one_touch": "30f6eafb4f0023c602c54bab8719ce105b2c28d07c7511cb5d9db42936f49d5c",
+    }
+
+
+def test_approval_only_does_not_create_declared_control_roots(tmp_path: Path, monkeypatch):
+    module = _module()
+    recovery = tmp_path / "recovery"
+    recovery.mkdir()
+    execution_alias = tmp_path / "execution-alias"
+    execution_alias.symlink_to(recovery, target_is_directory=True)
+    current = tmp_path / "current"
+    current.mkdir()
+    monkeypatch.setattr(module, "RECOVERY_ROOT", recovery)
+    monkeypatch.setattr(module, "EXECUTION_ALIAS_ROOT", execution_alias)
+    monkeypatch.setattr(module, "CURRENT", str(current))
+    monkeypatch.setattr(module, "_git", lambda *_args: b"0" * 40 + b"\n")
+    monkeypatch.setattr(module, "_only_owner_session_runtime_changes", lambda _root: True)
+    monkeypatch.setattr(module, "_inventory", lambda _root: b"[]\n")
+    monkeypatch.setattr(
+        module,
+        "_preflight_executables",
+        lambda _paths: {
+            "current_python": {"path": "/runtime/current/bin/python"},
+            "accepted_python": {"path": "/runtime/accepted/bin/python"},
+            "base_python": {"path": "/runtime/base/bin/python"},
+            "telemetry_script": {"path": "/runtime/telemetry"},
+        },
+    )
+    monkeypatch.setattr(module, "_runtime_inventory", lambda _interpreter: b"[]\n")
+    monkeypatch.setattr(module, "_ignored_source_inventory", lambda _root: b"[]\n", raising=False)
+    args = argparse.Namespace(
+        control_root=str(recovery / f"g056v8-controls-{module.RUN_ID}"),
+        key_root=str(recovery / f"g056v8-keys-{module.RUN_ID}"),
+        evidence_root=str(recovery / f"g056v8-acquisition-evidence-{module.RUN_ID}"),
+        telemetry_root=str(recovery / f"g056v8-telemetry-{module.RUN_ID}"),
+        output_parent=str(recovery / f"g056v8-acquisition-output-{module.RUN_ID}"),
+        current_approval=str(recovery / module.CURRENT_APPROVAL_LEAF),
+        run_id=module.RUN_ID,
+        request_id=module.ACQUISITION_REQUEST_ID,
+        phase_request_id=module.PHASE_PREPARATION_REQUEST_ID,
+        one_touch_request_id=module.ONE_TOUCH_REQUEST_ID,
+    )
+    module.create_approval(args)
+    assert (recovery / module.CURRENT_APPROVAL_LEAF).is_file()
+    assert not any(
+        Path(getattr(args, name)).exists()
+        for name in ("control_root", "key_root", "evidence_root", "telemetry_root", "output_parent")
+    )
+
+
+def test_stage_modes_are_explicit_and_require_predecessor_arguments():
+    parser_source = SCRIPT.read_text(encoding="utf-8")
+    assert "--build-phase-preparation" in parser_source
+    assert "--build-one-touch" in parser_source
+    assert "--canonical-finalize-receipt" in parser_source
+    assert "deferred_until_authenticated_acquisition_receipts" in parser_source
+    assert "deferred_until_authenticated_phase_receipts" in parser_source
+
+
+def test_staged_scope_contract_declares_authority_observer_and_telemetry_units():
+    source = SCRIPT.read_text(encoding="utf-8")
+    assert "alpha-max-v8-{scope}-telemetry-{args.run_id}.service" in source
+    assert '"telemetry": {' in source
+    assert "authority_capture" in source
+    assert "observer_capture" in source
+    assert "canonical-finalize-receipt" in source
+    assert '"unit_definitions": {' in source
+    assert "alpha_max_v8_terminal_stage_complete.v1" in source
+    assert "policy.validate_w10_canonical_finalize_bundle(" in source
+    assert "authority_public_key_b64=envelope.authority_key.public_key_b64" in source
+    assert "run_id=args.run_id" in source
+    assert "acquisition_request_id=ACQUISITION_REQUEST_ID" in source
+    assert 'approval_sha256=_file(approval_path)["sha256"]' in source
+    assert "canonical_finalize_identity = _file(canonical_finalize_receipt)" in source
+    assert "canonical finalize receipt identity drift" in source
+
+
+def test_persisted_probe_parses_real_cgroup_v2_whitespace_counters():
+    probe = _probe_module()
+    assert probe._cgroup_properties("high 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\n") == {
+        "high": "0",
+        "max": "0",
+        "oom": "0",
+        "oom_kill": "0",
+        "oom_group_kill": "0",
+    }
+    source = PROBE_SCRIPT.read_text(encoding="utf-8")
+    assert '"memory.high"' in source
+    assert '"memory.oom.group"' in source
+    assert '"cgroup.events"' in source
+    assert '"oom_group_kill"' in source
+
+
+def test_persisted_probe_stage_selection_allows_acquisition_only_and_rejects_missing_stage(
+    tmp_path: Path,
+):
+    probe = _probe_module()
+    control = tmp_path / "control"
+    control.mkdir()
+    assert probe._selected_stages(control, "acquisition") == ("acquisition",)
+    assert probe._selected_stages(control, "all-ready") == ("acquisition",)
+    with pytest.raises(RuntimeError, match="missing persisted phase_preparation stage"):
+        probe._selected_stages(control, "phase_preparation")
+    (control / "phase_preparation-manifest.json").write_text("{}")
+    with pytest.raises(RuntimeError, match="incomplete persisted phase_preparation stage"):
+        probe._selected_stages(control, "all-ready")
+
+
+def test_persisted_probe_scope_cleanup_and_live_property_contract_is_explicit():
+    source = PROBE_SCRIPT.read_text(encoding="utf-8")
+    assert "--scope" in source
+    assert 'default="acquisition"' in source
+    assert "all-ready cannot publish" in source
+    assert "production_links" in source
+    assert "_PRODUCTION_PROPERTIES" in source
+    assert "production_properties" in source
+    assert "if link.is_symlink()" in source
+    assert "probe_omits_production_prestart" in source

@@ -11,12 +11,13 @@ import os
 import re
 import socket
 import stat
+import resource
 import struct
 import urllib.parse
 from contextlib import ExitStack
 from dataclasses import asdict, dataclass, field as dataclass_field, is_dataclass
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 from collections.abc import Mapping
 
@@ -39,6 +40,7 @@ _RECEIPT_PREREQUISITE_KINDS = {
         "source_eligible_receipt",
         "source_manifest",
         "source_journal",
+        "canonical_finalize_receipt",
     ),
     "one_touch": (
         "checkpoint_pin",
@@ -74,6 +76,372 @@ _RESULT_ARTIFACT_KINDS = {
         ),
     ),
 }
+
+
+def scope_contract(
+    scope: str,
+) -> tuple[tuple[str, ...], tuple[tuple[tuple[str, ...], tuple[str, ...]], ...]]:
+    """Return the immutable prerequisite and successful-result contract for one scope."""
+    if scope not in _SCOPES:
+        raise TerminalPolicyError("unknown scope")
+    return _RECEIPT_PREREQUISITE_KINDS[scope], _RESULT_ARTIFACT_KINDS[scope]
+
+
+ALPHA_MAX_PUBLICATION_OBSERVER_READY_SCHEMA = "alpha_max_publication_observer_ready.v1"
+ALPHA_MAX_PUBLICATION_OBSERVER_READY_UNSIGNED_FIELDS = frozenset(
+    {
+        "schema",
+        "kind",
+        "run_id",
+        "request_id",
+        "approval_leaf",
+        "approval_sha256",
+        "canonical_root",
+        "query_spec_sha256",
+        "observer_key_id",
+        "observer_pid",
+        "observer_uid",
+        "observer_start_ticks",
+        "observed_ns",
+        "old_identity",
+        "old_inventory_sha256",
+        "old_loader_sha256",
+        "old_observation",
+    }
+)
+ALPHA_MAX_PUBLICATION_WINDOW_BINDING_FIELDS = frozenset(
+    {
+        "request_id",
+        "run_id",
+        "acquisition_request_id",
+        "approval_leaf",
+        "approval_sha256",
+        "authority_key_id",
+        "terminal_receipt_sha256",
+        "observer_key_id",
+        "observer_ready_sha256",
+        "observer_query_spec_sha256",
+        "candidate",
+        "candidate_leaf",
+        "predecessor",
+        "swap",
+        "swap_receipt_sha256",
+        "swap_temporary_path",
+        "candidate_identity",
+        "predecessor_identity",
+        "swap_identity",
+        "pre_exchange_predecessor_identity",
+        "post_exchange_candidate_identity",
+        "post_exchange_predecessor_identity",
+        "canonical_logical_root_identity",
+        "canonical_resolved_root",
+        "candidate_inventory_sha256",
+        "predecessor_inventory_sha256",
+    }
+)
+ALPHA_MAX_PUBLICATION_RECEIPT_FIELDS = ALPHA_MAX_PUBLICATION_WINDOW_BINDING_FIELDS | {
+    "schema",
+    "phase",
+}
+
+
+_ALPHA_MAX_EXCHANGE_TOKEN = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
+_ALPHA_MAX_SYMBOL_TOKEN = re.compile(r"^[A-Z0-9][A-Z0-9._-]*$")
+_ALPHA_MAX_MONTH_TOKEN = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
+_ALPHA_MAX_DATE_TOKEN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def is_alpha_max_coordination_lock(path: str) -> bool:
+    """Return whether a canonical-relative path is an approved mutable writer lock."""
+    parts = PurePosixPath(path).parts
+    exchange = _ALPHA_MAX_EXCHANGE_TOKEN
+    symbol = _ALPHA_MAX_SYMBOL_TOKEN
+    month = _ALPHA_MAX_MONTH_TOKEN
+    date = _ALPHA_MAX_DATE_TOKEN
+
+    def valid_date(value: str) -> bool:
+        if not date.fullmatch(value):
+            return False
+        try:
+            return datetime.strptime(value, "%Y-%m-%d").strftime("%Y-%m-%d") == value
+        except ValueError:
+            return False
+
+    if parts == (".bootstrap-incomplete",):
+        return True
+    if (
+        len(parts) == 4
+        and parts[0] == "market_ohlcv_1s"
+        and exchange.fullmatch(parts[1])
+        and symbol.fullmatch(parts[2])
+        and month.fullmatch(parts[3][:-5])
+        and parts[3].endswith(".lock")
+    ):
+        return True
+    if (
+        len(parts) == 4
+        and parts[0] == "market_data_raw_aggtrades"
+        and exchange.fullmatch(parts[1])
+        and symbol.fullmatch(parts[2])
+        and parts[3] == ".raw-stream.lock"
+    ):
+        return True
+    if (
+        len(parts) == 5
+        and parts[0] == "market_data_raw_aggtrades"
+        and exchange.fullmatch(parts[1])
+        and symbol.fullmatch(parts[2])
+        and parts[3].startswith("date=")
+        and valid_date(parts[3][5:])
+        and parts[4] == ".raw-partition.lock"
+    ):
+        return True
+    return (
+        len(parts) == 5
+        and parts[0] == "feature_points"
+        and parts[1].startswith("exchange=")
+        and exchange.fullmatch(parts[1][9:])
+        and parts[2].startswith("symbol=")
+        and symbol.fullmatch(parts[2][7:])
+        and parts[3].startswith("date=")
+        and valid_date(parts[3][5:])
+        and parts[4] == ".writer.lock"
+    )
+
+
+def stable_alpha_max_canonical_inventory(
+    records: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Normalize a full tree inventory to immutable, data-bearing entries."""
+    included_files = {
+        record["path"]
+        for record in records
+        if record.get("kind") == "file"
+        and record.get("path") != "commit.json"
+        and not str(record.get("path", "")).startswith(".alpha_max_publication/")
+        and not is_alpha_max_coordination_lock(str(record.get("path", "")))
+    }
+    included_directories = {
+        "/".join(PurePosixPath(path).parts[:index])
+        for path in included_files
+        for index in range(1, len(PurePosixPath(path).parts))
+    }
+    return [
+        {key: value for key, value in record.items() if key not in {"ctime_ns", "nlink"}}
+        for record in records
+        if (record.get("kind") == "file" and record.get("path") in included_files)
+        or (record.get("kind") == "dir" and record.get("path") in included_directories)
+    ]
+
+
+def _canonical_regular_file_record(
+    directory_fd: int, name: str, before: os.stat_result, common: dict[str, Any]
+) -> tuple[dict[str, Any], int]:
+    """Hash and retain a regular file until the full generation snapshot completes."""
+    try:
+        fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC, dir_fd=directory_fd)
+    except OSError as exc:
+        raise TerminalPolicyError("canonical generation changed during inventory") from exc
+    try:
+        opened = os.fstat(fd)
+        if not _same_stat(before, opened):
+            raise TerminalPolicyError("canonical generation changed during inventory")
+        digest = hashlib.sha256()
+        while True:
+            chunk = os.read(fd, 1 << 20)
+            if not chunk:
+                break
+            digest.update(chunk)
+        after = os.fstat(fd)
+        try:
+            pathname_after = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+        except OSError as exc:
+            raise TerminalPolicyError("canonical generation changed during inventory") from exc
+        if not _same_stat(before, after) or not _same_stat(before, pathname_after):
+            raise TerminalPolicyError("canonical generation changed during inventory")
+        return (
+            {
+                **common,
+                "kind": "file",
+                "size": before.st_size,
+                "mtime_ns": before.st_mtime_ns,
+                "nlink": before.st_nlink,
+                "sha256": digest.hexdigest(),
+            },
+            fd,
+        )
+    except BaseException:
+        os.close(fd)
+        raise
+
+
+def _same_stat(left: os.stat_result, right: os.stat_result) -> bool:
+    return (
+        left.st_dev,
+        left.st_ino,
+        left.st_size,
+        left.st_mtime_ns,
+        left.st_ctime_ns,
+        stat.S_IFMT(left.st_mode),
+    ) == (
+        right.st_dev,
+        right.st_ino,
+        right.st_size,
+        right.st_mtime_ns,
+        right.st_ctime_ns,
+        stat.S_IFMT(right.st_mode),
+    )
+
+
+def alpha_max_canonical_inventory_records(root: Path) -> list[dict[str, Any]]:
+    """Scan one pinned physical generation without mixing exchanged directories."""
+    retained_file_fds: list[tuple[int, os.stat_result, str]] = []
+    retained_directory_fds: list[tuple[int, int, str, os.stat_result]] = []
+    try:
+        soft_limit, _hard_limit = resource.getrlimit(resource.RLIMIT_NOFILE)
+        descriptor_budget = 131_072 if soft_limit == resource.RLIM_INFINITY else soft_limit - 256
+    except (OSError, ValueError) as exc:
+        raise TerminalPolicyError("cannot establish canonical inventory descriptor budget") from exc
+    if descriptor_budget <= 1:
+        raise TerminalPolicyError("canonical inventory descriptor budget is exhausted")
+
+    def reserve_descriptor() -> None:
+        if 1 + len(retained_file_fds) + len(retained_directory_fds) >= descriptor_budget:
+            raise TerminalPolicyError("canonical inventory descriptor budget is exhausted")
+
+    try:
+        named_root = os.lstat(root)
+        root_fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    except OSError as exc:
+        raise TerminalPolicyError("canonical generation is unavailable") from exc
+    try:
+        opened_root = os.fstat(root_fd)
+        if (
+            not stat.S_ISDIR(named_root.st_mode)
+            or stat.S_ISLNK(named_root.st_mode)
+            or not _same_stat(named_root, opened_root)
+        ):
+            raise TerminalPolicyError("canonical generation is not a physical directory")
+        records: list[dict[str, Any]] = []
+
+        def visit(directory_fd: int, relative: str) -> None:
+            before = os.fstat(directory_fd)
+            try:
+                names = sorted(os.listdir(directory_fd))
+            except OSError as exc:
+                raise TerminalPolicyError("canonical generation cannot be inventoried") from exc
+            if not _same_stat(before, os.fstat(directory_fd)):
+                raise TerminalPolicyError("canonical generation changed during inventory")
+            for entry_name in names:
+                name = f"{relative}/{entry_name}" if relative else entry_name
+                try:
+                    info = os.stat(entry_name, dir_fd=directory_fd, follow_symlinks=False)
+                except OSError as exc:
+                    raise TerminalPolicyError(
+                        "canonical generation changed during inventory"
+                    ) from exc
+                common = {
+                    "path": name,
+                    "mode": stat.S_IMODE(info.st_mode),
+                    "dev": info.st_dev,
+                    "ino": info.st_ino,
+                    "ctime_ns": info.st_ctime_ns,
+                }
+                if stat.S_ISDIR(info.st_mode):
+                    reserve_descriptor()
+                    try:
+                        child_fd = os.open(
+                            entry_name,
+                            os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC,
+                            dir_fd=directory_fd,
+                        )
+                    except OSError as exc:
+                        raise TerminalPolicyError(
+                            "canonical generation changed during inventory"
+                        ) from exc
+                    try:
+                        if not _same_stat(info, os.fstat(child_fd)):
+                            raise TerminalPolicyError(
+                                "canonical generation changed during inventory"
+                            )
+                        retained_directory_fds.append((child_fd, directory_fd, entry_name, info))
+                        records.append({**common, "kind": "dir"})
+                        visit(child_fd, name)
+                    except BaseException:
+                        if not any(item[0] == child_fd for item in retained_directory_fds):
+                            os.close(child_fd)
+                        raise
+                elif stat.S_ISREG(info.st_mode):
+                    reserve_descriptor()
+                    record, retained_fd = _canonical_regular_file_record(
+                        directory_fd, entry_name, info, common
+                    )
+                    transferred = False
+                    try:
+                        included = (
+                            name != "commit.json"
+                            and not name.startswith(".alpha_max_publication/")
+                            and not is_alpha_max_coordination_lock(name)
+                        )
+                        if included:
+                            retained_file_fds.append((retained_fd, info, record["sha256"]))
+                            transferred = True
+                        else:
+                            os.close(retained_fd)
+                            transferred = True
+                        records.append(record)
+                    except BaseException:
+                        if not transferred:
+                            os.close(retained_fd)
+                        raise
+                else:
+                    raise TerminalPolicyError("canonical generation contains an unsafe artifact")
+            if not _same_stat(before, os.fstat(directory_fd)):
+                raise TerminalPolicyError("canonical generation changed during inventory")
+
+        visit(root_fd, "")
+        try:
+            for fd, before, expected_digest in retained_file_fds:
+                if not _same_stat(before, os.fstat(fd)):
+                    raise TerminalPolicyError("canonical generation changed during inventory")
+                os.lseek(fd, 0, os.SEEK_SET)
+                digest = hashlib.sha256()
+                while True:
+                    chunk = os.read(fd, 1 << 20)
+                    if not chunk:
+                        break
+                    digest.update(chunk)
+                if digest.hexdigest() != expected_digest or not _same_stat(before, os.fstat(fd)):
+                    raise TerminalPolicyError("canonical generation changed during inventory")
+            for fd, parent_fd, entry_name, before in reversed(retained_directory_fds):
+                if not _same_stat(before, os.fstat(fd)) or not _same_stat(
+                    before, os.stat(entry_name, dir_fd=parent_fd, follow_symlinks=False)
+                ):
+                    raise TerminalPolicyError("canonical generation changed during inventory")
+        except OSError as exc:
+            raise TerminalPolicyError("canonical generation changed during inventory") from exc
+        try:
+            pathname_root = os.lstat(root)
+        except OSError as exc:
+            raise TerminalPolicyError("canonical generation changed during inventory") from exc
+        if not _same_stat(opened_root, os.fstat(root_fd)) or not _same_stat(
+            opened_root, pathname_root
+        ):
+            raise TerminalPolicyError("canonical generation changed during inventory")
+        return stable_alpha_max_canonical_inventory(records)
+    finally:
+        for fd, _parent_fd, _entry_name, _before in reversed(retained_directory_fds):
+            os.close(fd)
+        for fd, _before, _expected_digest in retained_file_fds:
+            os.close(fd)
+        os.close(root_fd)
+
+
+def alpha_max_canonical_inventory_sha256(root: Path) -> str:
+    """Digest one physical generation using publication-window inventory semantics."""
+    return hashlib.sha256(canonical_bytes(alpha_max_canonical_inventory_records(root))).hexdigest()
+
+
 _FORBIDDEN_ROOTS = (
     "/home/hoky/Quants-agent/LuminaQuant-data/alpha_max_20260711_listing_aware_source",
     "/home/hoky/Quants-agent/Quants-agent-alpha-max-data-pc",
@@ -646,6 +1014,328 @@ def _nonoverlap(paths: tuple[str, ...], label: str) -> None:
                 raise TerminalPolicyError(f"overlapping {label}")
 
 
+def _w10_topology_identity(info: os.stat_result, target: str | None = None) -> list[Any]:
+    if (
+        type(info.st_dev) is not int
+        or type(info.st_ino) is not int
+        or info.st_dev < 0
+        or info.st_ino < 0
+    ):
+        raise TerminalPolicyError("invalid W10 canonical identity")
+    if stat.S_ISDIR(info.st_mode):
+        if target is not None:
+            raise TerminalPolicyError("invalid W10 canonical identity")
+        return [info.st_dev, info.st_ino, "directory"]
+    if not stat.S_ISLNK(info.st_mode) or not isinstance(target, str) or not target:
+        raise TerminalPolicyError("invalid W10 canonical identity")
+    target_path = PurePosixPath(target)
+    if target_path.is_absolute() or any(part in {"", ".", ".."} for part in target_path.parts):
+        raise TerminalPolicyError("invalid W10 canonical identity")
+    return [info.st_dev, info.st_ino, "symlink", target]
+
+
+def _w10_canonical_root(bundle_path: Path) -> Path:
+    transaction_root = bundle_path.parent
+    transactions = transaction_root.parent
+    suffix = ".transactions"
+    if (
+        not _REQUEST_ID.fullmatch(transaction_root.name)
+        or not transactions.name.startswith(".")
+        or not transactions.name.endswith(suffix)
+    ):
+        raise TerminalPolicyError("W10 canonical finalize bundle path mismatch")
+    canonical_name = transactions.name[1 : -len(suffix)]
+    if not canonical_name or "/" in canonical_name or canonical_name in {".", ".."}:
+        raise TerminalPolicyError("W10 canonical finalize bundle path mismatch")
+    return transactions.parent / canonical_name
+
+
+def _sample_w10_canonical_identity(bundle_path: Path) -> dict[str, list[Any]]:
+    logical_root = _w10_canonical_root(bundle_path)
+    try:
+        logical_before = os.lstat(logical_root)
+        logical_target = os.readlink(logical_root) if stat.S_ISLNK(logical_before.st_mode) else None
+        logical_identity = _w10_topology_identity(logical_before, logical_target)
+        active_path = logical_root.resolve(strict=True)
+        active_before = os.lstat(active_path)
+        active_identity = _w10_topology_identity(active_before)
+        if active_identity[2] != "directory":
+            raise TerminalPolicyError("invalid W10 canonical identity")
+        active_after = os.lstat(active_path)
+        logical_after = os.lstat(logical_root)
+        logical_target_after = (
+            os.readlink(logical_root) if stat.S_ISLNK(logical_after.st_mode) else None
+        )
+    except OSError as exc:
+        raise TerminalPolicyError("W10 canonical topology is unavailable") from exc
+    if logical_identity != _w10_topology_identity(
+        logical_after, logical_target_after
+    ) or active_identity != _w10_topology_identity(active_after):
+        raise TerminalPolicyError("W10 canonical topology changed")
+    return {"logical_root": logical_identity, "active_generation": active_identity}
+
+
+def _parse_w10_canonical_identity(value: Any) -> dict[str, list[Any]]:
+    if not isinstance(value, dict) or set(value) != {"logical_root", "active_generation"}:
+        raise TerminalPolicyError("invalid W10 canonical identity")
+
+    def parse(identity: Any, allow_symlink: bool) -> list[Any]:
+        if not isinstance(identity, list) or len(identity) not in {3, 4}:
+            raise TerminalPolicyError("invalid W10 canonical identity")
+        dev, ino, kind = identity[:3]
+        if (
+            type(dev) is not int
+            or type(ino) is not int
+            or dev < 0
+            or ino < 0
+            or kind not in {"directory", "symlink"}
+        ):
+            raise TerminalPolicyError("invalid W10 canonical identity")
+        if kind == "directory":
+            if len(identity) != 3:
+                raise TerminalPolicyError("invalid W10 canonical identity")
+            return [dev, ino, kind]
+        if not allow_symlink or len(identity) != 4 or not isinstance(identity[3], str):
+            raise TerminalPolicyError("invalid W10 canonical identity")
+        target = PurePosixPath(identity[3])
+        if (
+            not identity[3]
+            or target.is_absolute()
+            or any(part in {"", ".", ".."} for part in target.parts)
+        ):
+            raise TerminalPolicyError("invalid W10 canonical identity")
+        return [dev, ino, kind, identity[3]]
+
+    logical = parse(value["logical_root"], True)
+    active = parse(value["active_generation"], False)
+    if active[2] != "directory":
+        raise TerminalPolicyError("invalid W10 canonical identity")
+    return {"logical_root": logical, "active_generation": active}
+
+
+def _w10_sibling_snapshot(
+    bundle_path: Path, receipts: dict[str, str]
+) -> tuple[dict[str, dict[str, Any]], list[tuple[int, Path, os.stat_result]]]:
+    siblings: dict[str, dict[str, Any]] = {}
+    retained: list[tuple[int, Path, os.stat_result]] = []
+    try:
+        for leaf, digest in receipts.items():
+            if validate_sha256(digest, f"W10 receipt {leaf}") != digest:
+                raise TerminalPolicyError("invalid W10 transaction receipt map")
+            path = bundle_path.parent / leaf
+            try:
+                named = os.lstat(path)
+                fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+            except OSError as exc:
+                raise TerminalPolicyError("W10 transaction receipt is unavailable") from exc
+            try:
+                opened = os.fstat(fd)
+                if (
+                    not stat.S_ISREG(opened.st_mode)
+                    or opened.st_nlink != 1
+                    or not _same_stat(named, opened)
+                    or opened.st_size > 64 * 1024 * 1024
+                ):
+                    raise TerminalPolicyError("invalid W10 transaction receipt")
+                raw = bytearray()
+                while len(raw) < opened.st_size:
+                    chunk = os.read(fd, min(1 << 20, opened.st_size - len(raw)))
+                    if not chunk:
+                        raise TerminalPolicyError("W10 transaction receipt was truncated")
+                    raw.extend(chunk)
+                after = os.fstat(fd)
+                if not _same_stat(opened, after):
+                    raise TerminalPolicyError("W10 transaction receipt changed")
+                receipt = parse_canonical_object(bytes(raw), f"W10 receipt {leaf}")
+                if hashlib.sha256(raw).hexdigest() != digest:
+                    raise TerminalPolicyError("W10 transaction receipt changed")
+                siblings[leaf] = receipt
+                retained.append((fd, path, opened))
+            except BaseException:
+                os.close(fd)
+                raise
+        return siblings, retained
+    except BaseException:
+        for fd, _path, _info in retained:
+            os.close(fd)
+        raise
+
+
+def _recheck_w10_sibling_snapshot(retained: list[tuple[int, Path, os.stat_result]]) -> None:
+    try:
+        for fd, path, before in retained:
+            if (
+                not _same_stat(before, os.fstat(fd))
+                or not _same_stat(before, os.lstat(path))
+                or os.fstat(fd).st_nlink != 1
+            ):
+                raise TerminalPolicyError("W10 transaction receipt changed")
+    except OSError as exc:
+        raise TerminalPolicyError("W10 transaction receipt changed") from exc
+
+
+_W10_FINALIZE_BUNDLE_LEAF = "canonical-finalize-bundle.json"
+_W10_FINALIZE_BUNDLE_DOMAIN = b"luminaquant.alpha_max.w10_canonical_finalize_bundle.v2\0"
+_W10_FINALIZE_RECEIPTS = (
+    "decision-localization.json",
+    "window-decision-intent.json",
+    "W8_FINALIZING.json",
+    "predecessor-cleanup-manifest.json",
+    "predecessor-quarantined.json",
+    "predecessor-cleanup-fsynced.json",
+    "completed.json",
+    "finalized.json",
+)
+
+
+def validate_w10_canonical_finalize_bundle(
+    path: Path | str,
+    *,
+    authority_public_key_b64: str,
+    run_id: str | None = None,
+    acquisition_request_id: str | None = None,
+    approval_sha256: str | None = None,
+    canonical_identity: dict[str, Any] | None = None,
+    finalize_authorization_sha256: str | None = None,
+    finalize_context_sha256: str | None = None,
+    transaction_receipt_sha256s: dict[str, str] | None = None,
+) -> dict[str, Any]:
+    """Authenticate the fixed, authority-signed W10 transaction-root bundle."""
+    bundle_path = Path(validate_lexical_control_path(path))
+    if bundle_path.name != _W10_FINALIZE_BUNDLE_LEAF:
+        raise TerminalPolicyError("W10 canonical finalize bundle leaf mismatch")
+    value = _canonical_object(bundle_path)
+    _exact(
+        value,
+        {"schema", "authority_key_id", "message", "signature"},
+        "W10 canonical finalize bundle",
+    )
+    try:
+        authority_raw = base64.b64decode(authority_public_key_b64, validate=True)
+        signature = base64.b64decode(value["signature"], validate=True)
+    except (TypeError, ValueError) as exc:
+        raise TerminalPolicyError("invalid W10 canonical finalize bundle signature") from exc
+    if (
+        len(authority_raw) != 32
+        or value["authority_key_id"] != hashlib.sha256(authority_raw).hexdigest()
+    ):
+        raise TerminalPolicyError("W10 canonical finalize bundle authority mismatch")
+    message = _exact(
+        value["message"],
+        {
+            "run_id",
+            "acquisition_request_id",
+            "transaction_root",
+            "approval_sha256",
+            "canonical_identity",
+            "state",
+            "finalize_authorization_sha256",
+            "finalize_context_sha256",
+            "transaction_receipt_sha256s",
+        },
+        "W10 canonical finalize message",
+    )
+    unsigned = {field: value[field] for field in ("schema", "authority_key_id", "message")}
+    try:
+        Ed25519PublicKey.from_public_bytes(authority_raw).verify(
+            signature, _W10_FINALIZE_BUNDLE_DOMAIN + canonical_bytes(unsigned)
+        )
+    except InvalidSignature as exc:
+        raise TerminalPolicyError("W10 canonical finalize bundle signature is invalid") from exc
+    if (
+        value["schema"] != "alpha_max_canonical_finalize_bundle.v2"
+        or message["state"] != "W10_FINALIZED"
+    ):
+        raise TerminalPolicyError("W10 canonical finalize bundle binding mismatch")
+    if message["transaction_root"] != str(bundle_path.parent):
+        raise TerminalPolicyError("W10 canonical finalize bundle path mismatch")
+    for field in (
+        "run_id",
+        "acquisition_request_id",
+        "approval_sha256",
+        "finalize_authorization_sha256",
+        "finalize_context_sha256",
+    ):
+        validate_sha256(message[field], f"W10 {field}")
+    signed_canonical_identity = _parse_w10_canonical_identity(message["canonical_identity"])
+    live_canonical_identity = _sample_w10_canonical_identity(bundle_path)
+    if signed_canonical_identity != live_canonical_identity:
+        raise TerminalPolicyError("W10 canonical topology changed")
+    if canonical_identity is not None and canonical_identity != live_canonical_identity:
+        raise TerminalPolicyError("W10 canonical finalize bundle binding mismatch")
+    receipts = message["transaction_receipt_sha256s"]
+    if not isinstance(receipts, dict) or set(receipts) != set(_W10_FINALIZE_RECEIPTS):
+        raise TerminalPolicyError("invalid W10 transaction receipt map")
+    siblings, retained_siblings = _w10_sibling_snapshot(bundle_path, receipts)
+    intent = siblings["window-decision-intent.json"]
+    journal = siblings["W8_FINALIZING.json"]
+    completed = siblings["completed.json"]
+    finalized = siblings["finalized.json"]
+    localization = siblings["decision-localization.json"]
+    manifest = siblings["predecessor-cleanup-manifest.json"]
+    quarantined = siblings["predecessor-quarantined.json"]
+    cleanup = siblings["predecessor-cleanup-fsynced.json"]
+    if (
+        intent.get("action") != "finalize"
+        or intent.get("authorization_sha256") != message["finalize_authorization_sha256"]
+        or intent.get("context_sha256") != message["finalize_context_sha256"]
+        or localization.get("action") != "finalize"
+        or localization.get("authorization_sha256") != message["finalize_authorization_sha256"]
+        or manifest.get("authorization_sha256") != message["finalize_authorization_sha256"]
+        or quarantined.get("authorization_sha256") != message["finalize_authorization_sha256"]
+        or cleanup
+        != {
+            "schema": "alpha_max_predecessor_cleanup.v1",
+            "authorization_sha256": message["finalize_authorization_sha256"],
+            "phase": "removal-fsynced",
+        }
+        or journal
+        != {
+            "schema": "alpha_max_window_action_journal.v1",
+            "action": "finalize",
+            "authorization_sha256": message["finalize_authorization_sha256"],
+            "context_sha256": message["finalize_context_sha256"],
+            "phase": "intent-fsynced",
+        }
+        or completed.get("schema") != "alpha_max_publication_completed.v1"
+        or completed.get("authorization_sha256") != message["finalize_authorization_sha256"]
+        or completed.get("context_sha256") != message["finalize_context_sha256"]
+        or finalized
+        != {
+            "schema": "alpha_max_window_terminal.v2",
+            "action": "finalize",
+            "state": "W10_FINALIZED",
+            "authorization_sha256": message["finalize_authorization_sha256"],
+            "context_sha256": message["finalize_context_sha256"],
+        }
+    ):
+        for fd, _path, _before in retained_siblings:
+            os.close(fd)
+        raise TerminalPolicyError("W10 transaction receipt cross-link mismatch")
+    expected = {
+        "run_id": run_id,
+        "acquisition_request_id": acquisition_request_id,
+        "approval_sha256": approval_sha256,
+        "canonical_identity": canonical_identity,
+        "finalize_authorization_sha256": finalize_authorization_sha256,
+        "finalize_context_sha256": finalize_context_sha256,
+        "transaction_receipt_sha256s": transaction_receipt_sha256s,
+    }
+    if any(
+        expected_value is not None and message[field] != expected_value
+        for field, expected_value in expected.items()
+    ):
+        for fd, _path, _before in retained_siblings:
+            os.close(fd)
+        raise TerminalPolicyError("W10 canonical finalize bundle binding mismatch")
+    try:
+        _recheck_w10_sibling_snapshot(retained_siblings)
+    finally:
+        for fd, _path, _before in retained_siblings:
+            os.close(fd)
+    return message
+
+
 def load_policy(path: Path | str) -> TerminalPolicy:
     value = _canonical_object(Path(validate_lexical_control_path(path)))
     _exact(
@@ -1006,22 +1696,7 @@ def load_request(
         path.parent != Path(evidence_root.path) for path in publication_paths
     ):
         raise TerminalPolicyError("publication path is outside evidence root")
-    prereq_kinds = {
-        "acquisition": ("checkpoint_pin", "alignment_receipt"),
-        "phase_preparation": (
-            "checkpoint_pin",
-            "alignment_receipt",
-            "source_eligible_receipt",
-            "source_manifest",
-            "source_journal",
-        ),
-        "one_touch": (
-            "checkpoint_pin",
-            "alignment_receipt",
-            "phase_handoff_receipt",
-            "preparation_manifest",
-        ),
-    }[scope]
+    prereq_kinds, _result_contract = scope_contract(scope)
     if not isinstance(value["prerequisites"], list) or len(value["prerequisites"]) != len(
         prereq_kinds
     ):
@@ -1111,6 +1786,14 @@ def load_request(
             expected_hash is not None and item.sha256 != expected_hash
         ):
             raise TerminalPolicyError(f"prerequisite {item.kind} binding mismatch")
+    if scope == "phase_preparation":
+        finalize_receipt = next(
+            item for item in prereqs if item.kind == "canonical_finalize_receipt"
+        )
+        validate_w10_canonical_finalize_bundle(
+            finalize_receipt.path,
+            authority_public_key_b64=envelope.authority_key.public_key_b64,
+        )
     checkpoint_record = next(item for item in prereqs if item.kind == "checkpoint_pin")
     checkpoint_identity = checkpoint.source_identity
     if (
@@ -1700,6 +2383,14 @@ def validate_prelaunch(
             or digest != item.sha256
         ):
             raise TerminalPolicyError(f"prerequisite {item.kind} identity drift")
+    if request.scope == "phase_preparation":
+        finalize_receipt = next(
+            item for item in request.prerequisites if item.kind == "canonical_finalize_receipt"
+        )
+        validate_w10_canonical_finalize_bundle(
+            finalize_receipt.path,
+            authority_public_key_b64=envelope.authority_key.public_key_b64,
+        )
     record = request.records
     outputs: list[AbsentOutput] = []
     for field in (
@@ -5586,6 +6277,7 @@ CLAIM_FIELDS = frozenset(
 MESSAGE_SIGNATURE_FIELDS = {
     "challenge": "authority_signature_b64",
     "observer_proof": "observer_signature_b64",
+    "publication_observer_ready": "observer_signature_b64",
     "authorization": "authority_signature_b64",
     "command_clearance": "authority_signature_b64",
     "process_event": "observer_signature_b64",

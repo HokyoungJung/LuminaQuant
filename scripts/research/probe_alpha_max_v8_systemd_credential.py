@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import base64
+import copy
 import argparse
 from datetime import UTC, datetime
 import hashlib
@@ -14,8 +16,10 @@ import secrets
 import shutil
 import subprocess
 import sys
+import socket
 import time
 from typing import Any
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
 _BUILDER = Path(__file__).with_name("create_alpha_max_v8_acquisition_controls.py")
 _PROBE_CODE = (
@@ -30,6 +34,149 @@ _PROBE_CODE = (
     "'entered_execstart':True},sort_keys=True,separators=(',',':')).encode()+b'\\n';"
     "fd=os.open(marker,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600);"
     "os.write(fd,payload);os.fsync(fd);os.close(fd)"
+)
+_PERSISTED_PROBE_CODE = (
+    "import hashlib,json,os,stat,sys,time;"
+    "credential_name=sys.argv[sys.argv.index('--credential-name')+1];"
+    "credential_flag={'authority.private':'--private-key','authority.public':'--authority-public-key',"
+    "'acquisition.private':'--observer-private-key','phase_preparation.private':'--observer-private-key',"
+    "'one_touch.private':'--observer-private-key'}[credential_name];"
+    "credential=sys.argv[sys.argv.index(credential_flag)+1];"
+    "expected=sys.argv[sys.argv.index('--expected-sha256')+1];"
+    "marker=sys.argv[sys.argv.index('--marker')+1];"
+    "release=sys.argv[sys.argv.index('--release')+1];"
+    "scope=sys.argv[sys.argv.index('--scope')+1];"
+    "role=sys.argv[sys.argv.index('--role')+1];"
+    "request=sys.argv[sys.argv.index('--request')+1];"
+    "key_id=sys.argv[sys.argv.index('--key-id')+1];"
+    "approval=sys.argv[sys.argv.index('--approval')+1];"
+    "data=open(credential,'rb').read();info=os.stat(credential);"
+    "assert hashlib.sha256(data).hexdigest()==expected;"
+    "assert stat.S_ISREG(info.st_mode) and info.st_size==len(data);"
+    "assert os.path.isfile(request) and os.path.isfile(approval) and len(key_id)==64;"
+    "payload=json.dumps({'credential_path':credential,'credential_sha256':expected,"
+    "'credential_mode':stat.S_IMODE(info.st_mode),'key_id':key_id,'scope':scope,'role':role,"
+    "'request':request,'approval':approval},sort_keys=True,separators=(',',':')).encode()+b'\\n';"
+    "fd=os.open(marker,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600);"
+    "os.write(fd,payload);os.fsync(fd);os.close(fd);"
+    "deadline=time.monotonic()+30;"
+    'exec("while not os.path.exists(release):\\n assert time.monotonic()<deadline\\n time.sleep(.01)")'
+)
+_ADMISSION_SIGN_SOURCE = r"""
+import fcntl
+import os
+from pathlib import Path
+import socket
+import stat
+import subprocess
+import sys
+
+
+def read_regular(path):
+    path = Path(path)
+    before = os.stat(path, follow_symlinks=False)
+    if (
+        not stat.S_ISREG(before.st_mode)
+        or before.st_nlink != 1
+        or before.st_uid != os.getuid()
+        or stat.S_IMODE(before.st_mode) & 0o022
+    ):
+        raise ValueError(f"unsafe signer input: {path}")
+    descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    try:
+        opened = os.fstat(descriptor)
+        chunks = []
+        while True:
+            chunk = os.read(descriptor, 1 << 20)
+            if not chunk:
+                break
+            chunks.append(chunk)
+        after = os.fstat(descriptor)
+    finally:
+        os.close(descriptor)
+    fields = ("st_dev", "st_ino", "st_uid", "st_gid", "st_mode", "st_nlink", "st_size")
+    if any(getattr(before, field) != getattr(opened, field) for field in fields) or any(
+        getattr(opened, field) != getattr(after, field) for field in fields
+    ):
+        raise ValueError(f"unstable signer input: {path}")
+    data = b"".join(chunks)
+    if len(data) != opened.st_size:
+        raise ValueError(f"short signer input: {path}")
+    return data
+
+
+key_path = sys.argv[sys.argv.index("--private-key") + 1]
+payload_path = sys.argv[sys.argv.index("--payload") + 1]
+socket_token = sys.argv[sys.argv.index("--socket") + 1]
+key = read_regular(key_path)
+payload = read_regular(payload_path)
+if len(key) != 32:
+    raise ValueError("invalid raw Ed25519 private key")
+pkcs8 = bytes.fromhex("302e020100300506032b657004220420") + key
+
+
+def sealed_memfd(name, data):
+    descriptor = os.memfd_create(name, os.MFD_CLOEXEC | os.MFD_ALLOW_SEALING)
+    try:
+        view = memoryview(data)
+        while view:
+            written = os.write(descriptor, view)
+            if written <= 0:
+                raise OSError("short memfd write")
+            view = view[written:]
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        fcntl.fcntl(
+            descriptor,
+            fcntl.F_ADD_SEALS,
+            fcntl.F_SEAL_SEAL
+            | fcntl.F_SEAL_SHRINK
+            | fcntl.F_SEAL_GROW
+            | fcntl.F_SEAL_WRITE,
+        )
+        return descriptor
+    except BaseException:
+        os.close(descriptor)
+        raise
+
+
+key_descriptor = sealed_memfd("alpha-max-ed25519", pkcs8)
+payload_descriptor = sealed_memfd("alpha-max-admission-payload", payload)
+try:
+    result = subprocess.run(
+        (
+            "/usr/bin/openssl",
+            "pkeyutl",
+            "-sign",
+            "-inkey",
+            f"/proc/self/fd/{key_descriptor}",
+            "-keyform",
+            "DER",
+            "-rawin",
+            "-in",
+            f"/proc/self/fd/{payload_descriptor}",
+        ),
+        check=True,
+        capture_output=True,
+        pass_fds=(key_descriptor, payload_descriptor),
+    )
+finally:
+    os.close(payload_descriptor)
+    os.close(key_descriptor)
+signature = result.stdout
+if len(signature) != 64:
+    raise ValueError("invalid Ed25519 signature length")
+channel = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+try:
+    channel.connect("\0" + socket_token)
+    channel.sendall(signature)
+    channel.shutdown(socket.SHUT_WR)
+finally:
+    channel.close()
+"""
+_ADMISSION_SIGN_CODE = (
+    "import base64;exec(compile(base64.b64decode("
+    + repr(base64.b64encode(_ADMISSION_SIGN_SOURCE.encode()).decode())
+    + "),'<alpha-max-admission-signer>','exec'))"
 )
 
 
@@ -80,7 +227,845 @@ def _properties(raw: str) -> dict[str, str]:
     return values
 
 
-def probe(evidence_root: Path) -> dict[str, Any]:
+def _ip_address_deny_all(value: str | None) -> bool:
+    return value == "any" or set((value or "").split()) == {"0.0.0.0/0", "::/0"}
+
+
+def _cgroup_properties(raw: str) -> dict[str, str]:
+    values: dict[str, str] = {}
+    for line in raw.splitlines():
+        fields = line.split()
+        if len(fields) == 2:
+            values[fields[0]] = fields[1]
+    return values
+
+
+_PRODUCTION_PROPERTIES = (
+    "FragmentPath",
+    "ExecStart",
+    "ExecStartPre",
+    "ExecStopPost",
+    "Environment",
+    "WorkingDirectory",
+    "UMask",
+    "NoNewPrivileges",
+    "PrivateTmp",
+    "PrivateDevices",
+    "ProtectSystem",
+    "ProtectHome",
+    "BindReadOnlyPaths",
+    "BindPaths",
+    "InaccessiblePaths",
+    "LoadCredential",
+    "ProtectKernelTunables",
+    "ProtectKernelModules",
+    "ProtectControlGroups",
+    "RestrictAddressFamilies",
+    "IPAddressDeny",
+    "MemoryHigh",
+    "MemoryMax",
+    "MemorySwapMax",
+    "OOMPolicy",
+    "TimeoutStartUSec",
+    "TimeoutStopUSec",
+)
+
+
+def _production_properties(unit_name: str) -> dict[str, str]:
+    command = ["systemctl", "--user", "show", unit_name]
+    for name in _PRODUCTION_PROPERTIES:
+        command.extend(("-p", name))
+    return _properties(_run(*command).stdout)
+
+
+def _selected_stages(control_root: Path, scope: str) -> tuple[str, ...]:
+    if scope not in {"acquisition", "phase_preparation", "one_touch", "all-ready"}:
+        raise ValueError("invalid persisted probe scope")
+    available = ["acquisition"]
+    for candidate in ("phase_preparation", "one_touch"):
+        stage = control_root / f"{candidate}-manifest.json"
+        complete = control_root / f"{candidate}.COMPLETE.json"
+        if stage.exists() != complete.exists():
+            raise RuntimeError(f"incomplete persisted {candidate} stage")
+        if stage.exists():
+            available.append(candidate)
+    if "one_touch" in available and "phase_preparation" not in available:
+        raise RuntimeError("one_touch stage exists without phase_preparation stage")
+    if scope == "all-ready":
+        return tuple(available)
+    required = {
+        "acquisition": ("acquisition",),
+        "phase_preparation": ("acquisition", "phase_preparation"),
+        "one_touch": ("acquisition", "phase_preparation", "one_touch"),
+    }[scope]
+    if any(candidate not in available for candidate in required):
+        raise RuntimeError(f"missing persisted {scope} stage")
+    return (scope,)
+
+
+def verify_persisted_topology(
+    control_root: Path, key_root: Path, approval: Path, scope: str = "all-ready"
+) -> dict[str, Any]:
+    """Fail closed on requested persisted stage artifacts before probing."""
+    selected = _selected_stages(control_root, scope)
+    required = (
+        selected
+        if scope == "all-ready"
+        else {
+            "acquisition": ("acquisition",),
+            "phase_preparation": ("acquisition", "phase_preparation"),
+            "one_touch": ("acquisition", "phase_preparation", "one_touch"),
+        }[scope]
+    )
+    controls = _controls()
+    expected_paths = {
+        "control_root": control_root,
+        "key_root": key_root,
+        "evidence_root": control_root.parent / f"g056v8-acquisition-evidence-{controls.RUN_ID}",
+        "telemetry_root": control_root.parent / f"g056v8-telemetry-{controls.RUN_ID}",
+        "output_parent": control_root.parent / f"g056v8-acquisition-output-{controls.RUN_ID}",
+        "stage_results_parent": control_root.parent / f"g056v8-stage-results-{controls.RUN_ID}",
+    }
+    controls._load_current_approval(
+        approval,
+        run_id=controls.RUN_ID,
+        request_ids={
+            "acquisition": controls.ACQUISITION_REQUEST_ID,
+            "phase_preparation": controls.PHASE_PREPARATION_REQUEST_ID,
+            "one_touch": controls.ONE_TOUCH_REQUEST_ID,
+        },
+        absent_paths=expected_paths,
+        require_absent=False,
+    )
+    manifest = controls._load_canonical(control_root / "manifest.json")
+    complete = controls._load_canonical(control_root / "COMPLETE.json")
+    if (
+        complete.get("manifest_sha256") != controls._file(control_root / "manifest.json")["sha256"]
+        or manifest.get("approval") != controls._file(approval)
+        or manifest.get("roots")
+        != {
+            name: controls._directory(path, private=True)
+            for name, path in expected_paths.items()
+            if name != "stage_results_parent"
+        }
+        or manifest.get("admission_root")
+        != controls._directory(control_root / "admissions", private=True)
+        or manifest.get("execution_alias") != controls._execution_alias()
+    ):
+        raise RuntimeError("acquisition manifest or approval binding mismatch")
+    _authority, _observers, _summary, key_files = controls._key_bindings(key_root)
+    controls._revalidate_key_files(key_files)
+    stages: dict[str, dict[str, Any]] = {}
+    for candidate in required:
+        if candidate == "acquisition":
+            continue
+        stage = control_root / f"{candidate}-manifest.json"
+        marker = control_root / f"{candidate}.COMPLETE.json"
+        value = controls._load_canonical(stage)
+        if (
+            value.get("scope") != candidate
+            or value.get("approval") != controls._file(approval)
+            or controls._load_canonical(marker).get("manifest_sha256")
+            != controls._file(stage)["sha256"]
+        ):
+            raise RuntimeError(f"{candidate} stage binding mismatch")
+        stages[candidate] = value
+    verified: list[dict[str, Any]] = []
+    acquisition_plan_path = Path(manifest["launch_plan"]["path"])
+    acquisition_plan = controls._load_canonical(acquisition_plan_path)
+    if (
+        controls._file(acquisition_plan_path) != manifest["launch_plan"]
+        or acquisition_plan.get("scope_topology", {}).get("execution_alias")
+        != controls._execution_alias()
+    ):
+        raise RuntimeError("acquisition launch plan or execution alias binding mismatch")
+    if "acquisition" in selected:
+        for role, rendered in acquisition_plan["rendered_systemd_units"].items():
+            item = acquisition_plan["systemd_units"][role]
+            unit = {key: value for key, value in item.items() if key != "name"}
+            if (
+                controls._file(Path(rendered["file"]["path"])) != rendered["file"]
+                or controls._render_systemd_unit(unit)
+                != Path(rendered["file"]["path"]).read_bytes()
+                or controls._credential_binding(unit, key_files) != rendered["credential"]
+            ):
+                raise RuntimeError("acquisition rendered unit or credential mismatch")
+            verified.append(
+                {
+                    "scope": "acquisition",
+                    "role": role,
+                    "unit": rendered["file"],
+                    "credential": rendered["credential"],
+                    "definition": unit,
+                    "production_unit": item["name"],
+                }
+            )
+    for candidate in selected:
+        if candidate == "acquisition":
+            continue
+        stage = stages[candidate]
+        for role, item in stage["units"].items():
+            definition = stage["unit_definitions"].get(role)
+            unit_path = Path(item["file"]["path"])
+            rendered = unit_path.read_bytes()
+            if (
+                not isinstance(definition, dict)
+                or controls._file(unit_path) != item["file"]
+                or controls._render_systemd_unit(definition) != rendered
+            ):
+                raise RuntimeError("staged rendered unit mismatch")
+            credential = item["credential"]
+            source = credential["source"]
+            if (
+                controls._file(Path(source["path"])) != source
+                or controls._credential_binding(definition, key_files) != credential
+                or credential["target"] not in rendered.decode()
+            ):
+                raise RuntimeError("staged credential binding mismatch")
+            verified.append(
+                {
+                    "scope": candidate,
+                    "role": role,
+                    "unit": item["file"],
+                    "credential": credential,
+                    "definition": definition,
+                    "production_unit": item["name"],
+                }
+            )
+    artifacts = [
+        controls._file(control_root / "manifest.json"),
+        controls._file(control_root / "COMPLETE.json"),
+        controls._file(acquisition_plan_path),
+        controls._file(Path(manifest["request"]["path"])),
+        *[item["unit"] for item in verified],
+    ]
+    for candidate in selected:
+        if candidate != "acquisition":
+            artifacts.extend(
+                (
+                    controls._file(control_root / f"{candidate}-request.json"),
+                    controls._file(control_root / f"{candidate}-manifest.json"),
+                    controls._file(control_root / f"{candidate}.COMPLETE.json"),
+                )
+            )
+    return {
+        "schema": "alpha_max_v8_persisted_unit_probe.v1",
+        "verdict": "PASS",
+        "requested_scope": scope,
+        "stages": list(selected),
+        "units": verified,
+        "control_artifacts": artifacts,
+    }
+
+
+def _persisted_probe_execstart(
+    controls: Any,
+    credential_name: str,
+    credential_target: str,
+    expected_sha256: str,
+    marker: Path,
+    release: Path,
+    scope: str,
+    role: str,
+    request: str,
+    key_id: str,
+    approval: Path,
+) -> list[str]:
+    return [
+        sys.executable,
+        "-I",
+        "-S",
+        "-c",
+        _PERSISTED_PROBE_CODE,
+        controls._credential_argument(credential_name),
+        credential_target,
+        "--credential-name",
+        credential_name,
+        "--expected-sha256",
+        expected_sha256,
+        "--marker",
+        str(marker),
+        "--release",
+        str(release),
+        "--scope",
+        scope,
+        "--role",
+        role,
+        "--request",
+        request,
+        "--key-id",
+        key_id,
+        "--approval",
+        str(approval),
+    ]
+
+
+def _execute_persisted_topology(
+    control_root: Path,
+    key_root: Path,
+    approval: Path,
+    evidence_root: Path,
+    scope: str = "all-ready",
+) -> dict[str, Any]:
+    """Run a safe command substitution under requested persisted unit directives."""
+    if scope == "all-ready":
+        raise ValueError("all-ready cannot publish a receipt unused by a single production scope")
+    verified = verify_persisted_topology(control_root, key_root, approval, scope)
+    requested_scope = scope
+    selected = tuple(verified["stages"])
+    controls = _controls()
+    authority, observers, _summary, _key_files = controls._key_bindings(key_root)
+    key_ids = {
+        "authority": authority["key_id"],
+        **{item["scope"]: item["key_id"] for item in observers},
+    }
+    expected_evidence = control_root.parent / f"g056v8-acquisition-evidence-{controls.RUN_ID}"
+    manifest = controls._load_canonical(control_root / "manifest.json")
+    admission_root = control_root / "admissions"
+    admission_paths = [
+        admission_root / f"launch-admission-{requested_scope}{suffix}"
+        for suffix in (".payload.json", ".signature", ".json")
+    ]
+    audit_path = evidence_root / f"launch-admission-{requested_scope}.audit.json"
+    if (
+        evidence_root != expected_evidence
+        or not evidence_root.is_absolute()
+        or evidence_root.is_symlink()
+        or not evidence_root.is_dir()
+        or manifest.get("admission_root") != controls._directory(admission_root, private=True)
+        or manifest.get("execution_alias") != controls._execution_alias()
+        or any(path.exists() or path.is_symlink() for path in [*admission_paths, audit_path])
+    ):
+        raise ValueError(
+            "persisted probe roots must be the declared fresh production evidence and admission paths"
+        )
+    plan = controls._load_canonical(Path(manifest["launch_plan"]["path"]))
+    definitions: list[tuple[str, str, dict[str, Any], dict[str, Any], str, str]] = []
+    if "acquisition" in selected:
+        for role, rendered in plan["rendered_systemd_units"].items():
+            item = plan["systemd_units"][role]
+            definitions.append(
+                (
+                    "acquisition",
+                    role,
+                    {key: value for key, value in item.items() if key != "name"},
+                    rendered["credential"],
+                    str(control_root / "acquisition-request.json"),
+                    item["name"],
+                )
+            )
+    for candidate in selected:
+        if candidate == "acquisition":
+            continue
+        stage = controls._load_canonical(control_root / f"{candidate}-manifest.json")
+        for role, item in stage["units"].items():
+            definitions.append(
+                (
+                    candidate,
+                    role,
+                    stage["unit_definitions"][role],
+                    item["credential"],
+                    stage["request"]["path"],
+                    item["name"],
+                )
+            )
+    unit_directory = Path.home() / ".config/systemd/user"
+    unit_directory.mkdir(parents=True, exist_ok=True)
+    receipts: list[dict[str, Any]] = []
+    production_links: list[Path] = []
+    production_properties: dict[str, dict[str, str]] = {}
+    try:
+        for entry in verified["units"]:
+            unit_file = Path(entry["unit"]["path"])
+            link = unit_directory / unit_file.name
+            if link.exists() or link.is_symlink():
+                raise RuntimeError(f"production unit link already exists: {link}")
+            if controls._file(unit_file) != entry["unit"]:
+                raise RuntimeError("production unit identity drift before link")
+            os.symlink(unit_file, link)
+            production_links.append(link)
+        _run("systemctl", "--user", "daemon-reload")
+        for entry in verified["units"]:
+            unit_file = Path(entry["unit"]["path"])
+            _run("systemd-analyze", "--user", "verify", str(unit_file))
+            properties = _production_properties(unit_file.name)
+            if (
+                properties.get("FragmentPath")
+                not in {str(unit_file), str(unit_directory / unit_file.name)}
+                or not properties.get("ExecStart")
+                or not properties.get("ExecStartPre")
+                or properties.get("WorkingDirectory") != "/"
+                or properties.get("UMask") != "0077"
+                or properties.get("MemoryHigh") != str(entry["definition"]["Service"]["MemoryHigh"])
+                or properties.get("MemoryMax") != str(entry["definition"]["Service"]["MemoryMax"])
+                or properties.get("MemorySwapMax")
+                != str(entry["definition"]["Service"]["MemorySwapMax"])
+                or properties.get("OOMPolicy") != entry["definition"]["Service"]["OOMPolicy"]
+            ):
+                raise RuntimeError("production unit static readback mismatch")
+            production_properties[unit_file.name] = properties
+    except BaseException:
+        for link in production_links:
+            if link.is_symlink():
+                link.unlink()
+        _run("systemctl", "--user", "daemon-reload", check=False)
+        raise
+    for index, (scope, role, original, credential, request, production_name) in enumerate(
+        definitions
+    ):
+        active = _properties(
+            _run(
+                "systemctl", "--user", "show", production_name, "-p", "ActiveState", check=False
+            ).stdout
+        )
+        if active.get("ActiveState") not in {"inactive", "failed", ""}:
+            raise RuntimeError(f"production unit is active: {production_name}")
+        source, credential_name = credential["source"], credential["name"]
+        marker = evidence_root / f"{index:02d}-{scope}-{role}.json"
+        release = evidence_root / f"{index:02d}-{scope}-{role}.release"
+        substituted = copy.deepcopy(original)
+        service = substituted["Service"]
+        production_wrapper = original["Service"]["ExecStart"]
+        if production_wrapper[:5] != [
+            "/usr/bin/python3",
+            "-I",
+            "-S",
+            "-c",
+            controls._MOUNT_IDENTITY_CODE,
+        ]:
+            raise RuntimeError("production ExecStart lacks final namespace verifier")
+        wrapper_config = json.loads(production_wrapper[5])
+        stop = service.get("ExecStopPost")
+        if stop is not None:
+            service["ExecStopPost"] = controls._wrap_execstart(
+                stop[-len(original["Service"]["ExecStopPost"][6:]) :],
+                [binding.split(":", 1)[1] for binding in service.get("BindPaths", [])],
+                receipt=wrapper_config["receipt"],
+                unit_name=wrapper_config["unit_name"],
+                authority_public_b64=wrapper_config["authority_public_b64"],
+            )
+        probe_prestart = service.pop("ExecStartPre", None)
+        if probe_prestart != original["Service"].get("ExecStartPre"):
+            raise RuntimeError("probe omitted a nonexact production prestart")
+        probe_argv = _persisted_probe_execstart(
+            controls,
+            credential_name,
+            credential["target"],
+            source["sha256"],
+            marker,
+            release,
+            scope,
+            role,
+            request,
+            key_ids[
+                "authority"
+                if credential_name.startswith("authority.")
+                else credential_name.removesuffix(".private")
+            ],
+            approval,
+        )
+        service["ExecStart"] = controls._wrap_execstart(
+            probe_argv,
+            [binding.split(":", 1)[1] for binding in service.get("BindPaths", [])],
+            receipt=wrapper_config["receipt"],
+            unit_name=wrapper_config["unit_name"],
+            authority_public_b64=wrapper_config["authority_public_b64"],
+        )
+        controls._validate_unit(substituted)
+        if any(
+            substituted["Service"].get(name) != value
+            for name, value in original["Service"].items()
+            if name not in {"ExecStart", "ExecStopPost", "ExecStartPre"}
+        ):
+            raise RuntimeError("probe directive drift")
+        probe_unit = controls._render_systemd_unit(substituted)
+        network_deny_overlay = True
+        probe_unit += (
+            b"RestrictAddressFamilies=\nRestrictAddressFamilies=AF_UNIX\nIPAddressDeny=any\n"
+        )
+        unit_name = f"luminaquant-persisted-{index}-{secrets.token_hex(12)}.service"
+        transient, link = evidence_root / unit_name, unit_directory / unit_name
+        _write_new(transient, probe_unit)
+        properties: dict[str, str] = {}
+        cgroup_evidence: dict[str, str] = {}
+        try:
+            os.symlink(transient, link)
+            _run("systemctl", "--user", "daemon-reload")
+            _run("systemd-analyze", "--user", "verify", str(transient))
+            _run("systemctl", "--user", "start", unit_name)
+            deadline = time.monotonic() + 10.0
+            while not marker.exists():
+                if time.monotonic() >= deadline:
+                    raise RuntimeError("safe substituted ExecStart did not publish marker")
+                time.sleep(0.01)
+            properties = _properties(
+                _run(
+                    "systemctl",
+                    "--user",
+                    "show",
+                    unit_name,
+                    "-p",
+                    "Result",
+                    "-p",
+                    "ExecMainStatus",
+                    "-p",
+                    "ActiveState",
+                    "-p",
+                    "MemoryHigh",
+                    "-p",
+                    "MemoryMax",
+                    "-p",
+                    "MemorySwapMax",
+                    "-p",
+                    "OOMPolicy",
+                    "-p",
+                    "LoadCredential",
+                    "-p",
+                    "ExecStart",
+                    "-p",
+                    "RestrictAddressFamilies",
+                    "-p",
+                    "IPAddressDeny",
+                    "-p",
+                    "ControlGroup",
+                    check=False,
+                ).stdout
+            )
+            marker_value = json.loads(marker.read_text(encoding="utf-8"))
+            if (
+                properties.get("ActiveState") != "active"
+                or marker_value.get("credential_sha256") != source["sha256"]
+                or marker_value.get("scope") != scope
+                or marker_value.get("role") != role
+                or marker_value.get("credential_mode") != 0o400
+                or marker_value.get("request") != request
+                or marker_value.get("approval") != str(approval)
+                or marker_value.get("key_id")
+                != key_ids[
+                    "authority"
+                    if credential_name.startswith("authority.")
+                    else credential_name.removesuffix(".private")
+                ]
+                or not marker_value.get("credential_path", "").endswith("/" + credential_name)
+                or marker_value.get("credential_path") == source["path"]
+                or properties.get("RestrictAddressFamilies") != "AF_UNIX"
+                or not _ip_address_deny_all(properties.get("IPAddressDeny"))
+            ):
+                raise RuntimeError("safe substituted unit readback mismatch")
+            control_group = properties.get("ControlGroup", "")
+            cgroup = Path("/sys/fs/cgroup") / control_group.lstrip("/")
+            required_cgroup_files = {
+                "cgroup.events": cgroup / "cgroup.events",
+                "memory.events": cgroup / "memory.events",
+                "memory.high": cgroup / "memory.high",
+                "memory.max": cgroup / "memory.max",
+                "memory.swap.max": cgroup / "memory.swap.max",
+                "memory.oom.group": cgroup / "memory.oom.group",
+            }
+            if not control_group or any(
+                not path.is_file() for path in required_cgroup_files.values()
+            ):
+                raise RuntimeError("safe substituted unit has no live cgroup evidence")
+            cgroup_evidence = {
+                name: path.read_text(encoding="utf-8")
+                for name, path in required_cgroup_files.items()
+            }
+            memory_events = _cgroup_properties(cgroup_evidence["memory.events"])
+            cgroup_events = _cgroup_properties(cgroup_evidence["cgroup.events"])
+            required_events = ("high", "max", "oom", "oom_kill", "oom_group_kill")
+            if (
+                cgroup_evidence["memory.high"].strip() != properties.get("MemoryHigh")
+                or cgroup_evidence["memory.max"].strip() != properties.get("MemoryMax")
+                or cgroup_evidence["memory.swap.max"].strip() != properties.get("MemorySwapMax")
+                or cgroup_evidence["memory.oom.group"].strip() != "1"
+                or cgroup_events.get("populated") != "1"
+                or any(
+                    name not in memory_events
+                    or not memory_events[name].isdigit()
+                    or int(memory_events[name]) < 0
+                    for name in required_events
+                )
+                or memory_events["oom"] != "0"
+                or memory_events["oom_kill"] != "0"
+                or memory_events["oom_group_kill"] != "0"
+            ):
+                raise RuntimeError("safe substituted unit cgroup limits or OOM evidence mismatch")
+            _write_new(release, b"release\n")
+            deadline = time.monotonic() + 10.0
+            while True:
+                terminal = _properties(
+                    _run(
+                        "systemctl",
+                        "--user",
+                        "show",
+                        unit_name,
+                        "-p",
+                        "Result",
+                        "-p",
+                        "ExecMainStatus",
+                        "-p",
+                        "ActiveState",
+                        check=False,
+                    ).stdout
+                )
+                if terminal.get("ActiveState") in {"inactive", "failed"}:
+                    break
+                if time.monotonic() >= deadline:
+                    raise RuntimeError("safe substituted ExecStart did not terminate")
+                time.sleep(0.01)
+            if terminal.get("Result") != "success" or terminal.get("ExecMainStatus") != "0":
+                raise RuntimeError("safe substituted ExecStart terminal result mismatch")
+            cgroup_evidence["terminal_result"] = _canonical(terminal).decode("utf-8")
+        finally:
+            _run("systemctl", "--user", "stop", unit_name, check=False)
+            _run("systemctl", "--user", "reset-failed", unit_name, check=False)
+            if link.is_symlink():
+                link.unlink()
+            _run("systemctl", "--user", "daemon-reload", check=False)
+        receipts.append(
+            {
+                "scope": scope,
+                "role": role,
+                "production_unit": production_name,
+                "credential": source,
+                "properties": properties,
+                "cgroup_evidence": cgroup_evidence,
+                "production_prestart": probe_prestart,
+                "probe_omits_production_prestart": True,
+                "network_deny_overlay": network_deny_overlay,
+                "probe_unit_sha256": hashlib.sha256(probe_unit).hexdigest(),
+            }
+        )
+    aggregate = {
+        "schema": "alpha_max_v8_persisted_probe_launch_admission.v1",
+        "verdict": "PASS",
+        "approval": controls._file(approval),
+        "complete": controls._file(control_root / "COMPLETE.json"),
+        "manifest": controls._file(control_root / "manifest.json"),
+        "requested_scope": requested_scope,
+        "stages": list(selected),
+        "topology": verified,
+        "control_artifacts": verified["control_artifacts"],
+        "units": receipts,
+        "source_inventory": controls._record(controls._inventory(Path(controls.CURRENT))),
+        "ignored_source_inventory": controls._record(
+            controls._ignored_source_inventory(Path(controls.CURRENT))
+        ),
+        "accepted_source_state": {
+            "root": controls.ACCEPTED,
+            "head": controls._git(Path(controls.ACCEPTED), "rev-parse", "HEAD").decode().strip(),
+            "porcelain": controls._record(
+                controls._source_git(Path(controls.ACCEPTED), "status", "--porcelain=v1", "-z")
+            ),
+            "source_inventory": controls._record(controls._inventory(Path(controls.ACCEPTED))),
+            "ignored_source_inventory": controls._record(
+                controls._ignored_source_inventory(Path(controls.ACCEPTED))
+            ),
+        },
+        "runtime_inventories": {
+            name: controls._record(
+                controls._runtime_inventory(
+                    controls._preflight_executables(
+                        {
+                            "current_python": Path(
+                                controls.EXECUTABLE_PINS["current_python"]["path"]
+                            ),
+                            "accepted_python": Path(
+                                controls.EXECUTABLE_PINS["accepted_python"]["path"]
+                            ),
+                            "telemetry_script": Path(
+                                controls.EXECUTABLE_PINS["telemetry_script"]["path"]
+                            ),
+                        }
+                    )[name]
+                )
+            )
+            for name in controls._RUNTIME_NAMES
+        },
+        "execution_alias": controls._execution_alias(),
+        "production_properties": production_properties,
+        "runtime_bindings": {
+            name: {
+                "interpreter": controls._preflight_executables(
+                    {
+                        "current_python": Path(controls.EXECUTABLE_PINS["current_python"]["path"]),
+                        "accepted_python": Path(
+                            controls.EXECUTABLE_PINS["accepted_python"]["path"]
+                        ),
+                        "telemetry_script": Path(
+                            controls.EXECUTABLE_PINS["telemetry_script"]["path"]
+                        ),
+                    }
+                )[name],
+                "root": str(Path(controls.EXECUTABLE_PINS[name]["path"]).parent.parent),
+            }
+            for name in controls._RUNTIME_NAMES
+        },
+    }
+    _write_new(audit_path, _canonical(aggregate), 0o600)
+    signed = _sign_launch_admission(
+        controls,
+        admission_root,
+        evidence_root,
+        key_root,
+        authority,
+        aggregate,
+        requested_scope,
+    )
+    return signed
+
+
+def execute_persisted_topology(
+    control_root: Path,
+    key_root: Path,
+    approval: Path,
+    evidence_root: Path,
+    scope: str = "acquisition",
+) -> dict[str, Any]:
+    try:
+        return _execute_persisted_topology(control_root, key_root, approval, evidence_root, scope)
+    except BaseException:
+        unit_directory = Path.home() / ".config/systemd/user"
+        systemd_root = control_root / "systemd"
+        if systemd_root.is_dir():
+            for link in unit_directory.iterdir() if unit_directory.is_dir() else ():
+                if link.is_symlink() and link.resolve().parent == systemd_root:
+                    link.unlink()
+            _run("systemctl", "--user", "daemon-reload", check=False)
+        raise
+
+
+def _sign_launch_admission(
+    controls,
+    admission_root: Path,
+    evidence_root: Path,
+    key_root: Path,
+    authority: dict[str, Any],
+    payload: dict[str, Any],
+    scope: str,
+) -> dict[str, Any]:
+    payload_path = admission_root / f"launch-admission-{scope}.payload.json"
+    signature_path = admission_root / f"launch-admission-{scope}.signature"
+    envelope_path = admission_root / f"launch-admission-{scope}.json"
+    _write_new(payload_path, _canonical(payload), 0o600)
+    socket_token = f"luminaquant-alpha-max-admission-{secrets.token_hex(12)}"
+    listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    listener.settimeout(30.0)
+    listener.bind("\0" + socket_token)
+    listener.listen(1)
+    unit = controls._unit(
+        "LuminaQuant authority launch-admission signer",
+        [
+            "/usr/bin/python3",
+            "-I",
+            "-S",
+            "-c",
+            _ADMISSION_SIGN_CODE,
+            "--private-key",
+            "%d/authority.private",
+            "--payload",
+            str(payload_path),
+            "--socket",
+            socket_token,
+        ],
+        {"HOME": "/tmp", "PYTHONDONTWRITEBYTECODE": "1"},
+        {"high": 67_108_864, "max": 134_217_728, "swap": 33_554_432},
+        None,
+        read_paths=[str(payload_path)],
+        write_paths=[],
+        inaccessible_paths=[str(key_root)],
+        load_credential=f"authority.private:{key_root / 'authority.private'}",
+        observer=False,
+    )
+    unit_name = f"luminaquant-launch-admission-{secrets.token_hex(12)}.service"
+    unit_path = evidence_root / unit_name
+    unit_link = Path.home() / ".config/systemd/user" / unit_name
+    _write_new(unit_path, controls._render_systemd_unit(unit))
+    try:
+        try:
+            unit_link.parent.mkdir(parents=True, exist_ok=True)
+            os.symlink(unit_path, unit_link)
+            _run("systemctl", "--user", "daemon-reload")
+            _run("systemd-analyze", "--user", "verify", str(unit_path))
+            _run("systemctl", "--user", "start", unit_name)
+            connection, _ = listener.accept()
+            with connection:
+                connection.settimeout(30.0)
+                chunks: list[bytes] = []
+                total = 0
+                while total <= 64:
+                    chunk = connection.recv(65 - total)
+                    if not chunk:
+                        break
+                    chunks.append(chunk)
+                    total += len(chunk)
+            signature = b"".join(chunks)
+            if len(signature) != 64:
+                raise RuntimeError("authority launch-admission signature length is invalid")
+            deadline = time.monotonic() + 10.0
+            while True:
+                shown = _properties(
+                    _run(
+                        "systemctl",
+                        "--user",
+                        "show",
+                        unit_name,
+                        "-p",
+                        "Result",
+                        "-p",
+                        "ExecMainStatus",
+                        "-p",
+                        "ActiveState",
+                        "-p",
+                        "RestrictAddressFamilies",
+                        "-p",
+                        "IPAddressDeny",
+                        "-p",
+                        "LoadCredential",
+                        "-p",
+                        "BindPaths",
+                        check=False,
+                    ).stdout
+                )
+                if shown.get("ActiveState") in {"inactive", "failed"}:
+                    break
+                if time.monotonic() >= deadline:
+                    raise RuntimeError("authority launch-admission signer did not terminate")
+                time.sleep(0.01)
+            if (
+                shown.get("Result") != "success"
+                or shown.get("ExecMainStatus") != "0"
+                or shown.get("RestrictAddressFamilies") != "AF_UNIX"
+                or not _ip_address_deny_all(shown.get("IPAddressDeny"))
+                or shown.get("BindPaths", "")
+                or shown.get("LoadCredential")
+                not in {"[unprintable]", f"authority.private:{key_root / 'authority.private'}"}
+            ):
+                raise RuntimeError("authority launch-admission signer readback failed")
+        finally:
+            _run("systemctl", "--user", "stop", unit_name, check=False)
+            _run("systemctl", "--user", "reset-failed", unit_name, check=False)
+            if unit_link.is_symlink():
+                unit_link.unlink()
+            _run("systemctl", "--user", "daemon-reload", check=False)
+    finally:
+        listener.close()
+    public = base64.b64decode(authority["public_key_b64"], validate=True)
+    Ed25519PublicKey.from_public_bytes(public).verify(
+        signature, controls._read_regular(payload_path)[1]
+    )
+    _write_new(signature_path, signature, 0o600)
+    envelope = {
+        "schema": "alpha_max_v8_signed_launch_admission.v1",
+        "payload": payload,
+        "signature_b64": base64.b64encode(signature).decode("ascii"),
+        "authority_key_id": authority["key_id"],
+    }
+    _write_new(envelope_path, _canonical(envelope), 0o600)
+    return envelope
+
+
+def _probe_one(evidence_root: Path, credential_name: str) -> dict[str, Any]:
     controls = _controls()
     if not evidence_root.is_absolute() or evidence_root.exists() or evidence_root.is_symlink():
         raise ValueError("evidence root must be a fresh absolute path")
@@ -92,11 +1077,11 @@ def probe(evidence_root: Path) -> dict[str, Any]:
         os.close(parent_fd)
 
     token = secrets.token_hex(12)
-    unit_name = f"luminaquant-credential-probe-{token}.service"
+    unit_name = f"luminaquant-credential-probe-{credential_name}-{token}.service"
     key_root = evidence_root.parent / f".{evidence_root.name}.{token}.keys"
     key_root.mkdir(mode=0o700)
-    source = key_root / "authority.private"
-    public = key_root / "authority.public"
+    source = key_root / f"{credential_name}.private"
+    public = key_root / f"{credential_name}.public"
     secret = secrets.token_bytes(32)
     _write_new(source, secret, 0o400)
     _write_new(public, secrets.token_bytes(32), 0o400)
@@ -110,13 +1095,13 @@ def probe(evidence_root: Path) -> dict[str, Any]:
     unit = controls._unit(
         "LuminaQuant non-network credential delivery probe",
         [
-            sys.executable,
+            "/usr/bin/python3",
             "-I",
             "-S",
             "-c",
             _PROBE_CODE,
             "--private-key",
-            "%d/authority.private",
+            f"%d/{credential_name}.private",
             "--expected-sha256",
             expected_sha256,
             "--marker",
@@ -125,14 +1110,15 @@ def probe(evidence_root: Path) -> dict[str, Any]:
         {"HOME": str(evidence_root)},
         {"high": 67_108_864, "max": 134_217_728, "swap": 33_554_432},
         None,
-        read_paths=[controls.CURRENT],
+        read_paths=[],
         write_paths=[str(evidence_root)],
         inaccessible_paths=[str(key_root)],
-        load_credential=f"authority.private:{source}",
+        load_credential=f"{credential_name}.private:{source}",
+        observer=False,
     )
     key_files = [
         {
-            "name": "authority",
+            "name": credential_name,
             "private": controls._file(source),
             "public": controls._file(public),
         }
@@ -198,6 +1184,8 @@ def probe(evidence_root: Path) -> dict[str, Any]:
                 "ExecStart",
                 "-p",
                 "LoadCredential",
+                "-p",
+                "BindPaths",
             )
             properties = _properties(shown.stdout)
             if properties.get("ActiveState") in {"inactive", "failed"}:
@@ -215,7 +1203,7 @@ def probe(evidence_root: Path) -> dict[str, Any]:
             marker_value.get("entered_execstart") is not True
             or marker_value.get("credential_sha256") != expected_sha256
             or not isinstance(credential_path, str)
-            or not credential_path.endswith("/authority.private")
+            or not credential_path.endswith(f"/{credential_name}.private")
             or credential_path == str(source)
             or properties.get("Result") != "success"
             or properties.get("ExecMainCode") not in {"0", "1"}
@@ -224,14 +1212,15 @@ def probe(evidence_root: Path) -> dict[str, Any]:
             or properties.get("UMask") != "0077"
             or terminal_unit_identity != unit_identity
             or fragment_path not in {str(unit_link), str(unit_path)}
-            or str(sys.executable) not in exec_start
+            or "/usr/bin/python3" not in exec_start
             or credential_path not in exec_start
             or expected_sha256 not in exec_start
             or str(marker) not in exec_start
-            or load_credential not in {"[unprintable]", f"authority.private:{source}"}
+            or load_credential not in {"[unprintable]", f"{credential_name}.private:{source}"}
             or str(source) in exec_start
-            or f"LoadCredential=authority.private:{source}" not in rendered.decode()
-            or "%d/authority.private" not in rendered.decode()
+            or f"LoadCredential={credential_name}.private:{source}" not in rendered.decode()
+            or properties.get("BindPaths") != unit["Service"]["BindPaths"][0] + ":rbind"
+            or f"%d/{credential_name}.private" not in rendered.decode()
             or properties.get("MemoryHigh") != "67108864"
             or properties.get("MemoryMax") != "134217728"
             or properties.get("MemorySwapMax") != "33554432"
@@ -307,11 +1296,53 @@ def probe(evidence_root: Path) -> dict[str, Any]:
     return receipt
 
 
+def probe(evidence_root: Path) -> dict[str, Any]:
+    if not evidence_root.is_absolute() or evidence_root.exists() or evidence_root.is_symlink():
+        raise ValueError("evidence root must be a fresh absolute path")
+    evidence_root.mkdir(mode=0o700)
+    parent_fd = os.open(evidence_root.parent, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(parent_fd)
+    finally:
+        os.close(parent_fd)
+    receipts = {
+        credential: _probe_one(evidence_root / credential, credential)
+        for credential in ("authority", "acquisition", "phase_preparation", "one_touch")
+    }
+    receipt = {
+        "schema": "alpha_max_v8_systemd_credential_probe.v2",
+        "verdict": "PASS",
+        "network_allowed": False,
+        "scopes": receipts,
+    }
+    _write_new(evidence_root / "all-scopes-probe.json", _canonical(receipt), 0o600)
+    return receipt
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--evidence-root", required=True, type=Path)
+    parser.add_argument("--evidence-root", type=Path)
+    parser.add_argument("--control-root", type=Path)
+    parser.add_argument("--key-root", type=Path)
+    parser.add_argument("--approval", type=Path)
+    parser.add_argument(
+        "--scope",
+        choices=("acquisition", "phase_preparation", "one_touch", "all-ready"),
+        default="acquisition",
+    )
     args = parser.parse_args(argv)
-    probe(args.evidence_root)
+    if args.control_root or args.key_root or args.approval:
+        if not (args.control_root and args.key_root and args.approval and args.evidence_root):
+            parser.error(
+                "persisted execution requires control root, key root, approval, and evidence root"
+            )
+        execute_persisted_topology(
+            args.control_root, args.key_root, args.approval, args.evidence_root, args.scope
+        )
+    elif args.evidence_root is not None:
+        probe(args.evidence_root)
+    else:
+        parser.error("provide persisted topology or evidence root")
     return 0
 
 

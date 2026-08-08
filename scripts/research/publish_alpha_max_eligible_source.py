@@ -15,10 +15,20 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 import base64
 from cryptography.exceptions import InvalidSignature
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
+from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 import polars as pl
+import subprocess
 
-from lumina_quant.alpha_max_terminal_policy import verify_signed_receipt
+from lumina_quant.alpha_max_terminal_policy import (
+    ALPHA_MAX_PUBLICATION_OBSERVER_READY_SCHEMA,
+    ALPHA_MAX_PUBLICATION_OBSERVER_READY_UNSIGNED_FIELDS,
+    TerminalPolicyError,
+    alpha_max_canonical_inventory_records,
+    is_alpha_max_coordination_lock as _is_coordination_lock,
+    verify_message,
+    verify_signed_receipt,
+)
 from lumina_quant.market_data import MarketDataRepository
 from lumina_quant.storage.parquet import ParquetMarketDataRepository
 
@@ -34,7 +44,62 @@ _PUBLICATION_CONTROL_RESERVE_BYTES = 64 * 1024 * 1024
 _PARQUET_ENCODING_RESERVE_BYTES = 64 * 1024 * 1024
 _HEX = set("0123456789abcdef")
 _CONFLICT_AUTHORIZATION_DOMAIN = b"luminaquant.alpha_max.canonical_conflict_authorization.v2\0"
-_CONFLICT_RUN_ID = "47eeac483e70d6af0784b873895024c8a2d01793a2447d3d3fbaa776d63bd2ad"
+_CONFLICT_RUN_ID = "41ed4e09bd7b4af1793d3138e5d55d22d217d5fd4bd9477493d885e42fae1602"
+_CURRENT_APPROVAL_LEAF = "current-state-approval-v8.json"
+_ACQUISITION_REQUEST_ID = "3377aca77e4edead9454051883d015c15389ffb0da06d63ec9e76ee2573252ec"
+_PHASE_REQUEST_ID = "a89b7872357feaee131c9bdbf4d78312ad86e7d4da90c7d2441d2d9cd2b43bac"
+_ONE_TOUCH_REQUEST_ID = "30f6eafb4f0023c602c54bab8719ce105b2c28d07c7511cb5d9db42936f49d5c"
+_PUBLICATION_STAGE_ENVELOPE_DOMAIN = b"luminaquant.alpha_max.publication_stage_envelope.v1\0"
+_PUBLICATION_STAGE_ENVELOPE_SCHEMA = "alpha_max_publication_stage_envelope.v1"
+_APPROVAL_OWNER_SESSION_PATH = ".gjc/_session-019fad7d-536a-7000-b794-52ccaa961746/"
+_APPROVAL_OWNER_EXCLUDE = f":(exclude){_APPROVAL_OWNER_SESSION_PATH}**"
+_APPROVAL_IGNORED_PATHS = (
+    "src",
+    "scripts",
+    "apps",
+    ":(exclude)apps/dashboard_web/.next/**",
+    ":(exclude)apps/dashboard_web/node_modules/**",
+)
+_APPROVAL_RUNTIME_ROOTS = {
+    "current_python": Path("/home/hoky/Quants-agent/LuminaQuant/.venv-g056v8-current"),
+    "accepted_python": Path(
+        "/home/hoky/Quants-agent/LuminaQuant-alpha-max-fresh-20260718/.venv-g056v8-accepted"
+    ),
+    "base_python": Path("/home/hoky/.local/share/uv/python/cpython-3.14.5-linux-x86_64-gnu"),
+}
+_APPROVAL_RECOVERY_ROOT = Path("/home/hoky/quants-recovery-runs")
+_APPROVAL_EXECUTION_ALIAS = Path(f"/mnt/wsl/luminaquant-alpha-max-execution-{_CONFLICT_RUN_ID}")
+
+_APPROVAL_ACCEPTED_ALPHA_COMMIT = "391000b40717386765bfa39bd212d91c2e3be794"
+_APPROVAL_BASELINE_ANCESTOR = "629d91e5d4aac26911af65a4a5e15ebdcbded30f"
+_APPROVAL_ACCEPTED_SOURCE_ROOT = Path(
+    "/home/hoky/Quants-agent/LuminaQuant-alpha-max-fresh-20260718"
+)
+_APPROVAL_ABSENT_RECOVERY_ARTIFACTS = {
+    "control_root": f"/home/hoky/quants-recovery-runs/g056v8-controls-{_CONFLICT_RUN_ID}",
+    "key_root": f"/home/hoky/quants-recovery-runs/g056v8-keys-{_CONFLICT_RUN_ID}",
+    "evidence_root": f"/home/hoky/quants-recovery-runs/g056v8-acquisition-evidence-{_CONFLICT_RUN_ID}",
+    "telemetry_root": f"/home/hoky/quants-recovery-runs/g056v8-telemetry-{_CONFLICT_RUN_ID}",
+    "output_parent": f"/home/hoky/quants-recovery-runs/g056v8-acquisition-output-{_CONFLICT_RUN_ID}",
+    "stage_results_parent": f"/home/hoky/quants-recovery-runs/g056v8-stage-results-{_CONFLICT_RUN_ID}",
+}
+_PREOPEN_ROLLBACK_FIELDS = frozenset(
+    {
+        "schema",
+        "phase",
+        "kind",
+        "request_id",
+        "approval_sha256",
+        "activation_intent_sha256",
+        "observer_ready_sha256",
+        "failure_reason",
+        "failure_evidence_leaf",
+        "failure_evidence_sha256",
+        "candidate_identity",
+        "predecessor_identity",
+        "swap_identity",
+    }
+)
 
 
 class PublicationError(ValueError):
@@ -137,6 +202,192 @@ def _conflict_public_key(path: Path) -> bytes:
         os.close(fd)
 
 
+def _publication_private_key(fd: int) -> Ed25519PrivateKey:
+    try:
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode) or info.st_size != 32:
+            raise PublicationError("publisher key fd must reference a raw 32-byte regular file")
+        data = bytearray()
+        while len(data) < 32:
+            chunk = os.read(fd, 32 - len(data))
+            if not chunk:
+                raise PublicationError("publisher key fd was truncated")
+            data.extend(chunk)
+        if os.read(fd, 1):
+            raise PublicationError("publisher key fd has trailing bytes")
+        return Ed25519PrivateKey.from_private_bytes(bytes(data))
+    except OSError as exc:
+        raise PublicationError("publisher key fd is unavailable") from exc
+
+
+def _stage_envelope(
+    private_key: Ed25519PrivateKey, kind: str, message: dict[str, Any]
+) -> dict[str, Any]:
+    if kind not in {"activation", "open_window", "replay"}:
+        raise PublicationError("publication stage kind is invalid")
+    inner = {**message, "kind": kind}
+    public = private_key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
+    unsigned = {
+        "schema": _PUBLICATION_STAGE_ENVELOPE_SCHEMA,
+        "kind": kind,
+        "authority_key_id": hashlib.sha256(public).hexdigest(),
+        "message": inner,
+    }
+    return {
+        **unsigned,
+        "signature": base64.b64encode(
+            private_key.sign(_PUBLICATION_STAGE_ENVELOPE_DOMAIN + canonical_bytes(unsigned))
+        ).decode("ascii"),
+    }
+
+
+def _verify_stage_envelope(
+    path: Path, publisher_key: Ed25519PrivateKey, expected_kind: str
+) -> dict[str, Any]:
+    envelope, _ = _json(path, "publication stage envelope")
+    public = publisher_key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
+    if (
+        set(envelope) != {"schema", "kind", "authority_key_id", "message", "signature"}
+        or envelope.get("schema") != _PUBLICATION_STAGE_ENVELOPE_SCHEMA
+        or envelope.get("kind") != expected_kind
+        or envelope.get("authority_key_id") != hashlib.sha256(public).hexdigest()
+        or not isinstance(envelope.get("message"), dict)
+        or envelope["message"].get("kind") != expected_kind
+        or not isinstance(envelope.get("signature"), str)
+    ):
+        raise PublicationError("publication stage envelope binding is invalid")
+    try:
+        Ed25519PublicKey.from_public_bytes(public).verify(
+            base64.b64decode(envelope["signature"], validate=True),
+            _PUBLICATION_STAGE_ENVELOPE_DOMAIN
+            + canonical_bytes(
+                {key: value for key, value in envelope.items() if key != "signature"}
+            ),
+        )
+    except (ValueError, InvalidSignature) as exc:
+        raise PublicationError("publication stage envelope signature is invalid") from exc
+    return envelope["message"]
+
+
+def _manager_terminal_or_observer_failure(control: Path) -> None:
+    names = (
+        "window-decision-intent.json",
+        "W7_ROLLING_BACK.json",
+        "W8_FINALIZING.json",
+        "rollback-exchange-fsynced.json",
+        "predecessor-cleanup-manifest.json",
+        "predecessor-quarantined.json",
+        "predecessor-cleanup-fsynced.json",
+        "rolled-back.json",
+        "finalized.json",
+        "completed.json",
+        "observer-failure.json",
+        "observer-failure-intent.json",
+        "failure-intent.json",
+    )
+    if any((control / name).exists() for name in names):
+        raise PublicationError("manager terminal or observer failure prevents publication replay")
+
+
+def _preopen_failure_evidence(
+    control: Path,
+    observer_public_key: Path,
+    *,
+    request_id: str,
+    approval_sha256: str,
+    observer_ready_sha256: str,
+) -> tuple[str, str] | None:
+    for name in (
+        "observer-failure.json",
+        "observer-failure-intent.json",
+        "observer-terminal-fail.json",
+    ):
+        path = control / name
+        if not path.exists():
+            continue
+        envelope, raw = _json(path, "observer failure evidence")
+        public = _conflict_public_key(observer_public_key)
+        unsigned = {key: value for key, value in envelope.items() if key != "signature"}
+        try:
+            Ed25519PublicKey.from_public_bytes(public).verify(
+                base64.b64decode(envelope.get("signature", ""), validate=True),
+                _PUBLICATION_STAGE_ENVELOPE_DOMAIN + canonical_bytes(unsigned),
+            )
+        except (TypeError, ValueError, InvalidSignature) as exc:
+            raise PublicationError("observer failure evidence signature is invalid") from exc
+        message = envelope.get("message")
+        if (
+            set(envelope) != {"schema", "kind", "authority_key_id", "message", "signature"}
+            or envelope.get("schema") != _PUBLICATION_STAGE_ENVELOPE_SCHEMA
+            or envelope.get("kind") != "observer"
+            or envelope.get("authority_key_id") != hashlib.sha256(public).hexdigest()
+            or not isinstance(message, dict)
+            or message.get("kind") != "observer_failure"
+            or message.get("outcome") != "FAIL"
+            or message.get("run_id") != _CONFLICT_RUN_ID
+            or message.get("request_id") != request_id
+            or message.get("approval_leaf") != _CURRENT_APPROVAL_LEAF
+            or message.get("approval_sha256") != approval_sha256
+            or not isinstance(message.get("frozen_observation"), dict)
+        ):
+            raise PublicationError("observer failure evidence binding is invalid")
+        return name, hashlib.sha256(raw).hexdigest()
+    return None
+
+
+def _validate_preopen_rollback_intent(
+    rollback: dict[str, Any],
+    *,
+    control: Path,
+    observer_public_key: Path,
+    request_id: str,
+    approval_sha256: str,
+    activation_intent_sha256: str,
+    candidate_identity: list[Any],
+    predecessor_identity: list[Any],
+    swap_identity: list[Any],
+    observer_ready_sha256: str | None,
+) -> None:
+    expected = {
+        "fields": _PREOPEN_ROLLBACK_FIELDS,
+        "schema": "alpha_max_publication_pre_open_rollback.v2",
+        "phase": "rollback_intent",
+        "kind": "activation",
+        "request_id": request_id,
+        "approval_sha256": approval_sha256,
+        "activation_intent_sha256": activation_intent_sha256,
+        "observer_ready_sha256": observer_ready_sha256,
+        "candidate_identity": candidate_identity,
+        "predecessor_identity": predecessor_identity,
+        "swap_identity": swap_identity,
+    }
+    mismatches = [
+        field
+        for field, value in expected.items()
+        if (set(rollback) if field == "fields" else rollback.get(field)) != value
+    ]
+    if mismatches:
+        raise PublicationError(
+            "pre-open rollback intent binding is invalid: " + ", ".join(mismatches)
+        )
+    leaf = rollback["failure_evidence_leaf"]
+    digest = rollback["failure_evidence_sha256"]
+    if (leaf is None) != (digest is None) or (
+        leaf is not None and (not isinstance(leaf, str) or not isinstance(digest, str))
+    ):
+        raise PublicationError("pre-open rollback failure evidence binding is invalid")
+    if leaf is not None and (control / leaf).exists():
+        verified = _preopen_failure_evidence(
+            control,
+            observer_public_key,
+            request_id=request_id,
+            approval_sha256=approval_sha256,
+            observer_ready_sha256=observer_ready_sha256,
+        )
+        if verified != (leaf, digest):
+            raise PublicationError("pre-open rollback failure evidence changed")
+
+
 def _json(path: Path, label: str, *, limit: int = _MAX_JSON) -> tuple[dict[str, Any], bytes]:
     raw = _regular_bytes(path, label, limit=limit)
     try:
@@ -146,6 +397,377 @@ def _json(path: Path, label: str, *, limit: int = _MAX_JSON) -> tuple[dict[str, 
     if not isinstance(value, dict) or canonical_bytes(value) != raw:
         raise PublicationError(f"{label} is not canonical JSON")
     return value, raw
+
+
+def _process_start_ticks(pid: int) -> int:
+    try:
+        raw = Path(f"/proc/{pid}/stat").read_text(encoding="ascii")
+        ticks = int(raw.rsplit(")", 1)[1].split()[19])
+    except (OSError, IndexError, ValueError, UnicodeError) as exc:
+        raise PublicationError("observer process identity is unavailable") from exc
+    if ticks <= 0:
+        raise PublicationError("observer process start time is invalid")
+    return ticks
+
+
+def _observer_process_alive(ready: dict[str, Any]) -> None:
+    pid = ready.get("observer_pid")
+    uid = ready.get("observer_uid")
+    if type(pid) is not int or pid <= 0 or type(uid) is not int or uid != os.getuid():
+        raise PublicationError("observer process binding is invalid")
+    try:
+        process = os.stat(f"/proc/{pid}", follow_symlinks=False)
+    except OSError as exc:
+        raise PublicationError("bound observer process is not alive") from exc
+    if process.st_uid != uid or _process_start_ticks(pid) != ready.get("observer_start_ticks"):
+        raise PublicationError("bound observer process identity changed")
+
+
+def _observer_ready(
+    path: Path,
+    public_key_path: Path,
+    *,
+    request_id: str,
+    approval_sha256: str,
+    canonical_root: Path,
+) -> tuple[dict[str, Any], str]:
+    value, raw = _json(path, "publication observer readiness")
+    public_bytes = _conflict_public_key(public_key_path)
+    public_key = Ed25519PublicKey.from_public_bytes(public_bytes)
+    try:
+        unsigned = verify_message("publication_observer_ready", value, public_key)
+    except TerminalPolicyError as exc:
+        raise PublicationError(str(exc)) from exc
+    if (
+        set(unsigned) != ALPHA_MAX_PUBLICATION_OBSERVER_READY_UNSIGNED_FIELDS
+        or unsigned.get("schema") != ALPHA_MAX_PUBLICATION_OBSERVER_READY_SCHEMA
+        or unsigned.get("kind") != "publication_observer_ready"
+        or unsigned.get("run_id") != _CONFLICT_RUN_ID
+        or unsigned.get("request_id") != request_id
+        or unsigned.get("approval_leaf") != _CURRENT_APPROVAL_LEAF
+        or unsigned.get("approval_sha256") != approval_sha256
+        or unsigned.get("canonical_root") != str(canonical_root)
+        or unsigned.get("observer_key_id") != hashlib.sha256(public_bytes).hexdigest()
+        or unsigned.get("observer_uid") != os.getuid()
+        or not isinstance(unsigned.get("query_spec_sha256"), str)
+        or re.fullmatch(r"[0-9a-f]{64}", unsigned["query_spec_sha256"]) is None
+        or not isinstance(unsigned.get("old_identity"), list)
+        or len(unsigned["old_identity"]) != 3
+        or unsigned["old_identity"][2] != "directory"
+        or not isinstance(unsigned.get("old_inventory_sha256"), str)
+        or re.fullmatch(r"[0-9a-f]{64}", unsigned["old_inventory_sha256"]) is None
+    ):
+        raise PublicationError("publication observer readiness binding is invalid")
+    ready = {
+        **unsigned,
+        "observer_signature_b64": value["observer_signature_b64"],
+    }
+    return ready, hashlib.sha256(raw).hexdigest()
+
+
+def _approval_canonical(value: Any) -> bytes:
+    return (
+        json.dumps(
+            value,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode("utf-8")
+        + b"\n"
+    )
+
+
+def _approval_record(value: bytes) -> dict[str, Any]:
+    return {"sha256": hashlib.sha256(value).hexdigest(), "byte_count": len(value)}
+
+
+def _valid_approval_record(value: Any) -> bool:
+    return (
+        isinstance(value, dict)
+        and set(value) == {"sha256", "byte_count"}
+        and isinstance(value["sha256"], str)
+        and re.fullmatch(r"[0-9a-f]{64}", value["sha256"]) is not None
+        and isinstance(value["byte_count"], int)
+        and not isinstance(value["byte_count"], bool)
+        and value["byte_count"] >= 0
+    )
+
+
+def _approval_git(root: Path, *arguments: str) -> bytes:
+    if arguments and arguments[0] == "diff":
+        arguments = ("diff", "--no-ext-diff", *arguments[1:])
+    return subprocess.run(
+        (
+            "/usr/bin/git",
+            "--no-optional-locks",
+            "-c",
+            "core.hooksPath=/dev/null",
+            "-c",
+            "core.fsmonitor=false",
+            "-C",
+            str(root),
+            *arguments,
+        ),
+        check=True,
+        capture_output=True,
+        env={
+            "GIT_CONFIG_NOSYSTEM": "1",
+            "HOME": "/tmp",
+            "LANG": "C.UTF-8",
+            "LC_ALL": "C.UTF-8",
+            "PATH": "/usr/bin:/bin",
+        },
+    ).stdout
+
+
+def _approval_source_git(root: Path, *arguments: str) -> bytes:
+    return _approval_git(root, *arguments, "--", ".", _APPROVAL_OWNER_EXCLUDE)
+
+
+def _approval_inventory_entry(root: Path, name: str) -> dict[str, Any]:
+    if not name or name.startswith("/") or ".." in Path(name).parts:
+        raise PublicationError("current-state approval inventory path is unsafe")
+    path = root / name
+    before = os.lstat(path)
+    if stat.S_ISREG(before.st_mode):
+        if (
+            before.st_nlink != 1
+            or before.st_uid != os.getuid()
+            or stat.S_IMODE(before.st_mode) & 0o022
+        ):
+            raise PublicationError("current-state approval inventory file is unsafe")
+        descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+        try:
+            opened = os.fstat(descriptor)
+            digest = hashlib.sha256()
+            size = 0
+            while True:
+                chunk = os.read(descriptor, 1 << 20)
+                if not chunk:
+                    break
+                digest.update(chunk)
+                size += len(chunk)
+            after = os.fstat(descriptor)
+            named_after = os.lstat(path)
+        finally:
+            os.close(descriptor)
+        if (
+            _identity(before) != _identity(opened)
+            or _identity(opened) != _identity(after)
+            or _identity(after) != _identity(named_after)
+            or size != after.st_size
+        ):
+            raise PublicationError("current-state approval inventory file identity drift")
+        kind = "regular"
+        content_size = size
+        sha256 = digest.hexdigest()
+        info = after
+    elif stat.S_ISLNK(before.st_mode):
+        if before.st_nlink != 1 or before.st_uid != os.getuid():
+            raise PublicationError("current-state approval inventory symlink is unsafe")
+        target = os.readlink(path)
+        info = os.lstat(path)
+        content = os.fsencode(target)
+        if _identity(before) != _identity(info) or len(content) != info.st_size:
+            raise PublicationError("current-state approval inventory symlink identity drift")
+        kind = "symlink"
+        content_size = len(content)
+        sha256 = hashlib.sha256(content).hexdigest()
+    else:
+        raise PublicationError("current-state approval inventory entry is unsafe")
+    return {
+        "path": name,
+        "type": kind,
+        "mode": stat.S_IMODE(info.st_mode),
+        "size": content_size,
+        "sha256": sha256,
+    }
+
+
+def _approval_inventory(root: Path, names: list[bytes]) -> bytes:
+    records = [_approval_inventory_entry(root, raw.decode("utf-8")) for raw in names]
+    return _approval_canonical(records)
+
+
+def _approval_source_inventory(root: Path) -> bytes:
+    names = _approval_source_git(
+        root, "ls-files", "-z", "--cached", "--others", "--exclude-standard"
+    ).split(b"\0")[:-1]
+    return _approval_inventory(root, names)
+
+
+def _approval_ignored_source_inventory(root: Path) -> bytes:
+    names = _approval_git(
+        root,
+        "ls-files",
+        "-z",
+        "--others",
+        "--ignored",
+        "--exclude-standard",
+        "--",
+        *_APPROVAL_IGNORED_PATHS,
+    ).split(b"\0")[:-1]
+    return _approval_inventory(root, names)
+
+
+def _approval_runtime_inventory(root: Path) -> bytes:
+    names: list[bytes] = []
+    for directory, subdirectories, filenames in os.walk(root, followlinks=False):
+        relative = Path(directory).relative_to(root)
+        for name in (*subdirectories, *filenames):
+            path = Path(directory) / name
+            info = os.lstat(path)
+            if stat.S_ISDIR(info.st_mode):
+                continue
+            if not (stat.S_ISREG(info.st_mode) or stat.S_ISLNK(info.st_mode)):
+                raise PublicationError("current-state approval runtime entry is unsafe")
+            names.append(os.fsencode(str(relative / name)))
+    return _approval_inventory(root, sorted(names))
+
+
+def _approval_execution_alias() -> dict[str, Any]:
+    before = os.lstat(_APPROVAL_EXECUTION_ALIAS)
+    if not stat.S_ISLNK(before.st_mode) or before.st_nlink != 1 or before.st_uid != os.getuid():
+        raise PublicationError("current-state execution alias is unsafe")
+    target = os.readlink(_APPROVAL_EXECUTION_ALIAS)
+    after = os.lstat(_APPROVAL_EXECUTION_ALIAS)
+    if (
+        target != str(_APPROVAL_RECOVERY_ROOT)
+        or _identity(before) != _identity(after)
+        or len(os.fsencode(target)) != after.st_size
+    ):
+        raise PublicationError("current-state execution alias identity drift")
+    return {
+        "path": str(_APPROVAL_EXECUTION_ALIAS),
+        "target": target,
+        "st_dev": after.st_dev,
+        "st_ino": after.st_ino,
+        "st_uid": after.st_uid,
+        "st_gid": after.st_gid,
+        "mode": stat.S_IMODE(after.st_mode),
+        "nlink": after.st_nlink,
+    }
+
+
+def _approval(path: Path) -> tuple[dict[str, Any], str]:
+    if path.name != _CURRENT_APPROVAL_LEAF:
+        raise PublicationError("current-state approval leaf is invalid")
+    approval, raw = _json(path, "current-state approval")
+    required = {
+        "schema",
+        "repository_root",
+        "head",
+        "accepted_alpha_commit",
+        "baseline_ancestor",
+        "verdict",
+        "porcelain",
+        "commit_overlay",
+        "worktree_overlay",
+        "source_inventory",
+        "ignored_source_inventory",
+        "runtime_inventories",
+        "execution_alias",
+        "run_id",
+        "request_ids",
+        "absent_recovery_artifacts",
+        "accepted_source_state",
+    }
+    repository_root = Path(__file__).resolve().parents[2]
+    records = (
+        "porcelain",
+        "commit_overlay",
+        "worktree_overlay",
+        "source_inventory",
+        "ignored_source_inventory",
+    )
+    accepted_state_fields = {
+        "root",
+        "head",
+        "porcelain",
+        "source_inventory",
+        "ignored_source_inventory",
+    }
+    if (
+        set(approval) != required
+        or approval.get("schema") != "alpha_max_v8_current_state_approval.v3"
+        or approval.get("repository_root") != str(repository_root)
+        or approval.get("run_id") != _CONFLICT_RUN_ID
+        or approval.get("request_ids")
+        != {
+            "acquisition": _ACQUISITION_REQUEST_ID,
+            "phase_preparation": _PHASE_REQUEST_ID,
+            "one_touch": _ONE_TOUCH_REQUEST_ID,
+        }
+        or approval.get("verdict") != "PASS_REVIEWED_OVERLAY"
+        or any(not _valid_approval_record(approval.get(name)) for name in records)
+        or not isinstance(approval.get("runtime_inventories"), dict)
+        or set(approval["runtime_inventories"]) != set(_APPROVAL_RUNTIME_ROOTS)
+        or any(
+            not _valid_approval_record(value) for value in approval["runtime_inventories"].values()
+        )
+        or approval.get("accepted_alpha_commit") != _APPROVAL_ACCEPTED_ALPHA_COMMIT
+        or approval.get("baseline_ancestor") != _APPROVAL_BASELINE_ANCESTOR
+        or approval.get("absent_recovery_artifacts") != _APPROVAL_ABSENT_RECOVERY_ARTIFACTS
+        or not isinstance(approval.get("accepted_source_state"), dict)
+        or set(approval["accepted_source_state"]) != accepted_state_fields
+        or approval["accepted_source_state"].get("root") != str(_APPROVAL_ACCEPTED_SOURCE_ROOT)
+        or approval["accepted_source_state"].get("head") != _APPROVAL_ACCEPTED_ALPHA_COMMIT
+        or any(
+            not _valid_approval_record(approval["accepted_source_state"].get(name))
+            for name in ("porcelain", "source_inventory", "ignored_source_inventory")
+        )
+    ):
+        raise PublicationError("current-state approval binding is invalid")
+    try:
+        actual = {
+            "head": _approval_git(repository_root, "rev-parse", "HEAD").decode().strip(),
+            "porcelain": _approval_record(
+                _approval_source_git(repository_root, "status", "--porcelain=v1", "-z")
+            ),
+            "commit_overlay": _approval_record(
+                _approval_source_git(
+                    repository_root,
+                    "diff",
+                    "--binary",
+                    f"{approval['accepted_alpha_commit']}..HEAD",
+                )
+            ),
+            "worktree_overlay": _approval_record(
+                _approval_source_git(repository_root, "diff", "--binary", "HEAD")
+            ),
+            "source_inventory": _approval_record(_approval_source_inventory(repository_root)),
+            "ignored_source_inventory": _approval_record(
+                _approval_ignored_source_inventory(repository_root)
+            ),
+            "runtime_inventories": {
+                name: _approval_record(_approval_runtime_inventory(root))
+                for name, root in _APPROVAL_RUNTIME_ROOTS.items()
+            },
+            "execution_alias": _approval_execution_alias(),
+            "accepted_source_state": {
+                "root": str(_APPROVAL_ACCEPTED_SOURCE_ROOT),
+                "head": _approval_git(_APPROVAL_ACCEPTED_SOURCE_ROOT, "rev-parse", "HEAD")
+                .decode()
+                .strip(),
+                "porcelain": _approval_record(
+                    _approval_source_git(
+                        _APPROVAL_ACCEPTED_SOURCE_ROOT, "status", "--porcelain=v1", "-z"
+                    )
+                ),
+                "source_inventory": _approval_record(
+                    _approval_source_inventory(_APPROVAL_ACCEPTED_SOURCE_ROOT)
+                ),
+                "ignored_source_inventory": _approval_record(
+                    _approval_ignored_source_inventory(_APPROVAL_ACCEPTED_SOURCE_ROOT)
+                ),
+            },
+        }
+    except (OSError, UnicodeError, subprocess.CalledProcessError) as exc:
+        raise PublicationError("current-state approval repository readback failed") from exc
+    if any(approval.get(name) != value for name, value in actual.items()):
+        raise PublicationError("current-state approval repository binding drift")
+    return approval, hashlib.sha256(raw).hexdigest()
 
 
 def _sha(value: Any, label: str) -> str:
@@ -234,26 +856,76 @@ def _ensure_private_directory(path: Path) -> None:
         raise PublicationError("private directory identity is unsafe")
 
 
+def _receipt_write(fd: int, payload: bytes) -> None:
+    _write_all(fd, payload)
+
+
+def _receipt_fsync(fd: int) -> None:
+    os.fsync(fd)
+
+
+def _receipt_install_noreplace(source: Path, destination: Path) -> None:
+    libc = ctypes.CDLL(None, use_errno=True)
+    renameat2 = libc.renameat2
+    renameat2.argtypes = [
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_uint,
+    ]
+    renameat2.restype = ctypes.c_int
+    if renameat2(-100, os.fsencode(source), -100, os.fsencode(destination), 1) != 0:
+        code = ctypes.get_errno()
+        raise OSError(code, os.strerror(code), str(destination))
+
+
+def _remove_receipt_temp_remnants(path: Path) -> None:
+    remnants = sorted(path.parent.glob(f".{path.name}.tmp-*"))
+    if len(remnants) > 64:
+        raise PublicationError("too many receipt temp remnants")
+    removed = False
+    for remnant in remnants:
+        info = os.lstat(remnant)
+        if (
+            not stat.S_ISREG(info.st_mode)
+            or info.st_uid != os.getuid()
+            or info.st_gid != os.getgid()
+            or stat.S_IMODE(info.st_mode) != 0o600
+            or info.st_size > _MAX_JSON
+            or info.st_nlink != 1
+        ):
+            raise PublicationError("publication receipt temp remnant is unsafe")
+        remnant.unlink()
+        removed = True
+    if removed:
+        _fsync_dir(path.parent)
+
+
 def _write_noreplace(path: Path, value: dict[str, Any]) -> None:
     payload = canonical_bytes(value)
     _ensure_private_directory(path.parent)
+    _remove_receipt_temp_remnants(path)
+    temporary = path.parent / f".{path.name}.tmp-{os.getpid()}-{uuid.uuid4().hex}"
+    fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
     try:
-        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        _receipt_write(fd, payload)
+        _receipt_fsync(fd)
+    except BaseException:
+        os.close(fd)
+        raise
+    else:
+        os.close(fd)
+    try:
+        _receipt_install_noreplace(temporary, path)
     except FileExistsError:
         existing, raw = _json(path, "publication receipt")
         if existing != value or raw != payload:
             raise PublicationError("publication receipt conflict")
-        return
-    try:
-        _write_all(fd, payload)
-        os.fsync(fd)
     finally:
-        os.close(fd)
-    directory = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
-    try:
-        os.fsync(directory)
-    finally:
-        os.close(directory)
+        if os.path.lexists(temporary):
+            temporary.unlink()
+    _fsync_dir(path.parent)
     if _regular_bytes(path, "publication receipt") != payload:
         raise PublicationError("publication receipt readback mismatch")
 
@@ -319,6 +991,7 @@ def _conflict_controls(
     args: argparse.Namespace,
     *,
     terminal: dict[str, Any],
+    approval_sha256: str | None,
     terminal_sha256: str,
     request_id: str,
     key_id: str,
@@ -364,6 +1037,7 @@ def _conflict_controls(
         or fresh.get("authority_key_id") != key_id
         or fresh.get("source_root") != str(args.source_root)
         or fresh.get("source_report") != str(args.source_report)
+        or fresh.get("approval_sha256") != approval_sha256
         or fresh.get("signed_terminal_request_sha256") != terminal.get("request_sha256")
         or not isinstance(telemetry, dict)
         or not isinstance(telemetry.get("sha256"), str)
@@ -378,11 +1052,13 @@ def _conflict_controls(
         or wal.get("request_id") != request_id
         or wal.get("canonical_root") != str(args.canonical_root)
         or wal.get("post_transition_inventory") != predecessor_inventory
+        or wal.get("approval_sha256") != approval_sha256
         or wal.get("post_transition_inventory_sha256") != _inventory_digest(predecessor_inventory)
     ):
         raise PublicationError("WAL transition receipt binding is invalid")
     return {
         "fresh_acquisition_audit_receipt_sha256": hashlib.sha256(fresh_bytes).hexdigest(),
+        "approval_sha256": approval_sha256,
         "acquisition_run_id": _CONFLICT_RUN_ID,
         "composite_telemetry_sha256": telemetry_digest,
         "wal_transition_receipt_sha256": hashlib.sha256(wal_bytes).hexdigest(),
@@ -402,6 +1078,7 @@ def _conflict_authorization(
     parts: list[dict[str, Any]],
     controls: dict[str, str] | None = None,
     terminal_public_key: bytes = b"",
+    allow_predecessor_ctime_transition: bool = False,
 ) -> dict[str, Any] | None:
     receipt_path = args.conflict_authorization_receipt
     key_path = args.conflict_authority_public_key
@@ -461,6 +1138,7 @@ def _conflict_authorization(
         "wal_transition_receipt_sha256",
         "wal_post_transition_inventory_sha256",
         "signed_terminal_request_sha256",
+        "approval_sha256",
         "entries",
     }
     if (
@@ -562,8 +1240,16 @@ def _conflict_authorization(
         target = _inside(predecessor, relative, "authorization predecessor")
         size, digest = _file_sha(target)
         target_info = os.stat(target)
+        actual_identity = list(_identity(target_info))
+        expected_identity = entry["predecessor_identity"]
+        identity_matches = expected_identity == actual_identity or (
+            allow_predecessor_ctime_transition
+            and expected_identity[:5] == actual_identity[:5]
+            and actual_identity[5] >= expected_identity[5]
+            and expected_identity[6:] == actual_identity[6:]
+        )
         if (
-            entry["predecessor_identity"] != list(_identity(target_info))
+            not identity_matches
             or entry["predecessor_sha256"] != digest
             or entry["predecessor_byte_count"] != size
             or entry["predecessor_row_count"] != _parquet_rows(target)
@@ -598,24 +1284,32 @@ def _replay_conflict_authorization(
     terminal_public_key: bytes = b"",
 ) -> None:
     paired = args.conflict_authorization_receipt is not None
-    is_v3 = final.get("schema") == "alpha_max_canonical_publication_receipt.v3"
-    if not is_v3:
+    is_signed_publication = final.get("schema") in {
+        "alpha_max_canonical_publication_receipt.v3",
+        "alpha_max_canonical_publication_receipt.v4",
+    }
+    if not is_signed_publication:
         if paired:
             raise PublicationError("V2 publication cannot accept conflict authorization")
         return
     if not paired:
-        raise PublicationError("V3 replay requires conflict authorization receipt and public key")
+        raise PublicationError(
+            "signed publication replay requires conflict authorization receipt and public key"
+        )
     predecessor = Path(final["predecessor_path"])
     controls = _conflict_controls(
         args,
         terminal=terminal or {},
+        approval_sha256=final.get("approval_sha256"),
         terminal_sha256=terminal_sha256,
         request_id=request_id,
         key_id=key_id,
         predecessor_inventory=final["old_inventory"],
     )
     if controls is None:
-        raise PublicationError("V3 replay requires fresh audit and WAL transition controls")
+        raise PublicationError(
+            "signed publication replay requires fresh audit and WAL transition controls"
+        )
     predecessor_available = (
         predecessor.exists()
         and not predecessor.is_symlink()
@@ -739,6 +1433,7 @@ def _replay_conflict_authorization(
                 "wal_transition_receipt_sha256",
                 "wal_post_transition_inventory_sha256",
                 "signed_terminal_request_sha256",
+                "approval_sha256",
                 "entries",
             }
             or message.get("schema") != "alpha_max_canonical_conflict_authorization_message.v2"
@@ -770,6 +1465,7 @@ def _replay_conflict_authorization(
                     "wal_transition_receipt_sha256",
                     "wal_post_transition_inventory_sha256",
                     "signed_terminal_request_sha256",
+                    "approval_sha256",
                 )
             )
             or hashlib.sha256(canonical_bytes(message)).hexdigest()
@@ -789,6 +1485,7 @@ def _replay_conflict_authorization(
         controls=controls,
         terminal_public_key=terminal_public_key,
         parts=parts,
+        allow_predecessor_ctime_transition=True,
     )
     if authorization is None or (
         authorization["receipt_sha256"] != final["conflict_authorization_receipt_sha256"]
@@ -1103,49 +1800,83 @@ def _inventory_digest(records: list[dict[str, Any]]) -> str:
 
 
 def _data_inventory_digest(root: Path) -> str:
-    """Digest stable candidate identities while excluding transaction evidence."""
-    records = []
-    for record in _inventory(root, require_private=False):
-        if record["path"] == "commit.json" or record["path"].endswith(
-            "/canonical_publication_receipt.json"
-        ):
-            continue
-        stable = {key: value for key, value in record.items() if key not in {"ctime_ns", "nlink"}}
-        records.append(stable)
-    return _inventory_digest(records)
+    """Digest immutable candidate data while excluding publication controls."""
+    return _inventory_digest(alpha_max_canonical_inventory_records(root))
 
 
-def _is_coordination_lock(path: str) -> bool:
-    parts = PurePosixPath(path).parts
-    if parts == (".bootstrap-incomplete",):
-        return True
-    if (
-        len(parts) == 4
-        and parts[0] == "market_ohlcv_1s"
-        and re.fullmatch(r"\d{4}-\d{2}\.lock", parts[3])
-    ):
-        return True
-    if (
-        len(parts) == 4
-        and parts[0] == "market_data_raw_aggtrades"
-        and parts[3] == ".raw-stream.lock"
-    ):
-        return True
-    if (
-        len(parts) == 5
-        and parts[0] == "market_data_raw_aggtrades"
-        and parts[3].startswith("date=")
-        and parts[4] == ".raw-partition.lock"
-    ):
-        return True
-    return (
-        len(parts) == 5
-        and parts[0] == "feature_points"
-        and parts[1].startswith("exchange=")
-        and parts[2].startswith("symbol=")
-        and parts[3].startswith("date=")
-        and parts[4] == ".writer.lock"
+def _canonical_inventory(root: Path) -> dict[str, Any]:
+    """Bind every immutable data-bearing dataset, including untouched partitions."""
+    records = alpha_max_canonical_inventory_records(root)
+    datasets: dict[str, dict[str, int]] = {}
+    for record in records:
+        if record["kind"] == "file":
+            dataset = PurePosixPath(record["path"]).parts[0]
+            totals = datasets.setdefault(dataset, {"files": 0, "bytes": 0, "rows": 0})
+            totals["files"] += 1
+            totals["bytes"] += record["size"]
+            if record["path"].endswith(".parquet"):
+                totals["rows"] += _parquet_rows(root / record["path"])
+    return {
+        "inventory": records,
+        "inventory_sha256": _inventory_digest(records),
+        "datasets": [{"dataset": name, **datasets[name]} for name in sorted(datasets)],
+        "files": sum(item["files"] for item in datasets.values()),
+        "bytes": sum(item["bytes"] for item in datasets.values()),
+        "rows": sum(item["rows"] for item in datasets.values()),
+    }
+
+
+def _merged_target_effects(
+    predecessor: Path | None, source: Path, target: Path, *, funding: bool
+) -> dict[str, int]:
+    """Derive key-union effects independently of the repository write path."""
+    key = "timestamp_ms" if funding else "datetime"
+    incoming = pl.read_parquet(source)
+    existing = (
+        pl.read_parquet(predecessor)
+        if predecessor is not None and predecessor.exists()
+        else pl.DataFrame(schema={key: incoming.schema[key]})
     )
+    candidate = pl.read_parquet(target)
+    if (
+        incoming.select(key).n_unique() != incoming.height
+        or existing.select(key).n_unique() != existing.height
+    ):
+        raise PublicationError("partition input keys are not unique")
+    overlap = existing.join(incoming, on=key, how="inner", suffix="_source")
+    if funding:
+        conflict = overlap.filter(
+            pl.col("funding_rate").is_not_null()
+            & pl.col("funding_rate_source").is_not_null()
+            & (pl.col("funding_rate") != pl.col("funding_rate_source"))
+        ).height
+    else:
+        conflict = overlap.filter(
+            pl.any_horizontal(
+                [
+                    pl.col(column) != pl.col(f"{column}_source")
+                    for column in ("open", "high", "low", "close", "volume")
+                ]
+            )
+        ).height
+    source_only = incoming.join(existing.select(key), on=key, how="anti").height
+    canonical_only = existing.join(incoming.select(key), on=key, how="anti").height
+    equal = overlap.height - conflict
+    effects = {
+        "predecessor_rows": existing.height,
+        "source_rows": incoming.height,
+        "equal_rows": equal,
+        "conflict_rows": conflict,
+        "canonical_only_rows": canonical_only,
+        "source_only_rows": source_only,
+        "target_rows": candidate.height,
+    }
+    if (
+        effects["target_rows"] != effects["source_rows"] + effects["canonical_only_rows"]
+        or effects["target_rows"] != effects["predecessor_rows"] + effects["source_only_rows"]
+    ):
+        raise PublicationError("merged target key-union accounting mismatch")
+    return effects
 
 
 def _clone_root(old: Path, candidate: Path, expected: list[dict[str, Any]]) -> None:
@@ -1284,6 +2015,139 @@ def _active_root(logical: Path, generations: Path) -> Path:
     return physical
 
 
+def _topology_identity(path: Path) -> list[Any]:
+    """Stable identity for directory/symlink exchange topology."""
+    info = os.lstat(path)
+    if stat.S_ISDIR(info.st_mode):
+        return [info.st_dev, info.st_ino, "directory"]
+    if stat.S_ISLNK(info.st_mode):
+        return [info.st_dev, info.st_ino, "symlink", os.readlink(path)]
+    raise PublicationError("exchange topology path is unsafe")
+
+
+def _window_bindings(
+    *,
+    request_id: str,
+    key_id: str,
+    terminal_sha256: str,
+    candidate: Path,
+    final: dict[str, Any],
+    swap: dict[str, Any],
+    temporary: Path,
+) -> dict[str, Any]:
+    predecessor = _retained_predecessor(Path(final["canonical_root"]), final)
+    canonical_root = Path(final["canonical_root"])
+    swap_bytes = canonical_bytes(swap)
+    return {
+        "request_id": request_id,
+        "run_id": _CONFLICT_RUN_ID,
+        "acquisition_request_id": _ACQUISITION_REQUEST_ID,
+        "approval_leaf": _CURRENT_APPROVAL_LEAF,
+        "approval_sha256": final.get("approval_sha256"),
+        "authority_key_id": key_id,
+        "terminal_receipt_sha256": terminal_sha256,
+        "observer_key_id": final.get("observer_key_id"),
+        "observer_ready_sha256": final.get("observer_ready_sha256"),
+        "observer_query_spec_sha256": final.get("observer_query_spec_sha256"),
+        "candidate": str(candidate),
+        "candidate_leaf": candidate.name,
+        "predecessor": str(predecessor),
+        "swap": temporary.name,
+        "swap_receipt_sha256": hashlib.sha256(swap_bytes).hexdigest(),
+        "swap_temporary_path": str(temporary),
+        "candidate_identity": _topology_identity(candidate),
+        "predecessor_identity": _topology_identity(predecessor),
+        "swap_identity": _topology_identity(temporary),
+        "pre_exchange_predecessor_identity": [
+            final["predecessor_identity"][0],
+            final["predecessor_identity"][1],
+            "directory",
+        ],
+        "post_exchange_candidate_identity": _topology_identity(candidate),
+        "post_exchange_predecessor_identity": _topology_identity(predecessor),
+        "canonical_logical_root_identity": _topology_identity(canonical_root),
+        "canonical_resolved_root": str(
+            _active_root(
+                canonical_root, canonical_root.parent / f".{canonical_root.name}.generations"
+            )
+        ),
+        "candidate_inventory_sha256": _canonical_inventory(candidate)["inventory_sha256"],
+        "predecessor_inventory_sha256": _canonical_inventory(predecessor)["inventory_sha256"],
+    }
+
+
+def _retained_predecessor(canonical_root: Path, final: dict[str, Any]) -> Path:
+    expected = final["predecessor_identity"]
+    predecessor = Path(final["predecessor_path"])
+    if predecessor.exists() and not predecessor.is_symlink():
+        info = os.lstat(predecessor)
+        if [info.st_dev, info.st_ino] == expected:
+            return predecessor
+    swap_path = (
+        canonical_root.parent
+        / f".{canonical_root.name}.transactions"
+        / final["request_id"]
+        / "swap.json"
+    )
+    if swap_path.exists():
+        swap, _ = _json(swap_path, "swap receipt")
+        temporary = canonical_root.parent / swap.get("temporary", "")
+        if temporary.exists() and not temporary.is_symlink():
+            info = os.lstat(temporary)
+            if [info.st_dev, info.st_ino] == expected:
+                return temporary
+    raise PublicationError("retained predecessor identity is unavailable")
+
+
+def _write_open_window_receipts(
+    *,
+    control: Path,
+    publisher_key: Ed25519PrivateKey,
+    request_id: str,
+    key_id: str,
+    terminal_sha256: str,
+    candidate: Path,
+    final: dict[str, Any],
+    swap: dict[str, Any],
+    temporary: Path,
+    replay: bool,
+) -> None:
+    bindings = _window_bindings(
+        request_id=request_id,
+        key_id=key_id,
+        terminal_sha256=terminal_sha256,
+        candidate=candidate,
+        final=final,
+        swap=swap,
+        temporary=temporary,
+    )
+    _write_noreplace(
+        control / "activated.json",
+        _stage_envelope(
+            publisher_key,
+            "activation",
+            {"schema": "alpha_max_publication_activation.v1", "phase": "activated", **bindings},
+        ),
+    )
+    _write_noreplace(
+        control / "rollback-window-open.json",
+        _stage_envelope(
+            publisher_key,
+            "open_window",
+            {"schema": "alpha_max_publication_rollback_window.v1", "phase": "open", **bindings},
+        ),
+    )
+    if replay:
+        _write_noreplace(
+            control / "replay-verified.json",
+            _stage_envelope(
+                publisher_key,
+                "replay",
+                {"schema": "alpha_max_publication_replay.v1", "phase": "pass", **bindings},
+            ),
+        )
+
+
 def _parquet_rows(path: Path) -> int:
     try:
         return int(pl.scan_parquet(path).select(pl.len()).collect(engine="streaming").item())
@@ -1345,7 +2209,7 @@ def _publication_admission(
         "required_increment_bytes": required_increment,
         "required_free_bytes": required_free_bytes,
     }
-    if free_bytes < required_free_bytes:
+    if free_bytes <= required_free_bytes:
         raise PublicationError("host reserve cannot guarantee publication peak")
     return admission
 
@@ -1360,7 +2224,6 @@ def _validate_prepared_commit(
     hashes: dict[str, str],
     listing: list[dict[str, Any]],
     parts: list[dict[str, Any]],
-    allow_active_mutation: bool = False,
 ) -> list[dict[str, Any]]:
     expected_final_fields = {
         "schema",
@@ -1387,8 +2250,10 @@ def _validate_prepared_commit(
         "listing_count",
         "rows",
     }
-    is_v3 = final.get("schema") == "alpha_max_canonical_publication_receipt.v3"
-    if is_v3:
+    is_v4 = True
+    if final.get("schema") != "alpha_max_canonical_publication_receipt.v4":
+        raise PublicationError("prepared commit must use v4 controls")
+    if is_v4:
         expected_final_fields |= {
             "conflict_authorization_receipt_sha256",
             "conflict_authority_key_id",
@@ -1402,16 +2267,18 @@ def _validate_prepared_commit(
             "wal_transition_receipt_sha256",
             "wal_post_transition_inventory_sha256",
             "signed_terminal_request_sha256",
+            "approval_sha256",
+            "observer_key_id",
+            "observer_ready_sha256",
+            "observer_query_spec_sha256",
+            "source_input",
+            "canonical_before",
+            "canonical_candidate",
         }
     if set(final) != expected_final_fields:
         raise PublicationError("prepared commit schema mismatch")
     if (
-        final.get("schema")
-        not in {
-            "alpha_max_canonical_publication_receipt.v2",
-            "alpha_max_canonical_publication_receipt.v3",
-        }
-        or final.get("request_id") != request_id
+        final.get("request_id") != request_id
         or final.get("terminal_receipt_sha256") != terminal_sha256
         or final.get("authority_key_id") != key_id
         or final.get("source_manifest_sha256") != hashes["manifest"]
@@ -1429,6 +2296,13 @@ def _validate_prepared_commit(
             for value in final["predecessor_identity"]
         )
         or not isinstance(final.get("old_inventory"), list)
+        or (
+            is_v4
+            and (
+                not isinstance(final.get("approval_sha256"), str)
+                or re.fullmatch(r"[0-9a-f]{64}", final["approval_sha256"]) is None
+            )
+        )
         or final.get("old_inventory_sha256") != _inventory_digest(final["old_inventory"])
     ):
         raise PublicationError("prepared commit binding mismatch")
@@ -1441,6 +2315,21 @@ def _validate_prepared_commit(
         or not (predecessor == canonical_root or predecessor.parent == candidate.parent)
     ):
         raise PublicationError("prepared generation path binding mismatch")
+    if is_v4:
+        ready, ready_raw = _json(
+            canonical_root.parent
+            / f".{canonical_root.name}.transactions"
+            / request_id
+            / "observer-ready.json",
+            "publication observer readiness",
+        )
+        if (
+            final.get("observer_key_id") != ready.get("observer_key_id")
+            or final.get("observer_ready_sha256") != hashlib.sha256(ready_raw).hexdigest()
+            or final.get("observer_query_spec_sha256") != ready.get("query_spec_sha256")
+        ):
+            raise PublicationError("prepared observer readiness binding mismatch")
+    predecessor = _retained_predecessor(canonical_root, final)
     listing_value, listing_bytes = _json(
         candidate / ".alpha_max_publication" / request_id / "listing_records.json",
         "canonical listing metadata",
@@ -1522,7 +2411,7 @@ def _validate_prepared_commit(
             + admission["control_fsync_rollback_reserve_bytes"]
             or admission["required_free_bytes"]
             != admission["host_reserve_bytes"] + admission["required_increment_bytes"]
-            or admission["free_bytes"] < admission["required_free_bytes"]
+            or admission["free_bytes"] <= admission["required_free_bytes"]
         ):
             raise PublicationError("prepared capacity admission binding mismatch")
     expected = {item["relative"]: item for item in parts}
@@ -1544,18 +2433,18 @@ def _validate_prepared_commit(
             "target_rows",
             "provenance_receipt_sha256",
         }
-        if is_v3:
-            expected_record_fields |= {"publication_mode", "conflict_effects"}
+        if is_v4:
+            expected_record_fields |= {
+                "publication_mode",
+                "conflict_effects",
+                "merged_targets",
+            }
         if set(record) != expected_record_fields:
             raise PublicationError("prepared target record shape is invalid")
         source = expected[record["relative"]]
-        if allow_active_mutation:
-            current_source_bytes = record["bytes"]
-            current_source_identity = tuple(record["source_identity"])
-        else:
-            current_source_bytes, current_source_identity = _hash_source(
-                source["source"], source["sha256"]
-            )
+        current_source_bytes, current_source_identity = _hash_source(
+            source["source"], source["sha256"]
+        )
         if (
             record["source_sha256"] != source["sha256"]
             or record["source_identity"] != list(current_source_identity)
@@ -1583,15 +2472,14 @@ def _validate_prepared_commit(
             final["old_inventory"],
         ):
             raise PublicationError("prepared predecessor authorization mismatch")
-        if not allow_active_mutation:
-            target = _inside(candidate, record["target"], "prepared target")
-            size, digest = _file_sha(target)
-            if (
-                size != record["target_bytes"]
-                or digest != record["target_sha256"]
-                or _parquet_rows(target) != record["target_rows"]
-            ):
-                raise PublicationError("prepared target readback mismatch")
+        target = _inside(candidate, record["target"], "prepared target")
+        size, digest = _file_sha(target)
+        if (
+            size != record["target_bytes"]
+            or digest != record["target_sha256"]
+            or _parquet_rows(target) != record["target_rows"]
+        ):
+            raise PublicationError("prepared target readback mismatch")
         partition_receipt, _ = _json(
             candidate
             / ".alpha_max_publication"
@@ -1602,7 +2490,7 @@ def _validate_prepared_commit(
         )
         if partition_receipt != record:
             raise PublicationError("prepared partition receipt binding mismatch")
-        if is_v3 and (
+        if is_v4 and (
             record["publication_mode"] not in {"strict_merge", "authorized_reconciliation"}
             or (
                 record["publication_mode"] == "strict_merge"
@@ -1612,6 +2500,7 @@ def _validate_prepared_commit(
                 record["publication_mode"] == "authorized_reconciliation"
                 and not isinstance(record["conflict_effects"], dict)
             )
+            or not isinstance(record["merged_targets"], dict)
         ):
             raise PublicationError("prepared conflict partition binding is invalid")
     canonical_receipt, _ = _json(
@@ -1620,11 +2509,31 @@ def _validate_prepared_commit(
     )
     if canonical_receipt != final:
         raise PublicationError("canonical publication receipt binding mismatch")
-    if not allow_active_mutation and _data_inventory_digest(candidate) != final.get(
-        "candidate_data_inventory_sha256"
-    ):
+    if _data_inventory_digest(candidate) != final.get("candidate_data_inventory_sha256"):
         raise PublicationError("prepared candidate data inventory digest mismatch")
-    if is_v3:
+    if is_v4:
+        source_input = {
+            "partitions": len(parts),
+            "rows": sum(part["rows"] for part in parts),
+            "bytes": sum(record["bytes"] for record in published),
+        }
+        if final.get("source_input") != source_input:
+            raise PublicationError("source input accounting mismatch")
+        if final.get("canonical_before") != _canonical_inventory(predecessor):
+            raise PublicationError("canonical-before inventory mismatch")
+        if final.get("canonical_candidate") != _canonical_inventory(candidate):
+            raise PublicationError("canonical-candidate inventory mismatch")
+        for record in published:
+            predecessor_target = predecessor / record["target"]
+            effects = _merged_target_effects(
+                predecessor_target if predecessor_target.exists() else None,
+                Path(record["immutable_source_pin"]),
+                _inside(candidate, record["target"], "prepared target"),
+                funding=record["relative"].startswith("feature_points/"),
+            )
+            if record["merged_targets"] != effects:
+                raise PublicationError("merged target accounting mismatch")
+    if is_v4:
         publication = candidate / ".alpha_max_publication" / request_id
         receipt, receipt_bytes = _json(
             publication / "conflict_authorization_receipt.json",
@@ -1652,6 +2561,7 @@ def _validate_prepared_commit(
             "wal_transition_receipt_sha256",
             "wal_post_transition_inventory_sha256",
             "signed_terminal_request_sha256",
+            "approval_sha256",
             "entries",
         }
         entry_fields = {
@@ -1771,6 +2681,7 @@ def _validate_prepared_commit(
                     "wal_transition_receipt_sha256",
                     "wal_post_transition_inventory_sha256",
                     "signed_terminal_request_sha256",
+                    "approval_sha256",
                 )
             )
             or message["predecessor_inventory_sha256"]
@@ -1872,44 +2783,6 @@ def _validate_cloned_predecessor(
     return sorted(detached)
 
 
-def _cleanup_predecessor(
-    *,
-    temporary: Path,
-    final: dict[str, Any],
-) -> None:
-    old_identity_value = final.get("predecessor_identity")
-    old_inventory = final.get("old_inventory")
-    predecessor_value = final.get("predecessor_path")
-    if (
-        not isinstance(old_identity_value, list)
-        or len(old_identity_value) != 2
-        or any(
-            isinstance(value, bool) or not isinstance(value, int) for value in old_identity_value
-        )
-        or not isinstance(old_inventory, list)
-        or not isinstance(predecessor_value, str)
-    ):
-        raise PublicationError("prepared predecessor binding is invalid")
-    old_identity = (old_identity_value[0], old_identity_value[1])
-    predecessor = Path(predecessor_value)
-    if temporary.exists() and not temporary.is_symlink():
-        retired = temporary
-    elif temporary.is_symlink():
-        target = os.readlink(temporary)
-        resolved = temporary.parent / target
-        if resolved != predecessor:
-            raise PublicationError("retired generation symlink changed")
-        temporary.unlink()
-        _fsync_dir(temporary.parent)
-        retired = predecessor
-    elif predecessor.exists() and not predecessor.is_symlink():
-        retired = predecessor
-    else:
-        return
-    _remove_bound_tree(retired, old_identity, old_inventory)
-    _fsync_dir(retired.parent)
-
-
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     for name in (
@@ -1920,10 +2793,17 @@ def main(argv: list[str] | None = None) -> int:
         "canonical-root",
     ):
         parser.add_argument("--" + name, required=True)
-    parser.add_argument("--conflict-authorization-receipt")
-    parser.add_argument("--conflict-authority-public-key")
-    parser.add_argument("--fresh-acquisition-audit-receipt")
-    parser.add_argument("--wal-transition-receipt")
+    for name in (
+        "conflict-authorization-receipt",
+        "conflict-authority-public-key",
+        "fresh-acquisition-audit-receipt",
+        "wal-transition-receipt",
+        "current-state-approval",
+        "observer-ready-receipt",
+        "observer-public-key",
+    ):
+        parser.add_argument("--" + name, required=True)
+    parser.add_argument("--publisher-key-fd", type=int, required=True)
     args = parser.parse_args(argv)
     for name in (
         "source_root",
@@ -1938,33 +2818,52 @@ def main(argv: list[str] | None = None) -> int:
         "conflict_authority_public_key",
         "fresh_acquisition_audit_receipt",
         "wal_transition_receipt",
+        "current_state_approval",
+        "observer_ready_receipt",
+        "observer_public_key",
     ):
         value = getattr(args, name)
         if value is not None:
             setattr(args, name, _absolute(value, name))
-    controls_present = (
-        args.conflict_authorization_receipt,
-        args.conflict_authority_public_key,
-        args.fresh_acquisition_audit_receipt,
-        args.wal_transition_receipt,
-    )
-    if any(value is not None for value in controls_present) and any(
-        value is None for value in controls_present
-    ):
-        raise PublicationError(
-            "conflict authorization, fresh audit, and WAL transition controls must be paired"
-        )
+    _, approval_sha256 = _approval(args.current_state_approval)
+    publisher_key = _publication_private_key(args.publisher_key_fd)
     terminal, key_id, bound, terminal_sha256 = _terminal(args)
-    terminal_public_key = b""
-    if all(value is not None for value in controls_present):
-        terminal_public_key = _conflict_public_key(args.authority_public_key)
-        if hashlib.sha256(terminal_public_key).hexdigest() != key_id:
-            raise PublicationError("terminal authority public key binding is invalid")
-    parts, hashes, listing = _partitions(args.source_root, args.source_report, bound)
+    terminal_public_key = _conflict_public_key(args.authority_public_key)
+    publisher_public = publisher_key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
+    if hashlib.sha256(publisher_public).hexdigest() == key_id:
+        raise PublicationError("publisher key must be distinct from terminal authority")
+    if hashlib.sha256(terminal_public_key).hexdigest() != key_id:
+        raise PublicationError("terminal authority public key binding is invalid")
     request_id = _sha(terminal.get("request_id"), "terminal request identity")
+    if request_id != _ACQUISITION_REQUEST_ID:
+        raise PublicationError(
+            "terminal request identity is not the authorized acquisition request"
+        )
+    parts, hashes, listing = _partitions(args.source_root, args.source_report, bound)
     generations = args.canonical_root.parent / f".{args.canonical_root.name}.generations"
     control = args.canonical_root.parent / f".{args.canonical_root.name}.transactions" / request_id
     candidate = generations / request_id
+    if args.observer_ready_receipt != control / "observer-ready.json":
+        raise PublicationError("publication observer readiness path is invalid")
+    observer_ready, observer_ready_sha256 = _observer_ready(
+        args.observer_ready_receipt,
+        args.observer_public_key,
+        request_id=request_id,
+        approval_sha256=approval_sha256,
+        canonical_root=args.canonical_root,
+    )
+    if (
+        observer_ready is not None
+        and len(
+            {
+                key_id,
+                hashlib.sha256(publisher_public).hexdigest(),
+                observer_ready["observer_key_id"],
+            }
+        )
+        != 3
+    ):
+        raise PublicationError("terminal authority, publisher, and observer keys must be distinct")
     lock_repo = ParquetMarketDataRepository(args.canonical_root)
     with lock_repo.generation_lock(exclusive=True, allow_incomplete_bootstrap=True):
         _ensure_private_directory(generations)
@@ -1973,8 +2872,109 @@ def main(argv: list[str] | None = None) -> int:
             active = _active_root(args.canonical_root, generations)
         except FileNotFoundError:
             active = None
+        if (
+            observer_ready is not None
+            and active != candidate
+            and not (control / "pre-open-rollback-intent.json").exists()
+        ):
+            _observer_process_alive(observer_ready)
+            if (
+                active is None
+                or _topology_identity(active) != observer_ready["old_identity"]
+                or _canonical_inventory(active)["inventory_sha256"]
+                != observer_ready["old_inventory_sha256"]
+            ):
+                raise PublicationError("active predecessor mismatches observer readiness")
+        if candidate.exists() and active != candidate:
+            rollback_path = control / "pre-open-rollback-intent.json"
+            if rollback_path.exists():
+                rollback = _verify_stage_envelope(rollback_path, publisher_key, "activation")
+                activation_intent = _verify_stage_envelope(
+                    control / "activation-intent.json", publisher_key, "activation"
+                )
+                swap, swap_raw = _json(control / "swap.json", "pre-open rollback swap receipt")
+                temporary_leaf = swap.get("temporary")
+                if (
+                    activation_intent.get("schema") != "alpha_max_publication_activation_intent.v1"
+                    or activation_intent.get("phase") != "activation_intent"
+                    or activation_intent.get("request_id") != request_id
+                    or activation_intent.get("approval_sha256") != approval_sha256
+                    or activation_intent.get("candidate") != str(candidate)
+                    or set(swap) != {"request_id", "phase", "candidate", "temporary", "mode"}
+                    or swap.get("request_id") != request_id
+                    or swap.get("phase") != "swap_ready"
+                    or swap.get("candidate") != candidate.name
+                    or swap.get("mode") != "exchange"
+                    or not isinstance(temporary_leaf, str)
+                    or Path(temporary_leaf).name != temporary_leaf
+                    or temporary_leaf in {"", ".", ".."}
+                    or hashlib.sha256(swap_raw).hexdigest()
+                    != activation_intent.get("swap_payload_sha256")
+                ):
+                    raise PublicationError("pre-open rollback activation binding is invalid")
+                temporary = args.canonical_root.parent / temporary_leaf
+                if activation_intent.get("swap") != temporary_leaf or activation_intent.get(
+                    "swap_temporary_path"
+                ) != str(temporary):
+                    raise PublicationError("pre-open rollback swap path binding is invalid")
+                if not os.path.lexists(args.canonical_root) or not os.path.lexists(temporary):
+                    raise PublicationError("pre-open rollback topology is unavailable")
+                restored_identity = _topology_identity(args.canonical_root)
+                candidate_identity = _topology_identity(candidate)
+                temporary_identity = _topology_identity(temporary)
+                if (
+                    restored_identity != activation_intent.get("expected_old_identity")
+                    or candidate_identity != activation_intent.get("expected_candidate_identity")
+                    or temporary_identity != activation_intent.get("expected_swap_identity")
+                ):
+                    raise PublicationError("pre-open rollback topology binding is invalid")
+                _validate_preopen_rollback_intent(
+                    rollback,
+                    control=control,
+                    observer_public_key=args.observer_public_key,
+                    request_id=request_id,
+                    approval_sha256=approval_sha256,
+                    activation_intent_sha256=hashlib.sha256(
+                        _regular_bytes(control / "activation-intent.json", "activation intent")
+                    ).hexdigest(),
+                    candidate_identity=candidate_identity,
+                    predecessor_identity=restored_identity,
+                    swap_identity=restored_identity,
+                    observer_ready_sha256=observer_ready_sha256,
+                )
+                _fsync_dir(args.canonical_root.parent)
+                if (
+                    _topology_identity(args.canonical_root) != restored_identity
+                    or _topology_identity(candidate) != candidate_identity
+                    or _topology_identity(temporary) != temporary_identity
+                ):
+                    raise PublicationError("pre-open rollback topology changed")
+                _write_noreplace(
+                    control / "pre-open-rollback.json",
+                    _stage_envelope(
+                        publisher_key, "activation", {**rollback, "phase": "rolled_back"}
+                    ),
+                )
+                raise PublicationError("pre-open observer failure was rolled back")
+            _manager_terminal_or_observer_failure(control)
 
         if active == candidate:
+            activation_intent_path = control / "activation-intent.json"
+            intent = _verify_stage_envelope(activation_intent_path, publisher_key, "activation")
+            activation_intent_sha256 = hashlib.sha256(
+                _regular_bytes(activation_intent_path, "activation intent")
+            ).hexdigest()
+            swap, _ = _json(control / "swap.json", "active swap receipt")
+            temporary = args.canonical_root.parent / swap["temporary"]
+            if (
+                intent.get("schema") != "alpha_max_publication_activation_intent.v1"
+                or intent.get("phase") != "activation_intent"
+                or intent.get("request_id") != request_id
+                or intent.get("expected_candidate_identity") != _topology_identity(candidate)
+                or intent.get("expected_swap_identity") != _topology_identity(args.canonical_root)
+                or intent.get("expected_old_identity") != _topology_identity(temporary)
+            ):
+                raise PublicationError("active candidate activation intent binding is invalid")
             if not (candidate / "commit.json").exists() or not (control / "prepared.json").exists():
                 swap, _ = _json(control / "swap.json", "unready active swap receipt")
                 temporary = args.canonical_root.parent / swap["temporary"]
@@ -1992,6 +2992,11 @@ def main(argv: list[str] | None = None) -> int:
                 )
                 raise PublicationError("unready active generation was rolled back")
             final, _ = _json(candidate / "commit.json", "active commit")
+            if (
+                final.get("schema") != "alpha_max_canonical_publication_receipt.v4"
+                or final.get("approval_sha256") != approval_sha256
+            ):
+                raise PublicationError("active publication v4 approval binding changed")
             _replay_conflict_authorization(
                 args,
                 final=final,
@@ -2012,15 +3017,99 @@ def main(argv: list[str] | None = None) -> int:
                 hashes=hashes,
                 listing=listing,
                 parts=parts,
-                allow_active_mutation=True,
             )
+            failure = _preopen_failure_evidence(
+                control,
+                args.observer_public_key,
+                request_id=request_id,
+                approval_sha256=approval_sha256,
+                observer_ready_sha256=observer_ready_sha256,
+            )
+            observer_unavailable = False
+            if observer_ready is not None:
+                try:
+                    _observer_process_alive(observer_ready)
+                except PublicationError:
+                    observer_unavailable = True
+            rollback_intent_path = control / "pre-open-rollback-intent.json"
+            rollback_intent = None
+            if rollback_intent_path.exists():
+                rollback_intent = _verify_stage_envelope(
+                    rollback_intent_path, publisher_key, "activation"
+                )
+                _validate_preopen_rollback_intent(
+                    rollback_intent,
+                    control=control,
+                    observer_public_key=args.observer_public_key,
+                    request_id=request_id,
+                    approval_sha256=approval_sha256,
+                    activation_intent_sha256=activation_intent_sha256,
+                    candidate_identity=intent["expected_candidate_identity"],
+                    predecessor_identity=intent["expected_old_identity"],
+                    swap_identity=_topology_identity(temporary),
+                    observer_ready_sha256=observer_ready_sha256,
+                )
+            elif not (control / "replay-verified.json").exists() and (
+                failure is not None or observer_unavailable
+            ):
+                failure_reason = (
+                    "observer_failure_evidence"
+                    if failure is not None
+                    else "observer_process_unavailable"
+                )
+                rollback_intent = {
+                    "schema": "alpha_max_publication_pre_open_rollback.v2",
+                    "phase": "rollback_intent",
+                    "request_id": request_id,
+                    "approval_sha256": approval_sha256,
+                    "activation_intent_sha256": activation_intent_sha256,
+                    "observer_ready_sha256": observer_ready_sha256,
+                    "failure_reason": failure_reason,
+                    "failure_evidence_leaf": failure[0] if failure is not None else None,
+                    "failure_evidence_sha256": failure[1] if failure is not None else None,
+                    "candidate_identity": intent["expected_candidate_identity"],
+                    "predecessor_identity": intent["expected_old_identity"],
+                    "swap_identity": _topology_identity(temporary),
+                }
+                _write_noreplace(
+                    rollback_intent_path,
+                    _stage_envelope(publisher_key, "activation", rollback_intent),
+                )
+            if rollback_intent is not None:
+                if not os.path.lexists(temporary):
+                    raise PublicationError("pre-open recovery predecessor is unavailable")
+                _rename_exchange(temporary, args.canonical_root)
+                _fsync_dir(args.canonical_root.parent)
+                if _topology_identity(args.canonical_root) != intent["expected_old_identity"]:
+                    raise PublicationError("pre-open recovery predecessor identity changed")
+                _fsync_dir(args.canonical_root.parent)
+                if (
+                    _topology_identity(args.canonical_root)
+                    != rollback_intent["predecessor_identity"]
+                ):
+                    raise PublicationError("pre-open recovery predecessor identity changed")
+                _write_noreplace(
+                    control / "pre-open-rollback.json",
+                    _stage_envelope(
+                        publisher_key, "activation", {**rollback_intent, "phase": "rolled_back"}
+                    ),
+                )
+                raise PublicationError("pre-open observer failure was rolled back")
             swap, _ = _json(control / "swap.json", "swap receipt")
             temporary = args.canonical_root.parent / swap["temporary"]
-            _cleanup_predecessor(temporary=temporary, final=final)
-            _inventory(candidate)
-            _write_noreplace(
-                control / "completed.json",
-                {"request_id": request_id, "phase": "completed"},
+            if observer_ready is not None:
+                _observer_process_alive(observer_ready)
+            _write_open_window_receipts(
+                control=control,
+                publisher_key=publisher_key,
+                request_id=request_id,
+                key_id=key_id,
+                terminal_sha256=terminal_sha256,
+                candidate=candidate,
+                final=final,
+                swap=swap,
+                temporary=temporary,
+                replay=True,
             )
             return 0
 
@@ -2028,6 +3117,11 @@ def main(argv: list[str] | None = None) -> int:
             if not (candidate / "commit.json").exists():
                 raise PublicationError("incomplete candidate requires bounded operator recovery")
             final, _ = _json(candidate / "commit.json", "prepared commit")
+            if (
+                final.get("schema") != "alpha_max_canonical_publication_receipt.v4"
+                or final.get("approval_sha256") != approval_sha256
+            ):
+                raise PublicationError("prepared publication v4 approval binding changed")
             canonical_receipt_path = (
                 candidate
                 / ".alpha_max_publication"
@@ -2096,6 +3190,7 @@ def main(argv: list[str] | None = None) -> int:
             controls = _conflict_controls(
                 args,
                 terminal=terminal,
+                approval_sha256=approval_sha256,
                 terminal_sha256=terminal_sha256,
                 request_id=request_id,
                 key_id=key_id,
@@ -2112,8 +3207,8 @@ def main(argv: list[str] | None = None) -> int:
                 controls=controls,
                 terminal_public_key=terminal_public_key,
             )
-            if authorization is not None and authorization["key_id"] != key_id:
-                raise PublicationError("conflict authority must equal terminal authority")
+            if authorization is None or authorization["key_id"] != key_id:
+                raise PublicationError("complete v4 conflict authorization is required")
             _write_noreplace(
                 control / "cloning.json",
                 {"request_id": request_id, "phase": "cloning"},
@@ -2178,6 +3273,8 @@ def main(argv: list[str] | None = None) -> int:
                         conflict_authorization_receipt=authorization["receipt"],
                         conflict_authority_public_key=authorization["public_key"],
                         authorization_entry=authorized_entry,
+                        expected_run_id=controls["acquisition_run_id"],
+                        expected_approval_sha256=approval_sha256,
                         max_output_bytes=admission["enforced_output_quota_bytes"],
                     )
                 elif path.parts[0] == "market_ohlcv_1s":
@@ -2214,7 +3311,7 @@ def main(argv: list[str] | None = None) -> int:
                     target_info.st_ino,
                 ):
                     raise PublicationError("published target shares the staging source inode")
-                if _host_free_bytes() < _STORAGE["host_reserve_bytes"]:
+                if _host_free_bytes() <= _STORAGE["host_reserve_bytes"]:
                     raise PublicationError("host reserve was violated during source copy")
                 target_size, target_sha = _file_sha(target)
                 record = {
@@ -2244,6 +3341,12 @@ def main(argv: list[str] | None = None) -> int:
                     record["conflict_effects"] = (
                         authorized_entry["effects"] if authorized_entry is not None else None
                     )
+                    record["merged_targets"] = _merged_target_effects(
+                        old / str(target.relative_to(candidate)),
+                        pin,
+                        target,
+                        funding=path.parts[0] == "feature_points",
+                    )
                 _write_noreplace(
                     candidate
                     / ".alpha_max_publication"
@@ -2272,11 +3375,7 @@ def main(argv: list[str] | None = None) -> int:
             ):
                 raise PublicationError("conflict authorization entry was not consumed exactly once")
             final = {
-                "schema": (
-                    "alpha_max_canonical_publication_receipt.v3"
-                    if authorization is not None
-                    else "alpha_max_canonical_publication_receipt.v2"
-                ),
+                "schema": "alpha_max_canonical_publication_receipt.v4",
                 "request_id": request_id,
                 "terminal_receipt_sha256": terminal_sha256,
                 "authority_key_id": key_id,
@@ -2305,6 +3404,8 @@ def main(argv: list[str] | None = None) -> int:
                 "rows": sum(item["rows"] for item in published),
             }
             if authorization is not None:
+                if observer_ready is None or observer_ready_sha256 is None:
+                    raise PublicationError("signed publication is missing observer readiness")
                 final.update(
                     {
                         "conflict_authorization_receipt_sha256": authorization["receipt_sha256"],
@@ -2318,6 +3419,16 @@ def main(argv: list[str] | None = None) -> int:
                             entry["effects"]["conflict_rows"]
                             for entry in authorization["entries"].values()
                         ),
+                        "observer_key_id": observer_ready["observer_key_id"],
+                        "observer_ready_sha256": observer_ready_sha256,
+                        "observer_query_spec_sha256": observer_ready["query_spec_sha256"],
+                        "source_input": {
+                            "partitions": len(parts),
+                            "rows": sum(item["rows"] for item in parts),
+                            "bytes": sum(item["bytes"] for item in published),
+                        },
+                        "canonical_before": _canonical_inventory(old),
+                        "canonical_candidate": _canonical_inventory(candidate),
                         **{
                             field: authorization["message"][field]
                             for field in (
@@ -2327,6 +3438,7 @@ def main(argv: list[str] | None = None) -> int:
                                 "wal_transition_receipt_sha256",
                                 "wal_post_transition_inventory_sha256",
                                 "signed_terminal_request_sha256",
+                                "approval_sha256",
                             )
                         },
                     }
@@ -2367,7 +3479,10 @@ def main(argv: list[str] | None = None) -> int:
             raise PublicationError("pre-exchange predecessor identity changed")
         if active is not None and active != predecessor:
             raise PublicationError("pre-exchange predecessor generation changed")
-        if _host_free_bytes() < _STORAGE["host_reserve_bytes"] + _PUBLICATION_CONTROL_RESERVE_BYTES:
+        if (
+            _host_free_bytes()
+            <= _STORAGE["host_reserve_bytes"] + _PUBLICATION_CONTROL_RESERVE_BYTES
+        ):
             raise PublicationError("host reserve cannot guarantee exchange and rollback")
         swap_path = control / "swap.json"
         if swap_path.exists():
@@ -2392,18 +3507,16 @@ def main(argv: list[str] | None = None) -> int:
                 f".{args.canonical_root.name}.generations/{request_id}",
                 temporary,
             )
-            mode = "exchange"
-            _write_noreplace(
-                swap_path,
-                {
-                    "request_id": request_id,
-                    "phase": "swap_ready",
-                    "candidate": candidate.name,
-                    "temporary": temporary.name,
-                    "mode": mode,
-                },
-            )
+            swap = {
+                "request_id": request_id,
+                "phase": "swap_ready",
+                "candidate": candidate.name,
+                "temporary": temporary.name,
+                "mode": "exchange",
+            }
+            _write_noreplace(swap_path, swap)
             _fsync_dir(args.canonical_root.parent)
+        mode = swap["mode"]
         if os.readlink(temporary) != f"{generations.name}/{request_id}":
             raise PublicationError("prepared swap target changed")
         if active is None:
@@ -2416,6 +3529,33 @@ def main(argv: list[str] | None = None) -> int:
             raise PublicationError("pre-exchange predecessor generation changed")
         if mode != "exchange":
             raise PublicationError("prepared swap mode is invalid")
+        _observer_process_alive(observer_ready)
+        intent_bindings = _window_bindings(
+            request_id=request_id,
+            key_id=key_id,
+            terminal_sha256=terminal_sha256,
+            candidate=candidate,
+            final=final,
+            swap=swap,
+            temporary=temporary,
+        )
+        _write_noreplace(
+            control / "activation-intent.json",
+            _stage_envelope(
+                publisher_key,
+                "activation",
+                {
+                    "schema": "alpha_max_publication_activation_intent.v1",
+                    "phase": "activation_intent",
+                    "expected_old_identity": _topology_identity(args.canonical_root),
+                    "expected_candidate_identity": _topology_identity(candidate),
+                    "expected_swap_identity": _topology_identity(temporary),
+                    "commit_payload_sha256": hashlib.sha256(canonical_bytes(final)).hexdigest(),
+                    "swap_payload_sha256": hashlib.sha256(canonical_bytes(swap)).hexdigest(),
+                    **intent_bindings,
+                },
+            ),
+        )
         _rename_exchange(temporary, args.canonical_root)
         _fsync_dir(args.canonical_root.parent)
         try:
@@ -2452,19 +3592,18 @@ def main(argv: list[str] | None = None) -> int:
                 {"request_id": request_id, "phase": "failure"},
             )
             raise
-        _write_noreplace(
-            control / "activated.json",
-            {
-                "request_id": request_id,
-                "phase": "activated",
-                "candidate": candidate.name,
-            },
-        )
-        _cleanup_predecessor(temporary=temporary, final=final)
-        _inventory(candidate)
-        _write_noreplace(
-            control / "completed.json",
-            {"request_id": request_id, "phase": "completed"},
+        swap, _ = _json(control / "swap.json", "swap receipt")
+        _write_open_window_receipts(
+            control=control,
+            publisher_key=publisher_key,
+            request_id=request_id,
+            key_id=key_id,
+            terminal_sha256=terminal_sha256,
+            candidate=candidate,
+            final=final,
+            swap=swap,
+            temporary=temporary,
+            replay=False,
         )
     return 0
 

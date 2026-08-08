@@ -18,6 +18,7 @@ from lumina_quant import alpha_max_terminal_policy as policy
 
 KEY_NAMES = (
     "authority",
+    "publication",
     "acquisition",
     "phase_preparation",
     "one_touch",

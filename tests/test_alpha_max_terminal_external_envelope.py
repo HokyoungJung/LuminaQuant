@@ -5,6 +5,8 @@ import copy
 import hashlib
 import json
 from datetime import UTC, datetime, timedelta
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from dataclasses import replace
 import os
 from pathlib import Path
@@ -161,6 +163,111 @@ def _digest(seed: str) -> str:
     return hashlib.sha256(seed.encode()).hexdigest()
 
 
+def _w10_authority_private_key() -> Ed25519PrivateKey:
+    return Ed25519PrivateKey.from_private_bytes(b"k" * 32)
+
+
+def _write_w10_finalize_bundle(
+    path: Path,
+    *,
+    run_id: str,
+    acquisition_request_id: str,
+    approval_sha256: str,
+) -> tuple[Path, dict]:
+    authorization_sha256 = _digest("canonical-finalize-authorization")
+    context_sha256 = _digest("canonical-finalize-context")
+    canonical = path.parent / "canonical"
+    generations = path.parent / ".canonical.generations"
+    active = generations / "active"
+    active.mkdir(parents=True)
+    canonical.symlink_to(".canonical.generations/active")
+    transaction_root = (
+        path.parent / ".canonical.transactions" / _digest(f"transaction-root:{path.parent}")
+    )
+    transaction_root.mkdir(parents=True)
+    bundle_path = transaction_root / "canonical-finalize-bundle.json"
+    receipts = {
+        "decision-localization.json": {
+            "action": "finalize",
+            "authorization_sha256": authorization_sha256,
+        },
+        "window-decision-intent.json": {
+            "action": "finalize",
+            "authorization_sha256": authorization_sha256,
+            "context_sha256": context_sha256,
+        },
+        "W8_FINALIZING.json": {
+            "schema": "alpha_max_window_action_journal.v1",
+            "action": "finalize",
+            "authorization_sha256": authorization_sha256,
+            "context_sha256": context_sha256,
+            "phase": "intent-fsynced",
+        },
+        "predecessor-cleanup-manifest.json": {"authorization_sha256": authorization_sha256},
+        "predecessor-quarantined.json": {"authorization_sha256": authorization_sha256},
+        "predecessor-cleanup-fsynced.json": {
+            "schema": "alpha_max_predecessor_cleanup.v1",
+            "authorization_sha256": authorization_sha256,
+            "phase": "removal-fsynced",
+        },
+        "completed.json": {
+            "schema": "alpha_max_publication_completed.v1",
+            "authorization_sha256": authorization_sha256,
+            "context_sha256": context_sha256,
+        },
+        "finalized.json": {
+            "schema": "alpha_max_window_terminal.v2",
+            "action": "finalize",
+            "state": "W10_FINALIZED",
+            "authorization_sha256": authorization_sha256,
+            "context_sha256": context_sha256,
+        },
+    }
+    for leaf, receipt in receipts.items():
+        write_canonical(bundle_path.parent / leaf, receipt)
+    private = _w10_authority_private_key()
+    authority_public = private.public_key().public_bytes(
+        serialization.Encoding.Raw, serialization.PublicFormat.Raw
+    )
+    logical = canonical.lstat()
+    physical = active.stat()
+    message = {
+        "run_id": run_id,
+        "acquisition_request_id": acquisition_request_id,
+        "transaction_root": str(bundle_path.parent),
+        "approval_sha256": approval_sha256,
+        "canonical_identity": {
+            "logical_root": [
+                logical.st_dev,
+                logical.st_ino,
+                "symlink",
+                ".canonical.generations/active",
+            ],
+            "active_generation": [physical.st_dev, physical.st_ino, "directory"],
+        },
+        "state": "W10_FINALIZED",
+        "finalize_authorization_sha256": authorization_sha256,
+        "finalize_context_sha256": context_sha256,
+        "transaction_receipt_sha256s": {
+            leaf: hashlib.sha256(canonical_bytes(receipt)).hexdigest()
+            for leaf, receipt in receipts.items()
+        },
+    }
+    unsigned = {
+        "schema": "alpha_max_canonical_finalize_bundle.v2",
+        "authority_key_id": hashlib.sha256(authority_public).hexdigest(),
+        "message": message,
+    }
+    bundle = {
+        **unsigned,
+        "signature": base64.b64encode(
+            private.sign(terminal_policy._W10_FINALIZE_BUNDLE_DOMAIN + canonical_bytes(unsigned))
+        ).decode(),
+    }
+    write_canonical(bundle_path, bundle)
+    return bundle_path, bundle
+
+
 def _file(path: Path, digest: str | None = None) -> dict[str, int | str]:
     return {
         "path": str(path),
@@ -188,7 +295,11 @@ def _directory(path: Path) -> dict[str, int | str]:
 
 
 def _envelope_value(tmp_path: Path, policy: object) -> dict:
-    key = b"k" * 32
+    key = (
+        _w10_authority_private_key()
+        .public_key()
+        .public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+    )
     key_id = hashlib.sha256(key).hexdigest()
     encoded = base64.b64encode(key).decode()
     observer_keys = []
@@ -350,6 +461,12 @@ def _request_value(tmp_path: Path, checkpoint: object, envelope: object, scope: 
         source, report = tmp_path / "source", tmp_path / "report"
         source.mkdir()
         report.mkdir()
+        canonical_finalize_receipt, _ = _write_w10_finalize_bundle(
+            tmp_path / "canonical-finalize-bundle.json",
+            run_id=_digest("request-canonical-finalize-run"),
+            acquisition_request_id=_digest("request-canonical-finalize-acquisition-request"),
+            approval_sha256=_digest("request-canonical-finalize-approval"),
+        )
         records = {
             "phase_wrapper": files["phase_wrapper"],
             "acquirer": files["acquirer"],
@@ -366,6 +483,7 @@ def _request_value(tmp_path: Path, checkpoint: object, envelope: object, scope: 
             "source_eligible_receipt",
             "source_manifest",
             "source_journal",
+            "canonical_finalize_receipt",
         )
     else:
         phase = tmp_path / "phase"
@@ -391,6 +509,8 @@ def _request_value(tmp_path: Path, checkpoint: object, envelope: object, scope: 
             item = terminal_policy._plain(checkpoint.source_identity)
         elif kind == "alignment_receipt":
             item = terminal_policy._plain(files["alignment_receipt"])
+        elif kind == "canonical_finalize_receipt":
+            item = _file(canonical_finalize_receipt)
         elif kind.startswith("source_"):
             suffix = {
                 "source_eligible_receipt": "source_eligible_receipt.json",
@@ -1851,6 +1971,12 @@ def _phase_records_fixture(
     )
     journal = report / "acquisition.journal.jsonl"
     journal.write_bytes(b'{"event":"acquired","run":"bounded-fixture"}\n')
+    canonical_finalize_receipt, _ = _write_w10_finalize_bundle(
+        tmp_path / "canonical-finalize-bundle.json",
+        run_id=_digest("canonical-finalize-run"),
+        acquisition_request_id=_digest("canonical-finalize-acquisition-request"),
+        approval_sha256=_digest("canonical-finalize-approval"),
+    )
     output_inventory: list[str] = []
     required_report = {
         "provenance/contract_manifest.json",
@@ -2278,6 +2404,7 @@ def _phase_records_fixture(
             _prerequisite("source_eligible_receipt", receipt_path),
             _prerequisite("source_manifest", manifest_path),
             _prerequisite("source_journal", journal),
+            _prerequisite("canonical_finalize_receipt", canonical_finalize_receipt),
         ),
     )
     paths = {
@@ -2487,8 +2614,148 @@ def _phase_records_fixture(
         source_owner=source / ".alpha_max_owner.json",
         report_owner=report / ".alpha_max_owner.json",
         handoff=handoff_path,
+        canonical_finalize_receipt=canonical_finalize_receipt,
     )
     return SimpleNamespace(scope_order=("phase_preparation",)), request, files
+
+
+def test_phase_records_canonical_finalize_receipt_requires_signed_bound_bundle(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _envelope, _request, files = _phase_records_fixture(tmp_path / "baseline")
+    receipt_path = files["canonical_finalize_receipt"]
+    receipt = json.loads(receipt_path.read_text())
+    message = receipt["message"]
+    authority_public_key_b64 = base64.b64encode(
+        _w10_authority_private_key()
+        .public_key()
+        .public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+    ).decode()
+    assert (
+        terminal_policy.validate_w10_canonical_finalize_bundle(
+            receipt_path,
+            authority_public_key_b64=authority_public_key_b64,
+            run_id=message["run_id"],
+            acquisition_request_id=message["acquisition_request_id"],
+            approval_sha256=message["approval_sha256"],
+            canonical_identity=message["canonical_identity"],
+            finalize_authorization_sha256=message["finalize_authorization_sha256"],
+            finalize_context_sha256=message["finalize_context_sha256"],
+            transaction_receipt_sha256s=message["transaction_receipt_sha256s"],
+        )
+        == message
+    )
+    _snapshot_envelope, _snapshot_request, snapshot_files = _phase_records_fixture(
+        tmp_path / "snapshot"
+    )
+    snapshot_receipt = snapshot_files["canonical_finalize_receipt"]
+    original_snapshot = terminal_policy._w10_sibling_snapshot
+
+    def replace_after_snapshot(path: Path, receipts: dict[str, str]):
+        siblings, retained = original_snapshot(path, receipts)
+        write_canonical(path.parent / "completed.json", {"replacement": True})
+        return siblings, retained
+
+    monkeypatch.setattr(terminal_policy, "_w10_sibling_snapshot", replace_after_snapshot)
+    with pytest.raises(TerminalPolicyError, match="W10 transaction receipt changed"):
+        terminal_policy.validate_w10_canonical_finalize_bundle(
+            snapshot_receipt, authority_public_key_b64=authority_public_key_b64
+        )
+    monkeypatch.setattr(terminal_policy, "_w10_sibling_snapshot", original_snapshot)
+    for field in ("run_id", "acquisition_request_id", "approval_sha256"):
+        expected = {
+            "run_id": message["run_id"],
+            "acquisition_request_id": message["acquisition_request_id"],
+            "approval_sha256": message["approval_sha256"],
+        }
+        expected[field] = "0" * 64
+        with pytest.raises(TerminalPolicyError, match="binding mismatch"):
+            terminal_policy.validate_w10_canonical_finalize_bundle(
+                receipt_path,
+                authority_public_key_b64=authority_public_key_b64,
+                **expected,
+            )
+    wrong_authority_public_key_b64 = base64.b64encode(
+        Ed25519PrivateKey.generate()
+        .public_key()
+        .public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+    ).decode()
+    with pytest.raises(TerminalPolicyError, match="authority mismatch"):
+        terminal_policy.validate_w10_canonical_finalize_bundle(
+            receipt_path, authority_public_key_b64=wrong_authority_public_key_b64
+        )
+
+    wrong_leaf = tmp_path / "canonical-finalize-copy.json"
+    write_canonical(wrong_leaf, receipt)
+    with pytest.raises(TerminalPolicyError, match="leaf mismatch"):
+        terminal_policy.validate_w10_canonical_finalize_bundle(
+            wrong_leaf, authority_public_key_b64=authority_public_key_b64
+        )
+
+    copied_root = tmp_path / "copied"
+    copied_root.mkdir()
+    copied = copied_root / "canonical-finalize-bundle.json"
+    write_canonical(copied, receipt)
+    with pytest.raises(TerminalPolicyError, match="path mismatch"):
+        terminal_policy.validate_w10_canonical_finalize_bundle(
+            copied, authority_public_key_b64=authority_public_key_b64
+        )
+    canonical = receipt_path.parents[2] / "canonical"
+    generations = receipt_path.parents[2] / ".canonical.generations"
+    active = generations / "active"
+    active.rename(generations / "replaced-active")
+    active.mkdir()
+    with pytest.raises(TerminalPolicyError, match="canonical topology changed"):
+        terminal_policy.validate_w10_canonical_finalize_bundle(
+            receipt_path, authority_public_key_b64=authority_public_key_b64
+        )
+    active.rmdir()
+    (generations / "replaced-active").rename(active)
+    canonical = receipt_path.parents[2] / "canonical"
+    generations = receipt_path.parents[2] / ".canonical.generations"
+    stale = generations / "stale"
+    stale.mkdir()
+    canonical.unlink()
+    canonical.symlink_to(".canonical.generations/stale")
+    with pytest.raises(TerminalPolicyError, match="canonical topology changed"):
+        terminal_policy.validate_w10_canonical_finalize_bundle(
+            receipt_path, authority_public_key_b64=authority_public_key_b64
+        )
+    canonical.unlink()
+    canonical.symlink_to(".canonical.generations/active")
+
+    tampered = copy.deepcopy(receipt)
+    tampered["signature"] = base64.b64encode(b"x" * 64).decode()
+    write_canonical(receipt_path, tampered)
+    with pytest.raises(TerminalPolicyError, match="signature"):
+        terminal_policy.validate_w10_canonical_finalize_bundle(
+            receipt_path, authority_public_key_b64=authority_public_key_b64
+        )
+
+    write_canonical(receipt_path, receipt)
+    write_canonical(receipt_path.parent / "W8_FINALIZING.json", {"changed": True})
+    with pytest.raises(TerminalPolicyError, match="transaction receipt changed"):
+        terminal_policy.validate_w10_canonical_finalize_bundle(
+            receipt_path, authority_public_key_b64=authority_public_key_b64
+        )
+
+
+@pytest.mark.parametrize(
+    "identity",
+    (
+        {"logical_root": [True, 1, "directory"], "active_generation": [1, 2, "directory"]},
+        {"logical_root": [1.0, 1, "directory"], "active_generation": [1, 2, "directory"]},
+        {"logical_root": [1, 1, "file"], "active_generation": [1, 2, "directory"]},
+        {
+            "logical_root": [1, 1, "directory"],
+            "active_generation": [1, 2, "directory"],
+            "extra": [],
+        },
+    ),
+)
+def test_w10_canonical_identity_requires_exact_wire_types(identity: dict) -> None:
+    with pytest.raises(TerminalPolicyError, match="invalid W10 canonical identity"):
+        terminal_policy._parse_w10_canonical_identity(identity)
 
 
 def _rewrite_sealed(path: Path, value: dict | bytes) -> None:

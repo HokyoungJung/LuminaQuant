@@ -51,12 +51,21 @@ ACCEPTED = "/home/hoky/Quants-agent/LuminaQuant-alpha-max-fresh-20260718"
 ACCEPTED_COMMIT = "391000b40717386765bfa39bd212d91c2e3be794"
 BASELINE = "629d91e5d4aac26911af65a4a5e15ebdcbded30f"
 RECOVERY_ROOT = Path("/home/hoky/quants-recovery-runs")
-G067_APPROVAL = (
-    "/home/hoky/quants-recovery-runs/g065-oom-safety-20260726/g067-solusdt-202311-approval.json"
-)
-CURRENT_APPROVAL = (
-    "/home/hoky/quants-recovery-runs/luminaquant-recovery-631242a65e5d9732/"
-    "current-state-approval-v7.json"
+CURRENT_APPROVAL_LEAF = "current-state-approval-v8.json"
+RUN_ID = "41ed4e09bd7b4af1793d3138e5d55d22d217d5fd4bd9477493d885e42fae1602"
+EXECUTION_ALIAS_ROOT = Path(f"/mnt/wsl/luminaquant-alpha-max-execution-{RUN_ID}")
+ACQUISITION_REQUEST_ID = "3377aca77e4edead9454051883d015c15389ffb0da06d63ec9e76ee2573252ec"
+PHASE_PREPARATION_REQUEST_ID = "a89b7872357feaee131c9bdbf4d78312ad86e7d4da90c7d2441d2d9cd2b43bac"
+ONE_TOUCH_REQUEST_ID = "30f6eafb4f0023c602c54bab8719ce105b2c28d07c7511cb5d9db42936f49d5c"
+CURRENT_APPROVAL = str(RECOVERY_ROOT / CURRENT_APPROVAL_LEAF)
+_OWNER_SESSION_RUNTIME_PATH = ".gjc/_session-019fad7d-536a-7000-b794-52ccaa961746/"
+_OWNER_SESSION_RUNTIME_EXCLUDE = f":(exclude){_OWNER_SESSION_RUNTIME_PATH}**"
+_IGNORED_SOURCE_PATHS = (
+    "src",
+    "scripts",
+    "apps",
+    ":(exclude)apps/dashboard_web/.next/**",
+    ":(exclude)apps/dashboard_web/node_modules/**",
 )
 ALIGNMENT = (
     "/home/hoky/quants-recovery-runs/20260714T105113Z/alpha-max-rev515-alignment-receipt-v5.json"
@@ -66,6 +75,23 @@ AUTHORITY_MEMORY_HIGH = 402653184
 AUTHORITY_MEMORY_MAX = 536870912
 AUTHORITY_SWAP_MAX = 268435456
 HEX = re.compile(r"^[0-9a-f]{64}$")
+_CREDENTIAL_ARGUMENTS = {
+    "authority.private": "--private-key",
+    "authority.public": "--authority-public-key",
+    "acquisition.private": "--observer-private-key",
+    "phase_preparation.private": "--observer-private-key",
+    "one_touch.private": "--observer-private-key",
+}
+
+
+def _credential_argument(name: str) -> str:
+    try:
+        return _CREDENTIAL_ARGUMENTS[name]
+    except KeyError:
+        _fail("systemd credential name has no role argument")
+
+
+_RUNTIME_NAMES = ("current_python", "accepted_python", "base_python")
 EXECUTABLE_PINS = {
     "current_python": {
         "path": "/home/hoky/Quants-agent/LuminaQuant/.venv-g056v8-current/bin/python-g056v8-current",
@@ -81,21 +107,18 @@ EXECUTABLE_PINS = {
         "mode": 0o555,
         "package_freeze_sha256": "df09a5a1d4d1ab657d6a11d28eaf00cea06df4d9e28c0ef81ec5382257d6abf6",
     },
+    "base_python": {
+        "path": "/home/hoky/.local/share/uv/python/cpython-3.14.5-linux-x86_64-gnu/bin/python3.14",
+        "sha256": "a1512f9a07029c4a9b02a1bb63bbd156d36b0dcb26f49cb7f5ee175f19b222da",
+        "byte_count": 32299584,
+        "mode": 0o755,
+    },
     "telemetry_script": {
         "path": "/home/hoky/Quants-agent/LuminaQuant/scripts/research/monitor_alpha_max_v8_resources.py",
         "sha256": "5d3e7eedea70102c6aa182e153139131bdbcd3ffc904499184aecc55eee54d4f",
         "byte_count": 28491,
         "mode": 0o600,
     },
-}
-G067_IDENTITY = {
-    "scientific_verdict": "APPROVED_EXACT_IDENTITY",
-    "symbol": "SOLUSDT",
-    "official_archive_url": "https://data.binance.vision/data/futures/um/monthly/aggTrades/SOLUSDT/SOLUSDT-aggTrades-2023-11.zip",
-    "official_checksum_url": "https://data.binance.vision/data/futures/um/monthly/aggTrades/SOLUSDT/SOLUSDT-aggTrades-2023-11.zip.CHECKSUM",
-    "archive_sha256": "188c3145ecaab1cf546318c293fb4fef0e320a6dc05b14eea013a46209ebbd73",
-    "archive_byte_count": 535864305,
-    "checksum_sha256": "d1a92cf7d5775d5edd1960d75091c06af72955c99fb806dca4ccf670af983f9d",
 }
 ROLE_PINS = {
     "runbook": (
@@ -287,6 +310,23 @@ def _read_symlink(path: Path, *, inventory_entry: bool = False) -> tuple[os.stat
     return after, data
 
 
+def _execution_alias() -> dict[str, Any]:
+    info, raw_target = _read_symlink(EXECUTION_ALIAS_ROOT)
+    target = os.fsdecode(raw_target)
+    if target != str(RECOVERY_ROOT):
+        _fail("execution alias target mismatch")
+    return {
+        "path": str(EXECUTION_ALIAS_ROOT),
+        "target": target,
+        "st_dev": info.st_dev,
+        "st_ino": info.st_ino,
+        "st_uid": info.st_uid,
+        "st_gid": info.st_gid,
+        "mode": stat.S_IMODE(info.st_mode),
+        "nlink": info.st_nlink,
+    }
+
+
 def _directory(path: Path, *, private: bool = False) -> dict[str, Any]:
     fd = _open_directory(path)
     try:
@@ -384,13 +424,59 @@ def _no_duplicates(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
 
 
 def _git(root: Path, *args: str) -> bytes:
-    return subprocess.run(("git", "-C", str(root), *args), check=True, capture_output=True).stdout
+    return subprocess.run(
+        (
+            "/usr/bin/git",
+            "--no-optional-locks",
+            "-c",
+            "core.hooksPath=/dev/null",
+            "-c",
+            "core.fsmonitor=false",
+            "-C",
+            str(root),
+            *args,
+        ),
+        check=True,
+        capture_output=True,
+        env={
+            "GIT_CONFIG_NOSYSTEM": "1",
+            "HOME": "/tmp",
+            "LANG": "C.UTF-8",
+            "LC_ALL": "C.UTF-8",
+            "PATH": "/usr/bin:/bin",
+        },
+    ).stdout
+
+
+def _source_git(root: Path, *args: str) -> bytes:
+    if args and args[0] == "diff":
+        args = ("diff", "--no-ext-diff", *args[1:])
+    return _git(root, *args, "--", ".", _OWNER_SESSION_RUNTIME_EXCLUDE)
 
 
 def _inventory(root: Path) -> bytes:
-    names = _git(root, "ls-files", "-z", "--cached", "--others", "--exclude-standard").split(b"\0")[
-        :-1
-    ]
+    names = _source_git(root, "ls-files", "-z", "--cached", "--others", "--exclude-standard").split(
+        b"\0"
+    )[:-1]
+    return _inventory_paths(root, names)
+
+
+def _ignored_source_inventory(root: Path) -> bytes:
+    """Bind ignored source/runtime bytes except explicit non-production web build trees."""
+    names = _git(
+        root,
+        "ls-files",
+        "-z",
+        "--others",
+        "--ignored",
+        "--exclude-standard",
+        "--",
+        *_IGNORED_SOURCE_PATHS,
+    ).split(b"\0")[:-1]
+    return _inventory_paths(root, names)
+
+
+def _inventory_paths(root: Path, names: list[bytes]) -> bytes:
     records = []
     for raw in names:
         name = raw.decode("utf-8")
@@ -418,18 +504,327 @@ def _inventory(root: Path) -> bytes:
     return _canonical(records)
 
 
+def _within(path: Path, roots: tuple[Path, ...]) -> bool:
+    return any(path == root or root in path.parents for root in roots)
+
+
+def _validate_runtime_extensions(root: Path) -> None:
+    runtime_roots = tuple(
+        Path(EXECUTABLE_PINS[name]["path"]).parent.parent.resolve() for name in _RUNTIME_NAMES
+    )
+    repository_roots = (
+        (Path(CURRENT, "src").resolve(),)
+        if root.resolve() == runtime_roots[0]
+        else (Path(ACCEPTED, "src").resolve(),)
+        if root.resolve() == runtime_roots[1]
+        else ()
+    )
+    for path in root.rglob("*"):
+        if path.is_symlink():
+            try:
+                target = path.resolve(strict=True)
+            except OSError:
+                _fail(f"runtime symlink target is missing: {path}")
+            if not _within(target, (root.resolve(), *runtime_roots)):
+                _fail(f"runtime symlink escapes inventoried roots: {path}")
+        if path.suffix == ".pth" and path.is_file():
+            for raw in path.read_text(encoding="utf-8").splitlines():
+                line = raw.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if line.startswith("import "):
+                    if not re.fullmatch(r"import [A-Za-z_][A-Za-z0-9_]*", line):
+                        _fail(f"unsafe runtime import hook: {path}")
+                    module = line.removeprefix("import ")
+                    if not any(root.rglob(f"{module}.py")):
+                        _fail(f"runtime import hook module is not inventoried: {path}")
+                    continue
+                target = Path(line)
+                if not target.is_absolute():
+                    target = path.parent / target
+                try:
+                    target = target.resolve(strict=True)
+                except OSError:
+                    _fail(f"runtime .pth target is missing: {path}")
+                if not _within(target, (root.resolve(), *runtime_roots, *repository_roots)):
+                    _fail(f"runtime .pth target escapes inventoried roots: {path}")
+
+
+def _runtime_inventory(interpreter: FileIdentity) -> bytes:
+    """Bind every executable/importable entry below the pinned virtualenv root."""
+    executable = _absolute(interpreter["path"])
+    root = executable.parent.parent
+    _validate_runtime_extensions(root)
+    names: list[bytes] = []
+    for directory, subdirectories, filenames in os.walk(root, followlinks=False):
+        relative = Path(directory).relative_to(root)
+        for name in [*subdirectories, *filenames]:
+            path = Path(directory) / name
+            info = os.stat(path, follow_symlinks=False)
+            if stat.S_ISDIR(info.st_mode):
+                continue
+            if not (stat.S_ISREG(info.st_mode) or stat.S_ISLNK(info.st_mode)):
+                _fail(f"unsupported runtime entry: {path}")
+            names.append(os.fsencode(str(relative / name)))
+    return _inventory_paths(root, sorted(names))
+
+
+def _only_owner_session_runtime_changes(root: Path) -> bool:
+    """Approval admits only the declared owner-session runtime files in porcelain state."""
+    allowed = _OWNER_SESSION_RUNTIME_PATH.encode()
+    records = _git(root, "status", "--porcelain=v1", "-z").split(b"\0")[:-1]
+    return all(
+        len(record) >= 4 and record[2:3] == b" " and record[3:].startswith(allowed)
+        for record in records
+    )
+
+
 def _record(raw: bytes) -> dict[str, Any]:
     return {"sha256": _sha(raw), "byte_count": len(raw)}
 
 
+def _accepted_source_state() -> dict[str, Any]:
+    root = Path(ACCEPTED)
+    return {
+        "root": ACCEPTED,
+        "head": _git(root, "rev-parse", "HEAD").decode().strip(),
+        "porcelain": _record(_source_git(root, "status", "--porcelain=v1", "-z")),
+        "source_inventory": _record(_inventory(root)),
+        "ignored_source_inventory": _record(_ignored_source_inventory(root)),
+    }
+
+
+_MOUNT_IDENTITY_SOURCE = r"""
+import base64
+import hashlib
+import json
+import os
+import stat
+import subprocess
+import sys
+
+
+def stat_tuple(info):
+    return (
+        info.st_dev,
+        info.st_ino,
+        info.st_uid,
+        info.st_gid,
+        stat.S_IFMT(info.st_mode),
+        stat.S_IMODE(info.st_mode),
+        info.st_nlink,
+        info.st_size,
+        info.st_mtime_ns,
+        info.st_ctime_ns,
+    )
+
+
+def read_fd(fd):
+    os.lseek(fd, 0, os.SEEK_SET)
+    parts = []
+    while chunk := os.read(fd, 1 << 20):
+        parts.append(chunk)
+    return b"".join(parts)
+
+
+def snapshot(path):
+    before = os.lstat(path)
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    fds.append(fd)
+    opened = os.fstat(fd)
+    expected = stat_tuple(opened)
+    if not stat.S_ISREG(opened.st_mode) or stat_tuple(before) != expected:
+        raise AssertionError("unstable final namespace input")
+    data = read_fd(fd)
+    if stat_tuple(os.fstat(fd)) != expected:
+        raise AssertionError("final namespace input drift")
+    return fd, expected, hashlib.sha256(data).hexdigest(), data
+
+
+def check_snapshot(path, fd, expected, digest):
+    if stat_tuple(os.fstat(fd)) != expected:
+        raise AssertionError("final namespace retained fd drift")
+    if hashlib.sha256(read_fd(fd)).hexdigest() != digest:
+        raise AssertionError("final namespace retained fd hash drift")
+    if stat_tuple(os.lstat(path)) != expected:
+        raise AssertionError("final namespace path drift")
+
+
+fds = []
+try:
+    config = json.loads(sys.argv[1])
+    mounts, argv = config["mounts"], sys.argv[2:]
+    assert argv and os.path.isabs(argv[0])
+    actual = [
+        {"path": path, "st_dev": info.st_dev, "st_ino": info.st_ino, "type": stat.S_IFMT(info.st_mode)}
+        for path in (item["path"] for item in mounts)
+        for info in [os.stat(path)]
+    ]
+    assert actual == mounts
+    receipt = config["receipt"]
+    payload_path = receipt.removesuffix(".json") + ".payload.json"
+    receipt_fd, receipt_stat, receipt_digest, receipt_raw = snapshot(receipt)
+    payload_fd, payload_stat, payload_digest, payload_raw = snapshot(payload_path)
+    envelope, payload = json.loads(receipt_raw), json.loads(payload_raw)
+    assert envelope["schema"] == "alpha_max_v8_signed_launch_admission.v1"
+    assert envelope["payload"] == payload
+    assert payload_raw == (
+        json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False) + "\n"
+    ).encode()
+    public = base64.b64decode(config["authority_public_b64"], validate=True)
+    signature = base64.b64decode(envelope["signature_b64"], validate=True)
+    assert (
+        len(public) == 32
+        and len(signature) == 64
+        and envelope["authority_key_id"] == hashlib.sha256(public).hexdigest()
+    )
+    public_fd = os.memfd_create("authority", os.MFD_CLOEXEC)
+    signature_fd = os.memfd_create("signature", os.MFD_CLOEXEC)
+    signed_payload_fd = os.memfd_create("payload", os.MFD_CLOEXEC)
+    fds.extend((public_fd, signature_fd, signed_payload_fd))
+    os.write(public_fd, b"\x30\x2a\x30\x05\x06\x03\x2b\x65\x70\x03\x21\x00" + public)
+    os.write(signature_fd, signature)
+    os.write(signed_payload_fd, payload_raw)
+    subprocess.run(
+        (
+            "/usr/bin/openssl",
+            "pkeyutl",
+            "-verify",
+            "-pubin",
+            "-inkey",
+            f"/proc/self/fd/{public_fd}",
+            "-keyform",
+            "DER",
+            "-rawin",
+            "-in",
+            f"/proc/self/fd/{signed_payload_fd}",
+            "-sigfile",
+            f"/proc/self/fd/{signature_fd}",
+        ),
+        check=True,
+        capture_output=True,
+        pass_fds=(public_fd, signature_fd, signed_payload_fd),
+    )
+    scope = receipt.rsplit("/", 1)[-1].removeprefix("launch-admission-").removesuffix(".json")
+    assert scope == config["scope"] == payload["requested_scope"]
+    matches = [
+        item
+        for item in payload["topology"]["units"]
+        if item["production_unit"] == config["unit_name"]
+    ]
+    assert len(matches) == 1 and matches[0]["scope"] == scope
+    artifacts = payload["control_artifacts"]
+    assert artifacts
+    artifact_snapshots = []
+    for item in artifacts:
+        fd, expected, digest, _data = snapshot(item["path"])
+        assert (
+            expected
+            == (
+                item["st_dev"],
+                item["st_ino"],
+                item["st_uid"],
+                item["st_gid"],
+                stat.S_IFREG,
+                item["mode"],
+                item["nlink"],
+                item["byte_count"],
+                os.fstat(fd).st_mtime_ns,
+                os.fstat(fd).st_ctime_ns,
+            )
+            and digest == item["sha256"]
+        )
+        artifact_snapshots.append((item["path"], fd, expected, digest))
+    check_snapshot(receipt, receipt_fd, receipt_stat, receipt_digest)
+    check_snapshot(payload_path, payload_fd, payload_stat, payload_digest)
+    for path, fd, expected, digest in artifact_snapshots:
+        check_snapshot(path, fd, expected, digest)
+    os.execv(argv[0], argv)
+finally:
+    for fd in fds:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+"""
+_MOUNT_IDENTITY_B64 = base64.b64encode(_MOUNT_IDENTITY_SOURCE.encode()).decode()
+_MOUNT_IDENTITY_CODE = (
+    "import base64;exec(compile(base64.b64decode("
+    + repr(_MOUNT_IDENTITY_B64)
+    + "),'<alpha-max-final-namespace>','exec'))"
+)
+
+
+def _writable_mount_identities(write_paths: list[str]) -> list[dict[str, Any]]:
+    return [
+        {
+            "path": path,
+            "st_dev": info.st_dev,
+            "st_ino": info.st_ino,
+            "type": stat.S_IFMT(info.st_mode),
+        }
+        for path in write_paths
+        for info in [os.stat(path)]
+    ]
+
+
+def _wrap_execstart(
+    argv: list[str],
+    write_paths: list[str],
+    *,
+    receipt: str,
+    unit_name: str,
+    authority_public_b64: str,
+) -> list[str]:
+    if not argv:
+        _fail("systemd ExecStart is empty")
+    if not os.path.isabs(argv[0]):
+        return argv
+    scope = Path(receipt).name.removeprefix("launch-admission-").removesuffix(".json")
+    if not scope or not unit_name:
+        _fail("invalid final namespace admission binding")
+    return [
+        "/usr/bin/python3",
+        "-I",
+        "-S",
+        "-c",
+        _MOUNT_IDENTITY_CODE,
+        json.dumps(
+            {
+                "mounts": _writable_mount_identities(write_paths),
+                "receipt": receipt,
+                "scope": scope,
+                "unit_name": unit_name,
+                "authority_public_b64": authority_public_b64,
+            },
+            separators=(",", ":"),
+        ),
+        *argv,
+    ]
+
+
 def _state(root: Path, approval: dict[str, Any]) -> str:
     head = _git(root, "rev-parse", "HEAD").decode().strip()
+    executables = _preflight_executables(
+        {
+            "current_python": Path(EXECUTABLE_PINS["current_python"]["path"]),
+            "accepted_python": Path(EXECUTABLE_PINS["accepted_python"]["path"]),
+            "telemetry_script": Path(EXECUTABLE_PINS["telemetry_script"]["path"]),
+        }
+    )
     actual = {
         "head": head,
-        "porcelain": _record(_git(root, "status", "--porcelain=v1", "-z")),
-        "commit_overlay": _record(_git(root, "diff", "--binary", f"{ACCEPTED_COMMIT}..HEAD")),
-        "worktree_overlay": _record(_git(root, "diff", "--binary", "HEAD")),
+        "porcelain": _record(_source_git(root, "status", "--porcelain=v1", "-z")),
+        "commit_overlay": _record(
+            _source_git(root, "diff", "--binary", f"{ACCEPTED_COMMIT}..HEAD")
+        ),
+        "worktree_overlay": _record(_source_git(root, "diff", "--binary", "HEAD")),
         "source_inventory": _record(_inventory(root)),
+        "ignored_source_inventory": _record(_ignored_source_inventory(root)),
+        "runtime_inventories": {
+            name: _record(_runtime_inventory(executables[name])) for name in _RUNTIME_NAMES
+        },
+        "execution_alias": _execution_alias(),
     }
     for key, record in actual.items():
         if key == "head":
@@ -445,6 +840,111 @@ def _approval(path: Path, fields: set[str], schema: str) -> dict[str, Any]:
     if set(value) != fields or value.get("schema") != schema:
         _fail("approval schema mismatch")
     return value
+
+
+def _create_current_approval(
+    path: Path,
+    *,
+    root: Path,
+    run_id: str,
+    request_ids: dict[str, str],
+    absent_paths: dict[str, Path],
+) -> dict[str, Any]:
+    """Publish the sole source-bound approval before any recovery artifact exists."""
+    if path != RECOVERY_ROOT / CURRENT_APPROVAL_LEAF:
+        _fail("approval path mismatch")
+    _absent(path)
+    for candidate in absent_paths.values():
+        _absent(candidate)
+    approval = {
+        "schema": "alpha_max_v8_current_state_approval.v3",
+        "repository_root": CURRENT,
+        "head": _git(root, "rev-parse", "HEAD").decode().strip(),
+        "accepted_alpha_commit": ACCEPTED_COMMIT,
+        "baseline_ancestor": BASELINE,
+        "verdict": "PASS_REVIEWED_OVERLAY",
+        "porcelain": _record(_source_git(root, "status", "--porcelain=v1", "-z")),
+        "commit_overlay": _record(
+            _source_git(root, "diff", "--binary", f"{ACCEPTED_COMMIT}..HEAD")
+        ),
+        "worktree_overlay": _record(_source_git(root, "diff", "--binary", "HEAD")),
+        "source_inventory": _record(_inventory(root)),
+        "ignored_source_inventory": _record(_ignored_source_inventory(root)),
+        "accepted_source_state": _accepted_source_state(),
+        "runtime_inventories": {
+            name: _record(
+                _runtime_inventory(
+                    _preflight_executables(
+                        {
+                            "current_python": Path(EXECUTABLE_PINS["current_python"]["path"]),
+                            "accepted_python": Path(EXECUTABLE_PINS["accepted_python"]["path"]),
+                            "telemetry_script": Path(EXECUTABLE_PINS["telemetry_script"]["path"]),
+                        }
+                    )[name]
+                )
+            )
+            for name in _RUNTIME_NAMES
+        },
+        "execution_alias": _execution_alias(),
+        "run_id": run_id,
+        "request_ids": request_ids,
+        "absent_recovery_artifacts": {
+            name: str(candidate) for name, candidate in absent_paths.items()
+        },
+    }
+    _write_new(path, approval)
+    return approval
+
+
+def _load_current_approval(
+    path: Path,
+    *,
+    run_id: str,
+    request_ids: dict[str, str],
+    absent_paths: dict[str, Path],
+    require_absent: bool = True,
+) -> dict[str, Any]:
+    approval = _approval(
+        path,
+        {
+            "schema",
+            "repository_root",
+            "head",
+            "accepted_alpha_commit",
+            "baseline_ancestor",
+            "verdict",
+            "porcelain",
+            "commit_overlay",
+            "worktree_overlay",
+            "source_inventory",
+            "ignored_source_inventory",
+            "runtime_inventories",
+            "accepted_source_state",
+            "execution_alias",
+            "run_id",
+            "request_ids",
+            "absent_recovery_artifacts",
+        },
+        "alpha_max_v8_current_state_approval.v3",
+    )
+    if (
+        approval["run_id"] != run_id
+        or approval["request_ids"] != request_ids
+        or approval["absent_recovery_artifacts"]
+        != {name: str(candidate) for name, candidate in absent_paths.items()}
+        or approval["repository_root"] != CURRENT
+        or approval["accepted_alpha_commit"] != ACCEPTED_COMMIT
+        or approval["baseline_ancestor"] != BASELINE
+        or approval["verdict"] != "PASS_REVIEWED_OVERLAY"
+        or approval["execution_alias"] != _execution_alias()
+        or approval["accepted_source_state"] != _accepted_source_state()
+    ):
+        _fail("current approval binding mismatch")
+    if require_absent:
+        for candidate in absent_paths.values():
+            _absent(candidate)
+    _state(Path(CURRENT), approval)
+    return approval
 
 
 def _create_root(path: Path) -> None:
@@ -571,7 +1071,7 @@ def _freeze(interpreter: FileIdentity) -> dict[str, Any]:
 def _preflight_executables(paths: dict[str, Path]) -> dict[str, FileIdentity]:
     identities: dict[str, FileIdentity] = {}
     for name, pin in EXECUTABLE_PINS.items():
-        path = paths[name]
+        path = paths.get(name, Path(pin["path"]))
         if path != Path(pin["path"]):
             _fail(f"executable path mismatch: {name}")
         identity = _file(path)
@@ -602,7 +1102,9 @@ def _key_bindings(
     root: Path,
 ) -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, Any], list[dict[str, Any]]]:
     expected = {
-        f"{name}.{kind}" for name in ("authority", *_SCOPES) for kind in ("private", "public")
+        f"{name}.{kind}"
+        for name in ("authority", "publication", *_SCOPES)
+        for kind in ("private", "public")
     }
     fd = _open_directory(root)
     try:
@@ -613,7 +1115,7 @@ def _key_bindings(
     bindings = []
     public_files = []
     key_files = []
-    for name in ("authority", *_SCOPES):
+    for name in ("authority", "publication", *_SCOPES):
         private = _file(root / f"{name}.private")
         public_path = root / f"{name}.public"
         public_info, public = _read_regular(public_path)
@@ -642,12 +1144,16 @@ def _key_bindings(
         )
         public_files.append({"name": name, "public": public_file, "key_id": digest})
         key_files.append({"name": name, "private": private, "public": public_file})
-    if len({item["key_id"] for item in bindings}) != 4:
+    if len({item["key_id"] for item in bindings}) != 5:
         _fail("duplicate keys")
-    summary = {"schema": "alpha_max_v8_public_key_summary.v1", "keys": public_files}
+    summary = {
+        "schema": "alpha_max_v8_public_key_summary.v1",
+        "keys": public_files,
+        "publication_key": bindings[1],
+    }
     return (
         bindings[0],
-        [{"scope": scope, **item} for scope, item in zip(_SCOPES, bindings[1:])],
+        [{"scope": scope, **item} for scope, item in zip(_SCOPES, bindings[2:])],
         summary,
         key_files,
     )
@@ -731,6 +1237,789 @@ def _load_key_creator(path: Path, expected: FileIdentity, policy):
     return creator
 
 
+_ADMISSION_ISOLATED_SOURCE = r"""
+import hashlib
+import json
+import os
+from pathlib import Path
+import stat
+import subprocess
+import sys
+
+
+def canonical(value):
+    return (
+        json.dumps(
+            value,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode()
+        + b"\n"
+    )
+
+
+def pairs(values):
+    result = dict(values)
+    if len(result) != len(values):
+        raise ValueError("duplicate JSON key")
+    return result
+
+
+def invalid_constant(value):
+    raise ValueError(f"invalid JSON constant: {value}")
+
+
+def read_regular(path):
+    path = Path(path)
+    before = os.lstat(path)
+    if (
+        not stat.S_ISREG(before.st_mode)
+        or before.st_nlink != 1
+        or before.st_uid != os.getuid()
+        or stat.S_IMODE(before.st_mode) & 0o022
+    ):
+        raise ValueError(f"unsafe regular file: {path}")
+    descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    try:
+        opened = os.fstat(descriptor)
+        chunks = []
+        while True:
+            chunk = os.read(descriptor, 1 << 20)
+            if not chunk:
+                break
+            chunks.append(chunk)
+        after = os.fstat(descriptor)
+    finally:
+        os.close(descriptor)
+    fields = ("st_dev", "st_ino", "st_uid", "st_gid", "st_mode", "st_nlink", "st_size")
+    if any(getattr(before, field) != getattr(opened, field) for field in fields) or any(
+        getattr(opened, field) != getattr(after, field) for field in fields
+    ):
+        raise ValueError(f"unstable regular file: {path}")
+    data = b"".join(chunks)
+    if len(data) != opened.st_size:
+        raise ValueError(f"short regular file read: {path}")
+    return opened, data
+
+
+def file_identity(path):
+    info, data = read_regular(path)
+    return {
+        "path": str(Path(path)),
+        "sha256": hashlib.sha256(data).hexdigest(),
+        "byte_count": len(data),
+        "st_dev": info.st_dev,
+        "st_ino": info.st_ino,
+        "st_uid": info.st_uid,
+        "st_gid": info.st_gid,
+        "mode": stat.S_IMODE(info.st_mode),
+        "nlink": info.st_nlink,
+    }
+
+
+def symlink_identity(path, expected_target):
+    path = Path(path)
+    before = os.lstat(path)
+    if not stat.S_ISLNK(before.st_mode) or before.st_nlink != 1 or before.st_uid != os.getuid():
+        raise ValueError(f"unsafe execution alias: {path}")
+    target = os.readlink(path)
+    after = os.lstat(path)
+    fields = (
+        "st_dev",
+        "st_ino",
+        "st_uid",
+        "st_gid",
+        "st_mode",
+        "st_nlink",
+        "st_size",
+        "st_mtime_ns",
+        "st_ctime_ns",
+    )
+    if (
+        target != expected_target
+        or any(getattr(before, field) != getattr(after, field) for field in fields)
+        or len(os.fsencode(target)) != after.st_size
+    ):
+        raise ValueError("execution alias identity mismatch")
+    return {
+        "path": str(path),
+        "target": target,
+        "st_dev": after.st_dev,
+        "st_ino": after.st_ino,
+        "st_uid": after.st_uid,
+        "st_gid": after.st_gid,
+        "mode": stat.S_IMODE(after.st_mode),
+        "nlink": after.st_nlink,
+    }
+
+
+def load(path):
+    _, raw = read_regular(path)
+    value = json.loads(raw, object_pairs_hook=pairs, parse_constant=invalid_constant)
+    if not isinstance(value, dict) or canonical(value) != raw:
+        raise ValueError(f"noncanonical JSON: {path}")
+    return value
+
+
+def record(raw):
+    return {"sha256": hashlib.sha256(raw).hexdigest(), "byte_count": len(raw)}
+
+
+def git(root, *arguments):
+    if arguments and arguments[0] == "diff":
+        arguments = ("diff", "--no-ext-diff", *arguments[1:])
+    return subprocess.run(
+        (
+            "/usr/bin/git",
+            "--no-optional-locks",
+            "-c",
+            "core.hooksPath=/dev/null",
+            "-c",
+            "core.fsmonitor=false",
+            "-C",
+            str(root),
+            *arguments,
+        ),
+        check=True,
+        capture_output=True,
+        env={
+            "GIT_CONFIG_NOSYSTEM": "1",
+            "HOME": "/tmp",
+            "LANG": "C.UTF-8",
+            "LC_ALL": "C.UTF-8",
+            "PATH": "/usr/bin:/bin",
+        },
+    ).stdout
+
+
+def inventory_entry(root, name):
+    if not name or name.startswith("/") or ".." in Path(name).parts:
+        raise ValueError("unsafe inventory path")
+    path = root / name
+    before = os.lstat(path)
+    if stat.S_ISREG(before.st_mode):
+        info, data = read_regular(path)
+        kind = "regular"
+    elif stat.S_ISLNK(before.st_mode):
+        if before.st_nlink != 1 or before.st_uid != os.getuid():
+            raise ValueError(f"unsafe inventory symlink: {path}")
+        target = os.readlink(path)
+        info = os.lstat(path)
+        fields = ("st_dev", "st_ino", "st_uid", "st_gid", "st_mode", "st_nlink", "st_size")
+        if any(getattr(before, field) != getattr(info, field) for field in fields):
+            raise ValueError(f"unstable inventory symlink: {path}")
+        data = os.fsencode(target)
+        if len(data) != info.st_size:
+            raise ValueError(f"invalid inventory symlink size: {path}")
+        kind = "symlink"
+    else:
+        raise ValueError(f"unsupported inventory entry: {path}")
+    return {
+        "path": name,
+        "type": kind,
+        "mode": stat.S_IMODE(info.st_mode),
+        "size": len(data),
+        "sha256": hashlib.sha256(data).hexdigest(),
+    }
+
+
+def inventory(root, names):
+    return canonical([inventory_entry(root, os.fsdecode(name)) for name in names])
+
+
+def runtime_inventory(root):
+    root = Path(root)
+    runtime_roots = (
+        Path(current_runtime).resolve(),
+        Path(accepted_runtime).resolve(),
+        Path(base_runtime).resolve(),
+    )
+    repository_roots = (
+        (Path(current, "src").resolve(),)
+        if root.resolve() == runtime_roots[0]
+        else (Path(accepted, "src").resolve(),)
+        if root.resolve() == runtime_roots[1]
+        else ()
+    )
+    allowed = (root.resolve(), *runtime_roots, *repository_roots)
+    def within(path):
+        return any(path == candidate or candidate in path.parents for candidate in allowed)
+    names = []
+    for directory, subdirectories, filenames in os.walk(root, followlinks=False):
+        relative = Path(directory).relative_to(root)
+        for name in (*subdirectories, *filenames):
+            path = Path(directory) / name
+            info = os.lstat(path)
+            if stat.S_ISDIR(info.st_mode):
+                continue
+            if not (stat.S_ISREG(info.st_mode) or stat.S_ISLNK(info.st_mode)):
+                raise ValueError(f"unsupported runtime entry: {path}")
+            if stat.S_ISLNK(info.st_mode) and not within(path.resolve(strict=True)):
+                raise ValueError(f"runtime symlink escapes inventoried roots: {path}")
+            if path.suffix == ".pth":
+                for raw in read_regular(path)[1].decode().splitlines():
+                    line = raw.strip()
+                    if not line or line.startswith("#"):
+                        continue
+                    if line.startswith("import "):
+                        if not __import__("re").fullmatch(r"import [A-Za-z_][A-Za-z0-9_]*", line):
+                            raise ValueError(f"unsafe runtime import hook: {path}")
+                        if not any(root.rglob(line[7:] + ".py")):
+                            raise ValueError(f"runtime import hook module is not inventoried: {path}")
+                    else:
+                        target = Path(line)
+                        target = (path.parent / target if not target.is_absolute() else target).resolve(
+                            strict=True
+                        )
+                        if not within(target):
+                            raise ValueError(f"runtime .pth target escapes inventoried roots: {path}")
+            names.append(os.fsencode(str(relative / name)))
+    return inventory(root, sorted(names))
+
+
+(
+    approval_path,
+    payload_path,
+    credential_name,
+    credential_source,
+    credential_json,
+    current,
+    accepted,
+    execution_alias,
+    recovery_root,
+    current_runtime,
+    accepted_runtime,
+    base_runtime,
+    accepted_commit,
+    owner_exclude,
+    *ignored_source_paths,
+) = sys.argv[1:]
+payload = load(payload_path)
+approval = load(approval_path)
+current_root = Path(current)
+source_paths = ("--", ".", owner_exclude)
+actual = {
+    "head": git(current_root, "rev-parse", "HEAD").decode().strip(),
+    "porcelain": record(git(current_root, "status", "--porcelain=v1", "-z", *source_paths)),
+    "commit_overlay": record(
+        git(current_root, "diff", "--binary", f"{accepted_commit}..HEAD", *source_paths)
+    ),
+    "worktree_overlay": record(
+        git(current_root, "diff", "--binary", "HEAD", *source_paths)
+    ),
+    "source_inventory": record(
+        inventory(
+            current_root,
+            git(
+                current_root,
+                "ls-files",
+                "-z",
+                "--cached",
+                "--others",
+                "--exclude-standard",
+                *source_paths,
+            ).split(b"\0")[:-1],
+        )
+    ),
+    "ignored_source_inventory": record(
+        inventory(
+            current_root,
+            git(
+                current_root,
+                "ls-files",
+                "-z",
+                "--others",
+                "--ignored",
+                "--exclude-standard",
+                "--",
+                *ignored_source_paths,
+            ).split(b"\0")[:-1],
+        )
+    ),
+}
+for name, value in actual.items():
+    if approval.get(name) != value:
+        raise ValueError(f"approval source state mismatch: {name}")
+if approval.get("accepted_alpha_commit") != accepted_commit:
+    raise ValueError("approval accepted commit mismatch")
+accepted_root = Path(accepted)
+accepted_actual = {
+    "root": accepted,
+    "head": git(accepted_root, "rev-parse", "HEAD").decode().strip(),
+    "porcelain": record(
+        git(accepted_root, "status", "--porcelain=v1", "-z", *source_paths)
+    ),
+    "source_inventory": record(
+        inventory(
+            accepted_root,
+            git(
+                accepted_root,
+                "ls-files",
+                "-z",
+                "--cached",
+                "--others",
+                "--exclude-standard",
+                *source_paths,
+            ).split(b"\0")[:-1],
+        )
+    ),
+    "ignored_source_inventory": record(
+        inventory(
+            accepted_root,
+            git(
+                accepted_root,
+                "ls-files",
+                "-z",
+                "--others",
+                "--ignored",
+                "--exclude-standard",
+                "--",
+                *ignored_source_paths,
+            ).split(b"\0")[:-1],
+        )
+    ),
+}
+if (
+    accepted_actual["head"] != accepted_commit
+    or approval.get("accepted_source_state") != accepted_actual
+    or payload.get("accepted_source_state") != accepted_actual
+):
+    raise ValueError("signed accepted source state mismatch")
+observed_alias = symlink_identity(execution_alias, recovery_root)
+if approval.get("execution_alias") != observed_alias or payload.get(
+    "execution_alias"
+) != observed_alias:
+    raise ValueError("signed execution alias mismatch")
+runtime_roots = {
+    "current_python": Path(current_runtime),
+    "accepted_python": Path(accepted_runtime),
+    "base_python": Path(base_runtime),
+}
+for name, root in runtime_roots.items():
+    binding = payload["runtime_bindings"][name]
+    if binding["root"] != str(root) or file_identity(binding["interpreter"]["path"]) != binding[
+        "interpreter"
+    ]:
+        raise ValueError(f"runtime binding mismatch: {name}")
+    observed = record(runtime_inventory(root))
+    if observed != approval["runtime_inventories"][name] or observed != payload[
+        "runtime_inventories"
+    ][name]:
+        raise ValueError(f"runtime inventory mismatch: {name}")
+if payload["source_inventory"] != approval["source_inventory"] or payload[
+    "ignored_source_inventory"
+] != approval["ignored_source_inventory"]:
+    raise ValueError("signed source inventory mismatch")
+expected_credential = json.loads(
+    credential_json, object_pairs_hook=pairs, parse_constant=invalid_constant
+)
+if (
+    expected_credential["name"] != credential_name
+    or expected_credential["source"]["path"] != credential_source
+    or file_identity(credential_source) != expected_credential["source"]
+):
+    raise ValueError("credential source identity mismatch")
+credential_path = Path(os.environ["CREDENTIALS_DIRECTORY"]) / credential_name
+credential_info, credential_bytes = read_regular(credential_path)
+if (
+    credential_info.st_size != expected_credential["source"]["byte_count"]
+    or hashlib.sha256(credential_bytes).hexdigest()
+    != expected_credential["source"]["sha256"]
+):
+    raise ValueError("delivered credential mismatch")
+"""
+
+_ADMISSION_PRESTART_SOURCE = r"""
+import base64
+import hashlib
+import json
+import os
+from pathlib import Path
+import stat
+import subprocess
+import sys
+import tempfile
+
+
+def canonical(value):
+    return (
+        json.dumps(
+            value,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode()
+        + b"\n"
+    )
+
+
+def pairs(values):
+    result = dict(values)
+    if len(result) != len(values):
+        raise ValueError("duplicate JSON key")
+    return result
+
+
+def invalid_constant(value):
+    raise ValueError(f"invalid JSON constant: {value}")
+
+
+def read_regular(path):
+    path = Path(path)
+    before = os.lstat(path)
+    if (
+        not stat.S_ISREG(before.st_mode)
+        or before.st_nlink != 1
+        or before.st_uid != os.getuid()
+        or stat.S_IMODE(before.st_mode) & 0o022
+    ):
+        raise ValueError(f"unsafe regular file: {path}")
+    descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    try:
+        opened = os.fstat(descriptor)
+        chunks = []
+        while True:
+            chunk = os.read(descriptor, 1 << 20)
+            if not chunk:
+                break
+            chunks.append(chunk)
+        after = os.fstat(descriptor)
+    finally:
+        os.close(descriptor)
+    fields = ("st_dev", "st_ino", "st_uid", "st_gid", "st_mode", "st_nlink", "st_size")
+    if any(getattr(before, field) != getattr(opened, field) for field in fields) or any(
+        getattr(opened, field) != getattr(after, field) for field in fields
+    ):
+        raise ValueError(f"unstable regular file: {path}")
+    data = b"".join(chunks)
+    if len(data) != opened.st_size:
+        raise ValueError(f"short regular file read: {path}")
+    return opened, data
+
+
+def file_identity(path):
+    info, data = read_regular(path)
+    return {
+        "path": str(Path(path)),
+        "sha256": hashlib.sha256(data).hexdigest(),
+        "byte_count": len(data),
+        "st_dev": info.st_dev,
+        "st_ino": info.st_ino,
+        "st_uid": info.st_uid,
+        "st_gid": info.st_gid,
+        "mode": stat.S_IMODE(info.st_mode),
+        "nlink": info.st_nlink,
+    }
+
+
+def load(path):
+    _, raw = read_regular(path)
+    value = json.loads(raw, object_pairs_hook=pairs, parse_constant=invalid_constant)
+    if not isinstance(value, dict) or canonical(value) != raw:
+        raise ValueError(f"noncanonical JSON: {path}")
+    return value, raw
+
+
+(
+    approval_path,
+    receipt_path,
+    key_root,
+    unit_name,
+    unit_file,
+    authority_public_b64,
+    current,
+    accepted,
+    execution_alias,
+    recovery_root,
+    current_runtime,
+    accepted_runtime,
+    base_runtime,
+    owner_exclude,
+    accepted_commit,
+    isolated_source_b64,
+    *ignored_source_paths,
+) = sys.argv[1:]
+receipt = Path(receipt_path)
+payload_path = receipt.with_suffix(".payload.json")
+envelope, _ = load(receipt)
+detached_payload, detached_bytes = load(payload_path)
+payload = envelope["payload"]
+if payload != detached_payload or canonical(payload) != detached_bytes:
+    raise ValueError("detached launch-admission payload mismatch")
+public = base64.b64decode(authority_public_b64, validate=True)
+signature = base64.b64decode(envelope["signature_b64"], validate=True)
+if (
+    len(public) != 32
+    or len(signature) != 64
+    or envelope["schema"] != "alpha_max_v8_signed_launch_admission.v1"
+    or envelope["authority_key_id"] != hashlib.sha256(public).hexdigest()
+):
+    raise ValueError("launch-admission envelope mismatch")
+der = b"\x30\x2a\x30\x05\x06\x03\x2b\x65\x70\x03\x21\x00" + public
+with tempfile.TemporaryDirectory() as directory:
+    public_path = Path(directory) / "authority.der"
+    signature_path = Path(directory) / "admission.signature"
+    public_path.write_bytes(der)
+    signature_path.write_bytes(signature)
+    subprocess.run(
+        (
+            "/usr/bin/openssl",
+            "pkeyutl",
+            "-verify",
+            "-pubin",
+            "-inkey",
+            str(public_path),
+            "-keyform",
+            "DER",
+            "-rawin",
+            "-in",
+            str(payload_path),
+            "-sigfile",
+            str(signature_path),
+        ),
+        check=True,
+        capture_output=True,
+    )
+scope = receipt.name.removeprefix("launch-admission-").removesuffix(".json")
+if payload["requested_scope"] != scope:
+    raise ValueError("launch-admission scope mismatch")
+if (
+    file_identity(approval_path) != payload["approval"]
+    or file_identity(payload["complete"]["path"]) != payload["complete"]
+    or file_identity(payload["manifest"]["path"]) != payload["manifest"]
+):
+    raise ValueError("launch-admission control identity mismatch")
+for artifact in payload.get("control_artifacts", []):
+    if not isinstance(artifact, dict) or file_identity(artifact.get("path", "")) != artifact:
+        raise ValueError("launch-admission signed control artifact mismatch")
+matching = [
+    item
+    for item in payload["topology"]["units"]
+    if item["production_unit"] == unit_name and item["unit"]["path"] == unit_file
+]
+if len(matching) != 1:
+    raise ValueError("launch-admission production unit mismatch")
+entry = matching[0]
+if entry["scope"] != scope or Path(unit_file).name != unit_name:
+    raise ValueError("launch-admission topology mismatch")
+if file_identity(unit_file) != entry["unit"]:
+    raise ValueError("launch-admission unit identity drift")
+credential = entry["credential"]
+credential_source = credential["source"]["path"]
+if Path(credential_source).parent != Path(key_root) or credential["target"] != (
+    f"%d/{credential['name']}"
+):
+    raise ValueError("launch-admission credential topology mismatch")
+transient_name = (
+    unit_name.removesuffix(".service")
+    + f"-admission-verify-{os.getpid()}.service"
+)
+inner_code = (
+    "import base64,sys;"
+    "exec(compile(base64.b64decode(sys.argv[1]),"
+    "'<alpha-max-admission-isolated>','exec'))"
+)
+command = [
+    "/usr/bin/systemd-run",
+    "--user",
+    "--wait",
+    "--collect",
+    "--quiet",
+    f"--unit={transient_name}",
+    "--property=Type=exec",
+    "--property=UMask=0077",
+    "--property=NoNewPrivileges=yes",
+    "--property=PrivateTmp=yes",
+    "--property=PrivateDevices=yes",
+    "--property=ProtectSystem=strict",
+    "--property=ProtectHome=tmpfs",
+    "--property=ProtectKernelTunables=yes",
+    "--property=ProtectKernelModules=yes",
+    "--property=ProtectControlGroups=yes",
+    "--property=RestrictAddressFamilies=AF_UNIX",
+    "--property=IPAddressDeny=any",
+    "--property=MemoryHigh=536870912",
+    "--property=MemoryMax=1073741824",
+    "--property=MemorySwapMax=0",
+    "--property=OOMPolicy=kill",
+    "--property=RuntimeMaxSec=1800s",
+    "--property=WorkingDirectory=/",
+    "--property=Environment=HOME=/tmp",
+    "--property=Environment=PYTHONDONTWRITEBYTECODE=1",
+]
+for path in (
+    current,
+    accepted,
+    current_runtime,
+    accepted_runtime,
+    base_runtime,
+    str(Path(unit_file).parent.parent),
+    approval_path,
+    credential_source,
+):
+    command.append(f"--property=BindReadOnlyPaths={path}")
+command.extend(
+    (
+        f"--property=LoadCredential={credential['name']}:{credential_source}",
+        "/usr/bin/python3",
+        "-I",
+        "-c",
+        inner_code,
+        isolated_source_b64,
+        approval_path,
+        str(payload_path),
+        credential["name"],
+        credential_source,
+        canonical(credential).decode().strip(),
+        current,
+        accepted,
+        execution_alias,
+        recovery_root,
+        current_runtime,
+        accepted_runtime,
+        base_runtime,
+        accepted_commit,
+        owner_exclude,
+        *ignored_source_paths,
+    )
+)
+subprocess.run(command, check=True)
+if (
+    file_identity(unit_file) != entry["unit"]
+    or file_identity(approval_path) != payload["approval"]
+    or load(payload_path)[1] != detached_bytes
+):
+    raise ValueError("launch-admission post-verification identity drift")
+property_names = (
+    "FragmentPath",
+    "ExecStart",
+    "ExecStartPre",
+    "ExecStopPost",
+    "Environment",
+    "WorkingDirectory",
+    "UMask",
+    "NoNewPrivileges",
+    "PrivateTmp",
+    "PrivateDevices",
+    "ProtectSystem",
+    "ProtectHome",
+    "BindReadOnlyPaths",
+    "BindPaths",
+    "InaccessiblePaths",
+    "LoadCredential",
+    "ProtectKernelTunables",
+    "ProtectKernelModules",
+    "ProtectControlGroups",
+    "RestrictAddressFamilies",
+    "IPAddressDeny",
+    "MemoryHigh",
+    "MemoryMax",
+    "MemorySwapMax",
+    "OOMPolicy",
+    "TimeoutStartUSec",
+    "TimeoutStopUSec",
+)
+show = ["/usr/bin/systemctl", "--user", "show", unit_name]
+for name in property_names:
+    show.extend(("-p", name))
+live = {}
+for line in subprocess.run(show, check=True, capture_output=True, text=True).stdout.splitlines():
+    name, separator, value = line.partition("=")
+    if separator:
+        live[name] = value
+if live != payload["production_properties"][unit_name]:
+    raise ValueError("launch-admission production property drift")
+"""
+
+_ADMISSION_ISOLATED_B64 = base64.b64encode(_ADMISSION_ISOLATED_SOURCE.encode()).decode()
+_ADMISSION_PRESTART_B64 = base64.b64encode(_ADMISSION_PRESTART_SOURCE.encode()).decode()
+_ADMISSION_PRESTART_CODE = (
+    "import base64;exec(compile(base64.b64decode("
+    + repr(_ADMISSION_PRESTART_B64)
+    + "),'<alpha-max-admission-prestart>','exec'))"
+)
+
+
+def _admission_prestart(
+    interpreter: str,
+    approval: Path,
+    receipt: Path,
+    key_root: Path,
+    unit_name: str,
+    unit_file: Path,
+    authority_public_b64: str,
+) -> list[str]:
+    return [
+        "/usr/bin/python3",
+        "-I",
+        "-c",
+        _ADMISSION_PRESTART_CODE,
+        str(approval),
+        str(receipt),
+        str(key_root),
+        unit_name,
+        str(unit_file),
+        authority_public_b64,
+        CURRENT,
+        ACCEPTED,
+        str(EXECUTION_ALIAS_ROOT),
+        str(RECOVERY_ROOT),
+        str(Path(EXECUTABLE_PINS["current_python"]["path"]).parent.parent),
+        str(Path(EXECUTABLE_PINS["accepted_python"]["path"]).parent.parent),
+        str(Path(EXECUTABLE_PINS["base_python"]["path"]).parent.parent),
+        _OWNER_SESSION_RUNTIME_EXCLUDE,
+        ACCEPTED_COMMIT,
+        _ADMISSION_ISOLATED_B64,
+        *_IGNORED_SOURCE_PATHS,
+    ]
+
+
+def _command_read_paths(
+    commands: list[list[str]],
+    *,
+    write_paths: list[str],
+    inaccessible_paths: list[str],
+) -> list[str]:
+    """Expose only exact absolute command inputs hidden by ProtectHome=tmpfs."""
+    excluded_roots = [*write_paths, *inaccessible_paths, *_FORBIDDEN_ROOTS]
+    result: list[str] = []
+    for command in commands:
+        if not isinstance(command, list) or not command:
+            _fail("invalid policy-derived command")
+        for argument in command:
+            if not isinstance(argument, str):
+                _fail("invalid policy-derived command argument")
+            if not argument.startswith("/"):
+                continue
+            if any(argument == root or argument.startswith(root + "/") for root in excluded_roots):
+                continue
+            if argument in {CURRENT, ACCEPTED}:
+                _fail("policy-derived command exposes a broad repository root")
+            _inventory_absolute(argument)
+            result.append(argument)
+    return list(dict.fromkeys(result))
+
+
+def _write_bind_paths(write_paths: list[str]) -> list[str]:
+    bindings: list[str] = []
+    seen: set[Path] = set()
+    for raw_destination in write_paths:
+        destination = _absolute(raw_destination)
+        try:
+            relative = destination.relative_to(RECOVERY_ROOT)
+        except ValueError:
+            _fail("systemd writable destination escapes the recovery root")
+        if relative == Path(".") or destination in seen:
+            _fail("systemd writable destinations must be distinct recovery subpaths")
+        seen.add(destination)
+        source = EXECUTION_ALIAS_ROOT / relative
+        bindings.append(f"{source}:{destination}")
+    return bindings
+
+
 def _unit(
     description: str,
     argv: list[str],
@@ -743,26 +2032,59 @@ def _unit(
     inaccessible_paths: list[str],
     load_credential: str,
     observer: bool = False,
+    prestart: list[str] | None = None,
 ) -> dict[str, Any]:
+    argv_read_paths = _command_read_paths(
+        [argv, *([stop] if stop is not None else [])],
+        write_paths=write_paths,
+        inaccessible_paths=inaccessible_paths,
+    )
+    if prestart is not None:
+        if len(prestart) < 5 or not prestart[4].startswith("/"):
+            _fail("production prestart lacks an absolute approval")
+        argv_read_paths.extend(
+            (
+                prestart[4],
+                str(Path(EXECUTABLE_PINS["current_python"]["path"]).parent.parent),
+                str(Path(EXECUTABLE_PINS["accepted_python"]["path"]).parent.parent),
+                str(Path(EXECUTABLE_PINS["base_python"]["path"]).parent.parent),
+                str(Path(CURRENT) / "src"),
+                str(Path(ACCEPTED) / "src"),
+            )
+        )
+    read_paths = list(dict.fromkeys([*read_paths, *argv_read_paths]))
+    bind_paths = _write_bind_paths(write_paths)
     service = {
         "UMask": "0077",
         "Type": "exec",
-        "ExecStart": argv,
+        "ExecStart": (
+            _wrap_execstart(
+                argv,
+                write_paths,
+                receipt=prestart[5],
+                unit_name=prestart[7],
+                authority_public_b64=prestart[9],
+            )
+            if prestart is not None
+            else argv
+        ),
         "Environment": [f"{k}={v}" for k, v in env.items()],
-        "WorkingDirectory": CURRENT,
+        "WorkingDirectory": "/",
         "NoNewPrivileges": True,
         "PrivateTmp": True,
         "PrivateDevices": True,
         "ProtectSystem": "strict",
-        "ProtectHome": "read-only",
-        "ReadOnlyPaths": read_paths,
-        "InaccessiblePaths": inaccessible_paths,
+        "ProtectHome": "tmpfs",
+        "BindReadOnlyPaths": read_paths,
+        "InaccessiblePaths": [f"-{path}" for path in inaccessible_paths],
         "LoadCredential": [load_credential],
-        "ReadWritePaths": write_paths,
+        "BindPaths": bind_paths,
         "ProtectKernelTunables": True,
         "ProtectKernelModules": True,
         "ProtectControlGroups": True,
-        "RestrictAddressFamilies": ["AF_UNIX", "AF_INET", "AF_INET6"] if observer else ["AF_UNIX"],
+        "RestrictAddressFamilies": (
+            ["AF_UNIX", "AF_INET", "AF_INET6"] if observer else ["AF_UNIX"]
+        ),
         "MemoryHigh": limits["high"],
         "MemoryMax": limits["max"],
         "MemorySwapMax": limits["swap"],
@@ -770,10 +2092,24 @@ def _unit(
         "TimeoutStartSec": "1800s",
         "TimeoutStopSec": "120s",
     }
-    if stop is not None:
-        service["ExecStopPost"] = stop
+    if not bind_paths:
+        service.pop("BindPaths")
+    if prestart is not None:
+        service["ExecStartPre"] = prestart
     if not observer:
         service["IPAddressDeny"] = "any"
+    if stop is not None:
+        service["ExecStopPost"] = (
+            _wrap_execstart(
+                stop,
+                write_paths,
+                receipt=prestart[5],
+                unit_name=prestart[7],
+                authority_public_b64=prestart[9],
+            )
+            if prestart is not None
+            else stop
+        )
     return {
         "Description": description,
         "After": ["network-online.target"],
@@ -894,6 +2230,7 @@ _SERVICE_RENDER_ORDER = (
     "Type",
     "UMask",
     "ExecStart",
+    "ExecStartPre",
     "ExecStopPost",
     "Environment",
     "WorkingDirectory",
@@ -902,10 +2239,10 @@ _SERVICE_RENDER_ORDER = (
     "PrivateDevices",
     "ProtectSystem",
     "ProtectHome",
-    "ReadOnlyPaths",
+    "BindReadOnlyPaths",
     "InaccessiblePaths",
     "LoadCredential",
-    "ReadWritePaths",
+    "BindPaths",
     "ProtectKernelTunables",
     "ProtectKernelModules",
     "ProtectControlGroups",
@@ -945,7 +2282,7 @@ def _render_systemd_value(name: str, value: Any) -> str:
             _fail(f"systemd directive requires one atom: {name}")
         return value
     if isinstance(value, list) and value and all(isinstance(item, str) for item in value):
-        if name in {"ExecStart", "ExecStopPost", "Environment"}:
+        if name in {"ExecStart", "ExecStartPre", "ExecStopPost", "Environment"}:
             return " ".join(_systemd_word(item) for item in value)
         if any(any(character.isspace() for character in item) for item in value):
             _fail(f"systemd directive contains a non-atomic list value: {name}")
@@ -1005,6 +2342,7 @@ _SERVICE_DIRECTIVES = frozenset(
         "Type",
         "UMask",
         "ExecStart",
+        "ExecStartPre",
         "Environment",
         "WorkingDirectory",
         "NoNewPrivileges",
@@ -1012,10 +2350,10 @@ _SERVICE_DIRECTIVES = frozenset(
         "PrivateDevices",
         "ProtectSystem",
         "ProtectHome",
-        "ReadOnlyPaths",
+        "BindReadOnlyPaths",
         "InaccessiblePaths",
         "LoadCredential",
-        "ReadWritePaths",
+        "BindPaths",
         "ProtectKernelTunables",
         "ProtectKernelModules",
         "ProtectControlGroups",
@@ -1042,9 +2380,17 @@ def _validate_unit(unit: dict[str, Any]) -> None:
     service = unit["Service"]
     if service.get("UMask") != "0077":
         _fail("systemd UMask must be 0077")
-    path_directives = ("ReadOnlyPaths", "ReadWritePaths", "InaccessiblePaths")
-    if any(not isinstance(service[key], list) for key in path_directives):
+    if not isinstance(service.get("BindReadOnlyPaths"), list) or not isinstance(
+        service.get("InaccessiblePaths"), list
+    ):
         _fail("invalid systemd path directives")
+    bind_paths = service.get("BindPaths", [])
+    if (
+        not isinstance(bind_paths, list)
+        or ("BindPaths" in service and not bind_paths)
+        or any(not isinstance(path, str) for path in bind_paths)
+    ):
+        _fail("invalid systemd writable bind paths")
     load_credential = service["LoadCredential"]
     if isinstance(load_credential, str):
         credentials = [load_credential]
@@ -1059,31 +2405,74 @@ def _validate_unit(unit: dict[str, Any]) -> None:
         _fail("invalid systemd LoadCredential")
     if any(
         not isinstance(path, str)
-        for path in (
-            *service["ReadOnlyPaths"],
-            *service["ReadWritePaths"],
-            *service["InaccessiblePaths"],
-        )
+        for path in (*service["BindReadOnlyPaths"], *service["InaccessiblePaths"])
     ):
         _fail("invalid systemd path directives")
-    read_paths = set(service["ReadOnlyPaths"])
-    write_paths = set(service["ReadWritePaths"])
-    inaccessible_paths = set(service["InaccessiblePaths"])
-    if len(service["InaccessiblePaths"]) != 1:
-        _fail("systemd inaccessible paths must contain only the key root")
-    key_root = service["InaccessiblePaths"][0]
+    read_paths = set(service["BindReadOnlyPaths"])
+    if len(read_paths) != len(service["BindReadOnlyPaths"]):
+        _fail("duplicate systemd read-only bind")
+    write_paths: set[str] = set()
+    bind_sources: set[str] = set()
+    for binding in bind_paths:
+        if binding.count(":") != 1:
+            _fail("systemd writable bind must map one source to one destination")
+        raw_source, raw_destination = binding.split(":")
+        source_path = Path(raw_source)
+        destination = Path(raw_destination)
+        if (
+            not source_path.is_absolute()
+            or not destination.is_absolute()
+            or str(source_path) != raw_source
+            or str(destination) != raw_destination
+            or os.path.normpath(raw_source) != raw_source
+            or os.path.normpath(raw_destination) != raw_destination
+            or any(component in {".", ".."} for component in source_path.parts)
+            or any(component in {".", ".."} for component in destination.parts)
+        ):
+            _fail("systemd writable bind paths must be canonically absolute")
+        try:
+            source_relative = source_path.relative_to(EXECUTION_ALIAS_ROOT)
+            destination_relative = destination.relative_to(RECOVERY_ROOT)
+        except ValueError:
+            _fail("systemd writable bind escapes its execution capability")
+        if (
+            source_relative == Path(".")
+            or source_relative != destination_relative
+            or raw_source in bind_sources
+            or raw_destination in write_paths
+        ):
+            _fail("systemd writable bind mapping mismatch")
+        bind_sources.add(raw_source)
+        write_paths.add(raw_destination)
+    raw_inaccessible_paths = set(service["InaccessiblePaths"])
+    if len(raw_inaccessible_paths) != 1 or any(
+        not path.startswith("-/") for path in raw_inaccessible_paths
+    ):
+        _fail("systemd inaccessible paths must contain only the optional key root")
+    inaccessible_paths = {path[1:] for path in raw_inaccessible_paths}
+    key_root = next(iter(inaccessible_paths))
+    if (
+        service.get("ProtectHome") != "tmpfs"
+        or service.get("WorkingDirectory") != "/"
+        or any(not path.startswith("/") for path in read_paths | write_paths)
+        or any(
+            path in {"/home", str(Path.home()), CURRENT, ACCEPTED}
+            or any(path == root or root.startswith(path + "/") for root in (CURRENT, ACCEPTED))
+            or any(
+                path == root or path.startswith(root + "/") or root.startswith(path + "/")
+                for root in _FORBIDDEN_ROOTS
+            )
+            for path in read_paths | write_paths
+        )
+    ):
+        _fail("systemd unit exposes a broad home path")
     source_path = Path(source)
     if not source_path.is_absolute() or source_path.parent != Path(key_root):
         _fail("systemd credential source must be directly under the inaccessible key root")
-    expected_arguments = {
-        "authority.private": "--private-key",
-        "acquisition.private": "--observer-private-key",
-        "authority.public": "--authority-public-key",
-    }
-    if name not in expected_arguments or source_path.name != name:
+    if source_path.name != name:
         _fail("systemd credential name does not match its source")
+    argument = _credential_argument(name)
     argv = service["ExecStart"]
-    argument = expected_arguments[name]
     if (
         not isinstance(argv, list)
         or argv.count(argument) != 1
@@ -1092,10 +2481,49 @@ def _validate_unit(unit: dict[str, Any]) -> None:
         _fail("systemd credential does not match unit role argv")
     if key_root in read_paths or key_root in write_paths:
         _fail("systemd key root must not be readable or writable")
-    if read_paths & write_paths:
-        _fail("systemd read-only and read-write paths overlap")
-    if (read_paths | write_paths) & inaccessible_paths:
+    if any(
+        left == right or left.startswith(right + "/") or right.startswith(left + "/")
+        for left in read_paths
+        for right in write_paths
+    ):
+        _fail("systemd read-only and writable binds overlap")
+    if any(
+        left == right or left.startswith(right + "/") or right.startswith(left + "/")
+        for left in read_paths | write_paths
+        for right in inaccessible_paths
+    ):
         _fail("systemd accessible and inaccessible paths overlap")
+    production = any(
+        "run_alpha_max_terminal_" in argument or "monitor_alpha_max_v8_resources.py" in argument
+        for argument in argv
+    )
+    prestart = service.get("ExecStartPre")
+    if production and (
+        not isinstance(prestart, list)
+        or len(prestart) < 10
+        or not all(isinstance(item, str) for item in prestart)
+        or prestart[3] != _ADMISSION_PRESTART_CODE
+        or not any(
+            re.fullmatch(
+                r".*/launch-admission-(acquisition|phase_preparation|one_touch)\.json", item
+            )
+            for item in prestart
+        )
+    ):
+        _fail("production unit lacks an exact launch-admission prestart contract")
+    if name == "acquisition.private":
+        if (
+            service.get("RestrictAddressFamilies") != ["AF_UNIX", "AF_INET", "AF_INET6"]
+            or "IPAddressDeny" in service
+        ):
+            _fail("acquisition observer must allow only Unix and Internet socket families")
+    elif (
+        service.get("RestrictAddressFamilies") != ["AF_UNIX"]
+        or service.get("IPAddressDeny") != "any"
+    ):
+        _fail("non-acquisition systemd unit must deny all network families")
+    if any(not path.startswith("/") for path in write_paths):
+        _fail("systemd writable paths must be absolute")
 
 
 def _repository_evidence(
@@ -1103,9 +2531,9 @@ def _repository_evidence(
 ) -> tuple[str, dict[str, Any], dict[str, Any]]:
     head = _git(root, "rev-parse", "HEAD").decode().strip()
     raw = {
-        "porcelain": _git(root, "status", "--porcelain=v1", "-z"),
-        "commit_overlay": _git(root, "diff", "--binary", f"{ACCEPTED_COMMIT}..HEAD"),
-        "worktree_overlay": _git(root, "diff", "--binary", "HEAD"),
+        "porcelain": _source_git(root, "status", "--porcelain=v1", "-z"),
+        "commit_overlay": _source_git(root, "diff", "--binary", f"{ACCEPTED_COMMIT}..HEAD"),
+        "worktree_overlay": _source_git(root, "diff", "--binary", "HEAD"),
         "source_inventory": _inventory(root),
     }
     evidence = {
@@ -1159,6 +2587,60 @@ def _quarantine_or_reraise(
     raise primary
 
 
+def create_approval(args: argparse.Namespace) -> dict[str, str]:
+    """Create only the reviewed source-bound approval; never create a control artifact."""
+    paths = {
+        name: _absolute(getattr(args, name))
+        for name in (
+            "control_root",
+            "key_root",
+            "evidence_root",
+            "telemetry_root",
+            "output_parent",
+            "current_approval",
+        )
+    }
+    paths["stage_results_parent"] = RECOVERY_ROOT / f"g056v8-stage-results-{args.run_id}"
+    request_ids = {
+        "acquisition": args.request_id,
+        "phase_preparation": args.phase_request_id,
+        "one_touch": args.one_touch_request_id,
+    }
+    expected = {
+        "control_root": f"g056v8-controls-{args.run_id}",
+        "key_root": f"g056v8-keys-{args.run_id}",
+        "evidence_root": f"g056v8-acquisition-evidence-{args.run_id}",
+        "telemetry_root": f"g056v8-telemetry-{args.run_id}",
+        "output_parent": f"g056v8-acquisition-output-{args.run_id}",
+        "stage_results_parent": f"g056v8-stage-results-{args.run_id}",
+    }
+    if (
+        paths["current_approval"] != RECOVERY_ROOT / CURRENT_APPROVAL_LEAF
+        or args.run_id != RUN_ID
+        or request_ids
+        != {
+            "acquisition": ACQUISITION_REQUEST_ID,
+            "phase_preparation": PHASE_PREPARATION_REQUEST_ID,
+            "one_touch": ONE_TOUCH_REQUEST_ID,
+        }
+        or any(
+            paths[name].parent != RECOVERY_ROOT or paths[name].name != leaf
+            for name, leaf in expected.items()
+        )
+    ):
+        _fail("fresh recovery approval identity mismatch")
+    if not _only_owner_session_runtime_changes(Path(CURRENT)):
+        _fail("current recovery source contains unapproved dirty or untracked files")
+    approval = _create_current_approval(
+        paths["current_approval"],
+        root=Path(CURRENT),
+        run_id=args.run_id,
+        request_ids=request_ids,
+        absent_paths={name: paths[name] for name in expected},
+    )
+    return {"approval": approval["schema"], "path": str(paths["current_approval"])}
+
+
 def build(args: argparse.Namespace) -> dict[str, str]:
     paths = {
         name: _absolute(getattr(args, name))
@@ -1169,22 +2651,31 @@ def build(args: argparse.Namespace) -> dict[str, str]:
             "telemetry_root",
             "output_parent",
             "telemetry_script",
-            "g067_approval",
             "current_approval",
             "current_python",
             "accepted_python",
         )
     }
-    if paths["g067_approval"] != Path(G067_APPROVAL) or paths["current_approval"] != Path(
-        CURRENT_APPROVAL
-    ):
+    paths["stage_results_parent"] = RECOVERY_ROOT / f"g056v8-stage-results-{args.run_id}"
+    if paths["current_approval"] != RECOVERY_ROOT / CURRENT_APPROVAL_LEAF:
         _fail("approval path mismatch")
+    request_ids = {
+        "acquisition": args.request_id,
+        "phase_preparation": args.phase_request_id,
+        "one_touch": args.one_touch_request_id,
+    }
     if (
-        not HEX.fullmatch(args.run_id)
-        or not HEX.fullmatch(args.request_id)
-        or args.run_id == args.request_id
+        args.run_id != RUN_ID
+        or request_ids
+        != {
+            "acquisition": ACQUISITION_REQUEST_ID,
+            "phase_preparation": PHASE_PREPARATION_REQUEST_ID,
+            "one_touch": ONE_TOUCH_REQUEST_ID,
+        }
+        or len(set(request_ids.values())) != len(_SCOPES)
+        or any(not HEX.fullmatch(value) for value in (args.run_id, *request_ids.values()))
     ):
-        _fail("run and request IDs must be distinct lowercase SHA-256 values")
+        _fail("fresh recovery identity mismatch")
     recovery = paths["output_parent"].parent
     if recovery != RECOVERY_ROOT:
         _fail("unexpected recovery root")
@@ -1194,49 +2685,25 @@ def build(args: argparse.Namespace) -> dict[str, str]:
         "evidence_root": f"g056v8-acquisition-evidence-{args.run_id}",
         "telemetry_root": f"g056v8-telemetry-{args.run_id}",
         "output_parent": f"g056v8-acquisition-output-{args.run_id}",
+        "stage_results_parent": f"g056v8-stage-results-{args.run_id}",
     }
     if (
         any(
             paths[name].parent != recovery or paths[name].name != leaf
             for name, leaf in expected.items()
         )
-        or len({paths[name] for name in expected}) != 5
+        or len({paths[name] for name in expected}) != 6
     ):
         _fail("invalid v8 root topology")
+    paths["admission_root"] = paths["control_root"] / "admissions"
     _directory(recovery)
-    for name in expected:
-        _absent(paths[name])
-    g067 = _approval(
-        paths["g067_approval"],
-        {"schema", *G067_IDENTITY, "approved_utc"},
-        "alpha_max_g067_sol_archive_approval.v1",
+    approval = _load_current_approval(
+        paths["current_approval"],
+        run_id=args.run_id,
+        request_ids=request_ids,
+        absent_paths={name: paths[name] for name in expected},
     )
-    if any(g067[key] != value for key, value in G067_IDENTITY.items()):
-        _fail("G067 identity mismatch")
-    fields = {
-        "schema",
-        "repository_root",
-        "head",
-        "accepted_alpha_commit",
-        "baseline_ancestor",
-        "verdict",
-        "porcelain",
-        "commit_overlay",
-        "worktree_overlay",
-        "source_inventory",
-        "approved_utc",
-    }
-    approval = _approval(
-        paths["current_approval"], fields, "alpha_max_v8_current_state_approval.v2"
-    )
-    if (
-        approval["repository_root"] != CURRENT
-        or approval["accepted_alpha_commit"] != ACCEPTED_COMMIT
-        or approval["baseline_ancestor"] != BASELINE
-        or approval["verdict"] != "PASS_REVIEWED_OVERLAY"
-    ):
-        _fail("current approval binding mismatch")
-    current_head = _state(Path(CURRENT), approval)
+    current_head = approval["head"]
     if _git(Path(ACCEPTED), "rev-parse", "HEAD").decode().strip() != ACCEPTED_COMMIT or _git(
         Path(ACCEPTED), "status", "--porcelain=v1", "-z"
     ):
@@ -1284,6 +2751,7 @@ def build(args: argparse.Namespace) -> dict[str, str]:
         ):
             _create_root(paths[name])
             created[name] = _directory(paths[name], private=True)
+        _create_root(paths["admission_root"])
         source, report = paths["output_parent"] / "source", paths["output_parent"] / "report"
         source_absence, report_absence = _absent(source), _absent(report)
         creator(paths["key_root"])
@@ -1338,7 +2806,7 @@ def build(args: argparse.Namespace) -> dict[str, str]:
         )
         if (
             chead != current_head
-            or craw["porcelain"] != _git(Path(CURRENT), "status", "--porcelain=v1", "-z")
+            or craw["porcelain"] != _source_git(Path(CURRENT), "status", "--porcelain=v1", "-z")
             or ahead != ACCEPTED_COMMIT
             or araw["porcelain"]
         ):
@@ -1489,6 +2957,7 @@ def build(args: argparse.Namespace) -> dict[str, str]:
             paths["telemetry_root"] / "authority-terminal.json",
             paths["telemetry_root"] / "observer-terminal.json",
         )
+        scope_contracts = {scope: policy.scope_contract(scope) for scope in _SCOPES}
         authority_stop = [
             str(paths["current_python"]),
             str(paths["telemetry_script"]),
@@ -1584,12 +3053,123 @@ def build(args: argparse.Namespace) -> dict[str, str]:
             "acquisition",
         ]
         plan = paths["control_root"] / "launch-plan.json"
+        systemd_root = paths["control_root"] / "systemd"
+        admission_receipt = paths["admission_root"] / "launch-admission-acquisition.json"
+
+        def admission_prestart(name: str) -> list[str]:
+            return _admission_prestart(
+                str(paths["current_python"]),
+                paths["current_approval"],
+                admission_receipt,
+                paths["key_root"],
+                name,
+                systemd_root / name,
+                authority["public_key_b64"],
+            )
+
+        observer_write_paths = [
+            str(paths["evidence_root"]),
+            str(paths["telemetry_root"]),
+            str(paths["output_parent"]),
+        ]
         plan_value = {
             "schema": "alpha_max_v8_acquisition_launch_plan.v3",
             "launch_performed": False,
             "launch_eligible_only_with_complete": True,
+            "launch_admission": {
+                "receipt": str(admission_receipt),
+                "schema": "alpha_max_v8_signed_launch_admission.v1",
+                "requirements": [
+                    "approval_digest",
+                    "COMPLETE_manifest",
+                    "production_unit_and_credential_identities",
+                    "live_properties_and_cgroup_evidence",
+                    "fresh_source_runtime_and_rendered_unit_readback",
+                ],
+            },
             "cgroup_contract": {
                 "oom_policy_kill_implies_memory_oom_group": 1,
+            },
+            "scope_topology": {
+                "approval": _file(paths["current_approval"]),
+                "execution_alias": _execution_alias(),
+                "run_id": args.run_id,
+                "terminal_contracts": {
+                    scope: {
+                        "prerequisites": list(contract[0]),
+                        "results": [
+                            {"validated": list(validated), "sealed": list(sealed)}
+                            for validated, sealed in contract[1]
+                        ],
+                    }
+                    for scope, contract in scope_contracts.items()
+                },
+                "authority": {
+                    "key": authority,
+                    "retirement": "recovery_epoch_close",
+                    "scopes": list(_SCOPES),
+                },
+                "scopes": {
+                    "acquisition": {
+                        "request_id": request_ids["acquisition"],
+                        "request": _file(request_path),
+                        "observer_key": next(
+                            item for item in observers if item["scope"] == "acquisition"
+                        ),
+                        "observer_retirement": "after_acquisition_and_fresh_audit_readback",
+                        "prerequisites": ["checkpoint_pin", "alignment_receipt"],
+                        "results": [
+                            ["source_eligible_receipt", "source_manifest", "source_journal"],
+                            ["source_eligible_receipt", "source_manifest", "source_journal"],
+                        ],
+                    },
+                    "phase_preparation": {
+                        "request_id": request_ids["phase_preparation"],
+                        "state": "deferred_until_authenticated_acquisition_receipts",
+                        "observer_key": next(
+                            item for item in observers if item["scope"] == "phase_preparation"
+                        ),
+                        "observer_retirement": "after_phase_terminal_and_readback",
+                        "prerequisites": [
+                            "checkpoint_pin",
+                            "alignment_receipt",
+                            "source_eligible_receipt",
+                            "source_manifest",
+                            "source_journal",
+                        ],
+                        "results": [["phase_handoff_receipt", "preparation_manifest"]],
+                    },
+                    "one_touch": {
+                        "request_id": request_ids["one_touch"],
+                        "state": "deferred_until_authenticated_phase_receipts",
+                        "observer_key": next(
+                            item for item in observers if item["scope"] == "one_touch"
+                        ),
+                        "observer_retirement": "after_one_touch_terminal_and_readback",
+                        "prerequisites": [
+                            "checkpoint_pin",
+                            "alignment_receipt",
+                            "phase_handoff_receipt",
+                            "preparation_manifest",
+                        ],
+                        "results": [
+                            [
+                                "prelock_readback",
+                                "prelock_observability",
+                                "prelock_inventory_before",
+                                "input_inventory_before",
+                                "prelock_bundle",
+                            ],
+                            [
+                                "historical_readback",
+                                "historical_observability",
+                                "prelock_inventory_after",
+                                "input_inventory_after",
+                                "historical_bundle",
+                            ],
+                        ],
+                    },
+                },
             },
             "telemetry_root": _directory(paths["telemetry_root"], private=True),
             "telemetry_script": telemetry,
@@ -1624,6 +3204,7 @@ def build(args: argparse.Namespace) -> dict[str, str]:
                         load_credential=(
                             f"authority.private:{paths['key_root'] / 'authority.private'}"
                         ),
+                        prestart=admission_prestart(authority_name),
                     ),
                 },
                 "telemetry": {
@@ -1643,6 +3224,7 @@ def build(args: argparse.Namespace) -> dict[str, str]:
                         load_credential=(
                             f"authority.public:{paths['key_root'] / 'authority.public'}"
                         ),
+                        prestart=admission_prestart(telemetry_name),
                     ),
                 },
                 "observer": {
@@ -1653,17 +3235,21 @@ def build(args: argparse.Namespace) -> dict[str, str]:
                         env,
                         {"high": 2147483648, "max": 3221225472, "swap": 536870912},
                         observer_stop,
-                        read_paths=[str(paths["control_root"])],
-                        write_paths=[
-                            str(paths["evidence_root"]),
-                            str(paths["telemetry_root"]),
-                            str(paths["output_parent"]),
+                        read_paths=[
+                            str(paths["control_root"]),
+                            *_command_read_paths(
+                                commands,
+                                write_paths=observer_write_paths,
+                                inaccessible_paths=[str(paths["key_root"])],
+                            ),
                         ],
+                        write_paths=observer_write_paths,
                         inaccessible_paths=[str(paths["key_root"])],
                         load_credential=(
                             f"acquisition.private:{paths['key_root'] / 'acquisition.private'}"
                         ),
                         observer=True,
+                        prestart=admission_prestart(observer_name),
                     ),
                 },
             },
@@ -1674,7 +3260,6 @@ def build(args: argparse.Namespace) -> dict[str, str]:
                 "monitor": monitor,
             },
         }
-        systemd_root = paths["control_root"] / "systemd"
         _create_root(systemd_root)
         rendered_units: dict[str, dict[str, Any]] = {}
         for role, item in plan_value["systemd_units"].items():
@@ -1694,7 +3279,13 @@ def build(args: argparse.Namespace) -> dict[str, str]:
             {
                 "schema": "alpha_max_v8_acquisition_manifest.v3",
                 "launch_performed": False,
-                "roots": {name: _directory(paths[name], private=True) for name in expected},
+                "roots": {
+                    name: _directory(paths[name], private=True)
+                    for name in expected
+                    if name != "stage_results_parent"
+                },
+                "admission_root": _directory(paths["admission_root"], private=True),
+                "execution_alias": _execution_alias(),
                 "source_absence": source_absence,
                 "report_absence": report_absence,
                 "policy": _file(policy_path),
@@ -1702,7 +3293,7 @@ def build(args: argparse.Namespace) -> dict[str, str]:
                 "envelope": _file(envelope_path),
                 "request": _file(request_path),
                 "launch_plan": _file(plan),
-                "g067_approval": _file(paths["g067_approval"]),
+                "approval": _file(paths["current_approval"]),
                 "repository_receipts": [current_receipt, accepted_receipt],
                 "package_freezes": freezes,
                 "executable_inputs": {
@@ -1753,7 +3344,14 @@ def build(args: argparse.Namespace) -> dict[str, str]:
         )
         if (
             manifest_value["roots"]
-            != {name: _directory(paths[name], private=True) for name in expected}
+            != {
+                name: _directory(paths[name], private=True)
+                for name in expected
+                if name != "stage_results_parent"
+            }
+            or manifest_value["admission_root"] != _directory(paths["admission_root"], private=True)
+            or manifest_value["execution_alias"] != _execution_alias()
+            or plan_value["scope_topology"]["execution_alias"] != _execution_alias()
             or manifest_value["public_key_summary"] != key_summary_file
             or manifest_value["repository_receipts"] != [current_receipt, accepted_receipt]
             or manifest_value["executable_inputs"] != plan_value["executable_inputs"]
@@ -1825,6 +3423,7 @@ def build(args: argparse.Namespace) -> dict[str, str]:
         _absent(report)
         result = {
             "policy": str(policy_path),
+            "approval": str(paths["current_approval"]),
             "checkpoint": str(checkpoint_path),
             "envelope": str(envelope_path),
             "request": str(request_path),
@@ -1844,6 +3443,501 @@ def build(args: argparse.Namespace) -> dict[str, str]:
         )
 
 
+def _build_stage(args: argparse.Namespace, scope: str) -> dict[str, str]:
+    """Append one exact terminal scope after its authenticated predecessor exists."""
+    if scope not in {"phase_preparation", "one_touch"}:
+        _fail("invalid staged scope")
+    control, keys, output = (
+        _absolute(args.control_root),
+        _absolute(args.key_root),
+        _absolute(args.output_parent),
+    )
+    approval_path = _absolute(args.current_approval)
+    if approval_path != RECOVERY_ROOT / CURRENT_APPROVAL_LEAF or output.parent != RECOVERY_ROOT:
+        _fail("staged approval or recovery root mismatch")
+    request_ids = {
+        "acquisition": args.request_id,
+        "phase_preparation": args.phase_request_id,
+        "one_touch": args.one_touch_request_id,
+    }
+    expected = {
+        "control_root": f"g056v8-controls-{args.run_id}",
+        "key_root": f"g056v8-keys-{args.run_id}",
+        "evidence_root": f"g056v8-acquisition-evidence-{args.run_id}",
+        "telemetry_root": f"g056v8-telemetry-{args.run_id}",
+        "output_parent": f"g056v8-acquisition-output-{args.run_id}",
+        "stage_results_parent": f"g056v8-stage-results-{args.run_id}",
+    }
+    paths = {
+        "control_root": control,
+        "key_root": keys,
+        "evidence_root": _absolute(args.evidence_root),
+        "telemetry_root": _absolute(args.telemetry_root),
+        "output_parent": output,
+        "stage_results_parent": RECOVERY_ROOT / f"g056v8-stage-results-{args.run_id}",
+    }
+    paths["admission_root"] = control / "admissions"
+    if (
+        args.run_id != RUN_ID
+        or request_ids
+        != {
+            "acquisition": ACQUISITION_REQUEST_ID,
+            "phase_preparation": PHASE_PREPARATION_REQUEST_ID,
+            "one_touch": ONE_TOUCH_REQUEST_ID,
+        }
+        or any(
+            paths[name].parent != RECOVERY_ROOT or paths[name].name != leaf
+            for name, leaf in expected.items()
+        )
+    ):
+        _fail("staged identity mismatch")
+    approval = _load_current_approval(
+        approval_path,
+        run_id=args.run_id,
+        request_ids=request_ids,
+        absent_paths={name: paths[name] for name in expected},
+        require_absent=False,
+    )
+    manifest = _load_canonical(control / "manifest.json")
+    complete = _load_canonical(control / "COMPLETE.json")
+    if (
+        complete.get("manifest_sha256") != _file(control / "manifest.json")["sha256"]
+        or manifest.get("approval") != _file(approval_path)
+        or manifest.get("roots")
+        != {
+            name: _directory(paths[name], private=True)
+            for name in expected
+            if name != "stage_results_parent"
+        }
+        or manifest.get("admission_root") != _directory(paths["admission_root"], private=True)
+        or manifest.get("execution_alias") != _execution_alias()
+        or _state(Path(CURRENT), approval) != approval["head"]
+    ):
+        _fail("acquisition control readback mismatch")
+    authority, observers, _summary, key_files = _key_bindings(keys)
+    _revalidate_key_files(key_files)
+    policy = _load_policy(Path(manifest["policy"]["path"]), manifest["policy"])
+    checkpoint = policy.load_checkpoint(Path(manifest["checkpoint"]["path"]), policy)
+    envelope = policy.load_envelope(Path(manifest["envelope"]["path"]), policy, checkpoint)
+    if authority["key_id"] != envelope.authority_key.key_id:
+        _fail("authority retention mismatch")
+    observer = next(item for item in observers if item["scope"] == scope)
+    canonical_finalize_receipt = None
+    canonical_finalize_identity: FileIdentity | None = None
+    if scope == "phase_preparation":
+        canonical_finalize_receipt = _absolute(args.canonical_finalize_receipt)
+        canonical_finalize_identity = _file(canonical_finalize_receipt)
+        policy.validate_w10_canonical_finalize_bundle(
+            canonical_finalize_receipt,
+            authority_public_key_b64=envelope.authority_key.public_key_b64,
+            run_id=args.run_id,
+            acquisition_request_id=ACQUISITION_REQUEST_ID,
+            approval_sha256=_file(approval_path)["sha256"],
+        )
+        if _file(canonical_finalize_receipt) != canonical_finalize_identity:
+            _fail("canonical finalize receipt identity drift")
+    scope_evidence = paths["evidence_root"] / scope
+    _absent(scope_evidence)
+    _create_root(scope_evidence)
+    source = output / "source"
+    report = output / "report"
+    prereq_paths = (
+        [
+            checkpoint.source_path,
+            envelope.file("alignment_receipt").path,
+            str(report / "source_eligible_receipt.json"),
+            str(report / "source_manifest.json"),
+            str(report / "acquisition.journal.jsonl"),
+            str(canonical_finalize_receipt),
+        ]
+        if scope == "phase_preparation"
+        else [
+            checkpoint.source_path,
+            envelope.file("alignment_receipt").path,
+            str(
+                _absolute(args.phase_output).parent
+                / f".{_absolute(args.phase_output).name}.alpha_max_phase_preparation.handoff.json"
+            ),
+            str(_absolute(args.phase_output) / "preparation_manifest.json"),
+        ]
+    )
+    prerequisite_kinds, _results = policy.scope_contract(scope)
+    prerequisites = [
+        _prerequisite(
+            kind,
+            (
+                canonical_finalize_identity
+                if kind == "canonical_finalize_receipt" and canonical_finalize_identity is not None
+                else _file(Path(path))
+            ),
+        )
+        for kind, path in zip(prerequisite_kinds, prereq_paths)
+    ]
+    environment = {
+        "HOME": str(scope_evidence),
+        "LANG": "C.UTF-8",
+        "LC_ALL": "C.UTF-8",
+        "PATH": "/usr/bin:/bin",
+        "PYTHONHASHSEED": "0",
+        "PYTHONNOUSERSITE": "1",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "TZ": "UTC",
+    }
+    by_role = {
+        item["role"]: item["file"]
+        for item in _load_canonical(Path(manifest["envelope"]["path"]))["files"]
+    }
+    phase_output = _absolute(args.phase_output)
+    stage_results = paths["stage_results_parent"]
+    phase_parent = stage_results / "phase_preparation"
+    if scope == "phase_preparation":
+        _absent(stage_results)
+        _create_root(stage_results)
+        _create_root(phase_parent)
+        if phase_output != phase_parent / "result":
+            _fail("phase output must be the exact dedicated stage-results child")
+        _absent(phase_output)
+        request = {
+            "schema": "alpha_max_terminal_request.phase_preparation.v1",
+            "request_id": request_ids[scope],
+            "scope": scope,
+            "checkpoint_pin_sha256": checkpoint.sha256,
+            "interpreter": _load_canonical(Path(manifest["envelope"]["path"]))["interpreters"][0][
+                "file"
+            ],
+            "repository_root": _load_canonical(Path(manifest["envelope"]["path"]))["repositories"][
+                0
+            ]["root"],
+            "evidence_root": _directory(scope_evidence, private=True),
+            "authority_socket": str(scope_evidence / "terminal-authority.sock"),
+            "environment": environment,
+            "forbidden_roots": list(_FORBIDDEN_ROOTS),
+            "publication": {
+                "claim": "prelaunch.claim.json",
+                "journal": "terminal-observer.journal.jsonl",
+                "stdout": ["child-0.stdout.log"],
+                "stderr": ["child-0.stderr.log"],
+                "receipt": "terminal-authority.receipt.json",
+            },
+            "prerequisites": prerequisites,
+            "phase_wrapper": by_role["phase_wrapper"],
+            "acquirer": by_role["acquirer"],
+            "source_root": _directory(source, private=True),
+            "source_report": _directory(report, private=True),
+            "contract_manifest": by_role["contract_manifest"],
+            "availability_evidence": by_role["availability_evidence"],
+            "preparer": by_role["preparer"],
+            "phase_output": _absent(phase_output),
+        }
+    else:
+        prelock, historical = _absolute(args.prelock_output), _absolute(args.historical_output)
+        prelock_parent = stage_results / "prelock"
+        historical_parent = stage_results / "historical"
+        if (
+            not stage_results.is_dir()
+            or phase_output != phase_parent / "result"
+            or prelock != prelock_parent / "result"
+            or historical != historical_parent / "result"
+        ):
+            _fail("one-touch stage result topology mismatch")
+        _directory(stage_results, private=True)
+        _directory(phase_parent, private=True)
+        _directory(phase_output, private=True)
+        _create_root(prelock_parent)
+        _create_root(historical_parent)
+        _absent(prelock)
+        _absent(historical)
+        request = {
+            "schema": "alpha_max_terminal_request.one_touch.v1",
+            "request_id": request_ids[scope],
+            "scope": scope,
+            "checkpoint_pin_sha256": checkpoint.sha256,
+            "interpreter": _load_canonical(Path(manifest["envelope"]["path"]))["interpreters"][1][
+                "file"
+            ],
+            "repository_root": _load_canonical(Path(manifest["envelope"]["path"]))["repositories"][
+                1
+            ]["root"],
+            "evidence_root": _directory(scope_evidence, private=True),
+            "authority_socket": str(scope_evidence / "terminal-authority.sock"),
+            "environment": environment,
+            "forbidden_roots": list(_FORBIDDEN_ROOTS),
+            "publication": {
+                "claim": "prelaunch.claim.json",
+                "journal": "terminal-observer.journal.jsonl",
+                "stdout": ["child-0.stdout.log", "child-1.stdout.log"],
+                "stderr": ["child-0.stderr.log", "child-1.stderr.log"],
+                "receipt": "terminal-authority.receipt.json",
+            },
+            "prerequisites": prerequisites,
+            "portfolio": by_role["portfolio"],
+            "contract_manifest": by_role["contract_manifest"],
+            "prelock_script": by_role["prelock_script"],
+            "historical_script": by_role["historical_script"],
+            "phase_output": _directory(phase_output, private=True),
+            "prelock_output": _absent(prelock),
+            "historical_output": _absent(historical),
+        }
+    request_path = control / f"{scope}-request.json"
+    _write_new(request_path, request)
+    loaded = policy.load_request(
+        request_path, scope=scope, policy=policy, checkpoint=checkpoint, envelope=envelope
+    )
+    commands = [list(command) for command in policy.derive_scope_commands(envelope, loaded)]
+    systemd = control / "systemd"
+    authority_name = f"alpha-max-v8-{scope}-authority-{args.run_id}.service"
+    observer_name = f"alpha-max-v8-{scope}-observer-{args.run_id}.service"
+    telemetry_name = f"alpha-max-v8-{scope}-telemetry-{args.run_id}.service"
+    authority_capture = paths["telemetry_root"] / f"{scope}-authority-terminal.json"
+    observer_capture = paths["telemetry_root"] / f"{scope}-observer-terminal.json"
+    authority_stop = [
+        _load_canonical(Path(manifest["envelope"]["path"]))["interpreters"][0]["file"]["path"],
+        manifest["telemetry"]["path"],
+        "capture",
+        "--expected-unit",
+        authority_name,
+        "--output",
+        str(authority_capture),
+    ]
+    observer_stop = [
+        _load_canonical(Path(manifest["envelope"]["path"]))["interpreters"][0]["file"]["path"],
+        manifest["telemetry"]["path"],
+        "capture",
+        "--expected-unit",
+        observer_name,
+        "--output",
+        str(observer_capture),
+    ]
+    observer_argv = [
+        _load_canonical(Path(manifest["envelope"]["path"]))["interpreters"][0]["file"]["path"],
+        by_role["observer_script"]["path"],
+        "--policy",
+        manifest["policy"]["path"],
+        "--checkpoint",
+        manifest["checkpoint"]["path"],
+        "--envelope",
+        manifest["envelope"]["path"],
+        "--request",
+        str(request_path),
+        "--authority-socket",
+        str(scope_evidence / "terminal-authority.sock"),
+        "--observer-private-key",
+        f"%d/{scope}.private",
+        "--evidence-root",
+        str(scope_evidence),
+        "--scope",
+        scope,
+    ]
+    admission_receipt = paths["admission_root"] / f"launch-admission-{scope}.json"
+
+    def staged_prestart(name: str) -> list[str]:
+        return _admission_prestart(
+            _load_canonical(Path(manifest["envelope"]["path"]))["interpreters"][0]["file"]["path"],
+            approval_path,
+            admission_receipt,
+            keys,
+            name,
+            systemd / name,
+            authority["public_key_b64"],
+        )
+
+    stage_write_paths = [
+        str(scope_evidence),
+        str(paths["telemetry_root"]),
+        *(
+            [str(phase_parent)]
+            if scope == "phase_preparation"
+            else [str(prelock_parent), str(historical_parent)]
+        ),
+    ]
+    unit = _unit(
+        f"Alpha-Max v8 {scope} observer",
+        observer_argv,
+        environment,
+        {"high": 2147483648, "max": 3221225472, "swap": 536870912},
+        observer_stop,
+        read_paths=[
+            str(control),
+            *_command_read_paths(
+                commands,
+                write_paths=stage_write_paths,
+                inaccessible_paths=[str(keys)],
+            ),
+        ],
+        write_paths=stage_write_paths,
+        inaccessible_paths=[str(keys)],
+        load_credential=f"{scope}.private:{keys / (scope + '.private')}",
+        observer=scope == "acquisition",
+        prestart=staged_prestart(observer_name),
+    )
+    _validate_unit(unit)
+    authority_argv = [
+        _load_canonical(Path(manifest["envelope"]["path"]))["interpreters"][0]["file"]["path"],
+        by_role["authority_script"]["path"],
+        "serve",
+        "--policy",
+        manifest["policy"]["path"],
+        "--checkpoint",
+        manifest["checkpoint"]["path"],
+        "--envelope",
+        manifest["envelope"]["path"],
+        "--request",
+        str(request_path),
+        "--private-key",
+        "%d/authority.private",
+        "--socket",
+        str(scope_evidence / "terminal-authority.sock"),
+        "--evidence-root",
+        str(scope_evidence),
+        "--scope",
+        scope,
+    ]
+    authority_unit = _unit(
+        f"Alpha-Max v8 {scope} authority",
+        authority_argv,
+        environment,
+        {"high": AUTHORITY_MEMORY_HIGH, "max": AUTHORITY_MEMORY_MAX, "swap": AUTHORITY_SWAP_MAX},
+        authority_stop,
+        read_paths=[str(control)],
+        write_paths=[str(scope_evidence), str(paths["telemetry_root"])],
+        inaccessible_paths=[str(keys)],
+        load_credential=f"authority.private:{keys / 'authority.private'}",
+        prestart=staged_prestart(authority_name),
+    )
+    _validate_unit(authority_unit)
+    authority_file = _write_bytes_new(
+        systemd / f"alpha-max-v8-{scope}-authority-{args.run_id}.service",
+        _render_systemd_unit(authority_unit),
+    )
+    authority_binding = _credential_binding(authority_unit, key_files)
+    telemetry_argv = [
+        _load_canonical(Path(manifest["envelope"]["path"]))["interpreters"][0]["file"]["path"],
+        manifest["telemetry"]["path"],
+        "monitor",
+        "--authority-unit",
+        authority_name,
+        "--observer-unit",
+        observer_name,
+        "--evidence-root",
+        str(paths["telemetry_root"]),
+        "--authority-terminal",
+        str(authority_capture),
+        "--observer-terminal",
+        str(observer_capture),
+        "--signed-terminal-receipt",
+        str(scope_evidence / "terminal-authority.receipt.json"),
+        "--authority-public-key",
+        "%d/authority.public",
+        "--request",
+        str(request_path),
+        "--output",
+        str(paths["telemetry_root"] / f"{scope}-monitor.json"),
+        "--interval-seconds",
+        "5",
+        "--timeout-seconds",
+        "86400",
+        "--authority-memory-max",
+        str(AUTHORITY_MEMORY_MAX),
+        "--authority-swap-max",
+        str(AUTHORITY_SWAP_MAX),
+        "--observer-memory-max",
+        "3221225472",
+        "--observer-swap-max",
+        "536870912",
+    ]
+    telemetry_unit = _unit(
+        f"Alpha-Max v8 {scope} telemetry",
+        telemetry_argv,
+        environment,
+        {"high": 67108864, "max": 134217728, "swap": 33554432},
+        None,
+        read_paths=[str(control), str(scope_evidence)],
+        write_paths=[str(paths["telemetry_root"])],
+        inaccessible_paths=[str(keys)],
+        load_credential=f"authority.public:{keys / 'authority.public'}",
+        prestart=staged_prestart(telemetry_name),
+    )
+    _validate_unit(telemetry_unit)
+    telemetry_file = _write_bytes_new(
+        systemd / f"alpha-max-v8-{scope}-telemetry-{args.run_id}.service",
+        _render_systemd_unit(telemetry_unit),
+    )
+    telemetry_binding = _credential_binding(telemetry_unit, key_files)
+    unit_file = _write_bytes_new(
+        systemd / f"alpha-max-v8-{scope}-observer-{args.run_id}.service", _render_systemd_unit(unit)
+    )
+    binding = _credential_binding(unit, key_files)
+    stage_manifest = {
+        "schema": "alpha_max_v8_terminal_stage.v1",
+        "scope": scope,
+        "approval": _file(approval_path),
+        "acquisition_manifest": _file(control / "manifest.json"),
+        "request": _file(request_path),
+        "commands": commands,
+        "observer": observer,
+        "authority": authority,
+        "unit_definitions": {
+            "authority": authority_unit,
+            "telemetry": telemetry_unit,
+            "observer": unit,
+        },
+        "observer_retirement": "after_phase_terminal_and_readback"
+        if scope == "phase_preparation"
+        else "after_one_touch_terminal_and_readback",
+        "authority_retirement": "recovery_epoch_close",
+        "units": {
+            "authority": {
+                "name": authority_name,
+                "file": authority_file,
+                "credential": authority_binding,
+            },
+            "telemetry": {
+                "name": telemetry_name,
+                "file": telemetry_file,
+                "credential": telemetry_binding,
+                "authority_capture": str(authority_capture),
+                "observer_capture": str(observer_capture),
+                "terminal_receipt": str(scope_evidence / "terminal-authority.receipt.json"),
+            },
+            "observer": {"name": observer_name, "file": unit_file, "credential": binding},
+        },
+    }
+    stage_path = control / f"{scope}-manifest.json"
+    _write_new(stage_path, stage_manifest)
+    _write_new(
+        control / f"{scope}.COMPLETE.json",
+        {
+            "schema": "alpha_max_v8_terminal_stage_complete.v1",
+            "scope": scope,
+            "manifest_sha256": _file(stage_path)["sha256"],
+        },
+    )
+    return {"request": str(request_path), "manifest": str(stage_path), "unit": str(unit_file)}
+
+
+def build_stage(args: argparse.Namespace, scope: str) -> dict[str, str]:
+    """Fail closed by quarantining the staged control root on every stage failure."""
+    try:
+        return _build_stage(args, scope)
+    except BaseException as error:
+        try:
+            control = _absolute(args.control_root)
+            if control.exists() and not (control / f"{scope}.COMPLETE.json").exists():
+                _write_new(
+                    control / f"{scope}.FAILED.json",
+                    {
+                        "schema": "alpha_max_v8_terminal_stage_failed.v1",
+                        "scope": scope,
+                        "error": type(error).__name__,
+                    },
+                )
+        except BaseException as quarantine_error:
+            raise BaseExceptionGroup(
+                "stage build failed and quarantine failed", [error, quarantine_error]
+            ) from error
+        raise
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     for name in (
@@ -1852,16 +3946,49 @@ def main(argv: list[str] | None = None) -> int:
         "evidence_root",
         "telemetry_root",
         "output_parent",
-        "telemetry_script",
-        "g067_approval",
         "current_approval",
-        "current_python",
-        "accepted_python",
     ):
         parser.add_argument("--" + name.replace("_", "-"), required=True)
+    for name in ("telemetry_script", "current_python", "accepted_python"):
+        parser.add_argument("--" + name.replace("_", "-"))
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--request-id", required=True)
-    print(json.dumps(build(parser.parse_args(argv)), sort_keys=True, separators=(",", ":")))
+    parser.add_argument("--phase-request-id", required=True)
+    parser.add_argument("--one-touch-request-id", required=True)
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--approval-only", action="store_true")
+    mode.add_argument("--build-acquisition", action="store_true")
+    mode.add_argument("--build-phase-preparation", action="store_true")
+    mode.add_argument("--build-one-touch", action="store_true")
+    parser.add_argument("--phase-output")
+    parser.add_argument("--prelock-output")
+    parser.add_argument("--historical-output")
+    parser.add_argument("--canonical-finalize-receipt")
+    args = parser.parse_args(argv)
+    if args.build_acquisition and any(
+        getattr(args, name) is None
+        for name in ("telemetry_script", "current_python", "accepted_python")
+    ):
+        parser.error("acquisition build requires telemetry script and both interpreters")
+    if args.build_phase_preparation and (
+        args.phase_output is None or args.canonical_finalize_receipt is None
+    ):
+        parser.error("phase build requires --phase-output and --canonical-finalize-receipt")
+    if args.build_one_touch and any(
+        getattr(args, name) is None
+        for name in ("phase_output", "prelock_output", "historical_output")
+    ):
+        parser.error("one-touch build requires phase, prelock, and historical outputs")
+    result = (
+        create_approval(args)
+        if args.approval_only
+        else build(args)
+        if args.build_acquisition
+        else build_stage(args, "phase_preparation")
+        if args.build_phase_preparation
+        else build_stage(args, "one_touch")
+    )
+    print(json.dumps(result, sort_keys=True, separators=(",", ":")))
     return 0
 
 
