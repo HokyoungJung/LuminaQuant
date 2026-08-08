@@ -15,6 +15,7 @@ from pathlib import Path
 import secrets
 import shutil
 import subprocess
+import sys
 import socket
 import time
 from typing import Any
@@ -664,10 +665,53 @@ def _execute_persisted_topology(
 
     common_admission = admission_snapshot(verified, production_properties)
     controls._create_root(probe_admission_root)
+    late_bound_receipt = evidence_root / "terminal-authority.receipt.json"
+    late_bound_consumers = [
+        {"scope": definition_scope, "role": role}
+        for definition_scope, role, original, _credential, _request, _name in definitions
+        if str(late_bound_receipt)
+        in original["Service"].get("BindReadOnlyPaths", [])
+    ]
+    probe_only_control_artifacts: list[dict[str, Any]] = []
+    probe_placeholder = (
+        probe_admission_root / "late-bound-terminal-authority.placeholder.json"
+    )
+    if late_bound_consumers:
+        if late_bound_receipt.exists() or late_bound_receipt.is_symlink():
+            raise RuntimeError("late-bound production receipt exists before persisted probe")
+        _write_new(
+            probe_placeholder,
+            _canonical(
+                {
+                    "schema": "alpha_max_v8_probe_late_bound_placeholder.v1",
+                    "production_path": str(late_bound_receipt),
+                    "consumers": late_bound_consumers,
+                    "requested_scope": requested_scope,
+                    "run_id": controls.RUN_ID,
+                }
+            ),
+            0o400,
+        )
+        probe_only_control_artifacts.append(controls._file(probe_placeholder))
+    late_bound_probe = {
+        "production_receipt": {
+            "path": str(late_bound_receipt),
+            "state": "absent",
+        },
+        "consumers": late_bound_consumers,
+        "placeholder": (
+            probe_only_control_artifacts[0] if probe_only_control_artifacts else None
+        ),
+    }
     probe_payload = {
         "schema": "alpha_max_v8_persisted_probe_preflight_admission.v1",
         "verdict": "PROBE_ONLY",
         **common_admission,
+        "control_artifacts": [
+            *common_admission["control_artifacts"],
+            *probe_only_control_artifacts,
+        ],
+        "late_bound_probe": late_bound_probe,
         "units": [],
     }
     signed_probe_admission = _sign_launch_admission(
@@ -707,6 +751,24 @@ def _execute_persisted_topology(
         unit_name = f"luminaquant-persisted-{index}-{secrets.token_hex(12)}.service"
         substituted = copy.deepcopy(original)
         service = substituted["Service"]
+        production_read_paths = list(service.get("BindReadOnlyPaths", []))
+        probe_read_paths = list(production_read_paths)
+        readonly_overlays: list[dict[str, Any]] = []
+        if str(late_bound_receipt) in probe_read_paths:
+            if probe_read_paths.count(str(late_bound_receipt)) != 1:
+                raise RuntimeError("late-bound production receipt binding is ambiguous")
+            if len(probe_only_control_artifacts) != 1:
+                raise RuntimeError("late-bound probe placeholder is unavailable")
+            probe_read_paths[probe_read_paths.index(str(late_bound_receipt))] = str(
+                probe_placeholder
+            )
+            service["BindReadOnlyPaths"] = probe_read_paths
+            readonly_overlays.append(
+                {
+                    "production_path": str(late_bound_receipt),
+                    "probe_placeholder": probe_only_control_artifacts[0],
+                }
+            )
         production_wrapper = original["Service"]["ExecStart"]
         if production_wrapper[:5] != [
             "/usr/bin/python3",
@@ -771,10 +833,19 @@ def _execute_persisted_topology(
             authority_public_b64=wrapper_config["authority_public_b64"],
         )
         controls._validate_unit(substituted)
-        if any(
-            substituted["Service"].get(name) != value
-            for name, value in original["Service"].items()
-            if name not in {"ExecStart", "ExecStopPost", "ExecStartPre"}
+        if (
+            service.get("BindReadOnlyPaths") != probe_read_paths
+            or any(
+                service.get(name) != value
+                for name, value in original["Service"].items()
+                if name
+                not in {
+                    "ExecStart",
+                    "ExecStopPost",
+                    "ExecStartPre",
+                    "BindReadOnlyPaths",
+                }
+            )
         ):
             raise RuntimeError("probe directive drift")
         probe_unit = controls._render_systemd_unit(substituted)
@@ -915,11 +986,35 @@ def _execute_persisted_topology(
                 raise RuntimeError("safe substituted ExecStart terminal result mismatch")
             cgroup_evidence["terminal_result"] = _canonical(terminal).decode("utf-8")
         finally:
-            _run("systemctl", "--user", "stop", unit_name, check=False)
-            _run("systemctl", "--user", "reset-failed", unit_name, check=False)
-            if link.is_symlink():
-                link.unlink()
-            _run("systemctl", "--user", "daemon-reload", check=False)
+            active_error = sys.exception()
+            cleanup_errors: list[BaseException] = []
+            for command in (
+                ("systemctl", "--user", "stop", unit_name),
+                ("systemctl", "--user", "reset-failed", unit_name),
+            ):
+                try:
+                    _run(*command, check=False)
+                except BaseException as error:
+                    cleanup_errors.append(error)
+            try:
+                if link.exists() or link.is_symlink():
+                    if not link.is_symlink():
+                        raise RuntimeError("transient probe unit link changed type")
+                    link.unlink()
+            except BaseException as error:
+                cleanup_errors.append(error)
+            try:
+                _run("systemctl", "--user", "daemon-reload", check=False)
+            except BaseException as error:
+                cleanup_errors.append(error)
+            if cleanup_errors:
+                failures = [
+                    *([active_error] if active_error is not None else []),
+                    *cleanup_errors,
+                ]
+                raise BaseExceptionGroup(
+                    "safe substituted unit cleanup failed", failures
+                ) from None
         receipts.append(
             {
                 "scope": scope,
@@ -931,6 +1026,7 @@ def _execute_persisted_topology(
                 "production_prestart": probe_prestart,
                 "probe_omits_production_prestart": True,
                 "network_deny_overlay": network_deny_overlay,
+                "readonly_path_overlays": readonly_overlays,
                 "probe_unit_sha256": hashlib.sha256(probe_unit).hexdigest(),
             }
         )
@@ -944,6 +1040,26 @@ def _execute_persisted_topology(
     final_common_admission = admission_snapshot(final_verified, final_properties)
     if final_verified != verified or final_common_admission != common_admission:
         raise RuntimeError("launch-admission state drifted during persisted probes")
+    final_probe_control_artifacts = [
+        controls._file(Path(item["path"])) for item in probe_only_control_artifacts
+    ]
+    final_late_bound_probe = {
+        "production_receipt": {
+            "path": str(late_bound_receipt),
+            "state": "absent",
+        },
+        "consumers": late_bound_consumers,
+        "placeholder": (
+            final_probe_control_artifacts[0] if final_probe_control_artifacts else None
+        ),
+    }
+    if (
+        late_bound_receipt.exists()
+        or late_bound_receipt.is_symlink()
+        or final_probe_control_artifacts != probe_only_control_artifacts
+        or final_late_bound_probe != late_bound_probe
+    ):
+        raise RuntimeError("late-bound probe state drifted during persisted probes")
     aggregate = {
         "schema": "alpha_max_v8_persisted_probe_launch_admission.v1",
         "verdict": "PASS",
@@ -951,9 +1067,11 @@ def _execute_persisted_topology(
         "control_artifacts": [
             *final_common_admission["control_artifacts"],
             *probe_artifacts.values(),
+            *probe_only_control_artifacts,
         ],
         "units": receipts,
         "probe_admission": probe_artifacts,
+        "late_bound_probe": late_bound_probe,
     }
     _write_new(audit_path, _canonical(aggregate), 0o600)
     signed = _sign_launch_admission(

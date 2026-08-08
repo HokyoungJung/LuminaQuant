@@ -1610,7 +1610,13 @@ def test_persisted_probe_scope_cleanup_and_live_property_contract_is_explicit():
 
 
 def _run_mocked_persisted_probe(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, fail_probe: bool
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    fail_probe: bool,
+    late_bound_present: bool = False,
+    late_bound_drift: bool = False,
+    cleanup_failure: bool = False,
 ) -> dict[str, object]:
     probe = _probe_module()
     run_id = "a" * 64
@@ -1642,6 +1648,7 @@ def _run_mocked_persisted_probe(
     signing_payloads: dict[str, dict[str, object]] = {}
     wrapper_calls: list[dict[str, object]] = []
     probe_state: dict[str, object] = {}
+    rendered_units: list[dict[str, object]] = []
     execution_alias = {"path": str(tmp_path / "execution-alias"), "target": str(root)}
     pinned_probe_python = tmp_path / "pinned-current-python"
 
@@ -1763,6 +1770,7 @@ def _run_mocked_persisted_probe(
 
         @staticmethod
         def _render_systemd_unit(unit: dict[str, object]) -> bytes:
+            rendered_units.append(json.loads(json.dumps(unit)))
             return probe._canonical(unit)
 
         @staticmethod
@@ -1808,6 +1816,9 @@ def _run_mocked_persisted_probe(
                 str(tmp_path / "terminal.json"),
             ],
             "BindPaths": [f"{credential_path.parent}:/runtime-keys"],
+            "BindReadOnlyPaths": [
+                str(evidence_root / "terminal-authority.receipt.json")
+            ],
             "WorkingDirectory": "/",
             "UMask": "0077",
             "MemoryHigh": 1,
@@ -1875,6 +1886,10 @@ def _run_mocked_persisted_probe(
         nonlocal verify_calls
         verify_calls += 1
         events.append(f"verify:{verify_calls}")
+        if verify_calls == 2 and late_bound_drift:
+            (evidence_root / "terminal-authority.receipt.json").write_text(
+                '{"drift":true}\n', encoding="utf-8"
+            )
         return json.loads(json.dumps(topology))
 
     def fake_properties(unit_name: str) -> dict[str, str]:
@@ -1960,6 +1975,14 @@ def _run_mocked_persisted_probe(
                 ),
                 encoding="utf-8",
             )
+        if command[:3] == ("systemctl", "--user", "stop"):
+            events.append("stop:probe")
+            if cleanup_failure:
+                raise OSError("injected cleanup stop failure")
+        if command[:3] == ("systemctl", "--user", "reset-failed"):
+            events.append("reset:probe")
+        if command[:3] == ("systemctl", "--user", "daemon-reload"):
+            events.append("daemon-reload")
         return SimpleNamespace(stdout="")
 
     cgroup_content = {
@@ -1992,8 +2015,33 @@ def _run_mocked_persisted_probe(
     monkeypatch.setattr(probe, "_sign_launch_admission", fake_sign)
     monkeypatch.setattr(probe, "_run", fake_run)
 
-    if fail_probe:
+    if late_bound_present:
+        (evidence_root / "terminal-authority.receipt.json").write_text(
+            '{"unexpected":true}\n', encoding="utf-8"
+        )
+        with pytest.raises(
+            RuntimeError, match="late-bound production receipt exists before persisted probe"
+        ):
+            probe.execute_persisted_topology(
+                control_root, key_root, approval, evidence_root, "acquisition"
+            )
+        result = None
+    elif fail_probe:
         with pytest.raises(RuntimeError, match="injected probe start failure"):
+            probe.execute_persisted_topology(
+                control_root, key_root, approval, evidence_root, "acquisition"
+            )
+        result = None
+    elif cleanup_failure:
+        with pytest.raises(BaseExceptionGroup, match="safe substituted unit cleanup failed"):
+            probe.execute_persisted_topology(
+                control_root, key_root, approval, evidence_root, "acquisition"
+            )
+        result = None
+    elif late_bound_drift:
+        with pytest.raises(
+            RuntimeError, match="late-bound probe state drifted during persisted probes"
+        ):
             probe.execute_persisted_topology(
                 control_root, key_root, approval, evidence_root, "acquisition"
             )
@@ -2014,6 +2062,9 @@ def _run_mocked_persisted_probe(
         "audit": evidence_root / "launch-admission-acquisition.audit.json",
         "definition": definition,
         "pinned_probe_python": pinned_probe_python,
+        "rendered_units": rendered_units,
+        "late_bound_receipt": evidence_root / "terminal-authority.receipt.json",
+        "unit_directory": home / ".config/systemd/user",
     }
 
 
@@ -2056,10 +2107,32 @@ def test_persisted_probe_bootstraps_then_revalidates_final_admission(
     assert isinstance(definition, dict)
     production_config = json.loads(definition["Service"]["ExecStart"][5])
     assert production_config["receipt"] == str(observed["final_receipt"])
+    placeholder = probe_receipt.parent / "late-bound-terminal-authority.placeholder.json"
+    assert placeholder.is_file()
+    placeholder_record = next(
+        item
+        for item in provisional["control_artifacts"]
+        if item["path"] == str(placeholder)
+    )
+    assert placeholder_record in final["control_artifacts"]
+    assert final["units"][0]["readonly_path_overlays"] == [
+        {
+            "production_path": str(observed["late_bound_receipt"]),
+            "probe_placeholder": placeholder_record,
+        }
+    ]
+    rendered_units = observed["rendered_units"]
+    assert isinstance(rendered_units, list)
+    substituted_service = rendered_units[-1]["Service"]
+    assert substituted_service["BindReadOnlyPaths"] == [str(placeholder)]
+    assert definition["Service"]["BindReadOnlyPaths"] == [
+        str(observed["late_bound_receipt"])
+    ]
 
     assert final["schema"] == "alpha_max_v8_persisted_probe_launch_admission.v1"
     assert final["verdict"] == "PASS"
     assert final["topology"] == observed["topology"]
+    assert provisional["late_bound_probe"] == final["late_bound_probe"]
     assert final["production_properties"] == {
         "alpha-max-authority.service": observed["production_properties"]
     }
@@ -2084,3 +2157,41 @@ def test_persisted_probe_failure_never_publishes_final_admission(
     assert observed["probe_receipt"].is_file()
     assert not observed["final_receipt"].exists()
     assert not observed["audit"].exists()
+
+
+def test_persisted_probe_rejects_preexisting_late_bound_receipt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    observed = _run_mocked_persisted_probe(
+        tmp_path, monkeypatch, fail_probe=False, late_bound_present=True
+    )
+    assert "sign:probe" not in observed["events"]
+    assert not observed["probe_receipt"].exists()
+    assert not observed["final_receipt"].exists()
+
+
+def test_persisted_probe_rejects_late_bound_drift_before_final_signing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    observed = _run_mocked_persisted_probe(
+        tmp_path, monkeypatch, fail_probe=False, late_bound_drift=True
+    )
+    assert observed["events"].count("sign:probe") == 1
+    assert "verify:2" in observed["events"]
+    assert "sign:final" not in observed["events"]
+    assert not observed["final_receipt"].exists()
+    assert not observed["audit"].exists()
+
+
+def test_persisted_probe_cleanup_attempts_all_steps_after_command_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    observed = _run_mocked_persisted_probe(
+        tmp_path, monkeypatch, fail_probe=False, cleanup_failure=True
+    )
+    assert "stop:probe" in observed["events"]
+    assert "reset:probe" in observed["events"]
+    assert observed["events"].count("daemon-reload") >= 3
+    assert not list(observed["unit_directory"].glob("luminaquant-persisted-*.service"))
+    assert "sign:final" not in observed["events"]
+    assert not observed["final_receipt"].exists()
