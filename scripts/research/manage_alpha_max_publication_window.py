@@ -33,9 +33,9 @@ from lumina_quant.alpha_max_terminal_policy import (
 )
 from lumina_quant.storage.parquet.ohlcv_repo import ParquetMarketDataRepository
 
-RUN_ID = "86e406732b9f5fdef9eab49fab1ab993d5529ac5526b2fdcca6fc73dd7cae95f"
-ACQUISITION_REQUEST = "cd176a532039742270e2ab573b8f26796ee20d36217636d932c3d0d3fab242e6"
-APPROVAL_LEAF = "current-state-approval-v11.json"
+RUN_ID = "dfc3f30f3bb29db1c3f4dafaf048de82f702594f987c061bb36236540a2fbaeb"
+ACQUISITION_REQUEST = "25acadc0f87fe5421554793e89b835f5076601966a2b9fe2624f11aee1fb445b"
+APPROVAL_LEAF = "current-state-approval-v12.json"
 CAPACITY_PATH = "/mnt/c"
 HOST_RESERVE_BYTES = 21_474_836_480
 MAX_JSON = 64 * 1024 * 1024
