@@ -1617,12 +1617,15 @@ def _run_mocked_persisted_probe(
     late_bound_present: bool = False,
     late_bound_drift: bool = False,
     cleanup_failure: bool = False,
+    telemetry_marker_root: bool = False,
+    unapproved_marker_root: bool = False,
 ) -> dict[str, object]:
     probe = _probe_module()
     run_id = "a" * 64
     root = tmp_path / "runs"
     control_root = root / f"g056v8-controls-{run_id}"
     evidence_root = root / f"g056v8-acquisition-evidence-{run_id}"
+    telemetry_root = root / f"g056v8-telemetry-{run_id}"
     key_root = root / f"g056v8-keys-{run_id}"
     admission_root = control_root / "admissions"
     probe_admission_root = admission_root / "probe"
@@ -1632,6 +1635,7 @@ def _run_mocked_persisted_probe(
     for path in (
         control_root,
         evidence_root,
+        telemetry_root,
         key_root,
         admission_root,
         current,
@@ -1787,6 +1791,11 @@ def _run_mocked_persisted_probe(
         },
         sort_keys=True,
     )
+    if unapproved_marker_root:
+        probe_write_root = tmp_path / "unapproved-probe-write"
+        probe_write_root.mkdir()
+    else:
+        probe_write_root = telemetry_root if telemetry_marker_root else evidence_root
     definition = {
         "Unit": {"Description": "mock persisted authority"},
         "Service": {
@@ -1815,7 +1824,7 @@ def _run_mocked_persisted_probe(
                 "--output",
                 str(tmp_path / "terminal.json"),
             ],
-            "BindPaths": [f"{credential_path.parent}:/runtime-keys"],
+            "BindPaths": [f"{credential_path.parent}:{probe_write_root}"],
             "BindReadOnlyPaths": [
                 str(evidence_root / "terminal-authority.receipt.json")
             ],
@@ -2015,7 +2024,15 @@ def _run_mocked_persisted_probe(
     monkeypatch.setattr(probe, "_sign_launch_admission", fake_sign)
     monkeypatch.setattr(probe, "_run", fake_run)
 
-    if late_bound_present:
+    if unapproved_marker_root:
+        with pytest.raises(
+            RuntimeError, match="persisted probe has no approved writable evidence root"
+        ):
+            probe.execute_persisted_topology(
+                control_root, key_root, approval, evidence_root, "acquisition"
+            )
+        result = None
+    elif late_bound_present:
         (evidence_root / "terminal-authority.receipt.json").write_text(
             '{"unexpected":true}\n', encoding="utf-8"
         )
@@ -2065,6 +2082,8 @@ def _run_mocked_persisted_probe(
         "rendered_units": rendered_units,
         "late_bound_receipt": evidence_root / "terminal-authority.receipt.json",
         "unit_directory": home / ".config/systemd/user",
+        "probe_marker_path": probe_state.get("marker"),
+        "telemetry_root": telemetry_root,
     }
 
 
@@ -2137,6 +2156,11 @@ def test_persisted_probe_bootstraps_then_revalidates_final_admission(
         "alpha-max-authority.service": observed["production_properties"]
     }
     assert final["units"][0]["probe_omits_production_prestart"] is True
+    marker_path = observed["probe_marker_path"]
+    assert isinstance(marker_path, Path)
+    assert final["units"][0]["probe_write_root"]["path"] == str(marker_path.parent)
+    assert final["units"][0]["probe_marker"]["role"] == "authority"
+    assert final["units"][0]["probe_marker_path"] == str(marker_path)
     assert set(final["probe_admission"]) == {"payload", "signature", "envelope"}
     assert all(
         identity in final["control_artifacts"] for identity in final["probe_admission"].values()
@@ -2193,5 +2217,34 @@ def test_persisted_probe_cleanup_attempts_all_steps_after_command_error(
     assert "reset:probe" in observed["events"]
     assert observed["events"].count("daemon-reload") >= 3
     assert not list(observed["unit_directory"].glob("luminaquant-persisted-*.service"))
+    assert "sign:final" not in observed["events"]
+    assert not observed["final_receipt"].exists()
+
+
+def test_persisted_probe_routes_marker_to_declared_writable_telemetry_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    observed = _run_mocked_persisted_probe(
+        tmp_path, monkeypatch, fail_probe=False, telemetry_marker_root=True
+    )
+    marker = observed["probe_marker_path"]
+    assert isinstance(marker, Path)
+    assert marker.parent == observed["telemetry_root"]
+    final = observed["signing_payloads"]["final"]
+    assert final["units"][0]["probe_write_root"]["path"] == str(
+        observed["telemetry_root"]
+    )
+    assert final["units"][0]["probe_marker"]["credential_sha256"]
+    assert final["units"][0]["probe_marker_path"] == str(marker)
+
+
+def test_persisted_probe_rejects_unapproved_marker_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    observed = _run_mocked_persisted_probe(
+        tmp_path, monkeypatch, fail_probe=False, unapproved_marker_root=True
+    )
+    assert "sign:probe" in observed["events"]
+    assert "start:probe" not in observed["events"]
     assert "sign:final" not in observed["events"]
     assert not observed["final_receipt"].exists()

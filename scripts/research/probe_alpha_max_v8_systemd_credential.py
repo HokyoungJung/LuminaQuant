@@ -746,11 +746,29 @@ def _execute_persisted_topology(
         if active.get("ActiveState") not in {"inactive", "failed", ""}:
             raise RuntimeError(f"production unit is active: {production_name}")
         source, credential_name = credential["source"], credential["name"]
-        marker = evidence_root / f"{index:02d}-{scope}-{role}.json"
-        release = evidence_root / f"{index:02d}-{scope}-{role}.release"
         unit_name = f"luminaquant-persisted-{index}-{secrets.token_hex(12)}.service"
         substituted = copy.deepcopy(original)
         service = substituted["Service"]
+        production_write_roots = {
+            Path(binding.split(":", 1)[1])
+            for binding in service.get("BindPaths", [])
+        }
+        marker_root = next(
+            (
+                candidate
+                for candidate in (
+                    evidence_root,
+                    control_root.parent / f"g056v8-telemetry-{controls.RUN_ID}",
+                )
+                if candidate in production_write_roots
+            ),
+            None,
+        )
+        if marker_root is None:
+            raise RuntimeError("persisted probe has no approved writable evidence root")
+        marker_root_identity = controls._directory(marker_root, private=True)
+        marker = marker_root / f"{index:02d}-{scope}-{role}.json"
+        release = marker_root / f"{index:02d}-{scope}-{role}.release"
         production_read_paths = list(service.get("BindReadOnlyPaths", []))
         probe_read_paths = list(production_read_paths)
         readonly_overlays: list[dict[str, Any]] = []
@@ -1015,6 +1033,8 @@ def _execute_persisted_topology(
                 raise BaseExceptionGroup(
                     "safe substituted unit cleanup failed", failures
                 ) from None
+        if controls._directory(marker_root, private=True) != marker_root_identity:
+            raise RuntimeError("persisted probe writable root drifted")
         receipts.append(
             {
                 "scope": scope,
@@ -1027,6 +1047,9 @@ def _execute_persisted_topology(
                 "probe_omits_production_prestart": True,
                 "network_deny_overlay": network_deny_overlay,
                 "readonly_path_overlays": readonly_overlays,
+                "probe_write_root": marker_root_identity,
+                "probe_marker": marker_value,
+                "probe_marker_path": str(marker),
                 "probe_unit_sha256": hashlib.sha256(probe_unit).hexdigest(),
             }
         )
