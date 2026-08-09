@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 import polars as pl
 
@@ -148,6 +148,73 @@ def test_feature_audit_fails_when_required_features_are_only_null(monkeypatch):
     assert audit["status"] == "fail"
     assert audit["complete_feature_symbols"] == []
     assert audit["missing_features_by_symbol"] == {"BTC/USDT": ["funding_rate", "open_interest"]}
+
+
+def test_feature_audit_requires_complete_bar_window_coverage(monkeypatch):
+    import lumina_quant.market_data as market_data
+
+    start = datetime(2026, 5, 1, tzinfo=UTC)
+    start_ms = int(start.timestamp() * 1000)
+
+    def fake_load_features(*args, **kwargs):
+        return pl.DataFrame(
+            {
+                "timestamp_ms": [start_ms, start_ms + 24 * 60 * 60 * 1000],
+                "open_interest": [1_000_000.0, 1_100_000.0],
+            }
+        )
+
+    monkeypatch.setattr(market_data, "load_futures_feature_points_from_db", fake_load_features)
+
+    audit = subject._feature_audit(
+        db_path="data/market_parquet",
+        exchange="binance",
+        symbols=("BTC/USDT",),
+        start=start,
+        end=datetime(2026, 5, 2, tzinfo=UTC),
+        required_features=("open_interest",),
+    )
+
+    assert audit["status"] == "fail"
+    coverage = audit["coverage_failures_by_symbol"]["BTC/USDT"]["open_interest"]
+    assert coverage["available_bars"] < coverage["expected_bars"]
+    assert coverage["missing_bars"] > 0
+
+
+def test_feature_audit_accepts_exact_bounded_forward_fill(monkeypatch):
+    import lumina_quant.market_data as market_data
+
+    start = datetime(2026, 5, 1, tzinfo=UTC)
+    start_ms = int(start.timestamp() * 1000)
+    interval_ms = 8 * 60 * 60 * 1000
+
+    def fake_load_features(*args, **kwargs):
+        return pl.DataFrame(
+            {
+                "timestamp_ms": [
+                    start_ms,
+                    start_ms + interval_ms,
+                    start_ms + 2 * interval_ms,
+                ],
+                "funding_rate": [0.0001, -0.0001, 0.0002],
+            }
+        )
+
+    monkeypatch.setattr(market_data, "load_futures_feature_points_from_db", fake_load_features)
+
+    audit = subject._feature_audit(
+        db_path="data/market_parquet",
+        exchange="binance",
+        symbols=("BTC/USDT",),
+        start=start,
+        end=datetime(2026, 5, 1, 16, tzinfo=UTC),
+        required_features=("funding_rate",),
+    )
+
+    assert audit["status"] == "pass"
+    assert audit["coverage_failures_by_symbol"] == {}
+    coverage = audit["symbols"]["BTC/USDT"]["coverage"]["funding_rate"]
+    assert coverage["available_bars"] == coverage["expected_bars"]
 
 
 def test_run_backtest_wires_feature_database_for_preloaded_frames(monkeypatch):

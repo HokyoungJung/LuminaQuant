@@ -23,6 +23,7 @@ import time
 import urllib.request
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from itertools import pairwise
 from pathlib import Path
 from typing import Any
 
@@ -456,6 +457,41 @@ def _load_and_audit_data(
     return data, audits
 
 
+def _feature_bar_coverage(
+    timestamps_ms: list[int],
+    *,
+    start_ms: int,
+    end_ms: int,
+    max_stale_ms: int,
+) -> dict[str, Any]:
+    expected_bars = max(0, ((int(end_ms) - int(start_ms)) // TIMEFRAME_MS) + 1)
+    timestamps = sorted({int(value) for value in timestamps_ms})
+    available_bars = 0
+    source_index = 0
+    latest_source: int | None = None
+    for bar_timestamp in range(int(start_ms), int(end_ms) + 1, TIMEFRAME_MS):
+        while source_index < len(timestamps) and timestamps[source_index] <= bar_timestamp:
+            latest_source = timestamps[source_index]
+            source_index += 1
+        if (
+            latest_source is not None
+            and bar_timestamp - latest_source <= int(max_stale_ms)
+        ):
+            available_bars += 1
+    source_gaps = [right - left for left, right in pairwise(timestamps)]
+    return {
+        "expected_bars": expected_bars,
+        "available_bars": available_bars,
+        "missing_bars": max(0, expected_bars - available_bars),
+        "coverage_ratio": (
+            float(available_bars / expected_bars) if expected_bars else 0.0
+        ),
+        "first_source_timestamp_ms": timestamps[0] if timestamps else None,
+        "last_source_timestamp_ms": timestamps[-1] if timestamps else None,
+        "max_source_gap_ms": max(source_gaps, default=0),
+    }
+
+
 def _feature_audit(
     *,
     db_path: str,
@@ -467,50 +503,72 @@ def _feature_audit(
 ) -> dict[str, Any]:
     if not required_features:
         return {"required_features": [], "status": "not_required", "symbols": {}}
+    from lumina_quant.data.feature_points import FEATURE_POINT_MAX_STALE_MS
     from lumina_quant.market_data import load_futures_feature_points_from_db
 
+    start_ms = int(start.timestamp() * 1000)
+    end_ms = int(end.timestamp() * 1000)
     rows: dict[str, Any] = {}
     empty_symbols: list[str] = []
     complete_symbols: list[str] = []
     missing_features_by_symbol: dict[str, list[str]] = {}
+    coverage_failures_by_symbol: dict[str, dict[str, Any]] = {}
     for symbol in symbols:
         frame = load_futures_feature_points_from_db(
             db_path,
             exchange=exchange,
             symbol=symbol,
-            start_date=start,
+            start_date=max(0, start_ms - FEATURE_POINT_MAX_STALE_MS),
             end_date=end,
         )
-        item: dict[str, Any] = {"rows": int(frame.height), "columns": []}
+        item: dict[str, Any] = {
+            "rows": int(frame.height),
+            "columns": [],
+            "non_null_counts": {},
+            "coverage": {},
+        }
         if frame.is_empty():
             empty_symbols.append(symbol)
             missing_features_by_symbol[symbol] = list(required_features)
         for feature in required_features:
-            count = 0
-            if feature in frame.columns:
-                count = int(frame.select(pl.col(feature).is_not_null().sum()).item())
-            item.setdefault("non_null_counts", {})[feature] = count
+            timestamps: list[int] = []
+            if feature in frame.columns and "timestamp_ms" in frame.columns:
+                timestamps = [
+                    int(value)
+                    for value in frame.filter(pl.col(feature).is_not_null())
+                    .get_column("timestamp_ms")
+                    .to_list()
+                ]
+            count = len(timestamps)
+            item["non_null_counts"][feature] = count
+            coverage = _feature_bar_coverage(
+                timestamps,
+                start_ms=start_ms,
+                end_ms=end_ms,
+                max_stale_ms=FEATURE_POINT_MAX_STALE_MS,
+            )
+            item["coverage"][feature] = coverage
             if count > 0:
                 item["columns"].append(feature)
-            else:
+            if count == 0 or coverage["missing_bars"] > 0:
                 missing_features_by_symbol.setdefault(symbol, []).append(feature)
+                coverage_failures_by_symbol.setdefault(symbol, {})[feature] = coverage
         if not missing_features_by_symbol.get(symbol):
             complete_symbols.append(symbol)
         rows[symbol] = item
-    if not complete_symbols:
-        status = "fail"
-    elif missing_features_by_symbol:
-        status = "warn"
-    else:
-        status = "pass"
+    status = "pass" if len(complete_symbols) == len(symbols) else "fail"
     return {
         "required_features": list(required_features),
         "status": status,
         "empty_feature_symbols": empty_symbols,
         "complete_feature_symbols": complete_symbols,
         "missing_features_by_symbol": missing_features_by_symbol,
+        "coverage_failures_by_symbol": coverage_failures_by_symbol,
         "symbols": rows,
-        "note": "FeaturePointLookup forward-fills only up to its 8h stale limit; no unbounded imputation.",
+        "note": (
+            "Every required feature must resolve on every 1m bar for every traded symbol; "
+            "FeaturePointLookup uses only real points at or before the bar and an 8h stale limit."
+        ),
     }
 
 
@@ -641,7 +699,7 @@ def _markdown_report(payload: dict[str, Any]) -> str:
             f"- OHLCV warning rows: `{data_warning_count}`",
             f"- max allowed 1m gap ratio: `{payload['max_gap_ratio']}`",
             "- OHLCV policy: no gap fill, no interpolation, no synthetic rows; any missing bars above threshold fail before simulation.",
-            "- Required external features must be present on at least one traded symbol; absent feature columns are not inferred or filled.",
+            "- Required external features must resolve on every 1m bar for every traded symbol under the bounded 8h stale policy; sparse columns fail before simulation.",
             "- Zero-volume bars are reported as warnings, not imputed.",
             "",
             f"## Top {min(top_n, len(sorted_results))} traded performers by total return",

@@ -10,7 +10,11 @@ from typing import Any, Final
 
 import polars as pl
 
-from lumina_quant.market_data import load_futures_feature_points_from_db, normalize_symbol
+from lumina_quant.market_data import (
+    _coerce_timestamp_ms,
+    load_futures_feature_points_from_db,
+    normalize_symbol,
+)
 
 FEATURE_COLUMNS: Final[tuple[str, ...]] = (
     "funding_rate",
@@ -158,11 +162,15 @@ class FeaturePointLookup:
             return loaded
 
     def _load_symbol(self, symbol: str) -> _FeatureCache:
+        lookup_start = self.start_date
+        start_ms = _coerce_timestamp_ms(self.start_date)
+        if start_ms is not None:
+            lookup_start = max(0, int(start_ms) - FEATURE_POINT_MAX_STALE_MS)
         frame = load_futures_feature_points_from_db(
             self.db_path,
             exchange=self.exchange,
             symbol=symbol,
-            start_date=self.start_date,
+            start_date=lookup_start,
             end_date=self.end_date,
         )
         if frame.is_empty():

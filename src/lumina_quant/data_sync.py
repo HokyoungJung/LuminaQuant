@@ -45,6 +45,8 @@ from lumina_quant.market_data import (
 )
 
 _DEFAULT_RAW_ARCHIVE_CHUNK_ROWS = 250_000
+_FUNDING_TIMESTAMP_JITTER_MS = 1_000
+_FUNDING_SETTLEMENT_GRANULARITY_MS = 60_000
 
 
 def _now_ms() -> int:
@@ -1216,6 +1218,16 @@ def _merge_feature_point(
     row.update(fields)
 
 
+def _normalize_funding_timestamp_ms(timestamp_ms: int) -> int:
+    timestamp = int(timestamp_ms)
+    remainder = timestamp % _FUNDING_SETTLEMENT_GRANULARITY_MS
+    if remainder <= _FUNDING_TIMESTAMP_JITTER_MS:
+        return timestamp - remainder
+    if remainder >= _FUNDING_SETTLEMENT_GRANULARITY_MS - _FUNDING_TIMESTAMP_JITTER_MS:
+        return timestamp + (_FUNDING_SETTLEMENT_GRANULARITY_MS - remainder)
+    return timestamp
+
+
 def _fetch_funding_history(
     *,
     symbol: str,
@@ -1470,7 +1482,7 @@ def sync_futures_feature_points(
                 base_wait_sec=base_wait_sec,
             )
             for row in funding_rows:
-                ts = int(row.get("fundingTime", 0) or 0)
+                ts = _normalize_funding_timestamp_ms(int(row.get("fundingTime", 0) or 0))
                 if ts <= 0:
                     continue
                 funding_rate = (

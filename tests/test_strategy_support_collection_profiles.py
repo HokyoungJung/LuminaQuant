@@ -71,7 +71,7 @@ def test_sync_futures_feature_points_skips_disabled_fetchers_and_persists_enable
     captured: dict[str, object] = {}
 
     def _funding_history(**_kwargs):
-        return [{"fundingTime": 1_735_689_600_000, "fundingRate": "0.0001", "markPrice": "50000"}]
+        return [{"fundingTime": 1_735_689_600_016, "fundingRate": "0.0001", "markPrice": "50000"}]
 
     def _price_klines(**_kwargs):
         raise AssertionError("mark/index fetcher should not be called when disabled")
@@ -125,6 +125,7 @@ def test_sync_futures_feature_points_skips_disabled_fetchers_and_persists_enable
     rows = list(captured["rows"])
     assert len(rows) == 3
     funding_row = rows[0]
+    assert funding_row["timestamp_ms"] == 1_735_689_600_000
     assert funding_row["funding_rate"] == 0.0001
     assert funding_row["funding_fee_rate"] == 0.0001
     assert funding_row["funding_fee_quote_per_unit"] == 5.0

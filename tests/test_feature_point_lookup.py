@@ -104,3 +104,31 @@ def test_feature_point_lookup_does_not_forward_fill_beyond_staleness_limit(tmp_p
 
     assert lookup.get_latest("BTC/USDT", "funding_rate", timestamp_ms=start_ms) == 0.0001
     assert lookup.get_latest("BTC/USDT", "funding_rate", timestamp_ms=stale_ms) is None
+
+
+def test_feature_point_lookup_loads_stale_window_before_backtest_start(tmp_path):
+    db_path = tmp_path / "market_parquet"
+    source_ms = 1_700_000_000_000
+    backtest_start_ms = source_ms + 5 * 60_000
+    upsert_futures_feature_points_rows(
+        str(db_path),
+        exchange="binance",
+        symbol="BTC/USDT",
+        rows=[{"timestamp_ms": source_ms, "open_interest": 1_250_000.0}],
+    )
+
+    lookup = FeaturePointLookup(
+        db_path=str(db_path),
+        exchange="binance",
+        start_date=backtest_start_ms,
+        end_date=backtest_start_ms + 60_000,
+    )
+
+    assert (
+        lookup.get_latest(
+            "BTC/USDT",
+            "open_interest",
+            timestamp_ms=backtest_start_ms,
+        )
+        == 1_250_000.0
+    )
