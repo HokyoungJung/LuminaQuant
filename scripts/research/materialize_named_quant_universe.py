@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 from copy import deepcopy
 from datetime import UTC, datetime
 from pathlib import Path
@@ -71,6 +72,8 @@ def _load_snapshots(path: Path, *, label: str) -> list[dict[str, Any]]:
         raise ValueError(f"invalid {label} snapshot file: {path}") from exc
     if isinstance(payload, dict) and "snapshots" in payload:
         payload = payload["snapshots"]
+    elif isinstance(payload, dict):
+        payload = [payload]
     if (
         not isinstance(payload, list)
         or not payload
@@ -148,6 +151,43 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _positive_float(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        parsed = float(value)
+    except TypeError, ValueError:
+        return None
+    return parsed if math.isfinite(parsed) and parsed > 0 else None
+
+
+def _validated_filters(row: dict[str, Any]) -> list[dict[str, Any]]:
+    symbol = _slash_symbol(row)
+    filters = [
+        deepcopy(item)
+        for item in row.get("filters", [])
+        if isinstance(item, dict) and item.get("filterType") in _FILTER_TYPES
+    ]
+    by_type = {str(item.get("filterType") or "").upper(): item for item in filters}
+    price = by_type.get("PRICE_FILTER", {})
+    lots = [by_type[key] for key in ("MARKET_LOT_SIZE", "LOT_SIZE") if key in by_type]
+    notional = by_type.get("MIN_NOTIONAL", {})
+    if _positive_float(price.get("tickSize")) is None:
+        raise ValueError(f"selected symbol {symbol} lacks a valid PRICE_FILTER.tickSize")
+    if not any(
+        _positive_float(item.get("minQty")) is not None
+        and _positive_float(item.get("stepSize")) is not None
+        for item in lots
+    ):
+        raise ValueError(f"selected symbol {symbol} lacks a valid lot minQty and stepSize")
+    if (
+        _positive_float(notional.get("notional")) is None
+        and _positive_float(notional.get("minNotional")) is None
+    ):
+        raise ValueError(f"selected symbol {symbol} lacks a valid MIN_NOTIONAL")
+    return filters
+
+
 def materialize(
     suite: dict[str, Any],
     market_cap_snapshot: dict[str, Any],
@@ -191,6 +231,7 @@ def materialize(
         "crypto_top10_plus_tradfi": crypto + tradfi,
     }
     patched: list[str] = []
+    disabled: dict[str, list[str]] = {}
     candidates = result.get("candidates")
     if not isinstance(candidates, list):
         raise ValueError("suite candidates must be a list")
@@ -209,11 +250,30 @@ def materialize(
         metadata = candidate.get("metadata")
         binding = metadata.get("universe_binding") if isinstance(metadata, dict) else None
         if binding is None:
-            continue
-        if binding not in bindings:
+            pass
+        elif binding not in bindings:
             raise ValueError(f"unknown universe binding: {binding!r}")
-        candidate["symbols"] = list(bindings[binding])
-        patched.append(str(candidate.get("candidate_id") or candidate.get("name") or "<unnamed>"))
+        else:
+            candidate["symbols"] = list(bindings[binding])
+            patched.append(
+                str(candidate.get("candidate_id") or candidate.get("name") or "<unnamed>")
+            )
+        constraint = metadata.get("universe_constraint") if isinstance(metadata, dict) else None
+        if constraint is None:
+            constraint = binding
+        if constraint is None:
+            continue
+        if constraint not in bindings:
+            raise ValueError(f"unknown universe constraint: {constraint!r}")
+        candidate_id = str(candidate.get("candidate_id") or candidate.get("name") or "<unnamed>")
+        outside = sorted(set(candidate.get("symbols") or []) - set(bindings[constraint]))
+        if outside:
+            candidate["enabled"] = False
+            candidate["disabled_reason"] = "outside point-in-time universe: " + ", ".join(outside)
+            disabled[candidate_id] = outside
+        else:
+            candidate.pop("enabled", None)
+            candidate.pop("disabled_reason", None)
 
     selected_rows = crypto_rows + tradfi_rows
     result["universe_materialization_receipt"] = {
@@ -242,17 +302,12 @@ def materialize(
             "selected_crypto": len(crypto),
             "selected_tradfi": len(tradfi),
             "patched_candidates": len(patched),
+            "disabled_candidates": len(disabled),
         },
         "selected_symbols": {"crypto_top10": crypto, "tradfi_all": tradfi},
         "patched_candidates": patched,
-        "binance_filters": {
-            _slash_symbol(row): [
-                deepcopy(item)
-                for item in row.get("filters", [])
-                if isinstance(item, dict) and item.get("filterType") in _FILTER_TYPES
-            ]
-            for row in selected_rows
-        },
+        "disabled_candidates": disabled,
+        "binance_filters": {_slash_symbol(row): _validated_filters(row) for row in selected_rows},
     }
     return result
 

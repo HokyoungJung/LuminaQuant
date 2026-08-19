@@ -48,6 +48,10 @@ def test_committed_json_matches_generator_and_is_research_only() -> None:
     ids = [row["candidate_id"] for row in suite["candidates"]]
     assert len(ids) == len(set(ids)) == 25
     assert {row["strategy_class"] for row in suite["candidates"]} == set(NEW_STRATEGIES)
+    assert any(
+        "trade-price OHLC isolated liquidation approximation" in row
+        for row in suite["required_data_contracts"]
+    )
 
 
 def test_every_new_strategy_is_registered_research_only() -> None:
@@ -113,8 +117,10 @@ def test_every_hypothesis_ref_resolves_to_a_registered_evidence_source() -> None
     ]
     for row in suite["candidates"]:
         refs = row["metadata"]["hypothesis_refs"]
-        assert refs, row["candidate_id"]
         unresolved = sorted(set(refs) - registry)
+        assert not unresolved, (row["candidate_id"], unresolved)
+        provenance_refs = row["metadata"].get("provenance_refs", [])
+        unresolved = sorted(set(provenance_refs) - registry)
         assert not unresolved, (row["candidate_id"], unresolved)
     for method, refs in suite["allocator_evidence_refs"].items():
         assert set(refs) <= registry, method
@@ -132,7 +138,8 @@ def test_every_hypothesis_ref_resolves_to_a_registered_evidence_source() -> None
     # The prev-day box proxy is independent: it must not cite the AOA interview.
     for row in suite["candidates"]:
         if row["strategy_class"] == "PrevDayBoxQuartileReversionStrategy":
-            assert "aoa_bitmex_interview_20250611" not in row["metadata"]["hypothesis_refs"]
+            assert row["metadata"]["hypothesis_refs"] == []
+            assert row["metadata"]["provenance_refs"] == ["dacapogo_public_repo_633ba5d"]
         if (
             row["strategy_class"] == "TurtleUnitPyramidingStrategy"
             and "public_rule" not in row["candidate_id"]
@@ -156,7 +163,7 @@ def test_flight_candidates_follow_the_audited_public_rule() -> None:
         assert params["require_htf_confirmation"] is True and params["htf_multiple"] == 6
 
 
-def test_multanchanbap_public_rule_candidates_are_exact() -> None:
+def test_multanchanbap_candidate_separates_public_backbone_from_independent_params() -> None:
     rows = [
         row
         for row in _load()["candidates"]
@@ -170,3 +177,68 @@ def test_multanchanbap_public_rule_candidates_are_exact() -> None:
         assert params["stop_loss_pct"] == 0.035 and params["trend_ma_window"] == 120
         assert params["max_units"] == 1 and params["use_n_stop"] is False
         assert params["allow_short"] is False
+        assert row["metadata"]["hypothesis_refs"] == ["multanchanbap_coin_preview"]
+        assert "independent" in row["notes"].lower()
+
+
+def test_universe_bindings_are_only_on_broad_candidates() -> None:
+    expected = {
+        "crypto_vb_noise_session_1h_v1": "crypto_top10",
+        "crypto_ma_score_vol_target_1d_v1": "crypto_top10",
+        "crypto_multanchanbap_20_10_public_rule_1d_v1": "crypto_top10",
+        "crypto_turtle_unit_pyramid_1d_v1": "crypto_top10",
+        "crypto_pca_residual_statarb_1d_v1": "crypto_top10",
+        "crypto_session_high_scalp_1m_v1": "crypto_top10",
+        "crypto_kill_switch_overlay_turtle_1d_v1": "crypto_top10",
+        "tradfi_vb_noise_session_1h_v1": "tradfi_all",
+        "tradfi_ma_score_vol_target_1d_v1": "tradfi_all",
+        "tradfi_multanchanbap_20_10_public_rule_1d_v1": "tradfi_all",
+        "tradfi_turtle_unit_pyramid_1d_v1": "tradfi_all",
+        "tradfi_pca_residual_statarb_equity_1d_v1": "tradfi_all",
+        "tradfi_pca_residual_statarb_etf_cmdty_1d_v1": "tradfi_all",
+        "tradfi_kill_switch_overlay_ma_rotation_1d_v1": "tradfi_all",
+        "xasset_ma_score_vol_target_1d_v1": "crypto_top10_plus_tradfi",
+    }
+    rows = {row["candidate_id"]: row for row in _load()["candidates"]}
+    assert {
+        candidate_id: row["metadata"]["universe_binding"]
+        for candidate_id, row in rows.items()
+        if "universe_binding" in row["metadata"]
+    } == expected
+    assert all(
+        row["metadata"]["universe_constraint"]
+        == (
+            "crypto_top10"
+            if row["candidate_id"].startswith("crypto_")
+            else "tradfi_all"
+            if row["candidate_id"].startswith("tradfi_")
+            else "crypto_top10_plus_tradfi"
+        )
+        for row in rows.values()
+    )
+
+
+def test_identity_and_diagnostic_refs_are_not_rule_hypotheses() -> None:
+    rows = {row["candidate_id"]: row for row in _load()["candidates"]}
+    flight_refs = {
+        "flightf_rsi_divergence_20210124",
+        "flightf_trading_principles_20200908",
+    }
+    for row in rows.values():
+        metadata = row["metadata"]
+        if row["strategy_class"] == "RsiDivergenceScaleOutStrategy":
+            assert set(metadata["hypothesis_refs"]) == flight_refs
+            assert metadata["provenance_refs"] == ["dacapogo_public_repo_633ba5d"]
+            assert "negative results" in metadata["diagnostic_context"]
+        if row["strategy_class"] == "SessionHighBreakoutScalpStrategy":
+            assert metadata["hypothesis_refs"] == []
+            assert set(metadata["provenance_refs"]) == {
+                "dolpago_dogdrip_20210802",
+                "dacapogo_public_repo_633ba5d",
+            }
+        if row["strategy_class"] in {
+            "KalmanPairsStatArbStrategy",
+            "PcaResidualStatArbStrategy",
+        }:
+            assert "amateurquant_profile" not in metadata["hypothesis_refs"]
+            assert "amateurquant_profile" in metadata["provenance_refs"]

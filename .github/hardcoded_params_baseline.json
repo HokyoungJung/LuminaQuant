@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-08-19T07:25:14.043165+00:00",
+  "generated_at_utc": "2026-08-19T07:43:45.013651+00:00",
   "literal_paths": [
     "src/lumina_quant/strategies",
     "lumina_quant/strategies"
@@ -751,8 +751,8 @@
     "literal:src/lumina_quant/strategies/cross_sectional_anomaly_alpha_sleeves.py:87:15:3",
     "literal:src/lumina_quant/strategies/cross_sectional_anomaly_alpha_sleeves.py:94:33:3",
     "literal:src/lumina_quant/strategies/cross_sectional_anomaly_alpha_sleeves.py:95:25:3",
-    "literal:src/lumina_quant/strategies/cross_sectional_funding_momentum_carry.py:478:75:62",
-    "literal:src/lumina_quant/strategies/cross_sectional_funding_momentum_carry.py:586:39:3.0",
+    "literal:src/lumina_quant/strategies/cross_sectional_funding_momentum_carry.py:479:75:62",
+    "literal:src/lumina_quant/strategies/cross_sectional_funding_momentum_carry.py:587:39:3.0",
     "literal:src/lumina_quant/strategies/cross_sectional_funding_momentum_carry.py:79:27:28800",
     "literal:src/lumina_quant/strategies/cusum_varratio_alpha_sleeves.py:141:31:1800",
     "literal:src/lumina_quant/strategies/cusum_varratio_alpha_sleeves.py:191:27:0.1",
@@ -1884,9 +1884,9 @@
     "literal:src/lumina_quant/strategies/selection_aware_alpha_sleeves.py:522:31:3600",
     "literal:src/lumina_quant/strategies/selection_aware_alpha_sleeves.py:585:32:0.01",
     "literal:src/lumina_quant/strategies/session_filtered_pair_carry.py:75:28:23",
-    "literal:src/lumina_quant/strategies/session_high_breakout_scalp.py:117:24:1439",
-    "literal:src/lumina_quant/strategies/session_high_breakout_scalp.py:123:54:60.0",
-    "literal:src/lumina_quant/strategies/session_high_breakout_scalp.py:208:51:1439",
+    "literal:src/lumina_quant/strategies/session_high_breakout_scalp.py:109:24:1439",
+    "literal:src/lumina_quant/strategies/session_high_breakout_scalp.py:115:54:60.0",
+    "literal:src/lumina_quant/strategies/session_high_breakout_scalp.py:200:51:1439",
     "literal:src/lumina_quant/strategies/silent_volume_shock_alpha_sleeves.py:180:31:86400",
     "literal:src/lumina_quant/strategies/silent_volume_shock_alpha_sleeves.py:638:28:540",
     "literal:src/lumina_quant/strategies/silent_volume_shock_alpha_sleeves.py:642:35:60",
@@ -2222,6 +2222,7 @@
     "literal:src/lumina_quant/strategies/volatility_breakout_noise.py:117:31:60",
     "literal:src/lumina_quant/strategies/volatility_breakout_noise.py:182:51:1439",
     "literal:src/lumina_quant/strategies/volatility_breakout_noise.py:183:64:5",
+    "literal:src/lumina_quant/strategies/volatility_breakout_noise.py:288:52:3",
     "literal:src/lumina_quant/strategies/volatility_breakout_noise.py:75:40:3",
     "literal:src/lumina_quant/strategies/volatility_breakout_noise.py:75:43:5",
     "literal:src/lumina_quant/strategies/volatility_breakout_noise.py:75:46:10",

@@ -435,6 +435,8 @@ class Backtest(TradingEngine):
 
             # time.sleep(self.heartbeat)
 
+        self.reconcile_final_portfolio_snapshot()
+
     def _output_performance(self, persist_output=True, verbose=True):
         """Outputs the strategy performance from the backtest."""
         self.portfolio.create_equity_curve_dataframe()

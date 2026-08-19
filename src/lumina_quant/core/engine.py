@@ -93,6 +93,7 @@ class TradingEngine(ABC):
         self.signals = 0
         self.orders = 0
         self.fills = 0
+        self._snapshot_fill_count = 0
 
     def _is_warmup_time(self, time_value: Any) -> bool:
         if self._live_start_ms is None:
@@ -191,6 +192,7 @@ class TradingEngine(ABC):
             # Warmup bars only prime indicator state — no equity rows, no order checks.
             return
         self.portfolio.update_timeindex(event)
+        self._snapshot_fill_count = self.fills
         # Optional: Simulated execution handler might need to check open orders
         if hasattr(self.execution_handler, "check_open_orders"):
             self.execution_handler.check_open_orders(event)
@@ -246,6 +248,7 @@ class TradingEngine(ABC):
 
         # Timestamp-level accounting update (once per second).
         self.portfolio.update_timeindex(event)
+        self._snapshot_fill_count = self.fills
 
         if hasattr(self.execution_handler, "check_open_orders"):
             for market_event in batch_events:
@@ -459,6 +462,7 @@ class TradingEngine(ABC):
 
         # Update portfolio once per decision tick.
         self.portfolio.update_timeindex(event)
+        self._snapshot_fill_count = self.fills
 
         if hasattr(self.execution_handler, "check_open_orders"):
             # 2026-07-03 audit perf fix: with no working conditional orders the
@@ -513,6 +517,14 @@ class TradingEngine(ABC):
         self.portfolio.update_fill(event)
         # Hook for state saving (LiveTrader can override or we add a hook)
         self.on_fill(event)
+
+    def reconcile_final_portfolio_snapshot(self):
+        if self.fills == self._snapshot_fill_count:
+            return
+        reconcile = getattr(self.portfolio, "reconcile_final_snapshot", None)
+        if callable(reconcile):
+            reconcile()
+            self._snapshot_fill_count = self.fills
 
     def get_engine_state(self) -> dict[str, Any]:
         """Capture engine-level state for chunk boundaries."""

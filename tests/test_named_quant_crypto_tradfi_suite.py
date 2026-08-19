@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from copy import deepcopy
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from queue import SimpleQueue
 
@@ -46,9 +47,12 @@ def test_suite_is_runnable_research_only_and_source_bounded() -> None:
     assert score_flags["route_unmapped_registered_strategies"] is True
     assert score_flags["emit_candidate_overfit_stats"] is True
     scoped = _score_config_scope(suite)
-    assert research_runner._candidate_cost_rate(
-        {"strategy_class": "TrendGatedIbsReversionStrategy"}, scoring_config=scoped
-    ) == 0.0011
+    assert (
+        research_runner._candidate_cost_rate(
+            {"strategy_class": "TrendGatedIbsReversionStrategy"}, scoring_config=scoped
+        )
+        == 0.0011
+    )
     limitations = suite["screening_runner_limitations"]
     assert limitations["portfolio_input_allowed"] is False
     assert limitations["models_target_sizing"] is False
@@ -89,9 +93,30 @@ def test_suite_is_runnable_research_only_and_source_bounded() -> None:
             assert row["metadata"]["universe_binding"] == "crypto_top10"
         if set(row["symbols"]) == tradfi:
             assert row["metadata"]["universe_binding"] == "tradfi_all"
+        if row["candidate_id"].startswith("tradfi_"):
+            assert row["metadata"]["universe_constraint"] == "tradfi_all"
 
     decisions = validate_source_registry(suite["evidence_sources"])
     assert decisions and all(decision.allowed for decision in decisions)
+    sources = {row["source_id"]: row for row in suite["evidence_sources"]}
+    assert sources["amateurquant_profile"]["allowed_usage_label"] == "evidence_only"
+    candidates = {row["candidate_id"]: row for row in suite["candidates"]}
+    for candidate_id in {
+        "crypto_residual_momentum_weekly_v1",
+        "tradfi_equity_residual_momentum_v1",
+        "tradfi_gold_silver_ratio_reversion_v1",
+        "tradfi_metals_relative_value_4h_v1",
+    }:
+        metadata = candidates[candidate_id]["metadata"]
+        assert "amateurquant_profile" not in metadata["hypothesis_refs"]
+        assert metadata["provenance_refs"] == ["amateurquant_profile"]
+    for candidate_id in {
+        "tradfi_gold_silver_ratio_reversion_v1",
+        "tradfi_metals_relative_value_4h_v1",
+    }:
+        metadata = candidates[candidate_id]["metadata"]
+        assert metadata["hypothesis_refs"] == []
+        assert metadata["rule_origin"] == "independent_hypothesis"
     unresolved = {
         row["requested_label"]
         for row in suite["source_resolution"]
@@ -130,11 +155,16 @@ def test_materialized_hrp_children_keep_runnable_strategy_definitions() -> None:
     suite = deepcopy(_load())
     t = np.linspace(0.0, 16.0 * np.pi, 480)
     for index, sleeve in enumerate(suite["sleeves"].values()):
-        sleeve["returns"] = (
-            0.001 + 0.0005 * np.sin(t * (index + 1) / 5.0 + index)
-        ).tolist()
+        sleeve["returns"] = (0.001 + 0.0005 * np.sin(t * (index + 1) / 5.0 + index)).tolist()
+        sleeve["return_timestamps"] = [
+            (datetime(2025, 1, 1, tzinfo=UTC) + timedelta(days=day)).isoformat()
+            for day in range(len(t))
+        ]
+        sleeve["returns_are_net"] = True
         sleeve["turnover"] = 0.01
-        assert "locked OOS excluded" in sleeve["returns_source"]["stream"]
+        assert sleeve["returns_source"]["stream"] == (
+            "common-date aligned train/validation NET returns only"
+        )
     suite["source_artifacts"][0].update(
         {
             "path": "/data/named_quant_train_validation.json",

@@ -168,6 +168,7 @@ class CrossSectionalFundingMomentumCarryStrategy(Strategy):
             "max_longs": HyperParam.integer("max_longs", default=5, low=1, high=50),
             "max_shorts": HyperParam.integer("max_shorts", default=5, low=0, high=50),
             "allow_short": HyperParam.boolean("allow_short", default=True, grid=[True, False]),
+            "true_carry_sign": HyperParam.boolean("true_carry_sign", default=False, tunable=False),
             "min_symbols": HyperParam.integer("min_symbols", default=4, low=2, high=512),
             "target_gross_exposure": HyperParam.floating(
                 "target_gross_exposure", default=1.0, low=0.0, high=3.0
@@ -218,8 +219,8 @@ class CrossSectionalFundingMomentumCarryStrategy(Strategy):
         # identical). Opt-in genuine funding-sign-aware carry: keep a ranked
         # target only if its side actually COLLECTS the funding it holds (LONG
         # iff latest funding < 0, SHORT iff latest funding > 0). Read from raw
-        # params (schema uses keep_unknown=False, so it is not in ``resolved``).
-        self.true_carry_sign = bool(params.get("true_carry_sign", False))
+        # resolved params so manifests, class schema and runtime behavior agree.
+        self.true_carry_sign = bool(resolved["true_carry_sign"])
         # Enforce the 8h funding cadence floor in code (instances cannot decide
         # faster than the underlying funding accrual interval).
         self.decision_cadence_seconds = max(

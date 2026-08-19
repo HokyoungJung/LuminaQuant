@@ -495,16 +495,21 @@ def long_only_min_variance(cov: Any, *, max_iter: int = 20_000, tol: float = 1e-
 def min_variance_kkt_residual(cov: Any, weights: Any) -> float:
     """KKT residual of a long-only min-variance candidate (0 at the optimum).
 
-    With ``g = S w`` and ``lam = min_i g_i``: every held asset must have
-    ``g_i == lam`` and every zero-weight asset ``g_i >= lam``.  Returns
-    ``max_i (g_i - lam) * w_i`` normalised by ``lam`` (complementary slackness).
+    With ``g = S w``: every held asset must have a common multiplier and every
+    zero-weight asset must have no smaller gradient.  Returns the largest
+    stationarity, dual-feasibility, or simplex residual on a stable absolute scale.
     """
     matrix = _clean_cov(cov)
     w = np.asarray(weights, dtype=float)
     g = matrix @ w
-    lam = float(g.min())
-    scale = max(abs(lam), 1e-18)
-    return float(np.max((g - lam) * w)) / scale
+    support = w > 1e-10
+    if not np.any(support):
+        return math.inf
+    lam = float(np.mean(g[support]))
+    held = float(np.max(np.abs(g[support] - lam)))
+    excluded = float(np.max(np.maximum(lam - g[~support], 0.0))) if np.any(~support) else 0.0
+    feasibility = max(abs(float(w.sum()) - 1.0), max(0.0, -float(w.min())))
+    return max(held, excluded, feasibility) / max(1.0, float(np.max(np.abs(g))))
 
 
 def _project_positive_hyperplane(vector: np.ndarray, mu: np.ndarray) -> np.ndarray:
@@ -538,18 +543,21 @@ def long_only_max_sharpe(
 ) -> np.ndarray:
     """Long-only maximum-Sharpe weights via ``min y'Sy s.t. mu'y = 1, y >= 0``, ``w = y/sum(y)``.
 
-    Requires at least one positive expected return; otherwise falls back to
-    :func:`long_only_min_variance`.
+    Requires at least one positive expected return.  The all-non-positive case
+    is not represented by the positive-return QP substitution and therefore
+    fails closed instead of silently solving a different objective.
     """
     matrix = _ensure_psd(cov)
     n = int(matrix.shape[0])
     mean = np.asarray(mu, dtype=float).reshape(-1)
     if n == 0:
         return np.zeros(0, dtype=float)
+    if mean.size != n or not np.all(np.isfinite(mean)):
+        raise ValueError("expected returns must be finite and match covariance dimensions")
     if n == 1:
         return np.ones(1, dtype=float)
-    if mean.size != n or not np.all(np.isfinite(mean)) or float(mean.max()) <= 0.0:
-        return long_only_min_variance(matrix, max_iter=max_iter, tol=tol)
+    if float(mean.max()) <= 0.0:
+        raise ValueError("long-only max-Sharpe requires at least one positive expected return")
     start = np.where(mean > 0.0, 1.0, 0.0)
     start = start / max(float(mean @ start), 1e-18)
     y = _active_set_qp(matrix, mean, max_iter=4 * n + 8)
@@ -565,7 +573,7 @@ def long_only_max_sharpe(
         )
     total = float(y.sum())
     if not np.isfinite(total) or total <= 0.0:
-        return long_only_min_variance(matrix, max_iter=max_iter, tol=tol)
+        raise RuntimeError("max-Sharpe solver returned invalid transformed weights")
     return y / total
 
 
@@ -617,8 +625,8 @@ def _resolve_bounds(
     hi = np.broadcast_to(np.asarray(upper, dtype=float), (n,)).astype(float)
     if not (np.all(np.isfinite(lo)) and np.all(np.isfinite(hi))):
         raise ValueError("constrained HRP bounds must be finite")
-    lo = np.clip(lo, 0.0, 1.0)
-    hi = np.clip(hi, 0.0, 1.0)
+    if np.any(lo < 0.0) or np.any(hi > 1.0):
+        raise ValueError("constrained HRP bounds must lie in [0, 1]")
     if np.any(hi < lo - _TOL) or float(lo.sum()) > 1.0 + 1e-9 or float(hi.sum()) < 1.0 - 1e-9:
         raise ValueError(
             "infeasible constrained-HRP box: need lower <= upper elementwise and "
@@ -782,13 +790,13 @@ def nco_weights(
     """
     matrix = _ensure_psd(cov)
     n = int(matrix.shape[0])
+    mean = None if mu is None else np.asarray(mu, dtype=float).reshape(-1)
+    if mean is not None and (mean.size != n or not np.all(np.isfinite(mean))):
+        raise ValueError("expected returns must be finite and match covariance dimensions")
     if n == 0:
         return np.zeros(0, dtype=float)
     if n == 1:
         return np.ones(1, dtype=float)
-    mean = None if mu is None else np.asarray(mu, dtype=float).reshape(-1)
-    if mean is not None and mean.size != n:
-        mean = None
     dist = correlation_distance(_cov_to_corr(matrix))
     link = hierarchical_linkage(dist, method=linkage_method)
     k = (
@@ -825,9 +833,17 @@ def nco_weights(
 
 def wasserstein_dro_objective(cov: Any, weights: Any, *, radius: float) -> float:
     """Robust standard deviation ``sqrt(w'Sw) + sqrt(radius) * ||w||_2``."""
-    matrix = _clean_cov(cov)
+    raw = np.asarray(cov, dtype=float)
+    r = float(radius)
+    if not np.isfinite(r) or r < 0.0:
+        raise ValueError("Wasserstein radius must be finite and non-negative")
+    if raw.ndim != 2 or raw.shape[0] != raw.shape[1] or not np.all(np.isfinite(raw)):
+        raise ValueError("covariance must be a finite square matrix")
+    matrix = _ensure_psd(raw)
     w = np.asarray(weights, dtype=float)
-    eps = math.sqrt(max(0.0, float(radius)))
+    if w.size != matrix.shape[0] or not np.all(np.isfinite(w)):
+        raise ValueError("weights must be finite and match covariance dimensions")
+    eps = math.sqrt(r)
     return math.sqrt(max(0.0, float(w @ matrix @ w))) + eps * float(np.linalg.norm(w))
 
 
@@ -851,16 +867,42 @@ def wasserstein_dro_weights(
     non-binding target reproduces :func:`long_only_min_variance`.  ``radius`` is
     in squared-return units (daily panels: ~1e-5..1e-4).
     """
-    matrix = _ensure_psd(cov)
+    raw = np.asarray(cov, dtype=float)
+    r = float(radius)
+    if not np.isfinite(r) or r < 0.0:
+        raise ValueError("Wasserstein radius must be finite and non-negative")
+    if raw.ndim != 2 or raw.shape[0] != raw.shape[1] or not np.all(np.isfinite(raw)):
+        raise ValueError("covariance must be a finite square matrix")
+    matrix = _ensure_psd(raw)
     n = int(matrix.shape[0])
-    if n == 0:
-        return np.zeros(0, dtype=float)
-    if n == 1:
-        return np.ones(1, dtype=float)
-    eps = math.sqrt(max(0.0, float(radius)))
     mean = None if mu is None else np.asarray(mu, dtype=float).reshape(-1)
     if mean is not None and (mean.size != n or not np.all(np.isfinite(mean))):
-        mean = None
+        raise ValueError("expected returns must be finite and match covariance dimensions")
+    if target_return is not None and not np.isfinite(float(target_return)):
+        raise ValueError("target_return must be finite")
+    if target_return is not None and mean is None:
+        raise ValueError("target_return requires expected returns")
+    if not isinstance(max_iter, int) or isinstance(max_iter, bool) or max_iter <= 0:
+        raise ValueError("max_iter must be a positive integer")
+    if not np.isfinite(float(tol)) or float(tol) <= 0.0:
+        raise ValueError("tol must be finite and positive")
+    if n == 0:
+        return np.zeros(0, dtype=float)
+    eps = math.sqrt(r)
+    if n == 1:
+        if target_return is not None and float(mean[0]) - eps < float(target_return) - 1e-12:
+            raise ValueError("infeasible target_return for singleton portfolio")
+        return np.ones(1, dtype=float)
+    radius_zero_weights: np.ndarray | None = None
+    if r == 0.0:
+        radius_zero_weights = long_only_min_variance(matrix, max_iter=max_iter, tol=tol)
+        if min_variance_kkt_residual(matrix, radius_zero_weights) > 1e-7:
+            raise RuntimeError("radius-zero Wasserstein solve lacks a min-variance KKT certificate")
+        if (
+            target_return is None
+            or float(mean @ radius_zero_weights) >= float(target_return) - 1e-12
+        ):
+            return radius_zero_weights
     step0 = _lipschitz_step(matrix + eps * eps * np.eye(n)) * max(1.0, math.sqrt(n))
 
     def _sigma(w: np.ndarray) -> float:
@@ -884,24 +926,37 @@ def wasserstein_dro_weights(
     def project(v: np.ndarray) -> np.ndarray:
         return project_to_simplex(v, total=1.0)
 
-    start = _equal_weights(n)
-    unconstrained = _projected_gradient(
-        _risk, _risk_grad, project, start, step0=step0, max_iter=max_iter, tol=tol
-    )
+    start = radius_zero_weights if radius_zero_weights is not None else _equal_weights(n)
+
+    def _certified_solve(
+        objective: Callable[[np.ndarray], float],
+        gradient: Callable[[np.ndarray], np.ndarray],
+        initial: np.ndarray,
+        step: float,
+    ) -> np.ndarray:
+        solved = _projected_gradient(
+            objective, gradient, project, initial, step0=step, max_iter=max_iter, tol=tol
+        )
+        cert_step = min(1.0, step)
+        grad = gradient(solved)
+        residual = float(np.linalg.norm(project(solved - cert_step * grad) - solved))
+        residual /= cert_step * max(1.0, float(np.linalg.norm(grad)))
+        if not np.isfinite(residual) or residual > max(1e-8, math.sqrt(tol)):
+            raise RuntimeError("Wasserstein solver did not reach a projected-KKT certificate")
+        return solved
+
+    unconstrained = _certified_solve(_risk, _risk_grad, start, step0)
     if mean is None or target_return is None:
         return unconstrained
     target = float(target_return)
     if _robust_mean(unconstrained) >= target - 1e-12:
         return unconstrained
     # Feasibility: maximise the concave robust mean over the simplex.
-    best_mean_w = _projected_gradient(
+    best_mean_w = _certified_solve(
         lambda w: -_robust_mean(w),
         lambda w: -_robust_mean_grad(w),
-        project,
         start,
-        step0=1.0 / max(1e-12, float(np.abs(mean).max()) + eps),
-        max_iter=max_iter,
-        tol=tol,
+        1.0 / max(1e-12, float(np.abs(mean).max()) + eps),
     )
     if _robust_mean(best_mean_w) < target - 1e-9:
         raise ValueError(
@@ -910,14 +965,11 @@ def wasserstein_dro_weights(
         )
 
     def _solve(lam: float) -> np.ndarray:
-        return _projected_gradient(
+        return _certified_solve(
             lambda w: _risk(w) - lam * _robust_mean(w),
             lambda w: _risk_grad(w) - lam * _robust_mean_grad(w),
-            project,
             unconstrained,
-            step0=step0 / (1.0 + lam),
-            max_iter=max_iter,
-            tol=tol,
+            step0 / (1.0 + lam),
         )
 
     lam_lo, lam_hi = 0.0, 1.0
@@ -928,7 +980,7 @@ def wasserstein_dro_weights(
         lam_lo, lam_hi = lam_hi, lam_hi * 2.0
         w_hi = _solve(lam_hi)
     else:  # pragma: no cover - the feasibility check above should prevent this
-        return best_mean_w
+        raise RuntimeError("Wasserstein target dual search did not converge")
     best = w_hi
     for _ in range(60):
         lam_mid = 0.5 * (lam_lo + lam_hi)
@@ -939,6 +991,11 @@ def wasserstein_dro_weights(
             lam_lo = lam_mid
         if lam_hi - lam_lo <= 1e-12 * max(1.0, lam_hi):
             break
+    primal_residual = max(0.0, target - _robust_mean(best))
+    complementarity = lam_hi * abs(_robust_mean(best) - target)
+    certificate_tol = max(1e-8, math.sqrt(tol))
+    if primal_residual > certificate_tol or complementarity > certificate_tol:
+        raise RuntimeError("Wasserstein target solve lacks primal/dual complementarity")
     return best
 
 
@@ -957,6 +1014,9 @@ def graph_inverse_centrality_weights(cov: Any, *, floor: float = 1e-6) -> np.nda
     most central (most connected) names.  Not a reproduction of MST/PMFG
     peripherality portfolios.
     """
+    floor_value = float(floor)
+    if not np.isfinite(floor_value) or floor_value <= 0.0:
+        raise ValueError("graph adjacency floor must be finite and positive")
     matrix = _ensure_psd(cov)
     n = int(matrix.shape[0])
     if n == 0:
@@ -964,7 +1024,7 @@ def graph_inverse_centrality_weights(cov: Any, *, floor: float = 1e-6) -> np.nda
     if n <= 2:
         return _equal_weights(n)
     corr = _cov_to_corr(matrix)
-    adjacency = np.maximum(np.abs(corr), max(0.0, float(floor)))
+    adjacency = np.maximum(np.abs(corr), floor_value)
     np.fill_diagonal(adjacency, 0.0)
     try:
         evals, evecs = np.linalg.eigh(adjacency)
@@ -1031,8 +1091,16 @@ class HRPDendrogramPortfolio:
                 "lower": 0.0 if self.lower is None else self.lower,
                 "upper": 1.0 if self.upper_bound is None else self.upper_bound,
             }
+        if bounds is not None and upper is not None:
+            lo, hi = _resolve_bounds(bounds, len(ids))
+            hi = np.minimum(hi, np.asarray([upper.get(sid, 1.0) for sid in ids], dtype=float))
+            bounds = (lo, hi)
         weights = hrp_dendrogram_weights(cov, linkage_method=self.linkage_method, bounds=bounds)
-        return _apply_upper_bounds(list(ids), weights, upper)
+        return (
+            dict(zip(ids, weights))
+            if bounds is not None
+            else _apply_upper_bounds(list(ids), weights, upper)
+        )
 
 
 @register("portfolio", "HERC")
@@ -1123,7 +1191,7 @@ class WassersteinDROPortfolio:
         max_iter: int = 20_000,
         cov_window: int | None = None,
     ) -> None:
-        self.radius = max(0.0, float(radius))
+        self.radius = float(radius)
         self.target_return = None if target_return is None else float(target_return)
         self.cov_estimator = str(cov_estimator)
         self.max_iter = int(max_iter)
@@ -1132,6 +1200,9 @@ class WassersteinDROPortfolio:
     def allocate(
         self, ids: list[str], returns_matrix: Any, *, upper: dict[str, float] | None = None
     ) -> dict[str, float]:
+        raw = np.asarray(returns_matrix, dtype=float)
+        if raw.ndim not in (1, 2) or not np.all(np.isfinite(raw)):
+            raise ValueError("Wasserstein returns must contain only finite values")
         estimator = "sample" if self.cov_estimator == "sample" else "lw"
         matrix, cov = _prep(ids, returns_matrix, self.cov_window, estimator=estimator)
         if cov is None:
@@ -1144,7 +1215,15 @@ class WassersteinDROPortfolio:
             target_return=self.target_return,
             max_iter=self.max_iter,
         )
-        return _apply_upper_bounds(list(ids), weights, upper)
+        allocated = _apply_upper_bounds(list(ids), weights, upper)
+        if self.target_return is not None:
+            capped = np.asarray([allocated[sid] for sid in ids], dtype=float)
+            robust_mean = float(mu @ capped) - math.sqrt(self.radius) * float(
+                np.linalg.norm(capped)
+            )
+            if robust_mean < self.target_return - 1e-10:
+                raise ValueError("upper bounds make the Wasserstein target_return infeasible")
+        return allocated
 
 
 @register("portfolio", "GraphInverseCentrality")

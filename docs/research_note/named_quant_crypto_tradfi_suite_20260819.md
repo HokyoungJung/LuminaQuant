@@ -1,9 +1,11 @@
-# 네임드 공개자료 기반 Crypto·TradFi 연구 스위트
+# 네임드 공개자료 기반 Crypto·TradFi 레인 (15후보)
+
+> **통합 data-PC 실행 정본:** [`named_quant_full_suite_20260819.md`](named_quant_full_suite_20260819.md). 아래 내용은 이 레인의 후보·근거 inventory다. 실행 명령, PIT 유니버스, 비용·체결, allocator, locked-OOS 계약은 정본만 따른다.
 
 ## 상태
 
 - 실행 명세: `configs/research/named_quant_crypto_tradfi_suite_v1.json`
-- 상태: **research-only / data-PC 백테스트 대기**
+- 상태: **research-only / 통합 data-PC 백테스트 대기**
 - 성과 주장, 실거래 적격성, 원저자 전략 복제 주장은 없다.
 - 공개 교육자료에서 확인되는 규칙만 독립적으로 각색했고, 학술 근거가 다른 자산군에 그대로 적용된다고 가정하지 않는다.
 
@@ -22,6 +24,7 @@
 | 플라이트/FlightF | 본인 RSI 다이버전스·매매원칙 글에서 확인되는 10분봉 교육 예시, 분할청산, 거래량 무효화, 상위 시간봉 확인만 가설화 |
 
 > 공개자료에서 영감을 받아 독립적으로 각색한 연구 가설이며, 원저자의 실제 전략·성과 재현이나 보증이 아니다.
+> 아마추어퀀트 프로필은 manifest에서도 `provenance_refs`/`evidence_only`로만 기록한다. residual momentum의 규칙 근거는 학술 문헌이고, 금/은 및 금속 상대가치 규칙은 독립 가설이다.
 
 ## 사전등록 후보 15개
 
@@ -48,15 +51,15 @@
 
 각 후보는 파라미터 한 세트만 사전등록했다. 대규모 grid를 추가하기 전에 이 단순 후보와 equal-weight·inverse-vol 기준선을 먼저 비교한다.
 
-## `dacapogo`에서 추가한 설계 가설
+## `dacapogo`에서 추가한 provenance 가설
 
-`/home/hoky/dacapogo`의 최신 `main`(`633ba5d`)을 확인했다. 이 저장소 역시 세 매매법을 원전략 복제가 아닌 반증 가능한 proxy로 구분하므로, 중복 코드를 복사하지 않고 아래 세 항목을 `supplemental_hypotheses`에 **design-only**로 등록했다.
+`/home/hoky/dacapogo`의 최신 `main`(`633ba5d`)을 확인했다. 이 저장소 역시 세 매매법을 원전략 복제가 아닌 반증 가능한 proxy로 구분한다. 이 레인 manifest의 `supplemental_hypotheses`는 provenance 기록이고, 통합 스위트는 아래 방향을 독립 프록시 후보로 실행한다.
 
 1. 돌파고 방향: L2 호가·체결방향·스프레드·참여율이 갖춰진 경우에만 fresh surge와 가격 수용을 결합한다. OHLCV 급등 프록시를 원전략으로 부르지 않는다.
 2. 워뇨띠/AOA 방향: BTC·ETH와 시점별 유동성 상위 종목의 박스 국면에서만 range-percentile 역추세를 연구하고, 원웨이 국면에서는 차단한다. 1.5–2배/30%는 추천값이 아니라 스트레스 상한이다.
 3. 플라이트 방향: BTCUSDT 10분 확정 피벗 RSI 다이버전스, 상위 시간봉 regime, 반대 방향 거래량 무효화, next-open과 분할청산을 함께 검증한다. 미공개 피벗·거래량·손절식은 사전등록 독립 가정으로 남긴다.
 
-데이터와 공개 규칙이 부족한 상태에서 3개 전략 클래스를 새로 만드는 것은 가짜 정밀도이므로 보류했다. `dacapogo`의 Wony quartile/wick/volume 및 Flight RSI 커널도 사후 탐색 proxy이며, 그대로 성과 근거로 사용하지 않는다.
+이 세 방향의 실행 후보는 통합 스위트에서 독립 프록시 전략으로 구현됐다. 공개되지 않은 원 주문식의 재현 주장은 하지 않는다. `dacapogo`의 Wony quartile/wick/volume 및 Flight RSI 커널도 사후 탐색 proxy이며 성과 근거로 사용하지 않는다.
 
 ## 지표와 포트폴리오
 
@@ -64,20 +67,20 @@
 - 기존 지표 재사용: Donchian, ATR, SMA, 모멘텀, 실현변동성, funding delta/slope, rolling beta/residual, correlation distance, 거래대금.
 - 기존 allocator 재사용: `ERC`, `HRP`; HRP는 알파 예측기가 아니라 동일 날짜로 정렬된 **순수익 스트림의 위험 배분기**다.
 - `named_quant_hrp_barbell_v1` 셀은 8개 이질적 sleeve를 미리 고정한다. data-PC가 **train/validation** 순수익과 turnover를 채운 뒤에만 가중치를 계산하고, locked OOS는 가중치 선택·사이징에서 제외한다.
-- 이 저장소의 HRP는 full dendrogram이 아니라 correlation-threshold cluster 구현이다. sleeve당 상한 30%, 총 gross 1.0, 연 변동성 목표 10%를 넘기지 않는다.
+- 이 레인의 legacy HRP 셀은 correlation-threshold 구현이다. 통합 스위트의 primary는 full dendrogram HRP이며, sleeve 상한과 gross cap은 통합 manifest를 따른다.
 
-### 포트폴리오 확장 우선순위
+### 포트폴리오 구현 상태
 
-| 방법 | 현재 상태 | 다음 검증 |
+| 방법 | 현재 상태 | 구현 경계 |
 |---|---|---|
-| NCO | `design_only_no_optimizer` | cluster 내/간 최적화를 구현하기 전에 equal-weight·ERC·constrained HRP 대비 bootstrap 및 cluster 안정성 기준을 동결 |
-| HERC | `design_only_no_full_dendrogram` | linkage·cluster 수·variance/CVaR/CDaR risk measure를 데이터 열기 전에 고정 |
-| Wasserstein DRO | `stress_protocol_only_not_a_dro_optimizer` | train/validation에서만 ambiguity radius를 정하고 radius별 weight 민감도와 equal-weight 수렴을 기록 |
-| Constrained HRP | 기존 `HRPPortfolio` + quality gate·상한·gross cap은 현 셀에서 실행 가능; turnover penalty는 allocator API opt-in | WP14/2019 알고리즘의 정확한 재현으로 주장하지 않고 baseline으로 사용 |
-| Graph portfolio | `diagnostic_only_no_graph_allocator` | correlation graph의 중심성·connected component·cluster 변동성부터 진단 |
+| NCO | 구현 | long-only 군집 내·간 최적화; 통합 variant는 min-variance |
+| HERC | 구현 | 결정론적 silhouette 군집 선택 변형; 원 논문의 gap statistic 재현은 아님 |
+| Wasserstein DRO | 구현 | BCZ p=q=2 mean-variance; radius는 민감도 파라미터 |
+| Constrained HRP | 구현 | 명시적 box-simplex 제약을 적용한 dendrogram HRP |
+| Graph portfolio | 구현 | full-graph inverse-centrality 위험 heuristic; NRP 정확 재현은 아님 |
 | Deep/RL | `deferred_overfit_risk` | 단순 allocator가 locked OOS에서 실패하고 별도 trial budget·환경 누출 검사가 있을 때만 착수 |
 
-NCO/HERC/DRO/graph를 이름만 같은 근사 optimizer로 급히 구현하지 않았다. 이 저장소에 이미 있는 제약·shrinkage·quality gate를 먼저 활용하고, data-PC에서 공통 날짜의 순수익 스트림이 생긴 뒤 독립 구현/검증한다.
+구현·실행 경계와 locked-OOS 절차는 통합 실행서를 따른다. 이 manifest의 `evidence_sources`에 남은 `no optimizer`류 문구는 병합 전 legacy source note이며 현재 구현 상태가 아니다.
 
 ## Universe 계약
 
@@ -95,33 +98,7 @@ data-PC는 fold마다 다음을 저장해야 한다.
 
 ## data-PC 실행
 
-> **중요:** `run_research_candidates.py`의 registry simulator는 후보 선별용 proxy다. 현재 목표 비중·손절/익절을 단위 부호 포지션으로 단순화하고, 이전 bar 노출의 close-to-close 수익을 쓰므로 next-open 체결을 재현하지 않는다. 이 출력은 HRP의 `sleeves`나 최종 locked-OOS 성과에 넣지 말고, 실제 sizing·보호주문·next-open 체결을 처리하는 full event-driven backtester 결과만 사용한다.
-
-```bash
-# 구조·등록·셀 명세 확인(데이터 불필요)
-uv run python scripts/run_research_candidates.py \
-  --manifest configs/research/named_quant_crypto_tradfi_suite_v1.json \
-  --score-config configs/research/named_quant_crypto_tradfi_suite_v1.json --dry-run
-uv run python scripts/research/build_quality_gated_allocation.py \
-  --validate-cell-spec configs/research/named_quant_crypto_tradfi_suite_v1.json
-
-# 실제 데이터 PC의 1차 screening: 날짜는 사전에 고정하고 synthetic fallback은 금지
-LQ_CONFIG_PATH=configs/profiles/backtest_cost_realistic.yaml \
-uv run python scripts/run_research_candidates.py \
-  --manifest configs/research/named_quant_crypto_tradfi_suite_v1.json \
-  --score-config configs/research/named_quant_crypto_tradfi_suite_v1.json \
-  --train-start YYYY-MM-DD --train-end YYYY-MM-DD \
-  --validation-start YYYY-MM-DD --validation-end YYYY-MM-DD \
-  --oos-start YYYY-MM-DD --oos-end YYYY-MM-DD \
-  --disable-csv-fallback --disable-synthetic-fallback
-
-# full event-driven backtester의 train/validation NET returns/turnover만 복사본에 채워 HRP 산출
-uv run python scripts/research/build_quality_gated_allocation.py \
-  --input /path/to/materialized_named_quant_suite.json \
-  --output /path/to/named_quant_hrp_weights.json
-```
-
-이 runner의 OOS는 shortlist에 사용되므로 최종 lockbox가 아니다. HRP 가중치까지 train/validation에서 동결한 뒤, 전혀 전달하지 않은 별도 locked OOS에서 한 번만 평가한다. 승격 조건은 비용 후 외부 lockbox, DSR·SPA·CSCV-PBO, fold 안정성, turnover·capacity, funding/청산 현실성, 포트폴리오 상관 안정성을 모두 통과하는 것이다.
+이 레인 단독의 오래된 `run_research_candidates.py` 예시는 폐기했다. 40후보 정본 생성 → PIT 물질화 → `run_named_quant_suite.py` event run → allocator 비교/QGA 동결 → 별도 PIT locked-OOS → frozen evaluator의 정확한 명령은 [통합 실행서](named_quant_full_suite_20260819.md)에 있다.
 
 ## 공개 근거
 
@@ -138,7 +115,7 @@ uv run python scripts/research/build_quality_gated_allocation.py \
 - HRP: <https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2708678>
 - Binance USD-M 공식 문서: <https://developers.binance.com/en/docs/products/derivatives-trading-usds-futures/Introduction>
 - 돌파고 본인 대회 인증: <https://www.dogdrip.net/341084283>
-- 보완 연구 저장소 `dacapogo`: <https://github.com/HokyoungJung/dacapogo/tree/633ba5d6d712df7a77ad201c3b6263d2343a65ed>
+- 보완 연구 저장소 `dacapogo`: <https://github.com/HokyoungJung/dacapogo/tree/633ba5d6bc0c84a20696af6b2bf807cf55d21248>
 - 워뇨띠/AOA BitMEX 공식 인터뷰: <https://www.bitmex.com/blog/whale-trader-talks-aoa>
 - FlightF 10분봉 RSI 다이버전스 본인 글: <https://gall.dcinside.com/mgallery/board/view/?id=electronicmoney&no=548338>
 - FlightF 매매원칙 본인 글: <https://gall.dcinside.com/mgallery/board/view/?id=electronicmoney&no=187860>

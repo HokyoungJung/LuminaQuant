@@ -49,6 +49,8 @@ code path with the overlay.
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from datetime import UTC, datetime
+from itertools import pairwise
 from typing import Any
 
 import numpy as np
@@ -92,6 +94,34 @@ def _round(value: Any, ndigits: int = 10) -> float:
     return round(float(value), ndigits)
 
 
+def _normalize_locked_oos_evaluation(value: Mapping[str, Any]) -> dict[str, int | float]:
+    """Validate and canonicalize the pre-registered locked-OOS evaluation contract."""
+    keys = (
+        "rebalance_every_observations",
+        "allocation_cost_bps",
+        "periods_per_year",
+    )
+    if not isinstance(value, Mapping) or set(value) != set(keys):
+        raise ValueError(f"locked_oos_evaluation must contain exactly {list(keys)}")
+    cadence = value["rebalance_every_observations"]
+    periods = value["periods_per_year"]
+    cost = value["allocation_cost_bps"]
+    if isinstance(cadence, bool) or not isinstance(cadence, (int, np.integer)) or cadence <= 0:
+        raise ValueError("rebalance_every_observations must be a positive integer")
+    if isinstance(periods, bool) or not isinstance(periods, (int, np.integer)) or periods <= 0:
+        raise ValueError("periods_per_year must be a positive integer")
+    if isinstance(cost, bool) or not isinstance(cost, (int, float, np.integer, np.floating)):
+        raise ValueError("allocation_cost_bps must be finite and nonnegative")
+    cost_value = float(cost)
+    if not np.isfinite(cost_value) or cost_value < 0.0:
+        raise ValueError("allocation_cost_bps must be finite and nonnegative")
+    return {
+        "rebalance_every_observations": int(cadence),
+        "allocation_cost_bps": cost_value,
+        "periods_per_year": int(periods),
+    }
+
+
 def _default_optimizer_provenance() -> dict[str, Any]:
     return {
         "source": "quality_gated_allocation.compute_sleeve_quality",
@@ -123,11 +153,13 @@ def compute_sleeve_quality(
     participation: float = DEFAULT_PARTICIPATION,
     periods_per_year: int = 365,
     turnover_penalty_lambda: float = 0.0,
+    returns_are_net: bool = False,
 ) -> dict[str, float]:
-    """Cost-realistic quality score for one sleeve's gross return stream.
+    """Cost-realistic quality score for one sleeve return stream.
 
-    Net returns are ``cost_realism.apply_cost_drag(gross_returns, turnover=...,
-    regime=regime)``; ``sharpe``/``calmar`` are read from
+    Gross inputs are converted with ``cost_realism.apply_cost_drag``; callers
+    that already supply fee/funding/slippage-adjusted returns set
+    ``returns_are_net=True`` so costs are not charged twice. ``sharpe``/``calmar`` are read from
     ``optimizer_core.metrics(net)`` (which does not compute a hit rate), so
     ``hit_rate`` is self-computed as ``mean(net > 0)``. Deterministic; gracefully
     handles ``None`` / empty ``returns`` (treated as a zero-length series, which
@@ -144,8 +176,12 @@ def compute_sleeve_quality(
     """
     gross = np.asarray(returns if returns is not None else [], dtype=np.float64).reshape(-1)
     turnover_value = float(turnover) if turnover is not None else 0.0
-    net = apply_cost_drag(
-        gross, turnover=turnover_value, regime=regime, participation=participation
+    net = (
+        gross
+        if returns_are_net
+        else apply_cost_drag(
+            gross, turnover=turnover_value, regime=regime, participation=participation
+        )
     )
     stats = metrics(net, periods_per_year=periods_per_year)
     hit_rate = float(np.mean(net > 0.0)) if net.size > 0 else 0.0
@@ -161,6 +197,62 @@ def compute_sleeve_quality(
             quality["net_sharpe"] - float(turnover_penalty_lambda) * turnover_value
         )
     return quality
+
+
+def _timestamp(value: Any, *, sleeve_id: str) -> datetime:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"invalid return timestamp for sleeve {sleeve_id!r}")
+    try:
+        parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise ValueError(f"invalid return timestamp for sleeve {sleeve_id!r}: {value!r}") from exc
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
+
+
+def _prepare_return_series(
+    sleeve_returns: Mapping[str, Sequence[float] | np.ndarray | None],
+    return_timestamps: Mapping[str, Sequence[str]] | None,
+) -> tuple[dict[str, np.ndarray], str, int]:
+    """Validate streams and, when timestamped, align their exact UTC intersection."""
+    series = {
+        sleeve_id: np.asarray(values if values is not None else [], dtype=np.float64).reshape(-1)
+        for sleeve_id, values in sleeve_returns.items()
+    }
+    if any(not np.all(np.isfinite(values)) for values in series.values()):
+        raise ValueError("return streams must contain only finite values")
+    active = sorted(sleeve_id for sleeve_id, values in series.items() if values.size > 0)
+    if not active:
+        return series, "trailing_min_length", 0
+
+    timestamps = return_timestamps or {}
+    timestamped = [sleeve_id for sleeve_id in active if sleeve_id in timestamps]
+    if not timestamped:
+        return series, "trailing_min_length", min(series[sleeve_id].size for sleeve_id in active)
+    if len(timestamped) != len(active):
+        raise ValueError("timestamped and untimestamped return streams cannot be mixed")
+
+    parsed_by_id: dict[str, list[datetime]] = {}
+    for sleeve_id in active:
+        timestamp_values = timestamps[sleeve_id]
+        if not isinstance(timestamp_values, Sequence) or isinstance(timestamp_values, str):
+            raise ValueError(f"invalid return timestamps for sleeve {sleeve_id!r}")
+        raw = list(timestamp_values)
+        if len(raw) != series[sleeve_id].size:
+            raise ValueError(f"return timestamp length mismatch for sleeve {sleeve_id!r}")
+        parsed = [_timestamp(value, sleeve_id=sleeve_id) for value in raw]
+        if any(current <= previous for previous, current in pairwise(parsed)):
+            raise ValueError(f"return timestamps must be unique and increasing for {sleeve_id!r}")
+        parsed_by_id[sleeve_id] = parsed
+
+    common = sorted(set.intersection(*(set(parsed_by_id[sleeve_id]) for sleeve_id in active)))
+    if len(common) < 2:
+        raise ValueError("fewer than two common return timestamps")
+    for sleeve_id in active:
+        index = dict(zip(parsed_by_id[sleeve_id], series[sleeve_id]))
+        series[sleeve_id] = np.asarray([index[value] for value in common], dtype=np.float64)
+    return series, "exact_timestamp_intersection", len(common)
 
 
 def _penalized_net_sharpe(score: Mapping[str, Any], turnover_penalty_lambda: float) -> float:
@@ -509,6 +601,13 @@ def _build_allocator(method: str, allocator_params: Mapping[str, Any] | None = N
 
     cls = getattr(_hier, class_name)
     params = {str(k): v for k, v in dict(allocator_params or {}).items()}
+    if token == "constrained_hrp" and (
+        "lower" not in params
+        or "upper_bound" not in params
+        or params["lower"] is None
+        or params["upper_bound"] is None
+    ):
+        raise ValueError("constrained_hrp requires explicit lower and upper_bound")
     return cls(**params)
 
 
@@ -521,6 +620,76 @@ def _resolve_upper(
         return {sleeve_id: float(upper.get(sleeve_id, 1.0)) for sleeve_id in ids}
     cap = float(upper)
     return dict.fromkeys(ids, cap)
+
+
+def _assert_train_validation_source(sleeve_id: str, spec: Mapping[str, Any]) -> None:
+    for key, value in spec.items():
+        token = str(key).strip().lower()
+        if (token.startswith("uses_locked_oos") or token == "uses_current_fold_oos") and bool(
+            value
+        ):
+            raise ValueError(f"locked_oos input is forbidden for sleeve {sleeve_id!r}")
+
+    def _oos_token(value: Any) -> bool:
+        if not isinstance(value, str):
+            return False
+        normalized = value.strip().lower().replace("-", "_").replace(" ", "_")
+        return "locked_oos" in normalized or any(part == "oos" for part in normalized.split("_"))
+
+    def _contains_oos(value: Any) -> bool:
+        if isinstance(value, Mapping):
+            for key, item in value.items():
+                token = str(key).strip().lower().replace("-", "_").replace(" ", "_")
+                if token.startswith("uses_locked_oos") or token in {
+                    "locked_oos_used_for_weights",
+                    "uses_current_fold_oos",
+                }:
+                    if bool(item):
+                        return True
+                    continue
+                if _contains_oos(item):
+                    return True
+            return False
+        if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
+            return any(_contains_oos(item) for item in value)
+        return _oos_token(value)
+
+    if _contains_oos(spec.get("returns_source")):
+        raise ValueError(f"locked_oos input is forbidden for sleeve {sleeve_id!r}")
+
+
+def _validate_materialized_data_contract(sleeves: Mapping[str, Mapping[str, Any]]) -> None:
+    active = {
+        sleeve_id
+        for sleeve_id, spec in sleeves.items()
+        if np.asarray(
+            [] if (spec or {}).get("returns") is None else (spec or {}).get("returns")
+        ).size
+        > 0
+    }
+    for sleeve_id, spec in sleeves.items():
+        _assert_train_validation_source(sleeve_id, spec or {})
+    opt_in = any(
+        any(
+            key in (spec or {})
+            for key in ("return_timestamps", "returns_are_net", "returns_source")
+        )
+        for spec in sleeves.values()
+    )
+    if not opt_in:
+        return
+    invalid_net = sorted(
+        sleeve_id
+        for sleeve_id in active
+        if "returns_are_net" in (sleeves[sleeve_id] or {})
+        and not isinstance((sleeves[sleeve_id] or {})["returns_are_net"], (bool, np.bool_))
+    )
+    if invalid_net:
+        raise ValueError(f"returns_are_net must be boolean for materialized sleeves: {invalid_net}")
+    for key in ("return_timestamps", "returns_source"):
+        missing = sorted(sleeve_id for sleeve_id in active if key not in (sleeves[sleeve_id] or {}))
+        if missing:
+            raise ValueError(f"{key} is required for materialized sleeves: {missing}")
 
 
 def allocate_quality_gated(
@@ -540,6 +709,8 @@ def allocate_quality_gated(
     family_momentum_tilt_cap: float = 0.30,
     min_families: int = 3,
     allocator_params: Mapping[str, Any] | None = None,
+    returns_are_net: Mapping[str, bool] | None = None,
+    return_timestamps: Mapping[str, Sequence[str]] | None = None,
 ) -> dict[str, float]:
     """Quality-gate then risk-allocate across sleeves; returns ``id -> weight``.
 
@@ -555,6 +726,10 @@ def allocate_quality_gated(
     ``min_sleeves`` survivors, mirroring the conservative default of the
     downstream manifest consumer. Gracefully handles ``None``/empty
     ``sleeve_returns``/``turnovers`` and per-sleeve ``None``/empty series.
+    When ``return_timestamps`` is supplied, every non-empty stream must carry a
+    unique increasing timestamp vector and all quality/covariance inputs are
+    restricted to the exact common UTC intersection. ``returns_are_net`` avoids
+    applying the reference cost model a second time to backtester-net streams.
 
     Two config-gated extensions (both default OFF -> the result is byte-identical
     to the pre-extension allocator):
@@ -583,13 +758,24 @@ def allocate_quality_gated(
     """
     if not sleeve_returns:
         return {}
+    if str(method or "erc").strip().lower() == "constrained_hrp":
+        _build_allocator(method, allocator_params)
     turnovers = turnovers or {}
+    returns_are_net = returns_are_net or {}
+    prepared, _alignment, _common_observations = _prepare_return_series(
+        sleeve_returns, return_timestamps
+    )
 
     quality = {
         sleeve_id: compute_sleeve_quality(
-            series, turnovers.get(sleeve_id), regime=regime, participation=participation
+            series,
+            turnovers.get(sleeve_id),
+            regime=regime,
+            participation=participation,
+            returns_are_net=bool(returns_are_net.get(sleeve_id, False)),
+            turnover_penalty_lambda=turnover_penalty_lambda,
         )
-        for sleeve_id, series in sleeve_returns.items()
+        for sleeve_id, series in prepared.items()
     }
     survivors = sorted(
         sleeve_id
@@ -601,13 +787,12 @@ def allocate_quality_gated(
 
     net_series: list[np.ndarray] = []
     for sleeve_id in survivors:
-        gross = np.asarray(
-            sleeve_returns[sleeve_id] if sleeve_returns[sleeve_id] is not None else [],
-            dtype=np.float64,
-        ).reshape(-1)
+        values = prepared[sleeve_id]
         net_series.append(
-            apply_cost_drag(
-                gross,
+            values
+            if bool(returns_are_net.get(sleeve_id, False))
+            else apply_cost_drag(
+                values,
                 turnover=float(turnovers.get(sleeve_id) or 0.0),
                 regime=regime,
                 participation=participation,
@@ -625,10 +810,8 @@ def allocate_quality_gated(
         equal = 1.0 / float(len(survivors))
         raw_weights = dict.fromkeys(survivors, equal)
     else:
-        # Trailing-window alignment: series of differing length are truncated
-        # to the shortest survivor's length by keeping the most recent
-        # observations. Callers that need calendar-exact alignment must supply
-        # equal-length, co-dated series themselves.
+        # Timestamped inputs were already intersected exactly above. Legacy
+        # untimestamped callers retain the historical trailing-window behavior.
         matrix = np.column_stack([series[-min_len:] for series in net_series])
         upper_map = _resolve_upper(upper, survivors)
         if (
@@ -668,6 +851,21 @@ def allocate_quality_gated(
             upper=upper,
         )
 
+    if str(method or "erc").strip().lower() == "constrained_hrp":
+        from lumina_quant.portfolio import hierarchical as _hier
+
+        params = dict(allocator_params or {})
+        lo, hi = _hier._resolve_bounds(
+            {"lower": params["lower"], "upper": params["upper_bound"]}, len(survivors)
+        )
+        upper_map = _resolve_upper(upper, survivors)
+        if upper_map is not None:
+            hi = np.minimum(hi, np.asarray([upper_map[sid] for sid in survivors], dtype=float))
+        projected = _hier.project_box_simplex(
+            [raw_weights.get(sleeve_id, 0.0) for sleeve_id in survivors], lo, hi
+        )
+        raw_weights = dict(zip(survivors, projected))
+
     return {sleeve_id: _round(raw_weights.get(sleeve_id, 0.0)) for sleeve_id in survivors}
 
 
@@ -687,8 +885,9 @@ def build_allocation_manifest(
     family_momentum_window: int = 0,
     family_momentum_tilt_strength: float = 0.5,
     family_momentum_tilt_cap: float = 0.30,
-    min_families: int = 3,
+    min_families: int | None = None,
     allocator_params: Mapping[str, Any] | None = None,
+    locked_oos_evaluation: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build a manifest the live ``ArtifactPortfolioModeStrategy`` accepts as-is.
 
@@ -711,10 +910,9 @@ def build_allocation_manifest(
     ``no_current_fold_oos_provenance=True`` and
     ``train_validation_optimizer_provenance=True``, a ``source_artifact_id``
     that reconciles against ``source_artifacts``, and per-leaf/per-netting-group
-    gross caps bounded by ``gross_cap``. When quality-gating leaves zero
-    survivors, this still emits a well-formed manifest with ``children: []`` --
-    the consumer's own ``manifest_children_empty`` fail-closed path (not a
-    special case here) safely routes that to 100% cash.
+    gross caps bounded by ``gross_cap``. Legacy callers without the materialized
+    return-data contract may still emit ``children: []``; opted-in research
+    inputs fail before freezing when their configured survivor floors are unmet.
 
     ``turnover_penalty_lambda``, ``correlation_shrinkage``, and the family
     meta-momentum kwargs (``families`` / ``family_momentum_window`` / ...) are
@@ -726,8 +924,60 @@ def build_allocation_manifest(
     """
     sleeves = sleeves or {}
     source_rows = [dict(artifact) for artifact in (source_artifacts or [])]
+    source_by_id: dict[str, dict[str, Any]] = {}
+    for source in source_rows:
+        source_id = str(source.get("id") or "")
+        if not source_id or source_id in source_by_id:
+            raise ValueError("source_artifacts ids must be nonempty and unique")
+        source_by_id[source_id] = source
     sleeve_returns = {sid: (spec or {}).get("returns") for sid, spec in sleeves.items()}
     turnovers = {sid: (spec or {}).get("turnover", 0.0) for sid, spec in sleeves.items()}
+    _validate_materialized_data_contract(sleeves)
+    active_ids = {
+        sleeve_id
+        for sleeve_id, values in sleeve_returns.items()
+        if np.asarray(values if values is not None else []).size > 0
+    }
+    return_timestamps = {
+        sleeve_id: (spec or {}).get("return_timestamps")
+        for sleeve_id, spec in sleeves.items()
+        if sleeve_id in active_ids and "return_timestamps" in (spec or {})
+    }
+    returns_are_net = {
+        sleeve_id: bool((spec or {}).get("returns_are_net", False))
+        for sleeve_id, spec in sleeves.items()
+        if sleeve_id in active_ids
+    }
+    returns_sources = {
+        sleeve_id: (spec or {}).get("returns_source")
+        for sleeve_id, spec in sleeves.items()
+        if sleeve_id in active_ids and "returns_source" in (spec or {})
+    }
+    opt_in_data_contract = any(
+        any(
+            key in (spec or {})
+            for key in ("return_timestamps", "returns_are_net", "returns_source")
+        )
+        for spec in sleeves.values()
+    )
+    if opt_in_data_contract:
+        for source_id, source in source_by_id.items():
+            if source.get("ready") is not True or source.get("portfolio_ready") is not True:
+                raise ValueError(f"source artifact {source_id!r} is not portfolio-ready")
+        default_source_id = str(source_rows[0].get("id") or "") if len(source_rows) == 1 else ""
+        referenced_source_ids = {
+            str((spec or {}).get("source_artifact_id") or default_source_id or "")
+            for spec in sleeves.values()
+        }
+        for source_id in sorted(referenced_source_ids):
+            source = source_by_id.get(source_id)
+            if source is None:
+                raise ValueError(f"referenced source artifact {source_id!r} is missing")
+            if source.get("ready") is not True or source.get("portfolio_ready") is not True:
+                raise ValueError(f"source artifact {source_id!r} is not portfolio-ready")
+    prepared_returns, alignment, common_observations = _prepare_return_series(
+        sleeve_returns, return_timestamps or None
+    )
     if families is None:
         derived = {
             sid: str((spec or {}).get("family"))
@@ -750,9 +1000,28 @@ def build_allocation_manifest(
         family_momentum_window=family_momentum_window,
         family_momentum_tilt_strength=family_momentum_tilt_strength,
         family_momentum_tilt_cap=family_momentum_tilt_cap,
-        min_families=min_families,
+        min_families=3 if min_families is None else min_families,
         allocator_params=allocator_params,
+        returns_are_net=returns_are_net,
+        return_timestamps=return_timestamps or None,
     )
+
+    if opt_in_data_contract and len(weights) < max(1, int(min_sleeves)):
+        raise ValueError(
+            f"quality gate left {len(weights)} sleeves; min_sleeves={min_sleeves} forbids "
+            "freezing an all-cash manifest"
+        )
+    if opt_in_data_contract and min_families is not None:
+        surviving_families = {
+            str(families[sleeve_id])
+            for sleeve_id in weights
+            if families is not None and sleeve_id in families
+        }
+        if len(surviving_families) < max(1, int(min_families)):
+            raise ValueError(
+                f"quality gate left {len(surviving_families)} families; "
+                f"min_families={min_families} forbids freezing the manifest"
+            )
 
     default_source_id = str(source_rows[0].get("id") or "") if len(source_rows) == 1 else ""
 
@@ -763,6 +1032,13 @@ def build_allocation_manifest(
             continue
         spec = sleeves.get(sleeve_id) or {}
         source_artifact_id = str(spec.get("source_artifact_id") or default_source_id or "")
+        source = source_by_id.get(source_artifact_id)
+        if source is None:
+            raise ValueError(
+                f"sleeve {sleeve_id!r} references missing source artifact {source_artifact_id!r}"
+            )
+        if source.get("ready") is not True or source.get("portfolio_ready") is not True:
+            raise ValueError(f"source artifact {source_artifact_id!r} is not portfolio-ready")
         children.append(
             {
                 "candidate_id": str(sleeve_id),
@@ -801,11 +1077,12 @@ def build_allocation_manifest(
     active_weight = _round(sum(child["weight"] for child in children)) if children else 0.0
     sleeve_quality = {
         sid: compute_sleeve_quality(
-            sleeve_returns.get(sid),
+            prepared_returns.get(sid),
             turnovers.get(sid),
             regime=regime,
             participation=participation,
             turnover_penalty_lambda=turnover_penalty_lambda,
+            returns_are_net=returns_are_net.get(sid, False),
         )
         for sid in sorted(sleeves)
     }
@@ -837,4 +1114,13 @@ def build_allocation_manifest(
         # Opt-in provenance only: without allocator_params the manifest stays
         # byte-identical to the pinned golden.
         manifest["allocator_params"] = {str(k): v for k, v in dict(allocator_params).items()}
+    if opt_in_data_contract:
+        manifest["return_data_contract"] = {
+            "alignment": alignment,
+            "common_observations": common_observations,
+            "returns_are_net": {sid: returns_are_net[sid] for sid in sorted(active_ids)},
+            "returns_source": {sid: returns_sources[sid] for sid in sorted(active_ids)},
+        }
+    if locked_oos_evaluation is not None:
+        manifest["locked_oos_evaluation"] = _normalize_locked_oos_evaluation(locked_oos_evaluation)
     return manifest

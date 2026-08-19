@@ -1,9 +1,12 @@
 import queue
+import tempfile
 import unittest
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from lumina_quant.backtesting.portfolio_backtest import Portfolio
 from lumina_quant.core.events import FillEvent, MarketWindowEvent
+from lumina_quant.data.feature_points import FeaturePointLookup
+from lumina_quant.market_data import upsert_futures_feature_points_rows
 
 
 class MockBars:
@@ -71,6 +74,14 @@ class BoundaryFundingConfig(FundingConfig):
     # Report defect #8: charge funding on crossed 00/08/16 UTC boundaries.
     FUNDING_ON_UTC_BOUNDARY = True
     FUNDING_RATE_PER_8H = 0.0
+
+
+class StrictBoundaryFundingConfig(BoundaryFundingConfig):
+    REQUIRE_FUNDING_COVERAGE = True
+
+
+class StaticFallbackBoundaryFundingConfig(BoundaryFundingConfig):
+    FUNDING_RATE_PER_8H = 0.001
 
 
 class TestFundingAndLiquidation(unittest.TestCase):
@@ -323,6 +334,111 @@ class TestFundingUtcBoundary(unittest.TestCase):
             return p.total_funding_paid
 
         self.assertAlmostEqual(run(DynamicFundingConfig), run(BoundaryFundingConfig), places=12)
+
+    def test_daily_bar_sums_three_distinct_actual_settlements(self):
+        with tempfile.TemporaryDirectory() as db_path:
+            start = datetime(2026, 1, 1, 0, 0)
+            start_ms = int(start.replace(tzinfo=UTC).timestamp() * 1000)
+            interval_ms = 8 * 60 * 60 * 1000
+            upsert_futures_feature_points_rows(
+                db_path,
+                exchange="binance",
+                symbol="BTC/USDT",
+                rows=[
+                    {
+                        "timestamp_ms": start_ms + interval_ms,
+                        "funding_rate": 0.001,
+                        "funding_mark_price": 100.0,
+                        "funding_fee_quote_per_unit": 0.1,
+                    },
+                    {
+                        "timestamp_ms": start_ms + 2 * interval_ms,
+                        "funding_rate": 0.002,
+                        "funding_mark_price": 200.0,
+                        "funding_fee_quote_per_unit": 0.4,
+                    },
+                    {
+                        "timestamp_ms": start_ms + 3 * interval_ms,
+                        "funding_rate": -0.001,
+                        "funding_mark_price": 300.0,
+                        "funding_fee_quote_per_unit": -0.3,
+                    },
+                ],
+            )
+            bars = MockBars(start, 999.0)
+            bars._feature_lookup = FeaturePointLookup(db_path=db_path, exchange="binance")
+            p = Portfolio(bars, queue.Queue(), start, StrictBoundaryFundingConfig)
+            p.current_positions["BTC/USDT"] = 1.0
+            p.entry_prices["BTC/USDT"] = 999.0
+
+            p.update_timeindex(None)
+            bars.current_dt += timedelta(days=1)
+            p.update_timeindex(None)
+
+            self.assertAlmostEqual(p.total_funding_paid, 0.2, places=12)
+
+    def test_strict_daily_bar_rejects_missing_settlement(self):
+        with tempfile.TemporaryDirectory() as db_path:
+            start = datetime(2026, 1, 1, 0, 0)
+            start_ms = int(start.replace(tzinfo=UTC).timestamp() * 1000)
+            interval_ms = 8 * 60 * 60 * 1000
+            upsert_futures_feature_points_rows(
+                db_path,
+                exchange="binance",
+                symbol="BTC/USDT",
+                rows=[
+                    {
+                        "timestamp_ms": start_ms + interval_ms,
+                        "funding_fee_quote_per_unit": 0.1,
+                    },
+                    {
+                        "timestamp_ms": start_ms + 3 * interval_ms,
+                        "funding_fee_quote_per_unit": 0.3,
+                    },
+                ],
+            )
+            bars = MockBars(start, 100.0)
+            bars._feature_lookup = FeaturePointLookup(db_path=db_path, exchange="binance")
+            p = Portfolio(bars, queue.Queue(), start, StrictBoundaryFundingConfig)
+            p.current_positions["BTC/USDT"] = 1.0
+            p.entry_prices["BTC/USDT"] = 100.0
+            p.update_timeindex(None)
+            bars.current_dt += timedelta(days=1)
+
+            with self.assertRaisesRegex(ValueError, "missing exact funding settlement data"):
+                p.update_timeindex(None)
+
+    def test_partial_actual_settlements_use_static_fallback_for_full_window(self):
+        with tempfile.TemporaryDirectory() as db_path:
+            start = datetime(2026, 1, 1, 0, 0)
+            start_ms = int(start.replace(tzinfo=UTC).timestamp() * 1000)
+            interval_ms = 8 * 60 * 60 * 1000
+            upsert_futures_feature_points_rows(
+                db_path,
+                exchange="binance",
+                symbol="BTC/USDT",
+                rows=[
+                    {
+                        "timestamp_ms": start_ms + interval_ms,
+                        "funding_fee_quote_per_unit": 0.1,
+                    },
+                    {
+                        "timestamp_ms": start_ms + 2 * interval_ms,
+                        "funding_fee_quote_per_unit": 0.4,
+                    },
+                ],
+            )
+            bars = MockBars(start, 100.0)
+            bars._feature_lookup = FeaturePointLookup(db_path=db_path, exchange="binance")
+            p = Portfolio(bars, queue.Queue(), start, StaticFallbackBoundaryFundingConfig)
+            p.current_positions["BTC/USDT"] = 1.0
+            p.entry_prices["BTC/USDT"] = 100.0
+            p.update_timeindex(None)
+            bars.current_dt += timedelta(days=1)
+
+            p.update_timeindex(None)
+
+            self.assertAlmostEqual(p.total_funding_paid, 0.3, places=12)
 
 
 if __name__ == "__main__":

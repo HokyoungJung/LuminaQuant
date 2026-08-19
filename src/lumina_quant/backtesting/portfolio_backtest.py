@@ -155,6 +155,9 @@ class Portfolio:
         self._liq_price_cache = {}
         self._metric_totals = [float(self.initial_capital)] if self.track_metrics else []
         self._metric_benchmarks = [0.0] if self.track_metrics else []
+        self._last_metric_timestamp_ms = (
+            self._to_timestamp_ms(self.start_date) if self.track_metrics else None
+        )
         self._equity_points = deque(maxlen=20_000)
         self.trading_frozen = False
         self.component_positions = {}
@@ -207,6 +210,7 @@ class Portfolio:
             "equity_points": list(self._equity_points),
             "component_positions": self.component_positions,
             "last_sample_timestamp_ms": self._last_sample_timestamp_ms,
+            "last_metric_timestamp_ms": self._last_metric_timestamp_ms,
             "strategy_quality": self.strategy_quality.get_state(),
             "current_day": self._current_day,
             "day_start_equity": self.day_start_equity,
@@ -252,6 +256,14 @@ class Portfolio:
                 )
             except Exception:
                 self._last_sample_timestamp_ms = None
+        if "last_metric_timestamp_ms" in state:
+            raw_last_metric = state.get("last_metric_timestamp_ms")
+            try:
+                self._last_metric_timestamp_ms = (
+                    int(raw_last_metric) if raw_last_metric is not None else None
+                )
+            except Exception:
+                self._last_metric_timestamp_ms = None
         if "strategy_quality" in state and isinstance(state["strategy_quality"], dict):
             self.strategy_quality.set_state(state["strategy_quality"])
         if "current_day" in state:
@@ -323,6 +335,7 @@ class Portfolio:
             if self.track_metrics and should_sample:
                 self._metric_totals.append(float(total))
                 self._metric_benchmarks.append(float(close_price))
+                self._last_metric_timestamp_ms = self._to_timestamp_ms(latest_datetime)
 
             if collect_history:
                 self.all_positions.append((latest_datetime, qty))
@@ -357,6 +370,7 @@ class Portfolio:
         if self.track_metrics and should_sample:
             self._metric_totals.append(float(total))
             self._metric_benchmarks.append(float(bench_price))
+            self._last_metric_timestamp_ms = self._to_timestamp_ms(latest_datetime)
         if not collect_history:
             return
 
@@ -381,6 +395,55 @@ class Portfolio:
                 bench_price,
             )
         )
+
+    def reconcile_final_snapshot(self):
+        """Refresh the last bar snapshot after its queued fills have drained."""
+        latest_datetime = self.bars.get_latest_bar_datetime(self.symbol_list[0])
+        if latest_datetime is None:
+            return
+        market_values = []
+        for symbol in self.symbol_list:
+            value = float(self.current_positions[symbol]) * float(
+                self.bars.get_latest_bar_value(symbol, "close")
+            )
+            self.current_holdings[symbol] = value
+            market_values.append(value)
+        total = float(self.current_holdings["cash"]) + sum(market_values)
+        self.current_holdings["total"] = total
+        benchmark = float(self.bars.get_latest_bar_value(self.symbol_list[0], "close"))
+
+        if self._equity_points and self._equity_points[-1][0] == self._to_unix_seconds(
+            latest_datetime
+        ):
+            self._equity_points[-1] = (self._equity_points[-1][0], total)
+        metric_timestamp_ms = self._to_timestamp_ms(latest_datetime)
+        if self.track_metrics:
+            if self._metric_totals and self._last_metric_timestamp_ms == metric_timestamp_ms:
+                self._metric_totals[-1] = total
+                self._metric_benchmarks[-1] = benchmark
+            else:
+                self._metric_totals.append(total)
+                self._metric_benchmarks.append(benchmark)
+                self._last_metric_timestamp_ms = metric_timestamp_ms
+        if not self.record_history:
+            return
+
+        positions = (latest_datetime, *(self.current_positions[s] for s in self.symbol_list))
+        holdings = (
+            latest_datetime,
+            self.current_holdings["cash"],
+            self.current_holdings["commission"],
+            self.current_holdings.get("funding", 0.0),
+            total,
+            *market_values,
+            benchmark,
+        )
+        if self.all_positions and self.all_positions[-1][0] == latest_datetime:
+            self.all_positions[-1] = positions
+            self.all_holdings[-1] = holdings
+        else:
+            self.all_positions.append(positions)
+            self.all_holdings.append(holdings)
 
     def _to_timestamp_ms(self, value):
         if value is None:
@@ -681,7 +744,44 @@ class Portfolio:
             if periods <= 0:
                 continue
 
-            rate_per_8h = self._resolve_funding_rate(symbol, default=default_rate_per_8h)
+            if self.funding_on_utc_boundary:
+                lookup = getattr(self.bars, "_feature_lookup", None)
+                sum_fn = getattr(lookup, "funding_fee_sum_between", None)
+                fee_sum = None
+                complete = False
+                if callable(sum_fn):
+                    fee_sum, complete = sum_fn(
+                        symbol,
+                        start_timestamp_ms=int(last_ts * 1000),
+                        end_timestamp_ms=int(now_ts * 1000),
+                        interval_ms=int(interval_seconds * 1000),
+                    )
+                if fee_sum is not None and complete:
+                    funding_payment = qty * fee_sum
+                    self.current_holdings["cash"] -= funding_payment
+                    self.current_holdings["total"] -= funding_payment
+                    self.current_holdings["funding"] += funding_payment
+                    self.total_funding_paid += funding_payment
+                    self._last_funding_ts[symbol] = now_ts
+                    continue
+                if (
+                    self.require_funding_coverage
+                    and not complete
+                    and abs(float(default_rate_per_8h)) <= 1e-12
+                ):
+                    raise ValueError(
+                        "require_funding_coverage: missing exact funding settlement data "
+                        f"for symbol {symbol!r} in ({int(last_ts * 1000)}, {int(now_ts * 1000)}]"
+                    )
+
+            if (
+                self.funding_on_utc_boundary
+                and not complete
+                and abs(float(default_rate_per_8h)) > 1e-12
+            ):
+                rate_per_8h = float(default_rate_per_8h)
+            else:
+                rate_per_8h = self._resolve_funding_rate(symbol, default=default_rate_per_8h)
             if rate_per_8h is None:
                 self._last_funding_ts[symbol] = now_ts
                 continue
@@ -1359,7 +1459,7 @@ class Portfolio:
             if cur_qty != 0:
                 try:
                     exit_fraction = float(metadata.get("exit_fraction", 1.0))
-                except (TypeError, ValueError):
+                except TypeError, ValueError:
                     exit_fraction = 1.0
                 if not math.isfinite(exit_fraction):
                     exit_fraction = 1.0

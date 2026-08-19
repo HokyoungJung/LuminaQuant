@@ -6,7 +6,7 @@ from queue import SimpleQueue
 
 import pytest
 
-from lumina_quant.core.events import MarketEvent
+from lumina_quant.core.events import MarketBatchEvent, MarketEvent
 from lumina_quant.strategies.volatility_breakout_noise import (
     NoiseFilteredVolatilityBreakoutStrategy,
 )
@@ -271,7 +271,9 @@ def test_stop_loss_pct_cuts_the_position_inside_the_session():
     assert [signal.signal_type for signal in entries] == ["LONG"]
     entry_price = session_open + 4.5
     assert entries[0].price == pytest.approx(entry_price)
-    assert entries[0].stop_loss == pytest.approx(entry_price * (1.0 - 0.01))
+    assert entries[0].stop_loss is None
+    assert entries[0].take_profit is None
+    assert entries[0].metadata["stop_loss"] == pytest.approx(entry_price * (1.0 - 0.01))
 
     stop_level = entry_price * (1.0 - 0.01)
     # A later bar of the SAME session that holds above the stop changes nothing.
@@ -358,6 +360,66 @@ def test_cross_sectional_noise_filter_keeps_only_the_quietest_symbol():
         breakout.extend([left, right])
     signals = _feed(strategy, events, breakout)
     assert [(signal.symbol, signal.signal_type) for signal in signals] == [("QUIET", "LONG")]
+
+
+def test_noise_batch_ranking_and_signals_ignore_bar_order():
+    seed_events = SimpleQueue()
+    seed = NoiseFilteredVolatilityBreakoutStrategy(
+        _Bars(["NOISY", "QUIET"]),
+        seed_events,
+        k_mode="fixed",
+        k=0.5,
+        noise_period=2,
+        use_ma_score=False,
+        use_vol_target=False,
+        max_symbols_by_noise=1,
+    )
+    noisy = _history("NOISY", 2, close_offset=-4.0)
+    quiet = _history("QUIET", 2, close_offset=-6.4)
+    for left, right in zip(noisy, quiet, strict=True):
+        seed.calculate_signals(left)
+        seed.calculate_signals(right)
+    assert _drain(seed_events) == []
+
+    def run(reverse: bool):
+        events = SimpleQueue()
+        strategy = NoiseFilteredVolatilityBreakoutStrategy(
+            _Bars(["NOISY", "QUIET"]),
+            events,
+            k_mode="fixed",
+            k=0.5,
+            noise_period=2,
+            use_ma_score=False,
+            use_vol_target=False,
+            max_symbols_by_noise=1,
+        )
+        strategy.set_state(seed.get_state())
+        first = [
+            _breakout_session_bars("NOISY", 3, 2)[0],
+            _breakout_session_bars("QUIET", 3, 2)[0],
+        ]
+        second = [
+            _breakout_session_bars("NOISY", 3, 2)[1],
+            _breakout_session_bars("QUIET", 3, 2)[1],
+        ]
+        if reverse:
+            first.reverse()
+            second.reverse()
+        strategy.calculate_signals_batch(MarketBatchEvent(first[0].time, tuple(first)))
+        allowed = strategy.get_state()["allowed_symbols"]
+        strategy.calculate_signals_batch(MarketBatchEvent(second[0].time, tuple(second)))
+        return allowed, [
+            (signal.symbol, signal.signal_type, signal.price, signal.metadata)
+            for signal in _drain(events)
+        ]
+
+    forward = run(False)
+    backward = run(True)
+    assert forward == backward
+    assert forward[0] == ["QUIET"]
+    assert [(symbol, signal_type) for symbol, signal_type, _, _ in forward[1]] == [
+        ("QUIET", "LONG")
+    ]
 
 
 def test_strategy_is_registered():

@@ -178,10 +178,12 @@
       "family": "crypto_residual_momentum",
       "metadata": {
         "hypothesis_refs": [
-          "jegadeesh_titman_1993",
-          "amateurquant_profile"
+          "jegadeesh_titman_1993"
         ],
         "promotion_eligible": false,
+        "provenance_refs": [
+          "amateurquant_profile"
+        ],
         "universe_binding": "crypto_top10",
         "universe_membership": "frozen smoke snapshot; data-PC must replace with point-in-time membership receipts"
       },
@@ -414,6 +416,7 @@
         ],
         "promotion_eligible": false,
         "universe_binding": "tradfi_all",
+        "universe_constraint": "tradfi_all",
         "universe_membership": "frozen smoke snapshot; data-PC must replace with point-in-time membership receipts"
       },
       "name": "TradFi Diversified Managed-Futures Trend",
@@ -550,6 +553,7 @@
           "jegadeesh_titman_1993"
         ],
         "promotion_eligible": false,
+        "universe_constraint": "tradfi_all",
         "universe_membership": "frozen smoke snapshot; data-PC must replace with point-in-time membership receipts"
       },
       "name": "TradFi Equity 12-1 Momentum",
@@ -658,10 +662,13 @@
       "family": "tradfi_equity_residual_momentum",
       "metadata": {
         "hypothesis_refs": [
-          "jegadeesh_titman_1993",
-          "amateurquant_profile"
+          "jegadeesh_titman_1993"
         ],
         "promotion_eligible": false,
+        "provenance_refs": [
+          "amateurquant_profile"
+        ],
+        "universe_constraint": "tradfi_all",
         "universe_membership": "frozen smoke snapshot; data-PC must replace with point-in-time membership receipts"
       },
       "name": "TradFi Equity Residual Momentum",
@@ -774,6 +781,7 @@
           "frazzini_pedersen_2014"
         ],
         "promotion_eligible": false,
+        "universe_constraint": "tradfi_all",
         "universe_membership": "frozen smoke snapshot; data-PC must replace with point-in-time membership receipts"
       },
       "name": "TradFi Equity Betting Against Beta",
@@ -881,10 +889,13 @@
       "candidate_id": "tradfi_gold_silver_ratio_reversion_v1",
       "family": "tradfi_relative_value",
       "metadata": {
-        "hypothesis_refs": [
+        "hypothesis_refs": [],
+        "promotion_eligible": false,
+        "provenance_refs": [
           "amateurquant_profile"
         ],
-        "promotion_eligible": false,
+        "rule_origin": "independent_hypothesis",
+        "universe_constraint": "tradfi_all",
         "universe_membership": "frozen smoke snapshot; data-PC must replace with point-in-time membership receipts"
       },
       "name": "TradFi Gold/Silver Ratio Reversion",
@@ -915,10 +926,13 @@
       "candidate_id": "tradfi_metals_relative_value_4h_v1",
       "family": "tradfi_metals_relative_value",
       "metadata": {
-        "hypothesis_refs": [
+        "hypothesis_refs": [],
+        "promotion_eligible": false,
+        "provenance_refs": [
           "amateurquant_profile"
         ],
-        "promotion_eligible": false,
+        "rule_origin": "independent_hypothesis",
+        "universe_constraint": "tradfi_all",
         "universe_membership": "frozen smoke snapshot; data-PC must replace with point-in-time membership receipts"
       },
       "name": "TradFi Precious-Metals Relative Value",
@@ -955,6 +969,7 @@
           "moreira_muir_2017"
         ],
         "promotion_eligible": false,
+        "universe_constraint": "tradfi_all",
         "universe_membership": "frozen smoke snapshot; data-PC must replace with point-in-time membership receipts"
       },
       "name": "TradFi Equity/Metal Regime Rotation",
@@ -1068,13 +1083,13 @@
     },
     {
       "access": "free_unauthenticated",
-      "allowed_usage_label": "strategy_class_evidence",
+      "allowed_usage_label": "evidence_only",
       "cache_path": "var/cache/external_sources/amateurquant_profile.html",
       "credential_requirement": "none",
       "fallback_behavior": "fail_closed",
       "license_note": "Public reference/link only; do not redistribute source content.",
       "notes": [
-        "Public profile supports microstructure, pairs and factor research scope only."
+        "Public profile supplies scope/provenance only, not strategy-rule evidence."
       ],
       "release_lag_policy": "evidence only; no market-time feature is consumed",
       "source_id": "amateurquant_profile",
@@ -1203,7 +1218,7 @@
     },
     {
       "access": "free_unauthenticated",
-      "allowed_usage_label": "strategy_class_evidence",
+      "allowed_usage_label": "diagnostic_only",
       "cache_path": "var/cache/external_sources/dolpago_dogdrip_20210802.html",
       "credential_requirement": "none",
       "fallback_behavior": "fail_closed",
@@ -1230,7 +1245,7 @@
       "release_lag_policy": "evidence only; no market-time feature is consumed",
       "source_id": "dacapogo_public_repo_633ba5d",
       "update_cadence": "static literature or public educational reference",
-      "url": "https://github.com/HokyoungJung/dacapogo/tree/633ba5d6d712df7a77ad201c3b6263d2343a65ed"
+      "url": "https://github.com/HokyoungJung/dacapogo/tree/633ba5d6bc0c84a20696af6b2bf807cf55d21248"
     },
     {
       "access": "free_unauthenticated",
@@ -1398,6 +1413,11 @@
     }
   ],
   "kind": "preregistered_allocation_cell",
+  "locked_oos_evaluation": {
+    "allocation_cost_bps": 10.0,
+    "periods_per_year": 252,
+    "rebalance_every_observations": 5
+  },
   "membership_is_preregistered_weights_are_measured": true,
   "method": "hrp",
   "min_sleeves": 5,
@@ -1491,8 +1511,8 @@
   "promotion_eligible": false,
   "required_data_contracts": [
     "timestamped OHLCV and next-open execution",
-    "mark/index price, funding rate and actual settlement timestamp per symbol",
-    "maker/taker fee, spread, slippage, sqrt-impact and liquidation simulation",
+    "mark/index price retained as diagnostics; funding rate and actual settlement timestamp per symbol",
+    "maker/taker fee, spread, slippage, sqrt-impact and trade-price OHLC isolated liquidation approximation",
     "exchangeInfo PRICE_FILTER, LOT_SIZE, MARKET_LOT_SIZE, MIN_NOTIONAL and PERCENT_PRICE snapshot",
     "point-in-time market-cap and listing/delisting membership receipts",
     "common-date aligned net sleeve return streams before allocation"
@@ -1526,7 +1546,7 @@
       "returns_source": {
         "artifact": "named_quant_data_pc_walkforward",
         "candidate_id": "crypto_funding_sign_filtered_v1",
-        "stream": "common-date aligned train/validation NET returns only; locked OOS excluded from selection and sizing",
+        "stream": "common-date aligned train/validation NET returns only",
         "turnover_source": "same candidate train/validation folds after fees, funding, slippage and impact"
       },
       "source_artifact_id": "named_quant_data_pc_walkforward",
@@ -1560,7 +1580,7 @@
       "returns_source": {
         "artifact": "named_quant_data_pc_walkforward",
         "candidate_id": "crypto_rebalancing_premium_monthly_v1",
-        "stream": "common-date aligned train/validation NET returns only; locked OOS excluded from selection and sizing",
+        "stream": "common-date aligned train/validation NET returns only",
         "turnover_source": "same candidate train/validation folds after fees, funding, slippage and impact"
       },
       "source_artifact_id": "named_quant_data_pc_walkforward",
@@ -1599,7 +1619,7 @@
       "returns_source": {
         "artifact": "named_quant_data_pc_walkforward",
         "candidate_id": "crypto_residual_momentum_weekly_v1",
-        "stream": "common-date aligned train/validation NET returns only; locked OOS excluded from selection and sizing",
+        "stream": "common-date aligned train/validation NET returns only",
         "turnover_source": "same candidate train/validation folds after fees, funding, slippage and impact"
       },
       "source_artifact_id": "named_quant_data_pc_walkforward",
@@ -1636,7 +1656,7 @@
       "returns_source": {
         "artifact": "named_quant_data_pc_walkforward",
         "candidate_id": "crypto_trend_gated_ibs_reversion_v1",
-        "stream": "common-date aligned train/validation NET returns only; locked OOS excluded from selection and sizing",
+        "stream": "common-date aligned train/validation NET returns only",
         "turnover_source": "same candidate train/validation folds after fees, funding, slippage and impact"
       },
       "source_artifact_id": "named_quant_data_pc_walkforward",
@@ -1675,7 +1695,7 @@
       "returns_source": {
         "artifact": "named_quant_data_pc_walkforward",
         "candidate_id": "crypto_turtle_20_10_atr_v1",
-        "stream": "common-date aligned train/validation NET returns only; locked OOS excluded from selection and sizing",
+        "stream": "common-date aligned train/validation NET returns only",
         "turnover_source": "same candidate train/validation folds after fees, funding, slippage and impact"
       },
       "source_artifact_id": "named_quant_data_pc_walkforward",
@@ -1713,7 +1733,7 @@
       "returns_source": {
         "artifact": "named_quant_data_pc_walkforward",
         "candidate_id": "tradfi_diversified_trend_1d_v1",
-        "stream": "common-date aligned train/validation NET returns only; locked OOS excluded from selection and sizing",
+        "stream": "common-date aligned train/validation NET returns only",
         "turnover_source": "same candidate train/validation folds after fees, funding, slippage and impact"
       },
       "source_artifact_id": "named_quant_data_pc_walkforward",
@@ -1839,7 +1859,7 @@
       "returns_source": {
         "artifact": "named_quant_data_pc_walkforward",
         "candidate_id": "tradfi_equity_bab_v1",
-        "stream": "common-date aligned train/validation NET returns only; locked OOS excluded from selection and sizing",
+        "stream": "common-date aligned train/validation NET returns only",
         "turnover_source": "same candidate train/validation folds after fees, funding, slippage and impact"
       },
       "source_artifact_id": "named_quant_data_pc_walkforward",
@@ -1940,7 +1960,7 @@
       "returns_source": {
         "artifact": "named_quant_data_pc_walkforward",
         "candidate_id": "tradfi_gold_silver_ratio_reversion_v1",
-        "stream": "common-date aligned train/validation NET returns only; locked OOS excluded from selection and sizing",
+        "stream": "common-date aligned train/validation NET returns only",
         "turnover_source": "same candidate train/validation folds after fees, funding, slippage and impact"
       },
       "source_artifact_id": "named_quant_data_pc_walkforward",
@@ -1971,37 +1991,37 @@
     },
     {
       "action": "No quant-strategy attribution without a user-supplied canonical URL or handle.",
-      "requested_label": "부동심",
+      "requested_label": "\ubd80\ub3d9\uc2ec",
       "status": "unverified"
     },
     {
       "action": "Only explicitly documented rules are used as hypotheses.",
-      "requested_label": "물탄찬밥",
+      "requested_label": "\ubb3c\ud0c4\ucc2c\ubc25",
       "status": "verified_public_preview"
     },
     {
       "action": "Risk-governance inspiration only.",
-      "requested_label": "알바트로스",
-      "status": "verified_as_성필규"
+      "requested_label": "\uc54c\ubc14\ud2b8\ub85c\uc2a4",
+      "status": "verified_as_\uc131\ud544\uaddc"
     },
     {
       "action": "Research-scope inspiration only; no undisclosed rule attribution.",
-      "requested_label": "아마추어퀀트",
-      "status": "verified_as_조성현"
+      "requested_label": "\uc544\ub9c8\ucd94\uc5b4\ud000\ud2b8",
+      "status": "verified_as_\uc870\uc131\ud604"
     },
     {
       "action": "Use public identity, execution-data philosophy and dacapogo diagnostics only; do not claim formula reconstruction.",
-      "requested_label": "돌파고",
+      "requested_label": "\ub3cc\ud30c\uace0",
       "status": "verified_public_identity_formula_unavailable"
     },
     {
       "action": "Use the official interview for liquid-major and portfolio-risk design constraints only.",
-      "requested_label": "워뇨띠/AOA",
+      "requested_label": "\uc6cc\ub1e8\ub760/AOA",
       "status": "verified_official_interview_entry_rule_unavailable"
     },
     {
       "action": "Use first-person educational RSI and regime posts as hypothesis seeds; keep missing pivot, volume and sizing rules explicit.",
-      "requested_label": "플라이트/FlightF",
+      "requested_label": "\ud50c\ub77c\uc774\ud2b8/FlightF",
       "status": "verified_first_person_posts_partial_rules"
     }
   ],

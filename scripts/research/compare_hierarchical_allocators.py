@@ -27,6 +27,12 @@ import numpy as np
 from lumina_quant.portfolio import hierarchical as hier
 from lumina_quant.portfolio.optimizer_core import ledoit_wolf_shrunk_covariance
 from lumina_quant.portfolio.optimizers_extra import erc_weights, hrp_weights_from_returns
+from lumina_quant.portfolio.quality_gated_allocation import (
+    REFERENCE_COST_REGIME_20BPS,
+    _prepare_return_series,
+    _validate_materialized_data_contract,
+)
+from lumina_quant.research.cost_realism import DEFAULT_PARTICIPATION, apply_cost_drag
 
 METHODS: tuple[str, ...] = (
     "equal_weight",
@@ -45,14 +51,43 @@ METHODS: tuple[str, ...] = (
 def _load_returns(path: Path) -> tuple[list[str], np.ndarray]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     raw = payload.get("returns")
+    timestamps = payload.get("return_timestamps") or {}
+    net_flags = payload.get("returns_are_net") or {}
+    turnovers = payload.get("turnovers") or {}
     if not isinstance(raw, dict):
         sleeves = payload.get("sleeves") or {}
+        _validate_materialized_data_contract(sleeves)
         raw = {sid: (spec or {}).get("returns") for sid, spec in sleeves.items()}
+        timestamps = {
+            sid: (spec or {}).get("return_timestamps")
+            for sid, spec in sleeves.items()
+            if "return_timestamps" in (spec or {})
+        }
+        net_flags = {
+            sid: bool((spec or {}).get("returns_are_net", False)) for sid, spec in sleeves.items()
+        }
+        turnovers = {
+            sid: float((spec or {}).get("turnover") or 0.0) for sid, spec in sleeves.items()
+        }
     ids = sorted(sid for sid, series in raw.items() if isinstance(series, list) and series)
     if len(ids) < 2:
         raise SystemExit("need at least two sleeves/assets with materialized returns")
-    min_len = min(len(raw[sid]) for sid in ids)
-    matrix = np.column_stack([np.asarray(raw[sid][-min_len:], dtype=float) for sid in ids])
+    prepared, _alignment, _common = _prepare_return_series(raw, timestamps or None)
+    min_len = min(prepared[sid].size for sid in ids)
+    columns = []
+    for sid in ids:
+        values = prepared[sid][-min_len:]
+        columns.append(
+            values
+            if bool(net_flags.get(sid, False))
+            else apply_cost_drag(
+                values,
+                turnover=float(turnovers.get(sid) or 0.0),
+                regime=REFERENCE_COST_REGIME_20BPS,
+                participation=DEFAULT_PARTICIPATION,
+            )
+        )
+    matrix = np.column_stack(columns)
     return ids, matrix
 
 
@@ -117,6 +152,7 @@ def run_cell_variants(payload: dict[str, Any]) -> dict[str, Any]:
     from lumina_quant.portfolio.quality_gated_allocation import allocate_quality_gated
 
     sleeves = payload.get("sleeves") or {}
+    _validate_materialized_data_contract(sleeves)
     returns = {sid: (spec or {}).get("returns") for sid, spec in sleeves.items()}
     turnovers = {sid: (spec or {}).get("turnover") or 0.0 for sid, spec in sleeves.items()}
     families = {
@@ -125,6 +161,18 @@ def run_cell_variants(payload: dict[str, Any]) -> dict[str, Any]:
         if (spec or {}).get("family") is not None
     }
     allocator = payload.get("allocator") if isinstance(payload.get("allocator"), dict) else {}
+
+    def setting(name: str, default: Any) -> Any:
+        return payload[name] if name in payload else allocator.get(name, default)
+
+    returns_are_net = {
+        sid: bool((spec or {}).get("returns_are_net", False)) for sid, spec in sleeves.items()
+    }
+    return_timestamps = {
+        sid: (spec or {}).get("return_timestamps")
+        for sid, spec in sleeves.items()
+        if "return_timestamps" in (spec or {})
+    }
     out: dict[str, Any] = {}
     for index, variant in enumerate(payload.get("allocator_variants") or []):
         method = str(variant.get("method") or payload.get("method") or "erc")
@@ -135,13 +183,20 @@ def run_cell_variants(payload: dict[str, Any]) -> dict[str, Any]:
                 returns,
                 turnovers,
                 method=method,
-                upper=payload.get("upper"),
-                min_sleeves=int(allocator.get("min_sleeves", payload.get("min_sleeves", 1))),
+                upper=setting("upper", None),
+                min_sleeves=int(setting("min_sleeves", 1)),
+                turnover_penalty_lambda=float(setting("turnover_penalty_lambda", 0.0)),
+                correlation_shrinkage=setting("correlation_shrinkage", None),
                 families=families or None,
-                min_families=int(allocator.get("min_families", 3)),
+                family_momentum_window=int(setting("family_momentum_window", 0)),
+                family_momentum_tilt_strength=float(setting("family_momentum_tilt_strength", 0.5)),
+                family_momentum_tilt_cap=float(setting("family_momentum_tilt_cap", 0.30)),
+                min_families=int(setting("min_families", 3)),
                 allocator_params=params or None,
+                returns_are_net=returns_are_net,
+                return_timestamps=return_timestamps or None,
             )
-        except ValueError as exc:  # fail-closed variants (infeasible box / target)
+        except (ValueError, RuntimeError) as exc:  # fail-closed variant, keep comparing rows
             out[label] = {"method": method, "allocator_params": params, "error": str(exc)}
             continue
         out[label] = {"method": method, "allocator_params": params, "weights": weights}

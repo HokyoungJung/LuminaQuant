@@ -8,7 +8,7 @@ from queue import SimpleQueue
 
 import pytest
 
-from lumina_quant.core.events import MarketEvent
+from lumina_quant.core.events import MarketBatchEvent, MarketEvent
 from lumina_quant.core.plugin_registry import GLOBAL_REGISTRY
 from lumina_quant.strategies.session_high_breakout_scalp import (
     SessionHighBreakoutScalpStrategy,
@@ -90,8 +90,10 @@ def test_breakout_with_volume_surge_emits_single_long() -> None:
     assert signal.signal_type == "LONG"
     assert signal.symbol == "AAA"
     assert signal.price == pytest.approx(100.2)
-    assert signal.stop_loss == pytest.approx(100.2 * (1.0 - 0.007))
-    assert signal.take_profit == pytest.approx(100.2 * (1.0 + 0.015))
+    assert signal.stop_loss is None
+    assert signal.take_profit is None
+    assert signal.metadata["stop_loss"] == pytest.approx(100.2 * (1.0 - 0.007))
+    assert signal.metadata["take_profit"] == pytest.approx(100.2 * (1.0 + 0.015))
     assert signal.metadata["target_allocation"] == pytest.approx(0.10)
     assert signal.metadata["max_order_value"] == pytest.approx(500.0)
     assert signal.metadata["session_high"] == pytest.approx(100.0)
@@ -115,6 +117,9 @@ def test_take_profit_exit_then_no_reentry_below_new_session_high() -> None:
     assert exits[0].metadata["reason"] == "take_profit"
     assert exits[0].metadata["side"] == "LONG"
     assert exits[0].price == pytest.approx(101.8)
+    assert strategy._state["AAA"].mode == "OUT"
+    assert strategy._state["AAA"].entry_price is None
+    assert strategy._state["AAA"].bars_held == 0
 
     # The session high is now 101.8, so a 100.3 close cannot re-arm the break.
     strategy.calculate_signals(_bar("AAA", nxt + 2, 100.3, 100.0, low=100.0))
@@ -135,6 +140,9 @@ def test_stop_loss_exit_fires_at_the_configured_level() -> None:
     assert exits[0].metadata["reason"] == "stop_loss"
     assert exits[0].metadata["entry_price"] == pytest.approx(100.2)
     assert exits[0].metadata["bars_held"] == 1
+    assert strategy._state["AAA"].mode == "OUT"
+    assert strategy._state["AAA"].entry_price is None
+    assert strategy._state["AAA"].bars_held == 0
 
 
 def test_time_stop_exit_after_max_hold_bars() -> None:
@@ -317,8 +325,10 @@ def test_short_mirror_requires_allow_short() -> None:
     signals = _drain(events)
     assert len(signals) == 1
     assert signals[0].signal_type == "SHORT"
-    assert signals[0].stop_loss == pytest.approx(99.8 * (1.0 + 0.007))
-    assert signals[0].take_profit == pytest.approx(99.8 * (1.0 - 0.015))
+    assert signals[0].stop_loss is None
+    assert signals[0].take_profit is None
+    assert signals[0].metadata["stop_loss"] == pytest.approx(99.8 * (1.0 + 0.007))
+    assert signals[0].metadata["take_profit"] == pytest.approx(99.8 * (1.0 - 0.015))
     assert signals[0].metadata["session_low"] == pytest.approx(100.0)
 
     flat_strategy, flat_events = _build()
@@ -394,6 +404,49 @@ def test_turnover_universe_filter_keeps_only_the_top_symbol() -> None:
     assert sorted(signal.symbol for signal in _drain(unfiltered_events)) == ["AAA", "BBB"]
 
 
+def test_turnover_batch_ranking_and_signals_ignore_bar_order() -> None:
+    seed, seed_events = _build(["AAA", "BBB"], max_symbols_by_turnover=1)
+    _feed_universe_session(seed, 0)
+    assert _drain(seed_events) == []
+
+    def run(reverse: bool):
+        events = SimpleQueue()
+        strategy = SessionHighBreakoutScalpStrategy(
+            _Bars(["AAA", "BBB"]), events, max_symbols_by_turnover=1
+        )
+        strategy.set_state(seed.get_state())
+
+        def batch(second: int, aaa: MarketEvent, bbb: MarketEvent) -> None:
+            bars = [aaa, bbb]
+            if reverse:
+                bars.reverse()
+            strategy.calculate_signals_batch(MarketBatchEvent(_ts(second), tuple(bars)))
+
+        start = 86_400
+        for index in range(60):
+            batch(
+                start + index,
+                _bar("AAA", start + index, 200.0, 1.0),
+                _bar("BBB", start + index, 100.0, 1.0),
+            )
+        allowed = strategy.get_state()["allowed_symbols"]
+        batch(
+            start + 60,
+            _bar("AAA", start + 60, 200.4, 100.0, low=200.0),
+            _bar("BBB", start + 60, 100.2, 100.0, low=100.0),
+        )
+        return allowed, [
+            (signal.symbol, signal.signal_type, signal.price, signal.metadata)
+            for signal in _drain(events)
+        ]
+
+    forward = run(False)
+    backward = run(True)
+    assert forward == backward
+    assert forward[0] == ["AAA"]
+    assert [(symbol, signal_type) for symbol, signal_type, _, _ in forward[1]] == [("AAA", "LONG")]
+
+
 def test_session_rollover_flattens_an_open_position() -> None:
     strategy, events = _build()
     nxt = _warmup(strategy)
@@ -432,8 +485,8 @@ def test_state_round_trip_preserves_behaviour() -> None:
     for left, right in zip(expected, actual, strict=True):
         assert left.signal_type == right.signal_type
         assert left.price == pytest.approx(right.price)
-        assert left.stop_loss == pytest.approx(right.stop_loss)
-        assert left.take_profit == pytest.approx(right.take_profit)
+        assert left.stop_loss == right.stop_loss is None
+        assert left.take_profit == right.take_profit is None
         assert left.metadata == right.metadata
 
 

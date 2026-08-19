@@ -268,7 +268,7 @@ def _simulate_event_driven_strategy_exposures(
                 metadata = dict(getattr(signal, "metadata", {}) or {})
                 try:
                     exit_fraction = float(metadata.get("exit_fraction", 1.0))
-                except (TypeError, ValueError):
+                except TypeError, ValueError:
                     exit_fraction = 1.0
                 if not math.isfinite(exit_fraction):
                     exit_fraction = 1.0

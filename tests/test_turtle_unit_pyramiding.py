@@ -110,7 +110,7 @@ def test_unit_entry_sizes_from_atr_risk_and_anchors_a_two_n_stop() -> None:
     assert entry.metadata["target_allocation"] == pytest.approx(min(0.25, 0.01 * 106.0 / FLAT_N))
     assert entry.metadata["max_order_value"] == pytest.approx(500.0)
     assert entry.metadata["stop"] == pytest.approx(106.0 - 2.0 * FLAT_N)
-    assert entry.stop_loss == pytest.approx(106.0 - 2.0 * FLAT_N)
+    assert entry.stop_loss is None
 
     # A repeat of the same bar timestamp is deduped.
     strategy.calculate_signals(_bar(FLAT_BARS, 106.0))
@@ -130,7 +130,7 @@ def test_unit_allocation_is_capped_by_max_unit_allocation() -> None:
     assert signals[0].metadata["n_atr"] == pytest.approx(2.0)
     assert 0.01 * 103.0 / 2.0 > 0.25
     assert signals[0].metadata["target_allocation"] == pytest.approx(0.25)
-    assert signals[0].stop_loss == pytest.approx(103.0 - 2.0 * 2.0)
+    assert signals[0].stop_loss is None
 
 
 def test_pyramid_adds_one_unit_per_half_n_up_to_max_units() -> None:
@@ -153,7 +153,7 @@ def test_pyramid_adds_one_unit_per_half_n_up_to_max_units() -> None:
             min(0.25, 0.01 * close / n_atr)
         )
         assert signal.metadata["stop"] == pytest.approx(close - 2.0 * n_atr)
-        assert signal.stop_loss == pytest.approx(close - 2.0 * n_atr)
+        assert signal.stop_loss is None
 
     # The stop ratchets up with every fill, always anchored on the LAST fill.
     stops = [signal.metadata["stop"] for signal in signals]
@@ -252,7 +252,7 @@ def test_short_entry_and_short_pyramid_mirror_the_long_side() -> None:
         assert signal.metadata["target_allocation"] == pytest.approx(
             min(0.25, 0.01 * close / n_atr)
         )
-        assert signal.stop_loss == pytest.approx(close + 2.0 * n_atr)
+        assert signal.stop_loss is None
 
     # allow_short=False refuses the same downside breakout outright.
     blocked, blocked_events = _warmed(allow_short=False)
@@ -272,7 +272,7 @@ def test_short_exits_through_the_opposite_channel_before_its_stop() -> None:
     entry = _drain(events)
     assert [signal.signal_type for signal in entry] == ["SHORT"]
     # The 2N stop sits at 114.0, well above the bar that follows.
-    assert entry[0].stop_loss == pytest.approx(94.0 + 2.0 * FLAT_N)
+    assert entry[0].stop_loss is None
 
     # The lagged 20-bar high is 105.0 (nineteen flat bars plus the 99.0 of the
     # entry bar), so 106.0 clears the exit channel while the stop stays untouched.
@@ -318,7 +318,7 @@ def test_state_round_trip_mid_pyramid_preserves_behaviour() -> None:
     assert len(original_add) == len(restored_add) == 1
     assert restored_add[0].signal_type == "LONG"
     assert restored_add[0].metadata == original_add[0].metadata
-    assert restored_add[0].stop_loss == pytest.approx(original_add[0].stop_loss)
+    assert restored_add[0].stop_loss is None
     assert restored.get_state() == strategy.get_state()
 
 
@@ -437,7 +437,7 @@ def test_close_channel_ignores_wicks_and_exits_on_a_close_new_low() -> None:
     assert entry[0].metadata["reason"] == "unit_entry"
     # Lagged N absorbs bar 60's 20-wide true range: (19 * 10 + 20) / 20.
     assert entry[0].metadata["n_atr"] == pytest.approx(10.5)
-    assert entry[0].stop_loss == pytest.approx(101.0 - 2.0 * 10.5)
+    assert entry[0].stop_loss is None
 
     # The 10-bar close-low is 100, so a 99 close leaves through the channel
     # while the 2N stop at 80.0 is still far away.
@@ -467,7 +467,7 @@ def test_pct_stop_exits_at_the_fixed_level_measured_from_the_entry() -> None:
 
     assert len(entry) == 1
     assert entry[0].signal_type == "LONG"
-    assert entry[0].stop_loss == pytest.approx(level)
+    assert entry[0].stop_loss is None
     assert entry[0].metadata["stop"] == pytest.approx(level)
     assert entry[0].metadata["pct_stop"] == pytest.approx(level)
     # use_n_stop=False really removes the ATR stop, which would have been 86.0.
@@ -493,7 +493,7 @@ def test_both_stops_are_evaluated_and_the_closer_one_names_the_exit() -> None:
     entry = _drain(tight_events)[0]
     level = 106.0 * (1.0 - PCT_STOP)
     assert entry.metadata["stop"] == pytest.approx(level)
-    assert entry.stop_loss == pytest.approx(level)
+    assert entry.stop_loss is None
     tight.calculate_signals(_bar(61, 102.0))
     stopped = _drain(tight_events)
     assert [signal.signal_type for signal in stopped] == ["EXIT"]
@@ -505,7 +505,7 @@ def test_both_stops_are_evaluated_and_the_closer_one_names_the_exit() -> None:
     loose.calculate_signals(_bar(FLAT_BARS, 106.0))
     loose_entry = _drain(loose_events)[0]
     assert loose_entry.metadata["stop"] == pytest.approx(106.0 - 2.0 * FLAT_N)
-    assert loose_entry.stop_loss == pytest.approx(106.0 - 2.0 * FLAT_N)
+    assert loose_entry.stop_loss is None
     assert loose_entry.metadata["pct_stop"] == pytest.approx(106.0 * 0.70)
     loose.calculate_signals(_bar(61, 85.0))
     loose_stopped = _drain(loose_events)
@@ -556,13 +556,12 @@ def test_public_rule_preset_round_trips_and_stops_at_the_fixed_percentage() -> N
 
     strategy.calculate_signals(_bar(125, 110.0))
     entry = _drain(events)
-    level = 110.0 * (1.0 - PCT_STOP)
     assert len(entry) == 1
     assert entry[0].signal_type == "LONG"
     assert entry[0].metadata["unit"] == 1
     assert entry[0].metadata["target_allocation"] == pytest.approx(min(0.25, 0.01 * 110.0 / FLAT_N))
     assert entry[0].metadata["max_order_value"] == pytest.approx(500.0)
-    assert entry[0].stop_loss == pytest.approx(level)
+    assert entry[0].stop_loss is None
 
     snapshot = strategy.get_state()
     restored_events: SimpleQueue = SimpleQueue()
@@ -591,5 +590,5 @@ def test_new_parameters_leave_the_default_signal_stream_untouched() -> None:
     # Nothing new leaks into the payload while the preset parameters are off.
     assert all("pct_stop" not in row[-1] for row in default_path)
     assert default_path[0][-1]["stop"] == pytest.approx(106.0 - 2.0 * FLAT_N)
-    assert default_path[0][3] == pytest.approx(106.0 - 2.0 * FLAT_N)
+    assert default_path[0][3] is None
     assert default_path[-1][-1]["reason"] == "unit_stop"

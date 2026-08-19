@@ -182,7 +182,8 @@ def test_regular_bullish_divergence_entry_and_rsi_exit():
     assert entry.metadata["rsi_prev"] == pytest.approx(rsi[prev_index])
     assert entry.metadata["pivot_distance"] == new_index - prev_index
     assert entry.price == pytest.approx(closes[new_index + 1])
-    assert entry.stop_loss == pytest.approx(closes[new_index] - _HALF_RANGE)
+    assert entry.stop_loss is None
+    assert entry.metadata["stop_price"] == pytest.approx(closes[new_index] - _HALF_RANGE)
 
     exit_signal = signals[1]
     assert exit_signal.metadata["reason"] == "stage1_rsi"
@@ -211,7 +212,8 @@ def test_mirrored_regular_bearish_divergence_short_and_exit():
     assert entry.metadata["divergence_type"] == "regular"
     assert entry.metadata["side"] == "SHORT"
     assert entry.metadata["target_allocation"] == pytest.approx(0.10)
-    assert entry.stop_loss == pytest.approx(closes[new_index] + _HALF_RANGE)
+    assert entry.stop_loss is None
+    assert entry.metadata["stop_price"] == pytest.approx(closes[new_index] + _HALF_RANGE)
     # Shorts mirror the staged levels: partial at RSI 55, remainder under 40.
     assert signals[1].metadata["reason"] == "stage1_rsi"
     assert signals[1].metadata["exit_fraction"] == pytest.approx(0.6)
@@ -456,7 +458,7 @@ def test_state_round_trip_preserves_behaviour():
         (signal.datetime, signal.signal_type) for signal in baseline
     ]
     assert replayed[0].metadata == baseline[0].metadata
-    assert replayed[0].stop_loss == pytest.approx(baseline[0].stop_loss)
+    assert replayed[0].stop_loss is baseline[0].stop_loss is None
     assert replayed[1].metadata == baseline[1].metadata
 
 
@@ -513,7 +515,7 @@ def test_market_window_contract_matches_the_market_event_path():
         signal.signal_type for signal in baseline
     ]
     assert windowed[0].metadata == baseline[0].metadata
-    assert windowed[0].stop_loss == pytest.approx(baseline[0].stop_loss)
+    assert windowed[0].stop_loss is baseline[0].stop_loss is None
     assert windowed[1].metadata["reason"] == baseline[1].metadata["reason"]
 
 

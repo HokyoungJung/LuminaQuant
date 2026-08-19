@@ -290,12 +290,7 @@ class PrevDayBoxQuartileReversionStrategy(Strategy):
         item.bars_held = 0
 
     def _manage(self, symbol: str, item: _State, snapshot: _Snapshot, close: float) -> None:
-        """Emit take-profit / stop-loss / max-hold exits for an open position.
-
-        The portfolio may also honour the ``stop_loss``/``take_profit`` carried on
-        the entry signal; emitting here as well is idempotent because the branch
-        only runs while ``mode != "OUT"``.
-        """
+        """Emit close-based take-profit / stop-loss / max-hold exits."""
         item.bars_held += 1
         target, stop = item.entry_target, item.entry_stop
         reason = ""
@@ -383,6 +378,8 @@ class PrevDayBoxQuartileReversionStrategy(Strategy):
             box_q25=q25,
             box_mid=mid,
             box_q75=q75,
+            stop_price=stop,
+            target_price=mid,
             prev_median_volume=item.prev_median_volume,
             bar_volume=volume,
         )
@@ -394,8 +391,6 @@ class PrevDayBoxQuartileReversionStrategy(Strategy):
             signal_type=side,
             strength=self.target_allocation or 1.0,
             price=close,
-            stop_loss=stop,
-            take_profit=mid,
             metadata=metadata,
         )
         item.mode = side

@@ -103,6 +103,8 @@ class _OverlayProbeChild:
             datetime=getattr(event, "time", None),
             signal_type=signal_type,
             strength=1.0,
+            stop_loss=90.0,
+            take_profit=110.0,
             metadata=metadata,
         )
 
@@ -327,6 +329,8 @@ def test_ladder_trim_scales_the_next_child_entry() -> None:
 
     first = next(sig for idx, sig in emitted if idx == 0)
     assert first.signal_type == "LONG"
+    assert first.stop_loss is None
+    assert first.take_profit is None
     assert first.metadata["overlay_scale"] == pytest.approx(1.0)
     assert first.metadata["target_allocation"] == pytest.approx(1.0)
 
@@ -434,6 +438,8 @@ def test_child_exit_is_forwarded_unscaled() -> None:
     )
     assert trimmed_exit.signal_type == "EXIT"
     assert trimmed_exit.strength == pytest.approx(1.0)
+    assert trimmed_exit.stop_loss is None
+    assert trimmed_exit.take_profit is None
     assert "overlay_scale" not in trimmed_exit.metadata
 
     # The book is flat after bar 12, so the ladder never reaches its kill rung;

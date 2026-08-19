@@ -151,13 +151,13 @@ _SHARED_EVIDENCE_SOURCES: list[dict[str, Any]] = json.loads(
     },
     {
         "access": "free_unauthenticated",
-        "allowed_usage_label": "strategy_class_evidence",
+        "allowed_usage_label": "evidence_only",
         "cache_path": "var/cache/external_sources/amateurquant_profile.html",
         "credential_requirement": "none",
         "fallback_behavior": "fail_closed",
         "license_note": "Public reference/link only; do not redistribute source content.",
         "notes": [
-            "Public profile supports microstructure, pairs and factor research scope only."
+            "Public profile supplies scope/provenance only, not strategy-rule evidence."
         ],
         "release_lag_policy": "evidence only; no market-time feature is consumed",
         "source_id": "amateurquant_profile",
@@ -227,7 +227,7 @@ _SHARED_EVIDENCE_SOURCES: list[dict[str, Any]] = json.loads(
     },
     {
         "access": "free_unauthenticated",
-        "allowed_usage_label": "strategy_class_evidence",
+        "allowed_usage_label": "diagnostic_only",
         "cache_path": "var/cache/external_sources/dolpago_dogdrip_20210802.html",
         "credential_requirement": "none",
         "fallback_behavior": "fail_closed",
@@ -412,9 +412,8 @@ _EVIDENCE_IDS = {row["source_id"] for row in _SHARED_EVIDENCE_SOURCES}
 _KALMAN_REFS = [
     "chan_algorithmic_trading_2013",
     "triantafyllopoulos_montana_2011",
-    "amateurquant_profile",
 ]
-_PCA_REFS = ["avellaneda_lee_2010", "amateurquant_profile"]
+_PCA_REFS = ["avellaneda_lee_2010"]
 
 
 def _default_params(strategy_class: str) -> dict[str, Any]:
@@ -435,6 +434,9 @@ def _candidate(
     extra_params: dict[str, Any] | None = None,
     hypothesis_refs: list[str],
     notes: str,
+    provenance_refs: list[str] | None = None,
+    diagnostic_context: str | None = None,
+    universe_binding: str | None = None,
     admission_route: str | None = None,
 ) -> dict[str, Any]:
     params = _default_params(strategy_class)
@@ -443,7 +445,8 @@ def _candidate(
             raise KeyError(f"{strategy_class} has no param {key!r}")
         params[key] = value
     params.update(dict(extra_params or {}))
-    unresolved = sorted(set(hypothesis_refs) - _EVIDENCE_IDS)
+    provenance_refs = list(provenance_refs or [])
+    unresolved = sorted((set(hypothesis_refs) | set(provenance_refs)) - _EVIDENCE_IDS)
     if unresolved:
         raise KeyError(f"{candidate_id}: hypothesis_refs not in evidence registry: {unresolved}")
     metadata: dict[str, Any] = {
@@ -452,6 +455,18 @@ def _candidate(
         "universe_membership": _UNIVERSE_NOTE,
         "lane": "claude",
     }
+    if provenance_refs:
+        metadata["provenance_refs"] = provenance_refs
+    if diagnostic_context:
+        metadata["diagnostic_context"] = diagnostic_context
+    if universe_binding:
+        metadata["universe_binding"] = universe_binding
+    if candidate_id.startswith("crypto_"):
+        metadata["universe_constraint"] = "crypto_top10"
+    elif candidate_id.startswith("tradfi_"):
+        metadata["universe_constraint"] = "tradfi_all"
+    elif candidate_id.startswith("xasset_"):
+        metadata["universe_constraint"] = "crypto_top10_plus_tradfi"
     if admission_route:
         metadata["admission_route"] = admission_route
     tags = list(_TAGS)
@@ -488,7 +503,8 @@ def build_candidates() -> list[dict[str, Any]]:
             symbols=CRYPTO10,
             overrides={"max_symbols_by_noise": 5},
             hypothesis_refs=["systrader79_public_post", "brock_technical_rules_1992"],
-            notes="UTC-day session open + noise-adaptive K x prev range; MA-score and range vol-target scale size; time-cut exit at next session.",
+            universe_binding="crypto_top10",
+            notes="UTC-day session open + independently selected noise-adaptive K x prev range; MA-score and range vol-target scale size; time-cut exit at next session. systrader79 supports design philosophy, not these exact parameters.",
         ),
         _candidate(
             candidate_id="crypto_ma_score_vol_target_1d_v1",
@@ -498,12 +514,13 @@ def build_candidates() -> list[dict[str, Any]]:
             timeframe="1d",
             symbols=CRYPTO10,
             hypothesis_refs=["systrader79_public_post", "moreira_muir_2017"],
-            notes="Long-only dynamic allocation: fraction of 3/5/10/20d SMAs below price x inverse-vol risk parity x per-bar vol-target clamp.",
+            universe_binding="crypto_top10",
+            notes="Long-only independent adaptation: fraction of 3/5/10/20d SMAs below price x inverse-vol risk parity x per-bar vol-target clamp; systrader79 supports design philosophy, not these exact parameters.",
             admission_route="allow_multi_asset_handoff",
         ),
         _candidate(
             candidate_id="crypto_multanchanbap_20_10_public_rule_1d_v1",
-            name="Crypto 20d close-high / 10d close-low / -3.5% stop / 120d MA gate (public rule)",
+            name="Crypto 20/10 + 120d Gate (independent close/-3.5% parameterization)",
             family="turtle_unit_pyramiding",
             strategy_class="TurtleUnitPyramidingStrategy",
             timeframe="1d",
@@ -519,8 +536,9 @@ def build_candidates() -> list[dict[str, Any]]:
                 "allow_short": False,
                 "unit_risk_pct": 0.02,
             },
-            hypothesis_refs=["multanchanbap_coin_preview", "multanchanbap_basic_preview"],
-            notes="Exact public rule set (close-channel 20/10, fixed -3.5% stop, long only above the 120-day MA); one unit, no pyramiding, no N-stop. Sizing (unit_risk_pct) is the author's choice.",
+            hypothesis_refs=["multanchanbap_coin_preview"],
+            universe_binding="crypto_top10",
+            notes="Public evidence supports the 120-day gate, 20-day high/10-day low and ATR short-stop/Turtle backbone. Close-channel, fixed -3.5% stop, long-only, one-unit sizing and no-pyramiding/no-N-stop settings are independent hypothesis parameters.",
         ),
         _candidate(
             candidate_id="crypto_turtle_unit_pyramid_1d_v1",
@@ -530,6 +548,7 @@ def build_candidates() -> list[dict[str, Any]]:
             timeframe="1d",
             symbols=CRYPTO10,
             hypothesis_refs=["faith_way_of_turtle_2007", "multanchanbap_coin_preview"],
+            universe_binding="crypto_top10",
             notes="Published Turtle rule shape (Faith 2007): risk%/N unit sizing, +0.5N adds, whole-position 2N stop from the last fill, 55/20 channels; the numeric values (1% risk, 4 units, caps) and the 물탄찬밥 pyramiding framing are this lane's independent choices, not quoted from either source.",
         ),
         _candidate(
@@ -541,6 +560,7 @@ def build_candidates() -> list[dict[str, Any]]:
             symbols=["ETH/USDT", "BTC/USDT"],
             overrides={"symbol_y": "ETH/USDT", "symbol_x": "BTC/USDT"},
             hypothesis_refs=_KALMAN_REFS,
+            provenance_refs=["amateurquant_profile"],
             notes="2-state Kalman hedge on log prices, standardized innovation z entry/exit, ADF gate, half-life hold cap.",
             admission_route="allow_multi_asset_handoff",
         ),
@@ -553,6 +573,7 @@ def build_candidates() -> list[dict[str, Any]]:
             symbols=["SOL/USDT", "AVAX/USDT"],
             overrides={"symbol_y": "SOL/USDT", "symbol_x": "AVAX/USDT", "max_hold_bars": 60},
             hypothesis_refs=_KALMAN_REFS,
+            provenance_refs=["amateurquant_profile"],
             notes="Same engine on an L1 pair at 4h.",
             admission_route="allow_multi_asset_handoff",
         ),
@@ -565,6 +586,8 @@ def build_candidates() -> list[dict[str, Any]]:
             symbols=CRYPTO10,
             overrides={"n_factors": 1, "min_symbols": 6},
             hypothesis_refs=_PCA_REFS,
+            provenance_refs=["amateurquant_profile"],
+            universe_binding="crypto_top10",
             notes="Eigenportfolio residual OU s-scores; open |s|>1.25, close 0.5/0.75; dollar-neutral caps.",
             admission_route="allow_multi_asset_handoff",
         ),
@@ -590,8 +613,9 @@ def build_candidates() -> list[dict[str, Any]]:
             hypothesis_refs=[
                 "flightf_rsi_divergence_20210124",
                 "flightf_trading_principles_20200908",
-                "dacapogo_public_repo_633ba5d",
             ],
+            provenance_refs=["dacapogo_public_repo_633ba5d"],
+            diagnostic_context="dacapogo's tested comparison-proxy family produced negative results; retain as nonreplication caution, not rule evidence.",
             notes="Audited public rule: 10m BTC futures, RSI<20 divergence; staged exit = 60% of the position (EXIT with metadata.exit_fraction=0.6, 'more than half' in the source) at RSI 45, the remaining 40% as a full EXIT at RSI 60; opposing-volume invalidation; 1h (6x10m) trend confirmation as the higher-timeframe proxy. Signals fire on bar close and fill at the next bar open (engine contract).",
         ),
         _candidate(
@@ -601,7 +625,8 @@ def build_candidates() -> list[dict[str, Any]]:
             strategy_class="PrevDayBoxQuartileReversionStrategy",
             timeframe="15m",
             symbols=["BTC/USDT", "ETH/USDT"],
-            hypothesis_refs=["dacapogo_public_repo_633ba5d"],
+            hypothesis_refs=[],
+            provenance_refs=["dacapogo_public_repo_633ba5d"],
             notes="INDEPENDENT comparison-proxy rule set (previous UTC-day box, 25/50/75 levels, wick>=body rebound, volume>prev-day median, TP mid / SL box end / flat at day end) as documented in the dacapogo repo; the AOA interview states no box/quartile rule, so it is deliberately NOT cited as evidence.",
         ),
         _candidate(
@@ -617,8 +642,10 @@ def build_candidates() -> list[dict[str, Any]]:
                 "max_hold_bars": 5,
                 "max_symbols_by_turnover": 5,
             },
-            hypothesis_refs=["dolpago_dogdrip_20210802", "dacapogo_public_repo_633ba5d"],
-            notes="Bar proxy of tape behaviour: prior-session-high break + volume surge in the first 4h of the UTC session, TP 1.5% / SL 0.7% / 5-bar time stop. Fill/queue realism required before any inference.",
+            hypothesis_refs=[],
+            provenance_refs=["dolpago_dogdrip_20210802", "dacapogo_public_repo_633ba5d"],
+            universe_binding="crypto_top10",
+            notes="Independent OHLCV proxy: prior-session-high break + volume surge in the first 4h of the UTC session, TP 1.5% / SL 0.7% / 5-bar time stop. Dolpago's formula is private/unavailable; fill/queue realism is required before any inference.",
         ),
         _candidate(
             candidate_id="crypto_kill_switch_overlay_turtle_1d_v1",
@@ -630,6 +657,7 @@ def build_candidates() -> list[dict[str, Any]]:
             overrides={"child_strategy_class": "TurtleUnitPyramidingStrategy"},
             extra_params={"child_params": turtle_child},
             hypothesis_refs=["albatross_risk_governance", "aoa_bitmex_interview_20250611"],
+            universe_binding="crypto_top10",
             notes="Proxy-equity drawdown ladder (5/10/15/20% -> 0.75/0.5/0.25/0), consecutive-loss halving from the 3rd loss, 10% monthly loss kill, re-risk hysteresis.",
         ),
         # ---------------- TradFi perps ----------------
@@ -642,6 +670,7 @@ def build_candidates() -> list[dict[str, Any]]:
             symbols=TRADFI_LIQUID20,
             overrides={"max_symbols_by_noise": 8},
             hypothesis_refs=["systrader79_public_post", "brock_technical_rules_1992"],
+            universe_binding="tradfi_all",
             notes="Same engine on 20 liquid TradFi perps; UTC session is a proxy for the underlying's cash session.",
         ),
         _candidate(
@@ -653,12 +682,13 @@ def build_candidates() -> list[dict[str, Any]]:
             symbols=TRADFI_LIQUID20,
             overrides={"max_weight": 0.25},
             hypothesis_refs=["systrader79_public_post", "moreira_muir_2017"],
+            universe_binding="tradfi_all",
             notes="Long-only tactical allocation across index ETFs, precious metals and energy.",
             admission_route="allow_multi_asset_handoff",
         ),
         _candidate(
             candidate_id="tradfi_multanchanbap_20_10_public_rule_1d_v1",
-            name="TradFi 20d close-high / 10d close-low / -3.5% stop / 120d MA gate (public rule)",
+            name="TradFi 20/10 + 120d Gate (independent close/-3.5% parameterization)",
             family="turtle_unit_pyramiding",
             strategy_class="TurtleUnitPyramidingStrategy",
             timeframe="1d",
@@ -674,8 +704,9 @@ def build_candidates() -> list[dict[str, Any]]:
                 "allow_short": False,
                 "unit_risk_pct": 0.02,
             },
-            hypothesis_refs=["multanchanbap_coin_preview", "multanchanbap_basic_preview"],
-            notes="Hypothesis transfer of the exact public rule set to ETF/metal/energy perps.",
+            hypothesis_refs=["multanchanbap_coin_preview"],
+            universe_binding="tradfi_all",
+            notes="TradFi transfer of the public 120-day gate, 20-day high/10-day low and ATR short-stop/Turtle backbone; close-channel, fixed -3.5% stop and sizing controls are independent parameters.",
         ),
         _candidate(
             candidate_id="tradfi_turtle_unit_pyramid_1d_v1",
@@ -685,6 +716,7 @@ def build_candidates() -> list[dict[str, Any]]:
             timeframe="1d",
             symbols=TRADFI_LIQUID20,
             hypothesis_refs=["faith_way_of_turtle_2007", "multanchanbap_coin_preview"],
+            universe_binding="tradfi_all",
             notes="Classic Turtle universe analogue (metals, energy, index ETFs); same rule shape as the crypto sleeve, values are independent choices.",
         ),
         _candidate(
@@ -696,6 +728,7 @@ def build_candidates() -> list[dict[str, Any]]:
             symbols=["QQQ/USDT", "SPY/USDT"],
             overrides={"symbol_y": "QQQ/USDT", "symbol_x": "SPY/USDT"},
             hypothesis_refs=_KALMAN_REFS,
+            provenance_refs=["amateurquant_profile"],
             notes="Index-ETF pair with drifting beta.",
             admission_route="allow_multi_asset_handoff",
         ),
@@ -708,6 +741,7 @@ def build_candidates() -> list[dict[str, Any]]:
             symbols=["EWY/USDT", "EWT/USDT"],
             overrides={"symbol_y": "EWY/USDT", "symbol_x": "EWT/USDT", "max_hold_bars": 60},
             hypothesis_refs=_KALMAN_REFS,
+            provenance_refs=["amateurquant_profile"],
             notes="Korea vs Taiwan country-ETF pair (semiconductor-heavy both).",
             admission_route="allow_multi_asset_handoff",
         ),
@@ -720,6 +754,7 @@ def build_candidates() -> list[dict[str, Any]]:
             symbols=["NVDA/USDT", "AMD/USDT"],
             overrides={"symbol_y": "NVDA/USDT", "symbol_x": "AMD/USDT"},
             hypothesis_refs=_KALMAN_REFS,
+            provenance_refs=["amateurquant_profile"],
             notes="Single-stock sector pair.",
             admission_route="allow_multi_asset_handoff",
         ),
@@ -739,6 +774,8 @@ def build_candidates() -> list[dict[str, Any]]:
                 "max_position_allocation": 0.1,
             },
             hypothesis_refs=_PCA_REFS,
+            provenance_refs=["amateurquant_profile"],
+            universe_binding="tradfi_all",
             notes="Avellaneda-Lee on the single-stock perp book; 3 eigenportfolios.",
             admission_route="allow_multi_asset_handoff",
         ),
@@ -751,6 +788,8 @@ def build_candidates() -> list[dict[str, Any]]:
             symbols=TRADFI_LIQUID20,
             overrides={"n_factors": 2, "min_symbols": 10, "max_longs": 4, "max_shorts": 4},
             hypothesis_refs=_PCA_REFS,
+            provenance_refs=["amateurquant_profile"],
+            universe_binding="tradfi_all",
             notes="Cross-asset residual reversion among index ETFs, metals and energy.",
             admission_route="allow_multi_asset_handoff",
         ),
@@ -774,8 +813,9 @@ def build_candidates() -> list[dict[str, Any]]:
             hypothesis_refs=[
                 "flightf_rsi_divergence_20210124",
                 "flightf_trading_principles_20200908",
-                "dacapogo_public_repo_633ba5d",
             ],
+            provenance_refs=["dacapogo_public_repo_633ba5d"],
+            diagnostic_context="dacapogo's tested comparison-proxy family produced negative results; retain as nonreplication caution, not rule evidence.",
             notes="Hypothesis transfer of the BTC-futures RSI method to gold and crude perps at the same 10m cadence (60% exit at RSI 45, remainder at 60).",
         ),
         _candidate(
@@ -785,7 +825,8 @@ def build_candidates() -> list[dict[str, Any]]:
             strategy_class="PrevDayBoxQuartileReversionStrategy",
             timeframe="15m",
             symbols=["XAU/USDT", "SPY/USDT", "QQQ/USDT"],
-            hypothesis_refs=["dacapogo_public_repo_633ba5d"],
+            hypothesis_refs=[],
+            provenance_refs=["dacapogo_public_repo_633ba5d"],
             notes="Same independent comparison-proxy rule set on macro perps; UTC-day box; no attribution to any trader's stated rule.",
         ),
         _candidate(
@@ -803,8 +844,9 @@ def build_candidates() -> list[dict[str, Any]]:
                 "entry_start_minute": 810,
                 "entry_end_minute": 990,
             },
-            hypothesis_refs=["dolpago_dogdrip_20210802", "dacapogo_public_repo_633ba5d"],
-            notes="Entry window 13:30-16:30 UTC (US cash open) as the morning-concentration analogue; top-10 turnover names of the previous session.",
+            hypothesis_refs=[],
+            provenance_refs=["dolpago_dogdrip_20210802", "dacapogo_public_repo_633ba5d"],
+            notes="Independent OHLCV proxy using a 13:30-16:30 UTC entry window and previous-session top-10 turnover names. Dolpago's formula is private/unavailable.",
         ),
         _candidate(
             candidate_id="tradfi_kill_switch_overlay_ma_rotation_1d_v1",
@@ -819,6 +861,7 @@ def build_candidates() -> list[dict[str, Any]]:
             },
             extra_params={"child_params": rotation_child},
             hypothesis_refs=["albatross_risk_governance"],
+            universe_binding="tradfi_all",
             notes="Adds the 60-bar equity-curve MA filter on top of the drawdown ladder.",
             admission_route="allow_multi_asset_handoff",
         ),
@@ -832,6 +875,7 @@ def build_candidates() -> list[dict[str, Any]]:
             symbols=CRYPTO10 + PRECIOUS + ENERGY_INDUSTRIAL + ETF_INDEX,
             overrides={"max_weight": 0.15, "min_symbols": 5},
             hypothesis_refs=["systrader79_public_post", "moreira_muir_2017"],
+            universe_binding="crypto_top10_plus_tradfi",
             notes="30-asset tactical book; the timing overlay for the asset-level hierarchical allocation study.",
             admission_route="allow_multi_asset_handoff",
         ),
@@ -853,10 +897,7 @@ def _sleeves(candidates: list[dict[str, Any]]) -> dict[str, Any]:
             "returns_source": {
                 "artifact": "named_quant_claude_data_pc_walkforward",
                 "candidate_id": row["candidate_id"],
-                "stream": (
-                    "common-date aligned train+validation NET returns only; the locked-OOS "
-                    "segment is NEVER an allocator/quality-gate input (reported separately)"
-                ),
+                "stream": "common-date aligned train+validation NET returns only",
                 "selection_inputs": ["train", "validation"],
                 "locked_oos_used_for_weights": False,
                 "turnover_source": (
@@ -884,9 +925,11 @@ def build_suite() -> dict[str, Any]:
         "lane": "claude",
         "sibling_lane": "configs/research/named_quant_crypto_tradfi_suite_v1.json",
         "attribution_policy": (
-            "Independent adaptations of publicly described rules (systrader79, 물탄찬밥, "
-            "아마추어퀀트, 알바트로스, FlightF, 워뇨띠/AOA, 돌파고 as documented in the "
-            "dacapogo repo); not a reproduction, endorsement or performance claim."
+            "Independent research hypotheses. Named sources are cited only for their stated "
+            "scope: systrader79 design philosophy, 물탄찬밥's disclosed Turtle backbone, "
+            "FlightF's direct posts, AmateurQuant scope, and Albatross/AOA risk context. "
+            "Box and session-scalp rules are unattributed proxies; not reproductions, "
+            "endorsements or performance claims."
         ),
         "candidate_research": {
             "research": {
@@ -947,16 +990,28 @@ def build_suite() -> dict[str, Any]:
                 "method": "constrained_hrp",
                 "allocator_params": {"linkage_method": "single", "lower": 0.0, "upper_bound": 0.2},
             },
-            {"method": "herc", "allocator_params": {"linkage_method": "ward"}},
+            {
+                "method": "herc",
+                "allocator_params": {"linkage_method": "ward"},
+                "notes": "Deterministic silhouette-selected HERC variant; not the original gap-statistic selection.",
+            },
             {"method": "nco", "allocator_params": {"use_mean": False}},
-            # BCZ radius is in squared-return units: 1e-5 ~ (0.32% per bar)^2 ambiguity
-            # on a daily NET-return panel; target_return is per bar.
-            {"method": "wasserstein_dro", "allocator_params": {"radius": 1e-5}},
+            # Sensitivity radii in squared-return units; no confidence or calibration claim.
+            {
+                "method": "wasserstein_dro",
+                "allocator_params": {"radius": 1e-5},
+                "notes": "Sensitivity radius in squared-return units; no confidence or calibration interpretation.",
+            },
             {
                 "method": "wasserstein_dro",
                 "allocator_params": {"radius": 1e-4, "target_return": 0.0002},
+                "notes": "Sensitivity radius in squared-return units; no confidence or calibration interpretation.",
             },
-            {"method": "graph_inverse_centrality", "allocator_params": {"floor": 1e-6}},
+            {
+                "method": "graph_inverse_centrality",
+                "allocator_params": {"floor": 1e-6},
+                "notes": "Independent graph-risk heuristic; no published-rule reproduction claim.",
+            },
             {"method": "hrp", "allocator_params": {}},
             {"method": "erc", "allocator_params": {}},
         ],
@@ -970,6 +1025,11 @@ def build_suite() -> dict[str, Any]:
         "min_sleeves": 6,
         "gross_cap": 1.0,
         "membership_is_preregistered_weights_are_measured": True,
+        "locked_oos_evaluation": {
+            "rebalance_every_observations": 5,
+            "allocation_cost_bps": 10.0,
+            "periods_per_year": 252,
+        },
         "sleeves": _sleeves(candidates),
         "source_artifacts": [
             {
@@ -1030,8 +1090,8 @@ def build_suite() -> dict[str, Any]:
         },
         "required_data_contracts": [
             "timestamped OHLCV and next-open execution",
-            "mark/index price, funding rate and actual settlement timestamp per symbol",
-            "maker/taker fee, spread, slippage, sqrt-impact and liquidation simulation",
+            "mark/index price retained as diagnostics; funding rate and actual settlement timestamp per symbol",
+            "maker/taker fee, spread, slippage, sqrt-impact and trade-price OHLC isolated liquidation approximation",
             "1s/1m bars with per-bar volume for the scalp candidates; queue-position model before any inference",
             "point-in-time market-cap and listing/delisting membership receipts",
             "common-date aligned net sleeve return streams before allocation",
@@ -1045,22 +1105,22 @@ def build_suite() -> dict[str, Any]:
             {
                 "requested_label": "systrader79",
                 "status": "public_blog_and_books",
-                "action": "volatility breakout / noise / MA score / vol control rules",
+                "action": "design-philosophy context only; exact noise-K, MA windows and other parameters are independent adaptations",
             },
             {
                 "requested_label": "물탄찬밥",
                 "status": "verified_public_preview",
-                "action": "exact public rule candidate (20d close-high entry / 10d close-low exit / -3.5% stop / 120d MA gate: *_multanchanbap_20_10_public_rule_1d_v1) plus the Turtle unit-sizing/pyramiding extension; IBS variant lives in the sibling lane",
+                "action": "source supports a 120d gate, 20d high/10d low and ATR short-stop/Turtle backbone; close-channel, fixed -3.5%, sizing and pyramiding settings are independent parameters",
             },
             {
                 "requested_label": "아마추어퀀트",
                 "status": "public_profile",
-                "action": "pairs / stat-arb research scope only",
+                "action": "pairs / stat-arb research scope only; provenance, not a rule source",
             },
             {
                 "requested_label": "알바트로스",
                 "status": "verified_as_성필규",
-                "action": "capital-management / kill-switch inspiration only",
+                "action": "risk-governance context only; overlay thresholds are independent parameters",
             },
             {
                 "requested_label": "부동심",
@@ -1069,18 +1129,18 @@ def build_suite() -> dict[str, Any]:
             },
             {
                 "requested_label": "FlightF",
-                "status": "primary_posts_catalogued_in_dacapogo",
-                "action": "RSI divergence proxy",
+                "status": "direct_primary_posts",
+                "action": "two direct Flight posts support the hypothesis; dacapogo is diagnostic provenance only and its tested proxy family had negative/nonreplicating results",
             },
             {
                 "requested_label": "워뇨띠/AOA",
-                "status": "bitmex_interview_catalogued_in_dacapogo",
-                "action": "prev-day box quartile proxy",
+                "status": "direct_bitmex_interview",
+                "action": "liquid-major preference and risk context only; no previous-day-box attribution",
             },
             {
                 "requested_label": "돌파고",
-                "status": "ledger_observations_only",
-                "action": "session-high breakout scalp proxy; formula not reproduced",
+                "status": "identity_and_ledger_provenance_only",
+                "action": "formula is private/unavailable; session scalp is an independent OHLCV proxy",
             },
         ],
     }

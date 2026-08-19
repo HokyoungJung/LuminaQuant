@@ -589,6 +589,7 @@ class RsiDivergenceScaleOutStrategy(Strategy):
             pivot_price_new=newest.price,
             pivot_price_prev=earlier.price,
             pivot_distance=newest.bar_index - earlier.bar_index,
+            stop_price=newest.price,
         )
         _emit(
             self.events,
@@ -598,7 +599,6 @@ class RsiDivergenceScaleOutStrategy(Strategy):
             signal_type=side,
             strength=self.target_allocation or 1.0,
             price=close,
-            stop_loss=newest.price,
             metadata=metadata,
         )
         item.mode = side

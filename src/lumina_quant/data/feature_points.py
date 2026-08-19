@@ -143,6 +143,35 @@ class FeaturePointLookup:
             return None
         return float(sum(values))
 
+    def funding_fee_sum_between(
+        self,
+        symbol: str,
+        *,
+        start_timestamp_ms: int,
+        end_timestamp_ms: int,
+        interval_ms: int,
+    ) -> tuple[float | None, bool]:
+        """Sum actual settlement fees in ``(start, end]`` and report exact coverage."""
+        if not self.db_path or interval_ms <= 0 or end_timestamp_ms <= start_timestamp_ms:
+            return None, False
+        first = ((int(start_timestamp_ms) // interval_ms) + 1) * interval_ms
+        settlements = range(first, int(end_timestamp_ms) + 1, interval_ms)
+        expected = len(settlements)
+        if expected == 0:
+            return None, True
+
+        cache = self._get_or_load(symbol)
+        values = cache.raw_columns.get("funding_fee_quote_per_unit", [])
+        found: list[float] = []
+        for timestamp_ms in settlements:
+            idx = bisect_right(cache.timestamps_ms, timestamp_ms) - 1
+            if idx < 0 or cache.timestamps_ms[idx] != timestamp_ms:
+                continue
+            value = values[idx]
+            if value is not None and math.isfinite(float(value)):
+                found.append(float(value))
+        return (float(sum(found)) if found else None), len(found) == expected
+
     def _get_or_load(self, symbol: str) -> _FeatureCache:
         normalized = normalize_symbol(symbol)
         cached = self._cache.get(normalized)

@@ -141,8 +141,10 @@ def test_long_rebound_then_single_signal_then_take_profit() -> None:
     assert len(entries) == 1
     entry = entries[0]
     assert entry.signal_type == "LONG"
-    assert entry.stop_loss == _BOX_LOW
-    assert entry.take_profit == _MID
+    assert entry.stop_loss is None
+    assert entry.take_profit is None
+    assert entry.metadata["stop_price"] == _BOX_LOW
+    assert entry.metadata["target_price"] == _MID
     assert entry.metadata["target_allocation"] == 0.25
     assert entry.metadata["max_order_value"] == 500.0
     assert entry.metadata["box_high"] == _BOX_HIGH
@@ -212,8 +214,10 @@ def test_short_mirror_from_the_upper_quartile() -> None:
     entries = events.drain()
     assert len(entries) == 1
     assert entries[0].signal_type == "SHORT"
-    assert entries[0].stop_loss == _BOX_HIGH
-    assert entries[0].take_profit == _MID
+    assert entries[0].stop_loss is None
+    assert entries[0].take_profit is None
+    assert entries[0].metadata["stop_price"] == _BOX_HIGH
+    assert entries[0].metadata["target_price"] == _MID
     assert entries[0].metadata["reason"] == "upper_quartile_rejection"
     assert entries[0].metadata["box_q75"] == _Q75
 
@@ -369,6 +373,8 @@ def test_market_window_path_produces_the_same_entry() -> None:
     entries = events.drain()
     assert len(entries) == 1
     assert entries[0].signal_type == "LONG"
-    assert entries[0].stop_loss == _BOX_LOW
-    assert entries[0].take_profit == _MID
+    assert entries[0].stop_loss is None
+    assert entries[0].take_profit is None
+    assert entries[0].metadata["stop_price"] == _BOX_LOW
+    assert entries[0].metadata["target_price"] == _MID
     assert entries[0].metadata["bar_volume"] == 20.0

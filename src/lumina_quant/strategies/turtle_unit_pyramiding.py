@@ -537,6 +537,5 @@ class TurtleUnitPyramidingStrategy(Strategy):
             signal_type=item.mode,
             strength=unit_alloc,
             price=close,
-            stop_loss=effective_stop,
             metadata=metadata,
         )

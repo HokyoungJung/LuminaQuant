@@ -109,6 +109,7 @@ def test_schema_keys_snake_case_and_hyperparam() -> None:
         "max_longs",
         "max_shorts",
         "allow_short",
+        "true_carry_sign",
         "target_gross_exposure",
         "target_vol",
         "rebalance_band",
@@ -119,7 +120,12 @@ def test_schema_keys_snake_case_and_hyperparam() -> None:
     ):
         assert required in schema
     # Caps are not tunable.
-    for cap in ("base_allocation", "max_symbol_exposure_pct", "max_order_value"):
+    for cap in (
+        "true_carry_sign",
+        "base_allocation",
+        "max_symbol_exposure_pct",
+        "max_order_value",
+    ):
         assert schema[cap].tunable is False
 
 

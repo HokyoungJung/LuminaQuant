@@ -36,7 +36,8 @@ def _exchange_snapshot(timestamp: str, *, tradfi: tuple[str, ...] = ("XAU", "SPX
                 "status": "TRADING",
                 "filters": [
                     {"filterType": "PRICE_FILTER", "tickSize": "0.1"},
-                    {"filterType": "LOT_SIZE", "stepSize": "0.001"},
+                    {"filterType": "LOT_SIZE", "minQty": "0.001", "stepSize": "0.001"},
+                    {"filterType": "MIN_NOTIONAL", "notional": "5"},
                     {"filterType": "NOT_COPIED", "x": "y"},
                 ],
             }
@@ -49,7 +50,11 @@ def _exchange_snapshot(timestamp: str, *, tradfi: tuple[str, ...] = ("XAU", "SPX
                 "quoteAsset": "USDT",
                 "contractType": "TRADIFI_PERPETUAL",
                 "status": "TRADING",
-                "filters": [{"filterType": "MIN_NOTIONAL", "notional": "5"}],
+                "filters": [
+                    {"filterType": "PRICE_FILTER", "tickSize": "0.1"},
+                    {"filterType": "LOT_SIZE", "minQty": "0.001", "stepSize": "0.001"},
+                    {"filterType": "MIN_NOTIONAL", "notional": "5"},
+                ],
             }
         )
     return {"timestamp": timestamp, "symbols": symbols}
@@ -72,6 +77,16 @@ def _suite() -> dict:
                 "candidate_id": "both",
                 "metadata": {"universe_binding": "crypto_top10_plus_tradfi"},
                 "symbols": ["OLD"],
+            },
+            {
+                "candidate_id": "fixed-outside",
+                "metadata": {"universe_constraint": "crypto_top10"},
+                "symbols": ["BTC/USDT", "LINK/USDT"],
+            },
+            {
+                "candidate_id": "fixed-tradfi-outside",
+                "metadata": {"universe_constraint": "tradfi_all"},
+                "symbols": ["XAU/USDT", "NVDA/USDT"],
             },
             {"candidate_id": "fixed", "metadata": {}, "symbols": ["BTC/USDT", "ETH/USDT"]},
         ]
@@ -124,6 +139,10 @@ def test_materializes_ranked_intersection_tradfi_filters_and_bindings(tmp_path: 
     assert candidates["crypto"]["symbols"] == crypto
     assert candidates["tradfi"]["symbols"] == ["SPX/USDT", "XAU/USDT"]
     assert candidates["both"]["symbols"] == [*crypto, "SPX/USDT", "XAU/USDT"]
+    assert candidates["fixed-outside"]["enabled"] is False
+    assert candidates["fixed-outside"]["disabled_reason"].endswith("LINK/USDT")
+    assert candidates["fixed-tradfi-outside"]["enabled"] is False
+    assert candidates["fixed-tradfi-outside"]["disabled_reason"].endswith("NVDA/USDT")
     assert candidates["fixed"]["symbols"] == ["BTC/USDT", "ETH/USDT"]
     receipt = output["universe_materialization_receipt"]
     assert receipt["source_sha256"] == {
@@ -131,12 +150,20 @@ def test_materializes_ranked_intersection_tradfi_filters_and_bindings(tmp_path: 
         "exchange_info": hashlib.sha256(exchange_path.read_bytes()).hexdigest(),
     }
     assert receipt["counts"]["eligible_ranked_crypto"] == 10
+    assert receipt["counts"]["disabled_candidates"] == 2
+    assert receipt["disabled_candidates"] == {
+        "fixed-outside": ["LINK/USDT"],
+        "fixed-tradfi-outside": ["NVDA/USDT"],
+    }
     assert receipt["binance_filters"]["BTC/USDT"] == [
         {"filterType": "PRICE_FILTER", "tickSize": "0.1"},
-        {"filterType": "LOT_SIZE", "stepSize": "0.001"},
+        {"filterType": "LOT_SIZE", "minQty": "0.001", "stepSize": "0.001"},
+        {"filterType": "MIN_NOTIONAL", "notional": "5"},
     ]
     assert receipt["binance_filters"]["XAU/USDT"] == [
-        {"filterType": "MIN_NOTIONAL", "notional": "5"}
+        {"filterType": "PRICE_FILTER", "tickSize": "0.1"},
+        {"filterType": "LOT_SIZE", "minQty": "0.001", "stepSize": "0.001"},
+        {"filterType": "MIN_NOTIONAL", "notional": "5"},
     ]
 
 
@@ -201,6 +228,14 @@ def test_cli_uses_latest_non_future_snapshot_and_jsonl(tmp_path: Path) -> None:
     }
 
 
+def test_single_snapshot_object_is_accepted(tmp_path: Path) -> None:
+    path = tmp_path / "exchange.json"
+    snapshot = _exchange_snapshot("2026-01-01T00:00:00Z")
+    path.write_text(json.dumps(snapshot))
+    assert MODULE._load_snapshots(path, label="exchangeInfo") == [snapshot]
+    assert MODULE._positive_float(True) is None
+
+
 def test_tradfi_binding_fails_closed_when_exchange_has_none(tmp_path: Path) -> None:
     ranking = ["BTC", "ETH", "SOL", "XRP", "DOGE", "ADA", "AVAX", "TON", "BNB", "TRX"]
     market = _market_snapshot("2026-01-01T00:00:00Z", ranking)
@@ -217,6 +252,41 @@ def test_tradfi_binding_fails_closed_when_exchange_has_none(tmp_path: Path) -> N
             as_of=datetime(2026, 1, 2, tzinfo=UTC),
             market_cap_source=market_path,
             exchange_info_source=exchange_path,
+        )
+
+
+@pytest.mark.parametrize("missing_filter", ["PRICE_FILTER", "LOT_SIZE", "MIN_NOTIONAL"])
+def test_selected_symbol_requires_complete_exchange_filters(
+    tmp_path: Path, missing_filter: str
+) -> None:
+    market = _market_snapshot("2026-01-01T00:00:00Z", ["BTC"])
+    exchange = _exchange_snapshot("2026-01-01T00:00:00Z", tradfi=())
+    exchange["symbols"][0]["filters"] = [
+        row for row in exchange["symbols"][0]["filters"] if row["filterType"] != missing_filter
+    ]
+    market_path = tmp_path / "caps.json"
+    exchange_path = tmp_path / "exchange.json"
+    market_path.write_text(json.dumps(market))
+    exchange_path.write_text(json.dumps(exchange))
+    suite = {
+        "candidates": [
+            {
+                "candidate_id": "crypto",
+                "metadata": {"universe_binding": "crypto_top10"},
+                "symbols": ["OLD"],
+            }
+        ]
+    }
+
+    with pytest.raises(ValueError, match="selected symbol BTC/USDT lacks"):
+        MODULE.materialize(
+            suite,
+            market,
+            exchange,
+            as_of=datetime(2026, 1, 2, tzinfo=UTC),
+            market_cap_source=market_path,
+            exchange_info_source=exchange_path,
+            crypto_top_n=1,
         )
 
 

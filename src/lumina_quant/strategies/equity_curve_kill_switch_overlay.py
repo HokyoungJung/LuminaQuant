@@ -821,8 +821,6 @@ class EquityCurveKillSwitchOverlayStrategy(Strategy):
             signal_type=str(signal.signal_type),
             strength=base_strength * float(strength_scale),
             price=getattr(signal, "price", None),
-            stop_loss=getattr(signal, "stop_loss", None),
-            take_profit=getattr(signal, "take_profit", None),
             position_side=getattr(signal, "position_side", None),
             client_order_id=getattr(signal, "client_order_id", None),
             time_in_force=getattr(signal, "time_in_force", None),

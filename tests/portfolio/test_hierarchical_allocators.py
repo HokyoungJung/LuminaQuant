@@ -163,10 +163,18 @@ def test_long_only_max_sharpe_matches_brute_force() -> None:
     assert np.isclose(w.sum(), 1.0) and np.all(w >= -1e-12)
     assert neg_sharpe(w) <= neg_sharpe(oracle) + 1e-9
     assert w[2] < 1e-9  # negative-mean asset is excluded, not shorted
-    # All-negative means fall back to min variance.
-    assert np.allclose(
-        hier.long_only_max_sharpe(cov, -np.abs(mu)), hier.long_only_min_variance(cov)
-    )
+    # The positive-return QP substitution does not cover all-negative means;
+    # silently returning min-variance solves the wrong objective.
+    with pytest.raises(ValueError, match="positive"):
+        hier.long_only_max_sharpe(cov, -np.abs(mu))
+
+
+def test_long_only_max_sharpe_invalid_solver_output_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(hier, "_active_set_qp", lambda *args, **kwargs: np.zeros(2))
+    with pytest.raises(RuntimeError, match="max-Sharpe solver"):
+        hier.long_only_max_sharpe(np.eye(2), np.array([0.1, 0.2]))
 
 
 def test_nco_max_sharpe_tilts_toward_higher_mean() -> None:
@@ -175,6 +183,8 @@ def test_nco_max_sharpe_tilts_toward_higher_mean() -> None:
     w = hier.nco_weights(cov, mu=mu, n_clusters=2)
     assert np.isclose(w.sum(), 1.0)
     assert w[0] > w[1]
+    with pytest.raises(ValueError, match="positive"):
+        hier.nco_weights(cov, mu=-mu, n_clusters=2)
 
 
 def test_wasserstein_dro_bcz_exact_formulation() -> None:
@@ -240,6 +250,26 @@ def test_wasserstein_dro_bcz_exact_formulation() -> None:
     assert np.allclose(
         hier.wasserstein_dro_weights(cov, mu=mu, radius=1e-5, target_return=-1.0), w_free
     )
+    radius_zero_cov = np.diag([1.0, 100.0, 10_000.0])
+    radius_zero = hier.wasserstein_dro_weights(
+        radius_zero_cov,
+        mu=np.ones(3),
+        radius=0.0,
+        target_return=-1.0,
+        max_iter=1,
+    )
+    np.testing.assert_allclose(
+        radius_zero,
+        hier.long_only_min_variance(radius_zero_cov, max_iter=1),
+    )
+    with pytest.raises(ValueError, match="radius"):
+        hier.wasserstein_dro_weights(cov, radius=-1e-6)
+    with pytest.raises(ValueError, match="expected returns"):
+        hier.wasserstein_dro_weights(cov, mu=[np.nan, 0.0, 0.0], target_return=0.0)
+    with pytest.raises(RuntimeError, match="certificate"):
+        hier.wasserstein_dro_weights(np.diag([1.0, 100.0, 10_000.0]), radius=0.1, max_iter=1)
+    with pytest.raises(ValueError, match="singleton"):
+        hier.wasserstein_dro_weights([[1.0]], mu=[0.0], radius=0.01, target_return=0.0)
 
 
 def test_indefinite_covariance_fails_closed_but_noise_is_clipped() -> None:
@@ -276,6 +306,9 @@ def test_graph_inverse_centrality_is_permutation_equivariant() -> None:
     permuted = hier.graph_inverse_centrality_weights(cov[np.ix_(perm, perm)])
     assert np.allclose(permuted, base[perm])
     assert np.allclose(hier.graph_inverse_centrality_weights(np.eye(2)), [0.5, 0.5])
+    for floor in (0.0, -1.0, np.nan):
+        with pytest.raises(ValueError, match="floor"):
+            hier.graph_inverse_centrality_weights(cov, floor=floor)
 
 
 def test_plugin_wrappers_registered_and_apply_upper_caps() -> None:
@@ -303,7 +336,6 @@ def test_quality_gated_dispatch_accepts_new_methods_and_records_params() -> None
     for method in (
         "hrp_dendrogram",
         "hrp_full",
-        "constrained_hrp",
         "herc",
         "nco",
         "wasserstein_dro",
@@ -314,6 +346,17 @@ def test_quality_gated_dispatch_accepts_new_methods_and_records_params() -> None
         assert weights and np.isclose(sum(weights.values()), 1.0)
         assert max(weights.values()) <= 0.4 + 1e-9
         assert set(weights) == set(legacy)
+    constrained = allocate_quality_gated(
+        sleeves,
+        method="constrained_hrp",
+        upper=0.4,
+        allocator_params={"lower": 0.05, "upper_bound": 0.3},
+        min_families=1,
+    )
+    assert min(constrained.values()) >= 0.05 - 1e-9
+    assert max(constrained.values()) <= 0.3 + 1e-9
+    with pytest.raises(ValueError, match="requires explicit"):
+        allocate_quality_gated(sleeves, method="constrained_hrp", min_families=1)
     assert _build_allocator("herc", {"n_clusters": 2}).n_clusters == 2
     with pytest.raises(ValueError):
         _build_allocator("bogus")

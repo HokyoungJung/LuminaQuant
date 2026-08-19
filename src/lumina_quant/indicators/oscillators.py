@@ -12,7 +12,7 @@ def internal_bar_strength(high, low, close) -> float | None:
     """Return the close's location within the bar range on ``[0, 1]``."""
     try:
         high_f, low_f, close_f = float(high), float(low), float(close)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     if not all(math.isfinite(value) for value in (high_f, low_f, close_f)):
         return None

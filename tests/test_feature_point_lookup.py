@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from lumina_quant.data.feature_points import FEATURE_POINT_MAX_STALE_MS, FeaturePointLookup
 from lumina_quant.market_data import upsert_futures_feature_points_rows
 
@@ -84,6 +86,33 @@ def test_feature_point_lookup_sums_raw_feature_window(tmp_path):
         )
         is None
     )
+
+
+def test_feature_point_lookup_sums_exact_funding_settlements(tmp_path):
+    db_path = tmp_path / "market_parquet"
+    interval_ms = 8 * 60 * 60 * 1000
+    start_ms = 1_767_225_600_000  # 2026-01-01 00:00 UTC
+    upsert_futures_feature_points_rows(
+        str(db_path),
+        exchange="binance",
+        symbol="BTC/USDT",
+        rows=[
+            {"timestamp_ms": start_ms + interval_ms, "funding_fee_quote_per_unit": 0.1},
+            {"timestamp_ms": start_ms + 2 * interval_ms, "funding_fee_quote_per_unit": 0.4},
+            {"timestamp_ms": start_ms + 3 * interval_ms, "funding_fee_quote_per_unit": -0.3},
+        ],
+    )
+
+    lookup = FeaturePointLookup(db_path=str(db_path), exchange="binance")
+
+    value, complete = lookup.funding_fee_sum_between(
+        "BTC/USDT",
+        start_timestamp_ms=start_ms,
+        end_timestamp_ms=start_ms + 3 * interval_ms,
+        interval_ms=interval_ms,
+    )
+    assert value == pytest.approx(0.2)
+    assert complete is True
 
 
 def test_feature_point_lookup_does_not_forward_fill_beyond_staleness_limit(tmp_path):

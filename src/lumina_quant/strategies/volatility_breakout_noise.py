@@ -274,9 +274,30 @@ class NoiseFilteredVolatilityBreakoutStrategy(Strategy):
         if symbol in self._state and (snapshot := _market_snapshot(event)) is not None:
             self._process(symbol, snapshot)
 
+    def calculate_signals_batch(self, event: Any) -> None:
+        prepared = []
+        for bar in sorted(getattr(event, "bars", ()), key=lambda item: str(item.symbol)):
+            symbol = str(getattr(bar, "symbol", ""))
+            if (
+                symbol in self._state
+                and (snapshot := _market_snapshot(bar)) is not None
+                and (context := self._prepare(symbol, snapshot, refresh_ranking=False))
+            ):
+                prepared.append(context)
+        if prepared:
+            self._refresh_noise_ranking(prepared[0][3])
+        for symbol, snapshot, item, session, high, low, close in prepared:
+            self._evaluate(symbol, snapshot, item, session, high, low, close)
+
     # ------------------------------------------------------------------- core
 
     def _process(self, symbol: str, snapshot: _Snapshot) -> None:
+        if context := self._prepare(symbol, snapshot, refresh_ranking=True):
+            self._evaluate(*context)
+
+    def _prepare(
+        self, symbol: str, snapshot: _Snapshot, *, refresh_ranking: bool
+    ) -> tuple[str, _Snapshot, _State, str, float, float, float] | None:
         item = self._state[symbol]
         key = time_key(snapshot.time)
         if key and key == item.last_time_key:
@@ -295,13 +316,27 @@ class NoiseFilteredVolatilityBreakoutStrategy(Strategy):
         item.last_time_key = key
 
         if session != item.session_key:
-            self._roll_session(symbol, item, snapshot, session, bar_open, high, low, close)
+            self._roll_session(
+                symbol, item, snapshot, session, bar_open, high, low, close, refresh_ranking
+            )
         else:
             item.session_high = high if item.session_high is None else max(item.session_high, high)
             item.session_low = low if item.session_low is None else min(item.session_low, low)
             item.session_close = close
-            if item.mode != "OUT" and self._stop_hit(item, close):
-                self._exit(symbol, snapshot, close, "stop_loss")
+        return symbol, snapshot, item, session, high, low, close
+
+    def _evaluate(
+        self,
+        symbol: str,
+        snapshot: _Snapshot,
+        item: _State,
+        session: str,
+        high: float,
+        low: float,
+        close: float,
+    ) -> None:
+        if item.mode != "OUT" and self._stop_hit(item, close):
+            self._exit(symbol, snapshot, close, "stop_loss")
         self._maybe_enter(symbol, item, snapshot, session, high, low, close)
 
     def _roll_session(
@@ -314,6 +349,7 @@ class NoiseFilteredVolatilityBreakoutStrategy(Strategy):
         high: float,
         low: float,
         close: float,
+        refresh_ranking: bool = True,
     ) -> None:
         """Archive the finished session, time-cut any open position, open the new one."""
         if (
@@ -335,12 +371,8 @@ class NoiseFilteredVolatilityBreakoutStrategy(Strategy):
         item.session_high = high
         item.session_low = low
         item.session_close = close
-        # ponytail: the cross-sectional ranking is recomputed on EVERY symbol roll
-        # rather than once per wall-clock boundary.  Symbols that have not yet
-        # delivered their first bar of the new session still contribute their own
-        # completed-session noise (strictly past data, so no look-ahead); the rank
-        # self-corrects as the remaining symbols roll in.
-        self._refresh_noise_ranking(session)
+        if refresh_ranking:
+            self._refresh_noise_ranking(session)
 
     def _maybe_enter(
         self,
@@ -428,6 +460,7 @@ class NoiseFilteredVolatilityBreakoutStrategy(Strategy):
             session=session,
             upper=float(upper),
             lower=float(lower),
+            stop_loss=stop_loss,
         )
         _emit(
             self.events,
@@ -437,7 +470,6 @@ class NoiseFilteredVolatilityBreakoutStrategy(Strategy):
             signal_type=direction,
             strength=allocation,
             price=price,
-            stop_loss=stop_loss,
             metadata=metadata,
         )
         item.mode = direction

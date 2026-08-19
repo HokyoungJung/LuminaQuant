@@ -123,7 +123,7 @@ class TrendGatedIbsReversionStrategy(Strategy):
             item.entry_price = safe_float(payload.get("entry_price"))
             try:
                 item.bars_held = max(0, int(payload.get("bars_held", 0)))
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 item.bars_held = 0
             item.last_time_key = str(payload.get("last_time_key", ""))
 

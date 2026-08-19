@@ -67,17 +67,9 @@ the session boundary; treat that one-bar lag as part of the proxy (a
 last-bar-of-session pre-emptive exit would need the bar interval, which the
 event contract does not carry).
 
-Double-managed bracket caveat: the entry signal carries ``stop_loss`` and
-``take_profit`` AND the sleeve re-checks the very same levels close-to-close in
-:meth:`_manage_position`.  That is the incumbent pattern in this book, but the
-two layers do not talk to each other: if the engine's bracket fills intrabar
-the sleeve is not told, so it keeps managing a position that is already flat
-(``bars_held`` keeps counting, and it will emit its own EXIT once a bar CLOSES
-through the level or the time stop trips).  The stale EXIT is harmless for a
-portfolio that ignores exits on a flat book, but any bar-level P&L attribution
-that trusts the sleeve's own bookkeeping will disagree with the fills; on a 1s
-cadence with a 0.7% stop that gap is the normal case, not the exception.  Read
-every backtest of this sleeve as bracket-fills-OR-close-rules, never both.
+Stop and target levels are recorded in signal metadata and managed close-to-close
+inside the sleeve.  They are not emitted as engine brackets because the engine
+has no fill callback with which to reconcile the sleeve's position state.
 """
 
 from __future__ import annotations
@@ -312,9 +304,43 @@ class SessionHighBreakoutScalpStrategy(Strategy):
         if symbol in self._state and (snapshot := _market_snapshot(event)) is not None:
             self._process(symbol, snapshot)
 
+    def calculate_signals_batch(self, event: Any) -> None:
+        prepared = []
+        for bar in sorted(getattr(event, "bars", ()), key=lambda item: str(item.symbol)):
+            symbol = str(getattr(bar, "symbol", ""))
+            if (
+                symbol in self._state
+                and (snapshot := _market_snapshot(bar)) is not None
+                and (context := self._prepare(symbol, snapshot, refresh_universe=False))
+            ):
+                prepared.append(context)
+        if prepared:
+            self._refresh_universe()
+        for context in prepared:
+            self._evaluate(*context)
+
     # ------------------------------------------------------------------- core
 
     def _process(self, symbol: str, snapshot: _Snapshot) -> None:
+        if context := self._prepare(symbol, snapshot, refresh_universe=True):
+            self._evaluate(*context)
+
+    def _prepare(
+        self, symbol: str, snapshot: _Snapshot, *, refresh_universe: bool
+    ) -> (
+        tuple[
+            str,
+            _State,
+            _Snapshot,
+            float,
+            float | None,
+            float | None,
+            int,
+            float | None,
+            float | None,
+        ]
+        | None
+    ):
         item = self._state[symbol]
         key = time_key(snapshot.time)
         if key and key == item.last_time_key:
@@ -334,7 +360,7 @@ class SessionHighBreakoutScalpStrategy(Strategy):
         item.last_time_key = key
 
         if session != item.session_key:
-            self._roll_session(symbol, item, snapshot, session, close)
+            self._roll_session(symbol, item, snapshot, session, close, refresh_universe)
 
         # Snapshot everything the entry rule is allowed to see BEFORE this bar is
         # folded in: the break must clear the session high made by *completed*
@@ -358,6 +384,31 @@ class SessionHighBreakoutScalpStrategy(Strategy):
         item.session_high = high if item.session_high is None else max(item.session_high, high)
         item.session_low = low if item.session_low is None else min(item.session_low, low)
 
+        return (
+            symbol,
+            item,
+            snapshot,
+            close,
+            volume,
+            prior_high,
+            prior_bars,
+            prior_volume_mean,
+            prior_low,
+        )
+
+    def _evaluate(
+        self,
+        symbol: str,
+        item: _State,
+        snapshot: _Snapshot,
+        close: float,
+        volume: float | None,
+        prior_high: float | None,
+        prior_bars: int,
+        prior_volume_mean: float | None,
+        prior_low: float | None,
+    ) -> None:
+
         if self._manage_position(symbol, item, snapshot, close):
             # ponytail: no same-bar re-entry after an exit - one decision per bar
             # keeps the round trip auditable and cannot double-count the fill.
@@ -377,7 +428,13 @@ class SessionHighBreakoutScalpStrategy(Strategy):
         )
 
     def _roll_session(
-        self, symbol: str, item: _State, snapshot: _Snapshot, session: str, close: float
+        self,
+        symbol: str,
+        item: _State,
+        snapshot: _Snapshot,
+        session: str,
+        close: float,
+        refresh_universe: bool = True,
     ) -> None:
         """Flatten, archive turnover, reset the day, re-rank the universe."""
         if item.mode != "OUT":
@@ -397,11 +454,8 @@ class SessionHighBreakoutScalpStrategy(Strategy):
         item.entries_this_session = 0
         item.reentry_high_barrier = None
         item.reentry_low_barrier = None
-        # ponytail: the rank is refreshed on EVERY symbol's rollover rather than
-        # once per wall-clock boundary.  Symbols that have not rolled yet still
-        # contribute their last completed session's turnover (strictly past data,
-        # so no look-ahead); the set self-corrects as the rest of the book rolls.
-        self._refresh_universe()
+        if refresh_universe:
+            self._refresh_universe()
 
     def _refresh_universe(self) -> None:
         if self.max_symbols_by_turnover <= 0:
@@ -564,6 +618,8 @@ class SessionHighBreakoutScalpStrategy(Strategy):
             surge_ratio=float(surge_ratio),
             minutes_since_open=float(minutes),
             entries_this_session=int(item.entries_this_session),
+            stop_loss=stop_loss,
+            take_profit=take_profit,
         )
         _emit(
             self.events,
@@ -573,8 +629,6 @@ class SessionHighBreakoutScalpStrategy(Strategy):
             signal_type=side,
             strength=self.target_allocation or 1.0,
             price=close,
-            stop_loss=stop_loss,
-            take_profit=take_profit,
             metadata=metadata,
         )
         item.mode = side
