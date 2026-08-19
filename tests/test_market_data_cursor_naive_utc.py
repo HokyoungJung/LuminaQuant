@@ -81,3 +81,42 @@ def test_materializer_bound_coercion_is_utc_on_any_host(host_tz) -> None:
     assert _coerce_timestamp_ms(_EXPECTED_MS // 1000) == _EXPECTED_MS
     assert _coerce_timestamp_ms(None) is None
     assert _coerce_timestamp_ms("not-a-date") is None
+
+
+def test_timeutil_helpers_and_remaining_sites_are_utc_on_any_host(host_tz, tmp_path) -> None:
+    from lumina_quant.live.readiness_policy import _parse_utc
+    from lumina_quant.optimization.frozen_dataset import _as_ns_epoch
+    from lumina_quant.timeframe_aggregator import TimeframeAggregator
+    from lumina_quant.utils.timeutil import as_utc, utc_epoch_ms, utc_epoch_seconds
+
+    naive = datetime(2026, 3, 2)
+    aware = datetime(2026, 3, 2, tzinfo=UTC)
+    assert as_utc(naive) == aware and as_utc(aware) == aware
+    assert utc_epoch_seconds(naive) == utc_epoch_seconds(aware) == _EXPECTED_MS / 1000
+    assert utc_epoch_ms(naive) == utc_epoch_ms(aware) == _EXPECTED_MS
+    assert utc_epoch_ms("2026-03-02") == utc_epoch_ms("2026-03-02T00:00:00Z") == _EXPECTED_MS
+    assert utc_epoch_ms(_EXPECTED_MS // 1000) == utc_epoch_ms(_EXPECTED_MS) == _EXPECTED_MS
+    assert (
+        utc_epoch_ms(None) is None
+        and utc_epoch_ms("garbage") is None
+        and utc_epoch_ms(True) is None
+    )
+    # Frozen-dataset split bounds and readiness stamps follow the same convention.
+    assert _as_ns_epoch(naive) == _as_ns_epoch("2026-03-02T00:00:00") == _EXPECTED_MS * 1_000_000
+    assert (
+        _parse_utc("2026-03-02T00:00:00") == aware and _parse_utc("2026-03-02T00:00:00Z") == aware
+    )
+    # Timeframe aggregator bucket coercion (naive datetime path).
+    assert TimeframeAggregator._coerce_timestamp_ms(naive) == _EXPECTED_MS
+    assert TimeframeAggregator._coerce_timestamp_ms(_EXPECTED_MS) == _EXPECTED_MS
+
+
+def test_raw_first_materializer_window_bounds_are_utc_on_any_host(host_tz, tmp_path) -> None:
+    """The per-partition window bounds must match the raw timestamp_ms slice exactly."""
+    import inspect
+
+    from lumina_quant.services import materialize_from_raw as mod
+
+    source = inspect.getsource(mod)
+    assert ".timestamp() * 1000" not in source  # no host-local epoch conversions remain
+    assert "utc_epoch_ms(dt_min)" in source and "utc_epoch_ms(dt_max)" in source

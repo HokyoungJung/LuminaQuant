@@ -33,6 +33,7 @@ from lumina_quant.strategy_factory.runtime_settings import (
 )
 from lumina_quant.strategy_factory.research_reporting import ResearchReportBuilder
 from lumina_quant.strategy_factory.strategy_signal_dispatch import StrategySignalDispatcher
+from lumina_quant.utils.timeutil import utc_epoch_seconds
 
 resolve_risk_free_config = _research_metrics.resolve_risk_free_config
 _resolve_feature_points_path = _research_run_support._resolve_feature_points_path
@@ -194,7 +195,7 @@ def _simulate_event_driven_strategy_exposures(
         try:
             first = datetimes[0]
             second = datetimes[1]
-            spacing = float(second.timestamp() - first.timestamp())
+            spacing = float(utc_epoch_seconds(second) - utc_epoch_seconds(first))
             if spacing > 0.0:
                 window_seconds = int(spacing)
         except AttributeError, TypeError, ValueError:

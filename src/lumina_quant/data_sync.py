@@ -38,6 +38,7 @@ from lumina_quant.market_data import (
     upsert_ohlcv_rows,
     upsert_ohlcv_rows_1s,
 )
+from lumina_quant.utils.timeutil import utc_epoch_ms
 
 _DEFAULT_RAW_ARCHIVE_CHUNK_ROWS = 250_000
 
@@ -1331,12 +1332,8 @@ def ensure_market_data_coverage(
         except RawFirstDataMissingError:
             frame = pl.DataFrame()
 
-        final_first = (
-            int(frame["datetime"].min().timestamp() * 1000) if not frame.is_empty() else None
-        )
-        final_last = (
-            int(frame["datetime"].max().timestamp() * 1000) if not frame.is_empty() else None
-        )
+        final_first = utc_epoch_ms(frame["datetime"].min()) if not frame.is_empty() else None
+        final_last = utc_epoch_ms(frame["datetime"].max()) if not frame.is_empty() else None
         summaries.append(
             SyncStats(
                 symbol=stream_symbol,

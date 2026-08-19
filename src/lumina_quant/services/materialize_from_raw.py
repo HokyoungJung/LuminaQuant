@@ -15,6 +15,7 @@ from lumina_quant.data.raw_first_lineage import (
     resample_1s_frame,
 )
 from lumina_quant.storage.parquet import ParquetMarketDataRepository
+from lumina_quant.utils.timeutil import utc_epoch_ms
 
 _OHLCV_COLUMNS = ["datetime", "open", "high", "low", "close", "volume"]
 
@@ -77,18 +78,9 @@ def _coerce_timestamp_ms(value: Any) -> int | None:
         if abs(numeric) < 100_000_000_000:
             return numeric * 1000
         return numeric
-    try:
-        if isinstance(value, datetime):
-            parsed = value
-        else:
-            parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
-        # Naive bounds are UTC wall times (repo convention, see
-        # ohlcv_repo._datetime_to_ms); never interpret them in the host timezone.
-        if parsed.tzinfo is None:
-            parsed = parsed.replace(tzinfo=UTC)
-        return int(parsed.astimezone(UTC).timestamp() * 1000)
-    except Exception:
-        return None
+    # Naive bounds are UTC wall times (repo convention, see ohlcv_repo._datetime_to_ms);
+    # never interpret them in the host timezone.
+    return utc_epoch_ms(value)
 
 
 def _load_raw_and_1s(
@@ -180,8 +172,10 @@ def _write_materialized_frame(
 
         dt_min = payload["datetime"].min()
         dt_max = payload["datetime"].max()
-        window_start_ms = int(dt_min.timestamp() * 1000) if dt_min is not None else 0
-        window_end_ms = int(dt_max.timestamp() * 1000) if dt_max is not None else 0
+        # Stored bar times are tz-naive UTC wall times: coerce as UTC (a bare
+        # ``.timestamp()`` would shift the window by the host UTC offset).
+        window_start_ms = utc_epoch_ms(dt_min) if dt_min is not None else 0
+        window_end_ms = utc_epoch_ms(dt_max) if dt_max is not None else 0
 
         raw_partition = raw.filter(
             (pl.col("timestamp_ms") >= int(window_start_ms))

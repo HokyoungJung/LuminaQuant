@@ -112,7 +112,9 @@ def _parse_utc(value: str | None) -> datetime | None:
     token = str(value or "").strip()
     if not token:
         return None
-    return datetime.fromisoformat(token.replace("Z", "+00:00")).astimezone(UTC)
+    parsed = datetime.fromisoformat(token.replace("Z", "+00:00"))
+    # A tz-less ISO stamp is UTC by repo convention (never the host timezone).
+    return parsed.replace(tzinfo=UTC) if parsed.tzinfo is None else parsed.astimezone(UTC)
 
 
 def _read_json(path: Path) -> dict[str, Any]:
