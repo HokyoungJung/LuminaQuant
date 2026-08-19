@@ -1348,7 +1348,8 @@ class Portfolio:
                 ),
             )
         elif direction == "EXIT":
-            component_id = self._component_id_from_metadata(signal.metadata)
+            metadata = dict(getattr(signal, "metadata", {}) or {})
+            component_id = self._component_id_from_metadata(metadata)
             if component_id:
                 cur_qty = float(
                     dict(self.component_positions.get(component_id) or {}).get(symbol, 0.0)
@@ -1356,6 +1357,15 @@ class Portfolio:
             else:
                 cur_qty = self.current_positions[symbol]
             if cur_qty != 0:
+                try:
+                    exit_fraction = float(metadata.get("exit_fraction", 1.0))
+                except (TypeError, ValueError):
+                    exit_fraction = 1.0
+                if not math.isfinite(exit_fraction):
+                    exit_fraction = 1.0
+                exit_fraction = min(1.0, max(0.0, exit_fraction))
+                if exit_fraction <= 0.0:
+                    return None
                 exit_direction = "SELL" if cur_qty > 0 else "BUY"
                 order_type = self._signal_order_type(signal)
                 price, limits = self._order_price(
@@ -1368,7 +1378,7 @@ class Portfolio:
                 order = OrderEvent(
                     symbol=symbol,
                     order_type=order_type,
-                    quantity=abs(cur_qty),
+                    quantity=abs(cur_qty) * exit_fraction,
                     direction=exit_direction,
                     price=price,
                     position_side="LONG" if cur_qty > 0 else "SHORT",

@@ -60,7 +60,7 @@ class SignalEvent(Event):
     strategy_id: str
     symbol: str
     datetime: Any
-    signal_type: str  # 'LONG', 'SHORT', 'EXIT'
+    signal_type: str  # 'LONG', 'SHORT', 'EXIT' (optional metadata.exit_fraction in (0, 1])
     strength: float = 1.0  # For potential position sizing
     price: float | None = None  # Price at which signal was generated (optional)
     stop_loss: float | None = None

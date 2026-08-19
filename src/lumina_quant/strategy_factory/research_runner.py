@@ -265,7 +265,14 @@ def _simulate_event_driven_strategy_exposures(
             elif signal_type == "SHORT":
                 position_state[token] = -1.0
             elif signal_type == "EXIT":
-                position_state[token] = 0.0
+                metadata = dict(getattr(signal, "metadata", {}) or {})
+                try:
+                    exit_fraction = float(metadata.get("exit_fraction", 1.0))
+                except (TypeError, ValueError):
+                    exit_fraction = 1.0
+                if not math.isfinite(exit_fraction):
+                    exit_fraction = 1.0
+                position_state[token] *= 1.0 - min(1.0, max(0.0, exit_fraction))
 
         for symbol, value in position_state.items():
             exposures[symbol_index[symbol], idx] = float(value)
