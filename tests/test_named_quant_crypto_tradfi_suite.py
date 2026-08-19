@@ -85,6 +85,10 @@ def test_suite_is_runnable_research_only_and_source_bounded() -> None:
         allowed = crypto if row["candidate_id"].startswith("crypto_") else tradfi
         assert set(row["symbols"]) <= allowed
         assert row["metadata"]["promotion_eligible"] is False
+        if set(row["symbols"]) == crypto:
+            assert row["metadata"]["universe_binding"] == "crypto_top10"
+        if set(row["symbols"]) == tradfi:
+            assert row["metadata"]["universe_binding"] == "tradfi_all"
 
     decisions = validate_source_registry(suite["evidence_sources"])
     assert decisions and all(decision.allowed for decision in decisions)
