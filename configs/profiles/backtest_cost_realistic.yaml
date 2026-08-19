@@ -387,6 +387,10 @@ research:
   max_per_symbol_basket: 2
   max_per_lineage: 1
   max_per_family_basket: 1
+  # Stamp per-candidate SPA/PBO evidence and execute unmapped drop-in strategies
+  # through their registered implementation instead of the generic proxy.
+  emit_candidate_overfit_stats: true
+  route_unmapped_registered_strategies: true
   # Honest realistic cost floor for the VECTORIZED research scorer
   # (performance_lever_measurement 2026-07-08). The scorer charges a LINEAR
   # per-turnover cost (net = returns - turnover * cost_rate); its shipped base map

@@ -741,6 +741,10 @@ class ResearchConfig:
     # the search-global num_trials the per-fold call site cannot know) -- that stays
     # a data-PC aggregation-layer stamp.
     emit_candidate_overfit_stats: bool = False
+    # Execute a registered strategy that has no bespoke vectorized handler through
+    # the event-driven simulator instead of silently measuring the generic proxy.
+    # OFF preserves the legacy dispatcher; honest-research profiles turn it ON.
+    route_unmapped_registered_strategies: bool = False
     # Honest cost/portfolio MEASUREMENT foundation (performance_lever_measurement
     # 2026-07-08). EVERY field below defaults to a strict no-op so the shipped
     # ``config.yaml`` / ``RuntimeConfig()`` load is byte-identical; they are turned
