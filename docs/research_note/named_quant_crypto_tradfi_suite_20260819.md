@@ -138,12 +138,12 @@ uv run python scripts/research/build_quality_gated_allocation.py \
 - HRP: <https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2708678>
 - Binance USD-M 공식 문서: <https://developers.binance.com/en/docs/products/derivatives-trading-usds-futures/Introduction>
 - 돌파고 본인 대회 인증: <https://www.dogdrip.net/341084283>
-- 보완 연구 저장소 `dacapogo`: <https://github.com/HokyoungJung/dacapogo> (`633ba5d` 기준)
+- 보완 연구 저장소 `dacapogo`: <https://github.com/HokyoungJung/dacapogo/tree/633ba5d6d712df7a77ad201c3b6263d2343a65ed>
 - 워뇨띠/AOA BitMEX 공식 인터뷰: <https://www.bitmex.com/blog/whale-trader-talks-aoa>
 - FlightF 10분봉 RSI 다이버전스 본인 글: <https://gall.dcinside.com/mgallery/board/view/?id=electronicmoney&no=548338>
 - FlightF 매매원칙 본인 글: <https://gall.dcinside.com/mgallery/board/view/?id=electronicmoney&no=187860>
 - NCO 원 논문: <https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3469961>
 - HERC 원 논문: <https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3237540>
-- Wasserstein DRO 원 논문: <https://doi.org/10.1007/s10107-017-1172-1>
+- Wasserstein mean-variance DRO 원 논문: <https://doi.org/10.1287/mnsc.2021.4155>
 - Constrained HRP WP14/2019: <https://www.ekon.sun.ac.za/wpapers/2019/wp142019/wp142019.pdf>
 - Network Risk Parity: <https://doi.org/10.1057/s41260-023-00347-8>

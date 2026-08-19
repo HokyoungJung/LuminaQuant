@@ -1224,12 +1224,13 @@
       "fallback_behavior": "fail_closed",
       "license_note": "Public reference/link only; do not redistribute source content.",
       "notes": [
-        "Secondary reproducible research notebook at commit 633ba5d; its trader rules are explicitly proxies."
+        "Secondary reproducible research notebook at commit 633ba5d; its trader rules are explicitly proxies.",
+        "Pinned commit; diagnostic/proxy provenance only (comparison-proxy documents and ledger analysis), NOT rule evidence."
       ],
       "release_lag_policy": "evidence only; no market-time feature is consumed",
       "source_id": "dacapogo_public_repo_633ba5d",
       "update_cadence": "static literature or public educational reference",
-      "url": "https://github.com/HokyoungJung/dacapogo"
+      "url": "https://github.com/HokyoungJung/dacapogo/tree/633ba5d6d712df7a77ad201c3b6263d2343a65ed"
     },
     {
       "access": "free_unauthenticated",
@@ -1309,17 +1310,17 @@
     {
       "access": "free_unauthenticated",
       "allowed_usage_label": "strategy_class_evidence",
-      "cache_path": "var/cache/external_sources/wasserstein_dro_esfahani_kuhn_2018.html",
+      "cache_path": "var/cache/external_sources/blanchet_chen_zhou_2022_wasserstein_mv.html",
       "credential_requirement": "none",
       "fallback_behavior": "fail_closed",
       "license_note": "Public reference/link only; do not redistribute source content.",
       "notes": [
-        "Primary Wasserstein DRO reference; the suite registers calibration stresses, not a DRO optimizer."
+        "Blanchet, Chen & Zhou (2022) Management Science: exact type-2 Wasserstein DRO mean-variance (p=q=2) -- the formulation implemented by wasserstein_dro_weights."
       ],
       "release_lag_policy": "evidence only; no market-time feature is consumed",
-      "source_id": "wasserstein_dro_esfahani_kuhn_2018",
+      "source_id": "blanchet_chen_zhou_2022_wasserstein_mv",
       "update_cadence": "static literature or public educational reference",
-      "url": "https://doi.org/10.1007/s10107-017-1172-1"
+      "url": "https://doi.org/10.1287/mnsc.2021.4155"
     },
     {
       "access": "free_unauthenticated",
@@ -1463,7 +1464,7 @@
     },
     {
       "evidence_refs": [
-        "wasserstein_dro_esfahani_kuhn_2018"
+        "blanchet_chen_zhou_2022_wasserstein_mv"
       ],
       "method": "wasserstein_stress_sensitivity",
       "name": "wasserstein_dro_research_protocol",
