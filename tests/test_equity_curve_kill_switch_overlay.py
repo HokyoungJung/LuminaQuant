@@ -329,8 +329,10 @@ def test_ladder_trim_scales_the_next_child_entry() -> None:
 
     first = next(sig for idx, sig in emitted if idx == 0)
     assert first.signal_type == "LONG"
-    assert first.stop_loss is None
-    assert first.take_profit is None
+    # The child's protective levels pass through untouched (as in the incumbent
+    # vol-managed overlay): the overlay only rescales notional, never protection.
+    assert first.stop_loss == pytest.approx(90.0)
+    assert first.take_profit == pytest.approx(110.0)
     assert first.metadata["overlay_scale"] == pytest.approx(1.0)
     assert first.metadata["target_allocation"] == pytest.approx(1.0)
 
@@ -438,8 +440,8 @@ def test_child_exit_is_forwarded_unscaled() -> None:
     )
     assert trimmed_exit.signal_type == "EXIT"
     assert trimmed_exit.strength == pytest.approx(1.0)
-    assert trimmed_exit.stop_loss is None
-    assert trimmed_exit.take_profit is None
+    assert trimmed_exit.stop_loss == pytest.approx(90.0)
+    assert trimmed_exit.take_profit == pytest.approx(110.0)
     assert "overlay_scale" not in trimmed_exit.metadata
 
     # The book is flat after bar 12, so the ladder never reaches its kill rung;
@@ -801,3 +803,54 @@ def test_strategy_is_registered() -> None:
     )
     assert "_OverlayProbeChild" not in GLOBAL_REGISTRY.list_names("strategy")
     assert "ProbeChild" not in GLOBAL_REGISTRY.list_names("strategy")
+
+
+def test_child_protective_levels_are_forwarded_untouched() -> None:
+    """stop_loss / take_profit set by the child must survive the overlay rebuild."""
+    from lumina_quant.core.events import SignalEvent
+    from lumina_quant.strategies.equity_curve_kill_switch_overlay import (
+        EquityCurveKillSwitchOverlayStrategy,
+    )
+
+    class _Bars:
+        symbol_list = ["BTC/USDT"]
+
+    class _Q:
+        def __init__(self) -> None:
+            self.items = []
+
+        def put(self, item) -> None:
+            self.items.append(item)
+
+    queue = _Q()
+    overlay = EquityCurveKillSwitchOverlayStrategy(
+        _Bars(), queue, child_strategy_class="_OverlayProbeChild"
+    )
+    child_signal = SignalEvent(
+        strategy_id="probe",
+        symbol="BTC/USDT",
+        datetime="2026-01-01T00:00:00Z",
+        signal_type="LONG",
+        strength=1.0,
+        price=100.0,
+        stop_loss=95.0,
+        take_profit=110.0,
+        metadata={"target_allocation": 0.2},
+    )
+    overlay._forward_child_signal(child_signal, 0.5)
+    assert len(queue.items) == 1
+    forwarded = queue.items[0]
+    assert forwarded.stop_loss == 95.0 and forwarded.take_profit == 110.0
+    assert forwarded.metadata["target_allocation"] == pytest.approx(0.1)
+    exit_signal = SignalEvent(
+        strategy_id="probe",
+        symbol="BTC/USDT",
+        datetime="2026-01-01T01:00:00Z",
+        signal_type="EXIT",
+        strength=1.0,
+        price=101.0,
+        metadata={"exit_fraction": 0.6},
+    )
+    overlay._forward_child_signal(exit_signal, 0.0)
+    assert queue.items[-1].signal_type == "EXIT"
+    assert queue.items[-1].metadata["exit_fraction"] == 0.6  # partial-exit contract preserved

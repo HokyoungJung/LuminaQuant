@@ -55,6 +55,17 @@ HYSTERESIS: de-risking applies on the bar it is detected; re-risking (a scale
 INCREASE) waits ``rerisk_min_bars`` bars after the last de-risk so the book does
 not flip-flop around a rung boundary.
 
+SIZING-MODE CAVEAT (shared with the incumbent overlays): the scale multiplies
+the child's ``target_allocation`` / ``max_order_value`` / ``strength`` only.  The
+child's protective ``stop_loss`` / ``take_profit`` are forwarded UNTOUCHED (a
+de-risk wrapper must never strip protection).  Under the default
+``target_allocation_mode=legacy_notional_cap`` the portfolio sizes
+``qty = equity * risk_per_trade / |price - stop|`` and uses the (scaled)
+allocation only as a notional CAP, so with a wide child stop an intermediate
+rung may leave the entry size unchanged (dollar risk-at-stop is governed by
+``risk_per_trade``); ``notional_fraction`` / ``isolated_margin_fraction`` modes
+scale fully.  Kill (scale 0) always drops entries regardless of mode.
+
 KILL STATE (``overlay_scale == 0``): the overlay emits one EXIT per symbol that
 carries a nonzero child target (once per kill episode) and then SUPPRESSES the
 child's LONG/SHORT signals; child EXITs are always forwarded.  A ladder-caused
@@ -821,6 +832,11 @@ class EquityCurveKillSwitchOverlayStrategy(Strategy):
             signal_type=str(signal.signal_type),
             strength=base_strength * float(strength_scale),
             price=getattr(signal, "price", None),
+            # The child's protective levels are part of its de-risking; the
+            # overlay must forward them untouched (dropping them would REMOVE
+            # protection, the opposite of this overlay's mandate).
+            stop_loss=getattr(signal, "stop_loss", None),
+            take_profit=getattr(signal, "take_profit", None),
             position_side=getattr(signal, "position_side", None),
             client_order_id=getattr(signal, "client_order_id", None),
             time_in_force=getattr(signal, "time_in_force", None),

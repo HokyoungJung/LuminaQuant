@@ -81,6 +81,16 @@ Codex 레인과 동일: JSON의 crypto 10·TradFi 100은 정적 스모크 스냅
 
 이 레인 단독의 오래된 `run_research_candidates.py` 예시는 폐기했다. 40후보 정본 생성 → PIT 물질화 → 400봉 warmup·비용 현실화 event run → allocator variant 비교 → QGA 동결 → 별도 PIT locked-OOS → frozen evaluator의 정확한 명령은 [통합 실행서](named_quant_full_suite_20260819.md)에 있다.
 
+## 실행 전 확인된 사항 (2026-08-19 합성데이터 파이프라인 스모크)
+
+`materialize_named_quant_universe.py` → `run_named_quant_suite.py`(event-driven, 비용/펀딩/청산 모델 ON) 경로에 이 레인 25후보 전부를 **합성 OHLCV·펀딩 스냅샷**으로 한 번 통과시켜 배선을 확인했다(성과 수치는 무의미하며 어떤 결론에도 쓰지 않는다; 실제 백테스트는 data-PC 전용).
+
+- 결과: 25/25 `pass`, `portfolio_ready=True`; 세션 돌파·RSI 10m·박스 15m·스캘프 1m·Kalman 1h(NVDA/AMD)·MA스코어 로테이션·20/10 규칙·터틀·PCA·오버레이가 실제 주문·체결·펀딩 회계까지 통과.
+- **엔진 버그 수정(근본원인)**: `core/engine._event_time_to_ms`가 naive datetime을 호스트 로컬TZ로 해석해, KST 호스트에서 legacy 백테스트 경로의 `TimeframeGatedStrategy`가 1d/4h 봉을 전부 버렸다(`event_ms % 86_400_000 != 0`) → 1d/4h 전략이 **조용히 0체결**. naive=UTC로 통일(`_warmup_time_to_ms`·데이터핸들러와 동일 규약)하고 TZ 파라미터(UTC/Asia/Seoul/America/New_York) 회귀테스트(`tests/test_timeframe_gate_naive_utc.py`)로 봉인. data-PC가 UTC 호스트가 아니라면 이 수정 없이는 두 레인의 모든 1d/4h 후보가 무효 결과를 냈을 것이다.
+- **warmup 유령상태 주의**: 엔진은 warmup 구간에서 전략을 돌리되 SIGNAL/ORDER를 억제하므로, 내부 포지션 상태를 가진 전략(터틀·PCA·로테이션·페어)은 live 시작 시점에 "체결되지 않은 포지션"을 들고 시작한다. 짧은 창에서는 첫 사이클이 왜곡되며(예: 첫 EXIT는 실체 없는 포지션 청산), 긴 창에서는 첫 트레이드만 영향. 엔진에 warmup 종료 훅이 없으므로 data-PC 결과 해석 시 첫 사이클을 제외하거나 훅 추가를 검토할 것. 킬스위치 오버레이는 자식의 warmup 의도로 proxy 자본곡선을 쌓으므로 같은 주의가 적용된다.
+- Kalman 페어 4종은 합성 독립 랜덤워크라 ADF 게이트가 정상 차단(0체결) — 의도된 동작.
+- 오버레이가 자식의 `stop_loss`/`take_profit`를 누락하던 결함 수정(보호 레벨 그대로 전달, `exit_fraction` 메타 유지).
+
 ## 공개 근거
 - systrader79 저서/블로그: 『주식투자 ETF로 시작하라』, 『돌파매매 전략』(이레미디어), stock79.tistory.com; 크립토 변동성돌파 4대 개선(노이즈·이평스코어·변동성조절·시간분할) 커뮤니티 재현본(예: coinpick.com/quant_program/39857)
 - 물탄찬밥 미리보기: Codex 레인 문서 링크 참조 (뉴지스탁 아카데미 PDF)

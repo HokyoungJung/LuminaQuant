@@ -12,6 +12,16 @@ from lumina_quant.message_bus import MessageBus
 
 
 def _event_time_to_ms(value: Any) -> int | None:
+    """Coerce a bar/event time to epoch milliseconds.
+
+    Naive ``datetime`` values are UTC (the data handlers emit naive UTC bar
+    times -- see ``HistoricCSVDataHandler._bar_time_ms`` and
+    ``_warmup_time_to_ms``).  Interpreting them in the host's local timezone
+    would shift every timeframe-alignment check by the UTC offset: on a KST
+    host a naive 00:00 daily bar landed at 15:00 UTC, so the legacy
+    ``TimeframeGatedStrategy`` ``event_ms % 86_400_000 == 0`` test dropped
+    EVERY 1d/4h bar and those strategies silently never traded.
+    """
     if value is None:
         return None
     if isinstance(value, (int, float)):
@@ -19,6 +29,9 @@ def _event_time_to_ms(value: Any) -> int | None:
         if abs(numeric) < 100_000_000_000:
             return numeric * 1000
         return numeric
+    if isinstance(value, datetime):
+        dt = value if value.tzinfo is not None else value.replace(tzinfo=UTC)
+        return int(dt.astimezone(UTC).timestamp() * 1000)
     ts_fn = getattr(value, "timestamp", None)
     if callable(ts_fn):
         try:
@@ -33,11 +46,9 @@ def _event_time_to_ms(value: Any) -> int | None:
 def _warmup_time_to_ms(value: Any) -> int | None:
     """Bar-time coercion for warmup-boundary checks.
 
-    Mirrors ``HistoricCSVDataHandler._bar_time_ms``: naive datetimes are UTC.
-    (``_event_time_to_ms`` calls ``datetime.timestamp()``, which interprets
-    naive datetimes in the host's local timezone — comparing that against the
-    UTC-based live-start boundary would shift the warmup region by the host's
-    UTC offset.)
+    Mirrors ``HistoricCSVDataHandler._bar_time_ms``: naive datetimes are UTC
+    (``_event_time_to_ms`` now follows the same convention; this helper is kept
+    for the ISO-string path used by window watermarks).
     """
     if value is None:
         return None
