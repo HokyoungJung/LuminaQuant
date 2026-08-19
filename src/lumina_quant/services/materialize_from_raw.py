@@ -78,7 +78,15 @@ def _coerce_timestamp_ms(value: Any) -> int | None:
             return numeric * 1000
         return numeric
     try:
-        return int(datetime.fromisoformat(str(value).replace("Z", "+00:00")).timestamp() * 1000)
+        if isinstance(value, datetime):
+            parsed = value
+        else:
+            parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        # Naive bounds are UTC wall times (repo convention, see
+        # ohlcv_repo._datetime_to_ms); never interpret them in the host timezone.
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=UTC)
+        return int(parsed.astimezone(UTC).timestamp() * 1000)
     except Exception:
         return None
 
