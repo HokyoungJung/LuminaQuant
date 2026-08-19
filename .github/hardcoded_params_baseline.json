@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-08-19T06:39:12.823533+00:00",
+  "generated_at_utc": "2026-08-19T07:25:14.043165+00:00",
   "literal_paths": [
     "src/lumina_quant/strategies",
     "lumina_quant/strategies"
@@ -1657,7 +1657,7 @@
     "literal:src/lumina_quant/strategies/regime_router_confirmed_alpha_sleeves.py:842:29:0.18",
     "literal:src/lumina_quant/strategies/regime_router_confirmed_alpha_sleeves.py:843:29:90",
     "literal:src/lumina_quant/strategies/regime_router_confirmed_alpha_sleeves.py:844:33:0.90",
-    "literal:src/lumina_quant/strategies/registry.py:494:83:3",
+    "literal:src/lumina_quant/strategies/registry.py:495:83:3",
     "literal:src/lumina_quant/strategies/residual_momentum_alpha_sleeves.py:120:27:30",
     "literal:src/lumina_quant/strategies/residual_momentum_alpha_sleeves.py:200:31:86400",
     "literal:src/lumina_quant/strategies/residual_momentum_alpha_sleeves.py:268:35:9",
@@ -2172,6 +2172,7 @@
     "literal:src/lumina_quant/strategies/timeframe_pair_zscore_reversion.py:261:58:5",
     "literal:src/lumina_quant/strategies/timeframe_pair_zscore_reversion.py:289:25:100_000_000_000",
     "literal:src/lumina_quant/strategies/timeframe_pair_zscore_reversion.py:290:22:1000.0",
+    "literal:src/lumina_quant/strategies/trend_gated_ibs_reversion.py:41:31:86400",
     "literal:src/lumina_quant/strategies/trend_quality_xs_alpha_sleeves.py:126:34:0.01",
     "literal:src/lumina_quant/strategies/trend_quality_xs_alpha_sleeves.py:128:37:0.90",
     "literal:src/lumina_quant/strategies/trend_quality_xs_alpha_sleeves.py:187:30:336",
