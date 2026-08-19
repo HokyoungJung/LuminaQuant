@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from copy import deepcopy
 from datetime import UTC, datetime
@@ -61,14 +62,20 @@ def _timestamp(snapshot: dict[str, Any], *, label: str) -> datetime:
 def _load_snapshots(path: Path, *, label: str) -> list[dict[str, Any]]:
     try:
         if path.suffix.lower() == ".jsonl":
-            payload: Any = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+            payload: Any = [
+                json.loads(line) for line in path.read_text().splitlines() if line.strip()
+            ]
         else:
             payload = json.loads(path.read_text())
     except (OSError, json.JSONDecodeError) as exc:
         raise ValueError(f"invalid {label} snapshot file: {path}") from exc
     if isinstance(payload, dict) and "snapshots" in payload:
         payload = payload["snapshots"]
-    if not isinstance(payload, list) or not payload or not all(isinstance(row, dict) for row in payload):
+    if (
+        not isinstance(payload, list)
+        or not payload
+        or not all(isinstance(row, dict) for row in payload)
+    ):
         raise ValueError(f"{label} snapshots must be a non-empty list")
     timestamps = [_timestamp(row, label=label) for row in payload]
     if len(timestamps) != len(set(timestamps)):
@@ -106,7 +113,9 @@ def _market_cap_ranking(snapshot: dict[str, Any]) -> list[str]:
         if rank_int <= 0:
             raise ValueError("invalid market-cap rank")
         ranked.append((rank_int, symbol))
-    if len({rank for rank, _ in ranked}) != len(ranked) or len({symbol for _, symbol in ranked}) != len(ranked):
+    if len({rank for rank, _ in ranked}) != len(ranked) or len(
+        {symbol for _, symbol in ranked}
+    ) != len(ranked):
         raise ValueError("duplicate market-cap rank or symbol")
     return [symbol for _, symbol in sorted(ranked)]
 
@@ -135,6 +144,10 @@ def _slash_symbol(row: dict[str, Any]) -> str:
     return f"{str(row['baseAsset']).upper()}/{str(row['quoteAsset']).upper()}"
 
 
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
 def materialize(
     suite: dict[str, Any],
     market_cap_snapshot: dict[str, Any],
@@ -153,8 +166,7 @@ def materialize(
     perpetual_rows = [
         row
         for row in exchange_rows
-        if _eligible(row, "PERPETUAL")
-        and str(row["baseAsset"]).upper() not in _STABLE_BASES
+        if _eligible(row, "PERPETUAL") and str(row["baseAsset"]).upper() not in _STABLE_BASES
     ]
     perpetual = {str(row["baseAsset"]).upper(): row for row in perpetual_rows}
     if len(perpetual) != len(perpetual_rows):
@@ -182,6 +194,15 @@ def materialize(
     candidates = result.get("candidates")
     if not isinstance(candidates, list):
         raise ValueError("suite candidates must be a list")
+    uses_tradfi = any(
+        isinstance(candidate, dict)
+        and isinstance(candidate.get("metadata"), dict)
+        and candidate["metadata"].get("universe_binding")
+        in {"tradfi_all", "crypto_top10_plus_tradfi"}
+        for candidate in candidates
+    )
+    if uses_tradfi and not tradfi:
+        raise ValueError("suite requires tradfi_all but no eligible TradFi contracts were selected")
     for candidate in candidates:
         if not isinstance(candidate, dict):
             raise ValueError("invalid suite candidate")
@@ -200,6 +221,10 @@ def materialize(
         "sources": {
             "market_caps": str(market_cap_source.resolve()),
             "exchange_info": str(exchange_info_source.resolve()),
+        },
+        "source_sha256": {
+            "market_caps": _sha256(market_cap_source),
+            "exchange_info": _sha256(exchange_info_source),
         },
         "snapshot_timestamps": {
             "market_caps": _timestamp(market_cap_snapshot, label="market-cap")

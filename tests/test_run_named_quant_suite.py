@@ -34,6 +34,8 @@ class _Repository:
 
 
 class _Backtest:
+    last_config = None
+
     def __init__(self, *args, **kwargs) -> None:
         assert kwargs["strategy_params"] == {"lookback": 20}
         assert kwargs["strategy_timeframe"] == "1d"
@@ -43,6 +45,7 @@ class _Backtest:
             "feature_db_path": "fake-data-root",
             "feature_exchange": "binance",
         }
+        type(self).last_config = kwargs["config"]
         self.portfolio = SimpleNamespace(
             initial_capital=100.0,
             all_holdings=[
@@ -109,6 +112,7 @@ def test_runs_each_candidate_and_writes_allocator_inputs_and_failures(
         lambda: SimpleNamespace(
             trading=SimpleNamespace(timeframe="1m"),
             backtest=SimpleNamespace(persist_output=True),
+            live=SimpleNamespace(symbol_limits={"BTC/USDT": {"price_tick_size": 0.25}}),
         ),
     )
 
@@ -123,6 +127,7 @@ def test_runs_each_candidate_and_writes_allocator_inputs_and_failures(
     )
 
     assert (result["pass_count"], result["fail_count"]) == (1, 1)
+    assert _Backtest.last_config.live.symbol_limits == {"BTC/USDT": {"price_tick_size": 0.25}}
     passed = json.loads((output / "000_works.json").read_text())
     assert passed["return_timestamps"] == ["2024-01-02", "2024-01-03"]
     assert passed["returns"] == [99.0 / 101.0 - 1.0, 102.0 / 99.0 - 1.0]
@@ -148,6 +153,87 @@ def test_runs_each_candidate_and_writes_allocator_inputs_and_failures(
     assert allocation_input["source_artifacts"][0]["ready"] is False
     assert len(allocation_input["source_artifacts"][0]["sha256"]) == 64
     build_manifest_from_input(allocation_input)
+
+
+def test_materialized_exchange_filters_are_injected_into_runtime_config(
+    tmp_path, monkeypatch
+) -> None:
+    manifest = tmp_path / "suite.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "candidates": [
+                    {
+                        "candidate_id": "works",
+                        "family": "trend",
+                        "strategy_class": "Strategy",
+                        "symbols": ["BTC/USDT"],
+                        "params": {"lookback": 20},
+                        "timeframe": "1d",
+                    }
+                ],
+                "universe_materialization_receipt": {
+                    "binance_filters": {
+                        "BTC/USDT": [
+                            {"filterType": "PRICE_FILTER", "tickSize": "0.1"},
+                            {
+                                "filterType": "LOT_SIZE",
+                                "minQty": "0.001",
+                                "stepSize": "0.001",
+                            },
+                            {
+                                "filterType": "MARKET_LOT_SIZE",
+                                "minQty": "0.01",
+                                "stepSize": "0.005",
+                            },
+                            {"filterType": "MIN_NOTIONAL", "minNotional": "5"},
+                        ],
+                        "INVALID/USDT": [
+                            {"filterType": "PRICE_FILTER", "tickSize": "0"},
+                            {"filterType": "LOT_SIZE", "minQty": "bad"},
+                        ],
+                    }
+                },
+            }
+        )
+    )
+    monkeypatch.setattr(MODULE, "MarketDataRepository", _Repository)
+    monkeypatch.setattr(MODULE, "Backtest", _Backtest)
+    monkeypatch.setattr(MODULE, "resolve_strategy_class", lambda name, strict: object)
+    monkeypatch.setattr(
+        MODULE,
+        "get_default_runtime_config",
+        lambda: SimpleNamespace(
+            trading=SimpleNamespace(timeframe="1m"),
+            backtest=SimpleNamespace(persist_output=True),
+            live=SimpleNamespace(
+                symbol_limits={
+                    "BTC/USDT": {"price_tick_size": 0.25},
+                    "KEEP/USDT": {"min_notional": 7.0},
+                }
+            ),
+        ),
+    )
+
+    result = MODULE.run_suite(
+        manifest,
+        tmp_path / "data",
+        tmp_path / "out",
+        exchange="binance",
+        start=datetime(2024, 1, 1),
+        end=datetime(2025, 1, 1),
+    )
+
+    assert result["fail_count"] == 0
+    assert _Backtest.last_config.live.symbol_limits == {
+        "BTC/USDT": {
+            "price_tick_size": 0.1,
+            "min_qty": 0.01,
+            "qty_step": 0.005,
+            "min_notional": 5.0,
+        },
+        "KEEP/USDT": {"min_notional": 7.0},
+    }
 
 
 def test_duplicate_candidate_ids_fail_closed(tmp_path) -> None:

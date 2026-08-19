@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import hashlib
 import json
 import subprocess
 import sys
@@ -57,8 +58,16 @@ def _exchange_snapshot(timestamp: str, *, tradfi: tuple[str, ...] = ("XAU", "SPX
 def _suite() -> dict:
     return {
         "candidates": [
-            {"candidate_id": "crypto", "metadata": {"universe_binding": "crypto_top10"}, "symbols": ["OLD"]},
-            {"candidate_id": "tradfi", "metadata": {"universe_binding": "tradfi_all"}, "symbols": ["OLD"]},
+            {
+                "candidate_id": "crypto",
+                "metadata": {"universe_binding": "crypto_top10"},
+                "symbols": ["OLD"],
+            },
+            {
+                "candidate_id": "tradfi",
+                "metadata": {"universe_binding": "tradfi_all"},
+                "symbols": ["OLD"],
+            },
             {
                 "candidate_id": "both",
                 "metadata": {"universe_binding": "crypto_top10_plus_tradfi"},
@@ -70,25 +79,57 @@ def _suite() -> dict:
 
 
 def test_materializes_ranked_intersection_tradfi_filters_and_bindings(tmp_path: Path) -> None:
-    ranking = ["USDC", "BTC", "MISSING", "ETH", "SOL", "XRP", "DOGE", "ADA", "AVAX", "TON", "BNB", "TRX"]
+    ranking = [
+        "USDC",
+        "BTC",
+        "MISSING",
+        "ETH",
+        "SOL",
+        "XRP",
+        "DOGE",
+        "ADA",
+        "AVAX",
+        "TON",
+        "BNB",
+        "TRX",
+    ]
     market = _market_snapshot("2026-01-01T00:00:00Z", ranking)
     exchange = _exchange_snapshot("2026-01-01T00:00:00Z")
+    market_path = tmp_path / "caps.json"
+    exchange_path = tmp_path / "exchange.json"
+    market_path.write_text(json.dumps(market))
+    exchange_path.write_text(json.dumps(exchange))
     output = MODULE.materialize(
         _suite(),
         market,
         exchange,
         as_of=datetime(2026, 1, 2, tzinfo=UTC),
-        market_cap_source=tmp_path / "caps.json",
-        exchange_info_source=tmp_path / "exchange.json",
+        market_cap_source=market_path,
+        exchange_info_source=exchange_path,
     )
 
     candidates = {row["candidate_id"]: row for row in output["candidates"]}
-    crypto = ["BTC/USDT", "ETH/USDT", "SOL/USDT", "XRP/USDT", "DOGE/USDT", "ADA/USDT", "AVAX/USDT", "TON/USDT", "BNB/USDT", "TRX/USDT"]
+    crypto = [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "XRP/USDT",
+        "DOGE/USDT",
+        "ADA/USDT",
+        "AVAX/USDT",
+        "TON/USDT",
+        "BNB/USDT",
+        "TRX/USDT",
+    ]
     assert candidates["crypto"]["symbols"] == crypto
     assert candidates["tradfi"]["symbols"] == ["SPX/USDT", "XAU/USDT"]
     assert candidates["both"]["symbols"] == [*crypto, "SPX/USDT", "XAU/USDT"]
     assert candidates["fixed"]["symbols"] == ["BTC/USDT", "ETH/USDT"]
     receipt = output["universe_materialization_receipt"]
+    assert receipt["source_sha256"] == {
+        "market_caps": hashlib.sha256(market_path.read_bytes()).hexdigest(),
+        "exchange_info": hashlib.sha256(exchange_path.read_bytes()).hexdigest(),
+    }
     assert receipt["counts"]["eligible_ranked_crypto"] == 10
     assert receipt["binance_filters"]["BTC/USDT"] == [
         {"filterType": "PRICE_FILTER", "tickSize": "0.1"},
@@ -109,8 +150,14 @@ def test_cli_uses_latest_non_future_snapshot_and_jsonl(tmp_path: Path) -> None:
         "\n".join(
             json.dumps(row)
             for row in [
-                _market_snapshot("2026-01-01T00:00:00Z", ["BTC", "ETH", "SOL", "XRP", "DOGE", "ADA", "AVAX", "TON", "BNB", "TRX"]),
-                _market_snapshot("2026-02-01T00:00:00Z", ["TRX", "BNB", "TON", "AVAX", "ADA", "DOGE", "XRP", "SOL", "ETH", "BTC"]),
+                _market_snapshot(
+                    "2026-01-01T00:00:00Z",
+                    ["BTC", "ETH", "SOL", "XRP", "DOGE", "ADA", "AVAX", "TON", "BNB", "TRX"],
+                ),
+                _market_snapshot(
+                    "2026-02-01T00:00:00Z",
+                    ["TRX", "BNB", "TON", "AVAX", "ADA", "DOGE", "XRP", "SOL", "ETH", "BTC"],
+                ),
             ]
         )
     )
@@ -148,6 +195,29 @@ def test_cli_uses_latest_non_future_snapshot_and_jsonl(tmp_path: Path) -> None:
         "exchange_info": "2026-01-01T00:00:00Z",
         "market_caps": "2026-01-01T00:00:00Z",
     }
+    assert result["universe_materialization_receipt"]["source_sha256"] == {
+        "market_caps": hashlib.sha256(caps.read_bytes()).hexdigest(),
+        "exchange_info": hashlib.sha256(exchange.read_bytes()).hexdigest(),
+    }
+
+
+def test_tradfi_binding_fails_closed_when_exchange_has_none(tmp_path: Path) -> None:
+    ranking = ["BTC", "ETH", "SOL", "XRP", "DOGE", "ADA", "AVAX", "TON", "BNB", "TRX"]
+    market = _market_snapshot("2026-01-01T00:00:00Z", ranking)
+    exchange = _exchange_snapshot("2026-01-01T00:00:00Z", tradfi=())
+    market_path = tmp_path / "caps.json"
+    exchange_path = tmp_path / "exchange.json"
+    market_path.write_text(json.dumps(market))
+    exchange_path.write_text(json.dumps(exchange))
+    with pytest.raises(ValueError, match="requires tradfi_all"):
+        MODULE.materialize(
+            _suite(),
+            market,
+            exchange,
+            as_of=datetime(2026, 1, 2, tzinfo=UTC),
+            market_cap_source=market_path,
+            exchange_info_source=exchange_path,
+        )
 
 
 @pytest.mark.parametrize("problem", ["future", "duplicate", "missing"])

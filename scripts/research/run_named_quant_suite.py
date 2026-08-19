@@ -96,6 +96,58 @@ def _artifact_name(index: int, candidate_id: str) -> str:
     return f"{index:03d}_{safe_id}.json"
 
 
+def _positive_float(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        parsed = float(value)
+    except TypeError, ValueError:
+        return None
+    return parsed if math.isfinite(parsed) and parsed > 0 else None
+
+
+def _symbol_limits_from_manifest(manifest: dict[str, Any]) -> dict[str, dict[str, float]]:
+    receipt = manifest.get("universe_materialization_receipt")
+    filters_by_symbol = receipt.get("binance_filters") if isinstance(receipt, dict) else None
+    if not isinstance(filters_by_symbol, dict):
+        return {}
+    limits: dict[str, dict[str, float]] = {}
+    for symbol, filters in filters_by_symbol.items():
+        if not isinstance(filters, list):
+            continue
+        by_type = {
+            str(row.get("filterType") or "").upper(): row
+            for row in filters
+            if isinstance(row, dict)
+        }
+        symbol_limits: dict[str, float] = {}
+        price_filter = by_type.get("PRICE_FILTER", {})
+        tick_size = _positive_float(price_filter.get("tickSize"))
+        if tick_size is not None:
+            symbol_limits["price_tick_size"] = tick_size
+        lot_filter = by_type.get("LOT_SIZE", {})
+        market_lot_filter = by_type.get("MARKET_LOT_SIZE", {})
+        min_qty = _positive_float(market_lot_filter.get("minQty")) or _positive_float(
+            lot_filter.get("minQty")
+        )
+        qty_step = _positive_float(market_lot_filter.get("stepSize")) or _positive_float(
+            lot_filter.get("stepSize")
+        )
+        if min_qty is not None:
+            symbol_limits["min_qty"] = min_qty
+        if qty_step is not None:
+            symbol_limits["qty_step"] = qty_step
+        notional_filter = by_type.get("MIN_NOTIONAL", {})
+        min_notional = _positive_float(notional_filter.get("notional")) or _positive_float(
+            notional_filter.get("minNotional")
+        )
+        if min_notional is not None:
+            symbol_limits["min_notional"] = min_notional
+        if symbol_limits:
+            limits[str(symbol)] = symbol_limits
+    return limits
+
+
 def _run_candidate(
     spec: dict[str, Any],
     *,
@@ -103,6 +155,7 @@ def _run_candidate(
     exchange: str,
     start: datetime,
     end: datetime,
+    symbol_limits: dict[str, dict[str, float]],
 ) -> dict[str, Any]:
     data = {
         symbol: repository.load_ohlcv(
@@ -121,6 +174,13 @@ def _run_candidate(
     config = get_default_runtime_config()
     config.trading.timeframe = spec["timeframe"]
     config.backtest.persist_output = False
+    config.live.symbol_limits = {
+        **config.live.symbol_limits,
+        **{
+            symbol: {**config.live.symbol_limits.get(symbol, {}), **limits}
+            for symbol, limits in symbol_limits.items()
+        },
+    }
     backtest = Backtest(
         "data",
         spec["symbols"],
@@ -187,6 +247,7 @@ def run_suite(
 
     output_dir.mkdir(parents=True, exist_ok=True)
     repository = MarketDataRepository(str(data_root))
+    symbol_limits = _symbol_limits_from_manifest(manifest)
     results: list[dict[str, Any]] = []
     for index, candidate in enumerate(candidates):
         fallback_id = (
@@ -202,6 +263,7 @@ def run_suite(
                 exchange=exchange,
                 start=start,
                 end=end,
+                symbol_limits=symbol_limits,
             )
         except Exception as exc:
             result = {
