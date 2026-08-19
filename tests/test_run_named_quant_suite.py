@@ -144,7 +144,7 @@ def test_runs_each_candidate_and_writes_allocator_inputs_and_failures(
         "artifact": "named_quant_data_pc_walkforward",
         "candidate_id": "works",
         "selection_inputs": ["train", "validation"],
-        "stream": "daily UTC train/validation net returns",
+        "stream": "daily UTC net returns over the caller-supplied selection window",
         "uses_locked_oos_for_selection": False,
         "uses_locked_oos_for_sizing": False,
     }
@@ -248,3 +248,49 @@ def test_duplicate_candidate_ids_fail_closed(tmp_path) -> None:
             start=datetime(2024, 1, 1),
             end=datetime(2025, 1, 1),
         )
+
+
+def test_locked_oos_run_never_emits_allocator_input(tmp_path, monkeypatch) -> None:
+    manifest = tmp_path / "suite.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "candidates": [
+                    {
+                        "candidate_id": "works",
+                        "family": "trend",
+                        "strategy_class": "Strategy",
+                        "symbols": ["BTC/USDT"],
+                        "params": {"lookback": 20},
+                        "timeframe": "1d",
+                    }
+                ]
+            }
+        )
+    )
+    monkeypatch.setattr(MODULE, "MarketDataRepository", _Repository)
+    monkeypatch.setattr(MODULE, "Backtest", _Backtest)
+    monkeypatch.setattr(MODULE, "resolve_strategy_class", lambda name, strict: object)
+    monkeypatch.setattr(
+        MODULE,
+        "get_default_runtime_config",
+        lambda: SimpleNamespace(
+            trading=SimpleNamespace(timeframe="1m"),
+            backtest=SimpleNamespace(persist_output=True),
+            live=SimpleNamespace(symbol_limits={}),
+        ),
+    )
+    output = tmp_path / "locked"
+
+    result = MODULE.run_suite(
+        manifest,
+        tmp_path / "data",
+        output,
+        exchange="binance",
+        start=datetime(2024, 1, 1),
+        end=datetime(2025, 1, 1),
+        purpose="locked_oos",
+    )
+
+    assert result["purpose"] == "locked_oos"
+    assert not (output / "allocation_input.json").exists()

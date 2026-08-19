@@ -230,6 +230,7 @@ def run_suite(
     exchange: str,
     start: datetime,
     end: datetime,
+    purpose: str = "selection",
 ) -> dict[str, Any]:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     candidates = manifest.get("candidates") if isinstance(manifest, dict) else None
@@ -237,6 +238,8 @@ def run_suite(
         raise ValueError("manifest candidates must be a list")
     if end <= start:
         raise ValueError("end must be after start")
+    if purpose not in {"selection", "locked_oos"}:
+        raise ValueError("purpose must be 'selection' or 'locked_oos'")
     candidate_ids = [
         str(candidate.get("candidate_id") or "")
         for candidate in candidates
@@ -281,6 +284,7 @@ def run_suite(
 
     summary = {
         "suite_id": manifest.get("suite_id"),
+        "purpose": purpose,
         "exchange": exchange,
         "start": start.isoformat(),
         "end": end.isoformat(),
@@ -293,6 +297,9 @@ def run_suite(
         json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
     summary_path = output_dir / "suite_results.json"
+    if purpose == "locked_oos":
+        return summary
+
     allocation_input = deepcopy(manifest)
     sleeves = allocation_input.get("sleeves")
     if isinstance(sleeves, dict):
@@ -327,7 +334,7 @@ def run_suite(
                     "returns_source": {
                         "artifact": "named_quant_data_pc_walkforward",
                         "candidate_id": result["candidate_id"],
-                        "stream": "daily UTC train/validation net returns",
+                        "stream": "daily UTC net returns over the caller-supplied selection window",
                         "selection_inputs": ["train", "validation"],
                         "uses_locked_oos_for_selection": False,
                         "uses_locked_oos_for_sizing": False,
@@ -358,6 +365,12 @@ def main() -> None:
     parser.add_argument("--exchange", default="binance")
     parser.add_argument("--start", required=True)
     parser.add_argument("--end", required=True)
+    parser.add_argument(
+        "--purpose",
+        choices=("selection", "locked_oos"),
+        default="selection",
+        help="selection emits allocator input; locked_oos never does",
+    )
     args = parser.parse_args()
     summary = run_suite(
         args.manifest,
@@ -366,6 +379,7 @@ def main() -> None:
         exchange=args.exchange,
         start=_datetime(args.start),
         end=_datetime(args.end),
+        purpose=args.purpose,
     )
     raise SystemExit(1 if summary["fail_count"] else 0)
 
