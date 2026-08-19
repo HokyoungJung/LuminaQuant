@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-08-19T07:43:45.013651+00:00",
+  "generated_at_utc": "2026-08-19T08:25:27.040343+00:00",
   "literal_paths": [
     "src/lumina_quant/strategies",
     "lumina_quant/strategies"
@@ -923,10 +923,10 @@
     "literal:src/lumina_quant/strategies/entropy_amihud_alpha_sleeves.py:175:34:3",
     "literal:src/lumina_quant/strategies/entropy_amihud_alpha_sleeves.py:254:31:1800",
     "literal:src/lumina_quant/strategies/entropy_amihud_alpha_sleeves.py:311:34:3",
-    "literal:src/lumina_quant/strategies/equity_curve_kill_switch_overlay.py:120:22:400",
-    "literal:src/lumina_quant/strategies/equity_curve_kill_switch_overlay.py:260:41:3",
-    "literal:src/lumina_quant/strategies/equity_curve_kill_switch_overlay.py:261:30:0.10",
-    "literal:src/lumina_quant/strategies/equity_curve_kill_switch_overlay.py:264:23:0.10",
+    "literal:src/lumina_quant/strategies/equity_curve_kill_switch_overlay.py:131:22:400",
+    "literal:src/lumina_quant/strategies/equity_curve_kill_switch_overlay.py:271:41:3",
+    "literal:src/lumina_quant/strategies/equity_curve_kill_switch_overlay.py:272:30:0.10",
+    "literal:src/lumina_quant/strategies/equity_curve_kill_switch_overlay.py:275:23:0.10",
     "literal:src/lumina_quant/strategies/equity_return_alpha_sleeves.py:239:31:86400",
     "literal:src/lumina_quant/strategies/equity_return_alpha_sleeves.py:299:46:12",
     "literal:src/lumina_quant/strategies/equity_return_alpha_sleeves.py:332:26:3",
