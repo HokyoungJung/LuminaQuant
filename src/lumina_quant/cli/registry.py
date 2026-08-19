@@ -47,6 +47,17 @@ def cmd_list(args: argparse.Namespace) -> int:
     try:
         from lumina_quant.core.plugin_registry import GLOBAL_REGISTRY
 
+        # Portfolio optimizers are opt-in modules (not imported by
+        # ``portfolio/__init__``); import them here so the listing is complete.
+        for module_name in (
+            "lumina_quant.portfolio.optimizers_extra",
+            "lumina_quant.portfolio.hierarchical",
+        ):
+            try:
+                __import__(module_name)
+            except Exception:
+                continue
+
         entries["indicators"] = sorted(
             n for n in GLOBAL_REGISTRY.list_names("indicator") if not n.startswith("_")
         )

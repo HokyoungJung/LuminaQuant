@@ -477,13 +477,39 @@ def _family_meta_momentum_tilted_weights(
     return normalized
 
 
-def _build_allocator(method: str) -> ERCPortfolio | HRPPortfolio:
+# Opt-in hierarchical / robust allocators (2026-08-19). Every token below is
+# additive: ``"erc"`` / ``"hrp"`` keep their exact legacy classes and kwargs-free
+# construction, so the default path stays byte-identical.
+_EXTENDED_ALLOCATORS: dict[str, str] = {
+    "hrp_dendrogram": "HRPDendrogramPortfolio",
+    "hrp_full": "HRPDendrogramPortfolio",
+    "constrained_hrp": "HRPDendrogramPortfolio",
+    "herc": "HERCPortfolio",
+    "nco": "NCOPortfolio",
+    "wasserstein_dro": "WassersteinDROPortfolio",
+    "dro": "WassersteinDROPortfolio",
+    "graph_inverse_centrality": "GraphInverseCentralityPortfolio",
+    "graph": "GraphInverseCentralityPortfolio",
+}
+_ALLOCATOR_METHODS: tuple[str, ...] = ("erc", "hrp", *sorted(_EXTENDED_ALLOCATORS))
+
+
+def _build_allocator(method: str, allocator_params: Mapping[str, Any] | None = None):
     token = str(method or "erc").strip().lower()
     if token == "erc":
         return ERCPortfolio()
     if token == "hrp":
         return HRPPortfolio()
-    raise ValueError(f"unsupported allocation method: {method!r} (expected 'erc' or 'hrp')")
+    class_name = _EXTENDED_ALLOCATORS.get(token)
+    if class_name is None:
+        raise ValueError(
+            f"unsupported allocation method: {method!r} (expected one of {_ALLOCATOR_METHODS})"
+        )
+    from lumina_quant.portfolio import hierarchical as _hier  # local: opt-in module
+
+    cls = getattr(_hier, class_name)
+    params = {str(k): v for k, v in dict(allocator_params or {}).items()}
+    return cls(**params)
 
 
 def _resolve_upper(
@@ -513,6 +539,7 @@ def allocate_quality_gated(
     family_momentum_tilt_strength: float = 0.5,
     family_momentum_tilt_cap: float = 0.30,
     min_families: int = 3,
+    allocator_params: Mapping[str, Any] | None = None,
 ) -> dict[str, float]:
     """Quality-gate then risk-allocate across sleeves; returns ``id -> weight``.
 
@@ -617,7 +644,7 @@ def allocate_quality_gated(
                     raw_weights, upper=upper_map, target_sum=1.0
                 )
         else:
-            allocator = _build_allocator(method)
+            allocator = _build_allocator(method, allocator_params)
             raw_weights = allocator.allocate(survivors, matrix, upper=upper_map)
         if not raw_weights:
             equal = 1.0 / float(len(survivors))
@@ -661,6 +688,7 @@ def build_allocation_manifest(
     family_momentum_tilt_strength: float = 0.5,
     family_momentum_tilt_cap: float = 0.30,
     min_families: int = 3,
+    allocator_params: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build a manifest the live ``ArtifactPortfolioModeStrategy`` accepts as-is.
 
@@ -723,6 +751,7 @@ def build_allocation_manifest(
         family_momentum_tilt_strength=family_momentum_tilt_strength,
         family_momentum_tilt_cap=family_momentum_tilt_cap,
         min_families=min_families,
+        allocator_params=allocator_params,
     )
 
     default_source_id = str(source_rows[0].get("id") or "") if len(source_rows) == 1 else ""
@@ -781,7 +810,7 @@ def build_allocation_manifest(
         for sid in sorted(sleeves)
     }
 
-    return {
+    manifest = {
         "artifact_kind": "quality_gated_allocation_manifest",
         "real_money_execution": False,
         "allow_real_money": False,
@@ -804,3 +833,8 @@ def build_allocation_manifest(
         "children": children,
         "sleeve_quality": sleeve_quality,
     }
+    if allocator_params:
+        # Opt-in provenance only: without allocator_params the manifest stays
+        # byte-identical to the pinned golden.
+        manifest["allocator_params"] = {str(k): v for k, v in dict(allocator_params).items()}
+    return manifest

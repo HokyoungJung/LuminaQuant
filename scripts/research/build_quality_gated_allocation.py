@@ -13,7 +13,9 @@ manifest, because nothing here reads the wall clock or the filesystem.
 Input JSON shape::
 
     {
-      "method": "erc",                 # optional, default "erc" ("erc"|"hrp")
+      "method": "erc",                 # optional, default "erc" ("erc"|"hrp"|
+                                       #   "hrp_dendrogram"|"herc"|"nco"|"wasserstein_dro"|"mst_peripheral")
+      "allocator_params": {...},        # optional kwargs for the opt-in allocators
       "upper": 0.6,                    # optional per-sleeve cap (float or {id: cap})
       "min_sleeves": 1,                # optional
       "gross_cap": 1.0,                # optional
@@ -65,6 +67,13 @@ def build_manifest_from_input(payload: dict[str, Any]) -> dict[str, Any]:
         upper=payload.get("upper"),
         min_sleeves=int(payload.get("min_sleeves", 1)),
         gross_cap=float(payload.get("gross_cap", 1.0)),
+        # Optional kwargs for the opt-in hierarchical/robust allocators
+        # (hrp_dendrogram / herc / nco / wasserstein_dro / mst_peripheral).
+        allocator_params=(
+            dict(payload["allocator_params"])
+            if isinstance(payload.get("allocator_params"), dict)
+            else None
+        ),
     )
 
 

@@ -390,3 +390,35 @@ __all__ = [
     "yang_zhang_volatility",
     "zscore",
 ]
+
+# ---------------------------------------------------------------------------
+# Named-quant public-rule primitives (2026-08-19): open-anchored volatility
+# breakout / noise ratio / MA-score (systrader79 lineage) and stat-arb Kalman
+# hedge + PCA residual s-scores.  Kept as a trailing block so the alphabetical
+# import list above stays untouched.
+# ---------------------------------------------------------------------------
+from .breakout_noise import average_noise_ratio as average_noise_ratio
+from .breakout_noise import bar_noise_ratio as bar_noise_ratio
+from .breakout_noise import moving_average_score as moving_average_score
+from .breakout_noise import range_volatility_target_weight as range_volatility_target_weight
+from .breakout_noise import volatility_breakout_levels as volatility_breakout_levels
+from .stat_arb import KalmanHedgeState as KalmanHedgeState
+from .stat_arb import kalman_hedge_initial_state as kalman_hedge_initial_state
+from .stat_arb import kalman_hedge_ratio as kalman_hedge_ratio
+from .stat_arb import kalman_hedge_ratio_step as kalman_hedge_ratio_step
+from .stat_arb import kalman_spread as kalman_spread
+from .stat_arb import pca_residual_sscores as pca_residual_sscores
+
+__all__ += [
+    "KalmanHedgeState",
+    "average_noise_ratio",
+    "bar_noise_ratio",
+    "kalman_hedge_initial_state",
+    "kalman_hedge_ratio",
+    "kalman_hedge_ratio_step",
+    "kalman_spread",
+    "moving_average_score",
+    "pca_residual_sscores",
+    "range_volatility_target_weight",
+    "volatility_breakout_levels",
+]

@@ -257,6 +257,21 @@ _STRATEGY_TIER_HINTS: dict[str, str] = {
     "SilentVolumeShockResolutionStrategy": "research_only",
     "RoundNumberBarrierStrategy": "research_only",
     "CrossSectionalOffSessionTugOfWarStrategy": "research_only",
+    # Named-quant public-rule suite, Claude lane (2026-08-19; see
+    # docs/research_note/named_quant_claude_suite_20260819.md and
+    # configs/research/named_quant_claude_suite_v1.json). Independent adaptations
+    # of publicly described rules (systrader79 / 물탄찬밥 / 아마추어퀀트 /
+    # 알바트로스 / FlightF / 워뇨띠(AOA) / 돌파고 lineage) -- research_only
+    # until the data-PC cost-realistic walk-forward passes the promotion gates.
+    "NoiseFilteredVolatilityBreakoutStrategy": "research_only",
+    "MaScoreVolTargetRotationStrategy": "research_only",
+    "TurtleUnitPyramidingStrategy": "research_only",
+    "KalmanPairsStatArbStrategy": "research_only",
+    "PcaResidualStatArbStrategy": "research_only",
+    "EquityCurveKillSwitchOverlayStrategy": "research_only",
+    "RsiDivergenceScaleOutStrategy": "research_only",
+    "PrevDayBoxQuartileReversionStrategy": "research_only",
+    "SessionHighBreakoutScalpStrategy": "research_only",
 }
 
 _STRATEGY_METADATA: dict[str, dict[str, Any]] = {
