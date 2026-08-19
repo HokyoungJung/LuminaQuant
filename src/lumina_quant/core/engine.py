@@ -4,7 +4,7 @@ from abc import ABC
 from datetime import UTC, datetime
 from typing import Any
 
-from lumina_quant.core.events import MarketEvent
+from lumina_quant.core.events import MarketBatchEvent, MarketEvent
 from lumina_quant.core.strategy_input import StrategyInputContext
 from lumina_quant.data.feature_points import FEATURE_COLUMNS
 from lumina_quant.event_clock import EventSequencer, assign_event_identity
@@ -202,6 +202,8 @@ class TradingEngine(ABC):
 
         warmup = self._update_warmup_state(getattr(event, "time", None))
         strategy_guard = getattr(self.strategy, "should_process_market_event", None)
+        batch_fn = getattr(self.strategy, "calculate_signals_batch", None)
+        accepted_events = []
         for market_event in batch_events:
             self.market_events += 1
             should_process = True
@@ -221,7 +223,20 @@ class TradingEngine(ABC):
                     },
                     feature_lookup=getattr(self.data_handler, "_feature_lookup", None),
                 )
-                self.strategy.calculate_signals(market_event)
+                if callable(batch_fn):
+                    accepted_events.append(market_event)
+                else:
+                    self.strategy.calculate_signals(market_event)
+
+        if callable(batch_fn) and accepted_events:
+            batch_fn(
+                MarketBatchEvent(
+                    time=getattr(event, "time", None),
+                    bars=tuple(accepted_events),
+                    timestamp_ns=getattr(event, "timestamp_ns", None),
+                    sequence=getattr(event, "sequence", None),
+                )
+            )
 
         if warmup:
             # Batch events share one timestamp, so the event-level warmup check
