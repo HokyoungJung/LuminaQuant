@@ -385,6 +385,105 @@ def test_chunked_runner_extends_first_loader_call_by_warmup():
     assert float(backtest.portfolio.current_holdings["total"]) > 0.0
 
 
+class _ProbeHookStrategy(_ProbeSmaStrategy):
+    """SMA probe with the optional on_warmup_end hook instrumented.
+
+    Uses a class-level counter so chunked runs (which rebuild the strategy per
+    chunk) still observe the total fire count.
+    """
+
+    hook_fired_total = 0
+
+    def __init__(self, bars, events, lookback=45, flip_minutes=10):
+        super().__init__(bars, events, lookback=lookback, flip_minutes=flip_minutes)
+        self.hook_calls: list[int] = []
+
+    def on_warmup_end(self):
+        type(self).hook_fired_total += 1
+        # Record how many samples the strategy had seen when the hook fired so
+        # the test can prove it fired BEFORE the first live bar was processed.
+        self.hook_calls.append(len(self.samples))
+
+
+def test_warmup_end_hook_fires_once_before_first_live_bar():
+    _ProbeHookStrategy.hook_fired_total = 0
+    frame = _build_minute_frame(T0, minutes=180)
+    live_start = T0 + timedelta(minutes=60)
+    live_start_ms = _to_ms(live_start)
+
+    warm = _run_backtest(
+        frame, start_date=live_start, warmup_bars=60, strategy_cls=_ProbeHookStrategy
+    )
+
+    assert _ProbeHookStrategy.hook_fired_total == 1
+    assert len(warm.strategy.hook_calls) == 1
+    # Every sample present at hook time was a warmup bar: the hook ran before
+    # the strategy processed the first live bar.
+    samples_at_hook = warm.strategy.hook_calls[0]
+    assert samples_at_hook > 0
+    assert all(sample[0] < live_start_ms for sample in warm.strategy.samples[:samples_at_hook])
+    assert warm.strategy.samples[samples_at_hook][0] >= live_start_ms
+
+
+def test_warmup_end_hook_never_fires_without_warmup():
+    _ProbeHookStrategy.hook_fired_total = 0
+    frame = _build_minute_frame(T0, minutes=120)
+
+    _run_backtest(frame, start_date=T0, warmup_bars=0, strategy_cls=_ProbeHookStrategy)
+
+    assert _ProbeHookStrategy.hook_fired_total == 0
+
+
+def test_warmup_end_hook_state_roundtrip_suppresses_refire():
+    _ProbeHookStrategy.hook_fired_total = 0
+    frame = _build_minute_frame(T0, minutes=180)
+    live_start = T0 + timedelta(minutes=60)
+
+    warm = _run_backtest(
+        frame, start_date=live_start, warmup_bars=60, strategy_cls=_ProbeHookStrategy
+    )
+    assert _ProbeHookStrategy.hook_fired_total == 1
+
+    engine_state = warm.get_engine_state()
+    assert engine_state.get("warmup_end_hook_fired") is True
+
+    # A restored engine (chunk boundary after the warmup transition) must not
+    # re-fire the hook on its first live event.
+    warm._warmup_end_hook_fired = False
+    warm.set_engine_state(engine_state)
+    assert warm._warmup_end_hook_fired is True
+
+
+def test_chunked_runner_fires_warmup_end_hook_once_total():
+    _ProbeHookStrategy.hook_fired_total = 0
+    frame = _build_minute_frame(T0, minutes=3 * 24 * 60)
+    runner_start = T0 + timedelta(hours=4)
+    runner_end = T0 + timedelta(days=2, hours=23)
+
+    def _loader(load_start: datetime, load_end: datetime):
+        sliced = frame.filter((pl.col("datetime") >= load_start) & (pl.col("datetime") <= load_end))
+        return {SYMBOL: sliced} if sliced.height > 0 else {}
+
+    run_backtest_chunked(
+        csv_dir="data",
+        symbol_list=[SYMBOL],
+        start_date=runner_start,
+        end_date=runner_end,
+        strategy_cls=_ProbeHookStrategy,
+        strategy_params={},
+        data_loader=_loader,
+        chunk_days=1,
+        strategy_timeframe="1m",
+        data_handler_cls=HistoricCSVDataHandler,
+        record_history=False,
+        track_metrics=True,
+        record_trades=False,
+        warmup_bars=120,
+    )
+
+    assert _ProbeHookStrategy.hook_fired_total == 1
+
+
 def test_chunked_runner_raises_when_loader_omits_warmup_rows():
     frame = _build_minute_frame(T0, minutes=24 * 60)
     runner_start = T0 + timedelta(hours=4)

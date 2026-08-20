@@ -213,6 +213,38 @@ def test_legacy_snapshot_does_not_grow_via_hint_removal() -> None:
 
 
 # --------------------------------------------------------------------------- #
+# H1 fail-safe: unknown-name tier fallback resolves research_only
+# --------------------------------------------------------------------------- #
+def test_unknown_name_fails_safe_to_research_only() -> None:
+    """A never-registered / unhinted name must NOT resolve to a live tier.
+
+    The CI membership guard above blocks unhinted registrations at merge time;
+    this asserts the runtime fallback for the path CI cannot see (a module
+    dropped onto a box after CI ran) fails SAFE instead of auto-promoting.
+    """
+    assert get_strategy_tier("SomeUnknownFutureStrategy") == "research_only"
+
+
+def test_registry_legacy_snapshot_matches_guard_copy() -> None:
+    from lumina_quant.strategies.registry import (
+        _LEGACY_UNHINTED_LIVE_DEFAULT as registry_legacy,
+    )
+
+    assert registry_legacy == _LEGACY_UNHINTED_LIVE_DEFAULT
+
+
+def test_frozen_legacy_names_stay_live_default() -> None:
+    # The H1 fail-safe flip must not change the tier of any pre-contract class.
+    for name in sorted(_LEGACY_UNHINTED_LIVE_DEFAULT):
+        assert get_strategy_tier(name) == "live_default", name
+
+
+def test_curated_map_unhinted_names_stay_live_default() -> None:
+    for name in sorted(set(_STRATEGY_MAP) - set(_STRATEGY_TIER_HINTS)):
+        assert get_strategy_tier(name) == "live_default", name
+
+
+# --------------------------------------------------------------------------- #
 # Batch wiring
 # --------------------------------------------------------------------------- #
 def test_batch_classes_resolve_via_registry_map() -> None:

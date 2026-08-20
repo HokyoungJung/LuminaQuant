@@ -165,6 +165,17 @@ class ExecutionConfig:
     #     Axis 3 finding #7). Default False preserves the golden backtest numerics;
     #     enable in the cost-realistic / strict research profiles.
     funding_on_utc_boundary: bool = False
+    #   funding_entry_guard: L-D pre-registered cost gate (docs/research_note/
+    #     performance_lever_measurement.md). When True, a new LONG/SHORT entry
+    #     whose signal metadata declares an intended hold SHORTER than one
+    #     funding interval is skipped when that hold window would cross the
+    #     next 00/08/16 UTC settlement boundary (a sub-interval round trip
+    #     that would pay a full funding event is never opened). Signals that
+    #     do not declare ``intended_hold_seconds`` / ``intended_hold_bars``
+    #     metadata are never blocked. EXITs are never blocked. The rule is
+    #     deliberately sign-blind and has no tunable threshold. Default False
+    #     preserves the golden backtest numerics byte-identical.
+    funding_entry_guard: bool = False
 
 
 @dataclass(slots=True)
@@ -560,6 +571,17 @@ class StrategyQualityConfig:
     loss_cooldown_bars: int = 12
     profit_moonshot_conflict_cooldown_bars: int = 3
     pair_min_correlation: float = 0.35
+    # L-C engine cost gates (docs/research_note/performance_lever_measurement.md).
+    # Both are inert at defaults (0 = OFF, byte-identical).  ``min_hold_bars``
+    # delays bare strategy EXITs and opposite-direction reversals for N bars
+    # after an entry fill; exits carrying a ``risk_exit`` / ``exit_reason`` /
+    # ``overlay_reason`` metadata marker always pass, and engine-level
+    # protective stops / liquidations are untouched (they fill via
+    # check_open_orders, not signals).  ``no_trade_band_bps`` drops entry /
+    # partial-exit orders whose notional is below this fraction (bps) of
+    # current equity; full exits are always exempt (position hygiene).
+    min_hold_bars: int = 0
+    no_trade_band_bps: float = 0.0
 
 
 @dataclass(slots=True)

@@ -120,6 +120,12 @@ class Portfolio:
         self.funding_on_utc_boundary = self._audit_flag(
             config, "FUNDING_ON_UTC_BOUNDARY", "execution", "funding_on_utc_boundary"
         )
+        # L-D funding-entry guard (pre-registered fixed rule, default OFF):
+        # skip a new entry whose declared intended hold is shorter than one
+        # funding interval AND would straddle the next settlement boundary.
+        self.funding_entry_guard = self._audit_flag(
+            config, "FUNDING_ENTRY_GUARD", "execution", "funding_entry_guard"
+        )
         # Lazily-constructed RiskManager backstop for the order-time gate (only when
         # enforce_order_risk_gate is True). Mirrors the live/trader.py:1713 usage.
         self._risk_manager = None
@@ -162,6 +168,12 @@ class Portfolio:
         self.trading_frozen = False
         self.component_positions = {}
 
+        # L-C no-trade band (bps of equity). 0.0 = OFF (byte-identical default):
+        # entry / partial-exit orders below the band are dropped as sub-cost
+        # churn; full exits are always exempt (position hygiene).
+        self.no_trade_band_bps = float(
+            getattr(config, "STRATEGY_QUALITY_NO_TRADE_BAND_BPS", 0.0) or 0.0
+        )
         self.strategy_quality = StrategyQualityOverlay(config)
         # Initialize first record
         self.update_initial_record()
@@ -1347,6 +1359,65 @@ class Portfolio:
             return float(entry_price) * (1.0 - pct)
         return float(entry_price) * (1.0 + pct)
 
+    def _funding_entry_guard_blocks(self, signal, symbol) -> bool:
+        """L-D pre-registered rule: block a sub-funding-interval entry that
+        would straddle the next 00/08/16 UTC settlement boundary.
+
+        Only fires when the flag is ON and the signal DECLARES an intended
+        hold via ``intended_hold_seconds`` (or ``intended_hold_bars`` at the
+        config timeframe); undeclared signals are never blocked.
+        """
+        if not self.funding_entry_guard:
+            return False
+        metadata = dict(getattr(signal, "metadata", {}) or {})
+        hold_s = None
+        raw_seconds = metadata.get("intended_hold_seconds")
+        if raw_seconds is not None:
+            try:
+                hold_s = float(raw_seconds)
+            except TypeError, ValueError:
+                hold_s = None
+        if hold_s is None:
+            raw_bars = metadata.get("intended_hold_bars")
+            if raw_bars is not None:
+                try:
+                    bars = float(raw_bars)
+                except TypeError, ValueError:
+                    bars = None
+                if bars is not None and bars > 0.0:
+                    timeframe = str(getattr(self.config, "TIMEFRAME", "") or "")
+                    if timeframe:
+                        try:
+                            tf_ms = timeframe_to_milliseconds(normalize_timeframe_token(timeframe))
+                        except TypeError, ValueError:
+                            tf_ms = None
+                        if tf_ms:
+                            hold_s = bars * float(tf_ms) / 1000.0
+        if hold_s is None or hold_s <= 0.0:
+            return False
+        interval_s = float(self.execution_model.cfg.funding_interval_hours) * 3600.0
+        if interval_s <= 0.0 or hold_s >= interval_s:
+            return False
+        now_ts = self._to_unix_seconds(self.bars.get_latest_bar_datetime(symbol))
+        if now_ts is None:
+            return False
+        next_boundary = (int(float(now_ts) // interval_s) + 1) * interval_s
+        return (next_boundary - float(now_ts)) < hold_s
+
+    def _below_no_trade_band(self, quantity, price) -> bool:
+        """True when an order's notional is below the L-C no-trade band."""
+        band = float(self.no_trade_band_bps)
+        if band <= 0.0:
+            return False
+        try:
+            notional = abs(float(quantity)) * float(price)
+        except TypeError, ValueError:
+            return False
+        equity = float(self.current_holdings.get("total", self.initial_capital) or 0.0)
+        if equity <= 0.0:
+            return False
+        return notional < equity * band / 10_000.0
+
     def generate_order_from_signal(self, signal) -> OrderEvent | None:
         """Generates an OrderEvent from a SignalEvent.
         Uses risk-based sizing with exchange constraints.
@@ -1377,10 +1448,15 @@ class Portfolio:
         elif direction == "SHORT":
             position_side = position_side or "SHORT"
 
+        if direction in ("LONG", "SHORT") and self._funding_entry_guard_blocks(signal, symbol):
+            return None
+
         if direction == "LONG":
             qty = self._risk_based_quantity(signal, current_price)
             qty = self._validate_and_round_quantity(symbol, qty, current_price)
             if qty <= 0:
+                return None
+            if self._below_no_trade_band(qty, current_price):
                 return None
             order_type = self._signal_order_type(signal)
             price, limits = self._order_price(
@@ -1416,6 +1492,8 @@ class Portfolio:
             qty = self._risk_based_quantity(signal, current_price)
             qty = self._validate_and_round_quantity(symbol, qty, current_price)
             if qty <= 0:
+                return None
+            if self._below_no_trade_band(qty, current_price):
                 return None
             order_type = self._signal_order_type(signal)
             price, limits = self._order_price(
@@ -1465,6 +1543,12 @@ class Portfolio:
                     exit_fraction = 1.0
                 exit_fraction = min(1.0, max(0.0, exit_fraction))
                 if exit_fraction <= 0.0:
+                    return None
+                if exit_fraction < 1.0 and self._below_no_trade_band(
+                    abs(cur_qty) * exit_fraction, current_price
+                ):
+                    # Full exits stay exempt from the no-trade band (hygiene);
+                    # only sub-band partial trims are dropped as churn.
                     return None
                 exit_direction = "SELL" if cur_qty > 0 else "BUY"
                 order_type = self._signal_order_type(signal)

@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-08-19T08:25:27.040343+00:00",
+  "generated_at_utc": "2026-08-20T03:18:34.503914+00:00",
   "literal_paths": [
     "src/lumina_quant/strategies",
     "lumina_quant/strategies"
@@ -1657,7 +1657,7 @@
     "literal:src/lumina_quant/strategies/regime_router_confirmed_alpha_sleeves.py:842:29:0.18",
     "literal:src/lumina_quant/strategies/regime_router_confirmed_alpha_sleeves.py:843:29:90",
     "literal:src/lumina_quant/strategies/regime_router_confirmed_alpha_sleeves.py:844:33:0.90",
-    "literal:src/lumina_quant/strategies/registry.py:495:83:3",
+    "literal:src/lumina_quant/strategies/registry.py:586:83:3",
     "literal:src/lumina_quant/strategies/residual_momentum_alpha_sleeves.py:120:27:30",
     "literal:src/lumina_quant/strategies/residual_momentum_alpha_sleeves.py:200:31:86400",
     "literal:src/lumina_quant/strategies/residual_momentum_alpha_sleeves.py:268:35:9",

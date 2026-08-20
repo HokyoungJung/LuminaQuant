@@ -134,6 +134,10 @@ class StrategyQualityOverlay:
     def __init__(self, config: Any) -> None:
         self.config = config
         self.enabled = bool(getattr(config, "STRATEGY_QUALITY_ENABLED", False))
+        # L-C min-hold gate: active independently of ``enabled`` so the cost
+        # lever can be A/B-measured without the full overlay. 0 = OFF
+        # (byte-identical default path).
+        self.min_hold_bars = max(0, int(getattr(config, "STRATEGY_QUALITY_MIN_HOLD_BARS", 0) or 0))
         self.bar_index = 0
         self._turnover_day = ""
         self._daily_turnover = 0.0
@@ -199,7 +203,7 @@ class StrategyQualityOverlay:
             self._daily_turnover = 0.0
 
     def note_fill(self, fill: Any, old_qty: float, new_qty: float, fill_price: float) -> None:
-        if not self.enabled or fill_price <= 0.0:
+        if (not self.enabled and self.min_hold_bars <= 0) or fill_price <= 0.0:
             return
         notional = abs(float(getattr(fill, "quantity", 0.0) or 0.0)) * float(fill_price)
         self._daily_turnover += notional
@@ -211,11 +215,14 @@ class StrategyQualityOverlay:
             return
 
         if old_qty == 0.0 and new_qty != 0.0:
-            self._entry[symbol] = {
+            record = {
                 "strategy": strategy_key,
                 "qty": float(new_qty),
                 "price": fill_price,
             }
+            if self.min_hold_bars > 0:
+                record["entry_bar"] = int(self.bar_index)
+            self._entry[symbol] = record
             return
 
         entry = self._entry.get(symbol)
@@ -230,11 +237,14 @@ class StrategyQualityOverlay:
             if new_qty == 0.0:
                 self._entry.pop(symbol, None)
             else:
-                self._entry[symbol] = {
+                record = {
                     "strategy": strategy_key,
                     "qty": float(new_qty),
                     "price": fill_price,
                 }
+                if self.min_hold_bars > 0:
+                    record["entry_bar"] = int(self.bar_index)
+                self._entry[symbol] = record
 
     def _record_health(self, strategy_key: str, realized_return: float) -> None:
         window = max(1, int(getattr(self.config, "STRATEGY_QUALITY_HEALTH_WINDOW_TRADES", 20)))
@@ -250,6 +260,38 @@ class StrategyQualityOverlay:
                 + int(getattr(self.config, "STRATEGY_QUALITY_LOSS_COOLDOWN_BARS", 0)),
             )
 
+    def _min_hold_block(self, signal: SignalEvent) -> str:
+        """L-C min-hold gate reason, or "" when the signal may pass.
+
+        Blocks bare strategy EXITs and opposite-direction reversal entries
+        while a tracked position is younger than ``min_hold_bars``.  Exits
+        carrying a protective marker (``risk_exit`` / ``exit_reason`` /
+        ``overlay_reason`` metadata) always pass; engine-level protective
+        stop / take-profit / liquidation fills never route through signals
+        and are therefore never delayed by this gate.
+        """
+        symbol = str(getattr(signal, "symbol", "") or "")
+        entry = self._entry.get(symbol)
+        if not entry:
+            return ""
+        entry_bar = entry.get("entry_bar")
+        if entry_bar is None:
+            return ""
+        if self.bar_index - int(entry_bar) >= self.min_hold_bars:
+            return ""
+        signal_type = str(getattr(signal, "signal_type", "")).upper()
+        if signal_type == "EXIT":
+            metadata = dict(getattr(signal, "metadata", {}) or {})
+            for key in ("risk_exit", "exit_reason", "overlay_reason"):
+                if metadata.get(key):
+                    return ""
+            return "min_hold_active"
+        direction = _direction(signal_type)
+        entry_qty = _safe_float(entry.get("qty")) or 0.0
+        if direction != 0 and entry_qty != 0.0 and (direction > 0) != (entry_qty > 0):
+            return "min_hold_reversal_block"
+        return ""
+
     def apply(
         self,
         signal: SignalEvent,
@@ -258,6 +300,14 @@ class StrategyQualityOverlay:
         current_price: float,
         current_equity: float,
     ) -> StrategyQualityDecision:
+        if self.min_hold_bars > 0:
+            block_reason = self._min_hold_block(signal)
+            if block_reason:
+                return StrategyQualityDecision(
+                    None,
+                    block_reason,
+                    {"min_hold_bars": int(self.min_hold_bars)},
+                )
         if not self.enabled:
             return StrategyQualityDecision(signal=signal)
         metadata = dict(getattr(signal, "metadata", {}) or {})

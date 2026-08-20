@@ -274,6 +274,87 @@ _STRATEGY_TIER_HINTS: dict[str, str] = {
     "SessionHighBreakoutScalpStrategy": "research_only",
 }
 
+# FROZEN legacy snapshot of the 68 glob-discovered classes that predate the
+# tier-hint contract (2026-07-03) and deliberately resolve ``live_default``
+# without an explicit hint.  APPEND-FORBIDDEN: a new strategy gets an explicit
+# ``_STRATEGY_TIER_HINTS`` entry (research_only until promoted) in the same
+# commit as its registration — never a slot here.  This set exists so the
+# unknown-name tier fallback below can fail SAFE (research_only) without
+# changing the tier of any pre-contract class; it must stay in lockstep with
+# the guard copy in tests/test_strategy_tier_guard.py.
+_LEGACY_UNHINTED_LIVE_DEFAULT: frozenset[str] = frozenset(
+    {
+        "AccelerationRiderStrategy",
+        "AdaptiveTrendRiderStrategy",
+        "AdfGatedReversionRiderStrategy",
+        "AmihudIlliquidityMomentumRiderStrategy",
+        "BenchmarkLeadLagContinuationStrategy",
+        "BettingAgainstBetaStrategy",
+        "BreadthRegimeTrendTimerStrategy",
+        "CalendarSeasonalityOverlayStrategy",
+        "CarryTrendConfluenceRiderStrategy",
+        "ConfidenceGatedTrendStrategy",
+        "CrossAssetDiversifiedTrendStrategy",
+        "CrossSectionalEquityMomentumStrategy",
+        "CrossSectionalShortTermReversalStrategy",
+        "CusumChangePointTrendRiderStrategy",
+        "DeepLearningForecastGateStrategy",
+        "DispersionConditionedReversionStrategy",
+        "DonchianAtrTrendStrategy",
+        "DualMomentumDefensiveRotationStrategy",
+        "DualMomentumIndexRotationStrategy",
+        "EquityBenchmarkResidualReversalStrategy",
+        "EquityMetalRiskRegimeRotationStrategy",
+        "FalseBreakoutReversalStrategy",
+        "FundingDislocationTrendCarryStrategy",
+        "FundingHarvestCarryStrategy",
+        "GarchInnovationRiderStrategy",
+        "GoldSilverRatioMeanReversionStrategy",
+        "GoldSilverRatioTrendStrategy",
+        "HurstRegimeGatedStrategy",
+        "IdiosyncraticVolatilityStrategy",
+        "IntermarketLeadLagContinuationStrategy",
+        "IntradayFlowPressureRiderStrategy",
+        "IntradaySeasonalMomentumRiderStrategy",
+        "KalmanTrendRiderStrategy",
+        "LeveragedTrendTimingRiderStrategy",
+        "LiquidationCascadeReversionStrategy",
+        "LiquidityShockReversionStrategy",
+        "LotterySkewnessStrategy",
+        "LowVolatilityMomentumStrategy",
+        "MetalEquityDivergenceReversalStrategy",
+        "MetalsRelativeValueBasketStrategy",
+        "MultiTimeframeTrendEnsembleStrategy",
+        "NearHighMomentumStrategy",
+        "OpenInterestTrendConfirmationRiderStrategy",
+        "OpeningRangeBreakoutRiderStrategy",
+        "OpeningRangeContinuationStrategy",
+        "OrderBookImbalanceReversionStrategy",
+        "OvernightSessionReturnRiderStrategy",
+        "PairsSpreadMeanReversionStrategy",
+        "PermutationEntropyTrendRiderStrategy",
+        "PullbackTrendContinuationStrategy",
+        "RealizedSemivarianceTrendRiderStrategy",
+        "RealizedVolTermStructureStrategy",
+        "ResidualEquityMomentumStrategy",
+        "ResidualMomentumRotationStrategy",
+        "SeasonalMicroBreakoutRiderStrategy",
+        "SelectionGatedMomentumStrategy",
+        "SelectionGatedReversionStrategy",
+        "SemisLeadLagRotationStrategy",
+        "SpectralCycleRiderStrategy",
+        "TakerFlowImbalanceContinuationStrategy",
+        "TrendEfficiencyMomentumStrategy",
+        "VWAPCompressionReversionStrategy",
+        "VarianceRatioTrendRiderStrategy",
+        "VolManagedMomentumCrashGateStrategy",
+        "VolOfVolRegimeTrendGateStrategy",
+        "VolatilityBreakoutRiderStrategy",
+        "VolatilitySqueezeBreakoutRiderStrategy",
+        "VolatilitySqueezeBreakoutStrategy",
+    }
+)
+
 _STRATEGY_METADATA: dict[str, dict[str, Any]] = {
     name: {
         "name": name,
@@ -375,8 +456,18 @@ def get_strategy_metadata(strategy_name: str) -> dict[str, Any]:
     # Glob-discovered strategies are not in _STRATEGY_METADATA (which is built over
     # the curated _STRATEGY_MAP), but an explicit _STRATEGY_TIER_HINTS entry must
     # still be honored so a new drop-in sleeve can pin itself to research_only /
-    # live_opt_in without being edited into _STRATEGY_MAP. Fail safe to the hint.
-    return {"name": token, "tier": str(_STRATEGY_TIER_HINTS.get(token, "live_default"))}
+    # live_opt_in without being edited into _STRATEGY_MAP.
+    hint = _STRATEGY_TIER_HINTS.get(token)
+    if hint is not None:
+        return {"name": token, "tier": str(hint)}
+    if token in _LEGACY_UNHINTED_LIVE_DEFAULT:
+        # Pre-contract classes keep their historical live_default resolution.
+        return {"name": token, "tier": "live_default"}
+    # FAIL-SAFE DEFAULT (H1): an unknown, unhinted drop-in must never
+    # auto-promote itself into the live tier — resolve research_only until a
+    # reviewed hint lands.  tests/test_strategy_tier_guard.py blocks unhinted
+    # registrations at CI; this guards the runtime path CI cannot see.
+    return {"name": token, "tier": "research_only"}
 
 
 def get_strategy_tier(strategy_name: str) -> str:

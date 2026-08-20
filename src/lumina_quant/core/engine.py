@@ -98,6 +98,11 @@ class TradingEngine(ABC):
         # None disables suppression entirely (live trading, plain backtests).
         self._live_start_ms = int(live_start_ms) if live_start_ms is not None else None
         self._warmup_active = False
+        # One-shot warmup->live transition hook guard.  Persisted across chunk
+        # boundaries via get_engine_state/set_engine_state so a chunked run
+        # neither double-fires nor skips the hook when the warmup boundary
+        # falls between chunks.
+        self._warmup_end_hook_fired = False
 
         # Stats
         self.market_events = 0
@@ -118,8 +123,25 @@ class TradingEngine(ABC):
         Signals/orders/fills are emitted into the queue by the market handlers
         and processed afterwards, so the flag set here governs suppression of
         the downstream events spawned by this market event.
+
+        On the first LIVE event of a warmup-configured run this fires the
+        optional one-shot ``strategy.on_warmup_end()`` hook (before the
+        strategy sees the live bar), so stateful sleeves can drop "positions"
+        they believe they entered during warmup — the engine suppressed those
+        signals, so no portfolio position ever existed (ghost-position
+        desynchronization).  Strategies without the hook are untouched.
         """
         self._warmup_active = self._is_warmup_time(time_value)
+        if (
+            self._live_start_ms is not None
+            and not self._warmup_active
+            and not self._warmup_end_hook_fired
+        ):
+            self._warmup_end_hook_fired = True
+            hook = getattr(self.strategy, "on_warmup_end", None)
+            if callable(hook):
+                # A deliberately-defined hook must not fail silently.
+                hook()
         return self._warmup_active
 
     def _required_inputs(self) -> tuple[str, ...]:
@@ -541,6 +563,7 @@ class TradingEngine(ABC):
         """Capture engine-level state for chunk boundaries."""
         state: dict[str, Any] = {
             "window_decision_last_bucket": self._window_decision_last_bucket,
+            "warmup_end_hook_fired": bool(self._warmup_end_hook_fired),
         }
         if self.timeframe_aggregator is None and not self._strategy_uses_timeframe_aggregator():
             return state
@@ -566,6 +589,9 @@ class TradingEngine(ABC):
                 self._window_decision_last_bucket = int(raw) if raw is not None else None
             except Exception:
                 self._window_decision_last_bucket = None
+
+        if "warmup_end_hook_fired" in state:
+            self._warmup_end_hook_fired = bool(state.get("warmup_end_hook_fired"))
 
         aggregator_state = state.get("timeframe_aggregator")
         if isinstance(aggregator_state, dict) and self._strategy_uses_timeframe_aggregator():
