@@ -98,6 +98,11 @@ def build_manifest_from_input(payload: dict[str, Any]) -> dict[str, Any]:
         locked_oos_evaluation=(
             dict(locked_oos_evaluation) if isinstance(locked_oos_evaluation, dict) else None
         ),
+        # Optional exposure layer above the allocator: {"method": "target_vol",
+        # "sigma_target_annual": 0.10, ...} or the gated fractional_kelly.
+        # Passed through RAW: resolve_risk_scaling_spec fails closed on a
+        # malformed (non-mapping) block instead of silently dropping it.
+        risk_scaling=setting("risk_scaling", None),
     )
 
 

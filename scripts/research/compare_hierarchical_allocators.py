@@ -130,16 +130,75 @@ def _diagnostics(weights: np.ndarray, cov: np.ndarray) -> dict[str, float]:
     }
 
 
-def compare(ids: list[str], matrix: np.ndarray, *, cap: float = 0.30) -> dict[str, Any]:
+def compare(
+    ids: list[str],
+    matrix: np.ndarray,
+    *,
+    cap: float = 0.30,
+    risk_scaling: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     cov, _ = ledoit_wolf_shrunk_covariance(matrix)
     out: dict[str, Any] = {}
     for method in METHODS:
         weights = _weights_for(method, ids, matrix, cap=cap)
-        out[method] = {
+        row: dict[str, Any] = {
             "weights": {sid: round(float(w), 6) for sid, w in zip(ids, weights)},
             **_diagnostics(weights, cov),
         }
+        if risk_scaling:
+            row["risk_scaling"] = _risk_scaling_row(ids, weights, matrix, risk_scaling)
+        out[method] = row
     return out
+
+
+def _risk_scaling_row(
+    ids: list[str],
+    weights: np.ndarray,
+    matrix: np.ndarray,
+    spec: dict[str, Any],
+) -> dict[str, Any]:
+    """Exposure layer per method: target-vol L (+ cash) and the Kelly mu-sensitivity.
+
+    The sensitivity block is the essay-style demonstration: a multiplicative
+    mu-hat error moves the fractional-Kelly exposure LINEARLY while the
+    target-vol exposure never reads mu at all. Diagnostic only -- the gated
+    fractional_kelly path in the allocator still requires mu_evidence_confirmed.
+    """
+    from lumina_quant.portfolio.risk_scaling import (
+        compute_risk_scaling,
+        kelly_mu_sensitivity,
+        resolve_risk_scaling_spec,
+    )
+
+    weight_map = dict(zip(ids, (float(w) for w in weights)))
+    target_spec = {key: value for key, value in spec.items() if key != "variants"}
+    target_spec["method"] = "target_vol"
+    resolved = resolve_risk_scaling_spec(target_spec)
+    result = compute_risk_scaling(weight_map, ids, matrix, spec=resolved)
+    row = result.to_payload()
+    kelly_variant = next(
+        (
+            dict(variant)
+            for variant in (spec.get("variants") or [])
+            if str(variant.get("method", "")).strip().lower() == "fractional_kelly"
+        ),
+        None,
+    )
+    if kelly_variant is not None:
+        # Uncapped on purpose: the diagnostic exists to SHOW the linear mu-hat
+        # amplification; the spec's max_leverage would clip all three points to
+        # the same value whenever full Kelly sits above the cap.
+        row["kelly_mu_sensitivity_uncapped"] = kelly_mu_sensitivity(
+            weight_map,
+            ids,
+            matrix,
+            fraction=float(kelly_variant.get("fraction", 0.5)),
+            risk_free_annual=float(kelly_variant.get("risk_free_annual", 0.0)),
+            bars_per_year=float(spec.get("bars_per_year", 365.0)),
+            max_leverage=float("1e9"),
+        )
+        row["target_vol_mu_sensitivity"] = "invariant (no mu estimate consumed)"
+    return row
 
 
 def run_cell_variants(payload: dict[str, Any]) -> dict[str, Any]:
@@ -173,11 +232,19 @@ def run_cell_variants(payload: dict[str, Any]) -> dict[str, Any]:
         for sid, spec in sleeves.items()
         if "return_timestamps" in (spec or {})
     }
+    # Variants share the cell's PRIMARY (mu-free) exposure layer; gated kelly
+    # variants are exercised only through the sensitivity diagnostic.
+    risk_scaling_spec = (
+        dict(payload.get("risk_scaling")) if isinstance(payload.get("risk_scaling"), dict) else None
+    )
+    if risk_scaling_spec is not None:
+        risk_scaling_spec.pop("variants", None)
     out: dict[str, Any] = {}
     for index, variant in enumerate(payload.get("allocator_variants") or []):
         method = str(variant.get("method") or payload.get("method") or "erc")
         params = dict(variant.get("allocator_params") or {})
         label = f"{index:02d}_{method}"
+        risk_scaling_out: dict[str, Any] = {}
         try:
             weights = allocate_quality_gated(
                 returns,
@@ -195,11 +262,16 @@ def run_cell_variants(payload: dict[str, Any]) -> dict[str, Any]:
                 allocator_params=params or None,
                 returns_are_net=returns_are_net,
                 return_timestamps=return_timestamps or None,
+                risk_scaling=risk_scaling_spec,
+                risk_scaling_out=risk_scaling_out if risk_scaling_spec else None,
             )
         except (ValueError, RuntimeError) as exc:  # fail-closed variant, keep comparing rows
             out[label] = {"method": method, "allocator_params": params, "error": str(exc)}
             continue
-        out[label] = {"method": method, "allocator_params": params, "weights": weights}
+        row = {"method": method, "allocator_params": params, "weights": weights}
+        if risk_scaling_out:
+            row["risk_scaling"] = risk_scaling_out
+        out[label] = row
     return out
 
 
@@ -215,7 +287,15 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
     ids, matrix = _load_returns(args.input)
-    result: dict[str, Any] = compare(ids, matrix, cap=float(args.cap))
+    payload_spec = json.loads(Path(args.input).read_text(encoding="utf-8"))
+    risk_scaling_spec = (
+        dict(payload_spec.get("risk_scaling"))
+        if isinstance(payload_spec.get("risk_scaling"), dict)
+        else None
+    )
+    result: dict[str, Any] = compare(
+        ids, matrix, cap=float(args.cap), risk_scaling=risk_scaling_spec
+    )
     if args.variants:
         payload = json.loads(Path(args.input).read_text(encoding="utf-8"))
         result = {"methods": result, "variants": run_cell_variants(payload)}

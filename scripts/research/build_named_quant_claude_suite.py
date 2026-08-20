@@ -1015,6 +1015,50 @@ def build_suite() -> dict[str, Any]:
             {"method": "hrp", "allocator_params": {}},
             {"method": "erc", "allocator_params": {}},
         ],
+        "risk_scaling": {
+            "method": "target_vol",
+            "sigma_target_annual": 0.10,
+            "bars_per_year": 365,
+            "max_leverage": 1.0,
+            "min_observations": 60,
+            "estimation": (
+                "sigma_hat = std of the common-date aligned train+validation NET portfolio "
+                "stream under the allocator's relative weights; the ONLY estimate consumed "
+                "(no mu forecast anywhere in the primary path)"
+            ),
+            "cash_note": (
+                "final weights = L * w (allocator weights sum to 1); the residual 1-L is the "
+                "cash weight recorded as the manifest's cash_weight. The simulator accrues NO "
+                "interest on idle cash (RiskFreePolicy is the excess-return benchmark for "
+                "Sharpe/Sortino only); a real risk-free yield on the residual is a "
+                "live-deployment detail outside the backtest"
+            ),
+            "variants": [
+                {"method": "target_vol", "sigma_target_annual": 0.10},
+                {"method": "target_vol", "sigma_target_annual": 0.05},
+                {
+                    "method": "fractional_kelly",
+                    "fraction": 0.5,
+                    "risk_free_annual": 0.0,
+                    "mu_evidence_confirmed": False,
+                    "status": "gated_until_locked_oos_mu_evidence",
+                    "note": (
+                        "Kelly re-introduces the mu-hat estimation problem the mu-free "
+                        "allocators avoid (an overestimated mean scales exposure linearly); "
+                        "resolve_risk_scaling_spec fails closed until mu_evidence_confirmed "
+                        "is set true on locked-OOS evidence. Until then it is exercised only "
+                        "through the kelly_mu_sensitivity diagnostic in "
+                        "compare_hierarchical_allocators.py."
+                    ),
+                },
+            ],
+        },
+        "allocation_layering": {
+            "layer_1_relative": "allocator (hrp_dendrogram primary + variants): HOW to split among risky sleeves; weights sum to 1; mu-free",
+            "layer_2_exposure": "risk_scaling target_vol: HOW MUCH total risky exposure L = min(max_leverage, sigma_target/sigma_hat); residual 1-L is risk-free cash; only sigma_hat is estimated",
+            "layer_3_growth": "fractional Kelly: growth-optimal L = f*mu_hat/sigma_hat^2 -- gated because it re-imports mu-hat error; pre-registered as a variant, never the primary until locked-OOS mu evidence exists",
+            "rationale": "Deliberate separation so the Markowitz's-curse mitigation of the mu-free allocator is not undone by a mu-dependent sizing layer on top.",
+        },
         "allocation_input_policy": {
             "weights_and_quality_gate_inputs": ["train", "validation"],
             "locked_oos_used_for_weights": False,

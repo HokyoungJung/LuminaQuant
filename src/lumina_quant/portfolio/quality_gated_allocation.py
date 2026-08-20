@@ -57,6 +57,7 @@ import numpy as np
 
 from lumina_quant.portfolio.optimizer_core import metrics, project_simplex_with_upper_bounds
 from lumina_quant.portfolio.optimizers_extra import ERCPortfolio, HRPPortfolio
+from lumina_quant.portfolio.risk_scaling import compute_risk_scaling, resolve_risk_scaling_spec
 from lumina_quant.research.cost_realism import DEFAULT_PARTICIPATION, CostRegime, apply_cost_drag
 
 __all__ = [
@@ -711,6 +712,8 @@ def allocate_quality_gated(
     allocator_params: Mapping[str, Any] | None = None,
     returns_are_net: Mapping[str, bool] | None = None,
     return_timestamps: Mapping[str, Sequence[str]] | None = None,
+    risk_scaling: Mapping[str, Any] | None = None,
+    risk_scaling_out: dict[str, Any] | None = None,
 ) -> dict[str, float]:
     """Quality-gate then risk-allocate across sleeves; returns ``id -> weight``.
 
@@ -755,6 +758,19 @@ def allocate_quality_gated(
       stay neutral); the tilt no-ops below ``min_families`` distinct families or
       zero cross-family dispersion. ``family_momentum_window == 0`` leaves every
       output byte-identical.
+    * ``risk_scaling`` (default ``None`` = OFF, byte-identical): the LAYER ABOVE
+      the allocator. The allocator's relative weights (sum 1) are multiplied by
+      the exposure ``L`` from :mod:`lumina_quant.portfolio.risk_scaling` --
+      ``target_vol`` (mu-free ``L = min(max_leverage, sigma_target/sigma_hat)``,
+      the primary method) or the gated ``fractional_kelly``. The residual
+      ``1 - L`` is the risk-free/cash weight (the manifest's ``cash_weight``
+      picks it up automatically). Fails closed when the covariance-less
+      equal-weight fallback is active (no volatility estimate). Applied LAST,
+      after every tilt/projection, so relative structure is preserved; when
+      ``risk_scaling_out`` is supplied it is filled with the computed
+      diagnostics payload. Allocator bounds (e.g. ``constrained_hrp`` lower /
+      upper) are contracts on the PRE-scaling sum-1 relative weights -- divide
+      the returned weights by the exposure before auditing bound compliance.
     """
     if not sleeve_returns:
         return {}
@@ -806,7 +822,9 @@ def allocate_quality_gated(
     if min_len < 2:
         # Not enough overlapping observations to estimate a covariance
         # structure; fall back to equal weight across survivors rather than
-        # fail. Still deterministic (equal split, sorted id order).
+        # fail. Still deterministic (equal split, sorted id order). With
+        # ``risk_scaling`` requested, ``matrix`` staying None makes
+        # ``compute_risk_scaling`` fail closed below (no volatility estimate).
         equal = 1.0 / float(len(survivors))
         raw_weights = dict.fromkeys(survivors, equal)
     else:
@@ -866,6 +884,20 @@ def allocate_quality_gated(
         )
         raw_weights = dict(zip(survivors, projected))
 
+    if risk_scaling:
+        scaling_result = compute_risk_scaling(raw_weights, survivors, matrix, spec=risk_scaling)
+        if risk_scaling_out is not None:
+            risk_scaling_out.update(scaling_result.to_payload())
+        exposure = float(scaling_result.exposure)
+        total = float(sum(raw_weights.get(sleeve_id, 0.0) for sleeve_id in survivors))
+        if total > 0.0:
+            # Normalize-then-scale so the final weights sum to exactly L and the
+            # allocator's relative structure is preserved.
+            return {
+                sleeve_id: _round(raw_weights.get(sleeve_id, 0.0) / total * exposure)
+                for sleeve_id in survivors
+            }
+
     return {sleeve_id: _round(raw_weights.get(sleeve_id, 0.0)) for sleeve_id in survivors}
 
 
@@ -888,6 +920,7 @@ def build_allocation_manifest(
     min_families: int | None = None,
     allocator_params: Mapping[str, Any] | None = None,
     locked_oos_evaluation: Mapping[str, Any] | None = None,
+    risk_scaling: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build a manifest the live ``ArtifactPortfolioModeStrategy`` accepts as-is.
 
@@ -986,6 +1019,19 @@ def build_allocation_manifest(
         }
         families = derived or None
 
+    # Validate the risk-scaling spec BEFORE allocating so a malformed block (or
+    # an ungated fractional_kelly) fails closed without touching the allocator.
+    resolved_risk_scaling = resolve_risk_scaling_spec(risk_scaling)
+    if (
+        resolved_risk_scaling is not None
+        and float(resolved_risk_scaling["max_leverage"]) > float(gross_cap) + 1e-12
+    ):
+        raise ValueError(
+            "risk_scaling.max_leverage exceeds the manifest gross_cap "
+            f"({resolved_risk_scaling['max_leverage']} > {gross_cap}); raise gross_cap in "
+            "step or the levered definition fail-closes at the consumer"
+        )
+    risk_scaling_payload: dict[str, Any] = {}
     weights = allocate_quality_gated(
         sleeve_returns,
         turnovers,
@@ -1004,8 +1050,15 @@ def build_allocation_manifest(
         allocator_params=allocator_params,
         returns_are_net=returns_are_net,
         return_timestamps=return_timestamps or None,
+        risk_scaling=resolved_risk_scaling,
+        risk_scaling_out=risk_scaling_payload if resolved_risk_scaling else None,
     )
 
+    if resolved_risk_scaling and weights and not any(value > 0.0 for value in weights.values()):
+        raise ValueError(
+            "risk_scaling produced zero risky exposure (L == 0); refusing to freeze an "
+            "all-cash manifest through the scaling layer"
+        )
     if opt_in_data_contract and len(weights) < max(1, int(min_sleeves)):
         raise ValueError(
             f"quality gate left {len(weights)} sleeves; min_sleeves={min_sleeves} forbids "
@@ -1114,6 +1167,14 @@ def build_allocation_manifest(
         # Opt-in provenance only: without allocator_params the manifest stays
         # byte-identical to the pinned golden.
         manifest["allocator_params"] = {str(k): v for k, v in dict(allocator_params).items()}
+    if resolved_risk_scaling:
+        # Opt-in provenance for the exposure layer: the requested spec plus the
+        # computed L / sigma / cash diagnostics. Child weights already sum to L,
+        # so the manifest's cash_weight reflects the risk-free residual.
+        manifest["risk_scaling"] = {
+            "spec": {str(k): v for k, v in dict(risk_scaling or {}).items()},
+            **risk_scaling_payload,
+        }
     if opt_in_data_contract:
         manifest["return_data_contract"] = {
             "alignment": alignment,

@@ -105,6 +105,35 @@ def test_cell_spec_validates_and_declares_hierarchical_variants() -> None:
     assert dro and all(row["allocator_params"]["radius"] <= 1e-3 for row in dro)
 
 
+def test_risk_scaling_layer_is_target_vol_primary_with_gated_kelly() -> None:
+    from lumina_quant.portfolio.risk_scaling import resolve_risk_scaling_spec
+
+    suite = _load()
+    scaling = suite["risk_scaling"]
+    assert scaling["method"] == "target_vol"
+    assert scaling["sigma_target_annual"] == 0.10
+    assert scaling["max_leverage"] == 1.0
+    # The primary block itself must validate through the fail-closed resolver.
+    resolved = resolve_risk_scaling_spec({k: v for k, v in scaling.items() if k != "variants"})
+    assert resolved is not None and resolved["method"] == "target_vol"
+    kelly = [v for v in scaling["variants"] if v["method"] == "fractional_kelly"]
+    assert len(kelly) == 1
+    assert kelly[0]["mu_evidence_confirmed"] is False
+    assert kelly[0]["status"] == "gated_until_locked_oos_mu_evidence"
+    # And the gate actually holds: the pre-registered kelly variant is rejected as-is.
+    import pytest
+
+    with pytest.raises(ValueError, match="gated"):
+        resolve_risk_scaling_spec(kelly[0])
+    assert scaling["bars_per_year"] == 365 and scaling["min_observations"] == 60
+    assert {
+        v["sigma_target_annual"] for v in scaling["variants"] if v["method"] == "target_vol"
+    } == {0.10, 0.05}
+    layering = suite["allocation_layering"]
+    assert set(layering) >= {"layer_1_relative", "layer_2_exposure", "layer_3_growth"}
+    assert "mu-free" in layering["layer_1_relative"]
+
+
 def test_every_hypothesis_ref_resolves_to_a_registered_evidence_source() -> None:
     suite = _load()
     registry = {row["source_id"] for row in suite["evidence_sources"]}

@@ -69,6 +69,21 @@
 3. **systrader79형 동적배분** — `MaScoreVolTargetRotationStrategy`가 자산 레벨 배분의 타이밍 오버레이 역할(스코어 0인 자산은 현금).
 4. 모든 배분은 **월간·주간 리밸런스 + 비용 후** 측정, 회전율 페널티(`turnover_penalty_lambda`)와 상관 축소(`correlation_shrinkage`)는 기존 옵션 재사용.
 
+## 배분 3층 구조 — HRP(상대배분) / risk-free·target-vol(총노출 L) / Kelly(성장 사이징)
+
+HRP와 Kelly는 경쟁자가 아니라 서로 다른 층이다. 이 레인은 세 층을 코드로 분리했다(`portfolio/risk_scaling.py`, 2026-08-20 추가):
+
+| 층 | 질문 | 구현 | 소비하는 추정치 |
+|---|---|---|---|
+| **1. 배분기** | 위험자산끼리 어떻게 나눌까 | `hrp_dendrogram`(주) + variants — 가중치 합 1, Σ⁻¹·μ̂ 불사용 | ρ̂(축소) |
+| **2. risk-free / target-vol** | 위험자산 전체를 얼마나 들까 | `risk_scaling: target_vol` — `L = min(max_leverage, σ_target/σ̂_H)`, 최종 가중치 = `L·w`, 잔여 `1−L`은 현금(`cash_weight`; **시뮬레이터는 유휴현금에 무이자** — `RiskFreePolicy`는 Sharpe/Sortino의 excess 기준으로만 쓰임, 실계좌의 현금 이자는 백테스트 밖) | σ̂_H **하나** |
+| **3. Kelly** | growth 관점 적정 노출은 | `risk_scaling: fractional_kelly` — `L = min(max_leverage, f·max(0, μ̂/σ̂²))`, **게이트드** | μ̂ + σ̂ |
+
+- **셀 사전등록값**: `method=target_vol`, `sigma_target_annual=0.10`, `bars_per_year=365`, `max_leverage=1.0`(차입 없음), `min_observations=60`. σ̂_H는 배분기 상대 가중치로 만든 **train+validation NET 포트폴리오 스트림**의 per-bar 표준편차(locked-OOS 불사용, 배분 입력 정책과 동일). variants에 `sigma_target_annual=0.05`도 사전등록.
+- **Kelly를 기본에서 뺀 근거(명문화)**: μ-free 배분기로 Markowitz's Curse를 완화해 놓고 그 위에 μ̂ 의존 사이징을 얹으면 추정오차가 도로 유입된다 — μ̂를 2배로 잘못 추정하면 노출도 정확히 2배가 된다(선형 증폭). 그래서 `fractional_kelly`는 `mu_evidence_confirmed: true`(locked-OOS μ 근거 확인 후에만 설정) 없이는 `resolve_risk_scaling_spec`이 **fail-closed**로 거부하며, 셀에는 `f=0.5` 변형이 `gated_until_locked_oos_mu_evidence` 상태로만 사전등록돼 있다. 검증된 edge가 생기기 전까지 Kelly는 `compare_hierarchical_allocators.py`의 `kelly_mu_sensitivity_uncapped` 진단(μ̂×0.5/×1.0/×1.5에서의 L — target_vol은 μ 불변)으로만 만진다.
+- **배선**: `allocate_quality_gated(..., risk_scaling=...)`이 모든 틸트/투영 **뒤에** L을 곱하고(상대 구조 보존, 미지정 시 바이트 동일), `build_allocation_manifest`가 spec+계산치(`exposure`/`sigma_annual`/`cash_weight`)를 `risk_scaling` provenance로 기록, CLI(`build_quality_gated_allocation.py`)는 입력 JSON의 `risk_scaling` 블록을 그대로 전달, `compare_hierarchical_allocators.py`는 method별 L·cash와 Kelly μ-민감도를 함께 보고한다(`--variants`는 셀의 주 target_vol을 공유). 퇴화 입력(σ̂=0, 관측 부족, 공분산-부재 폴백)은 전부 fail-closed.
+- JSON의 `allocation_layering` 키가 이 3층 구분을 셀 스펙 안에 고정한다.
+
 ## Codex 레인과의 접점
 - 통합 manifest가 이 레인의 실제 NCO/HERC/Wasserstein-DRO/constrained-HRP/graph allocator와 두 레인의 40후보를 결합한다. 하위 Codex manifest의 `design_only_*` 문구는 legacy metadata이며 현재 구현 상태가 아니다.
 - 두 레인 모두 `_STRATEGY_TIER_HINTS`·`indicators/__init__.py`·`.github/hardcoded_params_baseline.json`을 건드린다. 머지 후 `uv run python scripts/audit_hardcoded_params.py --write-baseline`을 한 번 더 돌려 줄 번호 시프트로 생긴 가짜 "new" 위반을 재고정해야 한다.
