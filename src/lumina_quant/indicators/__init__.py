@@ -409,16 +409,51 @@ from .stat_arb import kalman_hedge_ratio_step as kalman_hedge_ratio_step
 from .stat_arb import kalman_spread as kalman_spread
 from .stat_arb import pca_residual_sscores as pca_residual_sscores
 
+# Alpha-sleeve batch 2026-08-20: HAR-RV / variance-ratio / funding-structure /
+# behavioral-value primitives + rolling higher moments.
+from .behavioral_value import prospect_theory_value as prospect_theory_value
+from .behavioral_value import salience_theory_value as salience_theory_value
+from .funding_structure import basis_funding_gap_bps as basis_funding_gap_bps
+from .funding_structure import funding_implied_basis_bps as funding_implied_basis_bps
+from .funding_structure import funding_momentum as funding_momentum
+from .funding_structure import funding_term_structure_spread as funding_term_structure_spread
+from .har_rv import daily_realized_variance as daily_realized_variance
+from .har_rv import har_annualized_vol_forecast as har_annualized_vol_forecast
+from .har_rv import har_design as har_design
+from .har_rv import har_fit as har_fit
+from .har_rv import har_rv_forecast as har_rv_forecast
+from .har_rv import log_rv_transform as log_rv_transform
+from .rolling_stats import rolling_excess_kurtosis as rolling_excess_kurtosis
+from .rolling_stats import rolling_skewness as rolling_skewness
+from .variance_ratio import variance_ratio as variance_ratio
+from .variance_ratio import variance_ratio_zstat as variance_ratio_zstat
+
 __all__ += [
     "KalmanHedgeState",
     "average_noise_ratio",
     "bar_noise_ratio",
+    "basis_funding_gap_bps",
+    "daily_realized_variance",
+    "funding_implied_basis_bps",
+    "funding_momentum",
+    "funding_term_structure_spread",
+    "har_annualized_vol_forecast",
+    "har_design",
+    "har_fit",
+    "har_rv_forecast",
     "kalman_hedge_initial_state",
     "kalman_hedge_ratio",
     "kalman_hedge_ratio_step",
     "kalman_spread",
+    "log_rv_transform",
     "moving_average_score",
     "pca_residual_sscores",
+    "prospect_theory_value",
     "range_volatility_target_weight",
+    "rolling_excess_kurtosis",
+    "rolling_skewness",
+    "salience_theory_value",
+    "variance_ratio",
+    "variance_ratio_zstat",
     "volatility_breakout_levels",
 ]

@@ -50,6 +50,7 @@ from lumina_quant.core.plugin_registry import register
 from lumina_quant.indicators.common import safe_float, time_key
 from lumina_quant.indicators.moving_average import simple_moving_average
 from lumina_quant.indicators.oscillators import rate_of_change
+from lumina_quant.indicators.variance_ratio import variance_ratio as _variance_ratio
 from lumina_quant.strategies.external_alpha_sleeves import _EPS, _Snapshot
 from lumina_quant.strategies.return_rider_alpha_sleeves import (
     _ReturnRiderBase,
@@ -71,36 +72,12 @@ def _rolling_std(values: list[float]) -> float | None:
     return math.sqrt(var)
 
 
-def _variance_ratio(returns: list[float], k: int) -> float | None:
-    """Return the Lo-MacKinlay variance ratio ``Var(k-ret) / (k * Var(1-ret))``.
-
-    Uses overlapping ``k``-period sums.  ``~1`` random walk, ``>1`` persistent,
-    ``<1`` mean-reverting.  ``None`` when there are too few points or the
-    one-period variance is degenerate.  This is the BIASED overlapping estimator
-    (it divides ``Var(k)`` by the simple count ``n-k+1`` rather than the
-    Lo-MacKinlay unbiased ``k(n-k+1)(1-k/n)`` denominator), so a true random walk
-    reads slightly BELOW 1 in finite samples; that bias is conservative for a
-    ``VR >= 1 + threshold`` persistence gate (it raises, never lowers, the bar).
-    """
-    n = len(returns)
-    kk = max(2, int(k))
-    if n < kk + 1:
-        return None
-    mean = sum(returns) / n
-    var1 = sum((r - mean) * (r - mean) for r in returns) / n
-    if var1 <= _EPS:
-        return None
-    acc = 0.0
-    count = 0
-    target = kk * mean
-    for i in range(n - kk + 1):
-        s = math.fsum(returns[i : i + kk])
-        acc += (s - target) * (s - target)
-        count += 1
-    if count <= 0:
-        return None
-    var_k = acc / count
-    return var_k / (kk * var1)
+# The Lo-MacKinlay variance ratio now lives at indicator level
+# (``indicators/variance_ratio.py``); the BIASED overlapping estimator that this
+# sleeve always used is that indicator's DEFAULT, so the ``_variance_ratio``
+# import alias above is parity-locked byte-identical to the previous private
+# helper.  Unbiased / heteroskedasticity-robust z-stat variants are opt-in at
+# the indicator and unused here.
 
 
 def _trend_sign(

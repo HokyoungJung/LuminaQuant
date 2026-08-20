@@ -1,4 +1,16 @@
 # Research Note
+## 2026-08-20 KST — 신규 알파 슬리브 7클래스 + V-DIAG + 지표 5모듈 저작 완료 (3종 재고정 포함)
+
+같은 날 오전의 레버 커밋에 이어, 적대 심판 3인을 통과한 신규 저작물을 원자 통합했다. 전부 `research_only`이고 기본 후보 매니페스트에 21개 row로 편입되며(전부 cross_sectional 바스켓, `allow_multi_asset` 핸드오프 경로 전용), 2-symbol 스냅샷 픽스처에는 하나도 물질화되지 않아 **manifest sha는 불변**이다. tier-guard(BATCH 7종 추가)·hardcoded-baseline 재고정 완료, 전체 스위트 **4914 passed / 21 skipped / 3 xfailed**(베이스라인 4712 대비 +202 전원 신규 테스트), ruff/format/compileall/check_architecture/verify_docs/골든 핀 전부 그린.
+
+- **신규 슬리브(각 모듈 독스트링에 EXPECTED NULL + 단일 반증 측정 + 최근접 그레이브야드/인컴번트 사전등록)**: ① `CrossSectionalResidualTakerFlow`(~5일 taker 순공격흐름/턴오버를 수익률 z에 잔차화, 주간 L/S 퀸타일+1주 민홀드 — aggTrades 백필로 그레이브야드 #7 커버리지 사인 해제) ② `BasisFundingGapConvergence`(mark-index basis − funding-내재 basis 스프레드를 8h 정산 경계에서만 |z|>2 페이드, 민홀드 2인터벌 — 인컴번트가 계산하지 않는 funding-기대 오차) ③ `OffSessionBasisDislocation`(TradFi 퍼프의 오프세션 스테일-앵커 괴리를 현물 재개장 직전 페이드, 36h/72h) ④/⑤ `SalienceTheoryValue`/`ProspectTheoryValue`(BGS 2012/TK 1992 정준 상수 동결, 주간 ISO, 모멘텀+MAX 잔차화; ST-PT 중복 토너먼트 사전등록) ⑥ `OpenInterestGrowthPressure`(Hong-Yogo ΔOI/달러볼륨 연속, 모멘텀 잔차화, 부호 양(+) 사전등록·플립 금지).
+- **V-DIAG 구현**(마스터플랜 §6.3 최초 코드화): `research/vol_spillover_diagnostic.py` + 러너 — HAR-RV 기준 vs 리더 lagged-RV 블록, QLIKE(Patton)+블록 부트스트랩+BH-FDR, 승인선 사전등록(중앙 QLIKE 개선 ≥5%·폴드 ≥60%·p≤0.05). 실패 시 vol-스필오버 전략·신규 다변량-vol 코드 전면 KILL. 연기된 leader-RV 사이징 오버레이 설계는 모듈 독스트링에 동결 수록(빌드 게이트=BTC→alt 1쌍 이상 승인).
+- **지표**: `har_rv`·`variance_ratio`(cusum_varratio에서 패리티-락 추출, 편향 추정기 기본 유지)·`funding_structure`(funding_momentum 추출+텀구조 스프레드+basis-funding 갭; 심판 지시로 단일 모듈 병합)·`behavioral_value`·`rolling_stats`의 skew/kurt(전략 사본 2개 dedup, fsum 정준화·패리티 골든). funding-carry 슬리브에 config-gated `require_term_structure_agreement`(기본 False, 진입-스킵 전용).
+- **커버리지 감사 도구**: `scripts/research/audit_liquidation_feature_coverage.py`(OI ≥90%/청산 ≥80% 게이트, 무데이터 시 insufficient_data 폐쇄).
+- 실행서: [`alpha_sleeves_levers_20260820_handoff.md`](alpha_sleeves_levers_20260820_handoff.md) — 백필/감사 선행 → 표준 walkforward(21 row, evaluation_mode 감사) → V-DIAG → L-C/L-D A/B(사전등록 고정값: min_hold 1일 상당, band 8bps, guard ON) → 넷팅 발생률 측정 순.
+
+판정 불변: **do_not_promote / research_only_no_execution / 실배분 0%**. 이 배치는 falsification 프로토콜이며 대부분의 리프의 EXPECTED NULL은 reject다 — 죽음을 보고하는 것이 산출물이다.
+
 ## 2026-08-20 KST — 사전등록 엔진 레버 4종 구현 (L-C/L-D/warmup-hook/H1), 전부 기본 OFF
 
 `performance_lever_measurement.md`에 사전등록만 되어 있던 엔진 레버를 실제 엔진 seam에 구현했다. 설계는 8-lens 매핑 + 4-lens 제안 패널 + 3-adversarial-judge 라운드로 검증했고(그레이브야드/비용·데이터/신규성 심판 만장일치 PASS), 전부 config-gated OFF·기본 경로 바이트 동일이다. 골든 핀(`tests/integration/test_engine_golden.py`, `test_walk_forward_golden.py`) 그린, 신규·기존 타깃 스위트 85 passed.

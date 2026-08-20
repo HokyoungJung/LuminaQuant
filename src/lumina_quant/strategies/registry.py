@@ -272,6 +272,18 @@ _STRATEGY_TIER_HINTS: dict[str, str] = {
     "RsiDivergenceScaleOutStrategy": "research_only",
     "PrevDayBoxQuartileReversionStrategy": "research_only",
     "SessionHighBreakoutScalpStrategy": "research_only",
+    # Alpha-sleeve batch 2026-08-20 (adversarial design-panel survivors; see
+    # docs/research_note/research_note.md 2026-08-20 entries). research_only
+    # until the data-PC cost-realistic walk-forward passes the two-tier gate;
+    # each module docstring pre-registers its EXPECTED NULL and single
+    # falsifying measurement. Registration and these hints land atomically
+    # (live-safety), enforced by tests/test_strategy_tier_guard.py.
+    "CrossSectionalResidualTakerFlowStrategy": "research_only",
+    "BasisFundingGapConvergenceStrategy": "research_only",
+    "OffSessionBasisDislocationStrategy": "research_only",
+    "SalienceTheoryValueStrategy": "research_only",
+    "ProspectTheoryValueStrategy": "research_only",
+    "OpenInterestGrowthPressureStrategy": "research_only",
 }
 
 # FROZEN legacy snapshot of the 68 glob-discovered classes that predate the

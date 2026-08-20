@@ -295,6 +295,105 @@ def recursive_least_squares_beta_update(
     return float(updated_beta), float(updated_cov)
 
 
+def _finite_tail(values, *, window: int | None) -> list[float] | None:
+    """Return the trailing-``window`` slice of ``values`` as finite floats.
+
+    The window slice is taken BEFORE cleaning (mirroring the historical
+    strategy-side call pattern ``_skewness(series[-window:])``), then entries
+    are float-coerced and non-finite samples dropped.  Returns ``None`` when
+    ``values`` is not iterable or ``window`` is unusable; never raises.
+    """
+    try:
+        tail = list(values)
+    except TypeError:
+        return None
+    if window is not None:
+        try:
+            width = int(window)
+        except TypeError, ValueError:
+            return None
+        if width < 1:
+            return None
+        tail = tail[-width:]
+    cleaned: list[float] = []
+    for value in tail:
+        try:
+            parsed = float(value)
+        except Exception:
+            continue
+        if math.isfinite(parsed):
+            cleaned.append(parsed)
+    return cleaned
+
+
+def rolling_skewness(values, *, window: int | None = None) -> float | None:
+    """Fisher-Pearson (ddof-free) sample skewness over the trailing window.
+
+    Canonical extraction (2026-08-20) of the formerly duplicated
+    strategy-private ``_skewness`` helpers in
+    ``strategies/skew_innovation_alpha_sleeves.py`` and
+    ``strategies/cross_sectional_anomaly_alpha_sleeves.py`` -- the exact
+    ``math.fsum`` recipe of the skew-innovation copy, parity-locked by pinned
+    fixtures in ``tests/indicators/test_rolling_skew_kurt.py``.
+
+    Prior: Amaya, Christoffersen, Jacobs & Vasquez (2015, JFE) establish
+    realized skewness as a standard rolling characteristic.
+
+    ``window=None`` uses the full sample.  Returns ``None`` on fewer than three
+    finite samples, degenerate (``<= 1e-12``) variance, non-finite output, or
+    non-iterable input.  Latest-scalar ``float | None``; never raises.
+    """
+    cleaned = _finite_tail(values, window=window)
+    if cleaned is None:
+        return None
+    count = len(cleaned)
+    if count < 3:
+        return None
+    try:
+        avg = math.fsum(cleaned) / float(count)
+        variance = math.fsum((value - avg) ** 2 for value in cleaned) / float(count)
+        if variance <= 1e-12:
+            return None
+        std = variance**0.5
+        third = math.fsum((value - avg) ** 3 for value in cleaned) / float(count)
+        skew = third / (std**3)
+    except OverflowError, ZeroDivisionError:
+        return None
+    return float(skew) if math.isfinite(skew) else None
+
+
+def rolling_excess_kurtosis(values, *, window: int | None = None) -> float | None:
+    """Excess (Fisher) sample kurtosis over the trailing window.
+
+    Standardized fourth central moment minus 3 (ddof-free, same moment
+    conventions as :func:`rolling_skewness`): ``0.0`` for a normal sample,
+    negative for platykurtic input (uniform ~ ``-1.2``), positive for fat
+    tails.  Named non-trading consumer: the V-DIAG vol-spillover diagnostic
+    reports the RV-series excess kurtosis to flag admissions driven by a
+    handful of fat-tail days (Patton-Sheppard loss-differential caveat).
+
+    ``window=None`` uses the full sample.  Returns ``None`` on fewer than four
+    finite samples, degenerate (``<= 1e-12``) variance, non-finite output, or
+    non-iterable input.  Latest-scalar ``float | None``; never raises.
+    """
+    cleaned = _finite_tail(values, window=window)
+    if cleaned is None:
+        return None
+    count = len(cleaned)
+    if count < 4:
+        return None
+    try:
+        avg = math.fsum(cleaned) / float(count)
+        variance = math.fsum((value - avg) ** 2 for value in cleaned) / float(count)
+        if variance <= 1e-12:
+            return None
+        fourth = math.fsum((value - avg) ** 4 for value in cleaned) / float(count)
+        kurtosis = fourth / (variance * variance) - 3.0
+    except OverflowError, ZeroDivisionError:
+        return None
+    return float(kurtosis) if math.isfinite(kurtosis) else None
+
+
 class RollingZScoreWindow:
     """Rolling z-score helper preserving O(1) aggregate updates."""
 

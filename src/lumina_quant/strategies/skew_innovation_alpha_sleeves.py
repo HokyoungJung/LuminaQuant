@@ -70,7 +70,7 @@ from typing import Any
 from lumina_quant.core.plugin_registry import register
 from lumina_quant.indicators.alpha_features import realized_volatility
 from lumina_quant.indicators.common import safe_float, time_key
-from lumina_quant.indicators.rolling_stats import rolling_beta
+from lumina_quant.indicators.rolling_stats import rolling_beta, rolling_skewness
 from lumina_quant.strategies.adaptive_crypto_alpha_sleeves import _default_benchmark, _state_size
 from lumina_quant.strategies.external_alpha_sleeves import (
     _EPS,
@@ -108,24 +108,12 @@ def _bar_simple_returns(closes: list[float]) -> list[float]:
     return out
 
 
-def _skewness(values: list[float]) -> float | None:
-    """Return the sample (Fisher-Pearson, ddof-free) skewness of ``values``.
-
-    ``None`` on fewer than three finite samples or degenerate (zero-variance)
-    dispersion.  Pure, ``None``-safe, and never raises.
-    """
-    cleaned = [value for value in values if isinstance(value, (int, float)) and value == value]
-    count = len(cleaned)
-    if count < 3:
-        return None
-    avg = math.fsum(cleaned) / float(count)
-    variance = math.fsum((value - avg) ** 2 for value in cleaned) / float(count)
-    if variance <= _EPS:
-        return None
-    std = variance**0.5
-    third = math.fsum((value - avg) ** 3 for value in cleaned) / float(count)
-    skew = third / (std**3)
-    return float(skew) if math.isfinite(skew) else None
+# Canonical rolling-stat primitive (extracted 2026-08-20): the module-private
+# Fisher-Pearson skewness now lives in ``indicators/rolling_stats.rolling_skewness``
+# -- the SAME ``math.fsum`` recipe this module carried, parity-locked by pinned
+# fixtures in ``tests/indicators/test_rolling_skew_kurt.py``.  The private alias
+# keeps every call site and existing test import byte-stable.
+_skewness = rolling_skewness
 
 
 def _skew_innovation(residuals: list[float], window: int) -> float | None:

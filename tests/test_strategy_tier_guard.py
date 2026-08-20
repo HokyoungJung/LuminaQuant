@@ -77,6 +77,13 @@ BATCH_STRATEGIES = (
     "SilentVolumeShockResolutionStrategy",
     "RoundNumberBarrierStrategy",
     "CrossSectionalOffSessionTugOfWarStrategy",
+    # Alpha-sleeve batch (2026-08-20):
+    "CrossSectionalResidualTakerFlowStrategy",
+    "BasisFundingGapConvergenceStrategy",
+    "OffSessionBasisDislocationStrategy",
+    "SalienceTheoryValueStrategy",
+    "ProspectTheoryValueStrategy",
+    "OpenInterestGrowthPressureStrategy",
 )
 
 # FROZEN legacy snapshot (generated 2026-07-03; 68 names). Append-only for

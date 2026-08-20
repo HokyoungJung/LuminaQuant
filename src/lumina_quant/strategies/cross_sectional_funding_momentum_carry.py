@@ -40,6 +40,16 @@ OFF via ``true_carry_sign``: when ON, a ranked target is kept only if its side
 actually COLLECTS the funding it is exposed to (LONG only when the latest funding
 level is negative; SHORT only when it is positive).  With the flag OFF the book
 is byte-identical to the pure momentum ranking.
+
+TERM-STRUCTURE AGREEMENT GATE (config-gated, default OFF => byte-identical).
+``require_term_structure_agreement`` wires the pre-registered
+``funding_term_structure_spread`` (3 vs 21 funding prints = 1d vs 7d at the 8h
+cadence, constants fixed ex-ante) from ``indicators/funding_structure`` as an
+entry-SKIP-only condition: a NEW entry is skipped when its funding-momentum
+sign disagrees with the spread sign.  It never adds trades, never touches held
+same-side names, and an unavailable spread never skips -- so with the flag ON
+turnover can only fall.  The ranking momentum itself is the same
+``funding_momentum`` indicator (extracted verbatim, parity-locked).
 """
 
 from __future__ import annotations
@@ -51,6 +61,10 @@ from typing import Any
 from lumina_quant.core.plugin_registry import register
 from lumina_quant.indicators.alpha_features import realized_volatility
 from lumina_quant.indicators.common import safe_float, time_key
+from lumina_quant.indicators.funding_structure import (
+    funding_momentum as _funding_momentum,
+    funding_term_structure_spread,
+)
 from lumina_quant.strategies.adaptive_crypto_alpha_sleeves import (
     _age_cross_positions,
     _ranked_targets,
@@ -77,6 +91,11 @@ _STRATEGY_ID = "cross_sectional_funding_momentum_carry"
 _STRATEGY_NAME = "CrossSectionalFundingMomentumCarryStrategy"
 # 8h funding cadence floor (seconds).  decision_cadence_seconds must be >= this.
 _FUNDING_CADENCE_SECONDS = 28800
+# PRE-REGISTERED term-structure windows for ``require_term_structure_agreement``
+# (funding prints: 3 vs 21 = 1d vs 7d at the 8h funding cadence).  Constants by
+# design -- NOT a tuning axis (graveyard #13 pre-emption).
+_TS_SHORT_WINDOW = 3
+_TS_LONG_WINDOW = 21
 
 
 @dataclass(slots=True)
@@ -91,47 +110,10 @@ class _State:
     score: float | None = None
 
 
-def _funding_momentum(
-    funding: list[float], *, diff_window: int, slope_window: int, ewma_span: int
-) -> float | None:
-    """Delta-funding momentum: EWMA of first differences + rolling OLS slope.
-
-    Uses strictly the funding prints provided (the just-closed interval is the
-    last element — observable, no lookahead).  Returns ``None`` when there is too
-    little history to form a first difference.
-    """
-    if len(funding) < 2:
-        return None
-    diffs = [funding[i] - funding[i - 1] for i in range(1, len(funding))]
-    diff_tail = diffs[-max(1, diff_window) :]
-    # EWMA of the first differences (most-recent weighted highest).
-    span = max(1, int(ewma_span))
-    alpha = 2.0 / (span + 1.0)
-    ewma = diff_tail[0]
-    for value in diff_tail[1:]:
-        ewma = alpha * value + (1.0 - alpha) * ewma
-    # Rolling OLS slope of the funding LEVEL over the trailing slope window.
-    level_tail = funding[-max(2, slope_window) :]
-    slope = _ols_slope(level_tail)
-    return float(ewma) + float(slope)
-
-
-def _ols_slope(values: list[float]) -> float:
-    """Least-squares slope of ``values`` vs an index 0..n-1 (0.0 if degenerate)."""
-    n = len(values)
-    if n < 2:
-        return 0.0
-    mean_x = (n - 1) / 2.0
-    mean_y = sum(values) / float(n)
-    num = 0.0
-    den = 0.0
-    for i, value in enumerate(values):
-        dx = i - mean_x
-        num += dx * (value - mean_y)
-        den += dx * dx
-    if den <= _EPS:
-        return 0.0
-    return num / den
+# ``_funding_momentum`` now lives at indicator level
+# (``indicators/funding_structure.funding_momentum``); the import alias above is
+# parity-locked byte-identical to the previous private helper (extracted
+# verbatim), so signals are unchanged.
 
 
 @register("strategy", _STRATEGY_NAME, interface="event_driven")
@@ -169,6 +151,9 @@ class CrossSectionalFundingMomentumCarryStrategy(Strategy):
             "max_shorts": HyperParam.integer("max_shorts", default=5, low=0, high=50),
             "allow_short": HyperParam.boolean("allow_short", default=True, grid=[True, False]),
             "true_carry_sign": HyperParam.boolean("true_carry_sign", default=False, tunable=False),
+            "require_term_structure_agreement": HyperParam.boolean(
+                "require_term_structure_agreement", default=False, tunable=False
+            ),
             "min_symbols": HyperParam.integer("min_symbols", default=4, low=2, high=512),
             "target_gross_exposure": HyperParam.floating(
                 "target_gross_exposure", default=1.0, low=0.0, high=3.0
@@ -221,6 +206,13 @@ class CrossSectionalFundingMomentumCarryStrategy(Strategy):
         # iff latest funding < 0, SHORT iff latest funding > 0). Read from raw
         # resolved params so manifests, class schema and runtime behavior agree.
         self.true_carry_sign = bool(resolved["true_carry_sign"])
+        # STRATEGY-IMPROVE (config-gated, default OFF => byte-identical).
+        # Pre-registered funding TERM-STRUCTURE agreement gate (ind-funding-
+        # structure): when ON, skip NEW entries whose funding-momentum sign
+        # disagrees with the 3-vs-21-print term-structure spread sign.  Entry-
+        # SKIP only -- it never adds trades and never touches held same-side
+        # names, so it can only reduce turnover on this sleeve.
+        self.require_term_structure_agreement = bool(resolved["require_term_structure_agreement"])
         # Enforce the 8h funding cadence floor in code (instances cannot decide
         # faster than the underlying funding accrual interval).
         self.decision_cadence_seconds = max(
@@ -231,6 +223,9 @@ class CrossSectionalFundingMomentumCarryStrategy(Strategy):
             self.funding_slope_window,
             self.vol_window,
             self.max_hold_bars,
+            # Flag OFF contributes 0 => the deque sizes (and therefore state
+            # and signals) stay byte-identical to the pre-flag sleeve.
+            _TS_LONG_WINDOW if self.require_term_structure_agreement else 0,
         )
         self._state = {
             symbol: _State(
@@ -447,6 +442,42 @@ class CrossSectionalFundingMomentumCarryStrategy(Strategy):
                 kept[symbol] = entry
         return kept
 
+    def _filter_term_structure_agreement(
+        self, targets: dict[str, tuple[str, float, dict[str, Any]]]
+    ) -> dict[str, tuple[str, float, dict[str, Any]]]:
+        """Skip NEW entries whose funding-momentum sign disagrees with the TS spread.
+
+        Entry-SKIP-only semantics (pre-registered, ``ind-funding-structure``):
+        a target is dropped ONLY when it would require a NEW order (the symbol
+        is not already held on that side) AND its raw funding-momentum sign
+        disagrees with the sign of the 3-vs-21-print funding term-structure
+        spread.  Held same-side names are never touched, an unavailable spread
+        (fewer than 21 prints) never skips, and no trade is ever ADDED.  Only
+        invoked when ``require_term_structure_agreement`` is ON.
+        """
+        kept: dict[str, tuple[str, float, dict[str, Any]]] = {}
+        for symbol, entry in targets.items():
+            mode, _score, meta = entry
+            item = self._state.get(symbol)
+            if item is not None and item.mode == mode:
+                # Already held on this side -- not a new entry, never skipped.
+                kept[symbol] = entry
+                continue
+            momentum = safe_float(meta.get("funding_momentum"))
+            spread = funding_term_structure_spread(
+                list(item.funding_rate) if item is not None else [],
+                short_window=_TS_SHORT_WINDOW,
+                long_window=_TS_LONG_WINDOW,
+            )
+            if (
+                momentum is not None
+                and spread is not None
+                and (momentum > 0.0 > spread or momentum < 0.0 < spread)
+            ):
+                continue
+            kept[symbol] = entry
+        return kept
+
     def _evaluate(self, event_time: Any) -> None:
         if len(self.symbol_list) < self.min_symbols:
             return
@@ -472,6 +503,8 @@ class CrossSectionalFundingMomentumCarryStrategy(Strategy):
         )
         if self.true_carry_sign:
             targets = self._filter_carry_sign(targets)
+        if self.require_term_structure_agreement:
+            targets = self._filter_term_structure_agreement(targets)
         weights, scalar = self._inverse_vol_weights(targets, vols)
         self._emit_weighted(targets, weights, scalar, event_time)
 
