@@ -149,6 +149,110 @@ def test_min_hold_lets_protective_exits_pass() -> None:
         assert decision.signal is not None, marker
 
 
+def test_min_hold_blocks_descriptive_exit_reason_labels() -> None:
+    # F4: any-truthy exit_reason must NOT neutralize the gate — only the
+    # pre-registered protective whitelist passes.
+    overlay = _overlay(min_hold_bars=10)
+    _enter_long(overlay)
+    overlay.next_bar(datetime(2026, 1, 1, tzinfo=UTC))
+    decision = _apply(overlay, _signal("EXIT", metadata={"exit_reason": "rebalance"}))
+    assert decision.signal is None
+    assert decision.blocked_reason == "min_hold_active"
+
+
+def test_min_hold_defers_blocked_exit_and_releases_at_maturity() -> None:
+    # F1: a blocked bare EXIT is deferred, not dropped — the overlay releases
+    # it at hold maturity so one-shot transition-emit strategies stay in sync.
+    overlay = _overlay(min_hold_bars=3)
+    _enter_long(overlay)
+    overlay.next_bar(datetime(2026, 1, 1, tzinfo=UTC))
+
+    blocked = _apply(overlay, _signal("EXIT", metadata={"exit_fraction": 1.0}))
+    assert blocked.signal is None
+    assert overlay.pop_matured_pending_exits() == []
+
+    # Same-direction re-entry while the exit is pending must NOT stack.
+    stacked = _apply(overlay, _signal("LONG"))
+    assert stacked.signal is None
+    assert stacked.blocked_reason == "min_hold_exit_pending"
+
+    overlay.next_bar(datetime(2026, 1, 1, tzinfo=UTC))
+    overlay.next_bar(datetime(2026, 1, 1, tzinfo=UTC))
+    released = overlay.pop_matured_pending_exits()
+    assert len(released) == 1
+    assert released[0]["symbol"] == SYMBOL
+    assert released[0]["component_id"] == ""
+    assert released[0]["metadata"].get("exit_fraction") == 1.0
+    # One-shot: a second pop returns nothing.
+    assert overlay.pop_matured_pending_exits() == []
+
+
+def test_min_hold_release_survives_state_roundtrip() -> None:
+    overlay = _overlay(min_hold_bars=3)
+    _enter_long(overlay)
+    overlay.next_bar(datetime(2026, 1, 1, tzinfo=UTC))
+    assert _apply(overlay, _signal("EXIT")).signal is None
+
+    restored = _overlay(min_hold_bars=3)
+    restored.set_state(overlay.get_state())
+    restored.next_bar(datetime(2026, 1, 1, tzinfo=UTC))
+    restored.next_bar(datetime(2026, 1, 1, tzinfo=UTC))
+    released = restored.pop_matured_pending_exits()
+    assert len(released) == 1
+
+
+def test_min_hold_is_component_scoped() -> None:
+    # F6: one component's fresh entry must not gate another component's exit.
+    overlay = _overlay(min_hold_bars=10)
+    fill_a = _fill()
+    fill_a.metadata = {"component_id": "comp-a"}
+    overlay.note_fill(
+        fill_a,
+        1.0,
+        2.0,
+        100.0,
+        component_id="comp-a",
+        component_old_qty=0.0,
+        component_new_qty=1.0,
+    )
+    overlay.next_bar(datetime(2026, 1, 1, tzinfo=UTC))
+
+    # comp-b holds nothing tracked: its EXIT passes.
+    exit_b = _apply(overlay, _signal("EXIT", metadata={"component_id": "comp-b"}))
+    assert exit_b.signal is not None
+    # comp-a's own bare EXIT is gated.
+    exit_a = _apply(overlay, _signal("EXIT", metadata={"component_id": "comp-a"}))
+    assert exit_a.signal is None
+    # Un-scoped net-book signals are not gated by comp-a's record.
+    exit_net = _apply(overlay, _signal("EXIT"))
+    assert exit_net.signal is not None
+
+
+def test_portfolio_update_timeindex_emits_released_min_hold_exit() -> None:
+    events: list = []
+    portfolio = _portfolio(STRATEGY_QUALITY_MIN_HOLD_BARS=2)
+    portfolio.events = SimpleNamespace(put=events.append)
+    portfolio.update_fill(
+        FillEvent(
+            timeindex=datetime(2026, 1, 1, tzinfo=UTC),
+            symbol=SYMBOL,
+            exchange="SIM",
+            quantity=1.0,
+            direction="BUY",
+            fill_cost=100.0,
+            commission=0.0,
+        )
+    )
+    portfolio.strategy_quality.next_bar(datetime(2026, 1, 1, tzinfo=UTC))
+    blocked = portfolio.generate_order_from_signal(_signal("EXIT"))
+    assert blocked is None
+
+    portfolio.update_timeindex(SimpleNamespace(type="MARKET"))
+    released_exits = [e for e in events if getattr(e, "signal_type", "") == "EXIT"]
+    assert len(released_exits) == 1
+    assert released_exits[0].metadata.get("overlay_reason") == "min_hold_released"
+
+
 def test_min_hold_blocks_reversal_but_not_same_direction_add() -> None:
     overlay = _overlay(min_hold_bars=5)
     _enter_long(overlay)
@@ -252,8 +356,10 @@ def _guard_portfolio(now, **config_overrides):
 
 
 def test_funding_guard_blocks_straddling_short_hold() -> None:
-    # 07:30 UTC: 1800s to the 08:00 boundary < 3600s hold < 28800s interval.
-    portfolio = _guard_portfolio(datetime(2026, 1, 1, 7, 30, tzinfo=UTC))
+    # Decision bar stamped 06:30 UTC on 1h bars: the MKT order fills at the
+    # NEXT bar open (~07:30), so the 3600s hold [07:30, 08:30] straddles the
+    # 08:00 settlement -> blocked (fill-time anchoring, F2/W1).
+    portfolio = _guard_portfolio(datetime(2026, 1, 1, 6, 30, tzinfo=UTC))
     order = portfolio.generate_order_from_signal(
         _signal("LONG", metadata={"intended_hold_seconds": 3600})
     )
@@ -261,8 +367,19 @@ def test_funding_guard_blocks_straddling_short_hold() -> None:
 
 
 def test_funding_guard_passes_non_straddling_short_hold() -> None:
-    # 00:10 UTC: 28200s to the 08:00 boundary > 3600s hold.
+    # 00:10 UTC decision -> fill ~01:10; hold [01:10, 02:10] touches no boundary.
     portfolio = _guard_portfolio(datetime(2026, 1, 1, 0, 10, tzinfo=UTC))
+    order = portfolio.generate_order_from_signal(
+        _signal("LONG", metadata={"intended_hold_seconds": 3600})
+    )
+    assert order is not None
+
+
+def test_funding_guard_anchors_at_fill_time_not_signal_bar() -> None:
+    # Decision 07:30 on 1h bars fills at ~08:30 — AFTER the 08:00 settlement —
+    # so the hold [08:30, 09:30] is clean and must NOT be blocked (the old
+    # signal-bar anchor falsely blocked exactly this case).
+    portfolio = _guard_portfolio(datetime(2026, 1, 1, 7, 30, tzinfo=UTC))
     order = portfolio.generate_order_from_signal(
         _signal("LONG", metadata={"intended_hold_seconds": 3600})
     )
@@ -299,8 +416,9 @@ def test_funding_guard_never_blocks_undeclared_or_exit_signals() -> None:
 
 
 def test_funding_guard_intended_hold_bars_uses_config_timeframe() -> None:
-    # 1h timeframe, 1 bar hold = 3600s; entered at 07:30 it straddles 08:00.
-    portfolio = _guard_portfolio(datetime(2026, 1, 1, 7, 30, tzinfo=UTC))
+    # 1h timeframe, 1-bar hold = 3600s; decision at 06:30 fills ~07:30 and the
+    # hold [07:30, 08:30] straddles the 08:00 settlement.
+    portfolio = _guard_portfolio(datetime(2026, 1, 1, 6, 30, tzinfo=UTC))
     order = portfolio.generate_order_from_signal(
         _signal("LONG", metadata={"intended_hold_bars": 1})
     )

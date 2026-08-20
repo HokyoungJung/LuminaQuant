@@ -72,6 +72,7 @@ from __future__ import annotations
 
 from collections import deque
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 from lumina_quant.core.plugin_registry import register
@@ -98,6 +99,20 @@ from lumina_quant.tuning import HyperParam, resolve_params_from_schema
 
 _STRATEGY_ID = "basis_funding_gap_convergence"
 _STRATEGY_NAME = "BasisFundingGapConvergenceStrategy"
+
+
+def _coerce_float_list(value: Any) -> list[float]:
+    """Best-effort ``list[float]`` coercion that never raises on adversarial input."""
+    if not isinstance(value, (list, tuple)):
+        return []
+    out: list[float] = []
+    for item in value:
+        parsed = safe_float(item)
+        if parsed is not None:
+            out.append(parsed)
+    return out
+
+
 # 8h funding cadence floor (seconds).  decision_cadence_seconds must be >= this
 # (the boundary discipline mirrored from CrossSectionalFundingMomentumCarry).
 _FUNDING_CADENCE_SECONDS = 28800
@@ -224,10 +239,10 @@ class BasisFundingGapConvergenceStrategy(Strategy):
         self._last_eval_time_key = str(state.get("last_eval_time_key", ""))
         self._tick = _safe_non_negative_int(state.get("tick"))
         self._recent_times.clear()
-        for value in list(state.get("recent_times") or [])[-int(self._recent_times.maxlen or 0) :]:
-            parsed = safe_float(value)
-            if parsed is not None:
-                self._recent_times.append(parsed)
+        for value in _coerce_float_list(state.get("recent_times"))[
+            -int(self._recent_times.maxlen or 0) :
+        ]:
+            self._recent_times.append(value)
         raw = state.get("symbol_state")
         if not isinstance(raw, dict):
             return
@@ -238,10 +253,10 @@ class BasisFundingGapConvergenceStrategy(Strategy):
             for attr in ("closes", "gaps"):
                 target = getattr(item, attr)
                 target.clear()
-                for value in list(payload.get(attr) or [])[-int(target.maxlen or 0) :]:
-                    parsed = safe_float(value)
-                    if parsed is not None:
-                        target.append(parsed)
+                maxlen = int(target.maxlen or 0)
+                values = _coerce_float_list(payload.get(attr))
+                for value in values[-maxlen:] if maxlen else values:
+                    target.append(value)
             mode = str(payload.get("mode", "OUT")).upper()
             item.mode = mode if mode in {"OUT", "LONG", "SHORT"} else "OUT"
             item.entry_price = safe_float(payload.get("entry_price"))
@@ -251,6 +266,21 @@ class BasisFundingGapConvergenceStrategy(Strategy):
             )
             item.intervals_held = _safe_non_negative_int(payload.get("intervals_held"))
             item.last_time_key = str(payload.get("last_time_key", ""))
+
+    def on_warmup_end(self) -> None:
+        """One-shot engine hook fired at the warmup -> live boundary.
+
+        The engine suppresses signals emitted during warmup, so any position
+        this sleeve believes it entered during warmup never existed in the
+        portfolio (ghost book).  Reset the per-symbol position/hold-interval
+        state to OUT while preserving the accrued closes/gaps history and the
+        ``last_time_key`` freshness markers.
+        """
+        for item in self._state.values():
+            item.mode = "OUT"
+            item.entry_price = None
+            item.entry_gap_sign = 0
+            item.intervals_held = 0
 
     # ------------------------------------------------------------- data intake
     def _extract_feature(self, event: Any, symbol: str, field: str) -> float | None:
@@ -289,7 +319,7 @@ class BasisFundingGapConvergenceStrategy(Strategy):
         if updated and event_key and event_key != self._last_eval_time_key:
             self._last_eval_time_key = event_key
             self._tick += 1
-            self._evaluate(getattr(event, "time", None))
+            self._evaluate(getattr(event, "time", None), strict_freshness=True)
 
     def calculate_signals(self, event: Any) -> None:
         if str(getattr(event, "type", "")).upper() == "MARKET_WINDOW":
@@ -305,15 +335,45 @@ class BasisFundingGapConvergenceStrategy(Strategy):
                 if key and key != self._last_eval_time_key:
                     self._last_eval_time_key = key
                     self._tick += 1
-                    self._evaluate(snapshot.time)
+                    self._evaluate(snapshot.time, strict_freshness=False)
 
     # -------------------------------------------------------------- evaluation
-    def _collect(self) -> tuple[dict[str, float], dict[str, float]]:
-        """Latest gap + realized vol per symbol (short-history names self-skip)."""
+    def _symbol_is_fresh(
+        self, item: _State, eval_key: str, eval_dt: datetime | None, *, strict: bool
+    ) -> bool:
+        """True when the symbol's last ACCEPTED update is current for this evaluation.
+
+        Batch/window flow (``strict=True``): every live symbol is updated inside
+        the very event that triggers the evaluation, so the last accepted key
+        must EQUAL the evaluation key.  Per-symbol MARKET flow: the evaluation
+        fires on the FIRST symbol of a new interval while the rest still carry
+        the previous interval's key, so one decision cadence of tolerance
+        applies.  Anything older is a dead feed: frozen closes/gaps must not
+        enter the cross-sectional panel (stale-symbol cross-section trap).
+        """
+        if eval_key and item.last_time_key == eval_key:
+            return True
+        if strict:
+            return False
+        if eval_dt is None:
+            return False
+        last_dt = _event_datetime_utc(item.last_time_key)
+        if last_dt is None:
+            return False
+        return abs((eval_dt - last_dt).total_seconds()) <= float(self.decision_cadence_seconds)
+
+    def _collect(
+        self, event_time: Any, *, strict: bool
+    ) -> tuple[dict[str, float], dict[str, float]]:
+        """Latest gap + realized vol per FRESH symbol (stale/short-history self-skip)."""
         gaps: dict[str, float] = {}
         vols: dict[str, float] = {}
+        eval_key = time_key(event_time)
+        eval_dt = _event_datetime_utc(event_time)
         for symbol, item in self._state.items():
             if not item.gaps:
+                continue
+            if not self._symbol_is_fresh(item, eval_key, eval_dt, strict=strict):
                 continue
             vol = realized_volatility(item.closes, window=self.vol_window)
             if vol is None or vol <= _EPS:
@@ -346,7 +406,7 @@ class BasisFundingGapConvergenceStrategy(Strategy):
         }
         return weights, float(scalar)
 
-    def _evaluate(self, event_time: Any) -> None:
+    def _evaluate(self, event_time: Any, *, strict_freshness: bool) -> None:
         if len(self.symbol_list) < self.min_symbols:
             return
         dt = _event_datetime_utc(event_time)
@@ -355,7 +415,7 @@ class BasisFundingGapConvergenceStrategy(Strategy):
         # Exits run on EVERY funding-interval evaluation BEFORE fresh entries:
         # hard min-hold first, then gap sign flip, then unconditional max-hold.
         self._age(event_time)
-        gaps, vols = self._collect()
+        gaps, vols = self._collect(event_time, strict=strict_freshness)
         if len(gaps) < self.min_symbols:
             return
         z = _zscore_across(gaps)

@@ -131,6 +131,13 @@ def _build_live_config_namespace(rt, *, symbols) -> SimpleNamespace:
         FLATTEN_ESCALATE_TO_MARKET=bool(rk.flatten_escalate_to_market),
         ALLOW_METADATA_RISK_OVERRIDE=bool(rk.allow_metadata_risk_override),
         MAX_LEVERAGE=float(rk.max_leverage),
+        # L-C cost-gate levers: expose the same uppercase attrs the backtest
+        # view maps so one validated RuntimeConfig resolves identically on the
+        # live path (defaults 0 / 0.0 keep the live default byte-identical).
+        STRATEGY_QUALITY_MIN_HOLD_BARS=int(getattr(rt.strategy_quality, "min_hold_bars", 0) or 0),
+        STRATEGY_QUALITY_NO_TRADE_BAND_BPS=float(
+            getattr(rt.strategy_quality, "no_trade_band_bps", 0.0) or 0.0
+        ),
         MAKER_FEE_RATE=float(run_ex.maker_fee_rate),
         TAKER_FEE_RATE=float(run_ex.taker_fee_rate),
         SPREAD_RATE=float(run_ex.spread_rate),

@@ -128,6 +128,24 @@ def _direction(signal_type: str) -> int:
     return 0
 
 
+# Pre-registered protective exit_reason whitelist for the L-C min-hold gate.
+# Descriptive labels on ordinary exits (e.g. "rebalance") are deliberately NOT
+# in this set — any truthy exit_reason must not neutralize the gate.
+_PROTECTIVE_EXIT_REASONS: frozenset[str] = frozenset(
+    {
+        "stop_loss",
+        "take_profit",
+        "trailing_stop",
+        "trailing_exit",
+        "liquidation",
+        "kill_switch",
+        "risk_off",
+        "drawdown_flatten",
+        "protective_stop",
+    }
+)
+
+
 class StrategyQualityOverlay:
     """Applies edge, regime, sizing, turnover, exit and health overlays."""
 
@@ -136,13 +154,20 @@ class StrategyQualityOverlay:
         self.enabled = bool(getattr(config, "STRATEGY_QUALITY_ENABLED", False))
         # L-C min-hold gate: active independently of ``enabled`` so the cost
         # lever can be A/B-measured without the full overlay. 0 = OFF
-        # (byte-identical default path).
+        # (byte-identical default path). The gate keeps its own ledger keyed
+        # by "<component_id or __net__>|<symbol>" — separate from ``_entry``
+        # (the health tracker) so the enabled-overlay state stays untouched —
+        # and DEFERS blocked bare EXITs instead of dropping them: the blocked
+        # exit is released as a synthetic EXIT signal at hold maturity via
+        # ``pop_matured_pending_exits`` (one-shot transition-emit strategies
+        # never re-emit, so a dropped exit would leak the position forever).
         self.min_hold_bars = max(0, int(getattr(config, "STRATEGY_QUALITY_MIN_HOLD_BARS", 0) or 0))
         self.bar_index = 0
         self._turnover_day = ""
         self._daily_turnover = 0.0
         self._health: dict[str, _StrategyHealth] = {}
         self._entry: dict[str, dict[str, Any]] = {}
+        self._min_hold_entries: dict[str, dict[str, Any]] = {}
         self._profit_moonshot_intent: dict[str, tuple[int, int]] = {}
 
     def get_state(self) -> dict[str, Any]:
@@ -162,6 +187,17 @@ class StrategyQualityOverlay:
                 key: [int(value[0]), int(value[1])]
                 for key, value in self._profit_moonshot_intent.items()
             },
+            # Emitted only when the min-hold ledger holds records so the state
+            # shape stays byte-identical for every pre-existing configuration.
+            **(
+                {
+                    "min_hold_entries": {
+                        key: dict(value) for key, value in self._min_hold_entries.items()
+                    }
+                }
+                if self._min_hold_entries
+                else {}
+            ),
         }
 
     def set_state(self, state: dict[str, Any]) -> None:
@@ -194,6 +230,12 @@ class StrategyQualityOverlay:
         for key, value in dict(state.get("profit_moonshot_intent") or {}).items():
             if isinstance(value, (list, tuple)) and len(value) >= 2:
                 self._profit_moonshot_intent[str(key)] = (int(value[0]), int(value[1]))
+        raw_min_hold = state.get("min_hold_entries")
+        self._min_hold_entries = {}
+        if isinstance(raw_min_hold, dict):
+            for key, value in raw_min_hold.items():
+                if isinstance(value, dict):
+                    self._min_hold_entries[str(key)] = dict(value)
 
     def next_bar(self, event_time: Any) -> None:
         self.bar_index += 1
@@ -202,27 +244,73 @@ class StrategyQualityOverlay:
             self._turnover_day = day
             self._daily_turnover = 0.0
 
-    def note_fill(self, fill: Any, old_qty: float, new_qty: float, fill_price: float) -> None:
-        if (not self.enabled and self.min_hold_bars <= 0) or fill_price <= 0.0:
+    def _min_hold_key(self, symbol: str, component_id: Any) -> str:
+        token = str(component_id).strip() if component_id else ""
+        return f"{token or '__net__'}|{symbol}"
+
+    def _note_min_hold_fill(
+        self,
+        symbol: str,
+        old_qty: float,
+        new_qty: float,
+        *,
+        component_id: Any = None,
+    ) -> None:
+        """Maintain the min-hold ledger from the book the fill actually moved."""
+        key = self._min_hold_key(symbol, component_id)
+        if abs(new_qty) < 1e-12:
+            self._min_hold_entries.pop(key, None)
+            return
+        if old_qty == 0.0 or (old_qty > 0 > new_qty) or (old_qty < 0 < new_qty):
+            self._min_hold_entries[key] = {
+                "qty": float(new_qty),
+                "entry_bar": int(self.bar_index),
+            }
+            return
+        record = self._min_hold_entries.get(key)
+        if record is not None:
+            record["qty"] = float(new_qty)
+
+    def note_fill(
+        self,
+        fill: Any,
+        old_qty: float,
+        new_qty: float,
+        fill_price: float,
+        *,
+        component_id: Any = None,
+        component_old_qty: float | None = None,
+        component_new_qty: float | None = None,
+    ) -> None:
+        if fill_price <= 0.0:
+            return
+        symbol = str(getattr(fill, "symbol", ""))
+        if self.min_hold_bars > 0 and symbol:
+            if component_id and component_old_qty is not None and component_new_qty is not None:
+                self._note_min_hold_fill(
+                    symbol,
+                    float(component_old_qty),
+                    float(component_new_qty),
+                    component_id=component_id,
+                )
+            else:
+                self._note_min_hold_fill(symbol, float(old_qty), float(new_qty))
+        if not self.enabled:
             return
         notional = abs(float(getattr(fill, "quantity", 0.0) or 0.0)) * float(fill_price)
         self._daily_turnover += notional
         metadata = dict(getattr(fill, "metadata", {}) or {})
         signal_metadata = dict(metadata.get("signal_metadata") or {})
         strategy_key = str(signal_metadata.get("strategy_quality_strategy") or "unknown")
-        symbol = str(getattr(fill, "symbol", ""))
         if not symbol:
             return
 
         if old_qty == 0.0 and new_qty != 0.0:
-            record = {
+            self._entry[symbol] = {
                 "strategy": strategy_key,
                 "qty": float(new_qty),
                 "price": fill_price,
             }
-            if self.min_hold_bars > 0:
-                record["entry_bar"] = int(self.bar_index)
-            self._entry[symbol] = record
             return
 
         entry = self._entry.get(symbol)
@@ -237,14 +325,11 @@ class StrategyQualityOverlay:
             if new_qty == 0.0:
                 self._entry.pop(symbol, None)
             else:
-                record = {
+                self._entry[symbol] = {
                     "strategy": strategy_key,
                     "qty": float(new_qty),
                     "price": fill_price,
                 }
-                if self.min_hold_bars > 0:
-                    record["entry_bar"] = int(self.bar_index)
-                self._entry[symbol] = record
 
     def _record_health(self, strategy_key: str, realized_return: float) -> None:
         window = max(1, int(getattr(self.config, "STRATEGY_QUALITY_HEALTH_WINDOW_TRADES", 20)))
@@ -263,34 +348,97 @@ class StrategyQualityOverlay:
     def _min_hold_block(self, signal: SignalEvent) -> str:
         """L-C min-hold gate reason, or "" when the signal may pass.
 
-        Blocks bare strategy EXITs and opposite-direction reversal entries
-        while a tracked position is younger than ``min_hold_bars``.  Exits
-        carrying a protective marker (``risk_exit`` / ``exit_reason`` /
-        ``overlay_reason`` metadata) always pass; engine-level protective
-        stop / take-profit / liquidation fills never route through signals
-        and are therefore never delayed by this gate.
+        While a tracked position is younger than ``min_hold_bars``:
+
+        - a BARE strategy EXIT is DEFERRED, not dropped: the record is marked
+          ``exit_pending`` (with the signal's identity preserved) and released
+          as a synthetic EXIT at hold maturity via
+          ``pop_matured_pending_exits`` — one-shot transition-emit strategies
+          never re-emit, so dropping would leak the position;
+        - exits carrying a protective marker always pass: truthy ``risk_exit``
+          or ``overlay_reason`` metadata, or ``exit_reason`` in the
+          pre-registered protective whitelist (a descriptive label like
+          ``rebalance`` is NOT protective and stays gated); engine-level
+          stop / take-profit / liquidation fills never route through signals
+          and are never delayed;
+        - opposite-direction reversals are blocked, and while an exit is
+          pending SAME-direction re-entries are blocked too (the strategy
+          believes it is flat — a fresh entry would stack exposure).
+
+        The ledger is keyed by ``<component_id or __net__>|<symbol>`` so one
+        component's fresh entry never gates another component's exits.
         """
         symbol = str(getattr(signal, "symbol", "") or "")
-        entry = self._entry.get(symbol)
-        if not entry:
+        metadata = dict(getattr(signal, "metadata", {}) or {})
+        component_id = str(metadata.get("component_id") or "").strip()
+        key = self._min_hold_key(symbol, component_id or None)
+        record = self._min_hold_entries.get(key)
+        if record is None:
             return ""
-        entry_bar = entry.get("entry_bar")
+        entry_bar = record.get("entry_bar")
         if entry_bar is None:
             return ""
-        if self.bar_index - int(entry_bar) >= self.min_hold_bars:
-            return ""
+        matured = self.bar_index - int(entry_bar) >= self.min_hold_bars
         signal_type = str(getattr(signal, "signal_type", "")).upper()
         if signal_type == "EXIT":
-            metadata = dict(getattr(signal, "metadata", {}) or {})
-            for key in ("risk_exit", "exit_reason", "overlay_reason"):
-                if metadata.get(key):
-                    return ""
+            if matured:
+                return ""
+            if metadata.get("risk_exit") or metadata.get("overlay_reason"):
+                return ""
+            if str(metadata.get("exit_reason") or "").strip().lower() in _PROTECTIVE_EXIT_REASONS:
+                return ""
+            record["exit_pending"] = True
+            record["pending_strategy_id"] = str(getattr(signal, "strategy_id", "") or "overlay")
+            record["pending_metadata"] = {
+                str(k): v
+                for k, v in metadata.items()
+                if isinstance(v, (str, int, float, bool)) or v is None
+            }
             return "min_hold_active"
         direction = _direction(signal_type)
-        entry_qty = _safe_float(entry.get("qty")) or 0.0
+        entry_qty = _safe_float(record.get("qty")) or 0.0
+        if direction != 0 and record.get("exit_pending"):
+            return "min_hold_exit_pending"
+        if matured:
+            return ""
         if direction != 0 and entry_qty != 0.0 and (direction > 0) != (entry_qty > 0):
             return "min_hold_reversal_block"
         return ""
+
+    def pop_matured_pending_exits(self) -> list[dict[str, Any]]:
+        """Release deferred bare EXITs whose min-hold has matured.
+
+        Returns one dict per matured pending exit: ``symbol``,
+        ``component_id`` ("" for the net book), ``strategy_id``, and the
+        preserved signal ``metadata``.  The caller (Portfolio.update_timeindex)
+        synthesizes EXIT SignalEvents from these; the ledger record itself
+        stays until the closing fill removes it via ``note_fill``.
+        """
+        if self.min_hold_bars <= 0 or not self._min_hold_entries:
+            return []
+        released: list[dict[str, Any]] = []
+        for key, record in self._min_hold_entries.items():
+            if not record.get("exit_pending"):
+                continue
+            entry_bar = record.get("entry_bar")
+            if entry_bar is None:
+                continue
+            if self.bar_index - int(entry_bar) < self.min_hold_bars:
+                continue
+            component_token, _, symbol = key.partition("|")
+            record["exit_pending"] = False
+            metadata = dict(record.get("pending_metadata") or {})
+            record.pop("pending_metadata", None)
+            strategy_id = str(record.pop("pending_strategy_id", "") or "overlay")
+            released.append(
+                {
+                    "symbol": symbol,
+                    "component_id": "" if component_token == "__net__" else component_token,
+                    "strategy_id": strategy_id,
+                    "metadata": metadata,
+                }
+            )
+        return released
 
     def apply(
         self,

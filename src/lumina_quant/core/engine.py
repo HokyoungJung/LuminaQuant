@@ -101,8 +101,13 @@ class TradingEngine(ABC):
         # One-shot warmup->live transition hook guard.  Persisted across chunk
         # boundaries via get_engine_state/set_engine_state so a chunked run
         # neither double-fires nor skips the hook when the warmup boundary
-        # falls between chunks.
+        # falls between chunks.  ``_had_warmup`` records that THIS RUN was
+        # warmup-configured at some point: continuation chunks are constructed
+        # with warmup_bars=0 (live_start_ms=None), so without the carried
+        # provenance the hook could never fire when chunk 1 held only warmup
+        # bars and the first live event lands in a later chunk.
         self._warmup_end_hook_fired = False
+        self._had_warmup = self._live_start_ms is not None
 
         # Stats
         self.market_events = 0
@@ -133,7 +138,7 @@ class TradingEngine(ABC):
         """
         self._warmup_active = self._is_warmup_time(time_value)
         if (
-            self._live_start_ms is not None
+            (self._live_start_ms is not None or self._had_warmup)
             and not self._warmup_active
             and not self._warmup_end_hook_fired
         ):
@@ -564,6 +569,7 @@ class TradingEngine(ABC):
         state: dict[str, Any] = {
             "window_decision_last_bucket": self._window_decision_last_bucket,
             "warmup_end_hook_fired": bool(self._warmup_end_hook_fired),
+            "had_warmup": bool(self._live_start_ms is not None or self._had_warmup),
         }
         if self.timeframe_aggregator is None and not self._strategy_uses_timeframe_aggregator():
             return state
@@ -592,6 +598,8 @@ class TradingEngine(ABC):
 
         if "warmup_end_hook_fired" in state:
             self._warmup_end_hook_fired = bool(state.get("warmup_end_hook_fired"))
+        if state.get("had_warmup"):
+            self._had_warmup = True
 
         aggregator_state = state.get("timeframe_aggregator")
         if isinstance(aggregator_state, dict) and self._strategy_uses_timeframe_aggregator():

@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from lumina_quant.core.market_window_contract import build_market_window_event
+from lumina_quant.indicators.rolling_stats import rolling_skewness
 from lumina_quant.strategies.cross_sectional_anomaly_alpha_sleeves import (
     DispersionConditionedReversionStrategy,
     IdiosyncraticVolatilityStrategy,
@@ -115,6 +116,38 @@ def test_skewness_helper_is_none_safe_and_signed() -> None:
     left = _skewness([0.0, -10.0, 0.0, 0.0, 0.0])
     assert right is not None and right > 0.0
     assert left is not None and left < 0.0
+
+
+def test_skewness_is_the_original_plain_sum_recipe_not_the_fsum_alias() -> None:
+    # REGRESSION (W3, 2026-08-20): this registered module's ``_skewness`` was
+    # briefly aliased to the canonical ``rolling_stats.rolling_skewness``, whose
+    # ``math.fsum`` moment accumulation drifts from the original plain-``sum``
+    # recipe by one ULP on some inputs — enough to flip LotterySkewness
+    # cross-sectional rank ties.  Pin the ORIGINAL numerics: the fixture below
+    # is a return-scale vector where the two recipes provably disagree in the
+    # last bit, so re-aliasing flips this exact-equality golden.
+    assert _skewness is not rolling_skewness
+    fixture = [
+        -0.088907,
+        0.047501,
+        -0.035967,
+        -0.077349,
+        -0.005959,
+        -0.072556,
+        -0.032015,
+        -0.080339,
+        0.073846,
+        0.045776,
+        -0.05739,
+        -0.083633,
+    ]
+    # Golden from the original recipe (statistics.mean + plain-sum moments).
+    golden = 0.69033172674867
+    assert _skewness(fixture) == golden
+    # Witness that the fixture separates the recipes: the fsum canonical copy
+    # lands one ULP away, so the golden above uniquely pins the plain-sum path.
+    canonical = rolling_skewness(fixture)
+    assert canonical is not None and canonical != golden
 
 
 # ---------------------------------------------------------------------------

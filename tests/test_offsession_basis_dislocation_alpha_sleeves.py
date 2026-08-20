@@ -550,6 +550,140 @@ def test_two_runs_are_bit_identical() -> None:
 
 
 # --------------------------------------------------------------------------- #
+# SLEEVE-STATE-02 regressions: panel-wide aging + halted-symbol staleness gate
+# --------------------------------------------------------------------------- #
+
+
+def test_halted_symbol_gets_max_hold_exit_without_printing_bars() -> None:
+    # Fix 1a: a HALTED symbol with an open position gets its 72h max-hold EXIT
+    # from ANOTHER symbol's bar (panel-wide aging), price = last known close.
+    candidate = _make_candidate()
+    item = candidate._state[PUMP]
+    item.closes.append(123.0)
+    item.mode = "SHORT"
+    item.entry_price = 123.0
+    item.entry_epoch = _MONDAY_DECISION.timestamp()
+    later = _MONDAY_DECISION + timedelta(hours=73)
+    candidate.calculate_signals(_event(DUMP, later, 100.0, 100.0))
+    exits = [s for s in candidate.events.items if str(s.signal_type).upper() == "EXIT"]
+    assert [s.symbol for s in exits] == [PUMP]
+    assert dict(exits[0].metadata or {}).get("reason") == "max_hold"
+    assert exits[0].price == 123.0  # last known close of the halted leg
+    assert item.mode == "OUT"
+    assert item.entry_price is None and item.entry_epoch is None and item.score is None
+
+    # None-safety: a held symbol with NO known close still exits (price=None).
+    ghost = _make_candidate()
+    bare = ghost._state[PUMP]
+    bare.mode = "LONG"
+    bare.entry_epoch = _MONDAY_DECISION.timestamp()
+    ghost.calculate_signals(_event(DUMP, later, 100.0, 100.0))
+    exits = [s for s in ghost.events.items if str(s.signal_type).upper() == "EXIT"]
+    assert [s.symbol for s in exits] == [PUMP]
+    assert exits[0].price is None
+    assert bare.mode == "OUT"
+
+    # Inside the 72h window nothing ages out (no spurious panel-wide exits).
+    early = _make_candidate()
+    held = early._state[PUMP]
+    held.closes.append(123.0)
+    held.mode = "SHORT"
+    held.entry_epoch = _MONDAY_DECISION.timestamp()
+    early.calculate_signals(_event(DUMP, _MONDAY_DECISION + timedelta(hours=71), 100.0, 100.0))
+    assert not [s for s in early.events.items if str(s.signal_type).upper() == "EXIT"]
+    assert held.mode == "SHORT"
+
+
+def test_frozen_accumulator_is_never_scored_or_entered() -> None:
+    # Fix 1b (integration): PUMP halts at Monday 00:00 with a huge frozen
+    # weekend dislocation in its accumulator; the Monday pre-reopen decision
+    # must exclude it (stale last bar >> 3x the 1h spacing) while still
+    # entering the live dumped leg from the remaining fresh cross-section.
+    candidate = _make_candidate()
+    halt_at = 168  # Monday 2025-01-13 00:00 UTC: PUMP prints nothing from here
+    for step in range(182):  # through Monday 13:00
+        moment = _TIMES[step]
+        for symbol in _ALL_SYMBOLS:
+            if symbol == PUMP and step >= halt_at:
+                continue
+            candidate.calculate_signals(
+                _event(symbol, moment, _CLOSES[symbol][step], _INDEXES[symbol][step])
+            )
+    assert candidate._state[PUMP].off_accum_bps > 150.0  # frozen photograph
+    sides = _final_sides(candidate.events.items)
+    assert PUMP not in sides  # never scored, never entered
+    assert sides.get(DUMP) == "LONG"
+
+
+def test_stale_last_bar_excluded_from_scores_fresh_passes() -> None:
+    # Fix 1b (unit): with hourly spacing inferred from _recent_times, a leg
+    # whose last accepted bar is >3h older than the decision is dropped from
+    # the score panel; fresh legs and the no-decision-time path pass through.
+    candidate = _make_candidate()
+    _seed_eligible(candidate, dict.fromkeys(_TRADFI, 0.0))
+    candidate._state[PUMP].off_accum_bps = 200.0
+    decision_epoch = _MONDAY_DECISION.timestamp()
+    for back in range(8, 0, -1):
+        candidate._recent_times.append(decision_epoch - back * 3600.0)
+    for symbol in _TRADFI:
+        candidate._state[symbol].last_bar_epoch = decision_epoch
+    candidate._state[PUMP].last_bar_epoch = decision_epoch - 4 * 3600.0  # > 3x 1h
+    scores, _vols = candidate._dislocation_scores(decision_epoch)
+    assert PUMP not in scores
+    assert set(scores) == set(_TRADFI) - {PUMP}
+    # Exactly-3x staleness is NOT excluded (strict > boundary).
+    candidate._state[PUMP].last_bar_epoch = decision_epoch - 3 * 3600.0
+    scores, _vols = candidate._dislocation_scores(decision_epoch)
+    assert PUMP in scores
+    # No decision time -> pass-through (seeded direct-call paths keep working).
+    candidate._state[PUMP].last_bar_epoch = decision_epoch - 100 * 3600.0
+    scores, _vols = candidate._dislocation_scores()
+    assert PUMP in scores
+
+
+# --------------------------------------------------------------------------- #
+# WARMUP-GHOST-BOOK regression: on_warmup_end flattens positions only
+# --------------------------------------------------------------------------- #
+
+
+def test_on_warmup_end_flattens_ghost_book_preserves_accumulators() -> None:
+    candidate = _make_candidate()
+    _feed(candidate, _ALL_SYMBOLS, end_step=183)  # in-position, post-decision
+    item = candidate._state[PUMP]
+    assert item.mode == "SHORT"
+    closes_before = list(item.closes)
+    accum_before = item.off_accum_bps
+    obs_before = item.off_obs
+    anchor_before = item.prev_basis_bps
+    key_before = item.last_time_key
+    epoch_before = item.last_bar_epoch
+    recent_before = list(candidate._recent_times)
+    decision_before = candidate._last_decision_date
+    events_before = len(candidate.events.items)
+
+    candidate.on_warmup_end()
+
+    for state in candidate._state.values():
+        assert state.mode == "OUT"
+        assert state.entry_price is None
+        assert state.entry_epoch is None
+        assert state.score is None
+    # Accumulators / deques / clocks survive verbatim.
+    assert list(item.closes) == closes_before
+    assert item.off_accum_bps == accum_before
+    assert item.off_obs == obs_before
+    assert item.prev_basis_bps == anchor_before
+    assert item.last_time_key == key_before
+    assert item.last_bar_epoch == epoch_before
+    assert list(candidate._recent_times) == recent_before
+    assert candidate._last_decision_date == decision_before
+    # The ghost book is dropped silently: no EXIT is emitted for it.
+    assert len(candidate.events.items) == events_before
+    # The engine discovers the hook via getattr + callable.
+    assert callable(getattr(candidate, "on_warmup_end", None))
+
+
+# --------------------------------------------------------------------------- #
 # candidate-wiring exports (module-level slice + tags)
 # --------------------------------------------------------------------------- #
 

@@ -11,8 +11,9 @@ within the OI-COVERED universe, and residualized (single-regressor Gram-Schmidt 
 the shared ``cross_sectional_residualize`` primitive) against the 7d price-momentum
 z so the sleeve trades positioning flow, NOT momentum in disguise.  It LONGS the
 top residual quintile and SHORTS the bottom quintile on a weekly ISO-week clock
-with a hard ``min_hold_decisions`` floor (5 decisions), a rank-hysteresis band,
-and inverse-realized-vol sizing.
+with a hard ``min_hold_decisions`` floor (2 weekly decisions ~= 2-3 weeks; earliest
+rank-lapsed exit within the registered horizon), a rank-hysteresis band, and
+inverse-realized-vol sizing.
 
 SIGN PRE-REGISTRATION.  The sign is POSITIVE continuation (Hong-Yogo) at the
 1-4 week horizon; the crowding-fade reading (high OI + high funding -> fade) is
@@ -86,6 +87,7 @@ from __future__ import annotations
 import math
 from collections import deque
 from dataclasses import dataclass
+from datetime import date
 from typing import Any
 
 from lumina_quant.core.plugin_registry import register
@@ -147,6 +149,9 @@ class _State:
     decisions_held: int = 0
     last_time_key: str = ""
     score: float | None = None
+    # ISO date of this symbol's most recently FINALIZED day record (staleness
+    # guard for panel eligibility; "" until the first day commits).
+    last_committed_day: str = ""
 
 
 def _coerce_float_list(value: Any) -> list[float]:
@@ -181,6 +186,20 @@ def _coerce_day_records(value: Any) -> list[_DayRecord]:
             )
         )
     return out
+
+
+def _committed_day_lag_days(last_committed_day: str, latest_committed_day: str) -> int | None:
+    """Calendar-day lag of a symbol's last committed day behind the latest.
+
+    Returns ``None`` when either ISO day string is missing/unparsable (the
+    caller treats that as stale); never raises on adversarial state payloads.
+    """
+    try:
+        return (
+            date.fromisoformat(latest_committed_day) - date.fromisoformat(last_committed_day)
+        ).days
+    except TypeError, ValueError:
+        return None
 
 
 def _cross_z(values: dict[str, float]) -> dict[str, float]:
@@ -244,8 +263,10 @@ class OpenInterestGrowthPressureStrategy(Strategy):
             "min_oi_coverage": HyperParam.floating(
                 "min_oi_coverage", default=0.80, low=0.0, high=1.0, tunable=False
             ),
+            # 2 weekly decisions ~= 2-3 weeks: consistent with the ~2-week
+            # INTENDED_HOLD_SECONDS and the registered 1-4 week horizon.
             "min_hold_decisions": HyperParam.integer(
-                "min_hold_decisions", default=5, low=0, high=100000
+                "min_hold_decisions", default=2, low=0, high=100000
             ),
             "rank_hysteresis_buffer": HyperParam.integer(
                 "rank_hysteresis_buffer", default=1, low=0, high=512
@@ -300,6 +321,9 @@ class OpenInterestGrowthPressureStrategy(Strategy):
             for symbol in self.symbol_list
         }
         self._last_eval_week: tuple[int, int] | None = None
+        # Strategy-level latest committed day across the universe (freshness
+        # gate anchor, mirrors behavioral_value_xs_alpha_sleeves).
+        self._last_committed_day: str = ""
         # Recent decision-bar epochs (seconds) for deterministic bar-spacing
         # inference; the vol-target scalar annualizes per-bar portfolio vol via
         # sqrt(bars_per_year) derived from the median gap here.
@@ -313,6 +337,7 @@ class OpenInterestGrowthPressureStrategy(Strategy):
             "last_eval_week": (
                 list(self._last_eval_week) if self._last_eval_week is not None else None
             ),
+            "last_committed_day": self._last_committed_day,
             "recent_times": list(self._recent_times),
             "symbol_state": {
                 symbol: {
@@ -330,6 +355,7 @@ class OpenInterestGrowthPressureStrategy(Strategy):
                     "decisions_held": int(item.decisions_held),
                     "last_time_key": item.last_time_key,
                     "score": item.score,
+                    "last_committed_day": item.last_committed_day,
                 }
                 for symbol, item in self._state.items()
             },
@@ -343,6 +369,7 @@ class OpenInterestGrowthPressureStrategy(Strategy):
             -int(self._recent_times.maxlen or 0) :
         ]:
             self._recent_times.append(value)
+        self._last_committed_day = str(state.get("last_committed_day", "") or "")
         week = state.get("last_eval_week")
         if isinstance(week, (list, tuple)) and len(week) == 2:
             try:
@@ -382,8 +409,25 @@ class OpenInterestGrowthPressureStrategy(Strategy):
                 item.decisions_held = _safe_non_negative_int(payload.get("decisions_held"))
                 item.last_time_key = str(payload.get("last_time_key", ""))
                 item.score = safe_float(payload.get("score"))
+                item.last_committed_day = str(payload.get("last_committed_day", "") or "")
             except Exception:
                 continue
+
+    def on_warmup_end(self) -> None:
+        """Engine warmup-end hook: drop the ghost book entered during warmup.
+
+        The engine suppresses warmup-region signals, so any position this
+        sleeve believes it entered during warmup never existed on the
+        portfolio side.  Flatten the position fields (mode / entry /
+        decisions_held / score) while PRESERVING the OI/close deques, the
+        per-day accumulators, and the freshness bookkeeping -- the formation
+        history is real market data and must survive into the live region.
+        """
+        for item in self._state.values():
+            item.mode = "OUT"
+            item.entry_price = None
+            item.decisions_held = 0
+            item.score = None
 
     # ------------------------------------------------------------------ #
     # ingestion
@@ -413,6 +457,12 @@ class OpenInterestGrowthPressureStrategy(Strategy):
                     close=item.cur_close if item.cur_close is not None else close,
                 )
             )
+            # Freshness bookkeeping: this symbol just COMMITTED ``cur_date``;
+            # the strategy-level latest committed day anchors the stale-symbol
+            # exclusion gate in ``_residual_scores``.
+            item.last_committed_day = item.cur_date
+            if item.cur_date > self._last_committed_day:
+                self._last_committed_day = item.cur_date
             item.cur_oi_notional = None
             item.cur_dollar_volume = 0.0
         item.cur_date = date_str
@@ -483,7 +533,20 @@ class OpenInterestGrowthPressureStrategy(Strategy):
         vols: dict[str, float] = {}
         coverage_by_symbol: dict[str, float] = {}
         window_len = self.delta_oi_window_days + 1
+        latest_committed = self._last_committed_day
         for symbol, item in self._state.items():
+            if latest_committed:
+                # FRESHNESS GATE (mirrors behavioral_value_xs_alpha_sleeves):
+                # a symbol whose last committed day predates the strategy-level
+                # latest committed day is a dead/stale feed and is EXCLUDED
+                # from the rank instead of being ranked on old formation data.
+                # Days commit per symbol on that symbol's NEXT bar, so at the
+                # weekly trigger live peers lag the trigger symbol by at most
+                # one committed day -- the ``> 1`` allowance below is that
+                # commit lag, not a staleness tolerance.
+                lag = _committed_day_lag_days(item.last_committed_day, latest_committed)
+                if lag is None or lag > 1:
+                    continue
             if len(item.days) < self.min_history_days:
                 continue
             window = list(item.days)[-window_len:]
@@ -631,6 +694,12 @@ class OpenInterestGrowthPressureStrategy(Strategy):
         if len(self.symbol_list) < self.min_symbols:
             return
         targets, vols = self._score_and_select()
+        if not targets:
+            # Universe-wide coverage failure (empty residual panel) is a
+            # NO-INFORMATION week, not a rank signal: return without emitting
+            # rank_lapsed exits so a mature book is never flushed by a data
+            # outage (e.g. one ISO week of open_interest=None everywhere).
+            return
         weights, scalar = self._inverse_vol_weights(targets, vols)
         self._emit_targets(targets, weights, scalar, event_time)
 
@@ -756,7 +825,7 @@ _OI_GROWTH_PRESSURE_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
             "min_symbols": 5,
             "min_history_days": DELTA_OI_WINDOW_DAYS + 1,
             "min_oi_coverage": 0.80,
-            "min_hold_decisions": 5,
+            "min_hold_decisions": 2,
             "rank_hysteresis_buffer": 1,
             "vol_window": 168,
             "allow_short": True,
@@ -769,7 +838,7 @@ _OI_GROWTH_PRESSURE_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
             "min_symbols": 5,
             "min_history_days": DELTA_OI_WINDOW_DAYS_FALLBACK + 1,
             "min_oi_coverage": 0.80,
-            "min_hold_decisions": 5,
+            "min_hold_decisions": 2,
             "rank_hysteresis_buffer": 1,
             "vol_window": 168,
             "allow_short": True,

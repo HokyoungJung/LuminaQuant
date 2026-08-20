@@ -79,6 +79,19 @@ _EPS = 1e-12
 _GAMMA_FLOOR = 0.05
 
 
+def _coerce_param(raw: Any, default: float) -> float:
+    """Coerce a scalar constant to a finite float; canonical default otherwise.
+
+    Never raises: non-numeric (``None``, ``'abc'``) and non-finite inputs fall
+    back to the canonical default instead of propagating ``float()`` errors.
+    """
+    try:
+        value = float(raw)
+    except Exception:
+        return default
+    return value if math.isfinite(value) else default
+
+
 def _coerce_1d(values: Any) -> np.ndarray | None:
     """Best-effort coercion to a 1-D float array; ``None`` on failure."""
     if values is None:
@@ -132,9 +145,8 @@ def salience_theory_value(
     n = own.size
     if n < 2:
         return None
-    theta_f = max(float(theta), _EPS) if math.isfinite(float(theta)) else 0.1
-    delta_f = float(delta) if math.isfinite(float(delta)) else 0.7
-    delta_f = min(max(delta_f, _EPS), 1.0)
+    theta_f = max(_coerce_param(theta, 0.1), _EPS)
+    delta_f = min(max(_coerce_param(delta, 0.7), _EPS), 1.0)
     sigma = np.abs(own - market) / (np.abs(own) + np.abs(market) + theta_f)
     # Rank days by salience descending; stable sort makes ties deterministic.
     order = np.argsort(-sigma, kind="stable")
@@ -191,14 +203,10 @@ def prospect_theory_value(
     n = int(arr.size)
     if n < 2:
         return None
-    alpha_f = float(alpha) if math.isfinite(float(alpha)) else 0.88
-    alpha_f = min(max(alpha_f, _EPS), 1.0)
-    lam_f = float(lam) if math.isfinite(float(lam)) else 2.25
-    lam_f = max(lam_f, 0.0)
-    g_gain = float(gamma_gain) if math.isfinite(float(gamma_gain)) else 0.61
-    g_gain = min(max(g_gain, _GAMMA_FLOOR), 1.0)
-    g_loss = float(gamma_loss) if math.isfinite(float(gamma_loss)) else 0.69
-    g_loss = min(max(g_loss, _GAMMA_FLOOR), 1.0)
+    alpha_f = min(max(_coerce_param(alpha, 0.88), _EPS), 1.0)
+    lam_f = max(_coerce_param(lam, 2.25), 0.0)
+    g_gain = min(max(_coerce_param(gamma_gain, 0.61), _GAMMA_FLOOR), 1.0)
+    g_loss = min(max(_coerce_param(gamma_loss, 0.69), _GAMMA_FLOOR), 1.0)
 
     ordered = np.sort(arr, kind="stable")
     n_loss = int(np.count_nonzero(ordered < 0.0))

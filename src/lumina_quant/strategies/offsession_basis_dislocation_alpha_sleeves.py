@@ -101,6 +101,7 @@ from lumina_quant.indicators.alpha_features import basis_bps, realized_volatilit
 from lumina_quant.indicators.annualization import (
     annualize_per_bar_vol,
     bars_per_year_from_spacing,
+    median_bar_spacing_seconds,
 )
 from lumina_quant.indicators.common import safe_float, time_key
 from lumina_quant.research_universe import (
@@ -129,6 +130,15 @@ from lumina_quant.tuning import HyperParam, resolve_params_from_schema
 
 _STRATEGY_ID = "offsession_basis_dislocation"
 _STRATEGY_NAME = "OffSessionBasisDislocationStrategy"
+
+# PRE-REGISTERED STALENESS MULTIPLE (fixed, non-tunable, documented deviation).
+# A symbol whose last accepted bar predates the decision time by more than
+# 3x the inferred bar spacing (median spacing of recent decision-path epochs)
+# is a halted/frozen leg: its accumulator is a stale photograph of a past
+# episode, so it is excluded from cross-sectional scoring and can never be
+# entered.  3x tolerates a couple of missed prints on the hourly cadence while
+# rejecting anything halted for a session-scale gap.
+_STALE_BAR_SPACING_MULTIPLE = 3.0
 
 
 def _default_tradfi_universe() -> tuple[str, ...]:
@@ -183,6 +193,8 @@ class _State:
     entry_epoch: float | None = None
     last_time_key: str = ""
     score: float | None = None
+    # Epoch (seconds) of the last ACCEPTED bar -- staleness gate input.
+    last_bar_epoch: float | None = None
 
 
 @register("strategy", "OffSessionBasisDislocationStrategy", interface="event_driven")
@@ -341,6 +353,7 @@ class OffSessionBasisDislocationStrategy(Strategy):
                     "entry_epoch": item.entry_epoch,
                     "last_time_key": item.last_time_key,
                     "score": item.score,
+                    "last_bar_epoch": item.last_bar_epoch,
                 }
                 for symbol, item in self._state.items()
             },
@@ -379,12 +392,64 @@ class OffSessionBasisDislocationStrategy(Strategy):
                 item.entry_epoch = safe_float(payload.get("entry_epoch"))
                 item.last_time_key = str(payload.get("last_time_key", ""))
                 item.score = safe_float(payload.get("score"))
+                item.last_bar_epoch = safe_float(payload.get("last_bar_epoch"))
             except Exception:
                 continue
+
+    def on_warmup_end(self) -> None:
+        """One-shot engine hook: drop warmup ghost positions, keep learning.
+
+        The engine suppresses every signal emitted during the warmup region,
+        so any position this sleeve believes it entered during warmup never
+        existed in the portfolio (ghost-position desynchronization).  Flatten
+        the position fields WITHOUT emitting EXITs (there is nothing to exit);
+        the learned accumulators and deques -- trailing closes, the basis
+        anchor, the off-session accumulator/counter, bar identity, the decision
+        clock, and the bar-spacing history -- are preserved verbatim.
+        """
+        for item in self._state.values():
+            item.mode = "OUT"
+            item.entry_price = None
+            item.entry_epoch = None
+            item.score = None
 
     # ------------------------------------------------------------------ #
     # ingestion
     # ------------------------------------------------------------------ #
+    def _age_book(self, event_time: Any) -> None:
+        """Panel-wide max-hold aging pass: ANY symbol's bar ages the WHOLE book.
+
+        Runs at the top of the evaluation path, BEFORE the triggering bar is
+        ingested.  Every held symbol whose entry age has reached the fixed
+        ``max_hold_hours`` ceiling relative to the CURRENT event time gets its
+        close-confirmed max-hold EXIT (price = last known close, None-safe) --
+        including HALTED symbols that print no further bars of their own.
+        """
+        dt = _event_datetime_utc(event_time)
+        if dt is None:
+            return
+        now = dt.timestamp()
+        max_hold_seconds = self.max_hold_hours * 3600.0
+        for symbol, item in self._state.items():
+            if item.mode == "OUT" or item.entry_epoch is None:
+                continue
+            if now - item.entry_epoch < max_hold_seconds:
+                continue
+            price = item.closes[-1] if item.closes else None
+            _emit(
+                self.events,
+                strategy_id=_STRATEGY_ID,
+                symbol=symbol,
+                event_time=event_time,
+                signal_type="EXIT",
+                price=price,
+                metadata={"strategy": _STRATEGY_NAME, "reason": "max_hold"},
+            )
+            item.mode = "OUT"
+            item.entry_price = None
+            item.entry_epoch = None
+            item.score = None
+
     def _update_symbol(self, symbol: str, snapshot: _Snapshot, event: Any) -> bool:
         close = safe_float(snapshot.close)
         if close is None or close <= self.min_price:
@@ -397,6 +462,7 @@ class OffSessionBasisDislocationStrategy(Strategy):
         if dt is None:
             return False
         item.last_time_key = key
+        item.last_bar_epoch = dt.timestamp()
         item.closes.append(close)
         # None-tolerant feature access (8h staleness): the 3-tier cascade from
         # external_alpha_sleeves resolves event attr -> feature store -> bar
@@ -422,28 +488,14 @@ class OffSessionBasisDislocationStrategy(Strategy):
                 item.off_accum_bps += basis - item.prev_basis_bps
                 item.off_obs += 1
             item.prev_basis_bps = basis
-        # Fixed max-hold exit: close-confirmed EXIT once the position has aged
-        # past the pre-registered 72h ceiling (never an engine intrabar bracket).
-        if item.mode != "OUT" and item.entry_epoch is not None:
-            age = dt.timestamp() - item.entry_epoch
-            if age >= self.max_hold_hours * 3600.0:
-                _emit(
-                    self.events,
-                    strategy_id=_STRATEGY_ID,
-                    symbol=symbol,
-                    event_time=snapshot.time,
-                    signal_type="EXIT",
-                    price=close,
-                    metadata={"strategy": _STRATEGY_NAME, "reason": "max_hold"},
-                )
-                item.mode = "OUT"
-                item.entry_price = None
-                item.entry_epoch = None
-                item.score = None
+        # NOTE: the fixed max-hold exit lives in the panel-wide ``_age_book``
+        # pass (top of the evaluation path), NOT here -- a per-symbol check
+        # would let a HALTED symbol's position outlive its 72h ceiling.
         return True
 
     def calculate_signals_window(self, event: Any, aggregator: Any = None) -> None:
         _ = aggregator
+        self._age_book(getattr(event, "time", None))
         updated = False
         for symbol in _event_symbols(event, self.symbol_list):
             snapshot = _window_snapshot(event, symbol)
@@ -461,7 +513,10 @@ class OffSessionBasisDislocationStrategy(Strategy):
         symbol = getattr(event, "symbol", None)
         if symbol in self._state:
             snapshot = _market_snapshot(event)
-            if snapshot is not None and self._update_symbol(str(symbol), snapshot, event):
+            if snapshot is None:
+                return
+            self._age_book(snapshot.time)
+            if self._update_symbol(str(symbol), snapshot, event):
                 self._maybe_evaluate(snapshot.time)
 
     # ------------------------------------------------------------------ #
@@ -486,12 +541,33 @@ class OffSessionBasisDislocationStrategy(Strategy):
     # ------------------------------------------------------------------ #
     # scoring / selection
     # ------------------------------------------------------------------ #
-    def _dislocation_scores(self) -> tuple[dict[str, float], dict[str, float]]:
-        """Return ``(accumulated_dislocation_bps, vols)`` for eligible symbols."""
+    def _dislocation_scores(
+        self, decision_epoch: float | None = None
+    ) -> tuple[dict[str, float], dict[str, float]]:
+        """Return ``(accumulated_dislocation_bps, vols)`` for eligible symbols.
+
+        Symbols whose last ACCEPTED bar predates ``decision_epoch`` by more
+        than ``_STALE_BAR_SPACING_MULTIPLE`` x the inferred bar spacing are
+        halted/frozen legs: their accumulator is a stale photograph, so they
+        are excluded from scoring (and therefore can never be entered).
+        Unknown spacing or an unknown decision time passes through unfiltered.
+        """
+        stale_after: float | None = None
+        if decision_epoch is not None:
+            spacing = median_bar_spacing_seconds(self._recent_times)
+            if spacing is not None and spacing > 0.0:
+                stale_after = _STALE_BAR_SPACING_MULTIPLE * spacing
         scores: dict[str, float] = {}
         vols: dict[str, float] = {}
         for symbol, item in self._state.items():
             if item.off_obs < self.min_off_observations:
+                continue
+            if (
+                stale_after is not None
+                and decision_epoch is not None
+                and item.last_bar_epoch is not None
+                and (decision_epoch - item.last_bar_epoch) > stale_after
+            ):
                 continue
             vol = realized_volatility(item.closes, window=self.vol_window)
             if vol is None or vol <= _EPS:
@@ -502,8 +578,9 @@ class OffSessionBasisDislocationStrategy(Strategy):
 
     def _score_and_select(
         self,
+        decision_epoch: float | None = None,
     ) -> tuple[dict[str, tuple[str, float, dict[str, Any]]], dict[str, float]]:
-        scores, vols = self._dislocation_scores()
+        scores, vols = self._dislocation_scores(decision_epoch)
         if len(scores) < self.min_symbols:
             return {}, {}
         z_by_symbol = _cross_z(scores)
@@ -572,7 +649,9 @@ class OffSessionBasisDislocationStrategy(Strategy):
     def _evaluate(self, event_time: Any) -> None:
         if len(self.symbol_list) < self.min_symbols:
             return
-        targets, vols = self._score_and_select()
+        decision_dt = _event_datetime_utc(event_time)
+        decision_epoch = decision_dt.timestamp() if decision_dt is not None else None
+        targets, vols = self._score_and_select(decision_epoch)
         if not targets:
             return
         weights, scalar = self._inverse_vol_weights(targets, vols)

@@ -364,6 +364,19 @@ class CrossSectionalResidualTakerFlowStrategy(Strategy):
             except Exception:
                 continue
 
+    def on_warmup_end(self) -> None:
+        """Drop warmup ghost positions at the first live bar (engine one-shot hook).
+
+        The engine suppresses every signal emitted during the warmup region, so
+        an "entry" this sleeve recorded during warmup never became a portfolio
+        position (ghost-position desynchronization).  Reset every symbol's
+        position bookkeeping to the OUT defaults (mode, entry price, hold /
+        decision counters, score) while PRESERVING the data deques (closes /
+        net_flows / turnovers) so live decisions keep their formation history.
+        """
+        for item in self._state.values():
+            self._flatten(item)
+
     # ------------------------------------------------------------------ #
     # ingestion
     # ------------------------------------------------------------------ #
@@ -432,7 +445,18 @@ class CrossSectionalResidualTakerFlowStrategy(Strategy):
         returns: dict[str, float] = {}
         vols: dict[str, float] = {}
         window = self.formation_window_bars
+        # Panel-eligibility freshness gate (mirrors the behavioral-value
+        # sleeve's ``last_committed_day`` gate): the strategy-level latest
+        # committed key is the max accepted per-symbol bar key; a symbol whose
+        # last accepted update lags it is STALE (frozen feed / dropped bars)
+        # and must not pollute this decision's cross-sectional ranks.
+        latest_key = ""
+        for item in self._state.values():
+            if item.last_time_key > latest_key:
+                latest_key = item.last_time_key
         for symbol, item in self._state.items():
+            if not item.last_time_key or item.last_time_key != latest_key:
+                continue
             if len(item.net_flows) < window or len(item.closes) < window + 1:
                 continue
             closes = list(item.closes)
@@ -610,6 +634,12 @@ class CrossSectionalResidualTakerFlowStrategy(Strategy):
             return
         # Weekly REBALANCE tick: run the ranker.
         targets, vols = self._score_and_select()
+        if not targets:
+            # Degenerate panel (min-symbols shortfall, residual degeneracy,
+            # empty quantiles): NOT a rank verdict on held names -- return
+            # without flushing a mature book via ``rank_lapsed`` exits
+            # (mirrors offsession_basis_dislocation).
+            return
         weights, scalar = self._inverse_vol_weights(targets, vols)
         self._emit_targets(targets, weights, scalar, event_time)
 
@@ -676,11 +706,10 @@ class CrossSectionalResidualTakerFlowStrategy(Strategy):
                 if item.mode != "OUT":
                     self._flatten(item)
                 continue
-            stop_loss = None
-            if price is not None and self.stop_loss_pct > 0.0:
-                stop_loss = price * (
-                    1.0 - self.stop_loss_pct if target_mode == "LONG" else 1.0 + self.stop_loss_pct
-                )
+            # No engine intrabar bracket: the close-confirmed stop in
+            # ``_age`` / ``_age_cross_positions`` is the ONLY stop (module
+            # docstring: "never engine intrabar brackets"), so entries carry
+            # ``stop_loss=None`` and never desync from the aging path.
             metadata = _target_metadata(
                 strategy=_STRATEGY_NAME,
                 target_allocation=alloc,
@@ -705,7 +734,6 @@ class CrossSectionalResidualTakerFlowStrategy(Strategy):
                 signal_type=target_mode,
                 strength=max(0.25, min(3.0, abs(score))),
                 price=price,
-                stop_loss=stop_loss,
                 metadata=metadata,
             )
             item.mode = target_mode

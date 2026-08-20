@@ -152,6 +152,7 @@ class _State:
     """Per-symbol UTC-day close series + position / min-hold bookkeeping."""
 
     daily_closes: deque[float]  # one close per COMPLETED UTC day
+    daily_days: deque[str]  # committed UTC day key per daily_closes entry
     pending_day: str = ""  # UTC day of the not-yet-committed close
     pending_close: float | None = None
     last_committed_day: str = ""  # staleness guard for panel eligibility
@@ -166,6 +167,13 @@ def _mode(raw: Any) -> str:
     """Coerce a serialized mode token to one of ``{OUT, LONG, SHORT}``."""
     parsed = str(raw or "OUT").upper()
     return parsed if parsed in {"OUT", "LONG", "SHORT"} else "OUT"
+
+
+def _restore_day_deque(target: deque[str], payload: Any) -> None:
+    """Losslessly restore a committed UTC-day-key deque from serialized state."""
+    target.clear()
+    for value in list(payload or [])[-int(target.maxlen or 0) :]:
+        target.append(str(value))
 
 
 def _xs_zscores(values: dict[str, float]) -> dict[str, float]:
@@ -295,7 +303,8 @@ class _WeeklyBehavioralValueXS(Strategy):
         )
         size = _state_size(self._required_days, self.max_hold_daily_decisions)
         self._state: dict[str, _State] = {
-            symbol: _State(daily_closes=deque(maxlen=size)) for symbol in self.symbol_list
+            symbol: _State(daily_closes=deque(maxlen=size), daily_days=deque(maxlen=size))
+            for symbol in self.symbol_list
         }
         self._last_day_key = ""
         self._last_committed_day = ""
@@ -322,6 +331,7 @@ class _WeeklyBehavioralValueXS(Strategy):
             "symbol_state": {
                 symbol: {
                     "daily_closes": list(item.daily_closes),
+                    "daily_days": list(item.daily_days),
                     "pending_day": item.pending_day,
                     "pending_close": item.pending_close,
                     "last_committed_day": item.last_committed_day,
@@ -351,6 +361,7 @@ class _WeeklyBehavioralValueXS(Strategy):
             item = self._state[symbol]
             try:
                 _restore_deque(item.daily_closes, payload.get("daily_closes"))
+                _restore_day_deque(item.daily_days, payload.get("daily_days"))
                 item.pending_day = str(payload.get("pending_day", ""))
                 item.pending_close = safe_float(payload.get("pending_close"))
                 item.last_committed_day = str(payload.get("last_committed_day", ""))
@@ -404,6 +415,7 @@ class _WeeklyBehavioralValueXS(Strategy):
         for item in self._state.values():
             if item.pending_close is not None and item.pending_day and item.pending_day != new_day:
                 item.daily_closes.append(float(item.pending_close))
+                item.daily_days.append(item.pending_day)
                 item.last_committed_day = item.pending_day
                 if item.pending_day > committed:
                     committed = item.pending_day
@@ -460,20 +472,42 @@ class _WeeklyBehavioralValueXS(Strategy):
     # scoring (characteristic -> momentum+MAX residualization -> fade)
     # ------------------------------------------------------------------ #
     def _formation_panel(self) -> dict[str, list[float]]:
-        """Formation daily returns per eligible (fresh, long-enough) symbol."""
+        """Formation daily returns per eligible (fresh, long-enough) symbol.
+
+        CALENDAR alignment: each symbol must contribute the SAME trailing
+        ``formation_days + 1`` committed UTC day keys as the panel consensus
+        (the most common trailing day tuple).  A symbol missing an interior
+        UTC day would otherwise shift its whole formation window vs the
+        market, so it is skipped; gap-free data passes trivially.
+        """
         if not self._last_committed_day:
             return {}
-        panel: dict[str, list[float]] = {}
+        window = self.formation_days + 1
+        candidates: dict[str, list[float]] = {}
+        trailing_days: dict[str, tuple[str, ...]] = {}
         for symbol, item in self._state.items():
             if item.last_committed_day != self._last_committed_day:
                 continue
             if len(item.daily_closes) < self._required_days:
                 continue
+            if len(item.daily_days) != len(item.daily_closes):
+                continue
             returns = _daily_simple_returns(list(item.daily_closes))
             if len(returns) < self.formation_days:
                 continue
-            panel[symbol] = returns[-self.formation_days :]
-        return panel
+            candidates[symbol] = returns[-self.formation_days :]
+            trailing_days[symbol] = tuple(item.daily_days)[-window:]
+        if not candidates:
+            return {}
+        counts: dict[tuple[str, ...], int] = {}
+        for days in trailing_days.values():
+            counts[days] = counts.get(days, 0) + 1
+        consensus = max(counts.items(), key=lambda kv: (kv[1], kv[0]))[0]
+        return {
+            symbol: returns
+            for symbol, returns in candidates.items()
+            if trailing_days[symbol] == consensus
+        }
 
     def _score_symbols(self) -> dict[str, tuple[float, dict[str, Any]]]:
         panel = self._formation_panel()

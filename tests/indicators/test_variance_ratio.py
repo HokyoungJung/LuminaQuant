@@ -206,6 +206,48 @@ def test_zstat_signs_on_known_regimes() -> None:
     assert z_mr is not None and z_mr < 0.0
 
 
+def test_zstat_hand_computed_golden_k2() -> None:
+    # HAND-COMPUTED GOLDEN (W6 regression): fixed literal vector, k = 2, both
+    # z-stat variants pinned to literal expected values derived on paper (the
+    # implementation was NOT called to produce them).  Full derivation:
+    #
+    #   r = [0.01, -0.01, 0.02, -0.02, 0.01, -0.01],  n = 6,  k = 2
+    #   mu = sum(r)/6 = 0 (the +/- pairs cancel exactly, also in floats)
+    #
+    #   dev_sq = (r - mu)^2 = [1, 1, 4, 4, 1, 1] * 1e-4
+    #   sum_sq = 12e-4
+    #
+    #   VR (unbiased):
+    #     1-period leg: var1_u = sum_sq / (n-1) = 12e-4 / 5 = 2.4e-4
+    #     overlapping 2-sums: s = [0.00, 0.01, 0.00, -0.01, 0.00]
+    #       acc = sum s^2 = 1e-4 + 1e-4 = 2e-4
+    #     m = k(n-k+1)(1-k/n) = 2*5*(1 - 2/6) = 10 * 2/3 = 20/3
+    #     var_k_u = acc / m = 2e-4 * 3/20 = 3e-5
+    #     VR_u = var_k_u / var1_u = 3e-5 / 2.4e-4 = 1/8 = 0.125
+    #
+    #   Heteroskedastic z*(2):
+    #     delta_1 = sum_{t=1}^{5} dev_sq[t]*dev_sq[t-1] / sum_sq^2
+    #       numerator = (1*1 + 4*1 + 4*4 + 1*4 + 1*1) * 1e-8 = 26e-8
+    #       denominator = (12e-4)^2 = 1.44e-6
+    #       delta_1 = 2.6e-7 / 1.44e-6 = 26/144 = 13/72
+    #     theta = (2(k-1)/k)^2 * delta_1 = 1^2 * 13/72 = 13/72
+    #     z_het = (VR_u - 1)/sqrt(theta) = (-7/8) * sqrt(72/13)
+    #           = -2.0592194189509323
+    #
+    #   Homoskedastic z(2):
+    #     phi = 2(2k-1)(k-1) / (3kn) = 2*3*1 / (3*2*6) = 6/36 = 1/6
+    #     z_iid = (VR_u - 1)/sqrt(phi) = (-7/8) * sqrt(6)
+    #           = -2.1433035249352805
+    returns = [0.01, -0.01, 0.02, -0.02, 0.01, -0.01]
+    z_het = variance_ratio_zstat(returns, 2, heteroskedastic=True)
+    z_iid = variance_ratio_zstat(returns, 2, heteroskedastic=False)
+    assert z_het is not None and z_iid is not None
+    assert z_het == pytest.approx(-2.0592194189509323, abs=1e-9)
+    assert z_iid == pytest.approx(-2.1433035249352805, abs=1e-9)
+    # The shared unbiased-VR leg of both statistics is 1/8 by the derivation.
+    assert variance_ratio(returns, 2, unbiased=True) == pytest.approx(0.125, abs=1e-12)
+
+
 def test_zstat_guards_never_raise() -> None:
     assert variance_ratio_zstat([0.01, -0.01], 2) is None
     assert variance_ratio_zstat([0.01] * 64, 2) is None  # degenerate variance

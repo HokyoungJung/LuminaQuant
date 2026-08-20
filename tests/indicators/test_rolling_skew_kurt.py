@@ -51,10 +51,14 @@ def test_skewness_parity_goldens_bit_exact() -> None:
 
 
 def test_sleeve_aliases_are_the_canonical_function() -> None:
-    # The refactored sleeves must not re-implement the recipe: the private
-    # aliases ARE the canonical indicator, so parity can never drift again.
+    # skew_innovation's private alias IS the canonical indicator (its original
+    # recipe was bit-exact to the fsum canonical form). cross_sectional_anomaly
+    # deliberately KEEPS its own verbatim plain-sum copy (adversarial-review
+    # W3): the fsum recipe drifts by one ULP on ~10% of windows, and a silent
+    # last-ULP change to the registered LotterySkewness scoring path is the
+    # class of default-numerics change this repo requires to be gated.
     assert innovation_skewness is rolling_skewness
-    assert anomaly_skewness is rolling_skewness
+    assert anomaly_skewness is not rolling_skewness
 
 
 # --------------------------------------------------------------------------- #

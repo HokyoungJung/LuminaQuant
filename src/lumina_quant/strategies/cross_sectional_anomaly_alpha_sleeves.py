@@ -35,18 +35,20 @@ the plugin registry; validate scoring on the data-bearing research machine.
 
 from __future__ import annotations
 
+import math
 from collections import deque
 from statistics import mean
 from typing import Any
 
 from lumina_quant.core.plugin_registry import register
 from lumina_quant.indicators.alpha_features import (
+    finite_floats,
     simple_return,
     trend_efficiency,
 )
 from lumina_quant.indicators.common import safe_float, time_key
 from lumina_quant.indicators.momentum import kaufman_efficiency_ratio
-from lumina_quant.indicators.rolling_stats import rolling_beta, rolling_skewness, sample_std
+from lumina_quant.indicators.rolling_stats import rolling_beta, sample_std
 from lumina_quant.strategies.adaptive_crypto_alpha_sleeves import (
     _age_cross_positions,
     _emit_rebalance_targets,
@@ -73,14 +75,33 @@ from lumina_quant.strategy import Strategy
 from lumina_quant.tuning import HyperParam, resolve_params_from_schema
 
 
-# Canonical rolling-stat primitive (extracted 2026-08-20): the module-private
-# Fisher-Pearson skewness now lives in ``indicators/rolling_stats.rolling_skewness``
-# (same moment definitions; the canonical copy accumulates with ``math.fsum``,
-# the compensated-summation variant of the plain ``sum`` this module carried --
-# parity-locked by pinned fixtures in ``tests/indicators/test_rolling_skew_kurt.py``
-# and by this sleeve family's existing data-free tests).  The private alias keeps
-# every call site and existing test import stable.
-_skewness = rolling_skewness
+# DELIBERATE private copy (NOT an alias of ``rolling_stats.rolling_skewness``):
+# this module is a REGISTERED strategy module, so its default numerics must stay
+# byte-identical.  The canonical indicator accumulates moments with ``math.fsum``
+# (compensated summation) while this original recipe uses ``statistics.mean``
+# plus plain ``sum`` moments -- a last-ULP drift on the LotterySkewness scoring
+# path that can flip cross-sectional rank ties and therefore signals.  Keep the
+# verbatim original here; ``skew_innovation`` consumers alias the canonical copy
+# where the fsum parity is bit-exact.
+def _skewness(values: list[float]) -> float | None:
+    """Return the sample (Fisher-Pearson, ddof-free) skewness of ``values``.
+
+    ``None`` is returned when there are fewer than three finite samples or the
+    dispersion is degenerate (zero standard deviation).  Pure and ``None``-safe;
+    never raises.
+    """
+    cleaned = finite_floats(values)
+    count = len(cleaned)
+    if count < 3:
+        return None
+    avg = mean(cleaned)
+    variance = sum((value - avg) ** 2 for value in cleaned) / float(count)
+    if variance <= _EPS:
+        return None
+    std = variance**0.5
+    third = sum((value - avg) ** 3 for value in cleaned) / float(count)
+    skew = third / (std**3)
+    return float(skew) if math.isfinite(skew) else None
 
 
 def _pack_cross(item: _CrossSectionalState) -> dict[str, Any]:

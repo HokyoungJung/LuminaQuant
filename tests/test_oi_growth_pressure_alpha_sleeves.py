@@ -28,6 +28,7 @@ from lumina_quant.strategies.oi_growth_pressure_alpha_sleeves import (
     INTENDED_HOLD_SECONDS,
     OpenInterestGrowthPressureStrategy,
     _DayRecord,
+    _OI_GROWTH_PRESSURE_SLICE,
 )
 
 _START = datetime(2025, 1, 6, tzinfo=UTC)  # Monday
@@ -96,11 +97,12 @@ def _feed_panel(
     symbols: list[str],
     *,
     n_days: int = _N_DAYS,
+    start_day: int = 0,
     oi_fn: Any = _open_interest,
     price_fn: Any = None,
     mark_from_price: bool = False,
 ) -> None:
-    for day in range(n_days):
+    for day in range(start_day, n_days):
         moment = _START + timedelta(days=day)
         for symbol in symbols:
             close = price_fn(symbol, day) if price_fn is not None else _price(day)
@@ -129,7 +131,7 @@ def _make_candidate(symbols: list[str] | None = None, **overrides: Any) -> Any:
         min_symbols=5,
         min_history_days=DELTA_OI_WINDOW_DAYS + 1,
         min_oi_coverage=0.80,
-        min_hold_decisions=5,
+        min_hold_decisions=2,
         rank_hysteresis_buffer=1,
         vol_window=5,
         allow_short=True,
@@ -386,7 +388,7 @@ def test_min_hold_suppresses_flip_until_the_hold_clears() -> None:
     targets = {RISER: ("SHORT", -1.5, {})}
     weights = {RISER: 1.0}
 
-    held, held_item = _seed(min_hold=5)
+    held, held_item = _seed(min_hold=2)
     held._emit_targets(targets, weights, 1.0, "2026-01-01T00:00:00Z")
     assert held_item.mode == "LONG"  # flip suppressed inside the hold window
 
@@ -437,6 +439,138 @@ def test_self_skips_on_short_history() -> None:
 # --------------------------------------------------------------------------- #
 # weekly ISO clock (not per-bar churn)
 # --------------------------------------------------------------------------- #
+
+
+def test_min_hold_re_pinned_to_two_weekly_decisions() -> None:
+    """OI-MINHOLD-UNIT-MISMATCH: 2 weekly decisions ~= 2-3 weeks, matching the
+    ~2-week INTENDED_HOLD_SECONDS and the registered 1-4 week horizon."""
+    schema = OpenInterestGrowthPressureStrategy.get_param_schema()
+    assert schema["min_hold_decisions"].default == 2
+    for variants in _OI_GROWTH_PRESSURE_SLICE.values():
+        for variant in variants:
+            assert variant["min_hold_decisions"] == 2, variant["variant"]
+    assert INTENDED_HOLD_SECONDS == 14 * 86_400  # NOT re-pinned by the fix
+
+
+# --------------------------------------------------------------------------- #
+# SLEEVE-STATE-06: universe-wide coverage failure must not flush a mature book
+# --------------------------------------------------------------------------- #
+
+
+def test_universe_wide_oi_outage_week_does_not_flush_mature_book() -> None:
+    """One ISO week of universe-wide ``open_interest=None`` empties the panel;
+    the sleeve must return WITHOUT rank_lapsed exits, holding the mature book."""
+
+    def _oi_with_outage(symbol: str, day: int) -> float | None:
+        return None if day >= _N_DAYS else _open_interest(symbol, day)
+
+    candidate = _make_candidate()
+    # Days 0..27 build the book; days 28..34 are the None-OI ISO week; the
+    # day-35 bar (Monday W07) triggers the post-outage weekly evaluation.
+    _feed_panel(candidate, _ALL_SYMBOLS, n_days=_N_DAYS + 8, oi_fn=_oi_with_outage)
+    sides = _final_sides(candidate.events.items)
+    assert sides.get(RISER) == "LONG"
+    assert sides.get(FALLER) == "SHORT"
+    assert candidate._state[RISER].mode == "LONG"
+    assert candidate._state[FALLER].mode == "SHORT"
+    exits = [s for s in candidate.events.items if str(s.signal_type).upper() == "EXIT"]
+    assert not exits, "an empty residual panel must never emit rank_lapsed exits"
+
+
+# --------------------------------------------------------------------------- #
+# freshness gate: a stale symbol (dead feed) is excluded from the rank
+# --------------------------------------------------------------------------- #
+
+
+def test_stale_symbol_is_excluded_from_the_rank() -> None:
+    """A symbol whose last committed day predates the strategy-level latest
+    committed day (feed died mid-history) must be excluded from the panel even
+    though its own (old) formation window has full OI coverage."""
+    stale = FILLERS[0]
+    fresh = [symbol for symbol in _ALL_SYMBOLS if symbol != stale]
+    candidate = _make_candidate()
+    for day in range(_N_DAYS):
+        moment = _START + timedelta(days=day)
+        for symbol in _ALL_SYMBOLS:
+            if symbol == stale and day >= 13:
+                continue  # the stale feed dies after day 12
+            close = _price(day)
+            candidate.calculate_signals(
+                _event(
+                    symbol,
+                    moment,
+                    close,
+                    open_interest=_open_interest(symbol, day),
+                    mark_price=100.0,
+                )
+            )
+    stale_state = candidate._state[stale]
+    # The stale symbol WOULD be panel-eligible on history + coverage alone --
+    # only the freshness gate keeps its old window out of the rank.
+    window_len = DELTA_OI_WINDOW_DAYS + 1
+    assert len(stale_state.days) >= candidate.min_history_days
+    assert all(record.oi_notional is not None for record in list(stale_state.days)[-window_len:])
+    assert stale_state.last_committed_day < candidate._last_committed_day
+    residual, vols, _metas = candidate._residual_scores()
+    assert stale not in residual
+    assert stale not in vols
+    assert set(residual) == set(fresh)
+    # No entry was ever emitted for the stale symbol either.
+    assert not [
+        s
+        for s in candidate.events.items
+        if s.symbol == stale and str(s.signal_type).upper() in {"LONG", "SHORT"}
+    ]
+
+
+# --------------------------------------------------------------------------- #
+# WARMUP-GHOST-BOOK: on_warmup_end flattens the ghost book, keeps history
+# --------------------------------------------------------------------------- #
+
+
+def test_on_warmup_end_flattens_ghost_book_and_preserves_history() -> None:
+    candidate = _make_candidate()
+    _feed_panel(candidate, _ALL_SYMBOLS)
+    assert candidate._state[RISER].mode == "LONG"  # a warmup-built ghost book
+    before = {
+        symbol: (
+            list(item.closes),
+            [[r.oi_notional, r.dollar_volume, r.close] for r in item.days],
+            item.cur_date,
+            item.cur_oi_notional,
+            item.cur_dollar_volume,
+            item.cur_close,
+            item.last_committed_day,
+        )
+        for symbol, item in candidate._state.items()
+    }
+    hook = getattr(candidate, "on_warmup_end", None)
+    assert callable(hook)  # engine fires it via getattr + callable
+    hook()
+    for symbol, item in candidate._state.items():
+        assert item.mode == "OUT"
+        assert item.entry_price is None
+        assert item.decisions_held == 0
+        assert item.score is None
+        assert (
+            list(item.closes),
+            [[r.oi_notional, r.dollar_volume, r.close] for r in item.days],
+            item.cur_date,
+            item.cur_oi_notional,
+            item.cur_dollar_volume,
+            item.cur_close,
+            item.last_committed_day,
+        ) == before[symbol], symbol  # OI/close history fully preserved
+    # The preserved history keeps working: the next weekly clock re-enters.
+    marker = len(candidate.events.items)
+    _feed_panel(candidate, _ALL_SYMBOLS, n_days=_N_DAYS + 8, start_day=_N_DAYS)
+    fresh_entries = {
+        signal.symbol: str(signal.signal_type).upper()
+        for signal in candidate.events.items[marker:]
+        if str(signal.signal_type).upper() in {"LONG", "SHORT"}
+    }
+    assert fresh_entries.get(RISER) == "LONG"
+    assert fresh_entries.get(FALLER) == "SHORT"
 
 
 def test_decision_clock_is_weekly_iso_not_every_bar() -> None:

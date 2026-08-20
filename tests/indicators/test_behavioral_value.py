@@ -106,6 +106,14 @@ def test_salience_never_raises_on_degenerate() -> None:
     assert salience_theory_value([0.1, -0.1], [0.0, 0.0], theta=-1.0) is not None
     assert salience_theory_value([0.1, -0.1], [0.0, 0.0], delta=0.0) is not None
     assert salience_theory_value([0.1, -0.1], [0.0, 0.0], delta=float("nan")) is not None
+    # VDIAG-02 regression: non-numeric constants (None / 'abc') never raise --
+    # they fall back to the canonical BGS defaults exactly.
+    returns = [0.02, -0.03, 0.01, 0.05, -0.01]
+    market = [0.01, -0.01, 0.0, 0.02, 0.0]
+    base = salience_theory_value(returns, market)
+    assert base is not None
+    assert salience_theory_value(returns, market, theta=None, delta=None) == base
+    assert salience_theory_value(returns, market, theta="abc", delta="abc") == base
 
 
 # --------------------------------------------------------------------------- #
@@ -149,6 +157,19 @@ def test_prospect_never_raises_on_degenerate() -> None:
     assert prospect_theory_value([0.1, -0.1], alpha=-2.0) is not None
     assert prospect_theory_value([0.1, -0.1], lam=-5.0) is not None
     assert prospect_theory_value([0.1, -0.1], gamma_gain=0.0, gamma_loss=100.0) is not None
+    # VDIAG-02 regression: non-numeric constants (None / 'abc') never raise --
+    # they fall back to the canonical TK-1992 defaults exactly.
+    returns = [0.02, -0.03, 0.01, 0.05, -0.01]
+    base = prospect_theory_value(returns)
+    assert base is not None
+    assert (
+        prospect_theory_value(returns, alpha=None, lam=None, gamma_gain=None, gamma_loss=None)
+        == base
+    )
+    assert (
+        prospect_theory_value(returns, alpha="abc", lam="abc", gamma_gain="abc", gamma_loss="abc")
+        == base
+    )
 
 
 # --------------------------------------------------------------------------- #

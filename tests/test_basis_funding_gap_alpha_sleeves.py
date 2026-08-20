@@ -364,6 +364,109 @@ def test_adversarial_set_state_never_raises() -> None:
         assert item.intervals_held >= 0
 
 
+def test_set_state_never_raises_on_non_iterable_payloads() -> None:
+    """SLEEVE-STATE-01: non-iterable recent_times/closes/gaps must not raise."""
+    strat = _make(_Queue())
+    strat.set_state({"recent_times": 5})  # type: ignore[dict-item]
+    assert list(strat._recent_times) == []
+    strat.set_state({"symbol_state": {"A/USDT": {"closes": 7}}})
+    strat.set_state({"symbol_state": {_RICH: {"closes": 7, "gaps": 3.14}}})
+    item = strat._state[_RICH]
+    assert list(item.closes) == []
+    assert list(item.gaps) == []
+    # A generator is iterable but not list/tuple: the guarded coercion drops it.
+    strat.set_state({"recent_times": (x for x in (1.0, 2.0))})  # type: ignore[dict-item]
+    assert list(strat._recent_times) == []
+
+
+# --------------------------------------------------------------------------- #
+# Stale-symbol cross-section (dead feed must leave the panel)
+# --------------------------------------------------------------------------- #
+def test_dead_feed_symbol_leaves_the_panel_and_never_churns() -> None:
+    """STALE-SYMBOL-CROSS-SECTION: frozen gaps are not ranked, traded, or re-entered."""
+    queue = _Queue()
+    strat = _make(queue, min_symbols=6, min_hold_intervals=2, max_hold_intervals=3)
+    dead_at = 6
+    total = 16
+    for t in range(total):
+        for i, symbol in enumerate(_SYMBOLS):
+            if symbol == _RICH and t >= dead_at:
+                continue  # the outlier's feed dies here
+            strat.calculate_signals(
+                _event(symbol, t, close=_close(100.0 + i, t), mark=_rich_mark(symbol, t))
+            )
+    entries = _entries(queue)
+    exits = _exits(queue)
+    # Exactly ONE entry while the feed was alive; the max-hold flatten fires
+    # once, and the frozen |z|>2 gap must NEVER re-enter (no EXIT->re-ENTRY
+    # churn at frozen prices).
+    assert len(entries) == 1 and entries[0].symbol == _RICH
+    assert entries[0].signal_type == "SHORT"
+    assert len(exits) == 1 and exits[0].symbol == _RICH
+    assert exits[0].metadata["reason"] == "max_hold"
+    assert _interval_of(exits[0].datetime) > _interval_of(entries[0].datetime)
+    # The cross-sectional panel (mean/sigma inputs) excludes the stale symbol
+    # while every fresh symbol stays in.
+    gaps, vols = strat._collect(_ts(total - 1), strict=False)
+    assert _RICH not in gaps and _RICH not in vols
+    assert set(gaps) == set(_SYMBOLS) - {_RICH}
+
+
+def test_freshness_is_strict_for_window_flow_and_one_cadence_for_market_flow() -> None:
+    strat = _make(_Queue())
+    _feed(strat, 6, _default_mark)
+    item = strat._state[_RICH]
+    assert item.gaps and item.last_time_key == _ts(5)
+    # One cadence behind the evaluation key: fresh for the per-symbol MARKET
+    # flow, stale for the batch/window flow (strict equality required).
+    gaps_market, _ = strat._collect(_ts(6), strict=False)
+    gaps_window, _ = strat._collect(_ts(6), strict=True)
+    assert _RICH in gaps_market
+    assert _RICH not in gaps_window
+    # Two cadences behind: stale for BOTH flows.
+    gaps_market, _ = strat._collect(_ts(7), strict=False)
+    assert _RICH not in gaps_market
+    # At the exact evaluation key: fresh for both flows.
+    gaps_window, _ = strat._collect(_ts(5), strict=True)
+    assert _RICH in gaps_window
+
+
+# --------------------------------------------------------------------------- #
+# Warmup ghost book (engine on_warmup_end hook)
+# --------------------------------------------------------------------------- #
+def test_on_warmup_end_flattens_ghost_positions_but_keeps_history() -> None:
+    """WARMUP-GHOST-BOOK: warmup 'positions' reset to OUT; history is preserved."""
+    queue = _Queue()
+    strat = _make(queue)
+    _feed(strat, 10, _rich_mark)
+    assert strat._state[_RICH].mode == "SHORT"  # ghost position from warmup
+    before = {
+        symbol: (list(item.closes), list(item.gaps), item.last_time_key)
+        for symbol, item in strat._state.items()
+    }
+    strat.on_warmup_end()
+    for symbol, item in strat._state.items():
+        assert item.mode == "OUT"
+        assert item.entry_price is None
+        assert item.entry_gap_sign == 0
+        assert item.intervals_held == 0
+        closes, gaps, last_time_key = before[symbol]
+        assert list(item.closes) == closes
+        assert list(item.gaps) == gaps
+        assert item.last_time_key == last_time_key
+    # Live continuation: no EXIT may fire for the ghost book; the persisting
+    # dislocation is re-entered as a FRESH position instead.
+    queue.items.clear()
+    for t in range(10, 14):
+        for i, symbol in enumerate(_SYMBOLS):
+            strat.calculate_signals(
+                _event(symbol, t, close=_close(100.0 + i, t), mark=_rich_mark(symbol, t))
+            )
+    assert _exits(queue) == []
+    entries = _entries(queue)
+    assert entries and entries[0].symbol == _RICH and entries[0].signal_type == "SHORT"
+
+
 # --------------------------------------------------------------------------- #
 # State roundtrip
 # --------------------------------------------------------------------------- #

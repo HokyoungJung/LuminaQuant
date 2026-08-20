@@ -192,6 +192,73 @@ def test_degenerate_inputs_close_as_insufficient_data() -> None:
     assert constant.pairs[0].admitted is False
 
 
+def test_non_three_lag_specs_close_as_insufficient_data_never_raise() -> None:
+    # REGRESSION (VDIAG-01): ``evaluate_pair`` must normalize ``har_lags``
+    # exactly as ``har_design`` does (sorted unique ints) and fail closed
+    # BEFORE building the design when the normalized count != 3.  Previously
+    # a 2-lag spec raised IndexError inside ``_sign_stability`` (never-raise
+    # breach) and a 4-lag spec silently mislabeled own-history columns as
+    # leader coefficients.
+    leader, follower = _planted_pair(700, 42, 4242)
+    # Too few lags: [1, 5] -> insufficient_data, no raise.
+    assert evaluate_pair(follower, leader, spec={"har_lags": [1, 5]}) is None
+    short_report = run_diagnostic(
+        {"BTCUSDT": leader, "ETHUSDT": follower},
+        pairs=[("BTCUSDT", "ETHUSDT")],
+        spec={"har_lags": [1, 5]},
+    )
+    assert short_report.pairs[0].status == "insufficient_data"
+    assert short_report.program_verdict == "insufficient_data"
+    # Too many lags: [1, 5, 22, 66] -> insufficient_data (no mislabeled
+    # coefficient table is ever produced).
+    assert evaluate_pair(follower, leader, spec={"har_lags": [1, 5, 22, 66]}) is None
+    long_report = run_diagnostic(
+        {"BTCUSDT": leader, "ETHUSDT": follower},
+        pairs=[("BTCUSDT", "ETHUSDT")],
+        spec={"har_lags": [1, 5, 22, 66]},
+    )
+    assert long_report.pairs[0].status == "insufficient_data"
+    # Non-coercible lag entries also fail closed instead of raising.
+    assert evaluate_pair(follower, leader, spec={"har_lags": [1, "junk", 22]}) is None
+
+
+def test_default_lag_artifact_unchanged_by_normalization() -> None:
+    # The default (1, 5, 22) path must stay byte-identical, and a spec that
+    # normalizes TO the default (unsorted with a duplicate: sorted unique of
+    # [22, 5, 1, 5] is [1, 5, 22]) must produce the exact same numbers.
+    leader, follower = _planted_pair(700, 42, 4242)
+    default_artifact = evaluate_pair(follower, leader)
+    normalized_artifact = evaluate_pair(follower, leader, spec={"har_lags": [22, 5, 1, 5]})
+    assert default_artifact is not None and normalized_artifact is not None
+    for key in (
+        "n_design_rows",
+        "fold_qlike_improvements",
+        "median_qlike_improvement",
+        "median_mse_improvement",
+        "fold_win_rate",
+        "mean_qlike_baseline",
+        "mean_qlike_candidate",
+        "bootstrap_pvalue",
+        "coefficient_sign_stability",
+    ):
+        assert default_artifact[key] == normalized_artifact[key], key
+    fold0_default = default_artifact["folds"][0]
+    fold0_normalized = normalized_artifact["folds"][0]
+    assert np.array_equal(
+        fold0_default["forecast_candidate"], fold0_normalized["forecast_candidate"]
+    )
+    # Whole-artifact byte identity on the explicit default triple.
+    report_default = run_diagnostic(
+        {"BTCUSDT": leader, "ETHUSDT": follower}, pairs=[("BTCUSDT", "ETHUSDT")]
+    )
+    report_explicit = run_diagnostic(
+        {"BTCUSDT": leader, "ETHUSDT": follower},
+        pairs=[("BTCUSDT", "ETHUSDT")],
+        spec={"har_lags": [1, 5, 22]},
+    )
+    assert report_default.to_json() == report_explicit.to_json()
+
+
 def test_day_keyed_mapping_input_is_supported() -> None:
     leader, follower = _planted_pair(700, 42, 4242)
     leader_map = {day: value for day, value in enumerate(leader)}

@@ -1,4 +1,16 @@
 # Research Note
+## 2026-08-20 KST — 적대 리뷰 라운드: 25건 발견 → 23건 확정 → 전건 수정·회귀봉인
+
+배치 전체 diff에 대해 5-차원 헌터 → 발견별 회의론자 반증 검증(런타임 재현 의무) 라운드를 돌렸다. 25건 발견, **23건 CONFIRMED / 2건 REFUTED**, 확정 전건을 당일 수정하고 회귀 테스트로 봉인했다(전체 스위트 **4946 passed**, 골든·manifest 스냅샷 바이트 불변, ruff/format/architecture/docs 그린). 핵심 수정:
+
+- **L-C 민홀드 드랍→지연(deferral) 재설계(크리티컬 F1)**: 원샷-전이 전략의 bare EXIT를 차단만 하면 전략-북 영구 탈동기+포지션 누수+재진입 스태킹이 발생함을 런타임 재현으로 확정. 오버레이가 컴포넌트 스코프 원장(`component|symbol`)으로 차단 EXIT를 보존했다가 만기 시 합성 EXIT(`overlay_reason=min_hold_released`)로 방출하고, exit-pending 중 동방향 재진입도 차단. `exit_reason` 우회는 truthy가 아닌 **보호성 화이트리스트**로 교체(F4: 'rebalance' 라벨이 게이트를 무력화하던 결함), 컴포넌트 북 분리(F6), 라이브 네임스페이스 패리티(F5)까지 봉인.
+- **L-D 앵커 결함(F2/W1)**: 결정봉 타임스탬프 기준이라 실제 스트래들을 놓치고(12.5%) 깨끗한 진입을 오차단(12.5%) — MKT는 다음 봉 시가 체결이므로 **체결시각(+1 timeframe) 앵커**로 수정.
+- **warmup 훅 청크 연속성(F3)**: `had_warmup` 출처를 엔진 상태로 지속해 첫 라이브 이벤트가 warmup_bars=0 연속 청크에 떨어져도 정확히 1회 발화. **신규 슬리브 5종 전부 `on_warmup_end()` 구현**(유령 북 리셋, 데이터 deque 보존).
+- **슬리브 공통 결함**: 죽은 피드 심볼의 동결값이 크로스섹션을 영구 오염(entry↔exit 무한 churn 포함) → 전 XS 슬리브에 신선도 게이트; offsession 72h 만기를 패널-와이드로(정지 심볼도 만기 청산); 유니버스 전면 결측 1회가 성숙 북을 rank_lapsed로 플러시하던 경로 차단; taker-flow가 자기 계약을 어기고 엔진 인트라바 브래킷을 달던 결함 제거(종가확정 스톱만); basis-gap set_state 적대 입력 내성; salience/prospect 형성 패널 캘린더 정렬(내부 갭 심볼 제외, 위치 정렬은 시장수익률 왜곡 ~25% 재현); OI 민홀드 단위 재고정(주간 5→2, 등록 지평 1-4주 내로); V-DIAG har_lags 비정형 스펙 fail-closed; 행동가치 지표 파라미터 never-raise; VR z-stat 손계산 골든; **배치 배선 테스트 신설**(광역 유니버스 23행 전부 레지스트리 경유 생성+스키마 포함성 — 미지 파라미터 무성 드랍 차단).
+- W3 판정에 따라 cross_sectional_anomaly는 **원본 plain-sum skewness 사본을 의도적으로 유지**(fsum 정준화는 ~10% 윈도우에서 1-ULP 표류 — 등록 전략 기본 수치의 무게이트 변경 금지 원칙).
+
+REFUTED 2건: W4(basis-gap family="carry"는 빌더 헤더가 명시한 의도적 예외 — funding-정산 캐리는 진짜 캐리), W5(기본 매니페스트 행수 21이 정답 — guarded_ls 셀은 min_symbols=12라 기본 10심볼 유니버스에서 비물질화. 광역 유니버스 기준 23행). 판정 불변: **do_not_promote / research_only_no_execution / 실배분 0%**.
+
 ## 2026-08-20 KST — 신규 알파 슬리브 7클래스 + V-DIAG + 지표 5모듈 저작 완료 (3종 재고정 포함)
 
 같은 날 오전의 레버 커밋에 이어, 적대 심판 3인을 통과한 신규 저작물을 원자 통합했다. 전부 `research_only`이고 기본 후보 매니페스트에 21개 row로 편입되며(전부 cross_sectional 바스켓, `allow_multi_asset` 핸드오프 경로 전용), 2-symbol 스냅샷 픽스처에는 하나도 물질화되지 않아 **manifest sha는 불변**이다. tier-guard(BATCH 7종 추가)·hardcoded-baseline 재고정 완료, 전체 스위트 **4914 passed / 21 skipped / 3 xfailed**(베이스라인 4712 대비 +202 전원 신규 테스트), ruff/format/compileall/check_architecture/verify_docs/골든 핀 전부 그린.

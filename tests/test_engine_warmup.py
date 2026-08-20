@@ -454,6 +454,40 @@ def test_warmup_end_hook_state_roundtrip_suppresses_refire():
     assert warm._warmup_end_hook_fired is True
 
 
+def test_warmup_end_hook_fires_in_continuation_chunk_via_had_warmup():
+    """F3: chunk 2+ engines are built with warmup_bars=0 (live_start None), so
+    the hook must fire off the carried ``had_warmup`` provenance when chunk 1
+    held only warmup bars and the first live event lands later."""
+    _ProbeHookStrategy.hook_fired_total = 0
+    frame = _build_minute_frame(T0, minutes=120)
+
+    backtest = Backtest(
+        csv_dir="data",
+        symbol_list=[SYMBOL],
+        start_date=T0,
+        end_date=None,
+        data_handler_cls=HistoricCSVDataHandler,
+        execution_handler_cls=SimulatedExecutionHandler,
+        portfolio_cls=Portfolio,
+        strategy_cls=_ProbeHookStrategy,
+        strategy_params={},
+        data_dict={SYMBOL: frame},
+        data_handler_kwargs={},
+        record_history=False,
+        track_metrics=True,
+        record_trades=False,
+        strategy_timeframe="1m",
+        warmup_bars=0,
+    )
+    # Simulate the chunk-boundary restore: prior chunk was warmup-configured
+    # but never reached a live event (hook not fired).
+    backtest.set_engine_state({"had_warmup": True, "warmup_end_hook_fired": False})
+    backtest.simulate_trading(output=False)
+
+    assert _ProbeHookStrategy.hook_fired_total == 1
+    assert backtest.get_engine_state().get("had_warmup") is True
+
+
 def test_chunked_runner_fires_warmup_end_hook_once_total():
     _ProbeHookStrategy.hook_fired_total = 0
     frame = _build_minute_frame(T0, minutes=3 * 24 * 60)

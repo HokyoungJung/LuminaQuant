@@ -385,6 +385,62 @@ def test_degenerate_input_never_raises() -> None:
         assert cand.events.items == []
 
 
+def test_interior_utc_day_gap_excludes_symbol_from_panel() -> None:
+    """SLEEVE-STATE-05 regression: the formation panel is CALENDAR-aligned.
+
+    A symbol missing ONE interior UTC day (its formation window would be
+    shifted vs the market) is excluded from the panel even though it is fresh
+    and long enough; the gap-free symbols' ST/TK characteristics are exactly
+    the calendar-aligned computation (bit-identical to a run on the gap-free
+    universe alone).
+    """
+    for build, base_panel, n, gap_day in (
+        (_st_candidate, _st_panel(), _N_ST, 28),
+        (_pt_candidate, _pt_panel(), _N_PT, 50),
+    ):
+        syms = list(base_panel)
+        gappy = "GAPPY"
+        panel = dict(base_panel)
+        panel[gappy] = _closes_from_returns(
+            [0.002 * (1.0 if t % 3 == 0 else -1.0) for t in range(n - 1)]
+        )
+        cand = build([*syms, gappy])
+        for t in range(n):
+            event_panel = panel if t != gap_day else {s: panel[s] for s in syms}
+            cand.calculate_signals(_window_event(event_panel, t))
+        item = cand._state[gappy]
+        # The gap symbol is fresh and long enough -- ONLY the calendar check
+        # can exclude it (the exclusion is not staleness / short history).
+        assert item.last_committed_day == cand._last_committed_day
+        assert len(item.daily_closes) >= cand._required_days
+        formation = cand._formation_panel()
+        assert gappy not in formation
+        assert set(formation) == set(syms)
+        # Gap-free symbols match the calendar-aligned computation exactly.
+        ref = build(syms)
+        _feed(ref, base_panel, n=n)
+        scored_gap = cand._score_symbols()
+        scored_ref = ref._score_symbols()
+        assert set(scored_gap) == set(scored_ref) == set(syms)
+        for sym in syms:
+            assert scored_gap[sym][0] == scored_ref[sym][0]
+            assert scored_gap[sym][1]["behavioral_value"] == scored_ref[sym][1]["behavioral_value"]
+
+
+def test_state_roundtrip_preserves_committed_day_keys() -> None:
+    """The parallel committed-day-key deque serializes losslessly."""
+    cand = _st_candidate(_ST_SYMS)
+    _feed(cand, _st_panel(), n=31)
+    snap = cand.get_state()
+    payload = snap["symbol_state"]["SAL_UP"]
+    assert len(payload["daily_days"]) == len(payload["daily_closes"])
+    assert payload["daily_days"][-1] == cand._last_committed_day
+    restored = _st_candidate(_ST_SYMS)
+    restored.set_state(snap)
+    assert list(restored._state["SAL_UP"].daily_days) == payload["daily_days"]
+    assert restored.get_state() == snap
+
+
 def test_min_symbols_self_skip() -> None:
     syms = ["ONLY1", "ONLY2", "ONLY3"]  # below min_symbols=5
     panel = {

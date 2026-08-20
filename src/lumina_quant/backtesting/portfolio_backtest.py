@@ -11,7 +11,7 @@ from lumina_quant.backtesting.execution_model import (
     ExecutionModelConfig,
     _config_from_attrs,
 )
-from lumina_quant.core.events import FillEvent, OrderEvent
+from lumina_quant.core.events import FillEvent, OrderEvent, SignalEvent
 from lumina_quant.core.order_policy import (
     canonical_order_type,
     limit_price_for_direction,
@@ -324,6 +324,24 @@ class Portfolio:
         primary_symbol = self.symbol_list[0]
         latest_datetime = self.bars.get_latest_bar_datetime(primary_symbol)
         self.strategy_quality.next_bar(latest_datetime)
+        # L-C min-hold: release deferred bare EXITs whose hold just matured as
+        # synthetic EXIT signals (the emitting strategy is one-shot and will
+        # never re-emit). The overlay_reason marker lets them pass the gate.
+        for pending in self.strategy_quality.pop_matured_pending_exits():
+            metadata = dict(pending.get("metadata") or {})
+            metadata["overlay_reason"] = "min_hold_released"
+            if pending.get("component_id"):
+                metadata.setdefault("component_id", pending["component_id"])
+            self.events.put(
+                SignalEvent(
+                    strategy_id=str(pending.get("strategy_id") or "overlay"),
+                    symbol=str(pending.get("symbol") or ""),
+                    datetime=latest_datetime,
+                    signal_type="EXIT",
+                    strength=1.0,
+                    metadata=metadata,
+                )
+            )
         should_sample = self._should_sample(latest_datetime)
         self._update_day_boundary(latest_datetime)
         self._apply_funding(latest_datetime)
@@ -635,7 +653,27 @@ class Portfolio:
                 if event.fill_cost is not None and float(event.quantity) > 0.0
                 else float(self.bars.get_latest_bar_value(event.symbol, "close") or 0.0)
             )
-            self.strategy_quality.note_fill(event, old_qty, new_qty, fill_price)
+            # Component book qtys (pre-update: update_positions_from_fill runs
+            # below) so the min-hold ledger tracks the book the fill moved.
+            fill_component_id = self._component_id_from_metadata(getattr(event, "metadata", None))
+            component_old_qty = None
+            component_new_qty = None
+            if fill_component_id:
+                component_old_qty = float(
+                    dict(self.component_positions.get(fill_component_id) or {}).get(
+                        event.symbol, 0.0
+                    )
+                )
+                component_new_qty = component_old_qty + fill_dir * float(event.quantity)
+            self.strategy_quality.note_fill(
+                event,
+                old_qty,
+                new_qty,
+                fill_price,
+                component_id=fill_component_id,
+                component_old_qty=component_old_qty,
+                component_new_qty=component_new_qty,
+            )
             self.update_positions_from_fill(event)
             self.update_holdings_from_fill(event)
             self.trade_count += 1
@@ -1401,8 +1439,19 @@ class Portfolio:
         now_ts = self._to_unix_seconds(self.bars.get_latest_bar_datetime(symbol))
         if now_ts is None:
             return False
-        next_boundary = (int(float(now_ts) // interval_s) + 1) * interval_s
-        return (next_boundary - float(now_ts)) < hold_s
+        # MKT orders queue and fill at the NEXT bar's open, so the hold window
+        # starts one timeframe after the decision-bar stamp — anchoring at the
+        # signal bar would both miss real straddles and block clean entries.
+        timeframe = str(getattr(self.config, "TIMEFRAME", "") or "")
+        if not timeframe:
+            return False
+        try:
+            tf_s = float(timeframe_to_milliseconds(normalize_timeframe_token(timeframe))) / 1000.0
+        except TypeError, ValueError:
+            return False
+        fill_ts = float(now_ts) + max(0.0, tf_s)
+        next_boundary = (int(fill_ts // interval_s) + 1) * interval_s
+        return (next_boundary - fill_ts) < hold_s
 
     def _below_no_trade_band(self, quantity, price) -> bool:
         """True when an order's notional is below the L-C no-trade band."""

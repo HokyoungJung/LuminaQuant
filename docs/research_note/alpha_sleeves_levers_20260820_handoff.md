@@ -123,6 +123,46 @@ closes as insufficient_data.
    engine requires >=1% share AND a live-executor parity plan (judge
    condition).
 
+## 2b. Post-batch adversarial review round (same day)
+
+A find->refute review over the full diff (5 dimension hunters, 25 findings,
+each finding adversarially verified with runtime reproductions) CONFIRMED 23
+and REFUTED 2. Every confirmed defect was fixed and regression-locked in the
+same day (full suite 4946 passed; goldens/manifest snapshot byte-identical):
+
+- L-C min-hold now DEFERS blocked bare EXITs instead of dropping them
+  (one-shot transition-emit strategies never re-emit): the overlay keeps a
+  component-scoped ledger ("component|symbol"), releases the deferred exit as
+  a synthetic EXIT at hold maturity (overlay_reason=min_hold_released), and
+  blocks same-direction re-entries while an exit is pending (no stacking).
+  exit_reason bypass is now a pre-registered protective whitelist (a
+  descriptive "rebalance" label no longer neutralizes the gate).
+- L-D guard anchors the straddle window at the expected FILL time (next bar
+  open), not the decision-bar stamp.
+- Live path exposes STRATEGY_QUALITY_MIN_HOLD_BARS / NO_TRADE_BAND_BPS so one
+  validated config resolves identically on live and backtest.
+- Warmup-end hook carries had_warmup provenance across chunk boundaries
+  (fires even when the first live event lands in a warmup_bars=0
+  continuation chunk); all five new sleeves implement on_warmup_end()
+  (ghost-book reset, data deques preserved).
+- All XS sleeves gained stale-symbol freshness gates (a dead feed can no
+  longer freeze its last value into the cross-section or churn at frozen
+  prices); offsession max-hold ages panel-wide (a halted symbol still gets
+  its 72h exit); degenerate panels no longer flush mature books; taker-flow
+  entries no longer attach engine intrabar brackets (close-confirmed stops
+  only); basis-gap set_state is adversarial-input safe; salience/prospect
+  formation panels are calendar-aligned (interior-gap symbols excluded);
+  OI min_hold_decisions re-pinned 5->2 weekly decisions (~2-3wk, inside the
+  registered 1-4wk horizon); V-DIAG closes non-3-lag har_lags specs as
+  insufficient_data; behavioral-value indicators never raise on junk params;
+  variance-ratio z-stat has a hand-derived golden; a batch wiring test
+  constructs all 23 broad-universe candidate rows through the registry and
+  pins schema containment (unknown params can no longer be silently dropped).
+- cross_sectional_anomaly deliberately KEEPS its original plain-sum skewness
+  copy (the fsum canonical drifts one ULP on ~10% of windows — a silent
+  default-numerics change to registered LotterySkewness scoring is not
+  allowed ungated); skew_innovation's alias is bit-exact and stays.
+
 ## 3. Deferred (documented, do not build without the stated gate)
 
 | Item | Gate |

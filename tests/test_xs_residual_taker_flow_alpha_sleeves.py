@@ -609,3 +609,176 @@ def test_slice_mechanism_constants_pre_registered_and_invariant() -> None:
                 assert cell["formation_window_bars"] == 30
                 assert cell["decision_interval_bars"] == 6
     assert "cross_sectional" in _SUGGESTED_CANDIDATE_TAGS
+
+
+# --------------------------------------------------------------------------- #
+# XS-STOP-BRACKET-DESYNC regression: entries carry NO engine intrabar bracket
+# (stop_loss=None); the close-confirmed stop in _age is the ONLY stop.
+# --------------------------------------------------------------------------- #
+
+
+def test_entries_carry_no_bracket_and_close_confirmed_stop_still_fires() -> None:
+    phase1, phase2 = 30, 4
+    n = phase1 + phase2
+    series: dict[str, list[dict[str, Any]]] = {}
+    flows: dict[str, list[tuple[float, float] | None]] = {}
+    # ACC0 crashes ~20% in phase 2 (entry ~100 -> 80), breaching a 10% stop.
+    series["ACC0/USDT"] = _flat_bars(100.0, phase1) + _flat_bars(80.0, phase2)
+    flows["ACC0/USDT"] = _const_flow(800.0, 200.0, n)
+    series["ACC1/USDT"] = _flat_bars(101.0, n)
+    flows["ACC1/USDT"] = _const_flow(780.0, 220.0, n)
+    series["DIST0/USDT"] = _flat_bars(102.0, n)
+    flows["DIST0/USDT"] = _const_flow(200.0, 800.0, n)
+    series["DIST1/USDT"] = _flat_bars(103.0, n)
+    flows["DIST1/USDT"] = _const_flow(220.0, 780.0, n)
+    rng = _lcg(777)
+    for fi in range(6):
+        sym = f"F{fi}/USDT"
+        series[sym] = _flat_bars(90.0 + fi, n)
+        tilt = (rng() - 0.5) * 40.0
+        flows[sym] = _const_flow(500.0 + tilt, 500.0 - tilt, n)
+    strat = _run(series, flows, stop_loss_pct=0.10)
+    entries = _non_exit(strat.events.items)
+    assert entries, "expected sized entries with stop_loss_pct > 0"
+    for sig in entries:
+        assert sig.stop_loss is None, (sig.symbol, sig.stop_loss)
+    # The close-confirmed stop (aging path) still protects the breached long.
+    stop_exits = [
+        sig
+        for sig in strat.events.items
+        if str(sig.signal_type).upper() == "EXIT"
+        and dict(sig.metadata or {}).get("reason") == "stop_loss"
+    ]
+    assert any(sig.symbol == "ACC0/USDT" for sig in stop_exits), stop_exits
+
+
+# --------------------------------------------------------------------------- #
+# WARMUP-GHOST-BOOK regression: on_warmup_end drops ghost positions (the
+# engine suppressed warmup signals) while preserving the data deques, and the
+# next live rebalance can enter normally.
+# --------------------------------------------------------------------------- #
+
+
+def test_on_warmup_end_flattens_ghost_book_and_preserves_deques() -> None:
+    series, flows = _panel()
+    bars = _Bars(list(series))
+    strat = CrossSectionalResidualTakerFlowStrategy(bars, _Queue(), **_COMMON_KWARGS)
+    _feed(strat, bars, series, flows)  # warmup region: entries are ghosts
+    assert _non_exit(strat.events.items), "expected ghost entries during warmup"
+    assert any(item.mode != "OUT" for item in strat._state.values())
+    deques_before = {
+        sym: (list(item.closes), list(item.net_flows), list(item.turnovers))
+        for sym, item in strat._state.items()
+    }
+    strat.on_warmup_end()
+    for sym, item in strat._state.items():
+        assert item.mode == "OUT"
+        assert item.entry_price is None
+        assert item.bars_held == 0
+        assert item.decisions_held == 0
+        assert item.score is None
+        assert (list(item.closes), list(item.net_flows), list(item.turnovers)) == deques_before[
+            sym
+        ], sym
+    # Next live rebalance re-enters normally from the preserved history.
+    signals_before = len(strat.events.items)
+    live_series = {sym: rows[:3] for sym, rows in series.items()}
+    live_flows = {sym: rows[:3] for sym, rows in flows.items()}
+    # continue the bar-key clock past the warmup feed
+    n_live = 3
+    for idx in range(n_live):
+        bars.features = {}
+        for sym in live_series:
+            print_ = live_flows[sym][idx]
+            if print_ is not None:
+                buy, sell = print_
+                bars.features[(sym, "taker_buy_quote_volume")] = float(buy)
+                bars.features[(sym, "taker_sell_quote_volume")] = float(sell)
+        strat.calculate_signals(
+            _window_event(_N + idx, {sym: live_series[sym][idx] for sym in live_series})
+        )
+    live_entries = _non_exit(strat.events.items[signals_before:])
+    assert live_entries, "post-warmup live rebalance must be able to enter"
+    assert _final_side(strat.events.items).get("ACC0/USDT") == "LONG"
+
+
+# --------------------------------------------------------------------------- #
+# STALE-SYMBOL freshness regression: a frozen feed is excluded from the
+# cross-sectional ranks and receives no new entries while others advance.
+# --------------------------------------------------------------------------- #
+
+
+def test_frozen_symbol_excluded_from_ranks_and_gets_no_new_entries() -> None:
+    phase1, phase2 = 30, 20
+    series, flows = _panel()
+    bars = _Bars(list(series))
+    strat = CrossSectionalResidualTakerFlowStrategy(bars, _Queue(), **_COMMON_KWARGS)
+    # Phase 1: everyone feeds; top-flow ACC0 enters LONG.
+    for idx in range(phase1):
+        bars.features = {}
+        for sym in series:
+            buy, sell = flows[sym][idx]  # type: ignore[misc]
+            bars.features[(sym, "taker_buy_quote_volume")] = float(buy)
+            bars.features[(sym, "taker_sell_quote_volume")] = float(sell)
+        strat.calculate_signals(_window_event(idx, {sym: series[sym][idx] for sym in series}))
+    assert _final_side(strat.events.items).get("ACC0/USDT") == "LONG"
+    # Phase 2: ACC0's feed FREEZES (no bars); every other symbol advances and
+    # F0 ramps its buy flow so a FRESH name displaces into the long quintile.
+    for idx in range(phase1, phase1 + phase2):
+        bars.features = {}
+        rows: dict[str, dict[str, Any]] = {}
+        for sym in series:
+            if sym == "ACC0/USDT":
+                continue
+            if sym == "F0/USDT":
+                buy, sell = 900.0, 100.0
+            else:
+                buy, sell = flows[sym][idx % phase1]  # type: ignore[misc]
+            bars.features[(sym, "taker_buy_quote_volume")] = float(buy)
+            bars.features[(sym, "taker_sell_quote_volume")] = float(sell)
+            rows[sym] = series[sym][idx % phase1]
+        strat.calculate_signals(_window_event(idx, rows))
+    phase2_signals = [sig for sig in strat.events.items if int(str(sig.datetime)[1:]) >= phase1]
+    # The advancing names still rank and trade (the panel is alive)...
+    assert _non_exit(phase2_signals), "advancing symbols must still receive entries"
+    # ...but the frozen symbol is excluded from ranks: no new entries at all.
+    assert not [sig for sig in _non_exit(phase2_signals) if sig.symbol == "ACC0/USDT"], (
+        "frozen feed must not receive new entries"
+    )
+    assert "ACC0/USDT" not in _final_side(strat.events.items)
+
+
+# --------------------------------------------------------------------------- #
+# SLEEVE-STATE-06 sibling regression: a degenerate panel (empty targets) for
+# one decision must NOT flush a mature book via rank_lapsed exits.
+# --------------------------------------------------------------------------- #
+
+
+def test_degenerate_panel_decision_does_not_flush_mature_book() -> None:
+    series, flows = _panel()
+    bars = _Bars(list(series))
+    strat = CrossSectionalResidualTakerFlowStrategy(bars, _Queue(), **_COMMON_KWARGS)
+    _feed(strat, bars, series, flows)
+    book_before = {sym: item.mode for sym, item in strat._state.items() if item.mode != "OUT"}
+    assert book_before, "expected a mature book after the panel feed"
+    signals_before = len(strat.events.items)
+    # Universe-wide feature outage for one decision: only F0 prints taker
+    # features, so the fresh panel collapses below min_symbols and targets are
+    # empty -- the guard returns instead of emitting rank_lapsed exits.
+    bars.features = {
+        ("F0/USDT", "taker_buy_quote_volume"): 500.0,
+        ("F0/USDT", "taker_sell_quote_volume"): 500.0,
+    }
+    strat.calculate_signals(_window_event(_N, {"F0/USDT": series["F0/USDT"][0]}))
+    new_signals = strat.events.items[signals_before:]
+    assert new_signals == [], new_signals
+    book_after = {sym: item.mode for sym, item in strat._state.items() if item.mode != "OUT"}
+    assert book_after == book_before
+    # Direct degenerate-decision leg (pins the guard itself, independent of the
+    # freshness gate): a decision whose ranker returns EMPTY targets must not
+    # flush the mature book via rank_lapsed exits.
+    strat._score_and_select = lambda: ({}, {})  # type: ignore[method-assign]
+    strat._evaluate("t9999")
+    assert strat.events.items[signals_before:] == []
+    book_final = {sym: item.mode for sym, item in strat._state.items() if item.mode != "OUT"}
+    assert book_final == book_before

@@ -344,7 +344,19 @@ def evaluate_pair(
     merged = dict(DEFAULT_SPEC)
     if spec:
         merged.update(spec)
-    lags = tuple(int(k) for k in merged["har_lags"])
+    # Normalize the lag spec EXACTLY as ``har_design`` does (sorted unique
+    # ints) and fail closed BEFORE building any design: the coefficient
+    # labels (``_COEF_NAMES_BASE + _COEF_NAMES_LEADER``) and the leader-block
+    # column split below are only valid for exactly three lags.  Fewer lags
+    # would raise inside ``_sign_stability`` (never-raise breach); more lags
+    # would silently mislabel own-history columns as leader coefficients.
+    try:
+        lag_list = sorted({int(k) for k in merged["har_lags"]})
+    except Exception:
+        return None
+    if len(lag_list) != 3:
+        return None
+    lags = tuple(lag_list)
     eps = float(merged["log_rv_eps"])
     clip = float(merged["forecast_log_clip"])
     num_folds = int(merged["num_folds"])
