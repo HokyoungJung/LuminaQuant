@@ -1333,9 +1333,15 @@ def test_exact_native_day_restart_matches_uninterrupted_capsule(
                 raise RuntimeError("instrumented-crash-after-day-rename")
 
     globals_start = start
+    component = SimpleNamespace(
+        component_id="component",
+        strategy_class="ResearchOnlyDailyLowTurnoverTrendPersistenceStrategy",
+        symbols=admitted,
+    )
     seal = SimpleNamespace(
         expected_definition=SimpleNamespace(
-            components=(),
+            admitted_symbols=admitted,
+            components=(component,),
             native_timeframes=("4h", "1d"),
             portfolio_mode="instrumented",
         ),
@@ -1391,9 +1397,17 @@ def test_exact_native_day_restart_matches_uninterrupted_capsule(
 
     def finalize(*_args: object, **_kwargs: object) -> SimpleNamespace:
         finalizations.append(1)
+        coverage = _native_finalization_coverage_stub(
+            [("BTCUSDT", "2024-01-02")]
+        )
+        coverage["finalization_completed_native_keys"] = [
+            ["BTCUSDT", "2024-01-02"]
+        ]
+        coverage["finalization_barrier_keys"] = []
         return SimpleNamespace(
             discarded_signal_count=0,
-            finalized_children={},
+            finalized_children={"component": 1},
+            native_coverage_by_child={"component": coverage},
             sha256="b" * 64,
         )
 
@@ -1424,6 +1438,15 @@ def test_exact_native_day_restart_matches_uninterrupted_capsule(
 
     assert uninterrupted == resumed
     assert uninterrupted.windows_processed == 172_800
+    restored = alpha_max_runner._validate_alpha_max_indicator_capsule(
+        uninterrupted,
+        seal=seal,
+        expected_phase_id="warmup",
+    )
+    assert restored == uninterrupted.capsule
+    assert uninterrupted.finalized_children["component"][
+        "finalization_completed_native_keys"
+    ] == (("BTCUSDT", "2024-01-02"),)
     assert uninterrupted.capsule["state"] == {
         "handoffs": 1,
         "release_groups": 11,

@@ -4957,7 +4957,7 @@ def _build_alpha_max_indicator_capsule_incremental(
         admitted_symbol_count=len(admitted_symbols),
         require_exact_counts=True,
     )
-    finalized = dict(finalization.finalized_children)
+    finalized = dict(finalization.native_coverage_by_child)
     discarded_signals += finalization.discarded_signal_count
     strategy.validate_research_warmup_ready()
     discarded_signals += _drain_indicator_events(events)
@@ -5395,7 +5395,7 @@ def _build_alpha_max_indicator_capsule_exact_native(
         admitted_symbol_count=len(admitted),
         require_exact_counts=True,
     )
-    finalized = dict(finalization.finalized_children)
+    finalized = dict(finalization.native_coverage_by_child)
     discarded_signals += finalization.discarded_signal_count
     strategy.validate_research_warmup_ready()
     discarded_signals += _drain_indicator_events(events)
