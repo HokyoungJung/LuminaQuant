@@ -3534,7 +3534,7 @@ def _parse_alpha_max_indicator_checkpoint_bytes(payload: bytes) -> object:
     while pending:
         item = pending.pop()
         nodes += 1
-        if nodes > 100_000:
+        if nodes > 1_000_000:
             raise AlphaMaxRuntimeContractError("alpha_max_indicator_checkpoint_node_limit")
         if type(item) is dict:
             pending.extend(item.values())
@@ -4895,6 +4895,23 @@ def _alpha_max_assert_indicator_checkpoint_queues_empty(
             raise AlphaMaxRuntimeContractError("alpha_max_indicator_checkpoint_queue_not_empty")
 
 
+def _alpha_max_indicator_checkpoint_aggregator_state(
+    aggregator: TimeframeAggregator,
+) -> dict[str, Any]:
+    state = copy.deepcopy(aggregator.get_state())
+    history = state.get("history")
+    if not isinstance(history, dict):
+        raise AlphaMaxRuntimeContractError("alpha_max_indicator_checkpoint_aggregator_invalid")
+    for by_timeframe in history.values():
+        if not isinstance(by_timeframe, dict):
+            raise AlphaMaxRuntimeContractError("alpha_max_indicator_checkpoint_aggregator_invalid")
+        # The exact-native fold repopulates the complete rolling 1s tail from
+        # every full UTC day before Python replays native releases. Only the
+        # completed required-timeframe histories and working bars cross days.
+        by_timeframe.pop("1s", None)
+    return state
+
+
 def _alpha_max_native_release_groups(
     releases: tuple[NativeBarRelease, ...],
     *,
@@ -5187,7 +5204,7 @@ def _build_alpha_max_indicator_capsule_exact_native(
                 _AlphaMaxIndicatorDayCarry(
                     next_day_start_utc=day_end,
                     strategy_state=copy.deepcopy(strategy.get_state()),
-                    aggregator_state=copy.deepcopy(aggregator.get_state()),
+                    aggregator_state=_alpha_max_indicator_checkpoint_aggregator_state(aggregator),
                     windows_processed=windows_processed,
                     discarded_signal_count=discarded_signals,
                 )

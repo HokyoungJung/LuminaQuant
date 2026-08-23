@@ -1229,12 +1229,12 @@ def test_exact_native_day_restart_matches_uninterrupted_capsule(
     class FakeAggregator:
         def __init__(self, *, timeframes: list[str]) -> None:
             assert timeframes == ["4h", "1d"]
-            self.state = {"day_count": 0}
+            self.state = {"day_count": 0, "history": {}}
 
-        def get_state(self) -> dict[str, int]:
+        def get_state(self) -> dict[str, object]:
             return dict(self.state)
 
-        def set_state(self, value: dict[str, int]) -> None:
+        def set_state(self, value: dict[str, object]) -> None:
             self.state = dict(value)
 
     class FakeLoader:
@@ -1454,6 +1454,33 @@ def test_indicator_checkpoint_accepts_drained_real_child_queue() -> None:
             strategy,
             alpha_max_runner.FastQueue(),
         )
+
+
+def test_indicator_checkpoint_omits_reconstructible_one_second_history() -> None:
+    aggregator = alpha_max_runner.TimeframeAggregator(timeframes=["4h", "1d"])
+    one_second = (1_700_000_000_000, 10.0, 11.0, 9.0, 10.5, 1.0)
+    four_hour = (
+        datetime(2023, 11, 14, tzinfo=UTC).replace(tzinfo=None),
+        10.0,
+        12.0,
+        9.0,
+        11.0,
+        2.0,
+    )
+    aggregator._ensure_history("ADAUSDT", "1s").append(one_second)
+    aggregator._ensure_history("ADAUSDT", "4h").append(four_hour)
+
+    state = alpha_max_runner._alpha_max_indicator_checkpoint_aggregator_state(aggregator)
+
+    assert "1s" not in state["history"]["ADAUSDT"]
+    assert state["history"]["ADAUSDT"]["4h"] == [four_hour]
+    assert aggregator.get_state()["history"]["ADAUSDT"]["1s"] == [one_second]
+    assert (
+        alpha_max_runner._parse_alpha_max_indicator_checkpoint_bytes(
+            alpha_max_runner._alpha_max_indicator_checkpoint_bytes(state)
+        )
+        == state
+    )
 
 
 def test_indicator_capsule_validation_rejects_economic_or_finalization_tamper() -> None:
