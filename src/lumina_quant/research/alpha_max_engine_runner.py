@@ -3966,6 +3966,10 @@ class _AlphaMaxIndicatorDayCheckpointStore:
         days_status = os.fstat(self._days_fd)
         self._root_identity = (int(root_status.st_dev), int(root_status.st_ino))
         self._days_identity = (int(days_status.st_dev), int(days_status.st_ino))
+        self._journal_loaded = False
+        self._latest_carry: _AlphaMaxIndicatorDayCarry | None = None
+        self._latest_seal_sha256 = ""
+        self._day_identities: dict[str, tuple[tuple[int, ...], ...]] = {}
         self._validate_root()
 
     def __del__(self) -> None:
@@ -4040,6 +4044,45 @@ class _AlphaMaxIndicatorDayCheckpointStore:
             raise AlphaMaxRuntimeContractError("alpha_max_indicator_checkpoint_day_invalid")
         return value.strftime("%Y%m%d")
 
+    @staticmethod
+    def _entry_identity(status: os.stat_result) -> tuple[int, ...]:
+        return (
+            int(status.st_dev),
+            int(status.st_ino),
+            int(status.st_mode),
+            int(status.st_nlink),
+            int(status.st_size),
+            int(status.st_mtime_ns),
+            int(status.st_ctime_ns),
+        )
+
+    def _validate_cached_journal(self) -> None:
+        self._validate_root()
+        if not self._journal_loaded:
+            raise AlphaMaxRuntimeContractError("alpha_max_indicator_checkpoint_journal_not_loaded")
+        if set(os.listdir(self._days_fd)) != set(self._day_identities):
+            raise AlphaMaxRuntimeContractError("alpha_max_indicator_checkpoint_inventory_invalid")
+        for name, expected in self._day_identities.items():
+            target_fd = _alpha_max_open_checkpoint_directory_at(self._days_fd, name)
+            try:
+                if (
+                    set(os.listdir(target_fd)) != {"STATE.json", "SEALED.json"}
+                    or self._entry_identity(os.fstat(target_fd)) != expected[0]
+                    or self._entry_identity(
+                        os.stat("STATE.json", dir_fd=target_fd, follow_symlinks=False)
+                    )
+                    != expected[1]
+                    or self._entry_identity(
+                        os.stat("SEALED.json", dir_fd=target_fd, follow_symlinks=False)
+                    )
+                    != expected[2]
+                ):
+                    raise AlphaMaxRuntimeContractError(
+                        "alpha_max_indicator_checkpoint_identity_changed"
+                    )
+            finally:
+                os.close(target_fd)
+
     def load_latest(
         self, *, start_utc: datetime, end_utc: datetime
     ) -> _AlphaMaxIndicatorDayCarry | None:
@@ -4070,6 +4113,7 @@ class _AlphaMaxIndicatorDayCheckpointStore:
         carry: _AlphaMaxIndicatorDayCarry | None = None
         expected = start_utc
         previous_seal = ""
+        identities: dict[str, tuple[tuple[int, ...], ...]] = {}
         for name in sorted(os.listdir(self._days_fd)):
             target_fd = _alpha_max_open_checkpoint_directory_at(self._days_fd, name)
             try:
@@ -4082,12 +4126,39 @@ class _AlphaMaxIndicatorDayCheckpointStore:
                     raise AlphaMaxRuntimeContractError(
                         "alpha_max_indicator_checkpoint_gap_or_invalid"
                     )
+                state_status = os.stat("STATE.json", dir_fd=target_fd, follow_symlinks=False)
+                seal_status = os.stat("SEALED.json", dir_fd=target_fd, follow_symlinks=False)
                 state_bytes = _alpha_max_read_regular_at(
                     target_fd, "STATE.json", expected_mode=0o400
                 )
                 seal_bytes = _alpha_max_read_regular_at(
                     target_fd, "SEALED.json", expected_mode=0o400
                 )
+                identity = (
+                    self._entry_identity(target_status),
+                    self._entry_identity(state_status),
+                    self._entry_identity(seal_status),
+                )
+                if identity != (
+                    self._entry_identity(os.fstat(target_fd)),
+                    self._entry_identity(
+                        os.stat(
+                            "STATE.json",
+                            dir_fd=target_fd,
+                            follow_symlinks=False,
+                        )
+                    ),
+                    self._entry_identity(
+                        os.stat(
+                            "SEALED.json",
+                            dir_fd=target_fd,
+                            follow_symlinks=False,
+                        )
+                    ),
+                ):
+                    raise AlphaMaxRuntimeContractError(
+                        "alpha_max_indicator_checkpoint_identity_changed"
+                    )
             finally:
                 os.close(target_fd)
             if not state_bytes or not seal_bytes:
@@ -4152,8 +4223,13 @@ class _AlphaMaxIndicatorDayCheckpointStore:
                 raise AlphaMaxRuntimeContractError(
                     "alpha_max_indicator_checkpoint_next_day_invalid"
                 )
+            identities[name] = identity
             expected, previous_seal = carry.next_day_start_utc, _sha256(seal_bytes)
-        return carry
+        self._day_identities = identities
+        self._latest_carry = copy.deepcopy(carry)
+        self._latest_seal_sha256 = previous_seal
+        self._journal_loaded = True
+        return copy.deepcopy(carry)
 
     def seal(self, carry: _AlphaMaxIndicatorDayCarry) -> None:
         self._validate_root()
@@ -4174,7 +4250,14 @@ class _AlphaMaxIndicatorDayCheckpointStore:
             count != 0 for count in counts[2:]
         ):
             raise AlphaMaxRuntimeContractError("alpha_max_indicator_checkpoint_carry_invalid")
-        latest = self.load_latest(start_utc=self._start_utc, end_utc=self._end_utc)
+        if self._journal_loaded:
+            self._validate_cached_journal()
+            latest = self._latest_carry
+        else:
+            latest = self.load_latest(
+                start_utc=self._start_utc,
+                end_utc=self._end_utc,
+            )
         expected_next = (
             self._start_utc + timedelta(days=1)
             if latest is None
@@ -4214,18 +4297,7 @@ class _AlphaMaxIndicatorDayCheckpointStore:
         state = _alpha_max_indicator_checkpoint_bytes(state_value)
         if not _exact_state_equal(_parse_alpha_max_indicator_checkpoint_bytes(state), state_value):
             raise AlphaMaxRuntimeContractError("alpha_max_indicator_checkpoint_roundtrip_invalid")
-        prior = sorted(
-            value for value in os.listdir(self._days_fd) if len(value) == 8 and value.isdigit()
-        )
-        previous_seal_sha256 = ""
-        if prior:
-            prior_fd = _alpha_max_open_checkpoint_directory_at(self._days_fd, prior[-1])
-            try:
-                previous_seal_sha256 = _sha256(
-                    _alpha_max_read_regular_at(prior_fd, "SEALED.json", expected_mode=0o400)
-                )
-            finally:
-                os.close(prior_fd)
+        previous_seal_sha256 = self._latest_seal_sha256
         seal = (
             _canonical_bytes(
                 {
@@ -4252,6 +4324,7 @@ class _AlphaMaxIndicatorDayCheckpointStore:
                 dir=days_path,
             )
         )
+        published = False
         try:
             _write_bundle_file(stage, "STATE.json", state)
             _write_bundle_file(stage, "SEALED.json", seal)
@@ -4262,10 +4335,67 @@ class _AlphaMaxIndicatorDayCheckpointStore:
             os.chmod(stage, 0o500)
             _fsync_directory(stage)
             _rename_bundle_noreplace(stage, target)
+            published = True
             os.fsync(self._days_fd)
+            target_fd = _alpha_max_open_checkpoint_directory_at(self._days_fd, name)
+            try:
+                if (
+                    _alpha_max_read_regular_at(
+                        target_fd,
+                        "STATE.json",
+                        expected_mode=0o400,
+                    )
+                    != state
+                    or _alpha_max_read_regular_at(
+                        target_fd,
+                        "SEALED.json",
+                        expected_mode=0o400,
+                    )
+                    != seal
+                ):
+                    raise AlphaMaxRuntimeContractError(
+                        "alpha_max_indicator_checkpoint_publication_invalid"
+                    )
+                identity = (
+                    self._entry_identity(os.fstat(target_fd)),
+                    self._entry_identity(
+                        os.stat(
+                            "STATE.json",
+                            dir_fd=target_fd,
+                            follow_symlinks=False,
+                        )
+                    ),
+                    self._entry_identity(
+                        os.stat(
+                            "SEALED.json",
+                            dir_fd=target_fd,
+                            follow_symlinks=False,
+                        )
+                    ),
+                )
+            finally:
+                os.close(target_fd)
         except Exception:
-            _cleanup_partial_bundle(stage)
+            try:
+                if published:
+                    rollback_fd = _alpha_max_open_checkpoint_directory_at(self._days_fd, name)
+                    try:
+                        _alpha_max_cleanup_directory_fd(rollback_fd)
+                    finally:
+                        os.close(rollback_fd)
+                    os.rmdir(name, dir_fd=self._days_fd)
+                    os.fsync(self._days_fd)
+                else:
+                    _cleanup_partial_bundle(stage)
+            except Exception as rollback_exc:
+                raise AlphaMaxRuntimeContractError(
+                    "alpha_max_indicator_checkpoint_rollback_failed"
+                ) from rollback_exc
             raise
+        self._day_identities[name] = identity
+        self._latest_carry = copy.deepcopy(carry)
+        self._latest_seal_sha256 = _sha256(seal)
+        self._journal_loaded = True
 
 
 _ALPHA_MAX_INDICATOR_THREAD_KEYS: Final[tuple[str, ...]] = (

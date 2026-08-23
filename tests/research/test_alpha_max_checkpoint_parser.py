@@ -185,6 +185,136 @@ def test_indicator_day_checkpoint_store_rejects_gap_tamper_and_parent_swap(tmp_p
         )
 
 
+def test_indicator_day_checkpoint_seal_revalidates_prior_days_by_identity(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    dt = __import__("datetime")
+    root = tmp_path / "checkpoint"
+    store = runner._AlphaMaxIndicatorDayCheckpointStore(
+        root, descriptor=_indicator_day_descriptor(root)
+    )
+    start = dt.datetime(2024, 1, 1, tzinfo=dt.UTC)
+    store.seal(
+        runner._AlphaMaxIndicatorDayCarry(
+            next_day_start_utc=start + dt.timedelta(days=1),
+            strategy_state={"day": 1},
+            aggregator_state={"history": {}},
+            windows_processed=86_400,
+            discarded_signal_count=1,
+        )
+    )
+    original = runner._alpha_max_read_regular_at
+    reads: list[str] = []
+
+    def instrumented(
+        directory_fd: int,
+        name: str,
+        *,
+        expected_mode: int,
+    ) -> bytes:
+        reads.append(name)
+        return original(directory_fd, name, expected_mode=expected_mode)
+
+    monkeypatch.setattr(runner, "_alpha_max_read_regular_at", instrumented)
+    store.seal(
+        runner._AlphaMaxIndicatorDayCarry(
+            next_day_start_utc=start + dt.timedelta(days=2),
+            strategy_state={"day": 2},
+            aggregator_state={"history": {}},
+            windows_processed=172_800,
+            discarded_signal_count=2,
+        )
+    )
+
+    assert reads.count("STATE.json") == 1
+    assert reads.count("SEALED.json") == 1
+    assert (
+        store.load_latest(
+            start_utc=start,
+            end_utc=dt.datetime(2025, 1, 1, tzinfo=dt.UTC),
+        ).windows_processed
+        == 172_800
+    )
+
+
+def test_indicator_day_checkpoint_cached_identity_rejects_prior_tamper(
+    tmp_path: Path,
+) -> None:
+    dt = __import__("datetime")
+    root = tmp_path / "checkpoint"
+    store = runner._AlphaMaxIndicatorDayCheckpointStore(
+        root, descriptor=_indicator_day_descriptor(root)
+    )
+    start = dt.datetime(2024, 1, 1, tzinfo=dt.UTC)
+    store.seal(
+        runner._AlphaMaxIndicatorDayCarry(
+            next_day_start_utc=start + dt.timedelta(days=1),
+            strategy_state={},
+            aggregator_state={},
+            windows_processed=86_400,
+            discarded_signal_count=0,
+        )
+    )
+    state = root / "days" / "20240101" / "STATE.json"
+    state.chmod(0o600)
+    state.chmod(0o400)
+
+    with pytest.raises(
+        runner.AlphaMaxRuntimeContractError,
+        match="checkpoint_identity_changed",
+    ):
+        store.seal(
+            runner._AlphaMaxIndicatorDayCarry(
+                next_day_start_utc=start + dt.timedelta(days=2),
+                strategy_state={},
+                aggregator_state={},
+                windows_processed=172_800,
+                discarded_signal_count=0,
+            )
+        )
+
+
+def test_indicator_day_checkpoint_post_rename_fsync_failure_rolls_back(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    dt = __import__("datetime")
+    root = tmp_path / "checkpoint"
+    store = runner._AlphaMaxIndicatorDayCheckpointStore(
+        root, descriptor=_indicator_day_descriptor(root)
+    )
+    start = dt.datetime(2024, 1, 1, tzinfo=dt.UTC)
+    published = root / "days" / "20240101"
+    original_fsync = runner.os.fsync
+
+    def fail_after_rename(descriptor: int) -> None:
+        if descriptor == store._days_fd and published.exists():
+            raise OSError("injected day parent fsync")
+        original_fsync(descriptor)
+
+    monkeypatch.setattr(runner.os, "fsync", fail_after_rename)
+    with pytest.raises(OSError, match="injected day parent fsync"):
+        store.seal(
+            runner._AlphaMaxIndicatorDayCarry(
+                next_day_start_utc=start + dt.timedelta(days=1),
+                strategy_state={},
+                aggregator_state={},
+                windows_processed=86_400,
+                discarded_signal_count=0,
+            )
+        )
+
+    assert not published.exists()
+    assert (
+        store.load_latest(
+            start_utc=start,
+            end_utc=dt.datetime(2025, 1, 1, tzinfo=dt.UTC),
+        )
+        is None
+    )
+
+
 def test_indicator_day_checkpoint_initialization_failure_leaves_no_root(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
