@@ -35,10 +35,18 @@ def test_feature_point_lookup_keeps_canonical_and_official_source_clocks_separat
     )
     lookup = FeaturePointLookup(db_path=str(tmp_path / "features"), exchange="binance")
 
+    assert (
+        lookup.get_latest_point(
+            "BTC/USDT",
+            "funding_rate",
+            timestamp_ms=canonical_ms,
+        )
+        is None
+    )
     assert lookup.get_latest_point(
         "BTC/USDT",
         "funding_rate",
-        timestamp_ms=canonical_ms,
+        timestamp_ms=canonical_ms + 500,
     ) == FeaturePoint(0.0001, canonical_ms + 500, canonical_ms)
     assert lookup.get_latest_point(
         "BTC/USDT",

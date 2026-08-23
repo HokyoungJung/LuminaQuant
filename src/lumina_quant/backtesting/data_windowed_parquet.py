@@ -8,6 +8,7 @@ from collections import deque
 from dataclasses import dataclass
 from typing import Any
 
+import numpy as np
 from lumina_quant.backtesting.data import _ColumnarBarRows, HistoricCSVDataHandler
 from lumina_quant.configuration import get_default_runtime_config
 from lumina_quant.core.market_window_contract import build_market_window_event
@@ -321,6 +322,84 @@ class HistoricParquetWindowedDataHandler(HistoricCSVDataHandler):
 
         if not self.next_bar:
             self.continue_backtest = False
+
+    def alpha_max_exact_columnar_view(
+        self,
+    ) -> dict[str, tuple[np.ndarray, np.ndarray]]:
+        """Expose the frozen one-day columns to the exact Alpha-Max tick reducer."""
+        if (
+            self.backtest_poll_seconds != 1
+            or self.backtest_window_seconds != 1
+            or not self._parity_v2_enabled
+            or any(int(self.symbol_index.get(symbol, -1)) != 0 for symbol in self.symbol_list)
+        ):
+            raise ValueError("alpha_max_columnar_view_state_invalid")
+        output: dict[str, tuple[np.ndarray, np.ndarray]] = {}
+        expected_timestamps: np.ndarray | None = None
+        for symbol in self.symbol_list:
+            rows = self.symbol_rows.get(symbol)
+            if type(rows) is not _EpochMsWindowRows:
+                raise TypeError("alpha_max_columnar_rows_identity_invalid")
+            timestamps = rows._epoch_ms
+            numeric = rows._numeric
+            if (
+                not isinstance(timestamps, np.ndarray)
+                or timestamps.dtype != np.dtype(np.int64)
+                or timestamps.ndim != 1
+                or type(numeric) is not np.ndarray
+                or numeric.dtype != np.dtype(np.float64)
+                or numeric.ndim != 2
+                or numeric.shape != (timestamps.size, 5)
+                or timestamps.size == 0
+                or (timestamps.size > 1 and not bool(np.all(np.diff(timestamps) == 1000)))
+                or not bool(np.all(np.isfinite(numeric)))
+            ):
+                raise ValueError("alpha_max_columnar_rows_invalid")
+            if expected_timestamps is None:
+                expected_timestamps = timestamps
+            elif not np.array_equal(timestamps, expected_timestamps):
+                raise ValueError("alpha_max_columnar_timeline_mismatch")
+            output[symbol] = (timestamps, numeric)
+        return output
+
+    def alpha_max_advance_without_event(self, start_index: int, end_index: int) -> None:
+        """Advance exact aligned rows while retaining the ordinary handler tails."""
+        if (
+            type(start_index) is not int
+            or type(end_index) is not int
+            or start_index < 0
+            or end_index < start_index
+            or any(
+                int(self.symbol_index.get(symbol, -1)) != start_index for symbol in self.symbol_list
+            )
+        ):
+            raise ValueError("alpha_max_handler_advance_invalid")
+        for symbol in self.symbol_list:
+            rows = self.symbol_rows.get(symbol)
+            if type(rows) is not _EpochMsWindowRows or end_index >= len(rows):
+                raise ValueError("alpha_max_handler_advance_invalid")
+            window_rows = self._window_rows[symbol]
+            window_timestamps = self._window_row_timestamps_ms[symbol]
+            retained_start = max(start_index, end_index - int(window_rows.maxlen or 1) + 1)
+            for index in range(retained_start, end_index + 1):
+                row = rows[index]
+                window_rows.append(row)
+                window_timestamps.append(int(row[0]))
+            latest = self.latest_symbol_data[symbol]
+            latest_start = max(start_index, end_index - int(latest.maxlen or 1) + 1)
+            for index in range(latest_start, end_index + 1):
+                latest.append(rows[index])
+            next_index = end_index + 1
+            self.symbol_index[symbol] = next_index
+            if next_index < len(rows):
+                self.next_bar[symbol] = rows[next_index]
+            else:
+                self.next_bar.pop(symbol, None)
+        self.last_emitted_timestamp_ms = int(self.symbol_rows[self.symbol_list[0]][end_index][0])
+        self._last_window_event_ms = self.last_emitted_timestamp_ms
+        self._next_emit_ts_ms = self.last_emitted_timestamp_ms + self.backtest_poll_ms
+        self.continue_backtest = bool(self.next_bar)
+        self._rebuild_heap()
 
     def skip_to_timestamp_ms(self, target_ts_ms: int | None) -> int:
         moved = super().skip_to_timestamp_ms(target_ts_ms)

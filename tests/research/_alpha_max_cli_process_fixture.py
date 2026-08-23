@@ -250,6 +250,7 @@ class AlphaMaxCliProcessHarness:
         self.run_label = "setup"
         self.replay_calls: list[tuple[str, str, str, int, str]] = []
         self.matrix_invocations: list[tuple[str, str]] = []
+        self.historical_checkpoint_seal_calls: list[tuple[str, int, int]] = []
         self.constructor_rows: list[tuple[str, int]] = []
         self.real_root_validation = runner._alpha_max_root_validation
         self.real_complete_matrix = runner._alpha_max_complete_domain_matrix
@@ -740,6 +741,42 @@ class AlphaMaxCliProcessHarness:
         def complete_matrix_wrapper(*args, **kwargs):
             domain = kwargs["domain"]
             self.matrix_invocations.append((self.run_label, domain))
+            checkpoint_store = kwargs["checkpoint_store"]
+            if domain == "validation":
+                # Validation replay stubs deliberately use a compact fixture
+                # evidence object. Historical coverage retains the checkpoint
+                # branch and validates its typed preflight/root/descriptor seam.
+                kwargs["checkpoint_store"] = None
+            else:
+                if type(checkpoint_store) is not runner._AlphaMaxCellCheckpointStore:
+                    raise AssertionError("historical_checkpoint_store_type_invalid")
+                if (
+                    checkpoint_store._domain != "historical_exposed_evaluation"
+                    or checkpoint_store._attempt_role != "historical"
+                    or not checkpoint_store._descriptor_v2
+                ):
+                    raise AssertionError("historical_checkpoint_descriptor_invalid")
+
+                class HistoricalCheckpointSeam:
+                    def load(self, **load_kwargs):
+                        if load_kwargs["preflight"] is not args[0]:
+                            raise AssertionError("historical_checkpoint_preflight_identity_invalid")
+                        return None
+
+                    def seal(self, replayed, **seal_kwargs):
+                        if (
+                            seal_kwargs["preflight"] is not args[0]
+                            or seal_kwargs["prepared"] is None
+                            or replayed.domain != "historical_exposed_evaluation"
+                        ):
+                            raise AssertionError("historical_checkpoint_seam_invalid")
+                        self_outer.historical_checkpoint_seal_calls.append(
+                            (replayed.row_id, replayed.nominal_cost_bps, len(replayed.fold_runs))
+                        )
+                        return replayed
+
+                self_outer = self
+                kwargs["checkpoint_store"] = HistoricalCheckpointSeam()
             return self.real_complete_matrix(*args, **kwargs)
 
         runner._alpha_max_complete_domain_matrix = complete_matrix_wrapper
@@ -763,6 +800,8 @@ class AlphaMaxCliProcessHarness:
             "binance",
             "--output-root",
             str(output.resolve()),
+            "--checkpoint-root",
+            str((output.parent / f"{output.name}-checkpoints").resolve()),
         ]
         for root_id in PRELOCK_ROOT_IDS:
             for kind in ("raw", "feature"):
@@ -791,6 +830,8 @@ class AlphaMaxCliProcessHarness:
             "binance",
             "--output-root",
             str(output.resolve()),
+            "--checkpoint-root",
+            str((output.parent / f"{output.name}-checkpoints").resolve()),
         ]
 
     def run_prelock(
@@ -1003,6 +1044,10 @@ def run_alpha_max_cli_process_fixture(temp_root: Path) -> dict[str, object]:
         "prelock_modes_unchanged": all(
             mode == (0o555 if relative == "." or not (prelock_no / relative).is_file() else 0o444)
             for relative, mode in _snapshot_modes(prelock_no).items()
+        ),
+        "historical_checkpoint_cells": len(harness.historical_checkpoint_seal_calls),
+        "historical_checkpoint_folds": sum(
+            folds for _row, _cost, folds in harness.historical_checkpoint_seal_calls
         ),
     }
 

@@ -4,10 +4,13 @@ import hashlib
 import inspect
 import json
 import os
+import struct
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import MappingProxyType, SimpleNamespace
 
+import numpy as np
+import polars as pl
 import pytest
 
 import lumina_quant.research.alpha_max_evidence as alpha_max_evidence
@@ -39,6 +42,7 @@ from lumina_quant.research.alpha_max_evidence import (
     AlphaMaxRunReportOnlyDiagnostics,
     AlphaMaxRootSeal,
     AlphaMaxStreamingEquityTracker,
+    AlphaMaxTreeEntry,
     FeatureRootSpec,
     materialize_alpha_max_manifest,
     select_alpha_max_prelock_champion,
@@ -428,12 +432,30 @@ def test_run_owned_root_writes_sealed_last_and_never_seals_mismatched_bytes(
     root = alpha_max_runner._create_alpha_max_run_owned_root(output)
     writes: list[str] = []
     original_write = alpha_max_runner._write_bundle_file
+    original_atomic_write = alpha_max_runner._write_bundle_file_atomic
+    original_final_seal = alpha_max_runner._alpha_max_write_final_seal
 
-    def recording_write(bundle_root, relative_path, payload):
+    def recording_atomic_write(bundle_root, relative_path, payload):
+        written = original_atomic_write(bundle_root, relative_path, payload)
         writes.append(relative_path)
-        return original_write(bundle_root, relative_path, payload)
+        return written
 
-    monkeypatch.setattr(alpha_max_runner, "_write_bundle_file", recording_write)
+    monkeypatch.setattr(
+        alpha_max_runner,
+        "_write_bundle_file_atomic",
+        recording_atomic_write,
+    )
+
+    def recording_final_seal(seal_fd, payload):
+        result = original_final_seal(seal_fd, payload)
+        writes.append("SEALED.json")
+        return result
+
+    monkeypatch.setattr(
+        alpha_max_runner,
+        "_alpha_max_write_final_seal",
+        recording_final_seal,
+    )
     bundle = alpha_max_runner._finalize_alpha_max_run_owned_root(
         root,
         {"report/result.json": b"{}\n"},
@@ -751,6 +773,822 @@ def test_actual_backtest_construction_binds_all_alpha_runtime_seams(
     ):
         fanout.settle_day_end(reporting_end, settle_funding=True)
     assert funding_boundaries == [reporting_end]
+
+
+def test_fold_equity_fanout_batch_matches_pointwise_streams() -> None:
+    start = datetime(2025, 1, 1, tzinfo=UTC)
+    end = start + timedelta(hours=8)
+    points = np.array(
+        [
+            [start.timestamp() + 1.0, 10_000.0],
+            [start.timestamp() + 2.0, 9_500.0],
+            [start.timestamp() + 3.0, 10_250.0],
+        ],
+        dtype=np.float64,
+    )
+    aggregate_reference = AlphaMaxStreamingEquityTracker()
+    pointwise = alpha_max_runner._AlphaMaxFoldEquityFanout(
+        aggregate_reference,
+        aggregate_scale=1.25,
+        reporting_start=start,
+        reporting_end=end,
+    )
+    for point in points:
+        pointwise.observe((float(point[0]), float(point[1])))
+
+    aggregate_batch = AlphaMaxStreamingEquityTracker()
+    batched = alpha_max_runner._AlphaMaxFoldEquityFanout(
+        aggregate_batch,
+        aggregate_scale=1.25,
+        reporting_start=start,
+        reporting_end=end,
+    )
+    batched.update_batch(points)
+
+    assert batched.finalize().to_payload() == pointwise.finalize().to_payload()
+    assert (
+        batched.normalized_segment_tracker.finalize().to_payload()
+        == pointwise.normalized_segment_tracker.finalize().to_payload()
+    )
+    assert aggregate_batch.finalize().to_payload() == aggregate_reference.finalize().to_payload()
+
+
+def test_exact_indicator_loader_consumes_only_requested_subwindow() -> None:
+    symbol = "ADAUSDT"
+    parent_start = datetime(2025, 6, 1, tzinfo=UTC)
+    parent_end = datetime(2025, 7, 1, tzinfo=UTC)
+    start = datetime(2025, 6, 8, tzinfo=UTC)
+    end = start + timedelta(hours=8)
+    timestamps = pl.datetime_range(
+        start,
+        end - timedelta(seconds=1),
+        interval="1s",
+        eager=True,
+    )
+    frame = pl.DataFrame(
+        {
+            "datetime": timestamps,
+            "open": [100.0] * len(timestamps),
+            "high": [101.0] * len(timestamps),
+            "low": [99.0] * len(timestamps),
+            "close": [100.0] * len(timestamps),
+            "volume": [0.1] * len(timestamps),
+        }
+    )
+
+    def entry(relative_path: str) -> AlphaMaxTreeEntry:
+        return AlphaMaxTreeEntry(
+            relative_path=relative_path,
+            byte_count=1,
+            mode=0o444,
+            mtime_ns=1,
+            minimum_timestamp_ms=int(parent_start.timestamp() * 1000),
+            maximum_timestamp_ms=int((parent_end - timedelta(seconds=1)).timestamp() * 1000),
+            row_count=1,
+            maximum_gap_ms=0,
+            sha256="a" * 64,
+        )
+
+    june = entry("raw/ADAUSDT/2025-06.parquet")
+    may = entry("raw/ADAUSDT/2025-05.parquet")
+
+    class Reader:
+        def __init__(self):
+            self.paths = []
+
+        def read_entry(self, value):
+            self.paths.append(value.relative_path)
+            if value is not june:
+                raise AssertionError("out-of-window partition was read")
+            return frame
+
+        def close(self):
+            return None
+
+    loader = object.__new__(alpha_max_runner._AlphaMaxBoundedRawLoader)
+    loader._seal = SimpleNamespace(
+        start_utc=parent_start,
+        end_utc=parent_end,
+        availability_start_by_symbol={symbol: parent_start},
+        availability_end_by_symbol={symbol: parent_end},
+    )
+    loader._admitted_symbols = (symbol,)
+    loader._entries = MappingProxyType(
+        {
+            (symbol, "2025-05.parquet"): may,
+            (symbol, "2025-06.parquet"): june,
+        }
+    )
+    loader._frame_cache = {}
+    loader._reader = Reader()
+    releases, windows = loader.fold_exact_indicator_phase(
+        alpha_max_runner.TimeframeAggregator(timeframes=["4h"]),
+        start=start,
+        end=end,
+    )
+
+    assert windows == 28_800
+    assert len(releases) == 1
+    assert loader._reader.paths == [june.relative_path]
+    assert loader._read_entry_cached(symbol, june) is frame
+    assert loader._reader.paths == [june.relative_path]
+
+
+def _assert_bit_exact(actual: object, expected: object) -> None:
+    if isinstance(expected, float):
+        assert type(actual) is float
+        assert struct.pack("!d", actual) == struct.pack("!d", expected)
+    elif isinstance(expected, dict):
+        assert type(actual) is dict
+        assert actual.keys() == expected.keys()
+        for key in expected:
+            _assert_bit_exact(actual[key], expected[key])
+    elif isinstance(expected, (tuple, list)):
+        assert type(actual) is type(expected)
+        assert len(actual) == len(expected)
+        for actual_item, expected_item in zip(actual, expected, strict=True):
+            _assert_bit_exact(actual_item, expected_item)
+    else:
+        assert actual == expected
+
+
+def _exact_loader(
+    *,
+    admitted: tuple[str, ...],
+    start: datetime,
+    end: datetime,
+    frames: dict[str, pl.DataFrame],
+    entry_order: tuple[str, ...],
+) -> alpha_max_runner._AlphaMaxBoundedRawLoader:
+    entries = {
+        path: AlphaMaxTreeEntry(
+            relative_path=path,
+            byte_count=1,
+            mode=0o444,
+            mtime_ns=1,
+            minimum_timestamp_ms=int(start.timestamp() * 1000),
+            maximum_timestamp_ms=int((end - timedelta(seconds=1)).timestamp() * 1000),
+            row_count=1,
+            maximum_gap_ms=0,
+            sha256="a" * 64,
+        )
+        for path in entry_order
+    }
+
+    class Reader:
+        def read_entry(self, entry: AlphaMaxTreeEntry) -> pl.DataFrame:
+            return frames[entry.relative_path]
+
+        def close(self) -> None:
+            return None
+
+    loader = object.__new__(alpha_max_runner._AlphaMaxBoundedRawLoader)
+    loader._seal = SimpleNamespace(
+        start_utc=start - timedelta(days=31),
+        end_utc=end + timedelta(days=31),
+        availability_start_by_symbol=dict.fromkeys(admitted, start - timedelta(days=31)),
+        availability_end_by_symbol=dict.fromkeys(admitted, end + timedelta(days=31)),
+    )
+    loader._admitted_symbols = admitted
+    loader._entries = MappingProxyType(
+        {(path.split("/")[1], Path(path).name): entries[path] for path in entry_order}
+    )
+    loader._frame_cache = {}
+    loader._reader = Reader()
+    return loader
+
+
+def _canonical_rows(frame: pl.DataFrame, start: datetime, end: datetime):
+    start_ms = int(start.timestamp() * 1000)
+    end_ms = int(end.timestamp() * 1000)
+    scoped = (
+        frame.with_columns(pl.col("datetime").dt.epoch("ms").alias("timestamp"))
+        .filter((pl.col("timestamp") >= start_ms) & (pl.col("timestamp") < end_ms))
+        .sort("timestamp")
+    )
+    return tuple(
+        (int(timestamp), float(open_), float(high), float(low), float(close), float(volume))
+        for timestamp, open_, high, low, close, volume in scoped.select(
+            ("timestamp", "open", "high", "low", "close", "volume")
+        ).iter_rows()
+    )
+
+
+def test_exact_indicator_loader_is_bit_exact_for_dense_multisymbol_4h_and_1d_releases() -> None:
+    start = datetime(2025, 6, 1, tzinfo=UTC)
+    end = start + timedelta(days=1)
+    admitted = ("ADAUSDT", "BTCUSDT")
+    timestamps = pl.datetime_range(start, end - timedelta(seconds=1), "1s", eager=True)
+    frames: dict[str, pl.DataFrame] = {}
+    paths: list[str] = []
+    for symbol_index, symbol in enumerate(admitted):
+        values = np.arange(len(timestamps), dtype=np.float64)
+        close = 100.0 + symbol_index + (values % 997.0) / 997.0
+        path = f"raw/{symbol}/2025-06.parquet"
+        paths.append(path)
+        frames[path] = pl.DataFrame(
+            {
+                "datetime": timestamps,
+                "open": close - 0.125,
+                "high": close + 0.25,
+                "low": close - 0.5,
+                "close": close,
+                "volume": (values % 13.0) / 10.0,
+            }
+        )
+
+    seeded = alpha_max_runner.TimeframeAggregator(timeframes=["4h", "1d"])
+    for symbol in admitted:
+        seeded.update_from_canonical_1s_rows_exact(
+            symbol,
+            (
+                (
+                    int((start - timedelta(seconds=1)).timestamp() * 1000),
+                    99.0,
+                    100.0,
+                    98.0,
+                    99.5,
+                    0.0,
+                ),
+            ),
+        )
+    initial_state = seeded.get_state()
+    expected = alpha_max_runner.TimeframeAggregator(timeframes=["4h", "1d"])
+    expected.set_state(initial_state)
+    expected_releases = tuple(
+        release
+        for symbol in admitted
+        for release in expected.update_from_canonical_1s_rows_exact(
+            symbol, _canonical_rows(frames[f"raw/{symbol}/2025-06.parquet"], start, end)
+        )
+    )
+    actual = alpha_max_runner.TimeframeAggregator(timeframes=["4h", "1d"])
+    actual.set_state(initial_state)
+    releases, windows = _exact_loader(
+        admitted=admitted, start=start, end=end, frames=frames, entry_order=tuple(reversed(paths))
+    ).fold_exact_indicator_phase(actual, start=start, end=end)
+
+    assert windows == 86_400
+    _assert_bit_exact(releases, expected_releases)
+    _assert_bit_exact(actual.get_state(), expected.get_state())
+    _assert_bit_exact(
+        actual.get_state()["history"]["ADAUSDT"]["1s"],
+        expected.get_state()["history"]["ADAUSDT"]["1s"],
+    )
+    alpha_max_runner._alpha_max_validate_final_native_working_bars(
+        actual,
+        admitted_symbols=admitted,
+        required_timeframes=("4h", "1d"),
+        end_ms=int(end.timestamp() * 1000),
+    )
+
+
+def test_exact_indicator_loader_matches_sparse_partitioned_subwindows_and_prior_state() -> None:
+    start = datetime(2025, 6, 30, 20, tzinfo=UTC)
+    end = datetime(2025, 7, 1, 8, tzinfo=UTC)
+    admitted = ("ADAUSDT", "BTCUSDT")
+    offsets = (-1, 60, 14_399, 14_401, 28_799, 28_801, 43_199, 43_201, 57_599, 57_601)
+    frames: dict[str, pl.DataFrame] = {}
+    paths: list[str] = []
+    for symbol_index, symbol in enumerate(admitted):
+        rows = [start + timedelta(seconds=offset) for offset in offsets]
+        close = [100.0 + symbol_index + index / 10.0 for index in range(len(rows))]
+        for month in ("2025-06", "2025-07"):
+            path = f"raw/{symbol}/{month}.parquet"
+            paths.append(path)
+            frames[path] = pl.DataFrame(
+                {
+                    "datetime": rows,
+                    "open": [value - 0.1 for value in close],
+                    "high": [value + 0.2 for value in close],
+                    "low": [value - 0.3 for value in close],
+                    "close": close,
+                    "volume": [0.0 if index % 2 else 0.25 for index in range(len(rows))],
+                }
+            ).filter(pl.col("datetime").dt.strftime("%Y-%m") == month)
+
+    prior_time = start - timedelta(seconds=1)
+    prior = (int(prior_time.timestamp() * 1000), 90.0, 91.0, 89.0, 90.5, 0.0)
+    expected = alpha_max_runner.TimeframeAggregator(timeframes=["4h", "1d"])
+    actual = alpha_max_runner.TimeframeAggregator(timeframes=["4h", "1d"])
+    for symbol in admitted:
+        expected.update_from_canonical_1s_rows_exact(symbol, (prior,))
+    actual.set_state(expected.get_state())
+    expected_releases = tuple(
+        release
+        for symbol in admitted
+        for month in ("2025-06", "2025-07")
+        for release in expected.update_from_canonical_1s_rows_exact(
+            symbol, _canonical_rows(frames[f"raw/{symbol}/{month}.parquet"], start, end)
+        )
+    )
+    loader = _exact_loader(
+        admitted=admitted, start=start, end=end, frames=frames, entry_order=tuple(reversed(paths))
+    )
+    releases, windows = loader.fold_exact_indicator_phase(actual, start=start, end=end)
+
+    assert windows == 43_200
+    _assert_bit_exact(releases, expected_releases)
+    _assert_bit_exact(actual.get_state(), expected.get_state())
+    for symbol in admitted:
+        _assert_bit_exact(
+            actual.get_state()["history"][symbol]["1s"],
+            expected.get_state()["history"][symbol]["1s"],
+        )
+
+
+def test_native_indicator_fold_releases_simultaneous_boundaries_in_trigger_order() -> None:
+    start = datetime(2025, 6, 30, 23, 59, 59, tzinfo=UTC)
+    end = start + timedelta(seconds=3)
+    symbol = "ADAUSDT"
+    rows = [start + timedelta(seconds=offset) for offset in range(3)]
+    frames = {
+        "raw/ADAUSDT/2025-06.parquet": pl.DataFrame(
+            {
+                "datetime": rows[:1],
+                "open": [10.0],
+                "high": [10.0],
+                "low": [10.0],
+                "close": [10.0],
+                "volume": [1.0e16],
+            }
+        ),
+        "raw/ADAUSDT/2025-07.parquet": pl.DataFrame(
+            {
+                "datetime": rows[1:],
+                "open": [11.0, 12.0],
+                "high": [11.0, 12.0],
+                "low": [11.0, 12.0],
+                "close": [11.0, 12.0],
+                "volume": [1.0, 1.0e-16],
+            }
+        ),
+    }
+    prior = (
+        int((start - timedelta(seconds=1)).timestamp() * 1000),
+        9.0,
+        9.0,
+        9.0,
+        9.0,
+        1.0e16,
+    )
+    expected = alpha_max_runner.TimeframeAggregator(timeframes=["4h", "1d"])
+    actual = alpha_max_runner.TimeframeAggregator(timeframes=["4h", "1d"])
+    expected.update_from_canonical_1s_rows_exact(symbol, (prior,))
+    actual.set_state(expected.get_state())
+    expected_releases = tuple(
+        release
+        for path in ("raw/ADAUSDT/2025-06.parquet", "raw/ADAUSDT/2025-07.parquet")
+        for release in expected.update_from_canonical_1s_rows_exact(
+            symbol, _canonical_rows(frames[path], start, end)
+        )
+    )
+    releases, windows = _exact_loader(
+        admitted=(symbol,),
+        start=start,
+        end=end,
+        frames=frames,
+        entry_order=tuple(reversed(tuple(frames))),
+    ).fold_exact_indicator_phase(actual, start=start, end=end)
+
+    assert windows == 3
+    assert tuple(release.release_timestamp_ms for release in releases) == (
+        int(rows[1].timestamp() * 1000),
+        int(rows[1].timestamp() * 1000),
+    )
+    assert tuple(release.timeframe for release in releases) == ("4h", "1d")
+    _assert_bit_exact(releases, expected_releases)
+    _assert_bit_exact(actual.get_state(), expected.get_state())
+    _assert_bit_exact(
+        actual.get_state()["history"][symbol]["1s"],
+        expected.get_state()["history"][symbol]["1s"],
+    )
+
+
+def test_native_indicator_fold_rejects_malformed_arrays_and_state() -> None:
+    from lumina_quant import _compute
+
+    fold = _compute.fold_alpha_max_native_bars
+    common = (
+        np.array([1_000], dtype=np.int64),
+        np.array([1.0], dtype=np.float64),
+        np.array([1.0], dtype=np.float64),
+        np.array([1.0], dtype=np.float64),
+        np.array([1.0], dtype=np.float64),
+        np.array([0.0], dtype=np.float64),
+        np.array([14_400_000], dtype=np.int64),
+        -1,
+        np.array([0], dtype=np.uint8),
+        np.array([0], dtype=np.int64),
+        np.array([0.0], dtype=np.float64),
+        np.array([0.0], dtype=np.float64),
+        np.array([0.0], dtype=np.float64),
+        np.array([0.0], dtype=np.float64),
+        np.array([0.0], dtype=np.float64),
+    )
+    with pytest.raises(ValueError, match="timestamps_ms"):
+        fold(np.array([1_001], dtype=np.int64), *common[1:])
+    with pytest.raises(ValueError, match="inactive working state"):
+        fold(
+            *common[:8], np.array([0], dtype=np.uint8), np.array([1], dtype=np.int64), *common[10:]
+        )
+    with pytest.raises(ValueError, match="timeframe_ms"):
+        fold(
+            *common[:6],
+            np.array([14_400_000, 14_400_000], dtype=np.int64),
+            common[7],
+            np.array([0, 0], dtype=np.uint8),
+            np.array([0, 0], dtype=np.int64),
+            *[np.array([0.0, 0.0], dtype=np.float64) for _ in range(5)],
+        )
+    with pytest.raises(ValueError, match="realistic"):
+        fold(
+            np.array([100_000_001_000], dtype=np.int64),
+            *common[1:7],
+            0,
+            np.array([1], dtype=np.uint8),
+            np.array([0], dtype=np.int64),
+            *[np.array([1.0], dtype=np.float64) for _ in range(5)],
+        )
+
+
+def test_exact_native_day_restart_matches_uninterrupted_capsule(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    start = datetime(2024, 1, 1, tzinfo=UTC)
+    end = start + timedelta(days=2)
+    admitted = ("BTCUSDT",)
+    descriptor = {"artifact_kind": "instrumented-day-checkpoint"}
+    descriptor_bytes = alpha_max_runner._canonical_bytes(descriptor) + b"\n"
+    finalizations: list[int] = []
+
+    class FakeLookup:
+        ordered_root_ids = ("warmup",)
+
+    class FakeAggregator:
+        def __init__(self, *, timeframes: list[str]) -> None:
+            assert timeframes == ["4h", "1d"]
+            self.state = {"day_count": 0}
+
+        def get_state(self) -> dict[str, int]:
+            return dict(self.state)
+
+        def set_state(self, value: dict[str, int]) -> None:
+            self.state = dict(value)
+
+    class FakeLoader:
+        seal = SimpleNamespace(
+            path=str((tmp_path / "raw").resolve()),
+            root_id="warmup",
+            symbols=ALPHA_MAX_CANDIDATE_SYMBOLS,
+        )
+
+        def fold_exact_indicator_phase(
+            self,
+            aggregator: FakeAggregator,
+            *,
+            start: datetime,
+            end: datetime,
+        ) -> tuple[tuple[object, ...], int]:
+            assert end - start == timedelta(days=1)
+            day_index = (start - globals_start).days
+            releases: list[object] = []
+            four_hour_offsets = range(4, 24, 4) if day_index == 0 else range(0, 24, 4)
+            for hour in four_hour_offsets:
+                timestamp = start + timedelta(hours=hour)
+                releases.append(
+                    alpha_max_runner.NativeBarRelease(
+                        release_timestamp_ms=int(timestamp.timestamp() * 1000),
+                        symbol=admitted[0],
+                        timeframe="4h",
+                        bar=(timestamp, 1.0, 1.0, 1.0, 1.0, 1.0),
+                    )
+                )
+            if day_index:
+                releases.append(
+                    alpha_max_runner.NativeBarRelease(
+                        release_timestamp_ms=int(start.timestamp() * 1000),
+                        symbol=admitted[0],
+                        timeframe="1d",
+                        bar=(start, 1.0, 1.0, 1.0, 1.0, 1.0),
+                    )
+                )
+            aggregator.state["day_count"] = day_index + 1
+            return tuple(releases), 86_400
+
+    class FakeStrategy:
+        def __init__(
+            self,
+            bars: object,
+            events: object,
+            *,
+            portfolio_mode: str,
+            decision_cadence_seconds: int,
+        ) -> None:
+            assert portfolio_mode == "instrumented"
+            assert decision_cadence_seconds == 1
+            self.required_timeframes = ("4h", "1d")
+            self._children: list[tuple[object, object, object]] = []
+            self.state = {"handoffs": 0, "release_groups": 0}
+
+        def get_state(self) -> dict[str, int]:
+            return dict(self.state)
+
+        def set_state(self, value: dict[str, int]) -> None:
+            self.state = dict(value)
+
+        def calculate_signals_completed_native_release(self, **_kwargs: object) -> None:
+            self.state["release_groups"] += 1
+
+        def calculate_signals_context(self, _context: object) -> None:
+            self.state["handoffs"] += 1
+
+        def validate_research_warmup_ready(self) -> None:
+            return None
+
+        def get_research_indicator_state(self) -> dict[str, object]:
+            value: dict[str, object] = {"state": dict(self.state)}
+            value["sha256"] = hashlib.sha256(alpha_max_runner._canonical_bytes(value)).hexdigest()
+            return value
+
+    class FakeStore:
+        def __init__(
+            self,
+            journal: dict[str, object],
+            *,
+            crash_after_seal: bool,
+        ) -> None:
+            self.root = (tmp_path / "checkpoint").resolve()
+            self._descriptor_bytes = descriptor_bytes
+            self.journal = journal
+            self.crash_after_seal = crash_after_seal
+
+        def load_latest(self, **_kwargs: object) -> object | None:
+            return self.journal.get("carry")
+
+        def seal(self, carry: object) -> None:
+            self.journal["carry"] = carry
+            if self.crash_after_seal:
+                raise RuntimeError("instrumented-crash-after-day-rename")
+
+    globals_start = start
+    seal = SimpleNamespace(
+        expected_definition=SimpleNamespace(
+            components=(),
+            native_timeframes=("4h", "1d"),
+            portfolio_mode="instrumented",
+        ),
+        manifest_receipt=SimpleNamespace(sha256="a" * 64),
+    )
+    preflight = SimpleNamespace(
+        phase_windows={"warmup": SimpleNamespace()},
+    )
+    config = SimpleNamespace(
+        START_DATE=start.isoformat().replace("+00:00", "Z"),
+        END_DATE=end.isoformat().replace("+00:00", "Z"),
+    )
+    candidate_identity = {"candidate": "instrumented"}
+
+    monkeypatch.setattr(alpha_max_runner, "AlphaMaxOrderedFundingLookup", FakeLookup)
+    monkeypatch.setattr(alpha_max_runner, "_AlphaMaxBoundedRawLoader", FakeLoader)
+    monkeypatch.setattr(alpha_max_runner, "_AlphaMaxIndicatorDayCheckpointStore", FakeStore)
+    monkeypatch.setattr(alpha_max_runner, "TimeframeAggregator", FakeAggregator)
+    monkeypatch.setattr(alpha_max_runner, "ArtifactPortfolioModeStrategy", FakeStrategy)
+    monkeypatch.setattr(alpha_max_runner, "_validate_preflight", lambda _value: None)
+    monkeypatch.setattr(
+        alpha_max_runner,
+        "_validate_admitted_symbols",
+        lambda _preflight, symbols: symbols,
+    )
+    monkeypatch.setattr(
+        alpha_max_runner,
+        "_alpha_max_expected_root_sequence",
+        lambda _phase_id: ("warmup",),
+    )
+    monkeypatch.setattr(
+        alpha_max_runner,
+        "seal_alpha_max_manifest_activation",
+        lambda *_args, **_kwargs: seal,
+    )
+    monkeypatch.setattr(
+        alpha_max_runner,
+        "build_alpha_max_backtest_config",
+        lambda *_args, **_kwargs: config,
+    )
+    monkeypatch.setattr(alpha_max_runner, "_assert_definition_matches", lambda *_args: None)
+    monkeypatch.setattr(alpha_max_runner, "_assert_child_identities", lambda *_args: None)
+    monkeypatch.setattr(
+        alpha_max_runner,
+        "_alpha_max_indicator_day_checkpoint_descriptor",
+        lambda *_args, **_kwargs: descriptor,
+    )
+    monkeypatch.setattr(
+        alpha_max_runner,
+        "_alpha_max_validate_final_native_working_bars",
+        lambda *_args, **_kwargs: None,
+    )
+
+    def finalize(*_args: object, **_kwargs: object) -> SimpleNamespace:
+        finalizations.append(1)
+        return SimpleNamespace(
+            discarded_signal_count=0,
+            finalized_children={},
+            sha256="b" * 64,
+        )
+
+    monkeypatch.setattr(alpha_max_runner, "_finalize_alpha_max_native_boundary", finalize)
+
+    def run(store: FakeStore) -> object:
+        return alpha_max_runner._build_alpha_max_indicator_capsule_exact_native(
+            preflight,
+            output_root=tmp_path,
+            phase="validation_train_fit",
+            manifest_path=tmp_path / "manifest.json",
+            admitted_symbols=admitted,
+            phase_id="warmup",
+            raw_root=FakeLoader.seal.path,
+            ordered_lookup=FakeLookup(),
+            watermark=config.END_DATE,
+            prior_indicator_capsule=None,
+            bounded_raw_loader=FakeLoader(),
+            checkpoint_store=store,
+            checkpoint_candidate_identity=candidate_identity,
+        )
+
+    uninterrupted = run(FakeStore({}, crash_after_seal=False))
+    journal: dict[str, object] = {}
+    with pytest.raises(RuntimeError, match="crash-after-day-rename"):
+        run(FakeStore(journal, crash_after_seal=True))
+    resumed = run(FakeStore(journal, crash_after_seal=False))
+
+    assert uninterrupted == resumed
+    assert uninterrupted.windows_processed == 172_800
+    assert uninterrupted.capsule["state"] == {
+        "handoffs": 1,
+        "release_groups": 11,
+    }
+    assert len(finalizations) == 2
+
+
+def test_indicator_capsule_validation_rejects_economic_or_finalization_tamper() -> None:
+    state = {"child_states": {}, "sha256": ""}
+    state["sha256"] = hashlib.sha256(
+        alpha_max_runner._canonical_bytes({"child_states": {}})
+    ).hexdigest()
+    seal = SimpleNamespace(
+        manifest_receipt=SimpleNamespace(sha256="a" * 64),
+        expected_definition=SimpleNamespace(
+            portfolio_mode="mode",
+            admitted_symbols=("ADAUSDT",),
+            components=(SimpleNamespace(component_id="component"),),
+        ),
+    )
+    valid_fields = {
+        "portfolio_mode": "mode",
+        "phase_id": "warmup",
+        "manifest_sha256": "a" * 64,
+        "capsule_sha256": state["sha256"],
+        "capsule": MappingProxyType(state),
+        "finalized_children": MappingProxyType({}),
+        "native_finalization_sha256": "b" * 64,
+        "windows_processed": 1,
+        "discarded_signal_count": 0,
+    }
+    with pytest.raises(AlphaMaxRuntimeContractError, match="finalization_invalid"):
+        alpha_max_runner._validate_alpha_max_indicator_capsule(
+            alpha_max_runner.AlphaMaxIndicatorCapsule(**valid_fields),
+            seal=seal,
+            expected_phase_id="warmup",
+        )
+    with pytest.raises(AlphaMaxRuntimeContractError, match="capsule_invalid"):
+        alpha_max_runner._validate_alpha_max_indicator_capsule(
+            alpha_max_runner.AlphaMaxIndicatorCapsule(
+                **valid_fields,
+                market_event_count=1,
+            ),
+            seal=seal,
+            expected_phase_id="warmup",
+        )
+
+
+def test_exact_tick_reducer_matches_one_second_engine_state(
+    tmp_path: Path,
+) -> None:
+    preflight = preflight_alpha_max_runtime_contract(str(CONFIG_PATH))
+    admitted = preflight.candidate_symbols[:5]
+    root = _owned_root(tmp_path)
+    node = next(row for row in _nodes() if row["row_id"] == "component_trend_1x")
+    materialized = materialize_alpha_max_manifest(
+        node,
+        {"component_trend_1x": 1.0},
+        1.0,
+        "validation_train_fit",
+        str(CONFIG_PATH),
+        str(root),
+        preflight.candidate_symbols,
+        admitted,
+        "d" * 64,
+    )
+    purge_feature_root = (tmp_path / "features-purge").resolve()
+    validation_feature_root = (tmp_path / "features-validation").resolve()
+    raw_root = (tmp_path / "raw-validation").resolve()
+    purge_feature_root.mkdir()
+    validation_feature_root.mkdir()
+    raw_root.mkdir()
+    purge_window = preflight.phase_windows["purge"]
+    validation_window = preflight.phase_windows["validation"]
+    lookup = AlphaMaxOrderedFundingLookup(
+        (
+            FeatureRootSpec(
+                "purge",
+                str(purge_feature_root),
+                "binance",
+                purge_window.start_utc,
+                purge_window.end_utc,
+                "a" * 64,
+                "b" * 64,
+            ),
+            FeatureRootSpec(
+                "validation",
+                str(validation_feature_root),
+                "binance",
+                validation_window.start_utc,
+                validation_window.end_utc,
+                "c" * 64,
+                "d" * 64,
+            ),
+        )
+    )
+    start = datetime(2025, 6, 8, tzinfo=UTC)
+    timestamps = pl.datetime_range(
+        start,
+        start + timedelta(hours=1) - timedelta(seconds=1),
+        interval="1s",
+        eager=True,
+    )
+    data = {
+        symbol: pl.DataFrame(
+            {
+                "datetime": timestamps,
+                "open": [100.0 + index] * len(timestamps),
+                "high": [101.0 + index] * len(timestamps),
+                "low": [99.0 + index] * len(timestamps),
+                "close": [100.0 + index] * len(timestamps),
+                "volume": [10.0] * len(timestamps),
+            }
+        )
+        for index, symbol in enumerate(admitted)
+    }
+
+    def activation(tracker: AlphaMaxStreamingEquityTracker):
+        return construct_alpha_max_engine(
+            preflight,
+            output_root=str(root),
+            phase="validation_train_fit",
+            manifest_path=materialized.path,
+            admitted_symbols=admitted,
+            phase_id="validation",
+            nominal_cost_bps=30,
+            raw_root=str(raw_root),
+            ordered_lookup=lookup,
+            funding_resolver=AlphaMaxFundingBoundaryResolver(lookup, admitted),
+            data_dict=data,
+            full_event_equity_tracker=tracker,
+            _chunk_start_utc=start,
+            _chunk_end_utc=start + timedelta(days=1),
+        )
+
+    reference_tracker = AlphaMaxStreamingEquityTracker()
+    reference = activation(reference_tracker)
+    validate_alpha_max_engine_activation(reference)
+    reference.backtest._run_backtest()
+
+    batch_tracker = AlphaMaxStreamingEquityTracker()
+    batched = activation(batch_tracker)
+    validate_alpha_max_engine_activation(batched)
+    alpha_max_runner._run_alpha_max_exact_tick_reducer(batched)
+
+    assert batch_tracker.finalize().to_payload() == reference_tracker.finalize().to_payload()
+    assert batched.backtest.market_events == reference.backtest.market_events
+    assert batched.backtest.signals == reference.backtest.signals
+    assert batched.backtest.orders == reference.backtest.orders
+    assert batched.backtest.fills == reference.backtest.fills
+    assert batched.backtest.strategy.get_state() == reference.backtest.strategy.get_state()
+    assert batched.backtest.portfolio.get_state() == reference.backtest.portfolio.get_state()
+    assert (
+        batched.backtest.execution_handler.get_state()
+        == reference.backtest.execution_handler.get_state()
+    )
+    assert (
+        batched.backtest._event_sequencer.get_state()
+        == reference.backtest._event_sequencer.get_state()
+    )
+    assert {
+        symbol: tuple(rows) for symbol, rows in batched.backtest.data_handler._window_rows.items()
+    } == {
+        symbol: tuple(rows) for symbol, rows in reference.backtest.data_handler._window_rows.items()
+    }
 
 
 def test_actual_engine_intrabar_liquidation_wipeout_is_terminal_before_open_order_sweep(
@@ -1772,3 +2610,16 @@ def test_trend_liquidity_falsifier_is_wired_to_prelock_and_historical_artifact_p
         in historical_source
     )
     assert "historical_trend_liquidity_falsifier" in historical_source
+
+
+def test_indicator_incremental_checkpoint_is_opt_in_and_final_only() -> None:
+    """The operational journal is deliberately not part of capsule output."""
+    parameters = inspect.signature(
+        alpha_max_runner._build_alpha_max_indicator_capsule_incremental
+    ).parameters
+    assert parameters["checkpoint_store"].default is None
+    assert (
+        "checkpoint_store"
+        in inspect.signature(alpha_max_runner.build_alpha_max_indicator_capsule).parameters
+    )
+    assert "checkpoint" not in alpha_max_runner.AlphaMaxIndicatorCapsule.__dataclass_fields__

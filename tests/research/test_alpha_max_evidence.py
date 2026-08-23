@@ -10,6 +10,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import MappingProxyType
 
+import numpy as np
 import pytest
 
 import lumina_quant.research.alpha_max_evidence as evidence
@@ -2273,6 +2274,48 @@ def test_streaming_full_event_tracker_is_exact_and_constant_memory_for_large_str
     assert tracker.state_size_bytes < 4096
     with pytest.raises(FrozenInstanceError):
         snapshot.event_count = 1
+
+
+@pytest.mark.parametrize(
+    "value",
+    (0.0, -0.0, 1.0, -25.125, 1e-10, 1e20, 9_999.999999999998),
+)
+def test_streaming_equity_record_fast_encoding_is_canonical(value: float) -> None:
+    assert evidence._alpha_max_streaming_equity_record_bytes(value, 7, 1234) == (
+        evidence._canonical_json_bytes(
+            {"equity": value, "event_index": 7, "timestamp_ms": 1234},
+            newline=True,
+        )
+    )
+
+
+def test_streaming_full_event_batch_is_byte_exact_across_continuations() -> None:
+    seconds = np.arange(1_700_000_000.0, 1_700_000_010.0, dtype=np.float64)
+    equities = np.array(
+        [
+            10_000.0,
+            10_000.0,
+            9_500.0,
+            9_000.0,
+            10_000.0,
+            10_500.0,
+            10_500.0,
+            0.0,
+            -25.125,
+            10_600.0,
+        ],
+        dtype=np.float64,
+    )
+    points = np.column_stack((seconds, equities))
+    reference = AlphaMaxStreamingEquityTracker()
+    for second, equity in points:
+        reference.observe((float(second), float(equity)))
+    batched = AlphaMaxStreamingEquityTracker()
+    batched.update_batch(points[:4])
+    batched.update_batch(points[4:])
+
+    assert batched.finalize().to_payload() == reference.finalize().to_payload()
+    assert batched.event_stream_sha256 == reference.event_stream_sha256
 
 
 def test_streaming_full_event_tracker_rejects_malformed_portfolio_sink_points() -> None:

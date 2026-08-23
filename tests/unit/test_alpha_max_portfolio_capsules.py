@@ -122,6 +122,32 @@ class _WarmupReadyChild(_CapsuleChild):
         self.warmup_ready_calls += 1
 
 
+class _Release4hChild(_CapsuleChild):
+    native_timeframe = "4h"
+    native_timeframe_ms = 14_400_000
+
+    def calculate_signals_context(self, context):
+        self.state["release"] = {
+            "time": context.event.time,
+            "symbols": list(context.event.bars_1s),
+            "lookup_id": id(context.feature_lookup),
+            "completed": context.event.completed_native_bars,
+        }
+
+
+class _Release1dChild(_CapsuleChild):
+    native_timeframe = "1d"
+    native_timeframe_ms = 86_400_000
+
+    def calculate_signals_context(self, context):
+        self.state["release"] = {
+            "time": context.event.time,
+            "symbols": list(context.event.bars_1s),
+            "lookup_id": id(context.feature_lookup),
+            "completed": context.event.completed_native_bars,
+        }
+
+
 class _MutatingFinalizeChild(_CapsuleChild):
     def finalize_completed_native_buckets(self, watermark):
         self.finalize_calls.append(watermark)
@@ -192,6 +218,58 @@ def test_portfolio_mode_decision_cadence_defaults_to_60_and_accepts_explicit_1(m
 
     with pytest.raises(ValueError, match="decision_cadence_seconds"):
         _strategy(monkeypatch, [_component("comp-a")], decision_cadence_seconds=0)
+
+
+def test_completed_native_release_prevalidates_and_uses_manifest_order(monkeypatch) -> None:
+    strategy = _strategy(
+        monkeypatch,
+        [
+            _component("daily", ("ETH/USDT",), strategy_class="Release1d"),
+            _component("carry", ("BNB/USDT",), strategy_class="Release4h"),
+        ],
+        mapping={"Release1d": _Release1dChild, "Release4h": _Release4hChild},
+    )
+    lookup = object()
+    release_ms = int(datetime(2026, 1, 2, tzinfo=UTC).timestamp() * 1000)
+    bar = (datetime(2026, 1, 1), 100.0, 101.0, 99.0, 100.5, 10.0)
+    strategy.calculate_signals_completed_native_release(
+        release_timestamp_ms=release_ms,
+        bars_by_timeframe={
+            "4h": {"BNB/USDT": bar},
+            "1d": {"ETH/USDT": bar},
+        },
+        feature_lookup=lookup,
+    )
+    by_id = {
+        component.component_id: child.state["release"]
+        for component, child, _queue in strategy._children
+    }
+    assert by_id == {
+        "daily": {
+            "time": release_ms,
+            "symbols": ["ETH/USDT"],
+            "lookup_id": id(lookup),
+            "completed": True,
+        },
+        "carry": {
+            "time": release_ms,
+            "symbols": ["BNB/USDT"],
+            "lookup_id": id(lookup),
+            "completed": True,
+        },
+    }
+
+    before = _child_states(strategy)
+    with pytest.raises(ValueError, match="symbols"):
+        strategy.calculate_signals_completed_native_release(
+            release_timestamp_ms=release_ms,
+            bars_by_timeframe={
+                "4h": {"ETH/USDT": bar},
+                "1d": {"ETH/USDT": bar},
+            },
+            feature_lookup=lookup,
+        )
+    assert _child_states(strategy) == before
 
 
 def test_portfolio_mode_rejects_duplicate_component_ids_only_for_capsule_mode(monkeypatch):

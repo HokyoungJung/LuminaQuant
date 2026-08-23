@@ -44,6 +44,7 @@ PRELOCK_OPTIONS = {
     "--contract-manifest",
     "--exchange",
     "--output-root",
+    "--checkpoint-root",
     "--warmup-raw-root",
     "--warmup-feature-root",
     "--train-raw-root",
@@ -62,6 +63,7 @@ HISTORICAL_OPTIONS = {
     "--historical-evaluation-feature-root",
     "--exchange",
     "--output-root",
+    "--checkpoint-root",
 }
 BASELINE_LQ_KEYS = tuple(sorted(key for key in os.environ if key.startswith("LQ_")))
 
@@ -242,6 +244,8 @@ def _placeholder_prelock_argv() -> list[str]:
         "binance",
         "--output-root",
         "/not-opened/output",
+        "--checkpoint-root",
+        "/not-opened/checkpoints",
     ]
     for phase in ("warmup", "train", "purge", "validation", "embargo"):
         for kind in ("raw", "feature"):
@@ -263,6 +267,8 @@ def _placeholder_historical_argv() -> list[str]:
         "binance",
         "--output-root",
         "/not-opened/output",
+        "--checkpoint-root",
+        "/not-opened/checkpoints",
     ]
 
 
@@ -401,12 +407,21 @@ def test_clean_cli_main_delegates_exact_parsed_namespace(monkeypatch) -> None:
             monkeypatch.delenv(key, raising=False)
     module = _load("alpha_max_prelock_delegate", PRELOCK_PATH)
     seen = {}
-    monkeypatch.setattr(module, "_execute", lambda args: seen.update(vars(args)) or 0)
+    monkeypatch.setattr(
+        module,
+        "_execute",
+        lambda args, **kwargs: (
+            seen.update(vars(args))
+            or seen.update(bootstrap_inventory=kwargs["bootstrap_implementation_inventory"])
+            or 0
+        ),
+    )
     argv = []
     for option in (
         "config",
         "contract-manifest",
         "output-root",
+        "checkpoint-root",
         "warmup-raw-root",
         "warmup-feature-root",
         "train-raw-root",
@@ -423,7 +438,41 @@ def test_clean_cli_main_delegates_exact_parsed_namespace(monkeypatch) -> None:
 
     assert module.main(argv) == 0
     assert seen["exchange"] == "binance"
-    assert len(seen) == 14
+    assert seen["bootstrap_inventory"]
+    assert len(seen) == 16
+
+
+def test_historical_cli_forwards_checkpoint_root_exactly(monkeypatch) -> None:
+    module = _load("alpha_max_historical_delegate", HISTORICAL_PATH)
+    seen: dict[str, object] = {}
+    monkeypatch.setattr(
+        module,
+        "_execute",
+        lambda args: seen.update(vars(args)) or 0,
+    )
+    checkpoint_root = "/historical/checkpoint-root"
+    assert (
+        module.main(
+            [
+                "--sealed-prelock-directory",
+                "/prelock",
+                "--embargo-feature-root",
+                "/embargo-feature",
+                "--historical-evaluation-raw-root",
+                "/historical-raw",
+                "--historical-evaluation-feature-root",
+                "/historical-feature",
+                "--exchange",
+                "binance",
+                "--output-root",
+                "/historical-output",
+                "--checkpoint-root",
+                checkpoint_root,
+            ]
+        )
+        == 0
+    )
+    assert seen["checkpoint_root"] == checkpoint_root
 
 
 def test_prelock_invalid_roots_leave_no_output_or_stage(tmp_path: Path) -> None:
@@ -441,6 +490,7 @@ def test_prelock_invalid_roots_leave_no_output_or_stage(tmp_path: Path) -> None:
             contract_manifest=str(CONTRACT_PATH.resolve()),
             exchange="binance",
             output_root=str(output),
+            checkpoint_root=str((tmp_path / "prelock-checkpoints").resolve()),
             **roots,
         )
 
@@ -465,6 +515,8 @@ def test_prelock_cli_process_failure_leaves_no_output_or_stage(tmp_path: Path) -
         "binance",
         "--output-root",
         str(output),
+        "--checkpoint-root",
+        str((tmp_path / "prelock-checkpoints").resolve()),
     ]
     for name in ("warmup", "train", "purge", "validation", "embargo"):
         for kind in ("raw", "feature"):
@@ -586,6 +638,7 @@ def test_historical_invalid_roots_leave_no_output(tmp_path: Path) -> None:
             historical_evaluation_feature_root=str(historical_feature),
             exchange="binance",
             output_root=str(output),
+            checkpoint_root=str((tmp_path / "historical-checkpoints").resolve()),
         )
 
     assert not output.exists()
@@ -629,6 +682,8 @@ def test_p08_historical_process_accepts_exact_frozen_matrix_before_root_gate(
         "binance",
         "--output-root",
         str(output),
+        "--checkpoint-root",
+        str((tmp_path / "historical-checkpoints").resolve()),
     )
 
     assert result.returncode != 0
@@ -729,18 +784,59 @@ def _run_physical_schedule_child(temp_root: Path) -> None:
     duplicate_output = (temp_root / "historical-output-duplicate").resolve()
     snapshot = SimpleNamespace(root_path=str(prelock))
     embargo_bytes = b'{"root":"embargo"}\n'
+
+    def root_seal(
+        *,
+        root_id: str,
+        root_kind: str,
+        path: Path,
+        payload: bytes,
+        marker: str,
+    ) -> SimpleNamespace:
+        return SimpleNamespace(
+            availability_sha256=marker * 64,
+            canonical_bytes=payload,
+            content_sha256=marker * 64,
+            inventory_sha256=marker * 64,
+            path=str(path),
+            root_id=root_id,
+            root_kind=root_kind,
+            sha256=marker * 64,
+        )
+
     root_seals = {
         ("embargo", "feature"): SimpleNamespace(
-            canonical_bytes=embargo_bytes,
-            path=str(temp_root / "embargo-feature"),
+            **vars(
+                root_seal(
+                    root_id="embargo",
+                    root_kind="feature",
+                    path=temp_root / "embargo-feature",
+                    payload=embargo_bytes,
+                    marker="a",
+                )
+            ),
         ),
         ("historical_exposed_evaluation", "raw"): SimpleNamespace(
-            canonical_bytes=b"{}\n",
-            path=str(temp_root / "historical-raw"),
+            **vars(
+                root_seal(
+                    root_id="historical_exposed_evaluation",
+                    root_kind="raw",
+                    path=temp_root / "historical-raw",
+                    payload=b"{}\n",
+                    marker="b",
+                )
+            ),
         ),
         ("historical_exposed_evaluation", "feature"): SimpleNamespace(
-            canonical_bytes=b"{}\n",
-            path=str(temp_root / "historical-feature"),
+            **vars(
+                root_seal(
+                    root_id="historical_exposed_evaluation",
+                    root_kind="feature",
+                    path=temp_root / "historical-feature",
+                    payload=b"{}\n",
+                    marker="c",
+                )
+            ),
         ),
     }
     seal_bytes = b'{"prelock_champion":null,"selected_candidate_id":null}\n'
@@ -777,7 +873,8 @@ def _run_physical_schedule_child(temp_root: Path) -> None:
     runner._alpha_max_root_validation = lambda *_args, **_kwargs: (root_seals, ())
     runner._validate_alpha_max_adjacent_feature_roots = lambda *_args, **_kwargs: None
     runner._read_alpha_max_prelock_artifact = read_artifact
-    runner.preflight_alpha_max_runtime_contract = lambda _path: SimpleNamespace(config_bytes=b"{}")
+    physical_preflight = runner.preflight_alpha_max_runtime_contract(CONFIG_PATH)
+    runner.preflight_alpha_max_runtime_contract = lambda _path: physical_preflight
     runner._alpha_max_current_nodes = lambda _preflight: tuple(nodes)
     runner.build_alpha_max_trial_ledger = lambda *_args, **_kwargs: SimpleNamespace()
     evidence.validate_alpha_max_admission_artifact = lambda _raw: SimpleNamespace(
@@ -820,8 +917,33 @@ def _run_physical_schedule_child(temp_root: Path) -> None:
     runner._alpha_max_matrix_artifacts = lambda matrix: {
         "status/matrix.json": matrix.status_payload
     }
+
+    class InstrumentedCellCheckpointStore:
+        def __init__(
+            self,
+            _checkpoint_root: str,
+            *,
+            output_root: str,
+            descriptor: object,
+            config_bytes: bytes,
+        ) -> None:
+            assert descriptor
+            assert config_bytes
+            self.output_root = Path(output_root).resolve()
+            self.display_output_root = self.output_root
+            self._physical_schedule_sha256 = descriptor["physical_schedule_sha256"]
+
+        def load(self, **_kwargs: object) -> None:
+            return None
+
+        def seal(self, evidence_value: object, **_kwargs: object) -> object:
+            return evidence_value
+
+    runner._AlphaMaxCellCheckpointStore = InstrumentedCellCheckpointStore
     write_order: list[str] = []
     real_write_bundle_file = runner._write_bundle_file
+    real_write_bundle_file_atomic = runner._write_bundle_file_atomic
+    real_write_final_seal = runner._alpha_max_write_final_seal
 
     def recording_write_bundle_file(root: Path, relative_path: str, payload: bytes) -> Path:
         written = real_write_bundle_file(root, relative_path, payload)
@@ -830,6 +952,23 @@ def _run_physical_schedule_child(temp_root: Path) -> None:
 
     runner._write_bundle_file = recording_write_bundle_file
 
+    def recording_write_bundle_file_atomic(
+        root: Path,
+        relative_path: str,
+        payload: bytes,
+    ) -> Path:
+        written = real_write_bundle_file_atomic(root, relative_path, payload)
+        write_order.append(Path(relative_path).as_posix())
+        return written
+
+    runner._write_bundle_file_atomic = recording_write_bundle_file_atomic
+
+    def recording_write_final_seal(fd: int, payload: bytes) -> None:
+        real_write_final_seal(fd, payload)
+        write_order.append("SEALED.json")
+
+    runner._alpha_max_write_final_seal = recording_write_final_seal
+
     result = runner.run_alpha_max_historical_process(
         sealed_prelock_directory=str(prelock),
         embargo_feature_root=str(temp_root / "embargo-feature"),
@@ -837,6 +976,7 @@ def _run_physical_schedule_child(temp_root: Path) -> None:
         historical_evaluation_feature_root=str(temp_root / "historical-feature"),
         exchange="binance",
         output_root=str(output),
+        checkpoint_root=str(temp_root / "historical-checkpoints"),
     )
     historical_calls = tuple(
         (row_id, nominal, fold_id)
@@ -881,6 +1021,7 @@ def _run_physical_schedule_child(temp_root: Path) -> None:
             historical_evaluation_feature_root=str(temp_root / "historical-feature"),
             exchange="binance",
             output_root=str(output),
+            checkpoint_root=str(temp_root / "historical-checkpoints"),
         )
     except runner.AlphaMaxRuntimeContractError as exc:
         overwrite_error = str(exc)
@@ -897,6 +1038,7 @@ def _run_physical_schedule_child(temp_root: Path) -> None:
             historical_evaluation_feature_root=str(temp_root / "historical-feature"),
             exchange="binance",
             output_root=str(duplicate_output),
+            checkpoint_root=str(temp_root / "historical-checkpoints"),
         )
     except runner.AlphaMaxRuntimeContractError as exc:
         duplicate_error = str(exc)
@@ -1001,10 +1143,12 @@ def test_p04_public_process_keeps_prelock_immutable_and_refuses_overwrite(
 ) -> None:
     p04 = public_process_payload["p04"]
     assert type(p04) is dict
-    assert "alpha_max_output_root_exists" in p04["overwrite_error"]
+    assert "alpha_max_output_root_recovered_sealed" in p04["overwrite_error"]
     assert p04["overwrite_before_replay"] is True
     assert p04["prelock_bytes_unchanged"] is True
     assert p04["prelock_modes_unchanged"] is True
+    assert p04["historical_checkpoint_cells"] == 68
+    assert p04["historical_checkpoint_folds"] == 680
 
 
 def test_p05_public_historical_process_rejects_every_inner_binding_mismatch(

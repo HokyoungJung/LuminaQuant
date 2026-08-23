@@ -175,30 +175,38 @@ class FeaturePointLookup:
         if not cache.timestamps_ms:
             return None
 
-        idx = bisect_right(cache.timestamps_ms, int(timestamp_ms)) - 1
-        if idx < 0:
-            return None
-
-        value = cache.columns.get(token, [None])[idx]
-        if value is None:
-            return None
-        source_timestamp = cache.source_timestamps_ms.get(token, [None])[idx]
-        canonical_timestamp = cache.canonical_timestamps_ms.get(token, [None])[idx]
-        if source_timestamp is None or canonical_timestamp is None:
-            return None
-        if int(timestamp_ms) - int(canonical_timestamp) > FEATURE_POINT_MAX_STALE_MS:
-            return None
-        try:
-            parsed = float(value)
-        except Exception:
-            return None
-        if not math.isfinite(parsed):
-            return None
-        return FeaturePoint(
-            value=parsed,
-            source_timestamp_ms=int(source_timestamp),
-            canonical_timestamp_ms=int(canonical_timestamp),
-        )
+        query_ms = int(timestamp_ms)
+        idx = bisect_right(cache.timestamps_ms, query_ms) - 1
+        while idx >= 0:
+            value = cache.columns.get(token, [None])[idx]
+            source_timestamp = cache.source_timestamps_ms.get(token, [None])[idx]
+            canonical_timestamp = cache.canonical_timestamps_ms.get(token, [None])[idx]
+            if value is None or source_timestamp is None or canonical_timestamp is None:
+                idx -= 1
+                continue
+            canonical_ms = int(canonical_timestamp)
+            if query_ms - canonical_ms > FEATURE_POINT_MAX_STALE_MS:
+                return None
+            # A canonical funding boundary can precede the official exchange
+            # timestamp by the admitted subsecond jitter. Do not expose that
+            # value until its source event has actually occurred.
+            if int(source_timestamp) > query_ms:
+                idx -= 1
+                continue
+            try:
+                parsed = float(value)
+            except Exception:
+                idx -= 1
+                continue
+            if not math.isfinite(parsed):
+                idx -= 1
+                continue
+            return FeaturePoint(
+                value=parsed,
+                source_timestamp_ms=int(source_timestamp),
+                canonical_timestamp_ms=canonical_ms,
+            )
+        return None
 
     def sum_between(
         self,

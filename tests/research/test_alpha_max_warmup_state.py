@@ -380,6 +380,18 @@ _EXPECTED_DANGEROUS_SITES = Counter(
             None,
         ): 1,
         (
+            "alpha_max_engine_runner.py",
+            "_alpha_max_prelock_checkpoint_descriptor",
+            "os.environ",
+            None,
+        ): 1,
+        (
+            "alpha_max_engine_runner.py",
+            "_alpha_max_indicator_day_checkpoint_descriptor",
+            "os.environ",
+            None,
+        ): 2,
+        (
             "backtest.py",
             "Backtest.__init__",
             "get_default_runtime_config",

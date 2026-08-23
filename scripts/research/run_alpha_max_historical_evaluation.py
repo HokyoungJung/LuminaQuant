@@ -20,6 +20,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--historical-evaluation-feature-root", required=True)
     parser.add_argument("--exchange", required=True, choices=("binance",))
     parser.add_argument("--output-root", required=True)
+    parser.add_argument("--checkpoint-root", required=True)
     return parser
 
 
@@ -33,6 +34,7 @@ def _execute(args: argparse.Namespace) -> int:
         historical_evaluation_feature_root=args.historical_evaluation_feature_root,
         exchange=args.exchange,
         output_root=args.output_root,
+        checkpoint_root=args.checkpoint_root,
     )
     return result.exit_code
 

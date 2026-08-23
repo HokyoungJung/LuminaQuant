@@ -7,6 +7,7 @@ from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime, timedelta
 
+import numpy as np
 import polars as pl
 from lumina_quant.backtesting._config_view import wrapped_runtime_config
 from lumina_quant.backtesting.execution_model import (
@@ -1026,6 +1027,77 @@ class Portfolio:
                 bench_price,
             )
         )
+
+    def update_timeindex_inert_batch(
+        self,
+        timestamp_ms: np.ndarray,
+        closes_by_symbol: Mapping[str, np.ndarray],
+    ) -> None:
+        """Record exact consecutive non-boundary marks with immutable positions."""
+        if (
+            type(timestamp_ms) is not np.ndarray
+            or timestamp_ms.dtype != np.dtype(np.int64)
+            or timestamp_ms.ndim != 1
+            or timestamp_ms.size == 0
+            or tuple(closes_by_symbol) != tuple(self.symbol_list)
+            or self.strategy_quality.enabled
+        ):
+            raise ValueError("inert_equity_batch_invalid")
+        if timestamp_ms.size > 1 and not bool(np.all(np.diff(timestamp_ms) == 1000)):
+            raise ValueError("inert_equity_batch_timeline_invalid")
+        first_day = datetime.fromtimestamp(int(timestamp_ms[0]) / 1000.0, UTC).date()
+        last_day = datetime.fromtimestamp(int(timestamp_ms[-1]) / 1000.0, UTC).date()
+        current_day = (
+            self._current_day.date()
+            if isinstance(self._current_day, datetime)
+            else self._current_day
+        )
+        if (
+            first_day != last_day
+            or current_day != first_day
+            or (
+                self._sampling_interval_ms
+                and bool(np.any(timestamp_ms % int(self._sampling_interval_ms) == 0))
+            )
+        ):
+            raise ValueError("inert_equity_batch_boundary_invalid")
+
+        cash = float(self.current_holdings["cash"])
+        totals = np.full(timestamp_ms.shape, cash, dtype=np.float64)
+        final_market_values: dict[str, float] = {}
+        for symbol in self.symbol_list:
+            closes = closes_by_symbol[symbol]
+            if (
+                type(closes) is not np.ndarray
+                or closes.dtype != np.dtype(np.float64)
+                or closes.shape != timestamp_ms.shape
+                or not bool(np.all(np.isfinite(closes)))
+                or not bool(np.all(closes > 0.0))
+            ):
+                raise ValueError("inert_equity_batch_close_invalid")
+            quantity = float(self.current_positions[symbol])
+            market_values = closes * quantity if quantity != 0.0 else np.zeros_like(closes)
+            totals = totals + market_values
+            final_market_values[symbol] = quantity * float(closes[-1]) if quantity != 0.0 else 0.0
+        if not bool(np.all(np.isfinite(totals))):
+            raise ValueError("inert_equity_batch_total_invalid")
+
+        points = np.column_stack((timestamp_ms.astype(np.float64) / 1000.0, totals))
+        sink = self._full_event_equity_sink
+        batch_sink = getattr(sink, "update_batch", None)
+        if callable(batch_sink):
+            batch_sink(points)
+        elif sink is not None:
+            for point in points:
+                sink((float(point[0]), float(point[1])))
+        self._equity_points.extend(
+            (float(point[0]), float(point[1])) for point in points[-self._equity_points.maxlen :]
+        )
+        self.strategy_quality.bar_index += int(timestamp_ms.size) - 1
+        self.strategy_quality.next_bar(int(timestamp_ms[-1]))
+        for symbol, market_value in final_market_values.items():
+            self.current_holdings[symbol] = market_value
+        self.current_holdings["total"] = float(totals[-1])
 
     def _to_timestamp_ms(self, value):
         if value is None:

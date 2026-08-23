@@ -4,13 +4,16 @@ import copy
 import hashlib
 import json
 import os
+from collections.abc import Mapping
 from collections import deque
 from datetime import UTC, datetime
 from dataclasses import dataclass
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, cast
 
 from lumina_quant.core.events import SignalEvent
+from lumina_quant.core.strategy_input import StrategyInputContext
 from lumina_quant.portfolio_split_contract import FOLLOWUP_ROOT
 from lumina_quant.strategy import Strategy
 from lumina_quant.strategies import resolve_strategy_class
@@ -2833,6 +2836,84 @@ class ArtifactPortfolioModeStrategy(Strategy):
                 handler(context)
             else:
                 child.calculate_signals_window(context.event, context.aggregator)
+            self._drain_child_queue(component, child_queue)
+
+    def calculate_signals_completed_native_release(
+        self,
+        *,
+        release_timestamp_ms: int,
+        bars_by_timeframe: Mapping[
+            str,
+            Mapping[str, tuple[Any, float, float, float, float, float]],
+        ],
+        feature_lookup: Any,
+    ) -> None:
+        """Replay one prevalidated completed-native release without economics."""
+        if (
+            type(release_timestamp_ms) is not int
+            or release_timestamp_ms < 100_000_000_000
+            or not isinstance(bars_by_timeframe, Mapping)
+            or not bars_by_timeframe
+        ):
+            raise ValueError("completed_native_release_invalid")
+        prepared: list[
+            tuple[
+                PortfolioModeComponent,
+                Any,
+                _SignalCaptureQueue,
+                str,
+                Mapping[str, tuple[Any, float, float, float, float, float]],
+            ]
+        ] = []
+        consumed_timeframes: set[str] = set()
+        for component, child, child_queue in self._children:
+            timeframe = getattr(child, "native_timeframe", None)
+            timeframe_ms = getattr(child, "native_timeframe_ms", None)
+            if type(timeframe) is not str or type(timeframe_ms) is not int or timeframe_ms <= 0:
+                raise ValueError("completed_native_release_child_invalid")
+            bars = bars_by_timeframe.get(timeframe)
+            if bars is None:
+                continue
+            if tuple(bars) != component.symbols:
+                raise ValueError("completed_native_release_symbols_invalid")
+            for symbol, bar in bars.items():
+                if (
+                    symbol not in component.symbols
+                    or type(bar) is not tuple
+                    or len(bar) != 6
+                    or any(type(value) is not float for value in bar[1:])
+                ):
+                    raise ValueError("completed_native_release_bar_invalid")
+            prepared.append((component, child, child_queue, timeframe, bars))
+            consumed_timeframes.add(timeframe)
+        if not prepared or consumed_timeframes != set(bars_by_timeframe):
+            raise ValueError("completed_native_release_timeframes_invalid")
+
+        for component, child, child_queue, _timeframe, bars in prepared:
+            event = SimpleNamespace(
+                type="MARKET_WINDOW",
+                time=release_timestamp_ms,
+                event_time_watermark_ms=release_timestamp_ms,
+                completed_native_bars=True,
+                bars_1s={symbol: (bar,) for symbol, bar in bars.items()},
+            )
+            handler = getattr(child, "calculate_signals_context", None)
+            if callable(handler):
+                handler(
+                    StrategyInputContext(
+                        event=event,
+                        aggregator=None,
+                        feature_lookup=feature_lookup,
+                        data_handler=self.bars,
+                        provider_metadata={
+                            "data_handler_class": type(self.bars).__name__,
+                            "execution_handler_class": None,
+                            "market_data_source": "alpha_max_completed_native_release",
+                        },
+                    )
+                )
+            else:
+                child.calculate_signals_window(event, None)
             self._drain_child_queue(component, child_queue)
 
 

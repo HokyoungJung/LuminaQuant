@@ -149,6 +149,7 @@ __all__ = [
     "compute_alpha_max_turnover_rpt",
     "materialize_alpha_max_manifest",
     "normalize_alpha_max_prior_trial_node",
+    "parse_alpha_max_cost_cell_pre_gate_evidence",
     "rank_alpha_max_historical_report",
     "read_alpha_max_prior_trial_blob",
     "reconcile_alpha_max_cost_attribution",
@@ -346,21 +347,35 @@ def _require_sha256(value: Any, *, field: str) -> str:
     return token
 
 
+def _is_proc_fd_anchored_path(path: Path) -> bool:
+    parts = path.parts
+    return parts[:4] == ("/", "proc", "self", "fd") and len(parts) >= 5 and parts[4].isdigit()
+
+
 def _require_explicit_canonical_path(path: str | os.PathLike[str], *, field: str) -> str:
     raw = os.fspath(path)
     if not raw or not os.path.isabs(raw):
         raise ValueError(f"{field}_must_be_absolute")
     lexical = os.path.abspath(raw)
     target = Path(lexical)
+    parts = target.parts
+    proc_fd_anchored = _is_proc_fd_anchored_path(target)
+    if proc_fd_anchored:
+        try:
+            status = os.fstat(int(parts[4]))
+        except OSError as exc:
+            raise ValueError(f"{field}_descriptor_invalid") from exc
+        if not stat.S_ISDIR(status.st_mode):
+            raise ValueError(f"{field}_descriptor_invalid")
     if target.is_symlink():
         raise ValueError(f"{field}_symlink_rejected")
     try:
         canonical = str(target.resolve(strict=True))
     except FileNotFoundError as exc:
         raise ValueError(f"{field}_missing") from exc
-    if canonical != lexical:
+    if canonical != lexical and not proc_fd_anchored:
         raise ValueError(f"{field}_noncanonical")
-    return canonical
+    return lexical if proc_fd_anchored else canonical
 
 
 _ROOT_INTERVALS: Final[dict[str, tuple[datetime, datetime]]] = {
@@ -1708,7 +1723,9 @@ def _validate_run_owned_phase(output_root: str | os.PathLike[str], phase: str) -
             raise ValueError(f"{field}_missing") from exc
         if path.is_symlink() or not stat.S_ISDIR(status.st_mode):
             raise ValueError(f"{field}_not_owned_directory")
-        if status.st_uid != os.geteuid() or str(path.resolve(strict=True)) != str(path):
+        if status.st_uid != os.geteuid() or (
+            not _is_proc_fd_anchored_path(path) and str(path.resolve(strict=True)) != str(path)
+        ):
             raise ValueError(f"{field}_not_owned_directory")
     if {entry.name for entry in manifests_path.iterdir()} != set(_MANIFEST_PHASES):
         raise ValueError("alpha_max_manifests_parent_not_run_owned")
@@ -1734,9 +1751,14 @@ def _write_new_manifest(path: Path, payload: bytes) -> None:
     )
     created = False
     try:
-        parent_fd = os.open(Path(path.anchor), directory_flags)
+        if _is_proc_fd_anchored_path(path):
+            parent_fd = os.dup(int(path.parts[4]))
+            parent_parts = path.parent.parts[5:]
+        else:
+            parent_fd = os.open(Path(path.anchor), directory_flags)
+            parent_parts = path.parent.parts[1:]
         opened_directories.append(parent_fd)
-        for part in path.parent.parts[1:]:
+        for part in parent_parts:
             observed = os.stat(part, dir_fd=parent_fd, follow_symlinks=False)
             if not stat.S_ISDIR(observed.st_mode) or stat.S_ISLNK(observed.st_mode):
                 raise ValueError("alpha_max_manifest_parent_not_owned_directory")
@@ -1843,7 +1865,13 @@ def materialize_alpha_max_manifest(
     manifest_path = phase_dir / f"{row_id}.json"
     if manifest_path.exists() or manifest_path.is_symlink():
         raise ValueError("alpha_max_manifest_target_exists")
-    if manifest_path.parent != phase_dir or manifest_path.resolve(strict=False).parent != phase_dir:
+    expected_resolved_parent = (
+        phase_dir.resolve(strict=True) if _is_proc_fd_anchored_path(phase_dir) else phase_dir
+    )
+    if (
+        manifest_path.parent != phase_dir
+        or manifest_path.resolve(strict=False).parent != expected_resolved_parent
+    ):
         raise ValueError("alpha_max_manifest_path_escape")
 
     use_train_validation = phase == "prelock_final_refit" and allocation["method"] in {
@@ -5417,9 +5445,16 @@ def _alpha_max_validate_activation_receipt(
 ) -> None:
     if type(receipt) is not ArtifactReadReceipt:
         raise TypeError("alpha_max_activation_receipt_identity_invalid")
+    requested = Path(receipt.requested_path)
+    path_identity_valid = receipt.requested_path == receipt.canonical_path
+    if _is_proc_fd_anchored_path(requested):
+        try:
+            path_identity_valid = str(requested.resolve(strict=True)) == receipt.canonical_path
+        except OSError:
+            path_identity_valid = False
     if (
         receipt.artifact_id != artifact_id
-        or receipt.requested_path != receipt.canonical_path
+        or not path_identity_valid
         or receipt.pre_fstat_identity != receipt.post_fstat_identity
         or receipt.sha256 != expected_sha256
         or receipt.byte_count != expected_byte_count
@@ -8767,6 +8802,1147 @@ def build_alpha_max_cost_cell_pre_gate_evidence(
     )
 
 
+def _alpha_max_parse_object(value: object, *, keys: frozenset[str], field: str) -> dict[str, Any]:
+    """Accept only the ordinary JSON object shape used by canonical evidence."""
+    if type(value) is not dict or set(value) != keys:
+        raise ValueError(f"alpha_max_parse_{field}_schema_invalid")
+    return value
+
+
+def _alpha_max_parse_list(value: object, *, field: str) -> list[Any]:
+    if type(value) is not list:
+        raise ValueError(f"alpha_max_parse_{field}_list_invalid")
+    return value
+
+
+def _alpha_max_parse_utc(value: object, *, field: str) -> datetime:
+    if type(value) is not str:
+        raise ValueError(f"alpha_max_parse_{field}_timestamp_invalid")
+    parsed = _utc(value, field=field)
+    if parsed.isoformat().replace("+00:00", "Z") != value:
+        raise ValueError(f"alpha_max_parse_{field}_timestamp_noncanonical")
+    return parsed
+
+
+def _alpha_max_parse_exact_int(
+    value: object,
+    *,
+    field: str,
+    nonnegative: bool = False,
+) -> int:
+    if type(value) is not int or (nonnegative and value < 0):
+        raise ValueError(f"alpha_max_parse_{field}_integer_invalid")
+    return value
+
+
+def _alpha_max_parse_exact_float(value: object, *, field: str) -> float:
+    if type(value) is not float or not math.isfinite(value):
+        raise ValueError(f"alpha_max_parse_{field}_float_invalid")
+    return value
+
+
+def _alpha_max_parse_payload_equal(
+    actual: Mapping[str, Any], expected: Mapping[str, Any], *, field: str
+) -> None:
+    """Reject JSON numeric aliases as well as structural and derived mismatches."""
+    if _canonical_json_bytes(actual, newline=True) != _canonical_json_bytes(expected, newline=True):
+        raise ValueError(f"alpha_max_parse_{field}_payload_mismatch")
+
+
+def parse_alpha_max_cost_cell_pre_gate_evidence(
+    payload: Mapping[str, object],
+    *,
+    manifest_receipt: AlphaMaxManifestReceipt,
+    config_receipt: ArtifactReadReceipt,
+    capsule_receipts_by_sha256: Mapping[str, AlphaMaxCapsuleReceipt],
+    root_receipts_by_identity: Mapping[str, AlphaMaxRootReceipt],
+    runtime_contract_sha256: str,
+) -> AlphaMaxCostCellPreGateEvidence:
+    """Restore one sealed pre-gate cell from JSON plus live trusted receipts.
+
+    Capsule and manifest activation receipts are intentionally not serialized in
+    public payloads.  They therefore must be supplied as already validated live
+    receipts; all other values are reconstructed from strict JSON only.
+    """
+    if (
+        type(payload) is not dict
+        or type(manifest_receipt) is not AlphaMaxManifestReceipt
+        or type(config_receipt) is not ArtifactReadReceipt
+    ):
+        raise TypeError("alpha_max_parse_pre_gate_input_invalid")
+    if not isinstance(capsule_receipts_by_sha256, Mapping) or any(
+        type(key) is not str or type(value) is not AlphaMaxCapsuleReceipt
+        for key, value in capsule_receipts_by_sha256.items()
+    ):
+        raise TypeError("alpha_max_parse_capsule_receipts_invalid")
+    if not isinstance(root_receipts_by_identity, Mapping) or any(
+        type(key) is not str or type(value) is not AlphaMaxRootReceipt
+        for key, value in root_receipts_by_identity.items()
+    ):
+        raise TypeError("alpha_max_parse_root_receipts_invalid")
+    _require_sha256(
+        runtime_contract_sha256,
+        field="alpha_max_parse_runtime_contract_sha256",
+    )
+    supplied_capsules = dict(capsule_receipts_by_sha256)
+    if any(key != value.sha256 for key, value in supplied_capsules.items()):
+        raise ValueError("alpha_max_parse_capsule_receipt_key_mismatch")
+    used_capsules: set[str] = set()
+    supplied_roots = dict(root_receipts_by_identity)
+    if any(
+        key != f"{value.root_id}:{value.root_kind}:{value.content_sha256}"
+        for key, value in supplied_roots.items()
+    ):
+        raise ValueError("alpha_max_parse_root_receipt_key_mismatch")
+    used_roots: set[str] = set()
+
+    def obj(value: object, keys: set[str], field: str) -> dict[str, Any]:
+        return _alpha_max_parse_object(value, keys=frozenset(keys), field=field)
+
+    def stream(value: object) -> AlphaMaxStreamingEquityEvidence:
+        raw = obj(
+            value,
+            {
+                "artifact_kind",
+                "ending_equity",
+                "event_count",
+                "event_stream_sha256",
+                "first_timestamp_ms",
+                "full_event_mdd",
+                "initial_capital",
+                "last_timestamp_ms",
+                "max_drawdown_duration_events",
+                "max_drawdown_duration_ms",
+                "minimum_equity",
+                "peak_equity",
+                "ruin_detected",
+                "uncapped_full_event_drawdown",
+            },
+            "streaming_equity",
+        )
+        if raw["artifact_kind"] != "alpha_max_streaming_full_event_equity.v2":
+            raise ValueError("alpha_max_parse_artifact_kind_invalid")
+        for field in (
+            "initial_capital",
+            "ending_equity",
+            "peak_equity",
+            "minimum_equity",
+            "uncapped_full_event_drawdown",
+            "full_event_mdd",
+        ):
+            _alpha_max_parse_exact_float(raw[field], field=f"streaming_{field}")
+        for field in ("event_count", "max_drawdown_duration_events"):
+            _alpha_max_parse_exact_int(
+                raw[field],
+                field=f"streaming_{field}",
+                nonnegative=True,
+            )
+        for field in (
+            "max_drawdown_duration_ms",
+            "first_timestamp_ms",
+            "last_timestamp_ms",
+        ):
+            if raw[field] is not None:
+                _alpha_max_parse_exact_int(
+                    raw[field],
+                    field=f"streaming_{field}",
+                    nonnegative=True,
+                )
+        if type(raw["ruin_detected"]) is not bool:
+            raise ValueError("alpha_max_parse_streaming_ruin_detected_bool_invalid")
+        result = AlphaMaxStreamingEquityEvidence(
+            event_count=raw["event_count"],
+            initial_capital=raw["initial_capital"],
+            ending_equity=raw["ending_equity"],
+            peak_equity=raw["peak_equity"],
+            minimum_equity=raw["minimum_equity"],
+            uncapped_full_event_drawdown=raw["uncapped_full_event_drawdown"],
+            full_event_mdd=raw["full_event_mdd"],
+            ruin_detected=raw["ruin_detected"],
+            max_drawdown_duration_events=raw["max_drawdown_duration_events"],
+            max_drawdown_duration_ms=raw["max_drawdown_duration_ms"],
+            first_timestamp_ms=raw["first_timestamp_ms"],
+            last_timestamp_ms=raw["last_timestamp_ms"],
+            event_stream_sha256=raw["event_stream_sha256"],
+            canonical_bytes=_canonical_json_bytes(
+                {"artifact_kind": "alpha_max_streaming_full_event_equity.v2", **raw}, newline=True
+            ),
+            sha256=_sha256_bytes(
+                _canonical_json_bytes(
+                    {"artifact_kind": "alpha_max_streaming_full_event_equity.v2", **raw},
+                    newline=True,
+                )
+            ),
+        )
+        return result
+
+    def primary(value: object) -> AlphaMaxPrimaryReturnStream:
+        raw = obj(
+            value,
+            {
+                "artifact_kind",
+                "calendar_sha256",
+                "endpoint_equities",
+                "endpoint_timestamps",
+                "initial_capital",
+                "periods_per_year",
+                "returns",
+            },
+            "primary_return_stream",
+        )
+        if raw["artifact_kind"] != "alpha_max_primary_return_stream.v1":
+            raise ValueError("alpha_max_parse_artifact_kind_invalid")
+        _alpha_max_parse_exact_int(
+            raw["periods_per_year"],
+            field="primary_periods_per_year",
+            nonnegative=True,
+        )
+        timestamps = tuple(
+            _alpha_max_parse_utc(item, field="primary_return_stream_timestamp")
+            for item in _alpha_max_parse_list(
+                raw["endpoint_timestamps"], field="primary_return_stream_timestamps"
+            )
+        )
+        result = AlphaMaxPrimaryReturnStream(
+            endpoint_timestamps=timestamps,
+            endpoint_equities=tuple(
+                _alpha_max_finite_number(item, field="primary_equity")
+                for item in _alpha_max_parse_list(
+                    raw["endpoint_equities"], field="primary_equities"
+                )
+            ),
+            returns=tuple(
+                _alpha_max_finite_number(item, field="primary_return")
+                for item in _alpha_max_parse_list(raw["returns"], field="primary_returns")
+            ),
+            initial_capital=_alpha_max_finite_number(
+                raw["initial_capital"], field="primary_initial_capital"
+            ),
+            periods_per_year=raw["periods_per_year"],
+            calendar_sha256=raw["calendar_sha256"],
+        )
+        _validate_alpha_max_primary_stream(result)
+        _alpha_max_parse_payload_equal(raw, result.to_payload(), field="primary_return_stream")
+        return result
+
+    def root(value: object) -> AlphaMaxRootReceipt:
+        raw = obj(
+            value,
+            {
+                "availability_sha256",
+                "availability_end_by_symbol",
+                "availability_start_by_symbol",
+                "content_sha256",
+                "end_utc",
+                "exchange",
+                "file_count",
+                "inventory_sha256",
+                "path",
+                "root_id",
+                "root_kind",
+                "start_utc",
+                "symbols",
+            },
+            "root_receipt",
+        )
+
+        def boundaries(item: object, name: str) -> Mapping[str, datetime]:
+            source = obj(item, set(ALPHA_MAX_CANDIDATE_SYMBOLS), name)
+            return {
+                symbol: _alpha_max_parse_utc(source[symbol], field=name)
+                for symbol in ALPHA_MAX_CANDIDATE_SYMBOLS
+            }
+
+        boundaries(raw["availability_start_by_symbol"], "root_availability_start")
+        boundaries(raw["availability_end_by_symbol"], "root_availability_end")
+        identity = f"{raw['root_id']}:{raw['root_kind']}:{raw['content_sha256']}"
+        receipt = supplied_roots.get(identity)
+        if receipt is None or receipt.to_payload() != raw:
+            raise ValueError("alpha_max_parse_root_receipt_missing_or_mismatch")
+        used_roots.add(identity)
+        return receipt
+
+    def native(value: object) -> AlphaMaxNativeFinalizationReceipt:
+        raw = obj(
+            value,
+            {
+                "artifact_kind",
+                "boundary_utc",
+                "discarded_signal_count",
+                "discarded_signal_sha256",
+                "finalized_children",
+                "native_coverage_by_child",
+            },
+            "native_finalization",
+        )
+        if raw["artifact_kind"] != "alpha_max_native_finalization_receipt.v1":
+            raise ValueError("alpha_max_parse_artifact_kind_invalid")
+        if type(raw["finalized_children"]) is not dict:
+            raise ValueError("alpha_max_parse_native_children_schema_invalid")
+        children = raw["finalized_children"]
+        coverage = obj(raw["native_coverage_by_child"], set(children), "native_coverage")
+        result = build_alpha_max_native_finalization_receipt(
+            boundary_utc=_alpha_max_parse_utc(raw["boundary_utc"], field="native_boundary"),
+            finalized_children=children,
+            native_coverage_by_child=coverage,
+            discarded_signal_count=raw["discarded_signal_count"],
+            discarded_signal_sha256=raw["discarded_signal_sha256"],
+        )
+        _alpha_max_parse_payload_equal(raw, result.to_payload(), field="native_finalization")
+        return result
+
+    def liquidation(value: object) -> AlphaMaxLiquidationEventEvidence:
+        raw = obj(
+            value,
+            {
+                "bar_high",
+                "bar_low",
+                "close_price",
+                "configured_margin_mode",
+                "commission",
+                "entry_price",
+                "fill_cost",
+                "leverage",
+                "liquidation_price",
+                "modeled_margin_mode",
+                "position_qty",
+                "reason",
+                "symbol",
+                "timestamp_ms",
+                "trigger_price",
+            },
+            "liquidation",
+        )
+        _alpha_max_parse_exact_int(
+            raw["timestamp_ms"],
+            field="liquidation_timestamp_ms",
+            nonnegative=True,
+        )
+        for field in (
+            "position_qty",
+            "entry_price",
+            "liquidation_price",
+            "trigger_price",
+            "bar_high",
+            "bar_low",
+            "close_price",
+            "fill_cost",
+            "commission",
+            "leverage",
+        ):
+            _alpha_max_parse_exact_float(raw[field], field=f"liquidation_{field}")
+        return AlphaMaxLiquidationEventEvidence(**raw)
+
+    def capsule(value: object) -> AlphaMaxCapsuleReceipt:
+        raw = obj(
+            value,
+            {
+                "boundary_utc",
+                "byte_count",
+                "capsule_phase_id",
+                "manifest_sha256",
+                "phase",
+                "prefix_id",
+                "relative_path",
+                "row_id",
+                "sha256",
+                "state_payload",
+                "state_sha256",
+            },
+            "capsule_receipt",
+        )
+        receipt = supplied_capsules.get(raw["sha256"])
+        if receipt is None or receipt.to_payload() != raw:
+            raise ValueError("alpha_max_parse_capsule_receipt_missing_or_mismatch")
+        used_capsules.add(receipt.sha256)
+        return receipt
+
+    def manifest(value: object) -> AlphaMaxManifestReceipt:
+        raw = obj(
+            value, {"byte_count", "phase", "relative_path", "row_id", "sha256"}, "manifest_receipt"
+        )
+        if manifest_receipt.to_payload() != raw:
+            raise ValueError("alpha_max_parse_manifest_receipt_mismatch")
+        return manifest_receipt
+
+    # The reconciliation payload is deliberately rebuilt through its sole builder.
+    def reconciliation(
+        value: object,
+    ) -> tuple[
+        AlphaMaxReconciliationEvidence,
+        tuple[ExecutionPricingTrace, ...],
+        tuple[FillApplicationAttribution, ...],
+        tuple[NoFillAttempt, ...],
+        tuple[AlphaMaxFundingBoundaryLedgerRow, ...],
+    ]:
+        raw = obj(
+            value,
+            {
+                "application_count",
+                "application_trace_hashes",
+                "applications",
+                "applied_commission_total",
+                "artifact_kind",
+                "complete",
+                "fee_reconciled",
+                "funding_ledger",
+                "funding_payment_total",
+                "funding_reconciled",
+                "liquidation_cost_total",
+                "liquidation_reconciled",
+                "model_commission_total",
+                "no_fill_attempt_count",
+                "no_fill_attempts",
+                "no_fill_excluded_from_bijection",
+                "portfolio_fee_total",
+                "portfolio_funding_total",
+                "portfolio_liquidation_total",
+                "pricing_application_bijection",
+                "pricing_trace_count",
+                "pricing_trace_hashes",
+                "pricing_traces",
+                "zero_applied_application_count",
+            },
+            "reconciliation",
+        )
+        if raw["artifact_kind"] != "alpha_max_cost_reconciliation.v1":
+            raise ValueError("alpha_max_parse_artifact_kind_invalid")
+        traces = []
+        trace_keys = {
+            "record_type",
+            "raw_price",
+            "fill_price",
+            "requested_qty",
+            "executed_qty",
+            "unfilled_qty",
+            "direction",
+            "is_maker",
+            "liquidity_role",
+            "fee_rate",
+            "commission",
+            "sampled_base_slip",
+            "volatility_multiplier",
+            "applied_slip",
+            "half_spread",
+            "sqrt_impact",
+            "participation",
+            "impact_denominator",
+            "penalty_before_clamp",
+            "penalty_after_clamp",
+            "clamp_adjustment",
+            "liquidity_cap",
+            "apply_liquidity_cap",
+            "order_notional",
+            "order_kind",
+            "trigger_price",
+            "order_id",
+            "client_order_id",
+            "parent_order_id",
+            "remainder_of_order_id",
+            "oco_group",
+            "rng_consumed",
+        }
+        for item in _alpha_max_parse_list(raw["pricing_traces"], field="pricing_traces"):
+            trace = ExecutionPricingTrace(**obj(item, trace_keys, "pricing_trace"))
+            trace.to_payload()
+            traces.append(trace)
+        traces_by_hash: dict[str, list[ExecutionPricingTrace]] = {}
+        for trace in traces:
+            traces_by_hash.setdefault(execution_pricing_trace_sha256(trace), []).append(trace)
+        consumed_trace_counts: Counter[str] = Counter()
+        applications = []
+        application_keys = {
+            "record_type",
+            "pricing_trace_hash",
+            "pricing_trace",
+            "timeindex",
+            "symbol",
+            "direction",
+            "order_id",
+            "client_order_id",
+            "position_side",
+            "status",
+            "reduce_only",
+            "model_quantity",
+            "model_fill_cost",
+            "model_commission",
+            "applied_quantity",
+            "applied_fill_cost",
+            "applied_commission",
+            "reduce_only_scale",
+            "application_status",
+            "zero_applied_reason",
+        }
+        for item in _alpha_max_parse_list(raw["applications"], field="applications"):
+            app = obj(item, application_keys, "application")
+            trace_hash = app["pricing_trace_hash"]
+            if type(trace_hash) is not str:
+                raise ValueError("alpha_max_parse_application_trace_hash_invalid")
+            candidates = traces_by_hash.get(trace_hash, ())
+            occurrence = consumed_trace_counts[trace_hash]
+            if occurrence >= len(candidates):
+                raise ValueError("alpha_max_parse_application_trace_missing")
+            trace = candidates[occurrence]
+            consumed_trace_counts[trace_hash] += 1
+            embedded_trace = obj(app["pricing_trace"], trace_keys, "application_trace")
+            _alpha_max_parse_payload_equal(
+                embedded_trace,
+                trace.to_payload(),
+                field="application_trace",
+            )
+            result = FillApplicationAttribution(
+                record_type=app["record_type"],
+                pricing_trace_hash=app["pricing_trace_hash"],
+                pricing_trace=trace,
+                timeindex=app["timeindex"],
+                symbol=app["symbol"],
+                direction=app["direction"],
+                order_id=app["order_id"],
+                client_order_id=app["client_order_id"],
+                position_side=app["position_side"],
+                status=app["status"],
+                reduce_only=app["reduce_only"],
+                model_quantity=app["model_quantity"],
+                model_fill_cost=app["model_fill_cost"],
+                model_commission=app["model_commission"],
+                applied_quantity=app["applied_quantity"],
+                applied_fill_cost=app["applied_fill_cost"],
+                applied_commission=app["applied_commission"],
+                reduce_only_scale=app["reduce_only_scale"],
+                application_status=app["application_status"],
+                zero_applied_reason=app["zero_applied_reason"],
+            )
+            result.to_payload()
+            applications.append(result)
+        if any(
+            consumed_trace_counts[trace_hash] != len(candidates)
+            for trace_hash, candidates in traces_by_hash.items()
+        ):
+            raise ValueError("alpha_max_parse_unused_pricing_trace")
+        no_fills = tuple(
+            NoFillAttempt.from_payload(item)
+            for item in _alpha_max_parse_list(raw["no_fill_attempts"], field="no_fill_attempts")
+        )
+        funding = tuple(
+            AlphaMaxFundingBoundaryLedgerRow(
+                **obj(
+                    item,
+                    {
+                        "boundary_ms",
+                        "payment",
+                        "price",
+                        "price_close_timestamp_ms",
+                        "price_row_timestamp_ms",
+                        "qty",
+                        "rate",
+                        "rate_source_timestamp_ms",
+                        "symbol",
+                    },
+                    "funding_row",
+                )
+            )
+            for item in _alpha_max_parse_list(raw["funding_ledger"], field="funding_ledger")
+        )
+        result = reconcile_alpha_max_cost_attribution(
+            tuple(traces),
+            tuple(applications),
+            no_fills,
+            funding,
+            portfolio_fee_total=raw["portfolio_fee_total"],
+            portfolio_funding_total=raw["portfolio_funding_total"],
+            liquidation_cost_total=raw["liquidation_cost_total"],
+            portfolio_liquidation_total=raw["portfolio_liquidation_total"],
+        )
+        _alpha_max_parse_payload_equal(raw, result.to_payload(), field="reconciliation")
+        return result, tuple(traces), tuple(applications), no_fills, funding
+
+    def diagnostics(
+        value: object,
+        *,
+        pricing_traces: tuple[ExecutionPricingTrace, ...],
+        fill_applications: tuple[FillApplicationAttribution, ...],
+        no_fill_attempts: tuple[NoFillAttempt, ...],
+        funding_ledger: tuple[AlphaMaxFundingBoundaryLedgerRow, ...],
+        liquidation_events: tuple[AlphaMaxLiquidationEventEvidence, ...],
+        starting_equity: object,
+        ending_equity: object,
+    ) -> AlphaMaxRunReportOnlyDiagnostics:
+        raw = obj(
+            value,
+            {
+                "artifact_kind",
+                "capacity",
+                "capacity_observation_set_sha256",
+                "capacity_observations",
+                "contribution_total_usdt",
+                "ending_market_value_usdt",
+                "ending_realized_gross_exposure",
+                "ending_realized_gross_undefined_reason",
+                "fold_pnl_usdt",
+                "liquidity_clip_count",
+                "no_fill_attempt_count",
+                "reconciliation_residual_usdt",
+                "reduce_only_clip_count",
+                "report_only",
+                "selection_influence",
+                "symbol_contribution_usdt",
+                "target_gross_exposure",
+                "turnover_rpt",
+            },
+            "diagnostics",
+        )
+        if (
+            raw["artifact_kind"] != "alpha_max_run_report_only_diagnostics.v1"
+            or raw["report_only"] is not True
+            or raw["selection_influence"] is not False
+        ):
+            raise ValueError("alpha_max_parse_diagnostics_kind_invalid")
+        turnover_raw = obj(
+            raw["turnover_rpt"],
+            {
+                "artifact_kind",
+                "report_only",
+                "rpt_bps",
+                "turnover_multiple",
+                "turnover_notional",
+                "undefined_reason",
+            },
+            "turnover",
+        )
+        capacity_raw = obj(
+            raw["capacity"],
+            {
+                "artifact_kind",
+                "capacity_proxy_equity_usdt",
+                "observation_count",
+                "report_only",
+                "undefined_reason",
+            },
+            "capacity",
+        )
+        if (
+            turnover_raw["artifact_kind"] != "alpha_max_turnover_rpt.v1"
+            or turnover_raw["report_only"] is not True
+            or capacity_raw["artifact_kind"] != "alpha_max_capacity_diagnostics.v1"
+            or capacity_raw["report_only"] is not True
+        ):
+            raise ValueError("alpha_max_parse_diagnostics_kind_invalid")
+        observations = tuple(
+            MappingProxyType(
+                obj(
+                    item,
+                    {"bar_volume", "equity_before", "raw_price", "requested_qty"},
+                    "capacity_observation",
+                )
+            )
+            for item in _alpha_max_parse_list(
+                raw["capacity_observations"], field="capacity_observations"
+            )
+        )
+        capacity_values = capacity_raw["capacity_proxy_equity_usdt"]
+        if capacity_values is not None:
+            obj(
+                capacity_values,
+                {"minimum", "p10_type7", "median_type7"},
+                "capacity_values",
+            )
+        ending_market_values = obj(
+            raw["ending_market_value_usdt"],
+            set(ALPHA_MAX_CANDIDATE_SYMBOLS),
+            "ending_market_values",
+        )
+        obj(
+            raw["symbol_contribution_usdt"],
+            set(ALPHA_MAX_CANDIDATE_SYMBOLS),
+            "contributions",
+        )
+        result = build_alpha_max_run_report_only_diagnostics(
+            pricing_traces=pricing_traces,
+            fill_applications=fill_applications,
+            no_fill_attempts=no_fill_attempts,
+            funding_ledger=funding_ledger,
+            liquidation_events=liquidation_events,
+            capacity_observations=observations,
+            ending_market_values=ending_market_values,
+            starting_equity=starting_equity,
+            ending_equity=ending_equity,
+            target_gross_exposure=raw["target_gross_exposure"],
+        )
+        _alpha_max_parse_payload_equal(raw, result.to_payload(), field="diagnostics")
+        return result
+
+    def actual(value: object) -> AlphaMaxActualEngineRunReceipt:
+        raw = obj(
+            value,
+            {
+                "admitted_symbols",
+                "application_count",
+                "application_set_sha256",
+                "artifact_kind",
+                "capsule_receipt",
+                "config_receipt",
+                "config_sha256",
+                "domain",
+                "ending_cash",
+                "ending_equity",
+                "effective_config",
+                "effective_config_sha256",
+                "equity_observation_count",
+                "feature_root_receipts",
+                "feature_root_set_sha256",
+                "fill_event_count",
+                "fold_end_utc",
+                "fold_start_utc",
+                "full_event_equity",
+                "funding_ledger_count",
+                "funding_ledger_set_sha256",
+                "liquidation_event_count",
+                "liquidation_event_set_sha256",
+                "liquidation_events",
+                "manifest_receipt",
+                "market_event_count",
+                "native_finalization",
+                "no_fill_attempt_count",
+                "no_fill_attempt_set_sha256",
+                "nominal_cost_bps",
+                "order_event_count",
+                "pricing_trace_count",
+                "pricing_trace_set_sha256",
+                "raw_root_receipts",
+                "raw_root_set_sha256",
+                "reconciliation",
+                "report_only_diagnostics",
+                "row_id",
+                "ruin_detected",
+                "runtime_contract_sha256",
+                "runtime_read_audit",
+                "runtime_read_audit_sha256",
+                "seed",
+                "signal_event_count",
+                "split_or_fold_id",
+                "starting_cash",
+                "starting_equity",
+                "starting_open_order_count",
+                "starting_open_position_count",
+                "starting_used_margin",
+                "trade_count",
+                "universe_sha256",
+            },
+            "actual_run",
+        )
+        if raw["artifact_kind"] != "alpha_max_actual_engine_run_receipt.v3":
+            raise ValueError("alpha_max_parse_artifact_kind_invalid")
+        if raw["runtime_contract_sha256"] != runtime_contract_sha256:
+            raise ValueError("alpha_max_parse_runtime_contract_mismatch")
+        for field in (
+            "nominal_cost_bps",
+            "seed",
+            "market_event_count",
+            "equity_observation_count",
+            "signal_event_count",
+            "order_event_count",
+            "fill_event_count",
+            "trade_count",
+            "starting_open_position_count",
+            "starting_open_order_count",
+            "pricing_trace_count",
+            "application_count",
+            "no_fill_attempt_count",
+            "funding_ledger_count",
+            "liquidation_event_count",
+        ):
+            _alpha_max_parse_exact_int(
+                raw[field],
+                field=f"actual_{field}",
+                nonnegative=True,
+            )
+        for field in (
+            "starting_cash",
+            "starting_equity",
+            "starting_used_margin",
+            "ending_cash",
+            "ending_equity",
+        ):
+            _alpha_max_parse_exact_float(raw[field], field=f"actual_{field}")
+        fold_start, fold_end = _ALPHA_MAX_FOLD_INTERVALS.get(raw["split_or_fold_id"], (None, None))
+        if (
+            fold_start is None
+            or _alpha_max_parse_utc(raw["fold_start_utc"], field="fold_start") != fold_start
+            or _alpha_max_parse_utc(raw["fold_end_utc"], field="fold_end") != fold_end
+        ):
+            raise ValueError("alpha_max_parse_fold_bounds_mismatch")
+        config_raw = obj(
+            raw["config_receipt"],
+            {
+                "artifact_id",
+                "byte_count",
+                "canonical_path",
+                "post_fstat_identity",
+                "pre_fstat_identity",
+                "requested_path",
+                "sha256",
+            },
+            "config_receipt",
+        )
+
+        _alpha_max_parse_payload_equal(
+            config_raw,
+            {
+                "artifact_id": config_receipt.artifact_id,
+                "byte_count": config_receipt.byte_count,
+                "canonical_path": config_receipt.canonical_path,
+                "post_fstat_identity": list(config_receipt.post_fstat_identity),
+                "pre_fstat_identity": list(config_receipt.pre_fstat_identity),
+                "requested_path": config_receipt.requested_path,
+                "sha256": config_receipt.sha256,
+            },
+            field="config_receipt",
+        )
+        effective_config = obj(
+            raw["effective_config"],
+            set(raw["effective_config"]) if type(raw["effective_config"]) is dict else set(),
+            "effective_config",
+        )
+        effective_bytes = _canonical_json_bytes(effective_config, newline=False)
+        liquidation_events = tuple(
+            liquidation(item)
+            for item in _alpha_max_parse_list(
+                raw["liquidation_events"],
+                field="liquidations",
+            )
+        )
+        (
+            reconciliation_evidence,
+            pricing_traces,
+            fill_applications,
+            no_fill_attempts,
+            funding_ledger,
+        ) = reconciliation(raw["reconciliation"])
+        report_only_diagnostics = diagnostics(
+            raw["report_only_diagnostics"],
+            pricing_traces=pricing_traces,
+            fill_applications=fill_applications,
+            no_fill_attempts=no_fill_attempts,
+            funding_ledger=funding_ledger,
+            liquidation_events=liquidation_events,
+            starting_equity=raw["starting_equity"],
+            ending_equity=raw["ending_equity"],
+        )
+        result = AlphaMaxActualEngineRunReceipt(
+            row_id=raw["row_id"],
+            domain=raw["domain"],
+            split_or_fold_id=raw["split_or_fold_id"],
+            nominal_cost_bps=raw["nominal_cost_bps"],
+            seed=raw["seed"],
+            raw_root_receipts=tuple(
+                root(item)
+                for item in _alpha_max_parse_list(raw["raw_root_receipts"], field="raw_roots")
+            ),
+            feature_root_receipts=tuple(
+                root(item)
+                for item in _alpha_max_parse_list(
+                    raw["feature_root_receipts"], field="feature_roots"
+                )
+            ),
+            raw_root_set_sha256=raw["raw_root_set_sha256"],
+            feature_root_set_sha256=raw["feature_root_set_sha256"],
+            capsule_receipt=capsule(raw["capsule_receipt"]),
+            manifest_receipt=manifest(raw["manifest_receipt"]),
+            config_receipt=config_receipt,
+            config_sha256=raw["config_sha256"],
+            runtime_contract_sha256=raw["runtime_contract_sha256"],
+            effective_config_bytes=effective_bytes,
+            effective_config_sha256=raw["effective_config_sha256"],
+            runtime_read_audit=tuple(
+                _alpha_max_parse_list(raw["runtime_read_audit"], field="runtime_read_audit")
+            ),
+            runtime_read_audit_sha256=raw["runtime_read_audit_sha256"],
+            admitted_symbols=tuple(
+                _alpha_max_parse_list(raw["admitted_symbols"], field="admitted_symbols")
+            ),
+            universe_sha256=raw["universe_sha256"],
+            market_event_count=raw["market_event_count"],
+            equity_observation_count=raw["equity_observation_count"],
+            signal_event_count=raw["signal_event_count"],
+            order_event_count=raw["order_event_count"],
+            fill_event_count=raw["fill_event_count"],
+            trade_count=raw["trade_count"],
+            starting_cash=raw["starting_cash"],
+            starting_equity=raw["starting_equity"],
+            starting_open_position_count=raw["starting_open_position_count"],
+            starting_open_order_count=raw["starting_open_order_count"],
+            starting_used_margin=raw["starting_used_margin"],
+            ending_cash=raw["ending_cash"],
+            ending_equity=raw["ending_equity"],
+            full_event_equity=stream(raw["full_event_equity"]),
+            native_finalization=native(raw["native_finalization"]),
+            pricing_trace_count=raw["pricing_trace_count"],
+            pricing_trace_set_sha256=raw["pricing_trace_set_sha256"],
+            application_count=raw["application_count"],
+            application_set_sha256=raw["application_set_sha256"],
+            no_fill_attempt_count=raw["no_fill_attempt_count"],
+            no_fill_attempt_set_sha256=raw["no_fill_attempt_set_sha256"],
+            funding_ledger_count=raw["funding_ledger_count"],
+            funding_ledger_set_sha256=raw["funding_ledger_set_sha256"],
+            liquidation_event_count=raw["liquidation_event_count"],
+            liquidation_event_set_sha256=raw["liquidation_event_set_sha256"],
+            liquidation_events=liquidation_events,
+            reconciliation=reconciliation_evidence,
+            report_only_diagnostics=report_only_diagnostics,
+            canonical_bytes=_canonical_json_bytes(raw, newline=True),
+            sha256=_sha256_bytes(_canonical_json_bytes(raw, newline=True)),
+        )
+        _alpha_max_parse_payload_equal(raw, result.to_payload(), field="actual_run")
+        return result
+
+    def normalized_segment(value: object) -> AlphaMaxNormalizedFoldSegmentEvidence:
+        raw = obj(
+            value,
+            {
+                "aggregate_prefix_event_count",
+                "aggregate_prefix_event_stream_sha256",
+                "artifact_kind",
+                "event_count",
+                "first_timestamp_ms",
+                "fold_id",
+                "last_timestamp_ms",
+                "normalization_scale",
+                "normalized_ending_equity",
+                "normalized_segment_event_stream_sha256",
+                "normalized_starting_equity",
+                "source_event_stream_sha256",
+                "source_streaming_equity_sha256",
+            },
+            "normalized_segment",
+        )
+        if raw["artifact_kind"] != "alpha_max_normalized_fold_segment_evidence.v1":
+            raise ValueError("alpha_max_parse_artifact_kind_invalid")
+        for field in (
+            "normalization_scale",
+            "normalized_starting_equity",
+            "normalized_ending_equity",
+        ):
+            _alpha_max_parse_exact_float(raw[field], field=f"normalized_{field}")
+        for field in (
+            "event_count",
+            "first_timestamp_ms",
+            "last_timestamp_ms",
+            "aggregate_prefix_event_count",
+        ):
+            _alpha_max_parse_exact_int(
+                raw[field],
+                field=f"normalized_{field}",
+                nonnegative=True,
+            )
+        result = build_alpha_max_normalized_fold_segment_evidence(
+            fold_id=raw["fold_id"],
+            source_streaming_equity_sha256=raw["source_streaming_equity_sha256"],
+            source_event_stream_sha256=raw["source_event_stream_sha256"],
+            normalization_scale=raw["normalization_scale"],
+            normalized_starting_equity=raw["normalized_starting_equity"],
+            normalized_ending_equity=raw["normalized_ending_equity"],
+            normalized_segment_event_stream_sha256=raw["normalized_segment_event_stream_sha256"],
+            event_count=raw["event_count"],
+            first_timestamp_ms=raw["first_timestamp_ms"],
+            last_timestamp_ms=raw["last_timestamp_ms"],
+            aggregate_prefix_event_count=raw["aggregate_prefix_event_count"],
+            aggregate_prefix_event_stream_sha256=raw["aggregate_prefix_event_stream_sha256"],
+        )
+        _alpha_max_parse_payload_equal(raw, result.to_payload(), field="normalized_segment")
+        return result
+
+    def combined(value: object) -> AlphaMaxCombinedStreamingEquityEvidence:
+        raw = obj(
+            value,
+            {
+                "artifact_kind",
+                "domain",
+                "fold_event_stream_set_sha256",
+                "fold_ids",
+                "fold_run_sha256s",
+                "fold_streaming_equity_sha256s",
+                "normalized_fold_segments",
+                "streaming_equity",
+            },
+            "combined_streaming",
+        )
+        if raw["artifact_kind"] != "alpha_max_combined_streaming_equity.v1":
+            raise ValueError("alpha_max_parse_artifact_kind_invalid")
+        result = AlphaMaxCombinedStreamingEquityEvidence(
+            domain=raw["domain"],
+            fold_ids=tuple(_alpha_max_parse_list(raw["fold_ids"], field="combined_fold_ids")),
+            fold_run_sha256s=tuple(
+                _alpha_max_parse_list(raw["fold_run_sha256s"], field="combined_run_hashes")
+            ),
+            fold_streaming_equity_sha256s=tuple(
+                _alpha_max_parse_list(
+                    raw["fold_streaming_equity_sha256s"], field="combined_stream_hashes"
+                )
+            ),
+            fold_event_stream_set_sha256=raw["fold_event_stream_set_sha256"],
+            normalized_fold_segments=tuple(
+                normalized_segment(item)
+                for item in _alpha_max_parse_list(
+                    raw["normalized_fold_segments"], field="combined_segments"
+                )
+            ),
+            streaming_equity=stream(raw["streaming_equity"]),
+            canonical_bytes=_canonical_json_bytes(
+                {"artifact_kind": "alpha_max_combined_streaming_equity.v1", **raw}, newline=True
+            ),
+            sha256=_sha256_bytes(
+                _canonical_json_bytes(
+                    {"artifact_kind": "alpha_max_combined_streaming_equity.v1", **raw}, newline=True
+                )
+            ),
+        )
+        _alpha_max_parse_payload_equal(
+            {"artifact_kind": "alpha_max_combined_streaming_equity.v1", **raw},
+            result.to_payload(),
+            field="combined_streaming",
+        )
+        return result
+
+    def fold(value: object) -> AlphaMaxFoldRunEvidence:
+        raw = obj(
+            value,
+            {"actual_engine_run", "artifact_kind", "primary_return_stream", "status"},
+            "fold_run",
+        )
+        if raw["artifact_kind"] != "alpha_max_fold_run_evidence.v1":
+            raise ValueError("alpha_max_parse_artifact_kind_invalid")
+        run = actual(raw["actual_engine_run"])
+        result = AlphaMaxFoldRunEvidence(
+            actual_engine_run=run,
+            primary_return_stream=None
+            if raw["primary_return_stream"] is None
+            else primary(raw["primary_return_stream"]),
+            status=raw["status"],
+            canonical_bytes=_canonical_json_bytes(raw, newline=True),
+            sha256=_sha256_bytes(_canonical_json_bytes(raw, newline=True)),
+        )
+        _alpha_max_parse_payload_equal(raw, result.to_payload(), field="fold_run")
+        return result
+
+    top = obj(
+        payload,
+        {
+            "artifact_kind",
+            "combined_primary_return_stream",
+            "combined_streaming_equity",
+            "domain",
+            "domain_engine_run_count",
+            "fold_run_count",
+            "fold_run_set_sha256",
+            "fold_runs",
+            "logical_actual_engine_cell_count",
+            "metric_statistics",
+            "nominal_cost_bps",
+            "row_id",
+            "source_return_stream_set_sha256",
+            "status",
+        },
+        "pre_gate",
+    )
+    if top["artifact_kind"] != "alpha_max_cost_cell_pre_gate_evidence.v1":
+        raise ValueError("alpha_max_parse_artifact_kind_invalid")
+    for field in (
+        "domain_engine_run_count",
+        "fold_run_count",
+        "logical_actual_engine_cell_count",
+        "nominal_cost_bps",
+    ):
+        _alpha_max_parse_exact_int(
+            top[field],
+            field=f"pre_gate_{field}",
+            nonnegative=True,
+        )
+    folds = tuple(fold(item) for item in _alpha_max_parse_list(top["fold_runs"], field="fold_runs"))
+    combined_primary = (
+        None
+        if top["combined_primary_return_stream"] is None
+        else primary(top["combined_primary_return_stream"])
+    )
+    combined_stream = (
+        None
+        if top["combined_streaming_equity"] is None
+        else combined(top["combined_streaming_equity"])
+    )
+    metrics: AlphaMaxMetricStatistics | None = None
+    if top["metric_statistics"] is not None:
+        metric_raw = obj(
+            top["metric_statistics"],
+            {
+                "artifact_kind",
+                "canonical_metrics",
+                "drawdown_duration_endpoints",
+                "drawdown_duration_hours",
+                "expected_shortfall_5pct",
+                "full_event_event_count",
+                "full_event_mdd",
+                "gate_mdd",
+                "primary_return_stream_sha256",
+                "reporting_4h_mdd",
+                "ruin_detected",
+                "streaming_equity_sha256",
+                "uncapped_full_event_drawdown",
+                "value_at_risk_5pct_type7",
+            },
+            "metric_statistics",
+        )
+        if (
+            metric_raw["artifact_kind"] != "alpha_max_metric_statistics.v1"
+            or combined_primary is None
+            or combined_stream is None
+        ):
+            raise ValueError("alpha_max_parse_metric_statistics_invalid")
+        metrics = compute_alpha_max_metric_statistics(
+            combined_primary, combined_stream.streaming_equity
+        )
+        _alpha_max_parse_payload_equal(metric_raw, metrics.to_payload(), field="metric_statistics")
+    expected_source_stream_hash = (
+        None
+        if any(fold_run.status == "ruin_detected" for fold_run in folds)
+        else _sha256_bytes(
+            _canonical_json_bytes(
+                [
+                    {
+                        "fold_id": fold_run.split_or_fold_id,
+                        "primary_return_stream_sha256": _alpha_max_primary_stream_sha256(
+                            fold_run.primary_return_stream  # type: ignore[arg-type]
+                        ),
+                    }
+                    for fold_run in folds
+                ],
+                newline=True,
+            )
+        )
+    )
+    if top["source_return_stream_set_sha256"] != expected_source_stream_hash:
+        raise ValueError("alpha_max_parse_source_return_stream_set_hash_mismatch")
+    canonical = _canonical_json_bytes(top, newline=True)
+    result = AlphaMaxCostCellPreGateEvidence(
+        row_id=top["row_id"],
+        domain=top["domain"],
+        nominal_cost_bps=top["nominal_cost_bps"],
+        status=top["status"],
+        fold_runs=folds,
+        fold_run_set_sha256=top["fold_run_set_sha256"],
+        source_return_stream_set_sha256=top["source_return_stream_set_sha256"],
+        combined_primary_return_stream=combined_primary,
+        combined_streaming_equity=combined_stream,
+        metric_statistics=metrics,
+        canonical_bytes=canonical,
+        sha256=_sha256_bytes(canonical),
+    )
+    _alpha_max_parse_payload_equal(top, result.to_payload(), field="pre_gate")
+    if used_capsules != set(supplied_capsules):
+        raise ValueError("alpha_max_parse_unused_capsule_receipt")
+    if used_roots != set(supplied_roots):
+        raise ValueError("alpha_max_parse_unused_root_receipt")
+    return result
+
+
 @dataclass(frozen=True, slots=True)
 class AlphaMaxTerminalGateEvidence:
     row_id: str
@@ -9498,6 +10674,17 @@ def _validate_alpha_max_streaming_equity_evidence(
     return value
 
 
+def _alpha_max_streaming_equity_record_bytes(
+    equity: float,
+    event_index: int,
+    timestamp_ms: int | None,
+) -> bytes:
+    timestamp = "null" if timestamp_ms is None else str(timestamp_ms)
+    return (
+        f'{{"equity":{equity!r},"event_index":{event_index},"timestamp_ms":{timestamp}}}\n'
+    ).encode("ascii")
+
+
 class AlphaMaxStreamingEquityTracker:
     """Constant-memory exact full-event equity/MDD/drawdown-duration tracker."""
 
@@ -9597,14 +10784,7 @@ class AlphaMaxStreamingEquityTracker:
             raise ValueError("alpha_max_streaming_timestamp_not_monotone")
         event_index = self._event_count
         self._digest.update(
-            _canonical_json_bytes(
-                {
-                    "equity": parsed,
-                    "event_index": event_index,
-                    "timestamp_ms": timestamp_ms,
-                },
-                newline=True,
-            )
+            _alpha_max_streaming_equity_record_bytes(parsed, event_index, timestamp_ms)
         )
         self._event_count += 1
         self._ending_equity = parsed
@@ -9632,6 +10812,89 @@ class AlphaMaxStreamingEquityTracker:
             self._maximum_drawdown,
             1.0 - (parsed / self._peak_equity),
         )
+
+    def update_batch(self, points: np.ndarray) -> None:
+        """Consume exact ``(unix_seconds, equity)`` points without per-point objects."""
+        if (
+            type(points) is not np.ndarray
+            or points.dtype != np.dtype(np.float64)
+            or points.ndim != 2
+            or points.shape[1:] != (2,)
+            or points.shape[0] == 0
+            or not bool(np.all(np.isfinite(points)))
+            or not bool(np.all(points[:, 0] >= 0.0))
+        ):
+            raise TypeError("alpha_max_streaming_equity_batch_invalid")
+        if self._timestamp_mode is False:
+            raise ValueError("alpha_max_streaming_timestamp_mode_changed")
+        self._timestamp_mode = True
+        timestamp_ms = (points[:, 0] * 1000.0).astype(np.int64)
+        if bool(np.any(np.diff(timestamp_ms) < 0)) or (
+            self._last_timestamp_ms is not None and int(timestamp_ms[0]) < self._last_timestamp_ms
+        ):
+            raise ValueError("alpha_max_streaming_timestamp_not_monotone")
+        equities = points[:, 1]
+        start_index = self._event_count
+        for offset in range(0, len(equities), 8192):
+            equity_chunk = equities[offset : offset + 8192]
+            timestamp_chunk = timestamp_ms[offset : offset + 8192]
+            payload = b"".join(
+                _alpha_max_streaming_equity_record_bytes(
+                    float(equity),
+                    start_index + offset + index,
+                    int(timestamp),
+                )
+                for index, (timestamp, equity) in enumerate(
+                    zip(timestamp_chunk, equity_chunk, strict=True)
+                )
+            )
+            self._digest.update(payload)
+
+        prior_peak = self._peak_equity
+        peaks = np.maximum.accumulate(
+            np.concatenate((np.array([prior_peak], dtype=np.float64), equities))
+        )[1:]
+        resets = equities >= peaks
+        indices = np.arange(len(equities), dtype=np.int64)
+        prior_reset_index = -1 - int(self._current_duration)
+        last_reset_indices = np.maximum.accumulate(np.where(resets, indices, prior_reset_index))
+        durations = indices - last_reset_indices
+        self._current_duration = int(durations[-1])
+        self._max_drawdown_duration_events = max(
+            self._max_drawdown_duration_events,
+            int(np.max(durations)),
+        )
+        if self._last_peak_timestamp_ms is None:
+            peak_timestamps = np.maximum.accumulate(
+                np.where(resets, timestamp_ms, np.iinfo(np.int64).min)
+            )
+            duration_mask = (durations > 0) & (peak_timestamps != np.iinfo(np.int64).min)
+        else:
+            peak_timestamps = np.maximum.accumulate(
+                np.where(resets, timestamp_ms, self._last_peak_timestamp_ms)
+            )
+            duration_mask = durations > 0
+        if bool(np.any(duration_mask)):
+            self._max_drawdown_duration_ms = max(
+                self._max_drawdown_duration_ms,
+                int(np.max(timestamp_ms[duration_mask] - peak_timestamps[duration_mask])),
+            )
+        reset_indices = np.flatnonzero(resets)
+        if reset_indices.size:
+            self._last_peak_timestamp_ms = int(timestamp_ms[int(reset_indices[-1])])
+        drawdowns = 1.0 - (equities / peaks)
+        self._maximum_drawdown = max(
+            self._maximum_drawdown,
+            float(np.max(drawdowns)),
+        )
+        self._event_count += len(equities)
+        self._ending_equity = float(equities[-1])
+        self._minimum_equity = min(self._minimum_equity, float(np.min(equities)))
+        self._peak_equity = float(peaks[-1])
+        self._ruin_observed = self._ruin_observed or bool(np.any(equities <= 0.0))
+        if self._first_timestamp_ms is None:
+            self._first_timestamp_ms = int(timestamp_ms[0])
+        self._last_timestamp_ms = int(timestamp_ms[-1])
 
     def finalize(self) -> AlphaMaxStreamingEquityEvidence:
         if self._event_count == 0:

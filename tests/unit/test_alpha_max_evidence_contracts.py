@@ -239,15 +239,23 @@ def test_ordered_lookup_reads_actual_adjacent_parquet_roots_causally(tmp_path):
     write_point(current, boundary_ms + 1, 0.0002)
     lookup = AlphaMaxOrderedFundingLookup((previous, current))
 
+    assert (
+        lookup.get_latest_point(
+            "BTCUSDT",
+            "funding_rate",
+            timestamp_ms=boundary_ms,
+        )
+        is None
+    )
     assert lookup.get_latest_point(
         "BTCUSDT",
         "funding_rate",
-        timestamp_ms=boundary_ms,
+        timestamp_ms=boundary_ms + 499,
     ) == FeaturePoint(0.0001, boundary_ms + 499, boundary_ms - 1)
     assert lookup.get_latest_point(
         "BTCUSDT",
         "funding_rate",
-        timestamp_ms=boundary_ms + 1,
+        timestamp_ms=boundary_ms + 501,
     ) == FeaturePoint(0.0002, boundary_ms + 501, boundary_ms + 1)
 
 

@@ -13,8 +13,9 @@ Fixtures are tiny in-memory synthetics; no real backtest is run.
 import os
 import queue
 import unittest
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
+import numpy as np
 from lumina_quant.backtesting.portfolio_backtest import Portfolio
 from lumina_quant.core.events import OrderEvent, SignalEvent
 
@@ -78,6 +79,67 @@ def _signal(signal_type, *, stop_loss=None):
         signal_type=signal_type,
         stop_loss=stop_loss,
     )
+
+
+class _EquitySink:
+    def __init__(self):
+        self.points = []
+
+    def __call__(self, point):
+        self.points.append((float(point[0]), float(point[1])))
+
+    def update_batch(self, points):
+        self.points.extend((float(point[0]), float(point[1])) for point in points)
+
+
+class TestInertEquityBatch(unittest.TestCase):
+    def test_batch_matches_exact_one_second_updates(self):
+        start = datetime(2026, 1, 1, tzinfo=UTC)
+        start_ms = int(start.timestamp() * 1000)
+        standard_bars = MockBars(start_ms, 100.0)
+        batch_bars = MockBars(start_ms, 100.0)
+        standard_sink = _EquitySink()
+        batch_sink = _EquitySink()
+        standard = Portfolio(
+            standard_bars,
+            queue.Queue(),
+            start,
+            BaseConfig,
+            reporting_sampling_timeframe="4h",
+            full_event_equity_sink=standard_sink,
+        )
+        batch = Portfolio(
+            batch_bars,
+            queue.Queue(),
+            start,
+            BaseConfig,
+            reporting_sampling_timeframe="4h",
+            full_event_equity_sink=batch_sink,
+        )
+        for portfolio in (standard, batch):
+            portfolio.current_positions["BTC/USDT"] = 1.25
+            portfolio.entry_prices["BTC/USDT"] = 100.0
+        standard.update_timeindex(None)
+        batch.update_timeindex(None)
+
+        prices = np.array([100.125, 99.875, 101.5], dtype=np.float64)
+        timestamps = np.array(
+            [int((start + timedelta(seconds=index)).timestamp() * 1000) for index in (1, 2, 3)],
+            dtype=np.int64,
+        )
+        for index, price in enumerate(prices, start=1):
+            standard_bars.current_dt = int((start + timedelta(seconds=index)).timestamp() * 1000)
+            standard_bars.close = float(price)
+            standard.update_timeindex(None)
+        batch.update_timeindex_inert_batch(
+            timestamps,
+            {"BTC/USDT": prices},
+        )
+
+        self.assertEqual(standard.current_holdings, batch.current_holdings)
+        self.assertEqual(standard.strategy_quality.get_state(), batch.strategy_quality.get_state())
+        self.assertEqual(list(standard._equity_points), list(batch._equity_points))
+        self.assertEqual(standard_sink.points, batch_sink.points)
 
 
 # --------------------------------------------------------------------------- #

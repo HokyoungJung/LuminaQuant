@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import queue
 from datetime import UTC, datetime, timedelta
 
+import numpy as np
 import polars as pl
 from lumina_quant.backtesting.backtest import Backtest
 from lumina_quant.backtesting.data import HistoricCSVDataHandler
@@ -11,7 +13,7 @@ from lumina_quant.backtesting.portfolio_backtest import Portfolio
 from lumina_quant.core.events import SignalEvent
 from lumina_quant.core.market_window_contract import normalize_bars_1s
 from lumina_quant.strategy import Strategy
-from lumina_quant.timeframe_aggregator import TimeframeAggregator
+from lumina_quant.timeframe_aggregator import NativeBarRelease, TimeframeAggregator
 
 
 class _CadenceFlipStrategy(Strategy):
@@ -199,6 +201,100 @@ def test_timeframe_aggregator_canonical_epoch_rows_match_datetime_rows():
             timeframe,
             n=16,
         )
+
+
+def test_exact_native_releases_match_one_second_left_fold() -> None:
+    start = datetime(2026, 1, 1, tzinfo=UTC)
+    rows = [
+        (
+            int((start + timedelta(seconds=index)).timestamp() * 1000),
+            100.0,
+            101.0,
+            99.0,
+            100.0,
+            1e16 if index == 0 else 1.0,
+        )
+        for index in range((8 * 60 * 60) + 1)
+    ]
+    exact = TimeframeAggregator(timeframes=["4h", "1d"])
+    releases = exact.update_from_canonical_1s_rows_exact("BTCUSDT", rows)
+
+    reference = TimeframeAggregator(timeframes=["4h", "1d"])
+    for row in rows:
+        reference.update_from_1s_batch({"BTCUSDT": (row,)})
+
+    assert exact.get_state() == reference.get_state()
+    assert releases == (
+        NativeBarRelease(
+            release_timestamp_ms=rows[14_400][0],
+            symbol="BTCUSDT",
+            timeframe="4h",
+            bar=reference.get_bars("BTCUSDT", "4h", n=3)[0],
+        ),
+        NativeBarRelease(
+            release_timestamp_ms=rows[28_800][0],
+            symbol="BTCUSDT",
+            timeframe="4h",
+            bar=reference.get_bars("BTCUSDT", "4h", n=3)[1],
+        ),
+    )
+
+
+def test_alpha_max_columnar_advance_matches_ordinary_handler_tails() -> None:
+    start = datetime(2026, 1, 1, tzinfo=UTC)
+    end = start + timedelta(seconds=100)
+    data = {
+        symbol: _build_1s_frame(
+            start,
+            100,
+            offset=float(index),
+        )
+        for index, symbol in enumerate(("BTC/USDT", "ETH/USDT"))
+    }
+    reference_events = queue.Queue()
+    reference = HistoricParquetWindowedDataHandler(
+        reference_events,
+        ".",
+        ["BTC/USDT", "ETH/USDT"],
+        start,
+        end,
+        data,
+        backtest_poll_seconds=1,
+        backtest_window_seconds=1,
+        market_window_parity_v2_enabled=True,
+    )
+    while reference.continue_backtest:
+        reference.update_bars()
+        while not reference_events.empty():
+            reference_events.get_nowait()
+
+    batched = HistoricParquetWindowedDataHandler(
+        queue.Queue(),
+        ".",
+        ["BTC/USDT", "ETH/USDT"],
+        start,
+        end,
+        data,
+        backtest_poll_seconds=1,
+        backtest_window_seconds=1,
+        market_window_parity_v2_enabled=True,
+    )
+    view = batched.alpha_max_exact_columnar_view()
+    assert tuple(view) == ("BTC/USDT", "ETH/USDT")
+    assert np.array_equal(view["BTC/USDT"][0], view["ETH/USDT"][0])
+    batched.alpha_max_advance_without_event(0, 49)
+    batched.alpha_max_advance_without_event(50, 99)
+
+    assert batched.symbol_index == reference.symbol_index
+    assert batched.next_bar == reference.next_bar
+    assert batched.continue_backtest is reference.continue_backtest is False
+    assert batched.last_emitted_timestamp_ms == reference.last_emitted_timestamp_ms
+    assert {symbol: tuple(rows) for symbol, rows in batched._window_rows.items()} == {
+        symbol: tuple(rows) for symbol, rows in reference._window_rows.items()
+    }
+    assert {symbol: tuple(rows) for symbol, rows in batched.latest_symbol_data.items()} == {
+        symbol: tuple(rows) for symbol, rows in reference.latest_symbol_data.items()
+    }
 
 
 def test_market_window_normalize_canonical_epoch_rows_match_datetime_rows():

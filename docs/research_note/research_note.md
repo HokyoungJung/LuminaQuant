@@ -1,4 +1,37 @@
 # Research Note
+## 2026-08-23 — G003 integrated alpha-research decision and restartable native replay
+
+Current canonical navigation moved to `README.md`, `strategy_taxonomy.md`,
+`strategy_relationships.json`, `strategy_evidence_index.json`, and
+`evaluation_contract.md`. This diary remains chronological provenance rather
+than the current status authority.
+
+G003 selection-v11 completed 24 candidate runs with 16 allowed data exclusions
+and 20 active return panels. Only `crypto_turtle_20_10_atr_v1` survived its
+positive-quality gate; the preregistered floor was six. The suite was rejected,
+no allocator portfolio was emitted, and locked OOS was not launched.
+Post-activation `19/19` and registry `127 pass + 16 exclusions` are execution
+smokes, not promotion evidence. The earlier 144-strategy snapshot and later
+143-row registry report remain explicitly unreconciled by commit/scope.
+
+The checkpointless parity-v10 oracle was stopped at modeled `21.97%` progress
+and sealed non-reusable under receipt
+`f1793acc435a626f2e42fdbad739a12decfa8f8c33f1a39c9fed57e86161dd24`.
+Its separately sealed exact-native candidate remains execution provenance, not
+official acceptance or performance evidence. The integrated replacement moves
+only authenticated canonical 1-second OHLCV folding into Rust/PyO3; Python
+retains release grouping, strategy/event ordering, final handoff,
+finalization, capsule serialization, and economic semantics. Whole UTC days
+are the parity restart unit and whole row/cost cells are the prelock/historical
+restart unit.
+
+Research priorities are now explicit: fresh sealed price-volume continuation;
+Turtle versus one equal-gross crash/correlation guard; echo/residual momentum
+orthogonality; matched rebalancing controls; and a preregistered
+stationarity-gated residual momentum/reversion switch. These are hypotheses,
+not observed performance. Official parity, prelock, historical, and
+observability acceptance remain pending. `order_routing_enabled=false`.
+
 ## 2026-07-10 KST — 최신 upstream task 전수 실행: evaluability v3 / defect v5 / eq-flow / dashboard
 
 `private/main`을 `49bdd52a`까지 fast-forward하고, 새 task 원문 `alpha_pool_evaluability_v3_handoff.md`, `systematic_defect_fix_v5_handoff.md`, `eqflow_complements_handoff.md`와 dashboard UI/UX fix를 현재 data-PC에서 검증했다. 이번 추가 구현은 strict profile을 실제 candidate CLI까지 전달하고, cost override를 score JSON보다 우선시키며, 등록된 research strategy를 shared generic momentum proxy 대신 registry simulator로 라우팅하고, validation/whole-search evidence가 없으면 fail-closed하도록 만든다. locked-OOS는 보고 전용으로 남겼고 post-OOS variant의 paper/live/real alias와 실배분 경로는 모두 닫았다.

@@ -138,6 +138,55 @@ def test_feature_point_lookup_does_not_forward_fill_beyond_staleness_limit(tmp_p
     assert lookup.get_latest("BTC/USDT", "funding_rate", timestamp_ms=stale_ms) is None
 
 
+def test_feature_point_lookup_waits_for_jittered_source_timestamp(tmp_path):
+    db_path = tmp_path / "market_parquet"
+    prior_ms = 1_700_000_000_000
+    boundary_ms = prior_ms + FEATURE_POINT_MAX_STALE_MS
+    source_ms = boundary_ms + 8
+    partition = (
+        db_path
+        / "feature_points"
+        / "exchange=binance"
+        / "symbol=XRPUSDT"
+        / "date=2023-11-14"
+        / "part-0.parquet"
+    )
+    partition.parent.mkdir(parents=True)
+    pl.DataFrame(
+        [
+            {
+                "timestamp_ms": prior_ms,
+                "source_timestamp_ms": prior_ms,
+                "funding_rate": 0.0001,
+            },
+            {
+                "timestamp_ms": boundary_ms,
+                "source_timestamp_ms": source_ms,
+                "funding_rate": -0.0002,
+            },
+        ]
+    ).write_parquet(partition)
+    lookup = FeaturePointLookup(db_path=str(db_path), exchange="binance")
+
+    at_boundary = lookup.get_latest_point(
+        "XRP/USDT",
+        "funding_rate",
+        timestamp_ms=boundary_ms,
+    )
+    after_source = lookup.get_latest_point(
+        "XRP/USDT",
+        "funding_rate",
+        timestamp_ms=source_ms,
+    )
+
+    assert at_boundary is not None
+    assert at_boundary.value == pytest.approx(0.0001)
+    assert at_boundary.source_timestamp_ms == prior_ms
+    assert after_source is not None
+    assert after_source.value == pytest.approx(-0.0002)
+    assert after_source.source_timestamp_ms == source_ms
+
+
 def test_sealed_feature_lookup_rejects_post_binding_content_replacement(tmp_path):
     db_path, partition, entry, timestamp_ms = _sealed_feature_fixture(tmp_path)
     lookup = FeaturePointLookup(

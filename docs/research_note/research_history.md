@@ -1,6 +1,13 @@
 # Profit Moonshot Research History — March-to-May Dynamic Restart Ledger
 
-Future profit-moonshot sessions must read this file before repeating searches or promoting candidates.
+> Historical provenance only as of 2026-08-23. Current strategy state,
+> evaluation semantics, relationships, and evidence authority live in
+> `README.md`, `strategy_taxonomy.md`, `strategy_relationships.json`,
+> `strategy_evidence_index.json`, and `evaluation_contract.md`. Historic
+> diagnostic winners below are not silently promoted.
+
+Future profit-moonshot sessions must read this file before repeating searches,
+then reconcile any conclusion against the current canonical graph.
 
 ## Generation metadata
 - schema_version: `profit_moonshot_research_history.v1`
