@@ -1449,7 +1449,10 @@ class Portfolio:
         if now_ts is None:
             return
         if self.funding_boundary_resolver is not None:
-            self._apply_funding_boundary_resolution(latest_datetime, now_ts=now_ts)
+            self._apply_funding_boundary_resolution(
+                datetime.fromtimestamp(now_ts, tz=UTC),
+                now_ts=now_ts,
+            )
             return
 
         for symbol in self.symbol_list:

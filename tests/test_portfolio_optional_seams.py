@@ -927,6 +927,30 @@ def test_funding_boundary_batch_is_single_call_fsum_settled_and_not_replayed():
     assert portfolio.total_funding_paid == pytest.approx(1.0)
 
 
+def test_funding_boundary_resolver_normalizes_epoch_ms_latest_time_to_utc():
+    expected = datetime(2026, 7, 10, 8, 0, 1, tzinfo=UTC)
+
+    class _BatchResolver:
+        def resolve_batch(self, requests, **_kwargs):
+            assert requests[0]["latest_datetime"] == expected
+            return (
+                {
+                    "symbol": requests[0]["symbol"],
+                    "boundary_ms": requests[0]["boundary_ms"],
+                    "qty": requests[0]["qty"],
+                    "payment": 0.0,
+                },
+            )
+
+    portfolio, _ = _portfolio(funding_boundary_resolver=_BatchResolver())
+    portfolio.current_positions["BTC"] = 1.0
+    portfolio._last_funding_ts["BTC"] = datetime(
+        2026, 7, 10, 0, 0, tzinfo=UTC
+    ).timestamp()
+
+    portfolio._apply_funding(int(expected.timestamp() * 1000))
+
+
 def test_funding_boundary_resolver_must_expose_resolve_and_be_constructor_bound():
     with pytest.raises(TypeError, match="funding_boundary_resolver must expose"):
         _portfolio(funding_boundary_resolver=lambda **_: {"payment": 0.0})
