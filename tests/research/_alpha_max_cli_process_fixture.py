@@ -33,6 +33,9 @@ CONTRACT_PATH = (
 ).resolve()
 PRELOCK_PATH = REPO_ROOT / "scripts/research/run_alpha_max_prelock.py"
 HISTORICAL_PATH = REPO_ROOT / "scripts/research/run_alpha_max_historical_evaluation.py"
+PRIOR_TRIAL_PATH = (
+    REPO_ROOT / "var/reports/ultragoal_full_pool_strategy/g004_frozen_candidate_manifest.json"
+)
 ROOT_IDS = (
     "warmup",
     "train",
@@ -238,6 +241,9 @@ class AlphaMaxCliProcessHarness:
         evidence._ROOT_INTERVALS.update(_FIXTURE_ROOT_INTERVALS)
         self.temp_root = temp_root.resolve()
         self.temp_root.mkdir(parents=True, exist_ok=True)
+        self.prior_trial_blob = self.temp_root / "prior-trials.json"
+        self.prior_trial_blob.write_bytes(PRIOR_TRIAL_PATH.read_bytes())
+        self.prior_trial_blob.chmod(0o400)
         self.roots: dict[tuple[str, str], Path] = {}
         self.root_seal_cache: dict[tuple[str, str, str], runner.AlphaMaxRootSeal] = {}
         self.force_root_paths: set[str] = set()
@@ -743,6 +749,12 @@ class AlphaMaxCliProcessHarness:
             self.matrix_invocations.append((self.run_label, domain))
             checkpoint_store = kwargs["checkpoint_store"]
             if domain == "validation":
+                if (
+                    type(checkpoint_store) is not runner._AlphaMaxCellCheckpointStore
+                    or checkpoint_store._attempt_role != "prelock"
+                    or not checkpoint_store._descriptor_v2
+                ):
+                    raise AssertionError("prelock_checkpoint_descriptor_invalid")
                 # Validation replay stubs deliberately use a compact fixture
                 # evidence object. Historical coverage retains the checkpoint
                 # branch and validates its typed preflight/root/descriptor seam.
@@ -796,6 +808,8 @@ class AlphaMaxCliProcessHarness:
             str(config.resolve()),
             "--contract-manifest",
             str(contract.resolve()),
+            "--prior-trial-blob",
+            str(self.prior_trial_blob),
             "--exchange",
             "binance",
             "--output-root",

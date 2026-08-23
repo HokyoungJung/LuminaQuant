@@ -998,6 +998,12 @@ def _v2_cell_descriptor(
             "immutable_prelock_seal_sha256": "b" * 64,
             "validated_snapshot_sha256": "c" * 64,
         }
+    else:
+        descriptor["prior_trial_blob"] = {
+            "byte_count": 1,
+            "path": str((checkpoint.parent / "prior-trials.json").resolve()),
+            "sha256": "d" * 64,
+        }
     return descriptor
 
 
@@ -1181,6 +1187,24 @@ def test_checkpoint_store_seals_and_reloads_exact_typed_cell(
     assert restarted.descriptor_sha256 == descriptor_sha256
     assert cell_path.stat().st_ino == inode_before
     assert loaded == context.cell
+
+
+def test_v2_prelock_descriptor_requires_prior_trial_blob_binding(
+    tmp_path: Path,
+) -> None:
+    descriptor = _v2_cell_descriptor(
+        (tmp_path / "prelock-checkpoint").resolve(),
+        (tmp_path / "prelock-output").resolve(),
+        domain="validation",
+    )
+
+    assert runner._alpha_max_validate_checkpoint_descriptor(descriptor) == (
+        "prelock",
+        "validation",
+    )
+    descriptor.pop("prior_trial_blob")
+    with pytest.raises(runner.AlphaMaxRuntimeContractError):
+        runner._alpha_max_validate_checkpoint_descriptor(descriptor)
 
 
 def test_historical_checkpoint_store_round_trip_binds_ten_fold_cell_and_prelock(

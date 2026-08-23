@@ -152,6 +152,7 @@ __all__ = [
     "parse_alpha_max_cost_cell_pre_gate_evidence",
     "rank_alpha_max_historical_report",
     "read_alpha_max_prior_trial_blob",
+    "read_alpha_max_prior_trial_blob_input",
     "reconcile_alpha_max_cost_attribution",
     "seal_alpha_max_contract_manifest",
     "seal_alpha_max_root_tree",
@@ -2874,6 +2875,56 @@ def read_alpha_max_prior_trial_blob(repo_root: str | os.PathLike[str]) -> bytes:
     if resolved_oid != _ALPHA_MAX_PRIOR_BLOB_OID:
         raise ValueError("alpha_max_prior_trial_inventory_mismatch")
     payload = _alpha_max_git_command(root, "cat-file", "blob", _ALPHA_MAX_PRIOR_BLOB_OID)
+    git_oid = hashlib.sha1(f"blob {len(payload)}\0".encode("ascii") + payload).hexdigest()
+    if (
+        git_oid != _ALPHA_MAX_PRIOR_BLOB_OID
+        or _sha256_bytes(payload) != _ALPHA_MAX_PRIOR_FILE_SHA256
+    ):
+        raise ValueError("alpha_max_prior_trial_inventory_mismatch")
+    return payload
+
+
+def read_alpha_max_prior_trial_blob_input(
+    path: str | os.PathLike[str],
+) -> bytes:
+    """Read an immutable runtime copy of the exact frozen G004 Git blob."""
+    try:
+        source = _require_explicit_canonical_path(
+            path,
+            field="alpha_max_prior_trial_blob",
+        )
+    except (OSError, ValueError) as exc:
+        raise ValueError("alpha_max_prior_trial_inventory_mismatch") from exc
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(source, flags)
+    except OSError as exc:
+        raise ValueError("alpha_max_prior_trial_inventory_mismatch") from exc
+    try:
+        before = os.fstat(descriptor)
+        if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1 or before.st_mode & 0o222:
+            raise ValueError("alpha_max_prior_trial_inventory_mismatch")
+        chunks: list[bytes] = []
+        while chunk := os.read(descriptor, 1024 * 1024):
+            chunks.append(chunk)
+        after = os.fstat(descriptor)
+        if (
+            before.st_dev,
+            before.st_ino,
+            before.st_size,
+            before.st_mtime_ns,
+            before.st_ctime_ns,
+        ) != (
+            after.st_dev,
+            after.st_ino,
+            after.st_size,
+            after.st_mtime_ns,
+            after.st_ctime_ns,
+        ):
+            raise ValueError("alpha_max_prior_trial_inventory_mismatch")
+    finally:
+        os.close(descriptor)
+    payload = b"".join(chunks)
     git_oid = hashlib.sha1(f"blob {len(payload)}\0".encode("ascii") + payload).hexdigest()
     if (
         git_oid != _ALPHA_MAX_PRIOR_BLOB_OID

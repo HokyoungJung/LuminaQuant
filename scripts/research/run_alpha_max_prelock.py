@@ -19,6 +19,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--config", required=True)
     parser.add_argument("--contract-manifest", required=True)
+    parser.add_argument("--prior-trial-blob", required=True)
     parser.add_argument("--exchange", required=True, choices=("binance",))
     parser.add_argument("--output-root", required=True)
     parser.add_argument("--checkpoint-root", required=True)
@@ -45,6 +46,7 @@ def _execute(
     result = run_alpha_max_prelock_process(
         config=args.config,
         contract_manifest=args.contract_manifest,
+        prior_trial_blob=args.prior_trial_blob,
         exchange=args.exchange,
         output_root=args.output_root,
         checkpoint_root=args.checkpoint_root,

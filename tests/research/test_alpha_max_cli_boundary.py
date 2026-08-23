@@ -42,6 +42,7 @@ CONTRACT_PATH = (
 PRELOCK_OPTIONS = {
     "--config",
     "--contract-manifest",
+    "--prior-trial-blob",
     "--exchange",
     "--output-root",
     "--checkpoint-root",
@@ -240,6 +241,8 @@ def _placeholder_prelock_argv() -> list[str]:
         "/not-opened/config.json",
         "--contract-manifest",
         "/not-opened/contract.json",
+        "--prior-trial-blob",
+        "/not-opened/prior-trials.json",
         "--exchange",
         "binance",
         "--output-root",
@@ -420,6 +423,7 @@ def test_clean_cli_main_delegates_exact_parsed_namespace(monkeypatch) -> None:
     for option in (
         "config",
         "contract-manifest",
+        "prior-trial-blob",
         "output-root",
         "checkpoint-root",
         "warmup-raw-root",
@@ -439,7 +443,7 @@ def test_clean_cli_main_delegates_exact_parsed_namespace(monkeypatch) -> None:
     assert module.main(argv) == 0
     assert seen["exchange"] == "binance"
     assert seen["bootstrap_inventory"]
-    assert len(seen) == 16
+    assert len(seen) == 17
 
 
 def test_historical_cli_forwards_checkpoint_root_exactly(monkeypatch) -> None:
@@ -488,6 +492,13 @@ def test_prelock_invalid_roots_leave_no_output_or_stage(tmp_path: Path) -> None:
         run_alpha_max_prelock_process(
             config=str(CONFIG_PATH.resolve()),
             contract_manifest=str(CONTRACT_PATH.resolve()),
+            prior_trial_blob=str(
+                (
+                    Path(__file__).resolve().parents[2]
+                    / "var/reports/ultragoal_full_pool_strategy/"
+                    "g004_frozen_candidate_manifest.json"
+                ).resolve()
+            ),
             exchange="binance",
             output_root=str(output),
             checkpoint_root=str((tmp_path / "prelock-checkpoints").resolve()),
@@ -511,6 +522,13 @@ def test_prelock_cli_process_failure_leaves_no_output_or_stage(tmp_path: Path) -
         str(CONFIG_PATH.resolve()),
         "--contract-manifest",
         str(CONTRACT_PATH.resolve()),
+        "--prior-trial-blob",
+        str(
+            (
+                Path(__file__).resolve().parents[2] / "var/reports/ultragoal_full_pool_strategy/"
+                "g004_frozen_candidate_manifest.json"
+            ).resolve()
+        ),
         "--exchange",
         "binance",
         "--output-root",

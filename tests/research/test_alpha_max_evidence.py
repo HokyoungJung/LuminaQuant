@@ -446,6 +446,31 @@ def test_prior_trial_inventory_reads_the_frozen_git_blob_not_mutable_worktree(
         evidence.read_alpha_max_prior_trial_blob(repo)
 
 
+def test_prior_trial_runtime_input_requires_exact_read_only_blob(
+    tmp_path: Path,
+) -> None:
+    source = (
+        Path(__file__).resolve().parents[2]
+        / "var/reports/ultragoal_full_pool_strategy/g004_frozen_candidate_manifest.json"
+    )
+    frozen = evidence.read_alpha_max_prior_trial_blob(Path(__file__).resolve().parents[2])
+    runtime_input = (tmp_path / "prior-trials.json").resolve()
+    runtime_input.write_bytes(frozen)
+    runtime_input.chmod(0o400)
+
+    assert evidence.read_alpha_max_prior_trial_blob_input(runtime_input) == frozen
+
+    runtime_input.chmod(0o600)
+    with pytest.raises(ValueError, match="prior_trial_inventory_mismatch"):
+        evidence.read_alpha_max_prior_trial_blob_input(runtime_input)
+    runtime_input.chmod(0o400)
+    alias = tmp_path / "prior-trials-alias.json"
+    alias.symlink_to(runtime_input)
+    with pytest.raises(ValueError, match="prior_trial_inventory_mismatch"):
+        evidence.read_alpha_max_prior_trial_blob_input(alias)
+    assert hashlib.sha256(source.read_bytes()).hexdigest() == hashlib.sha256(frozen).hexdigest()
+
+
 def test_manifest_write_is_bound_to_opened_phase_when_ancestor_is_swapped(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

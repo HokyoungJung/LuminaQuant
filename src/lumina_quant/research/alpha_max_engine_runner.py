@@ -105,7 +105,7 @@ from lumina_quant.research.alpha_max_evidence import (
     compute_alpha_max_train_admission_from_daily_summaries,
     parse_alpha_max_cost_cell_pre_gate_evidence,
     rank_alpha_max_historical_report,
-    read_alpha_max_prior_trial_blob,
+    read_alpha_max_prior_trial_blob_input,
     seal_alpha_max_contract_manifest,
     seal_alpha_max_root_tree,
     select_alpha_max_prelock_champion,
@@ -7085,6 +7085,7 @@ def _alpha_max_prelock_checkpoint_descriptor(
     output_root: str | os.PathLike[str],
     checkpoint_root: str | os.PathLike[str],
     implementation_inventory: list[dict[str, object]],
+    prior_trial_binding: Mapping[str, object] | None = None,
     _include_v2_bindings: bool = False,
 ) -> dict[str, object]:
     target, parent = _validated_output_target(output_root)
@@ -7101,10 +7102,19 @@ def _alpha_max_prelock_checkpoint_descriptor(
         or stat.S_ISLNK(checkpoint_parent_status.st_mode)
     ):
         raise AlphaMaxRuntimeContractError("alpha_max_checkpoint_parent_invalid")
+    if prior_trial_binding is not None and (
+        type(prior_trial_binding) is not dict
+        or set(prior_trial_binding) != {"byte_count", "path", "sha256"}
+        or type(prior_trial_binding.get("path")) is not str
+        or type(prior_trial_binding.get("byte_count")) is not int
+        or type(prior_trial_binding.get("sha256")) is not str
+    ):
+        raise AlphaMaxRuntimeContractError("alpha_max_checkpoint_prior_trial_binding_invalid")
     protected_paths = (
         Path(preflight.config_receipt.canonical_path),
         Path(contract_seal.path),
         *(Path(seal.path) for seal in root_seals.values()),
+        *((Path(str(prior_trial_binding["path"])),) if prior_trial_binding is not None else ()),
     )
     for left, right in (
         (checkpoint, target),
@@ -7207,6 +7217,8 @@ def _alpha_max_prelock_checkpoint_descriptor(
             "sha256": _sha256(_canonical_bytes(list(admitted_symbols))),
         },
     }
+    if prior_trial_binding is not None:
+        descriptor["prior_trial_blob"] = dict(prior_trial_binding)
     if _include_v2_bindings:
         return descriptor
     return {
@@ -7320,7 +7332,10 @@ def _alpha_max_validate_checkpoint_descriptor(descriptor: Mapping[str, object]) 
     }
     role = descriptor.get("attempt_role")
     domain = descriptor.get("domain")
-    if (role, domain) != ("historical", "historical_exposed_evaluation"):
+    if (role, domain) not in {
+        ("prelock", "validation"),
+        ("historical", "historical_exposed_evaluation"),
+    }:
         raise AlphaMaxRuntimeContractError("alpha_max_checkpoint_descriptor_role_invalid")
     schedule = descriptor.get("physical_schedule")
     expected_schedule = [
@@ -7333,7 +7348,8 @@ def _alpha_max_validate_checkpoint_descriptor(descriptor: Mapping[str, object]) 
         for row_id, nominal, fold_id in _alpha_max_physical_fold_schedule(domain)
     ]
     if (
-        set(descriptor) != required | ({"prelock_binding"} if role == "historical" else set())
+        set(descriptor)
+        != required | ({"prelock_binding"} if role == "historical" else {"prior_trial_blob"})
         or descriptor.get("immutable") is not True
         or descriptor.get("checkpoint_unit") != "whole_row_cost_cell"
         or descriptor.get("cost_cells_bps") != list(ALPHA_MAX_COST_CELL_BPS)
@@ -7375,10 +7391,24 @@ def _alpha_max_validate_checkpoint_descriptor(descriptor: Mapping[str, object]) 
             raise AlphaMaxRuntimeContractError(
                 "alpha_max_checkpoint_descriptor_prelock_binding_invalid"
             )
-    elif prelock_binding is not None:
-        raise AlphaMaxRuntimeContractError(
-            "alpha_max_checkpoint_descriptor_prelock_binding_invalid"
-        )
+    else:
+        if prelock_binding is not None:
+            raise AlphaMaxRuntimeContractError(
+                "alpha_max_checkpoint_descriptor_prelock_binding_invalid"
+            )
+        prior_trial_blob = descriptor.get("prior_trial_blob")
+        if (
+            type(prior_trial_blob) is not dict
+            or set(prior_trial_blob) != {"byte_count", "path", "sha256"}
+            or type(prior_trial_blob.get("byte_count")) is not int
+            or prior_trial_blob["byte_count"] <= 0
+            or type(prior_trial_blob.get("path")) is not str
+            or type(prior_trial_blob.get("sha256")) is not str
+            or re.fullmatch(r"[0-9a-f]{64}", prior_trial_blob["sha256"]) is None
+        ):
+            raise AlphaMaxRuntimeContractError(
+                "alpha_max_checkpoint_descriptor_prior_trial_binding_invalid"
+            )
     return role, domain
 
 
@@ -10392,6 +10422,7 @@ def run_alpha_max_prelock_process(
     *,
     config: str | os.PathLike[str],
     contract_manifest: str | os.PathLike[str],
+    prior_trial_blob: str | os.PathLike[str],
     exchange: str,
     output_root: str | os.PathLike[str],
     checkpoint_root: str | os.PathLike[str],
@@ -10510,7 +10541,8 @@ def run_alpha_max_prelock_process(
     )
     train_liquidity_buckets = build_alpha_max_train_liquidity_buckets(admission)
     try:
-        prior_bytes = read_alpha_max_prior_trial_blob(Path(__file__).resolve().parents[3])
+        prior_trial_path = _require_exact_explicit_path(prior_trial_blob)
+        prior_bytes = read_alpha_max_prior_trial_blob_input(prior_trial_path)
         trial_ledger = build_alpha_max_trial_ledger(
             prior_bytes,
             _strict_json_object(preflight.config_bytes),
@@ -10530,6 +10562,12 @@ def run_alpha_max_prelock_process(
         output_root=output_root,
         checkpoint_root=checkpoint_root,
         implementation_inventory=implementation_inventory,
+        prior_trial_binding={
+            "byte_count": len(prior_bytes),
+            "path": prior_trial_path,
+            "sha256": _sha256(prior_bytes),
+        },
+        _include_v2_bindings=True,
     )
     checkpoint_store = _AlphaMaxCellCheckpointStore(
         checkpoint_root,
