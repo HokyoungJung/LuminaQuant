@@ -1431,6 +1431,31 @@ def test_exact_native_day_restart_matches_uninterrupted_capsule(
     assert len(finalizations) == 2
 
 
+def test_indicator_checkpoint_accepts_drained_real_child_queue() -> None:
+    from lumina_quant.strategies.artifact_portfolio_mode import _SignalCaptureQueue
+
+    child_queue = _SignalCaptureQueue()
+    child_queue.put(object())
+    assert child_queue.drain()
+    assert child_queue.empty()
+
+    strategy = SimpleNamespace(_children=[(object(), object(), child_queue)])
+    alpha_max_runner._alpha_max_assert_indicator_checkpoint_queues_empty(
+        strategy,
+        alpha_max_runner.FastQueue(),
+    )
+
+    child_queue.put(object())
+    with pytest.raises(
+        AlphaMaxRuntimeContractError,
+        match="checkpoint_queue_not_empty",
+    ):
+        alpha_max_runner._alpha_max_assert_indicator_checkpoint_queues_empty(
+            strategy,
+            alpha_max_runner.FastQueue(),
+        )
+
+
 def test_indicator_capsule_validation_rejects_economic_or_finalization_tamper() -> None:
     state = {"child_states": {}, "sha256": ""}
     state["sha256"] = hashlib.sha256(

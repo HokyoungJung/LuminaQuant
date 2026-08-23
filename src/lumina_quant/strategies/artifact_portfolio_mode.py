@@ -246,6 +246,9 @@ class _SignalCaptureQueue:
         self._items.clear()
         return out
 
+    def empty(self) -> bool:
+        return not self._items
+
     def snapshot(self) -> list[Any]:
         return list(self._items)
 
