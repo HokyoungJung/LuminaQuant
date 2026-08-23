@@ -29,6 +29,7 @@ import sys
 import tempfile
 import types
 from collections.abc import Mapping, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from itertools import pairwise
@@ -2738,28 +2739,28 @@ def _validate_alpha_max_root_seals(
             raise AlphaMaxRuntimeContractError("alpha_max_root_seal_scope_mismatch")
     if not repeat_hash:
         return
-    repeated_raw = tuple(
-        seal_alpha_max_root_tree(
+    retained_roots = (*raw_root_seals, *feature_root_seals)
+
+    def reseal(retained: AlphaMaxRootSeal) -> AlphaMaxRootSeal:
+        return seal_alpha_max_root_tree(
             retained.root_id,
-            "raw",
+            retained.root_kind,
             retained.path,
             exchange=retained.exchange,
             availability_start_by_symbol=retained.availability_start_by_symbol,
             availability_end_by_symbol=retained.availability_end_by_symbol,
         )
-        for retained in raw_root_seals
-    )
-    repeated_features = tuple(
-        seal_alpha_max_root_tree(
-            retained.root_id,
-            "feature",
-            retained.path,
-            exchange=retained.exchange,
-            availability_start_by_symbol=retained.availability_start_by_symbol,
-            availability_end_by_symbol=retained.availability_end_by_symbol,
-        )
-        for retained in feature_root_seals
-    )
+
+    if len(retained_roots) == 1:
+        repeated = (reseal(retained_roots[0]),)
+    else:
+        with ThreadPoolExecutor(
+            max_workers=min(8, len(retained_roots)),
+            thread_name_prefix="alpha-max-root-seal",
+        ) as executor:
+            repeated = tuple(executor.map(reseal, retained_roots))
+    repeated_raw = repeated[: len(raw_root_seals)]
+    repeated_features = repeated[len(raw_root_seals) :]
     if repeated_raw != raw_root_seals or repeated_features != feature_root_seals:
         raise AlphaMaxRuntimeContractError("alpha_max_root_seal_changed")
 
@@ -10273,11 +10274,16 @@ def _alpha_max_root_validation(
 ) -> tuple[dict[tuple[str, str], AlphaMaxRootSeal], tuple[str, ...]]:
     seals: dict[tuple[str, str], AlphaMaxRootSeal] = {}
     failures: list[str] = []
-    for root_id, root_kind, root_path in roots:
+    root_specs = tuple(roots)
+
+    def seal_root(
+        spec: tuple[str, str, str],
+    ) -> tuple[tuple[str, str], AlphaMaxRootSeal | None, str | None]:
+        root_id, root_kind, root_path = spec
         try:
             availability_start_by_symbol = availability_start_by_kind[root_kind]
             availability_end_by_symbol = availability_end_by_kind[root_kind]
-            seals[(root_id, root_kind)] = seal_alpha_max_root_tree(
+            seal = seal_alpha_max_root_tree(
                 root_id,
                 root_kind,
                 root_path,
@@ -10286,7 +10292,26 @@ def _alpha_max_root_validation(
                 availability_end_by_symbol=availability_end_by_symbol,
             )
         except (KeyError, OSError, TypeError, ValueError) as exc:
-            failures.append(_alpha_max_failure_reason(f"{root_id}_{root_kind}_root", exc))
+            return (
+                (root_id, root_kind),
+                None,
+                _alpha_max_failure_reason(f"{root_id}_{root_kind}_root", exc),
+            )
+        return (root_id, root_kind), seal, None
+
+    if len(root_specs) <= 1:
+        results = tuple(seal_root(spec) for spec in root_specs)
+    else:
+        with ThreadPoolExecutor(
+            max_workers=min(8, len(root_specs)),
+            thread_name_prefix="alpha-max-root-seal",
+        ) as executor:
+            results = tuple(executor.map(seal_root, root_specs))
+    for key, seal, failure in results:
+        if failure is not None:
+            failures.append(failure)
+        elif seal is not None:
+            seals[key] = seal
     return seals, tuple(failures)
 
 

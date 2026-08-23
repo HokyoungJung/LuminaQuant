@@ -5,6 +5,7 @@ import inspect
 import json
 import os
 import struct
+import threading
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import MappingProxyType, SimpleNamespace
@@ -1545,6 +1546,37 @@ def test_indicator_capsule_validation_rejects_economic_or_finalization_tamper() 
             seal=seal,
             expected_phase_id="warmup",
         )
+
+
+def test_root_validation_parallelizes_independent_roots_and_preserves_order(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    rendezvous = threading.Barrier(2)
+
+    def seal(
+        root_id: str,
+        root_kind: str,
+        _root_path: str,
+        **_kwargs: object,
+    ) -> object:
+        rendezvous.wait(timeout=2)
+        if root_id == "train":
+            raise ValueError("poisoned")
+        return (root_id, root_kind)
+
+    monkeypatch.setattr(alpha_max_runner, "seal_alpha_max_root_tree", seal)
+    seals, failures = alpha_max_runner._alpha_max_root_validation(
+        (
+            ("warmup", "raw", "/sealed/warmup"),
+            ("train", "feature", "/sealed/train"),
+        ),
+        exchange="binance",
+        availability_start_by_kind={"raw": {}, "feature": {}},
+        availability_end_by_kind={"raw": {}, "feature": {}},
+    )
+
+    assert seals == {("warmup", "raw"): ("warmup", "raw")}
+    assert failures == ("train_feature_root:poisoned",)
 
 
 def test_exact_tick_reducer_matches_one_second_engine_state(
