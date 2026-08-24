@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 import lumina_quant.configuration as configuration
+from lumina_quant.portfolio.strategy_quality import StrategyQualityOverlay
 from lumina_quant.research import alpha_max_engine_runner as runner
 from lumina_quant.research.alpha_max_engine_runner import (
     ALPHA_MAX_CANDIDATE_SYMBOLS,
@@ -212,6 +213,23 @@ def test_u41_allowlist_values_and_nested_runtime_state_are_immutable(preflight) 
         snapshot["SYMBOL_LIMITS"]["BTCUSDT"]["min_qty"] = 1.0
     with pytest.raises(TypeError):
         snapshot["SYMBOL_LIMITS"]["BTCUSDT"] = {}
+
+
+def test_u41_disabled_quality_empty_state_restores_without_unfrozen_read(preflight) -> None:
+    config = build_alpha_max_backtest_config(
+        preflight,
+        phase_id="train",
+        admitted_symbols=ADMITTED_SYMBOLS,
+        nominal_cost_bps=10,
+    )
+    overlay = StrategyQualityOverlay(config)
+    state = overlay.get_state()
+
+    assert state["health"] == {}
+    overlay.set_state(state)
+
+    assert overlay.get_state() == state
+    assert config.runtime_read_audit == ("STRATEGY_QUALITY_ENABLED",)
 
 
 def test_u41_unknown_or_private_rt_read_fails_closed_and_audit_is_deterministic(
