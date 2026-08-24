@@ -229,7 +229,7 @@ def execution_pricing_trace_payload(trace: ExecutionPricingTrace) -> dict[str, o
         trace.executed_qty + trace.unfilled_qty,
         trace.requested_qty,
         rel_tol=0.0,
-        abs_tol=1e-12,
+        abs_tol=max(1e-12, math.ulp(trace.requested_qty)),
     ):
         raise ValueError("execution_pricing_trace_quantity_reconciliation")
     expected_role = "maker" if trace.is_maker else "taker"

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+import math
 import queue
 import random
 from copy import deepcopy
@@ -290,6 +291,31 @@ def test_taker_partial_trace_reconciles_every_price_component():
     assert trace.commission == pytest.approx(trace.fill_price * trace.executed_qty * trace.fee_rate)
     assert trace.liquidity_role == "taker"
     assert trace.rng_consumed is True
+
+
+def test_large_partial_trace_allows_only_arithmetic_quantity_roundoff():
+    traces: list[ExecutionPricingTrace] = []
+    requested = 12446.54782655596
+    executed = 1654.727109392149
+    model = ExecutionModel(_model_config(random_seed=7))
+
+    model.compute_fill(
+        raw_price=1.0,
+        qty=requested,
+        direction="BUY",
+        bar_volume=executed / 0.1,
+        attribution_sink=traces.append,
+    )
+
+    trace = traces[0]
+    tolerance = math.ulp(requested)
+    assert abs(trace.executed_qty + trace.unfilled_qty - requested) == tolerance
+    assert trace.to_payload()["requested_qty"] == requested
+    invalid_unfilled = trace.unfilled_qty
+    while abs(trace.executed_qty + invalid_unfilled - requested) <= tolerance:
+        invalid_unfilled = math.nextafter(invalid_unfilled, math.inf)
+    with pytest.raises(ValueError, match="quantity_reconciliation"):
+        replace(trace, unfilled_qty=invalid_unfilled).to_payload()
 
 
 def test_maker_partial_trace_uses_exact_price_fee_and_no_rng():
