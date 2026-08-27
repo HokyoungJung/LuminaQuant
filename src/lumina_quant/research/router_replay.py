@@ -41,7 +41,7 @@ CANDIDATE_IDS = (
 CANDIDATE_IDS_SHA256 = "ddc8996136e70d3847e8270f6165a26992ec8def8439ba6f56e3bcdbdee239b9"
 BALANCED_LABEL = "strict_efficiency:balanced_mdd12_gross5_69_asset_efficiency_repair_optuna"
 GROWTH_LABEL = "strict_efficiency:growth_mdd20_gross8_69_asset_efficiency_repair_optuna"
-PROFILE_SHA256 = "a3e9572365d39e3388c97b8b6c094c0bb9d63a3b1fd6d38c918342b435716950"
+PROFILE_SHA256 = "493e72694744258dbf763a9e1149ec68cd37139cb1da563d58b2e39cd59c7e96"
 ROUTER_SOURCE_PREDICATE = (
     "scripts.research.run_alpha_zoo_69_asset_monthly_refit_walkforward._lagged_shadow_leaf_source"
 )

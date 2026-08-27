@@ -55,6 +55,8 @@ def test_materializer_parser_defaults_use_runtime_config(monkeypatch):
     assert materialize_script._resolve_periodic_enabled("", once=False) is (
         config.storage.materializer_periodic_enabled
     )
+
+
 def test_materializer_help_resolves_storage_defaults(monkeypatch, capsys):
     monkeypatch.setattr(sys, "argv", [str(_SCRIPT_PATH), "--help"])
 

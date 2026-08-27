@@ -20,6 +20,17 @@ then reconcile any conclusion against the current canonical graph.
 
 ## Manual addenda after generated ledger
 
+### 2026-08-12 — one_minute_strategy_inventory_evidence_and_common_screen
+- Research dates: 2026-08-12
+- Source type: `registry_inventory + exact_1m_common_screen + primary_literature + generated_knowledge_graph`
+- Title/path: ≥1-minute strategy inventory, evidence map, and common-period screen — `var/reports/strategy_research_20260812/strategy_catalog.json|csv`, `strategy_scorecards.md`, `family_scorecards.md|csv`; source screen `var/reports/common_period_reval_20260812/common_period_summary.json|md`
+- Content summary: Reconciled the current `144` registered strategies, excluded the sole required-`1s` strategy, verified explicit ≥1-minute cadence/timeframe for `119`, retained `24` cadence-unknown rows as `scope_unverified`, and classified all `143` catalog rows into `14` families with unresolved `0`; separately disclosed `12` candidate-library-only classes. The `143`-row exact-1m common screen predates the dedicated `DacapogoDailySourceStrategy` registration, so that explicit-`1d` polars-batch research-only row is retained as `not_available` rather than forced through an incompatible event runner. Bound all measured metrics to the hashed exact-1m `2026-07-01..2026-08-12` common screen and nested `2026-08-01..2026-08-12` cold-start sensitivity. Structured `38` primary/official/source-code evidence records with explicit support and limitation fields; external performance remains a design prior.
+- What was used: Research prioritization, taxonomy, falsification protocol, and a generated Obsidian graph. The screen is unsealed and not independent OOS, so it is forbidden for promotion.
+- Families: benchmark, breakout, cross_sectional, derivatives_directional_crowding, ensemble_regime_router, event_alpha, formulaic_alpha, intermarket, mean_reversion_relative_value, microstructure_intraday, rebalancing_diversification, seasonality, trend_momentum, volatility_risk_overlay
+- Decision impact: `do_not_promote / research_only_no_execution`. The measured raw common-screen diagnostic is `5/82`; after explicit sub-minute exclusion and unmatched-rebalancing suppression, the catalog-controlled diagnostic that still retains cadence-unverified/NA rows is `4/80`. The final `scope_status=verified_in_scope` ≥1-minute controlled scorecard is `3/67`. `RebalancingPremiumHarvestStrategy` raw return was suppressed because an identical-basket no-rebalance control is missing; Dacapogo remains cash because intrabar ordering reverses the headline and its gate is false. No additional paper-derived strategy class was justified; the authenticated Dacapogo source-parity class is isolated behind its dedicated research-only runner.
+- Staleness/recheck: Recheck only with a sealed preregistered run, genuine family-wide multiplicity matrices, matched controls, fresh locked report-only OOS, BBO/funding/capacity, and shadow reconciliation. / `True`
+- Do-not-repeat note: Do not use paper/online Sharpe as LuminaQuant performance, treat nested recent as independent OOS, call directional funding a carry arbitrage, or claim a rebalancing premium from raw total return.
+
 ### 2026-06-28 — latest_data_full_scoreboard_correction
 - Research dates: 2026-06-28
 - Source type: `local_artifact + data_coverage_audit`

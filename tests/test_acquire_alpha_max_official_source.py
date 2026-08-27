@@ -1016,7 +1016,11 @@ def test_allowlisted_may_2023_rejects_duplicate_ids_and_post_sort_timestamp_regr
     subject.scratch_directory(scratch)
     source = may_2023_archive(tmp_path, rows)
     allow_may_2023_order(monkeypatch, source)
-    before = _tree_snapshot(tmp_path)
+    before = [
+        item
+        for item in _tree_snapshot(tmp_path)
+        if item[0] != subject.scratch_path(scratch).relative_to(tmp_path).as_posix()
+    ]
     with pytest.raises(subject.AcquisitionError, match=r"^archive_trade_order_invalid$"):
         subject.frame_from_archive(
             source,
@@ -1028,6 +1032,7 @@ def test_allowlisted_may_2023_rejects_duplicate_ids_and_post_sort_timestamp_regr
             scratch,
             authenticated_archive_receipt(source),
         )
+    assert not subject.scratch_path(scratch).exists()
     assert _tree_snapshot(tmp_path) == before
 
 
@@ -1181,14 +1186,15 @@ def test_canonical_merge_removal_failure_is_retried_by_finalizer(
     allow_may_2023_order(monkeypatch, source)
     monkeypatch.setattr(subject, "ORDER_CHUNK_RECORDS", 1)
     monkeypatch.setattr(subject, "ORDER_MERGE_FAN_IN", 2)
-    original_identity = subject.scratch_file_identity
+    original_identity = subject.scratch_fd_identity
     original_remove = subject.remove_aggtrades_file
     tracked: set[Path] = set()
     attempts: dict[Path, int] = {}
     failed = False
 
-    def track_identity(path: Path) -> tuple[int, int]:
-        identity = original_identity(path)
+    def track_identity(fd: int) -> tuple[int, int]:
+        identity = original_identity(fd)
+        path = Path(os.readlink(f"/proc/self/fd/{fd}"))
         if path.name.startswith(".aggtrades-"):
             tracked.add(path)
         return identity
@@ -1201,7 +1207,7 @@ def test_canonical_merge_removal_failure_is_retried_by_finalizer(
             raise OSError("injected removal failure")
         original_remove(path, identity)
 
-    monkeypatch.setattr(subject, "scratch_file_identity", track_identity)
+    monkeypatch.setattr(subject, "scratch_fd_identity", track_identity)
     monkeypatch.setattr(subject, "remove_aggtrades_file", fail_first_removal)
     with pytest.raises(subject.AcquisitionError, match=r"^archive_order_canonicalization_failed$"):
         subject.frame_from_archive(
@@ -1230,18 +1236,19 @@ def test_pre_sink_identity_failure_closes_descriptor_and_is_stale_cleaned(
         [["1", "10", "1", "1", "1", str(MAY_2023_START_MS), "FALSE"]],
     )
     allow_may_2023_order(monkeypatch, source)
-    original_identity = subject.scratch_file_identity
+    original_identity = subject.scratch_fd_identity
 
-    def pre_sink_identity(path: Path) -> tuple[int, int]:
+    def pre_sink_identity(fd: int) -> tuple[int, int]:
+        path = Path(os.readlink(f"/proc/self/fd/{fd}"))
         if path.name.startswith(".aggtrades-chunk-"):
             raise subject.AcquisitionError("injected_identity_failure")
-        return original_identity(path)
+        return original_identity(fd)
 
     def descriptor_count() -> int:
         return len(list(Path("/proc/self/fd").iterdir()))
 
     before = descriptor_count()
-    monkeypatch.setattr(subject, "scratch_file_identity", pre_sink_identity)
+    monkeypatch.setattr(subject, "scratch_fd_identity", pre_sink_identity)
     with pytest.raises(subject.AcquisitionError, match=r"^injected_identity_failure$"):
         subject.frame_from_archive(
             source,
@@ -1255,7 +1262,7 @@ def test_pre_sink_identity_failure_closes_descriptor_and_is_stale_cleaned(
         )
     assert descriptor_count() == before
     assert aggtrades_scratch_entries(scratch)
-    monkeypatch.setattr(subject, "scratch_file_identity", original_identity)
+    monkeypatch.setattr(subject, "scratch_fd_identity", original_identity)
     subject.frame_from_archive(
         source,
         "BTCUSDT",
@@ -1384,7 +1391,11 @@ def test_allowlisted_branch_preserves_parse_precedence_and_cleans_order_scratch(
     subject.scratch_directory(scratch)
     source = source_factory(tmp_path)
     allow_may_2023_order(monkeypatch, source)
-    before = _tree_snapshot(tmp_path)
+    before = [
+        item
+        for item in _tree_snapshot(tmp_path)
+        if item[0] != subject.scratch_path(scratch).relative_to(tmp_path).as_posix()
+    ]
     with pytest.raises(subject.AcquisitionError, match=error):
         subject.frame_from_archive(
             source,
@@ -1397,6 +1408,7 @@ def test_allowlisted_branch_preserves_parse_precedence_and_cleans_order_scratch(
             authenticated_archive_receipt(source),
         )
     assert aggtrades_scratch_entries(scratch) == []
+    assert not subject.scratch_path(scratch).exists()
     assert _tree_snapshot(tmp_path) == before
 
 
@@ -2026,7 +2038,11 @@ def test_plan_report_can_be_securely_adopted_for_execute(
     monkeypatch.setattr(subject, "load_contract", lambda _: [contract])
     monkeypatch.setattr(subject, "load_evidence", lambda _: {})
     monkeypatch.setattr(subject, "bind_input_provenance", lambda *args: None)
-    monkeypatch.setattr(subject, "safe_existing_directory", lambda _: [1, 1])
+    monkeypatch.setattr(
+        subject,
+        "safe_existing_directory",
+        lambda path: [Path(path).stat().st_dev, Path(path).stat().st_ino],
+    )
 
     def cached_exchange(_: str, destination: Path, **__: object) -> dict[str, str]:
         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -2067,7 +2083,11 @@ def test_noncontiguous_month_selectors_are_forwarded_as_an_exact_set(
     monkeypatch.setattr(subject, "load_contract", lambda _: [contract])
     monkeypatch.setattr(subject, "load_evidence", lambda _: {})
     monkeypatch.setattr(subject, "bind_input_provenance", lambda *args: None)
-    monkeypatch.setattr(subject, "safe_existing_directory", lambda _: [1, 1])
+    monkeypatch.setattr(
+        subject,
+        "safe_existing_directory",
+        lambda path: [Path(path).stat().st_dev, Path(path).stat().st_ino],
+    )
 
     def cached_exchange(_: str, destination: Path, **__: object) -> dict[str, str]:
         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -2122,7 +2142,11 @@ def test_execute_recovers_empty_report_prefix(
     monkeypatch.setattr(subject, "load_contract", lambda _: [contract])
     monkeypatch.setattr(subject, "load_evidence", lambda _: {})
     monkeypatch.setattr(subject, "bind_input_provenance", lambda *_: None)
-    monkeypatch.setattr(subject, "safe_existing_directory", lambda _: [1, 1])
+    monkeypatch.setattr(
+        subject,
+        "safe_existing_directory",
+        lambda path: [Path(path).stat().st_dev, Path(path).stat().st_ino],
+    )
 
     def cached(_: str, destination: Path, **__: object) -> dict[str, str]:
         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -2672,6 +2696,263 @@ def test_completed_eligible_original_argv_replays_offline_idempotently(
     assert (_tree_snapshot(output), _tree_snapshot(report)) == before
 
 
+def test_successful_operations_remove_empty_scratch_directories(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    output, report = tmp_path / "output", tmp_path / "report"
+    output.mkdir()
+    report.mkdir()
+    monkeypatch.setattr(subject, "assert_host_reserve", lambda *_args, **_kwargs: None)
+    frame = subject.pl.DataFrame(
+        {
+            "datetime": [subject.datetime(2024, 1, 1)],
+            "open": [1.0],
+            "high": [1.0],
+            "low": [1.0],
+            "close": [1.0],
+            "volume": [1.0],
+        }
+    ).with_columns(subject.pl.col("datetime").cast(subject.pl.Datetime("ms")))
+
+    subject.atomic_write(report / "receipt.json", b"{}\n", scratch_root=report)
+    assert not subject.scratch_path(report).exists()
+
+    target = output / "frame.parquet"
+    subject.publish_frame(target, frame, output)
+    assert not subject.scratch_path(output).exists()
+
+    subject.frame_sha256(frame, target.parent, target)
+    assert not subject.scratch_path(target).exists()
+
+    monkeypatch.setattr(
+        subject.urllib.request,
+        "urlopen",
+        lambda *args, **kwargs: _StreamingResponse(b'{"symbols":[]}'),
+    )
+    subject.fetch_receipt(
+        "https://fapi.binance.com/fapi/v1/exchangeInfo",
+        report / "exchangeInfo.json",
+        scratch_root=report,
+    )
+    assert not subject.scratch_path(report).exists()
+
+    scratch = subject.scratch_directory(report)
+    stale = scratch / ".partial-stale"
+    stale.write_bytes(b"stale")
+    stale.chmod(0o600)
+    preserved = stale.lstat()
+    subject.remove_empty_scratch(report)
+    assert scratch.is_dir()
+    assert stale.read_bytes() == b"stale"
+    assert (stale.lstat().st_dev, stale.lstat().st_ino) == (
+        preserved.st_dev,
+        preserved.st_ino,
+    )
+    subject.cleanup_scratch(report)
+    assert not scratch.exists()
+
+
+def test_unreceipted_cached_fetch_is_adopted_without_nested_scratch_loss(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    report = tmp_path / "report"
+    report.mkdir()
+    destination = report / "exchangeInfo.json"
+    destination.write_bytes(b'{"symbols":[]}')
+    monkeypatch.setattr(
+        subject.urllib.request,
+        "urlopen",
+        lambda *args, **kwargs: _StreamingResponse(destination.read_bytes()),
+    )
+
+    receipt = subject.fetch_receipt(
+        "https://fapi.binance.com/fapi/v1/exchangeInfo",
+        destination,
+        scratch_root=report,
+    )
+
+    assert receipt["sha256"] == subject.file_sha256(destination)
+    assert destination.with_suffix(".json.receipt.json").is_file()
+    assert not subject.scratch_path(report).exists()
+
+
+def test_finish_scratch_file_rejects_directory_path_swap(tmp_path: Path) -> None:
+    report = tmp_path / "report"
+    report.mkdir()
+    fd, temporary = subject.scratch_file(report, ".acquire-")
+    identity = subject.scratch_fd_identity(fd)
+    os.write(fd, b"owned")
+    os.close(fd)
+    scratch = subject.scratch_path(report)
+    displaced = scratch.with_name(scratch.name + "-displaced")
+    scratch.rename(displaced)
+    scratch.mkdir(mode=0o700)
+    replacement = scratch / Path(temporary).name
+    replacement.write_bytes(b"unrelated")
+    replacement.chmod(0o600)
+
+    with pytest.raises(subject.AcquisitionError, match="unsafe_scratch_entry"):
+        subject.finish_scratch_file(Path(temporary), identity, report)
+
+    assert (displaced / Path(temporary).name).read_bytes() == b"owned"
+    assert replacement.read_bytes() == b"unrelated"
+
+
+def test_finish_scratch_file_quarantines_entry_swap_without_deleting_replacement(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    report = tmp_path / "report"
+    report.mkdir()
+    fd, temporary = subject.scratch_file(report, ".acquire-")
+    identity = subject.scratch_fd_identity(fd)
+    os.write(fd, b"owned")
+    os.close(fd)
+    scratch = subject.scratch_path(report)
+    displaced = scratch / ".displaced-owned"
+    replacement = Path(temporary)
+    original_rename = subject.os.rename
+    swapped = False
+
+    def swap_before_rename(
+        source: str,
+        destination: str,
+        *args: object,
+        **kwargs: object,
+    ) -> None:
+        nonlocal swapped
+        if not swapped and source == replacement.name:
+            swapped = True
+            original_rename(
+                source,
+                displaced.name,
+                src_dir_fd=kwargs["src_dir_fd"],
+                dst_dir_fd=kwargs["dst_dir_fd"],
+            )
+            replacement.write_bytes(b"unrelated")
+            replacement.chmod(0o600)
+        original_rename(source, destination, *args, **kwargs)
+
+    monkeypatch.setattr(subject.os, "rename", swap_before_rename)
+
+    with pytest.raises(subject.AcquisitionError, match="unsafe_scratch_entry"):
+        subject.finish_scratch_file(Path(temporary), identity, report)
+
+    assert displaced.read_bytes() == b"owned"
+    assert any(path.read_bytes() == b"unrelated" for path in scratch.iterdir())
+
+
+@pytest.mark.parametrize("replace", (False, True))
+def test_publish_scratch_file_uses_bound_inode_after_temp_path_swap(
+    tmp_path: Path,
+    replace: bool,
+) -> None:
+    report = tmp_path / "report"
+    report.mkdir()
+    fd, temporary = subject.scratch_file(report, ".acquire-")
+    identity = subject.scratch_fd_identity(fd)
+    os.write(fd, b"bound")
+    os.fsync(fd)
+    temporary_path = Path(temporary)
+    displaced = temporary_path.with_name(".displaced-bound")
+    temporary_path.rename(displaced)
+    temporary_path.write_bytes(b"unrelated")
+    temporary_path.chmod(0o600)
+    destination = report / "published.json"
+    if replace:
+        destination.write_bytes(b"old")
+        destination.chmod(0o600)
+
+    subject.publish_scratch_file(fd, identity, destination, replace=replace)
+
+    assert destination.read_bytes() == b"bound"
+    assert destination.lstat().st_ino == os.fstat(fd).st_ino
+    assert temporary_path.read_bytes() == b"unrelated"
+    os.close(fd)
+
+
+def test_publish_scratch_file_rejects_destination_parent_swap(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    report = tmp_path / "report"
+    report.mkdir()
+    destination = report / "published.json"
+    destination.write_bytes(b"old")
+    destination.chmod(0o600)
+    fd, _temporary = subject.scratch_file(report, ".acquire-")
+    identity = subject.scratch_fd_identity(fd)
+    os.write(fd, b"bound")
+    os.fsync(fd)
+    displaced = tmp_path / "displaced-report"
+    original_safe = subject.safe_existing_directory
+    swapped = False
+
+    def swap_after_validation(path: Path) -> list[int]:
+        nonlocal swapped
+        observed = original_safe(path)
+        if path == report and not swapped:
+            swapped = True
+            report.rename(displaced)
+            report.mkdir()
+            replacement = report / destination.name
+            replacement.write_bytes(b"unrelated")
+            replacement.chmod(0o600)
+        return observed
+
+    monkeypatch.setattr(subject, "safe_existing_directory", swap_after_validation)
+
+    with pytest.raises(subject.AcquisitionError, match="publication_parent_identity_changed"):
+        subject.publish_scratch_file(fd, identity, destination, replace=True)
+
+    assert (displaced / destination.name).read_bytes() == b"old"
+    assert destination.read_bytes() == b"unrelated"
+    os.close(fd)
+
+
+def test_fetch_urlopen_failures_close_every_scratch_descriptor(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    report = tmp_path / "report"
+    report.mkdir()
+    monkeypatch.setattr(subject, "assert_host_reserve", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        subject.urllib.request,
+        "urlopen",
+        lambda *args, **kwargs: (_ for _ in ()).throw(subject.urllib.error.URLError("offline")),
+    )
+
+    before = len(list(Path("/proc/self/fd").iterdir()))
+    with pytest.raises(subject.AcquisitionError, match="official_download_failed"):
+        subject.fetch_receipt(
+            "https://fapi.binance.com/fapi/v1/exchangeInfo",
+            report / "exchangeInfo.json",
+            scratch_root=report,
+        )
+
+    assert len(list(Path("/proc/self/fd").iterdir())) == before
+    assert not subject.scratch_path(report).exists()
+
+
+def test_hardlink_recovery_requires_shared_inode_not_equal_bytes(tmp_path: Path) -> None:
+    output, report = tmp_path / "output", tmp_path / "report"
+    output.mkdir()
+    report.mkdir()
+    plan = b'{"plan":true}'
+    (report / "plan.json").write_bytes(plan)
+    scratch = subject.scratch_directory(report, clean=False)
+    candidate = scratch / ".acquire-candidate"
+    candidate.write_bytes(plan)
+    candidate.chmod(0o600)
+    sibling = tmp_path / "same-inode-sibling"
+    os.link(candidate, sibling)
+
+    subject.recover_owned_hardlink_prefixes(output, report, plan)
+
+    assert candidate.is_file()
+    assert sibling.is_file()
+    assert candidate.lstat().st_ino != (report / "plan.json").lstat().st_ino
+
+
 def test_streaming_and_scratch_publication_crashes_never_mutate_authenticated_roots(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -2783,7 +3064,7 @@ def test_linked_scratch_crash_prefixes_are_recovered_without_content_loss(
             "https://fapi.binance.com/fapi/v1/exchangeInfo", receipt_target, scratch_root=report
         )
     assert receipt_target.stat().st_nlink == 2
-    assert not receipt_target.with_suffix(".json.receipt.json").exists()
+    assert receipt_target.with_suffix(".json.receipt.json").is_file()
     monkeypatch.setattr(subject.os, "unlink", original_unlink)
     subject.cleanup_scratch(report)
     assert receipt_target.stat().st_nlink == 1
@@ -2957,7 +3238,11 @@ def test_verify_eligible_rejects_tampered_eligible_receipt(
 def test_ownership_binds_the_exact_plan_hash(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(subject, "safe_existing_directory", lambda _: [1, 1])
+    monkeypatch.setattr(
+        subject,
+        "safe_existing_directory",
+        lambda path: [Path(path).stat().st_dev, Path(path).stat().st_ino],
+    )
     output, report = tmp_path / "output", tmp_path / "report"
     output.mkdir()
     report.mkdir()

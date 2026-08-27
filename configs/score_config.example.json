@@ -32,6 +32,13 @@
       "max_drawdown": 0.45,
       "min_trade_count": 5.0
     },
+    "research": {
+      "strict_selection_gate": true,
+      "enforce_selection_reject_gate": true,
+      "dsr_gate_floor": 0.9,
+      "spa_gate_ceiling": 0.05,
+      "pbo_gate_ceiling": 0.5
+    },
     "keep_ratio_bounds": {
       "min": 0.05,
       "max": 1.0
@@ -63,7 +70,12 @@
         "shortlist_missing_score_fallback": -1000000.0,
         "weight_exp_clamp_floor": -60.0,
         "pair_multi_mix_bonus": 1.05,
-        "mdd_risk_penalty_coeff": 2.5
+        "mdd_risk_penalty_coeff": 2.5,
+        "strict_selection_gate": true,
+        "enforce_selection_reject_gate": true,
+        "dsr_gate_floor": 0.9,
+        "spa_gate_ceiling": 0.05,
+        "pbo_gate_ceiling": 0.5
       }
     }
   },

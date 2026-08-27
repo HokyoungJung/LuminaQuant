@@ -193,6 +193,7 @@ def test_dropfile_strategy_registers_resolves_and_runs(dropped_strategy_file):
         portfolio_cls=Portfolio,
         strategy_cls=setup.strategy_cls,
         strategy_params=setup.strategy_params,
+        data_handler_kwargs={"feature_db_path": ""},
         record_history=True,
         track_metrics=True,
         record_trades=True,

@@ -266,10 +266,10 @@ def _coverage_row(
 def _scan_pair_paths(inv: SymbolInventory, timeframe: str) -> tuple[list[Path], str] | None:
     """Physical parquet paths + source label for a ``(symbol, tf)``, if present."""
     tf = _norm_tf(timeframe)
-    if tf in inv.materialized_tfs:
-        return sorted(inv.materialized_tfs[tf].glob("date=*/*.parquet")), "materialized"
     if tf in inv.partitioned_tfs:
         return sorted(inv.partitioned_tfs[tf].glob("date=*/*.parquet")), "partitioned"
+    if tf in inv.materialized_tfs:
+        return sorted(inv.materialized_tfs[tf].glob("date=*/*.parquet")), "materialized"
     if tf == "1s" and inv.monthly_1s_dir is not None:
         return sorted(inv.monthly_1s_dir.glob(_MONTHLY_GLOB)), "monthly_1s"
     return None
@@ -290,10 +290,10 @@ def scan_coverage_rows(
         physical: dict[str, tuple[list[Path], str]] = {}
         if inv.monthly_1s_dir is not None:
             physical["1s"] = (sorted(inv.monthly_1s_dir.glob(_MONTHLY_GLOB)), "monthly_1s")
-        for tf, tf_dir in inv.materialized_tfs.items():
-            physical[tf] = (sorted(tf_dir.glob("date=*/*.parquet")), "materialized")
         for tf, tf_dir in inv.partitioned_tfs.items():
-            physical.setdefault(tf, (sorted(tf_dir.glob("date=*/*.parquet")), "partitioned"))
+            physical[tf] = (sorted(tf_dir.glob("date=*/*.parquet")), "partitioned")
+        for tf, tf_dir in inv.materialized_tfs.items():
+            physical.setdefault(tf, (sorted(tf_dir.glob("date=*/*.parquet")), "materialized"))
         for tf, (paths, source) in physical.items():
             if tf_filter is not None and tf not in tf_filter:
                 continue

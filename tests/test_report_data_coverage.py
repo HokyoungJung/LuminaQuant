@@ -95,6 +95,17 @@ def synthetic_store(tmp_path: Path) -> Path:
     _write_partitioned(
         root, exchange="binance", token="BTCUSDT", timeframe="1m", day="2026-01-01", bars=500
     )
+    # A parallel materialized tree must not mask the collector's current
+    # partitioned footprint.
+    (
+        root
+        / "market_data_materialized"
+        / "binance"
+        / "BTCUSDT"
+        / "timeframe=1m"
+        / "date=2026-01-01"
+        / "commit=stale"
+    ).mkdir(parents=True)
     # ETH has only a short partitioned 1h series (below the 360-bar floor).
     _write_partitioned(
         root, exchange="binance", token="ETHUSDT", timeframe="1h", day="2026-01-01", bars=50

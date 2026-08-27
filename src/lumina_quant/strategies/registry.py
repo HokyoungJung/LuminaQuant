@@ -213,6 +213,7 @@ _STRATEGY_TIER_HINTS: dict[str, str] = {
     "RegimeBreakoutCandidateStrategy": "research_only",
     "VolatilityCompressionReversionStrategy": "research_only",
     "MicroRangeExpansion1sStrategy": "research_only",
+    "DacapogoDailySourceStrategy": "research_only",
     # New multi-factor book — research_only until backtest-validated on the
     # data-bearing machine (see docs/COST_REALISM_REMEASUREMENT.md). Promote to
     # live_opt_in only after the cost-realistic walk-forward passes the gates.

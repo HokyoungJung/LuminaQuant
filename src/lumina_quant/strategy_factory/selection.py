@@ -49,9 +49,10 @@ DEFAULT_ROBUST_SCORE_PARAMS: dict[str, float] = {
 
 def safe_float(value: Any, default: float = 0.0) -> float:
     try:
-        return float(value)
+        parsed = float(value)
     except TypeError, ValueError:
         return float(default)
+    return parsed if math.isfinite(parsed) else float(default)
 
 
 def strategy_family(name: str, fallback: str = "other") -> str:
@@ -211,16 +212,15 @@ def hurdle_score(
     failed_scale = float(cfg["failed_candidate_scale"])
 
     mode_token = str(mode).strip().lower()
-    hurdle_key = "val" if mode_token == "live" else "oos"
+    hurdle_key = "val" if mode_token in {"live", "val", "validation"} else "oos"
     hurdle = ((candidate.get("hurdle_fields") or {}).get(hurdle_key)) or {}
 
     score = safe_float(hurdle.get("score"), sentinel_floor_score)
     excess_return = safe_float(hurdle.get("excess_return"), sentinel_floor_score)
     passed = bool(hurdle.get("pass", False))
 
-    metric_key = "val" if mode_token == "live" else "oos"
-    metrics = candidate.get(metric_key)
-    if isinstance(metrics, dict):
+    metrics = _mode_metrics(candidate, mode=mode_token)
+    if metrics:
         robust_score = robust_score_from_metrics(metrics, params=robust_score_params)
         if _has_no_trade_train(candidate):
             return failed_candidate_base_penalty - abs(float(cfg["no_trade_train_penalty"]))
@@ -282,28 +282,14 @@ def _allowlisted_portfolio_native_multi_asset_candidate(candidate: dict[str, Any
 def _mode_metric_block_keys(mode: str) -> tuple[str, ...]:
     """Ordered candidate keys to look up a metric block for ``mode``.
 
-    Preserves the legacy behavior for the two modes existing callers use EXACTLY,
-    while ADDING a genuine validation mode (previously ``mode='val'`` aliased to
-    the ``'oos'`` key -- the recorded-artifact overfit bug):
-
-      * ``mode='oos'``          -> ``('oos',)``  (legacy: primary ``'oos'`` ONLY).
-      * ``mode='live'``         -> ``('val',)``  (legacy: primary ``'val'`` ONLY).
-      * ``mode='val'``/``'validation'`` -> ``('validation', 'val',
-        'locked_oos_report_only')``  (NEW validation-gate mode: reads a real
-        validation block instead of the OOS block, tolerating both key naming
-        styles, and accepting the walk-forward artifact's locked-OOS report block
-        as a last-resort fallback).
-
-    The extended fallback list is DELIBERATELY scoped to the new ``val`` /
-    ``validation`` mode only. The legacy ``oos`` and ``live`` reads return a
-    single-key tuple so an existing caller sees the identical ``{}`` / ``False``
-    result it saw before this gate landed when the primary key is absent (e.g. a
-    ``mode='oos'`` read of a row carrying only ``locked_oos_report_only`` must NOT
-    silently pick that block up -- regression pinned in the selection tests).
+    Validation selection may read either supported validation key, but it must
+    never fall back to a locked-OOS reporting block. Missing validation metrics
+    therefore fail closed instead of allowing the lockbox to influence ranking,
+    filtering, or allocation.
     """
     token = str(mode).strip().lower()
     if token in ("val", "validation"):
-        return ("validation", "val", "locked_oos_report_only")
+        return ("validation", "val")
     if token == "live":
         return ("val",)
     return ("oos",)
@@ -362,17 +348,15 @@ def passes_dsr_spa_hard_gate(
     pbo_ceiling = float(cfg["pbo_gate_ceiling"])
 
     deflated_sharpe = safe_float(metrics.get("deflated_sharpe"), 0.0)
-    if deflated_sharpe < dsr_floor:
+    if not 0.0 <= deflated_sharpe <= 1.0 or deflated_sharpe < dsr_floor:
         return False
     spa_pvalue = safe_float(metrics.get("spa_pvalue"), 1.0)
-    if spa_pvalue > spa_ceiling:
+    if not 0.0 <= spa_pvalue <= 1.0 or spa_pvalue > spa_ceiling:
         return False
-    # Reuse the recorded/computed PBO: the ``pbo`` field carries the
-    # fold-instability estimate (``research_metrics.approx_pbo`` of the mode's
-    # return stream); ``approx_pbo`` is accepted as an alias. Missing -> 0.0 so a
-    # candidate without a recorded PBO is never rejected on this axis (no-op).
-    pbo = safe_float(metrics.get("pbo", metrics.get("approx_pbo")), 0.0)
-    return pbo <= pbo_ceiling
+    # Reuse the recorded/computed PBO diagnostic: ``approx_pbo`` is accepted as
+    # an alias, but a strict gate must fail closed when neither value exists.
+    pbo = safe_float(metrics.get("pbo", metrics.get("approx_pbo")), 1.0)
+    return 0.0 <= pbo <= 1.0 and pbo <= pbo_ceiling
 
 
 def apply_selection_reject_and_dedup(
@@ -463,6 +447,7 @@ def apply_selection_reject_and_dedup(
 def allocate_portfolio_weights(
     shortlist: Iterable[dict[str, Any]],
     *,
+    mode: str = "oos",
     score_key: str = "shortlist_score",
     temperature: float = 0.35,
     max_weight: float = 0.35,
@@ -478,7 +463,7 @@ def allocate_portfolio_weights(
     pair_multi_mix_bonus = float(cfg["pair_multi_mix_bonus"])
     mdd_risk_penalty_coeff = float(cfg["mdd_risk_penalty_coeff"])
 
-    capped_max = min(1.0, max(0.05, float(max_weight)))
+    capped_max = min(1.0, max(0.0, safe_float(max_weight, 0.0)))
     temp = max(0.05, float(temperature))
 
     family_counts: dict[str, int] = {}
@@ -510,31 +495,49 @@ def allocate_portfolio_weights(
         timeframe_penalty = 1.0 / math.sqrt(max(1, timeframe_counts.get(timeframe, 1)))
         mix_bonus = pair_multi_mix_bonus if mix_type in {"pair", "multi"} else 1.0
 
-        mdd = abs(safe_float((row.get("oos") or {}).get("mdd"), 0.0))
+        mdd = abs(safe_float(_mode_metrics(row, mode=mode).get("mdd"), 0.0))
         risk_penalty = 1.0 / (1.0 + (mdd_risk_penalty_coeff * max(0.0, mdd)))
         raw_weights.append(base * diversity_penalty * timeframe_penalty * mix_bonus * risk_penalty)
 
     weight_sum = float(sum(raw_weights))
     if weight_sum <= 0.0:
-        equal = 1.0 / float(len(rows))
+        equal = min(capped_max, 1.0 / float(len(rows)))
+        cash_weight = max(0.0, 1.0 - (equal * len(rows)))
         for row in rows:
             row["portfolio_weight"] = equal
+            row["unallocated_cash_weight"] = cash_weight
         return rows
 
-    normalized = [value / weight_sum for value in raw_weights]
+    # Never relax a configured concentration limit. If N * cap < 1, allocate the
+    # feasible risky mass and leave the remainder explicitly in cash.
+    target_risky_mass = min(1.0, capped_max * float(len(rows)))
+    remaining = set(range(len(rows)))
+    normalized = [0.0] * len(rows)
+    remaining_mass = target_risky_mass
+    while remaining:
+        remaining_raw = sum(raw_weights[index] for index in remaining)
+        if remaining_raw <= 0.0:
+            equal = min(capped_max, remaining_mass / float(len(remaining)))
+            for index in remaining:
+                normalized[index] = equal
+            break
+        proposed = {
+            index: remaining_mass * raw_weights[index] / remaining_raw for index in remaining
+        }
+        over_cap = {index for index, value in proposed.items() if value > capped_max}
+        if not over_cap:
+            for index, value in proposed.items():
+                normalized[index] = value
+            break
+        for index in over_cap:
+            normalized[index] = capped_max
+        remaining.difference_update(over_cap)
+        remaining_mass = max(0.0, target_risky_mass - sum(normalized))
 
-    # One-pass capping.
-    capped = [min(capped_max, value) for value in normalized]
-    capped_sum = float(sum(capped))
-    if capped_sum <= 0.0:
-        equal = 1.0 / float(len(rows))
-        for row in rows:
-            row["portfolio_weight"] = equal
-        return rows
-    normalized = [value / capped_sum for value in capped]
-
+    cash_weight = max(0.0, 1.0 - sum(normalized))
     for row, value in zip(rows, normalized, strict=True):
         row["portfolio_weight"] = float(value)
+        row["unallocated_cash_weight"] = float(cash_weight)
 
     rows.sort(key=lambda item: float(item.get("portfolio_weight", 0.0)), reverse=True)
     return rows
@@ -676,6 +679,8 @@ def select_diversified_shortlist(
     max_weight: float = 0.35,
     robust_score_params: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
+    resolved_score_params = _resolve_robust_score_params(robust_score_params)
+    strict_upstream_gate = float(resolved_score_params["dsr_spa_hard_gate"]) > 0.0
     ranked = sorted(
         candidates,
         key=lambda row: hurdle_score(row, mode=mode, robust_score_params=robust_score_params),
@@ -704,6 +709,12 @@ def select_diversified_shortlist(
         score = float(hurdle_score(row, mode=mode, robust_score_params=robust_score_params))
 
         if identity in seen_identities:
+            continue
+        if strict_upstream_gate and (
+            row.get("pass") is not True
+            or bool(row.get("hard_reject", False))
+            or bool(row.get("hard_reject_reasons"))
+        ):
             continue
         if not passes_dsr_spa_hard_gate(row, mode=mode, robust_score_params=robust_score_params):
             continue
@@ -762,6 +773,7 @@ def select_diversified_shortlist(
     if include_weights:
         return allocate_portfolio_weights(
             selected,
+            mode=mode,
             score_key="shortlist_score",
             temperature=weight_temperature,
             max_weight=max_weight,

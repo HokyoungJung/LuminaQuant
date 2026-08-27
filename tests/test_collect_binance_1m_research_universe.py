@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import hashlib
 import io
 import sys
 import zipfile
@@ -20,6 +21,25 @@ def _load_module() -> ModuleType:
 
 
 MODULE = _load_module()
+
+
+def _data_vision_zip(
+    *,
+    member: str = "BTCUSDT-1m-2026-08-01.csv",
+    extra_member: str | None = None,
+) -> tuple[bytes, bytes]:
+    csv_bytes = (
+        b"open_time,open,high,low,close,volume,close_time,quote_volume,count,"
+        b"taker_buy_volume,taker_buy_quote_volume,ignore\n"
+        b"1786060800000,100,101,99,100.5,12,1786060859999,1206,42,7,704,0\n"
+        b"1786060860000,100.5,102,100,101,9,1786060919999,910,38,4,405,0\n"
+    )
+    archive_bytes = io.BytesIO()
+    with zipfile.ZipFile(archive_bytes, "w") as archive:
+        archive.writestr(member, csv_bytes)
+        if extra_member is not None:
+            archive.writestr(extra_member, b"unexpected")
+    return archive_bytes.getvalue(), csv_bytes
 
 
 def test_data_vision_specs_use_monthly_files_when_period_is_complete() -> None:
@@ -152,21 +172,14 @@ def test_rows_to_frame_preserves_official_kline_taker_flow() -> None:
     ]
 
 
-def test_data_vision_zip_preserves_official_taker_flow_columns() -> None:
-    csv_bytes = (
-        b"open_time,open,high,low,close,volume,close_time,quote_volume,count,"
-        b"taker_buy_volume,taker_buy_quote_volume,ignore\n"
-        b"1786060800000,100,101,99,100.5,12,1786060859999,1206,42,7,704,0\n"
-        b"1786060860000,100.5,102,100,101,9,1786060919999,910,38,4,405,0\n"
-    )
-    archive_bytes = io.BytesIO()
-    with zipfile.ZipFile(archive_bytes, "w") as archive:
-        archive.writestr("BTCUSDT-1m.csv", csv_bytes)
+def test_data_vision_zip_preserves_official_taker_flow_and_provenance() -> None:
+    blob, csv_bytes = _data_vision_zip()
 
-    frame = MODULE.data_vision_zip_to_frame(
-        archive_bytes.getvalue(),
+    frame, receipt = MODULE.parse_data_vision_zip(
+        blob,
         since_ms=1_786_060_860_000,
         until_ms=1_786_060_919_999,
+        expected_member="BTCUSDT-1m-2026-08-01.csv",
     )
 
     assert frame.to_dicts() == [
@@ -184,3 +197,48 @@ def test_data_vision_zip_preserves_official_taker_flow_columns() -> None:
             "taker_sell_quote_volume": 505.0,
         }
     ]
+    assert receipt == {
+        "archive_sha256": hashlib.sha256(blob).hexdigest(),
+        "archive_byte_count": len(blob),
+        "archive_member": "BTCUSDT-1m-2026-08-01.csv",
+        "member_sha256": hashlib.sha256(csv_bytes).hexdigest(),
+        "member_byte_count": len(csv_bytes),
+        "source_row_count": 2,
+        "filtered_row_count": 1,
+        "first_timestamp_ms": 1_786_060_860_000,
+        "last_timestamp_ms": 1_786_060_860_000,
+        "frame_sha256": hashlib.sha256(frame.write_csv().encode()).hexdigest(),
+        "parser": "collect_binance_1m_research_universe.parse_data_vision_zip.v1",
+    }
+
+
+def test_data_vision_zip_rejects_unexpected_member() -> None:
+    blob, _ = _data_vision_zip(member="ETHUSDT-1m-2026-08-01.csv")
+
+    try:
+        MODULE.parse_data_vision_zip(
+            blob,
+            since_ms=0,
+            until_ms=2_000_000_000_000,
+            expected_member="BTCUSDT-1m-2026-08-01.csv",
+        )
+    except ValueError as exc:
+        assert "archive member mismatch" in str(exc)
+    else:
+        raise AssertionError("unexpected archive member was accepted")
+
+
+def test_data_vision_zip_rejects_multiple_members() -> None:
+    blob, _ = _data_vision_zip(extra_member="CHECKSUM")
+
+    try:
+        MODULE.parse_data_vision_zip(
+            blob,
+            since_ms=0,
+            until_ms=2_000_000_000_000,
+            expected_member="BTCUSDT-1m-2026-08-01.csv",
+        )
+    except ValueError as exc:
+        assert "exactly one CSV member" in str(exc)
+    else:
+        raise AssertionError("multi-member archive was accepted")

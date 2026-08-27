@@ -5,10 +5,16 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import os
+import platform
 import subprocess
-from collections.abc import Mapping, Sequence
+import sys
+import tempfile
+from collections.abc import Iterator, Mapping, Sequence
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
+from importlib import metadata
 from pathlib import Path
 from typing import Any
 
@@ -128,6 +134,91 @@ def file_sha256(path: str | Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def file_identity(path: str | Path) -> dict[str, str | int]:
+    """Return a resolved path plus byte/hash identity for a runtime input."""
+    resolved = Path(path).resolve()
+    return {
+        "path": str(resolved),
+        "bytes": resolved.stat().st_size,
+        "sha256": file_sha256(resolved),
+    }
+
+
+@contextmanager
+def atomic_output_path(path: str | Path) -> Iterator[Path]:
+    """Yield a same-directory staging path and replace the target only on success."""
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(
+        dir=target.parent, prefix=f".{target.name}.", suffix=".tmp"
+    )
+    os.close(descriptor)
+    temporary = Path(temporary_name)
+    try:
+        yield temporary
+        os.replace(temporary, target)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def atomic_write_text(path: str | Path, text: str) -> Path:
+    """Atomically replace a text artifact."""
+    target = Path(path)
+    with atomic_output_path(target) as temporary:
+        temporary.write_text(text, encoding="utf-8")
+    return target
+
+
+def runtime_provenance(
+    *,
+    repo_root: str | Path | None = None,
+    packages: Sequence[str] = (),
+    source_files: Sequence[str | Path] = (),
+) -> dict[str, Any]:
+    """Capture the small runtime identity needed to reproduce a research artifact."""
+    root = Path(repo_root or Path(__file__).resolve().parents[3]).resolve()
+
+    def git(*args: str) -> str | None:
+        try:
+            process = subprocess.run(
+                ["git", *args],
+                cwd=root,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+        except OSError:
+            return None
+        return process.stdout.strip() if process.returncode == 0 else None
+
+    status = git("status", "--porcelain=v1", "--untracked-files=all")
+    lock = root / "uv.lock"
+    versions: dict[str, str | None] = {}
+    for package in packages:
+        try:
+            versions[package] = metadata.version(package)
+        except metadata.PackageNotFoundError:
+            versions[package] = None
+    return {
+        "python": {
+            "version": platform.python_version(),
+            "implementation": sys.implementation.name,
+            "cache_tag": sys.implementation.cache_tag,
+            "executable": file_identity(sys.executable),
+        },
+        "packages": versions,
+        "uv_lock": file_identity(lock) if lock.is_file() else None,
+        "git": {
+            "head": git("rev-parse", "HEAD"),
+            "dirty": None if status is None else bool(status),
+            "status_sha256": None
+            if status is None
+            else hashlib.sha256(status.encode()).hexdigest(),
+        },
+        "source_files": {str(Path(path).resolve()): file_identity(path) for path in source_files},
+    }
 
 
 def _git_head() -> str | None:

@@ -1900,9 +1900,7 @@ def _run_mocked_persisted_probe(
                 str(tmp_path / "terminal.json"),
             ],
             "BindPaths": [f"{credential_path.parent}:{probe_write_root}"],
-            "BindReadOnlyPaths": [
-                str(evidence_root / "terminal-authority.receipt.json")
-            ],
+            "BindReadOnlyPaths": [str(evidence_root / "terminal-authority.receipt.json")],
             "WorkingDirectory": "/",
             "UMask": "0077",
             "MemoryHigh": 1,
@@ -2204,9 +2202,7 @@ def test_persisted_probe_bootstraps_then_revalidates_final_admission(
     placeholder = probe_receipt.parent / "late-bound-terminal-authority.placeholder.json"
     assert placeholder.is_file()
     placeholder_record = next(
-        item
-        for item in provisional["control_artifacts"]
-        if item["path"] == str(placeholder)
+        item for item in provisional["control_artifacts"] if item["path"] == str(placeholder)
     )
     assert placeholder_record in final["control_artifacts"]
     assert final["units"][0]["readonly_path_overlays"] == [
@@ -2219,9 +2215,7 @@ def test_persisted_probe_bootstraps_then_revalidates_final_admission(
     assert isinstance(rendered_units, list)
     substituted_service = rendered_units[-1]["Service"]
     assert substituted_service["BindReadOnlyPaths"] == [str(placeholder)]
-    assert definition["Service"]["BindReadOnlyPaths"] == [
-        str(observed["late_bound_receipt"])
-    ]
+    assert definition["Service"]["BindReadOnlyPaths"] == [str(observed["late_bound_receipt"])]
 
     assert final["schema"] == "alpha_max_v8_persisted_probe_launch_admission.v1"
     assert final["verdict"] == "PASS"
@@ -2306,9 +2300,7 @@ def test_persisted_probe_routes_marker_to_declared_writable_telemetry_root(
     assert isinstance(marker, Path)
     assert marker.parent == observed["telemetry_root"]
     final = observed["signing_payloads"]["final"]
-    assert final["units"][0]["probe_write_root"]["path"] == str(
-        observed["telemetry_root"]
-    )
+    assert final["units"][0]["probe_write_root"]["path"] == str(observed["telemetry_root"])
     assert final["units"][0]["probe_marker"]["credential_sha256"]
     assert final["units"][0]["probe_marker_path"] == str(marker)
 

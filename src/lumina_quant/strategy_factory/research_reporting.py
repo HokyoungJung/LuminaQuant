@@ -116,7 +116,7 @@ class ResearchReportBuilder:
         split_masks: Mapping[str, np.ndarray],
         has_aligned_timestamps: bool,
     ) -> dict[str, list[dict[str, float | int]]]:
-        return {
+        streams = {
             "train": self.series_to_stream(
                 returns[split_masks["train"]],
                 timestamps=timestamps[split_masks["train"]] if has_aligned_timestamps else None,
@@ -126,10 +126,20 @@ class ResearchReportBuilder:
                 timestamps=timestamps[split_masks["val"]] if has_aligned_timestamps else None,
             ),
             "oos": self.series_to_stream(
-                returns[split_masks["oos"]],
-                timestamps=timestamps[split_masks["oos"]] if has_aligned_timestamps else None,
+                returns[split_masks.get("lockbox", split_masks["oos"])],
+                timestamps=(
+                    timestamps[split_masks.get("lockbox", split_masks["oos"])]
+                    if has_aligned_timestamps
+                    else None
+                ),
             ),
         }
+        if "lockbox" in split_masks:
+            streams["oos_intermediate"] = self.series_to_stream(
+                returns[split_masks["oos"]],
+                timestamps=timestamps[split_masks["oos"]] if has_aligned_timestamps else None,
+            )
+        return streams
 
     def successful_candidate_report_payload(
         self,
@@ -197,6 +207,14 @@ class ResearchReportBuilder:
         }
         if isinstance(effective_split, Mapping):
             candidate_payload["effective_split"] = dict(effective_split)
+        for key in (
+            "oos_intermediate",
+            "validation_cost_stress",
+            "oos_intermediate_cost_stress",
+        ):
+            value = result.get(key)
+            if isinstance(value, Mapping):
+                candidate_payload[key] = dict(value)
         candidate_payload["selection_score"] = self.candidate_rank_score(
             candidate_payload,
             scoring_config=resolved_scoring_config,

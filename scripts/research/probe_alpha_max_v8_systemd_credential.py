@@ -669,13 +669,10 @@ def _execute_persisted_topology(
     late_bound_consumers = [
         {"scope": definition_scope, "role": role}
         for definition_scope, role, original, _credential, _request, _name in definitions
-        if str(late_bound_receipt)
-        in original["Service"].get("BindReadOnlyPaths", [])
+        if str(late_bound_receipt) in original["Service"].get("BindReadOnlyPaths", [])
     ]
     probe_only_control_artifacts: list[dict[str, Any]] = []
-    probe_placeholder = (
-        probe_admission_root / "late-bound-terminal-authority.placeholder.json"
-    )
+    probe_placeholder = probe_admission_root / "late-bound-terminal-authority.placeholder.json"
     if late_bound_consumers:
         if late_bound_receipt.exists() or late_bound_receipt.is_symlink():
             raise RuntimeError("late-bound production receipt exists before persisted probe")
@@ -699,9 +696,7 @@ def _execute_persisted_topology(
             "state": "absent",
         },
         "consumers": late_bound_consumers,
-        "placeholder": (
-            probe_only_control_artifacts[0] if probe_only_control_artifacts else None
-        ),
+        "placeholder": (probe_only_control_artifacts[0] if probe_only_control_artifacts else None),
     }
     probe_payload = {
         "schema": "alpha_max_v8_persisted_probe_preflight_admission.v1",
@@ -750,8 +745,7 @@ def _execute_persisted_topology(
         substituted = copy.deepcopy(original)
         service = substituted["Service"]
         production_write_roots = {
-            Path(binding.split(":", 1)[1])
-            for binding in service.get("BindPaths", [])
+            Path(binding.split(":", 1)[1]) for binding in service.get("BindPaths", [])
         }
         marker_root = next(
             (
@@ -851,19 +845,16 @@ def _execute_persisted_topology(
             authority_public_b64=wrapper_config["authority_public_b64"],
         )
         controls._validate_unit(substituted)
-        if (
-            service.get("BindReadOnlyPaths") != probe_read_paths
-            or any(
-                service.get(name) != value
-                for name, value in original["Service"].items()
-                if name
-                not in {
-                    "ExecStart",
-                    "ExecStopPost",
-                    "ExecStartPre",
-                    "BindReadOnlyPaths",
-                }
-            )
+        if service.get("BindReadOnlyPaths") != probe_read_paths or any(
+            service.get(name) != value
+            for name, value in original["Service"].items()
+            if name
+            not in {
+                "ExecStart",
+                "ExecStopPost",
+                "ExecStartPre",
+                "BindReadOnlyPaths",
+            }
         ):
             raise RuntimeError("probe directive drift")
         probe_unit = controls._render_systemd_unit(substituted)
@@ -1030,9 +1021,7 @@ def _execute_persisted_topology(
                     *([active_error] if active_error is not None else []),
                     *cleanup_errors,
                 ]
-                raise BaseExceptionGroup(
-                    "safe substituted unit cleanup failed", failures
-                ) from None
+                raise BaseExceptionGroup("safe substituted unit cleanup failed", failures) from None
         if controls._directory(marker_root, private=True) != marker_root_identity:
             raise RuntimeError("persisted probe writable root drifted")
         receipts.append(

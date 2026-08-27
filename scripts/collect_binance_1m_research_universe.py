@@ -8,6 +8,7 @@ collect raw aggTrades, does not derive 1s bars, and does not place orders.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import io
 import json
 import re
@@ -20,7 +21,7 @@ import urllib.request
 import zipfile
 from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -73,6 +74,7 @@ class SymbolResult:
     source_files: int = 0
     missing_files: int = 0
     feature_upserted_rows: int = 0
+    source_receipts: list[dict[str, Any]] = field(default_factory=list)
     error: str = ""
 
 
@@ -420,9 +422,11 @@ def taker_feature_rows(frame: pl.DataFrame) -> list[dict[str, Any]]:
     ]
     if frame.is_empty() or not set(columns).issubset(frame.columns):
         return []
-    return frame.select(columns).with_columns(
-        pl.lit("binance_futures_kline").alias("source")
-    ).to_dicts()
+    return (
+        frame.select(columns)
+        .with_columns(pl.lit("binance_futures_kline").alias("source"))
+        .to_dicts()
+    )
 
 
 def floor_utc_day_ms(ms: int) -> int:
@@ -522,50 +526,96 @@ def download_data_vision_zip(
             time.sleep(float(base_wait_sec) * (2 ** (attempt - 1)))
 
 
-def data_vision_zip_to_frame(blob: bytes, *, since_ms: int, until_ms: int) -> pl.DataFrame:
+def parse_data_vision_zip(
+    blob: bytes,
+    *,
+    since_ms: int,
+    until_ms: int,
+    expected_member: str | None,
+) -> tuple[pl.DataFrame, dict[str, Any]]:
     with zipfile.ZipFile(io.BytesIO(blob)) as archive:
-        names = [name for name in archive.namelist() if name.endswith(".csv")]
-        if not names:
-            return rows_to_frame([])
-        csv_bytes = archive.read(names[0])
+        members = archive.infolist()
+        if len(members) != 1 or members[0].is_dir() or not members[0].filename.endswith(".csv"):
+            raise ValueError("data.vision archive must contain exactly one CSV member")
+        member = members[0]
+        if expected_member is not None and member.filename != expected_member:
+            raise ValueError(
+                f"data.vision archive member mismatch: {member.filename!r} != {expected_member!r}"
+            )
+        csv_bytes = archive.read(member)
+    source_frame = pl.read_csv(
+        io.BytesIO(csv_bytes),
+        has_header=True,
+        columns=[
+            "open_time",
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume",
+            "quote_volume",
+            "taker_buy_volume",
+            "taker_buy_quote_volume",
+        ],
+        schema_overrides={
+            "open_time": pl.Int64,
+            "open": pl.Float64,
+            "high": pl.Float64,
+            "low": pl.Float64,
+            "close": pl.Float64,
+            "volume": pl.Float64,
+            "quote_volume": pl.Float64,
+            "taker_buy_volume": pl.Float64,
+            "taker_buy_quote_volume": pl.Float64,
+        },
+    )
     frame = (
-        pl.read_csv(
-            io.BytesIO(csv_bytes),
-            has_header=True,
-            columns=[
-                "open_time",
-                "open",
-                "high",
-                "low",
-                "close",
-                "volume",
-                "quote_volume",
-                "taker_buy_volume",
-                "taker_buy_quote_volume",
-            ],
-            schema_overrides={
-                "open_time": pl.Int64,
-                "open": pl.Float64,
-                "high": pl.Float64,
-                "low": pl.Float64,
-                "close": pl.Float64,
-                "volume": pl.Float64,
-                "quote_volume": pl.Float64,
-                "taker_buy_volume": pl.Float64,
-                "taker_buy_quote_volume": pl.Float64,
-            },
-        )
-        .rename(
+        source_frame.rename(
             {
                 "open_time": "timestamp_ms",
                 "taker_buy_volume": "taker_buy_base_volume",
             }
         )
         .pipe(_with_taker_flow_columns)
+        .filter(
+            (pl.col("timestamp_ms") >= int(since_ms)) & (pl.col("timestamp_ms") <= int(until_ms))
+        )
     )
-    return frame.filter(
-        (pl.col("timestamp_ms") >= int(since_ms)) & (pl.col("timestamp_ms") <= int(until_ms))
+    frame_bytes = frame.write_csv().encode()
+    receipt = {
+        "archive_sha256": hashlib.sha256(blob).hexdigest(),
+        "archive_byte_count": len(blob),
+        "archive_member": member.filename,
+        "member_sha256": hashlib.sha256(csv_bytes).hexdigest(),
+        "member_byte_count": len(csv_bytes),
+        "source_row_count": int(source_frame.height),
+        "filtered_row_count": int(frame.height),
+        "first_timestamp_ms": (
+            int(frame.get_column("timestamp_ms").min()) if not frame.is_empty() else None
+        ),
+        "last_timestamp_ms": (
+            int(frame.get_column("timestamp_ms").max()) if not frame.is_empty() else None
+        ),
+        "frame_sha256": hashlib.sha256(frame_bytes).hexdigest(),
+        "parser": "collect_binance_1m_research_universe.parse_data_vision_zip.v1",
+    }
+    return frame, receipt
+
+
+def data_vision_zip_to_frame(
+    blob: bytes,
+    *,
+    since_ms: int,
+    until_ms: int,
+    expected_member: str | None = None,
+) -> pl.DataFrame:
+    frame, _ = parse_data_vision_zip(
+        blob,
+        since_ms=since_ms,
+        until_ms=until_ms,
+        expected_member=expected_member,
     )
+    return frame
 
 
 def collect_symbol_data_vision(
@@ -600,11 +650,13 @@ def collect_symbol_data_vision(
     feature_upserted = 0
     first_ts: int | None = None
     last_ts: int | None = None
+    source_receipts: list[dict[str, Any]] = []
     try:
         for period, token in iter_data_vision_specs(plan.start_ms, plan.end_ms):
             requests += 1
+            url = data_vision_url(plan.symbol, period=period, token=token)
             blob = download_data_vision_zip(
-                data_vision_url(plan.symbol, period=period, token=token),
+                url,
                 retries=retries,
                 base_wait_sec=base_wait_sec,
                 throttle=throttle,
@@ -613,7 +665,36 @@ def collect_symbol_data_vision(
                 missing_files += 1
                 continue
             source_files += 1
-            frame = data_vision_zip_to_frame(blob, since_ms=plan.start_ms, until_ms=plan.end_ms)
+            expected_member = f"{plan.symbol}-1m-{token}.csv"
+            try:
+                frame, source_receipt = parse_data_vision_zip(
+                    blob,
+                    since_ms=plan.start_ms,
+                    until_ms=plan.end_ms,
+                    expected_member=expected_member,
+                )
+            except Exception as exc:
+                source_receipts.append(
+                    {
+                        "period": period,
+                        "token": token,
+                        "url": url,
+                        "status": "parse_error",
+                        "archive_sha256": hashlib.sha256(blob).hexdigest(),
+                        "archive_byte_count": len(blob),
+                        "error": str(exc),
+                    }
+                )
+                raise
+            source_receipts.append(
+                {
+                    "period": period,
+                    "token": token,
+                    "url": url,
+                    "status": "verified",
+                    **source_receipt,
+                }
+            )
             if frame.is_empty():
                 continue
             fetched += int(frame.height)
@@ -651,6 +732,7 @@ def collect_symbol_data_vision(
             last_timestamp_ms=last_ts,
             source_files=source_files,
             missing_files=missing_files,
+            source_receipts=source_receipts,
         )
     except Exception as exc:
         return SymbolResult(
@@ -666,6 +748,7 @@ def collect_symbol_data_vision(
             source_files=source_files,
             missing_files=missing_files,
             feature_upserted_rows=feature_upserted,
+            source_receipts=source_receipts,
             error=str(exc),
         )
 
@@ -969,9 +1052,7 @@ def main(argv: list[str] | None = None) -> int:
             "missing_files": sum(item.missing_files for item in results_sorted),
             "fetched_rows": sum(item.fetched_rows for item in results_sorted),
             "upserted_rows": sum(item.upserted_rows for item in results_sorted),
-            "feature_upserted_rows": sum(
-                item.feature_upserted_rows for item in results_sorted
-            ),
+            "feature_upserted_rows": sum(item.feature_upserted_rows for item in results_sorted),
         },
         "symbols": [asdict(item) for item in results_sorted],
     }

@@ -21,11 +21,12 @@ import math
 import os
 import time
 import urllib.request
+from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from itertools import pairwise
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import polars as pl
 
@@ -164,7 +165,26 @@ def _parse_datetime(value: str) -> datetime:
 def _iso(value: datetime | None) -> str | None:
     if value is None:
         return None
-    return value.replace(tzinfo=UTC).isoformat().replace("+00:00", "Z")
+    normalized = value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+    return normalized.isoformat().replace("+00:00", "Z")
+
+
+def _utc_epoch_ms(value: datetime) -> int:
+    normalized = value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+    return int(normalized.timestamp() * 1000)
+
+
+def _half_open_window_bar_count(start: datetime, end: datetime) -> int:
+    start_ms = _utc_epoch_ms(start)
+    end_ms = _utc_epoch_ms(end)
+    if end_ms <= start_ms:
+        raise ValueError("--end must be after --start")
+    if start_ms % TIMEFRAME_MS or end_ms % TIMEFRAME_MS:
+        raise ValueError("--start and --end must be aligned to exact UTC minutes")
+    duration_ms = end_ms - start_ms
+    if duration_ms % TIMEFRAME_MS:
+        raise ValueError("backtest window must contain a whole number of 1m bars")
+    return duration_ms // TIMEFRAME_MS
 
 
 def _safe_float(value: Any, default: float = 0.0) -> float:
@@ -248,8 +268,10 @@ def _required_features_for_strategy(strategy_cls: type) -> tuple[str, ...]:
         return ()
     if isinstance(raw_features, str):
         return (raw_features,) if raw_features else ()
+    if not isinstance(raw_features, Iterable):
+        return ()
     try:
-        return tuple(str(item) for item in tuple(raw_features) if str(item))
+        return tuple(str(item) for item in raw_features if str(item))
     except TypeError:
         return ()
 
@@ -326,16 +348,24 @@ def _audit_exchange_symbols(
 def _frame_time_bounds(frame: pl.DataFrame) -> tuple[datetime | None, datetime | None]:
     if frame.is_empty() or "datetime" not in frame.columns:
         return None, None
-    return frame["datetime"].min(), frame["datetime"].max()
+    return cast(datetime | None, frame["datetime"].min()), cast(
+        datetime | None, frame["datetime"].max()
+    )
 
 
 def audit_ohlcv_frame(
     symbol: str,
     frame: pl.DataFrame,
     *,
+    start: datetime,
+    end: datetime,
     max_gap_ratio: float,
 ) -> dict[str, Any]:
-    """Return a fail-closed OHLCV audit for one already-loaded frame."""
+    """Audit one real OHLCV frame against an exact ``[start, end)`` minute grid."""
+    expected = _half_open_window_bar_count(start, end)
+    start_ms = _utc_epoch_ms(start)
+    end_ms = _utc_epoch_ms(end)
+    expected_last_ms = end_ms - TIMEFRAME_MS
     if frame.is_empty():
         return {
             "symbol": symbol,
@@ -343,6 +373,10 @@ def audit_ohlcv_frame(
             "errors": ["empty_frame"],
             "warnings": [],
             "rows": 0,
+            "window_contract": "[start,end)",
+            "requested_start": _iso(start),
+            "requested_end_exclusive": _iso(end),
+            "expected_1m_bars": expected,
         }
 
     required = ("datetime", "open", "high", "low", "close", "volume")
@@ -354,25 +388,43 @@ def audit_ohlcv_frame(
             "errors": ["missing_columns:" + ",".join(missing_columns)],
             "warnings": [],
             "rows": int(frame.height),
+            "window_contract": "[start,end)",
+            "requested_start": _iso(start),
+            "requested_end_exclusive": _iso(end),
+            "expected_1m_bars": expected,
         }
 
-    selected = frame.select(required).sort("datetime")
+    selected = (
+        frame.select(required)
+        .sort("datetime")
+        .with_columns(pl.col("datetime").dt.epoch("ms").alias("_timestamp_ms"))
+    )
     first_time, last_time = _frame_time_bounds(selected)
-    unique_times = int(selected["datetime"].n_unique())
+    first_timestamp_ms = int(selected["_timestamp_ms"][0])
+    last_timestamp_ms = int(selected["_timestamp_ms"][-1])
+    unique_times = int(selected["_timestamp_ms"].n_unique())
     duplicates = int(selected.height - unique_times)
-    expected = 0
-    missing_bars = 0
-    gap_ratio = 0.0
-    if first_time is not None and last_time is not None:
-        expected = int((last_time - first_time).total_seconds() * 1000 // TIMEFRAME_MS) + 1
-        missing_bars = max(0, expected - unique_times)
-        gap_ratio = float(missing_bars / expected) if expected else 0.0
+    in_window = (pl.col("_timestamp_ms") >= start_ms) & (pl.col("_timestamp_ms") < end_ms)
+    on_grid = ((pl.col("_timestamp_ms") - start_ms) % TIMEFRAME_MS) == 0
+    valid_unique_times = int(selected.filter(in_window & on_grid)["_timestamp_ms"].n_unique())
+    missing_bars = max(0, expected - valid_unique_times)
+    gap_ratio = float(missing_bars / expected) if expected else 0.0
+    outside_window = int(selected.filter(~in_window).height)
+    off_grid = int(selected.filter(~on_grid).height)
 
     errors: list[str] = []
     warnings: list[str] = []
+    if first_timestamp_ms != start_ms:
+        errors.append(f"first_timestamp_mismatch:{first_timestamp_ms}!={start_ms}")
+    if last_timestamp_ms != expected_last_ms:
+        errors.append(f"last_timestamp_mismatch:{last_timestamp_ms}!={expected_last_ms}")
+    if outside_window:
+        errors.append(f"outside_requested_window:{outside_window}")
+    if off_grid:
+        errors.append(f"off_requested_minute_grid:{off_grid}")
     if duplicates:
         errors.append(f"duplicate_timestamps:{duplicates}")
-    if gap_ratio > float(max_gap_ratio):
+    if missing_bars:
         errors.append(f"missing_1m_bars:{missing_bars}/{expected}")
 
     numeric = selected.select(
@@ -423,6 +475,11 @@ def audit_ohlcv_frame(
         "expected_1m_bars": expected,
         "missing_1m_bars": missing_bars,
         "gap_ratio": gap_ratio,
+        "configured_max_gap_ratio": float(max_gap_ratio),
+        "window_contract": "[start,end)",
+        "requested_start": _iso(start),
+        "requested_end_exclusive": _iso(end),
+        "expected_last_bar": _iso(end - timedelta(milliseconds=TIMEFRAME_MS)),
         "start": _iso(first_time),
         "end": _iso(last_time),
         "first_close": first_close,
@@ -442,15 +499,23 @@ def _load_and_audit_data(
 ) -> tuple[dict[str, pl.DataFrame], list[dict[str, Any]]]:
     data: dict[str, pl.DataFrame] = {}
     audits: list[dict[str, Any]] = []
+    storage_end = end - timedelta(milliseconds=TIMEFRAME_MS)
     for symbol in symbols:
-        frame = repo.load_ohlcv(
+        frame, source_audit = repo.load_ohlcv_with_source_audit(
             exchange=exchange,
             symbol=symbol,
             timeframe="1m",
             start_date=start,
-            end_date=end,
+            end_date=storage_end,
         )
-        audit = audit_ohlcv_frame(symbol, frame, max_gap_ratio=max_gap_ratio)
+        audit = audit_ohlcv_frame(
+            symbol,
+            frame,
+            start=start,
+            end=end,
+            max_gap_ratio=max_gap_ratio,
+        )
+        audit["source_lineage"] = source_audit
         audits.append(audit)
         if audit["status"] == "pass":
             data[symbol] = frame
@@ -464,28 +529,23 @@ def _feature_bar_coverage(
     end_ms: int,
     max_stale_ms: int,
 ) -> dict[str, Any]:
-    expected_bars = max(0, ((int(end_ms) - int(start_ms)) // TIMEFRAME_MS) + 1)
+    expected_bars = max(0, (int(end_ms) - int(start_ms)) // TIMEFRAME_MS)
     timestamps = sorted({int(value) for value in timestamps_ms})
     available_bars = 0
     source_index = 0
     latest_source: int | None = None
-    for bar_timestamp in range(int(start_ms), int(end_ms) + 1, TIMEFRAME_MS):
+    for bar_timestamp in range(int(start_ms), int(end_ms), TIMEFRAME_MS):
         while source_index < len(timestamps) and timestamps[source_index] <= bar_timestamp:
             latest_source = timestamps[source_index]
             source_index += 1
-        if (
-            latest_source is not None
-            and bar_timestamp - latest_source <= int(max_stale_ms)
-        ):
+        if latest_source is not None and bar_timestamp - latest_source <= int(max_stale_ms):
             available_bars += 1
     source_gaps = [right - left for left, right in pairwise(timestamps)]
     return {
         "expected_bars": expected_bars,
         "available_bars": available_bars,
         "missing_bars": max(0, expected_bars - available_bars),
-        "coverage_ratio": (
-            float(available_bars / expected_bars) if expected_bars else 0.0
-        ),
+        "coverage_ratio": (float(available_bars / expected_bars) if expected_bars else 0.0),
         "first_source_timestamp_ms": timestamps[0] if timestamps else None,
         "last_source_timestamp_ms": timestamps[-1] if timestamps else None,
         "max_source_gap_ms": max(source_gaps, default=0),
@@ -519,7 +579,7 @@ def _feature_audit(
             exchange=exchange,
             symbol=symbol,
             start_date=max(0, start_ms - FEATURE_POINT_MAX_STALE_MS),
-            end_date=end,
+            end_date=end_ms - 1,
         )
         item: dict[str, Any] = {
             "rows": int(frame.height),
@@ -566,8 +626,9 @@ def _feature_audit(
         "coverage_failures_by_symbol": coverage_failures_by_symbol,
         "symbols": rows,
         "note": (
-            "Every required feature must resolve on every 1m bar for every traded symbol; "
-            "FeaturePointLookup uses only real points at or before the bar and an 8h stale limit."
+            "Every required feature must resolve on every 1m bar in the exact [start,end) "
+            "window for every traded symbol; FeaturePointLookup uses only real points at "
+            "or before the bar and an 8h stale limit."
         ),
     }
 
@@ -671,7 +732,7 @@ def _markdown_report(payload: dict[str, Any]) -> str:
         f"- data_root: `{payload['data_root']}`",
         f"- exchange: `{payload['exchange']}`",
         "- timeframe: `1m`",
-        f"- period: `{payload['start']}` → `{payload['end']}`",
+        f"- period `[start,end)`: `{payload['start']}` → `{payload['end']}`",
         f"- annual_periods: `{payload['annual_periods']}`",
         f"- strategy_count: `{len(payload['strategy_results'])}`",
         f"- pass_count: `{len(passed_results)}`",
@@ -697,9 +758,8 @@ def _markdown_report(payload: dict[str, Any]) -> str:
             f"unmatched={len(exchange_audit.get('unmatched_symbols') or [])})",
             f"- feature audit statuses: `{feature_status_counts}`",
             f"- OHLCV warning rows: `{data_warning_count}`",
-            f"- max allowed 1m gap ratio: `{payload['max_gap_ratio']}`",
-            "- OHLCV policy: no gap fill, no interpolation, no synthetic rows; any missing bars above threshold fail before simulation.",
-            "- Required external features must resolve on every 1m bar for every traded symbol under the bounded 8h stale policy; sparse columns fail before simulation.",
+            "- OHLCV policy: exact requested [start,end) 1m grid, no gap fill, no interpolation, and no synthetic rows; any missing, duplicate, off-grid, or out-of-window bar fails before simulation.",
+            "- Required external features must resolve on every 1m bar in the same half-open window under the bounded 8h stale policy; sparse columns fail before simulation.",
             "- Zero-volume bars are reported as warnings, not imputed.",
             "",
             f"## Top {min(top_n, len(sorted_results))} traded performers by total return",
@@ -823,8 +883,9 @@ def run_latest_alpha_sleeve_backtests(args: argparse.Namespace) -> dict[str, Any
 
     start = _parse_datetime(args.start)
     end = _parse_datetime(args.end)
-    if end <= start:
-        raise ValueError("--end must be after --start")
+    _half_open_window_bar_count(start, end)
+    if float(args.max_gap_ratio) != 0.0:
+        raise ValueError("--max-gap-ratio must be 0 for exact [start,end) auditing")
 
     scope = str(getattr(args, "scope", "latest") or "latest")
     top_n = int(getattr(args, "top_n", 20) or 20)
@@ -844,17 +905,20 @@ def run_latest_alpha_sleeve_backtests(args: argparse.Namespace) -> dict[str, Any
     data_audits: dict[str, list[dict[str, Any]]] = {}
     feature_audits: dict[str, Any] = {}
     issues: list[dict[str, str]] = []
+    loaded_data, loaded_audits = _load_and_audit_data(
+        repo,
+        exchange=args.exchange,
+        symbols=tuple(all_symbols),
+        start=start,
+        end=end,
+        max_gap_ratio=float(args.max_gap_ratio),
+    )
+    audit_by_symbol = {str(audit["symbol"]): audit for audit in loaded_audits}
 
     for spec in specs:
         print(f"[RUN] {spec.strategy} symbols={','.join(spec.symbols)}", flush=True)
-        data, audits = _load_and_audit_data(
-            repo,
-            exchange=args.exchange,
-            symbols=spec.symbols,
-            start=start,
-            end=end,
-            max_gap_ratio=float(args.max_gap_ratio),
-        )
+        data = {symbol: loaded_data[symbol] for symbol in spec.symbols if symbol in loaded_data}
+        audits = [audit_by_symbol[symbol] for symbol in spec.symbols]
         data_audits[spec.strategy] = audits
         failed_audits = [audit for audit in audits if audit.get("status") != "pass"]
         if failed_audits:
@@ -1002,6 +1066,7 @@ def run_latest_alpha_sleeve_backtests(args: argparse.Namespace) -> dict[str, Any
         "timeframe": "1m",
         "start": _iso(start),
         "end": _iso(end),
+        "window_contract": "[start,end)",
         "annual_periods": int(args.annual_periods),
         "max_gap_ratio": float(args.max_gap_ratio),
         "new_strategy_source_files": [
@@ -1020,7 +1085,7 @@ def run_latest_alpha_sleeve_backtests(args: argparse.Namespace) -> dict[str, Any
             "no_gap_fill": True,
             "no_interpolation": True,
             "no_synthetic_rows": True,
-            "missing_bar_policy": "fail_closed_before_simulation",
+            "missing_bar_policy": "exact_[start,end)_minute_grid_fail_closed_before_simulation",
             "duplicate_timestamp_policy": "fail_closed_before_simulation",
             "feature_staleness_policy": "FeaturePointLookup bounded <= 8h forward-fill only",
             "execution_model": "repository Backtest + Portfolio + SimulatedExecutionHandler",

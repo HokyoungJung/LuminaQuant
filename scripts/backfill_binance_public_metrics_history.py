@@ -62,7 +62,9 @@ def metrics_rows_from_zip(
             for raw in reader:
                 if str(raw.get("symbol") or "").strip().upper() != compact:
                     raise ValueError("metrics archive symbol does not match request")
-                timestamp = datetime.fromisoformat(str(raw["create_time"]).strip()).replace(tzinfo=UTC)
+                timestamp = datetime.fromisoformat(str(raw["create_time"]).strip()).replace(
+                    tzinfo=UTC
+                )
                 if not window_start <= timestamp <= window_end:
                     raise ValueError("metrics archive row is outside its [start, end] UTC window")
                 timestamp_ms = int(timestamp.timestamp() * 1000)

@@ -278,6 +278,9 @@ def _candidate(name: str, *, deflated_sharpe: float, spa_pvalue: float) -> dict:
             "spa_pvalue": spa_pvalue,
         },
         "hurdle_fields": {"oos": {"score": 10.0, "excess_return": 0.05, "pass": True}},
+        "pass": True,
+        "hard_reject": False,
+        "hard_reject_reasons": {},
     }
 
 

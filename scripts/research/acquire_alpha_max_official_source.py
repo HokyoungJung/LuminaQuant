@@ -8,11 +8,13 @@ from array import array
 from collections.abc import Iterable
 from contextvars import ContextVar
 from contextlib import ExitStack, contextmanager
+import ctypes
 import fcntl
 import heapq
 import csv
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+import errno
 import hashlib
 import io
 import itertools
@@ -22,6 +24,7 @@ import shutil
 import os
 from pathlib import Path
 import re
+import secrets
 import stat
 import struct
 import sys
@@ -34,6 +37,10 @@ import urllib.request
 import zipfile
 
 import polars as pl
+
+AT_FDCWD = -100
+AT_SYMLINK_FOLLOW = 0x400
+RENAME_EXCHANGE = 0x2
 
 EXCHANGE = "binance"
 SYMBOLS = (
@@ -60,8 +67,8 @@ RAW_COLUMNS = ["datetime", "open", "high", "low", "close", "volume"]
 FUNDING_COLUMNS = ["timestamp_ms", "source_timestamp_ms", "exchange", "symbol", "funding_rate"]
 DOWNLOAD_CHUNK = 1 << 20
 DOWNLOAD_ATTEMPTS = 3
-HOST_RESERVE_PATH = Path("/mnt/c")
-HOST_RESERVE_BYTES = 21_474_836_480
+HOST_RESERVE_PATH = Path(os.getenv("LQ_ALPHA_MAX_RESERVE_PATH", "/mnt/c")).expanduser()
+HOST_RESERVE_BYTES = int(os.getenv("LQ_ALPHA_MAX_RESERVE_BYTES", "21474836480"))
 MAX_LIVE_ARCHIVES = 1
 ARCHIVE_RETENTION = "retired_after_double_derivation"
 
@@ -274,8 +281,21 @@ def fsync_directory(path: Path) -> None:
         os.close(fd)
 
 
+def fsync_scratch_if_present(root: Path) -> None:
+    """Sync the exact scratch directory unless a nested owner already retired it."""
+    opened = _open_scratch_directory(root, create=False)
+    if opened is None:
+        return
+    parent_fd, scratch_fd, _, _ = opened
+    try:
+        os.fsync(scratch_fd)
+    finally:
+        os.close(scratch_fd)
+        os.close(parent_fd)
+
+
 def assert_host_reserve(required_bytes: int = 0) -> None:
-    """Fail before a write can consume the WSL host's reserved capacity."""
+    """Fail before a write can consume the configured filesystem reserve."""
     if isinstance(required_bytes, bool) or required_bytes < 0:
         raise AcquisitionError("host_reserve_requirement_invalid")
     try:
@@ -306,104 +326,484 @@ def scratch_file_identity(path: Path) -> tuple[int, int]:
     return item.st_dev, item.st_ino
 
 
-def remove_aggtrades_file(path: Path, identity: tuple[int, int] | None = None) -> None:
-    expected = identity or scratch_file_identity(path)
-    item = path.lstat()
+def scratch_fd_identity(fd: int) -> tuple[int, int]:
+    item = os.fstat(fd)
     if (
         not stat.S_ISREG(item.st_mode)
         or item.st_uid != os.getuid()
         or stat.S_IMODE(item.st_mode) != 0o600
         or item.st_nlink != 1
-        or (item.st_dev, item.st_ino) != expected
     ):
         raise AcquisitionError("unsafe_scratch_entry")
-    path.unlink()
-    fsync_directory(path.parent)
+    return item.st_dev, item.st_ino
 
 
-def scratch_directory(root: Path) -> Path:
-    """Return a private, same-filesystem scratch directory beside an owned root."""
+def remove_aggtrades_file(path: Path, identity: tuple[int, int] | None = None) -> None:
+    expected = identity or scratch_file_identity(path)
+    parent_fd = os.open(
+        path.parent,
+        os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0),
+    )
+    try:
+        parent_item = os.fstat(parent_fd)
+        item = os.stat(path.name, dir_fd=parent_fd, follow_symlinks=False)
+        if (
+            not stat.S_ISDIR(parent_item.st_mode)
+            or parent_item.st_uid != os.getuid()
+            or stat.S_IMODE(parent_item.st_mode) & 0o022
+            or not stat.S_ISREG(item.st_mode)
+            or item.st_uid != os.getuid()
+            or stat.S_IMODE(item.st_mode) != 0o600
+            or item.st_nlink != 1
+            or item.st_dev != parent_item.st_dev
+            or (item.st_dev, item.st_ino) != expected
+        ):
+            raise AcquisitionError("unsafe_scratch_entry")
+        _quarantine_unlink(parent_fd, path.name, item, parent_item)
+        os.fsync(parent_fd)
+    finally:
+        os.close(parent_fd)
+
+
+def _open_scratch_directory(
+    root: Path,
+    *,
+    create: bool,
+) -> tuple[int, int, str, os.stat_result] | None:
     root = lexical(root)
     safe_existing_directory(root.parent)
     scratch = scratch_path(root)
+    parent_fd = os.open(
+        root.parent,
+        os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0),
+    )
     try:
-        os.mkdir(scratch, 0o700)
-        fsync_directory(scratch.parent)
-    except FileExistsError:
-        pass
-    try:
-        item = scratch.lstat()
-    except OSError as exc:
-        raise AcquisitionError("unsafe_scratch_directory") from exc
+        if create:
+            try:
+                os.mkdir(scratch.name, 0o700, dir_fd=parent_fd)
+                os.fsync(parent_fd)
+            except FileExistsError:
+                pass
+        try:
+            item = os.stat(scratch.name, dir_fd=parent_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            if not create:
+                os.close(parent_fd)
+                return None
+            raise AcquisitionError("unsafe_scratch_directory")
+        parent_item = os.fstat(parent_fd)
+        if (
+            not stat.S_ISDIR(item.st_mode)
+            or item.st_uid != os.getuid()
+            or stat.S_IMODE(item.st_mode) != 0o700
+            or item.st_dev != parent_item.st_dev
+        ):
+            raise AcquisitionError("unsafe_scratch_directory")
+        scratch_fd = -1
+        try:
+            scratch_fd = os.open(
+                scratch.name,
+                os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0),
+                dir_fd=parent_fd,
+            )
+            opened = os.fstat(scratch_fd)
+            rebound = os.stat(scratch.name, dir_fd=parent_fd, follow_symlinks=False)
+            if (opened.st_dev, opened.st_ino) != (item.st_dev, item.st_ino) or (
+                rebound.st_dev,
+                rebound.st_ino,
+            ) != (item.st_dev, item.st_ino):
+                raise AcquisitionError("unsafe_scratch_directory")
+        except BaseException:
+            if scratch_fd >= 0:
+                os.close(scratch_fd)
+            raise
+        return parent_fd, scratch_fd, scratch.name, item
+    except BaseException:
+        os.close(parent_fd)
+        raise
+
+
+def _quarantine_unlink(
+    directory_fd: int,
+    name: str,
+    expected: os.stat_result,
+    directory_identity: os.stat_result,
+) -> None:
+    """Rename first, then unlink only the exact inode validated before the rename."""
+    quarantine = f"{name}.retired-{secrets.token_hex(16)}"
+    os.rename(
+        name,
+        quarantine,
+        src_dir_fd=directory_fd,
+        dst_dir_fd=directory_fd,
+    )
+    moved = os.stat(quarantine, dir_fd=directory_fd, follow_symlinks=False)
     if (
-        not stat.S_ISDIR(item.st_mode)
-        or item.st_uid != os.getuid()
-        or item.st_mode & 0o777 != 0o700
-        or item.st_dev != root.parent.stat().st_dev
-    ):
-        raise AcquisitionError("unsafe_scratch_directory")
-    candidates = list(scratch.iterdir())
-    stale_aggtrades: list[tuple[Path, tuple[int, int]]] = []
-    for candidate in candidates:
-        item = candidate.lstat()
-        if candidate.name.startswith(".aggtrades-"):
-            stale_aggtrades.append((candidate, scratch_file_identity(candidate)))
-            continue
-        if not candidate.name.startswith((".acquire-", ".derive-", ".partial-", ".recovery-")):
-            raise AcquisitionError("unsafe_scratch_entry")
-        if not stat.S_ISREG(item.st_mode) or item.st_uid != os.getuid():
-            raise AcquisitionError("unsafe_scratch_entry")
-    for candidate, identity in stale_aggtrades:
-        remove_aggtrades_file(candidate, identity)
-    for candidate in candidates:
-        if candidate.name.startswith(".aggtrades-"):
-            continue
-        candidate.unlink()
-        fsync_directory(scratch)
-    return scratch
+        moved.st_dev,
+        moved.st_ino,
+        moved.st_uid,
+        stat.S_IMODE(moved.st_mode),
+        moved.st_nlink,
+    ) != (
+        expected.st_dev,
+        expected.st_ino,
+        expected.st_uid,
+        stat.S_IMODE(expected.st_mode),
+        expected.st_nlink,
+    ) or moved.st_dev != directory_identity.st_dev:
+        raise AcquisitionError("unsafe_scratch_entry")
+    os.unlink(quarantine, dir_fd=directory_fd)
+
+
+def scratch_directory(root: Path, *, clean: bool = True) -> Path:
+    """Return a descriptor-validated private scratch directory beside an owned root."""
+    root = lexical(root)
+    scratch = scratch_path(root)
+    opened = _open_scratch_directory(root, create=True)
+    assert opened is not None
+    parent_fd, scratch_fd, name, directory_identity = opened
+    try:
+        if clean:
+            entries: list[tuple[str, os.stat_result]] = []
+            with os.scandir(scratch_fd) as iterator:
+                names = sorted(entry.name for entry in iterator)
+            for candidate in names:
+                item = os.stat(candidate, dir_fd=scratch_fd, follow_symlinks=False)
+                if (
+                    not stat.S_ISREG(item.st_mode)
+                    or item.st_uid != os.getuid()
+                    or stat.S_IMODE(item.st_mode) != 0o600
+                    or item.st_dev != directory_identity.st_dev
+                ):
+                    raise AcquisitionError("unsafe_scratch_entry")
+                if candidate.startswith(".aggtrades-"):
+                    if item.st_nlink != 1:
+                        raise AcquisitionError("unsafe_scratch_entry")
+                elif not candidate.startswith(
+                    (".acquire-", ".derive-", ".partial-", ".recovery-")
+                ) or item.st_nlink not in {1, 2}:
+                    raise AcquisitionError("unsafe_scratch_entry")
+                entries.append((candidate, item))
+            for candidate, identity in entries:
+                _quarantine_unlink(
+                    scratch_fd,
+                    candidate,
+                    identity,
+                    directory_identity,
+                )
+            os.fsync(scratch_fd)
+        rebound = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+        if (rebound.st_dev, rebound.st_ino) != (
+            directory_identity.st_dev,
+            directory_identity.st_ino,
+        ):
+            raise AcquisitionError("unsafe_scratch_directory")
+        return scratch
+    finally:
+        os.close(scratch_fd)
+        os.close(parent_fd)
+
+
+def remove_empty_scratch(root: Path) -> None:
+    """Remove only the exact owned scratch directory after its final entry is gone."""
+    root = lexical(root)
+    opened = _open_scratch_directory(root, create=False)
+    if opened is None:
+        return
+    parent_fd, scratch_fd, name, identity = opened
+    try:
+        with os.scandir(scratch_fd) as iterator:
+            if next(iterator, None) is not None:
+                return
+        quarantine = f".alpha-max-scratch-retired-{secrets.token_hex(16)}"
+        try:
+            os.rename(
+                name,
+                quarantine,
+                src_dir_fd=parent_fd,
+                dst_dir_fd=parent_fd,
+            )
+        except OSError as exc:
+            if exc.errno == errno.ENOENT:
+                return
+            raise AcquisitionError("scratch_cleanup_failed") from exc
+        rebound = os.stat(quarantine, dir_fd=parent_fd, follow_symlinks=False)
+        if (
+            rebound.st_dev,
+            rebound.st_ino,
+            rebound.st_uid,
+            stat.S_IMODE(rebound.st_mode),
+        ) != (
+            identity.st_dev,
+            identity.st_ino,
+            identity.st_uid,
+            stat.S_IMODE(identity.st_mode),
+        ):
+            raise AcquisitionError("unsafe_scratch_directory")
+        try:
+            os.rmdir(quarantine, dir_fd=parent_fd)
+        except OSError as exc:
+            raise AcquisitionError("scratch_cleanup_failed") from exc
+        os.fsync(parent_fd)
+    finally:
+        os.close(scratch_fd)
+        os.close(parent_fd)
+
+
+def finish_scratch(root: Path) -> None:
+    """Retire scratch without masking an in-flight operation failure."""
+    primary = sys.exception()
+    try:
+        fsync_scratch_if_present(root)
+        remove_empty_scratch(root)
+    except (OSError, AcquisitionError) as exc:
+        if primary is None:
+            raise
+        primary.add_note(f"scratch_cleanup_failed:{type(exc).__name__}")
 
 
 def cleanup_scratch(*roots: Path) -> None:
     for root in roots:
-        scratch_directory(root)
+        scratch_directory(root, clean=True)
+        remove_empty_scratch(root)
 
 
 def scratch_file(root: Path, prefix: str, suffix: str = "") -> tuple[int, str]:
-    return tempfile.mkstemp(prefix=prefix, suffix=suffix, dir=scratch_directory(root))
+    return tempfile.mkstemp(
+        prefix=prefix,
+        suffix=suffix,
+        dir=scratch_directory(root, clean=False),
+    )
+
+
+def finish_scratch_file(
+    path: Path,
+    identity: tuple[int, int],
+    root: Path,
+) -> None:
+    """Unlink only the descriptor-bound scratch inode and preserve a primary failure."""
+    primary = sys.exception()
+    opened: tuple[int, int, str, os.stat_result] | None = None
+    try:
+        path = lexical(path)
+        if path.parent != scratch_path(root):
+            raise AcquisitionError("unsafe_scratch_entry")
+        opened = _open_scratch_directory(root, create=False)
+        if opened is None:
+            return
+        _, scratch_fd, _, directory_identity = opened
+        try:
+            item = os.stat(path.name, dir_fd=scratch_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            return
+        if (
+            not stat.S_ISREG(item.st_mode)
+            or item.st_uid != os.getuid()
+            or stat.S_IMODE(item.st_mode) != 0o600
+            or item.st_nlink not in {1, 2}
+            or item.st_dev != directory_identity.st_dev
+            or (item.st_dev, item.st_ino) != identity
+        ):
+            raise AcquisitionError("unsafe_scratch_entry")
+        _quarantine_unlink(
+            scratch_fd,
+            path.name,
+            item,
+            directory_identity,
+        )
+        os.fsync(scratch_fd)
+    except (OSError, AcquisitionError) as exc:
+        if primary is None:
+            raise
+        primary.add_note(f"scratch_file_cleanup_failed:{type(exc).__name__}")
+    finally:
+        if opened is not None:
+            os.close(opened[1])
+            os.close(opened[0])
+        try:
+            remove_empty_scratch(root)
+        except (OSError, AcquisitionError) as exc:
+            if primary is None:
+                raise
+            primary.add_note(f"scratch_cleanup_failed:{type(exc).__name__}")
+
+
+def publish_scratch_file(
+    fd: int,
+    identity: tuple[int, int],
+    destination: Path,
+    *,
+    replace: bool = False,
+) -> None:
+    """Publish only while the written scratch inode remains descriptor-bound."""
+    bound = os.fstat(fd)
+    if (
+        not stat.S_ISREG(bound.st_mode)
+        or (bound.st_dev, bound.st_ino) != identity
+        or bound.st_uid != os.getuid()
+        or stat.S_IMODE(bound.st_mode) != 0o600
+    ):
+        raise AcquisitionError("unsafe_scratch_entry")
+    expected_parent_identity = safe_existing_directory(destination.parent)
+    parent_fd = os.open(
+        destination.parent,
+        os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0),
+    )
+    try:
+        parent_identity = os.fstat(parent_fd)
+        if [parent_identity.st_dev, parent_identity.st_ino] != expected_parent_identity:
+            raise AcquisitionError("publication_parent_identity_changed")
+
+        def link_descriptor(name: str) -> None:
+            libc = ctypes.CDLL(None, use_errno=True)
+            linkat = libc.linkat
+            linkat.argtypes = [
+                ctypes.c_int,
+                ctypes.c_char_p,
+                ctypes.c_int,
+                ctypes.c_char_p,
+                ctypes.c_int,
+            ]
+            linkat.restype = ctypes.c_int
+            result = linkat(
+                AT_FDCWD,
+                os.fsencode(f"/proc/self/fd/{fd}"),
+                parent_fd,
+                os.fsencode(name),
+                AT_SYMLINK_FOLLOW,
+            )
+            if result != 0:
+                error = ctypes.get_errno()
+                raise OSError(error, os.strerror(error), name)
+
+        if not replace:
+            link_descriptor(destination.name)
+        else:
+            try:
+                previous = os.stat(
+                    destination.name,
+                    dir_fd=parent_fd,
+                    follow_symlinks=False,
+                )
+            except FileNotFoundError:
+                link_descriptor(destination.name)
+            else:
+                if (
+                    not stat.S_ISREG(previous.st_mode)
+                    or previous.st_uid != os.getuid()
+                    or stat.S_IMODE(previous.st_mode) != 0o600
+                    or previous.st_nlink != 1
+                ):
+                    raise AcquisitionError("unsafe_replace_destination")
+                replacement = f".replace-{destination.name}-{secrets.token_hex(16)}"
+                link_descriptor(replacement)
+                libc = ctypes.CDLL(None, use_errno=True)
+                renameat2 = libc.renameat2
+                renameat2.argtypes = [
+                    ctypes.c_int,
+                    ctypes.c_char_p,
+                    ctypes.c_int,
+                    ctypes.c_char_p,
+                    ctypes.c_uint,
+                ]
+                renameat2.restype = ctypes.c_int
+                result = renameat2(
+                    parent_fd,
+                    os.fsencode(replacement),
+                    parent_fd,
+                    os.fsencode(destination.name),
+                    RENAME_EXCHANGE,
+                )
+                if result != 0:
+                    error = ctypes.get_errno()
+                    raise OSError(error, os.strerror(error), destination.name)
+                published = os.stat(
+                    destination.name,
+                    dir_fd=parent_fd,
+                    follow_symlinks=False,
+                )
+                displaced = os.stat(
+                    replacement,
+                    dir_fd=parent_fd,
+                    follow_symlinks=False,
+                )
+                if (published.st_dev, published.st_ino) != identity or (
+                    displaced.st_dev,
+                    displaced.st_ino,
+                ) != (previous.st_dev, previous.st_ino):
+                    raise AcquisitionError("published_file_identity_invalid")
+                _quarantine_unlink(
+                    parent_fd,
+                    replacement,
+                    displaced,
+                    parent_identity,
+                )
+        published = os.stat(
+            destination.name,
+            dir_fd=parent_fd,
+            follow_symlinks=False,
+        )
+        if not stat.S_ISREG(published.st_mode) or (published.st_dev, published.st_ino) != identity:
+            raise AcquisitionError("published_file_identity_invalid")
+        os.fsync(parent_fd)
+        if safe_existing_directory(destination.parent) != expected_parent_identity:
+            raise AcquisitionError("publication_parent_identity_changed")
+    finally:
+        os.close(parent_fd)
 
 
 def atomic_write(
-    path: Path, data: bytes, replace: bool = False, scratch_root: Path | None = None
+    path: Path,
+    data: bytes,
+    replace: bool = False,
+    scratch_root: Path | None = None,
+    *,
+    _identity_sink: dict[Path, tuple[int, int]] | None = None,
 ) -> None:
     assert_host_reserve(len(data))
     mkdir_durable(path.parent)
     fsync_directory(path.parent)
     if not replace and (path.exists() or path.is_symlink()):
         raise AcquisitionError(f"output_already_exists:{path}")
-    fd, temporary = scratch_file(scratch_root or path.parent, ".acquire-")
+    owner = scratch_root or path.parent
+    fd, temporary = scratch_file(owner, ".acquire-")
+    temporary_identity: tuple[int, int] | None = None
     try:
-        with os.fdopen(fd, "wb") as sink:
+        temporary_identity = scratch_fd_identity(fd)
+        with os.fdopen(fd, "wb", closefd=False) as sink:
             sink.write(data)
             sink.flush()
             os.fsync(sink.fileno())
-        if replace:
-            os.replace(temporary, path)
-        else:
-            os.link(temporary, path)
-        fsync_directory(path.parent)
+        publish_scratch_file(
+            fd,
+            temporary_identity,
+            path,
+            replace=replace,
+        )
+        if _identity_sink is not None:
+            _identity_sink[lexical(path)] = temporary_identity
     except FileExistsError as exc:
         raise AcquisitionError(f"output_already_exists:{path}") from exc
     finally:
-        try:
-            os.unlink(temporary)
-        except FileNotFoundError:
-            pass
-        fsync_directory(Path(temporary).parent)
+        os.close(fd)
+        if temporary_identity is not None:
+            finish_scratch_file(Path(temporary), temporary_identity, owner)
 
 
-def immutable_json(path: Path, value: Any, scratch_root: Path | None = None) -> str:
+def immutable_json(
+    path: Path,
+    value: Any,
+    scratch_root: Path | None = None,
+    *,
+    _identity_sink: dict[Path, tuple[int, int]] | None = None,
+) -> str:
     data = canonical_bytes(value)
-    atomic_write(path, data, scratch_root=scratch_root)
+    atomic_write(
+        path,
+        data,
+        scratch_root=scratch_root,
+        _identity_sink=_identity_sink,
+    )
     return sha256(data)
 
 
@@ -817,7 +1217,7 @@ def canonical_frame_from_archive(
         fd, name = tempfile.mkstemp(prefix=".aggtrades-chunk-", suffix=".bin", dir=scratch)
         target = Path(name)
         with os.fdopen(fd, "wb") as sink:
-            identities[target] = scratch_file_identity(target)
+            identities[target] = scratch_fd_identity(sink.fileno())
             sink.write(b"".join(records))
             sink.flush()
             os.fsync(sink.fileno())
@@ -851,7 +1251,7 @@ def canonical_frame_from_archive(
                 fd, name = tempfile.mkstemp(prefix=".aggtrades-merge-", suffix=".bin", dir=scratch)
                 target = Path(name)
                 with os.fdopen(fd, "wb") as sink:
-                    identities[target] = scratch_file_identity(target)
+                    identities[target] = scratch_fd_identity(sink.fileno())
                     with ExitStack() as stack:
                         sources = [stack.enter_context(stable_file(item)) for item in group]
                         heap = [
@@ -892,6 +1292,7 @@ def canonical_frame_from_archive(
             if primary is None:
                 raise AcquisitionError("archive_order_canonicalization_failed")
             primary.add_note(f"archive_order_cleanup_failed:{cleanup_failures}")
+        finish_scratch(scratch_root)
 
 
 def frame_from_archive(
@@ -1379,25 +1780,77 @@ def recover_owned_hardlink_prefixes(output: Path, report: Path, plan_data: bytes
         output / ".alpha_max_owner.json",
     ]
     for root in (output, report):
-        scratch = scratch_path(root)
-        if not scratch.exists():
+        opened = _open_scratch_directory(root, create=False)
+        if opened is None:
             continue
-        item = scratch.lstat()
-        if not stat.S_ISDIR(item.st_mode) or item.st_uid != os.getuid():
-            raise AcquisitionError("unsafe_scratch_directory")
-        for candidate in scratch.iterdir():
-            candidate_item = candidate.lstat()
-            if not stat.S_ISREG(candidate_item.st_mode) or candidate_item.st_nlink != 2:
-                continue
-            if not candidate.name.startswith(".acquire-"):
-                raise AcquisitionError("unsafe_scratch_entry")
-            for destination in expected:
-                if destination.exists() and candidate.read_bytes() == destination.read_bytes():
-                    if destination == report / "plan.json" and candidate.read_bytes() != plan_data:
+        parent_fd, scratch_fd, _, directory_identity = opened
+        try:
+            with os.scandir(scratch_fd) as iterator:
+                names = sorted(entry.name for entry in iterator)
+            for name in names:
+                candidate_item = os.stat(name, dir_fd=scratch_fd, follow_symlinks=False)
+                if not stat.S_ISREG(candidate_item.st_mode) or candidate_item.st_nlink != 2:
+                    continue
+                if (
+                    not name.startswith(".acquire-")
+                    or candidate_item.st_uid != os.getuid()
+                    or stat.S_IMODE(candidate_item.st_mode) != 0o600
+                    or candidate_item.st_dev != directory_identity.st_dev
+                ):
+                    raise AcquisitionError("unsafe_scratch_entry")
+                for destination in expected:
+                    try:
+                        destination_item = destination.lstat()
+                    except FileNotFoundError:
                         continue
-                    candidate.unlink()
-                    fsync_directory(scratch)
+                    if not stat.S_ISREG(destination_item.st_mode) or (
+                        candidate_item.st_dev,
+                        candidate_item.st_ino,
+                    ) != (destination_item.st_dev, destination_item.st_ino):
+                        continue
+                    if destination == report / "plan.json":
+                        destination_fd = os.open(
+                            destination,
+                            os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0),
+                        )
+                        try:
+                            bound = os.fstat(destination_fd)
+                            if (bound.st_dev, bound.st_ino) != (
+                                candidate_item.st_dev,
+                                candidate_item.st_ino,
+                            ):
+                                continue
+                            with os.fdopen(destination_fd, "rb", closefd=False) as source:
+                                observed_plan = source.read(len(plan_data) + 1)
+                            rebound_destination = os.fstat(destination_fd)
+                            if (
+                                rebound_destination.st_dev,
+                                rebound_destination.st_ino,
+                                rebound_destination.st_size,
+                            ) != (bound.st_dev, bound.st_ino, bound.st_size):
+                                raise AcquisitionError("unsafe_scratch_entry")
+                            if observed_plan != plan_data:
+                                continue
+                        finally:
+                            os.close(destination_fd)
+                    rebound = os.stat(name, dir_fd=scratch_fd, follow_symlinks=False)
+                    if (rebound.st_dev, rebound.st_ino) != (
+                        candidate_item.st_dev,
+                        candidate_item.st_ino,
+                    ):
+                        raise AcquisitionError("unsafe_scratch_entry")
+                    _quarantine_unlink(
+                        scratch_fd,
+                        name,
+                        rebound,
+                        directory_identity,
+                    )
+                    os.fsync(scratch_fd)
                     break
+        finally:
+            os.close(scratch_fd)
+            os.close(parent_fd)
+        remove_empty_scratch(root)
 
 
 def verify_ownership(output: Path, report: Path, run_id: str) -> dict[str, Any]:
@@ -1495,9 +1948,12 @@ def fetch_receipt(
     destination: Path,
     query: dict[str, Any] | None = None,
     scratch_root: Path | None = None,
+    *,
+    _identity_sink: dict[Path, tuple[int, int]] | None = None,
 ) -> dict[str, Any]:
     requested, expected_query = _request_fields(url, query)
     receipt_path = destination.with_suffix(destination.suffix + ".receipt.json")
+    owner = scratch_root or destination.parent
     if destination.exists() or receipt_path.exists():
         if not destination.exists():
             raise AcquisitionError("cached_request_receipt_invalid")
@@ -1506,70 +1962,87 @@ def fetch_receipt(
         # An unreceipted payload is adopted only after an independent official
         # retrieval produces the exact same bytes.
         recovered = (
-            scratch_directory(scratch_root or destination.parent) / f".recovery-{destination.name}"
+            scratch_directory(owner, clean=False)
+            / f".recovery-{secrets.token_hex(16)}-{destination.name}"
         )
+        recovery_identities: dict[Path, tuple[int, int]] = {}
         try:
-            fresh = fetch_receipt(requested, recovered, expected_query, scratch_root)
+            fresh = fetch_receipt(
+                requested,
+                recovered,
+                expected_query,
+                owner,
+                _identity_sink=recovery_identities,
+            )
             if file_sha256(destination) != fresh["sha256"]:
                 raise AcquisitionError("cached_request_orphan_mismatch")
-            immutable_json(receipt_path, fresh, scratch_root)
+            immutable_json(
+                receipt_path,
+                fresh,
+                scratch_root,
+                _identity_sink=_identity_sink,
+            )
             return request_receipt(destination, requested, expected_query)
         finally:
-            for path in (recovered, recovered.with_suffix(recovered.suffix + ".receipt.json")):
-                try:
-                    path.unlink()
-                except FileNotFoundError:
-                    pass
-                fsync_directory(path.parent)
+            for path, identity in tuple(recovery_identities.items()):
+                finish_scratch_file(path, identity, owner)
     mkdir_durable(destination.parent)
     fsync_directory(destination.parent)
     for attempt in range(DOWNLOAD_ATTEMPTS):
-        fd, temporary = scratch_file(scratch_root or destination.parent, ".partial-")
+        fd, temporary = scratch_file(owner, ".partial-")
+        temporary_identity: tuple[int, int] | None = None
         digest = hashlib.sha256()
         count = 0
         try:
+            temporary_identity = scratch_fd_identity(fd)
             request = urllib.request.Request(
                 requested, headers={"User-Agent": "LuminaQuant-official-acquirer/1"}
             )
-            with (
-                urllib.request.urlopen(request, timeout=90) as response,
-                os.fdopen(fd, "wb") as sink,
-            ):
-                final = response.geturl()
-                checked_url(final)
-                if final != requested:
-                    raise AcquisitionError("official_redirect_identity_invalid")
-                while block := response.read(DOWNLOAD_CHUNK):
-                    assert_host_reserve(len(block))
-                    digest.update(block)
-                    count += len(block)
-                    sink.write(block)
+            with os.fdopen(fd, "wb", closefd=False) as sink:
+                with urllib.request.urlopen(request, timeout=90) as response:
+                    final = response.geturl()
+                    checked_url(final)
+                    if final != requested:
+                        raise AcquisitionError("official_redirect_identity_invalid")
+                    while block := response.read(DOWNLOAD_CHUNK):
+                        assert_host_reserve(len(block))
+                        digest.update(block)
+                        count += len(block)
+                        sink.write(block)
                 sink.flush()
                 os.fsync(sink.fileno())
-            receipt = {
-                "schema": "official_request_receipt.v1",
-                "requested_url": requested,
-                "final_url": final,
-                "final_host": urllib.parse.urlsplit(final).hostname,
-                "query": expected_query,
-                "retrieved_at_utc": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
-                "byte_count": count,
-                "sha256": digest.hexdigest(),
-            }
-            os.link(temporary, destination)
-            fsync_directory(destination.parent)
-            immutable_json(receipt_path, receipt, scratch_root)
+                receipt = {
+                    "schema": "official_request_receipt.v1",
+                    "requested_url": requested,
+                    "final_url": final,
+                    "final_host": urllib.parse.urlsplit(final).hostname,
+                    "query": expected_query,
+                    "retrieved_at_utc": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+                    "byte_count": count,
+                    "sha256": digest.hexdigest(),
+                }
+                publish_scratch_file(
+                    fd,
+                    temporary_identity,
+                    destination,
+                )
+                if _identity_sink is not None:
+                    _identity_sink[lexical(destination)] = temporary_identity
+            immutable_json(
+                receipt_path,
+                receipt,
+                scratch_root,
+                _identity_sink=_identity_sink,
+            )
             return receipt
         except (urllib.error.HTTPError, urllib.error.URLError, OSError) as exc:
             if attempt + 1 == DOWNLOAD_ATTEMPTS:
                 raise AcquisitionError("official_download_failed") from exc
             time.sleep(0.25 * (2**attempt))
         finally:
-            try:
-                os.unlink(temporary)
-            except FileNotFoundError:
-                pass
-            fsync_directory(Path(temporary).parent)
+            os.close(fd)
+            if temporary_identity is not None:
+                finish_scratch_file(Path(temporary), temporary_identity, owner)
     raise AssertionError("unreachable")
 
 
@@ -1579,42 +2052,52 @@ def publish_frame(path: Path, frame: pl.DataFrame, scratch_root: Path | None = N
     assert_host_reserve(max(int(frame.estimated_size()), 1 << 20))
     mkdir_durable(path.parent)
     fsync_directory(path.parent)
-    fd, temp = scratch_file(scratch_root or path.parent, ".acquire-", ".parquet")
-    os.close(fd)
+    owner = scratch_root or path.parent
+    fd, temp = scratch_file(owner, ".acquire-", ".parquet")
+    temp_identity: tuple[int, int] | None = None
+    digest: str | None = None
     try:
-        frame.write_parquet(temp)
-        # The inode must be durable before its no-replace hard-link publication.
-        with stable_file(Path(temp)) as source:
-            source.flush()
-            os.fsync(source.fileno())
-        digest = file_sha256(Path(temp))
-        assert_host_reserve()
-        os.link(temp, path)
-        fsync_directory(path.parent)
-        os.unlink(temp)
-        fsync_directory(Path(temp).parent)
-        # Reopen only after the temporary hard link is gone, so the target is singly linked.
-        if file_sha256(path) != digest:
-            raise AcquisitionError("published_parquet_identity_invalid")
-        return digest
+        temp_identity = scratch_fd_identity(fd)
+        with os.fdopen(fd, "w+b", closefd=False) as sink:
+            frame.write_parquet(sink)
+            sink.flush()
+            os.fsync(sink.fileno())
+            sink.seek(0)
+            hasher = hashlib.sha256()
+            while block := sink.read(1 << 20):
+                hasher.update(block)
+            digest = hasher.hexdigest()
+            assert_host_reserve()
+            publish_scratch_file(fd, temp_identity, path)
     finally:
-        try:
-            os.unlink(temp)
-        except FileNotFoundError:
-            pass
-        fsync_directory(Path(temp).parent)
+        os.close(fd)
+        if temp_identity is not None:
+            finish_scratch_file(Path(temp), temp_identity, owner)
+    if digest is None or file_sha256(path) != digest:
+        raise AcquisitionError("published_parquet_identity_invalid")
+    return digest
 
 
 def frame_sha256(frame: pl.DataFrame, directory: Path, scratch_root: Path | None = None) -> str:
     assert_host_reserve(max(int(frame.estimated_size()), 1 << 20))
-    fd, temporary = scratch_file(scratch_root or directory, ".derive-", ".parquet")
-    os.close(fd)
+    owner = scratch_root or directory
+    fd, temporary = scratch_file(owner, ".derive-", ".parquet")
+    temporary_identity: tuple[int, int] | None = None
     try:
-        frame.write_parquet(temporary)
-        return file_sha256(Path(temporary))
+        temporary_identity = scratch_fd_identity(fd)
+        with os.fdopen(fd, "w+b", closefd=False) as sink:
+            frame.write_parquet(sink)
+            sink.flush()
+            os.fsync(sink.fileno())
+            sink.seek(0)
+            digest = hashlib.sha256()
+            while block := sink.read(1 << 20):
+                digest.update(block)
+            return digest.hexdigest()
     finally:
-        os.unlink(temporary)
-        fsync_directory(Path(temporary).parent)
+        os.close(fd)
+        if temporary_identity is not None:
+            finish_scratch_file(Path(temporary), temporary_identity, owner)
 
 
 def expected_partition_receipt(
@@ -1863,11 +2346,14 @@ def acquire_archive(
                 not archive.exists() and not paths["retirement-intent"].exists()
             ):
                 raise AcquisitionError("archive_retirement_absence_invalid")
+            archive_identity = scratch_file_identity(archive) if archive.exists() else None
             archive_receipt = (
                 request_receipt(archive, url)
-                if archive.exists()
+                if archive_identity is not None
                 else detached_archive_receipt(archive_receipt_path, url)
             )
+            if archive_identity is not None and scratch_file_identity(archive) != archive_identity:
+                raise AcquisitionError("archive_identity_changed")
             checksum_receipt = request_receipt(checksum, url + ".CHECKSUM")
             expected = parse_checksum(stable_file_bytes(checksum), filename)
             if archive_receipt["sha256"] != expected:
@@ -1910,8 +2396,8 @@ def acquire_archive(
                     raise AcquisitionError("archive_retirement_intent_invalid")
             else:
                 immutable_json(paths["retirement-intent"], intent, report)
-            if archive.exists():
-                remove_aggtrades_file(archive)
+            if archive_identity is not None:
+                remove_aggtrades_file(archive, archive_identity)
             if archive.exists() or archive.is_symlink():
                 raise AcquisitionError("archive_retirement_absence_invalid")
             deletion = {
@@ -1936,6 +2422,7 @@ def acquire_archive(
         checksum_receipt = fetch_receipt(url + ".CHECKSUM", checksum, scratch_root=report)
         expected = parse_checksum(stable_file_bytes(checksum), filename)
         archive_receipt = fetch_receipt(url, archive, scratch_root=report)
+        archive_identity = scratch_file_identity(archive)
         if archive_receipt["sha256"] != expected:
             raise AcquisitionError("archive_checksum_mismatch")
         frame, _facts = frame_from_archive(
@@ -1982,7 +2469,7 @@ def acquire_archive(
         immutable_json(paths["derivation"], derivation, report)
         intent = expected_archive_intent(archive, derivation)
         immutable_json(paths["retirement-intent"], intent, report)
-        remove_aggtrades_file(archive)
+        remove_aggtrades_file(archive, archive_identity)
         if archive.exists() or archive.is_symlink():
             raise AcquisitionError("archive_retirement_absence_invalid")
         deletion = {
@@ -2358,7 +2845,7 @@ def full_plan() -> dict[str, Any]:
         "months": [],
         "contract_sha256": CONTRACT_SHA256,
         "availability_evidence_sha256": EVIDENCE_SHA256,
-        # ponytail: /mnt/c is the deliberate WSL ceiling; upgrade only through a signed CLI/platform capacity probe.
+        # ponytail: one local filesystem reserve is the deliberate ceiling; upgrade to multi-volume accounting only when collection spans filesystems.
         "storage_contract": {
             "host_reserve_path": str(HOST_RESERVE_PATH),
             "host_reserve_bytes": HOST_RESERVE_BYTES,

@@ -18,6 +18,7 @@ import numpy as np
 import polars as pl
 from lumina_quant.backtesting.cli_contract import RawFirstDataMissingError
 from lumina_quant.configuration import get_default_runtime_config
+from lumina_quant.configuration.schema import ResearchConfig
 from lumina_quant.market_data import load_futures_feature_points_from_db
 from lumina_quant.storage.parquet import load_data_dict_from_parquet
 from lumina_quant.data.timeframe import timeframe_to_milliseconds
@@ -1073,16 +1074,36 @@ def _hurdle_hard_reject_reasons(
     scoring_config: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     hard_reject_reasons: dict[str, Any] = {}
-    if float(oos.get("sharpe", 0.0)) < config.oos_sharpe_min:
-        hard_reject_reasons["oos_sharpe"] = float(oos.get("sharpe", 0.0))
-    if float(oos.get("pbo", 1.0)) > config.max_pbo:
-        hard_reject_reasons["pbo"] = float(oos.get("pbo", 1.0))
-    if float(oos.get("turnover", 0.0)) > config.max_turnover:
-        hard_reject_reasons["turnover"] = float(oos.get("turnover", 0.0))
-    if float(oos.get("mdd", 0.0)) > config.max_drawdown:
-        hard_reject_reasons["max_drawdown"] = float(oos.get("mdd", 0.0))
-    if float(oos.get("trade_count", 0.0)) < config.min_trade_count:
-        hard_reject_reasons["trade_count"] = float(oos.get("trade_count", 0.0))
+    required = {
+        "sharpe": "oos_sharpe",
+        "pbo": "pbo",
+        "turnover": "turnover",
+        "mdd": "max_drawdown",
+        "trade_count": "trade_count",
+    }
+    values: dict[str, float] = {}
+    for field, reason in required.items():
+        try:
+            value = float(oos[field])
+        except KeyError, TypeError, ValueError:
+            hard_reject_reasons[reason] = "missing_or_nonfinite"
+            continue
+        if not math.isfinite(value):
+            hard_reject_reasons[reason] = "missing_or_nonfinite"
+            continue
+        values[field] = value
+    if values.get("sharpe", float("-inf")) < config.oos_sharpe_min:
+        hard_reject_reasons.setdefault("oos_sharpe", values.get("sharpe", "missing_or_nonfinite"))
+    if values.get("pbo", float("inf")) > config.max_pbo:
+        hard_reject_reasons.setdefault("pbo", values.get("pbo", "missing_or_nonfinite"))
+    if values.get("turnover", float("inf")) > config.max_turnover:
+        hard_reject_reasons.setdefault("turnover", values.get("turnover", "missing_or_nonfinite"))
+    if values.get("mdd", float("inf")) > config.max_drawdown:
+        hard_reject_reasons.setdefault("max_drawdown", values.get("mdd", "missing_or_nonfinite"))
+    if values.get("trade_count", float("-inf")) < config.min_trade_count:
+        hard_reject_reasons.setdefault(
+            "trade_count", values.get("trade_count", "missing_or_nonfinite")
+        )
     # Strict-selection gate (opt-in): promote the deflated Sharpe / SPA reality
     # check from an advisory soft-score weight to a binding hard reject. The DSR
     # is already computed with the correct multiplicity count (num_trials =
@@ -1101,12 +1122,19 @@ def _hurdle_hard_reject_reasons(
         spa_ceiling = float(
             _research_flag(scoring_config, "spa_gate_ceiling", _RESEARCH_SPA_GATE_CEILING_DEFAULT)
         )
-        deflated_sharpe = float(oos.get("deflated_sharpe", 0.0))
-        if deflated_sharpe < dsr_floor:
-            hard_reject_reasons["deflated_sharpe"] = deflated_sharpe
-        spa_pvalue = float(oos.get("spa_pvalue", 1.0))
-        if spa_pvalue > spa_ceiling:
-            hard_reject_reasons["spa_pvalue"] = spa_pvalue
+        for field, threshold, reject_low in (
+            ("deflated_sharpe", dsr_floor, True),
+            ("spa_pvalue", spa_ceiling, False),
+        ):
+            try:
+                value = float(oos[field])
+            except KeyError, TypeError, ValueError:
+                hard_reject_reasons[field] = "missing_or_nonfinite"
+                continue
+            if not math.isfinite(value):
+                hard_reject_reasons[field] = "missing_or_nonfinite"
+            elif (reject_low and value < threshold) or (not reject_low and value > threshold):
+                hard_reject_reasons[field] = value
     return hard_reject_reasons
 
 
@@ -6877,13 +6905,11 @@ def _candidate_effective_split(
                 or candidate.get("timeframe")
                 or timeframe
             )
-            # Backfill the research-profile lockbox/purge flags when the
-            # candidate's own coverage-derived split metadata doesn't set them
-            # itself, so a per-candidate data window still honors an active
-            # strict-research profile. The candidate's own value (if any) wins.
+            # Run-level research policy is authoritative. Candidate-specific
+            # metadata may refine date windows, never downgrade lockbox/purge.
             if isinstance(fallback_split, Mapping):
                 for _flag_name in ("use_lockbox_split", "purge_embargo_bars"):
-                    if _flag_name not in resolved and _flag_name in fallback_split:
+                    if _flag_name in fallback_split:
                         resolved[_flag_name] = fallback_split[_flag_name]
             return _resolve_split_config(resolved, strategy_timeframe=str(timeframe))
 
@@ -7065,7 +7091,7 @@ def _candidate_stage_metrics(
     return train_metrics, val_metrics, oos_metrics
 
 
-def _candidate_oos_cost_stress_metrics(
+def _candidate_cost_stress_metrics(
     *,
     returns_raw: np.ndarray,
     turnover: np.ndarray,
@@ -7076,51 +7102,68 @@ def _candidate_oos_cost_stress_metrics(
     cost_rate: float,
     periods_per_year: int,
     candidate_count: int,
+    stage: str,
     hac_inference: bool = _RESEARCH_HAC_INFERENCE_DEFAULT,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    oos_mask = split_masks["oos"]
-    oos_turnover = turnover[oos_mask]
-    oos_x2 = returns_raw[oos_mask] - (oos_turnover * (cost_rate * 2.0))
-    oos_x3 = returns_raw[oos_mask] - (oos_turnover * (cost_rate * 3.0))
-    oos_stress_x2 = _compute_metrics(
-        oos_x2,
-        turnover=oos_turnover,
-        exposure=exposure[oos_mask],
-        benchmark_returns=benchmark[oos_mask],
+    stage_mask = split_masks[stage]
+    stage_turnover = turnover[stage_mask]
+    stage_x2 = returns_raw[stage_mask] - (stage_turnover * (cost_rate * 2.0))
+    stage_x3 = returns_raw[stage_mask] - (stage_turnover * (cost_rate * 3.0))
+    stress_x2 = _compute_metrics(
+        stage_x2,
+        turnover=stage_turnover,
+        exposure=exposure[stage_mask],
+        benchmark_returns=benchmark[stage_mask],
         periods_per_year=periods_per_year,
         num_trials=candidate_count,
         metric_config=get_default_runtime_config().backtest,
-        timestamps=timestamps[oos_mask],
+        timestamps=timestamps[stage_mask],
         hac_inference=hac_inference,
     )
-    oos_stress_x3 = _compute_metrics(
-        oos_x3,
-        turnover=oos_turnover,
-        exposure=exposure[oos_mask],
-        benchmark_returns=benchmark[oos_mask],
+    stress_x3 = _compute_metrics(
+        stage_x3,
+        turnover=stage_turnover,
+        exposure=exposure[stage_mask],
+        benchmark_returns=benchmark[stage_mask],
         periods_per_year=periods_per_year,
         num_trials=candidate_count,
         metric_config=get_default_runtime_config().backtest,
-        timestamps=timestamps[oos_mask],
+        timestamps=timestamps[stage_mask],
         hac_inference=hac_inference,
     )
-    return oos_stress_x2, oos_stress_x3
+    return stress_x2, stress_x3
+
+
+def _candidate_oos_cost_stress_metrics(
+    **kwargs: Any,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Legacy wrapper for the ordinary three-way OOS stress calculation."""
+    return _candidate_cost_stress_metrics(**kwargs, stage="oos")
 
 
 def _apply_cost_stress_hard_rejects(
     *,
     hard_reject: dict[str, Any],
-    oos_stress_x2: Mapping[str, Any],
-    oos_stress_x3: Mapping[str, Any],
+    stress_x2: Mapping[str, Any],
+    stress_x3: Mapping[str, Any],
     scoring_config: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
     updated = dict(hard_reject)
     cfg = _resolve_score_config(scoring_config)
     stress_cfg = dict(cfg.get("cost_stress_thresholds") or {})
-    if float(oos_stress_x2.get("sharpe", 0.0)) < float(stress_cfg.get("x2_sharpe_min", 0.0)):
-        updated["stress_x2_sharpe"] = float(oos_stress_x2.get("sharpe", 0.0))
-    if float(oos_stress_x3.get("sharpe", 0.0)) < float(stress_cfg.get("x3_sharpe_min", -0.25)):
-        updated["stress_x3_sharpe"] = float(oos_stress_x3.get("sharpe", 0.0))
+    for reason, block, threshold in (
+        ("stress_x2_sharpe", stress_x2, float(stress_cfg.get("x2_sharpe_min", 0.0))),
+        ("stress_x3_sharpe", stress_x3, float(stress_cfg.get("x3_sharpe_min", -0.25))),
+    ):
+        try:
+            value = float(block["sharpe"])
+        except KeyError, TypeError, ValueError:
+            updated[reason] = "missing_or_nonfinite"
+            continue
+        if not math.isfinite(value):
+            updated[reason] = "missing_or_nonfinite"
+        elif value < threshold:
+            updated[reason] = value
     return updated
 
 
@@ -7163,6 +7206,10 @@ class _CandidateMetricPayload:
     # Populated only under the lockbox discipline (opt-in). When ``None`` the
     # legacy 3-way train/val/oos payload is used unchanged.
     lockbox_metrics: dict[str, Any] | None = None
+    val_stress_x2: dict[str, Any] | None = None
+    val_stress_x3: dict[str, Any] | None = None
+    lockbox_stress_x2: dict[str, Any] | None = None
+    lockbox_stress_x3: dict[str, Any] | None = None
 
 
 def _load_candidate_signal_payload(
@@ -7268,8 +7315,25 @@ def _evaluate_candidate_metric_payload(
         hac_inference=hac_inference,
     )
     lockbox_metrics: dict[str, Any] | None = None
+    val_stress_x2: dict[str, Any] | None = None
+    val_stress_x3: dict[str, Any] | None = None
+    lockbox_stress_x2: dict[str, Any] | None = None
+    lockbox_stress_x3: dict[str, Any] | None = None
     lockbox_mask = split_masks.get("lockbox")
     if lockbox_mask is not None:
+        val_stress_x2, val_stress_x3 = _candidate_cost_stress_metrics(
+            returns_raw=signal_payload.returns_raw,
+            turnover=signal_payload.turnover,
+            exposure=signal_payload.exposure,
+            benchmark=benchmark,
+            timestamps=signal_payload.timestamps,
+            split_masks=split_masks,
+            cost_rate=signal_payload.cost_rate,
+            periods_per_year=periods_per_year,
+            candidate_count=candidate_count,
+            stage="val",
+            hac_inference=hac_inference,
+        )
         lockbox_metrics = _metrics_for_mask(
             returns=signal_payload.returns,
             turnover=signal_payload.turnover,
@@ -7281,6 +7345,19 @@ def _evaluate_candidate_metric_payload(
             candidate_count=candidate_count,
             hac_inference=hac_inference,
         )
+        lockbox_stress_x2, lockbox_stress_x3 = _candidate_cost_stress_metrics(
+            returns_raw=signal_payload.returns_raw,
+            turnover=signal_payload.turnover,
+            exposure=signal_payload.exposure,
+            benchmark=benchmark,
+            timestamps=signal_payload.timestamps,
+            split_masks=split_masks,
+            cost_rate=signal_payload.cost_rate,
+            periods_per_year=periods_per_year,
+            candidate_count=candidate_count,
+            stage="lockbox",
+            hac_inference=hac_inference,
+        )
     return _CandidateMetricPayload(
         train_metrics=train_metrics,
         val_metrics=val_metrics,
@@ -7288,6 +7365,10 @@ def _evaluate_candidate_metric_payload(
         oos_stress_x2=oos_stress_x2,
         oos_stress_x3=oos_stress_x3,
         lockbox_metrics=lockbox_metrics,
+        val_stress_x2=val_stress_x2,
+        val_stress_x3=val_stress_x3,
+        lockbox_stress_x2=lockbox_stress_x2,
+        lockbox_stress_x3=lockbox_stress_x3,
     )
 
 
@@ -7313,14 +7394,21 @@ def _evaluate_candidate_hurdles(
         scoring_config=scoring_config,
         bind_stage=bind_stage,
     )
+    binding_stress_x2 = (
+        metric_payload.val_stress_x2 if use_lockbox else metric_payload.oos_stress_x2
+    )
+    binding_stress_x3 = (
+        metric_payload.val_stress_x3 if use_lockbox else metric_payload.oos_stress_x3
+    )
     hard_reject = _apply_cost_stress_hard_rejects(
         hard_reject=hard_reject,
-        oos_stress_x2=metric_payload.oos_stress_x2,
-        oos_stress_x3=metric_payload.oos_stress_x3,
+        stress_x2=binding_stress_x2 or {},
+        stress_x3=binding_stress_x3 or {},
         scoring_config=scoring_config,
     )
     passed = bool(passed and not hard_reject)
-    for stage in ("train", "val", "oos"):
+    stages_to_bind = ("val",) if use_lockbox else ("train", "val", "oos")
+    for stage in stages_to_bind:
         hurdle_fields[stage]["pass"] = bool(hurdle_fields[stage]["pass"] and passed)
     return hurdle_fields, passed, hard_reject
 
@@ -7350,6 +7438,28 @@ def _candidate_result_payload(
         _split_flag(effective_split, "use_lockbox_split", _RESEARCH_USE_LOCKBOX_SPLIT_DEFAULT)
     )
     reported_oos = metric_payload.lockbox_metrics if use_lockbox else metric_payload.oos_metrics
+    reported_stress_x2 = (
+        metric_payload.lockbox_stress_x2 if use_lockbox else metric_payload.oos_stress_x2
+    )
+    reported_stress_x3 = (
+        metric_payload.lockbox_stress_x3 if use_lockbox else metric_payload.oos_stress_x3
+    )
+
+    def _stress_payload(
+        stress_x2: Mapping[str, Any] | None,
+        stress_x3: Mapping[str, Any] | None,
+    ) -> dict[str, dict[str, float]]:
+        return {
+            "x2": {
+                "sharpe": float((stress_x2 or {}).get("sharpe", 0.0)),
+                "return": float((stress_x2 or {}).get("return", 0.0)),
+            },
+            "x3": {
+                "sharpe": float((stress_x3 or {}).get("sharpe", 0.0)),
+                "return": float((stress_x3 or {}).get("return", 0.0)),
+            },
+        }
+
     payload = {
         "candidate": candidate,
         "timestamps": signal_payload.timestamps,
@@ -7359,16 +7469,7 @@ def _candidate_result_payload(
         "train": metric_payload.train_metrics,
         "val": metric_payload.val_metrics,
         "oos": reported_oos,
-        "oos_cost_stress": {
-            "x2": {
-                "sharpe": float(metric_payload.oos_stress_x2.get("sharpe", 0.0)),
-                "return": float(metric_payload.oos_stress_x2.get("return", 0.0)),
-            },
-            "x3": {
-                "sharpe": float(metric_payload.oos_stress_x3.get("sharpe", 0.0)),
-                "return": float(metric_payload.oos_stress_x3.get("return", 0.0)),
-            },
-        },
+        "oos_cost_stress": _stress_payload(reported_stress_x2, reported_stress_x3),
         "hurdle_fields": hurdle_fields,
         "pass": bool(passed),
         "hard_reject_reasons": hard_reject,
@@ -7376,6 +7477,14 @@ def _candidate_result_payload(
     }
     if use_lockbox:
         payload["oos_intermediate"] = metric_payload.oos_metrics
+        payload["validation_cost_stress"] = _stress_payload(
+            metric_payload.val_stress_x2,
+            metric_payload.val_stress_x3,
+        )
+        payload["oos_intermediate_cost_stress"] = _stress_payload(
+            metric_payload.oos_stress_x2,
+            metric_payload.oos_stress_x3,
+        )
     return payload
 
 
@@ -7466,6 +7575,15 @@ def _candidate_instability_penalty(
     cfg = _resolve_score_config(scoring_config)
     weights = dict(cfg["candidate_rank_score_weights"])
     val = dict(row.get("val") or {})
+    use_lockbox = bool(
+        _split_flag(
+            _candidate_row_effective_split(row),
+            "use_lockbox_split",
+            _RESEARCH_USE_LOCKBOX_SPLIT_DEFAULT,
+        )
+    )
+    if use_lockbox:
+        return 0.0
     oos = dict(row.get("oos") or {})
     sharpe_gap = max(0.0, float(val.get("sharpe", 0.0)) - float(oos.get("sharpe", 0.0)))
     return_gap = max(0.0, float(val.get("return", 0.0)) - float(oos.get("return", 0.0)))
@@ -7484,7 +7602,14 @@ def _candidate_sparse_fold_penalty(
 ) -> float:
     cfg = _resolve_score_config(scoring_config)
     weights = dict(cfg["candidate_rank_score_weights"])
-    oos = dict(row.get("oos") or {})
+    use_lockbox = bool(
+        _split_flag(
+            _candidate_row_effective_split(row),
+            "use_lockbox_split",
+            _RESEARCH_USE_LOCKBOX_SPLIT_DEFAULT,
+        )
+    )
+    oos = dict(row.get("val" if use_lockbox else "oos") or {})
     active_fold_ratio = max(0.0, min(1.0, float(oos.get("active_fold_ratio", 1.0))))
     inactive_fold_count = max(0.0, float(oos.get("inactive_fold_count", 0.0)))
     failed_fold_ratio = max(
@@ -8647,6 +8772,7 @@ def run_candidate_research(
     stage1_keep_ratio: float = 0.35,
     max_candidates: int = 512,
     score_config: Mapping[str, Any] | None = None,
+    research_config: ResearchConfig | None = None,
     split: Mapping[str, Any] | None = None,
     data_mode: str = "legacy",
     allow_csv_fallback: bool = True,
@@ -8657,8 +8783,32 @@ def run_candidate_research(
     """Evaluate candidate manifest into train/val/OOS report contract (v2)."""
     base_tf = _normalize_candidate_research_base_timeframe(base_timeframe)
     market_data_settings = _current_research_market_data_settings()
+    resolved_score_config = dict(score_config or {})
+    resolved_split = dict(split or {})
+    if research_config is not None:
+        research_fields = {
+            "strict_selection_gate": bool(research_config.strict_selection_gate),
+            "use_lockbox_split": bool(research_config.use_lockbox_split),
+            "purge_embargo_bars": int(research_config.purge_embargo_bars),
+            "hac_inference": bool(research_config.hac_inference),
+            "enforce_selection_reject_gate": bool(research_config.enforce_selection_reject_gate),
+            "dsr_gate_floor": float(research_config.dsr_gate_floor),
+            "spa_gate_ceiling": float(research_config.spa_gate_ceiling),
+            "pbo_gate_ceiling": float(research_config.pbo_gate_ceiling),
+            "max_cross_trial_pbo": float(research_config.max_cross_trial_pbo),
+        }
+        existing_research = resolved_score_config.get("research")
+        if isinstance(existing_research, Mapping):
+            research_fields = {**dict(existing_research), **research_fields}
+        resolved_score_config["research"] = research_fields
+        resolved_split.update(
+            {
+                "use_lockbox_split": bool(research_config.use_lockbox_split),
+                "purge_embargo_bars": int(research_config.purge_embargo_bars),
+            }
+        )
     scoring = _resolve_research_run_scoring_config(
-        score_config=score_config,
+        score_config=resolved_score_config,
         stage1_keep_ratio=stage1_keep_ratio,
     )
     adapted = _adapt_candidate_inputs(candidates, max_candidates=max_candidates)
@@ -8670,7 +8820,7 @@ def run_candidate_research(
             symbol_universe=symbol_universe,
             stage1_keep_ratio=stage1_keep_ratio,
             scoring=scoring,
-            split=split,
+            split=resolved_split,
         )
 
     return _run_candidate_research_with_adapted_candidates(
@@ -8680,7 +8830,7 @@ def run_candidate_research(
         symbol_universe=symbol_universe,
         stage1_keep_ratio=stage1_keep_ratio,
         scoring=scoring,
-        split=split,
+        split=resolved_split,
         data_mode=data_mode,
         allow_csv_fallback=allow_csv_fallback,
         allow_synthetic_fallback=allow_synthetic_fallback,

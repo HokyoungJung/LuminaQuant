@@ -17,7 +17,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -284,6 +284,7 @@ class FuturesFeatureSyncStats:
     upserted_rows: int
     first_timestamp_ms: int | None
     last_timestamp_ms: int | None
+    source_receipts: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass(slots=True)
@@ -1066,6 +1067,40 @@ def _http_get_json(
             wait = min(wait * 2.0, 10.0)
 
 
+def _append_api_source_receipt(
+    receipts: list[dict[str, Any]] | None,
+    *,
+    source: str,
+    url: str,
+    params: dict[str, Any],
+    payload: Any,
+    first_timestamp_ms: int | None,
+    last_timestamp_ms: int | None,
+) -> None:
+    if receipts is None:
+        return
+    canonical = json.dumps(
+        payload,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode()
+    query = urllib.parse.urlencode(params)
+    receipts.append(
+        {
+            "source": source,
+            "request_url": f"{url}?{query}" if query else url,
+            "request_params": dict(params),
+            "canonical_response_sha256": sha256(canonical).hexdigest(),
+            "canonical_response_byte_count": len(canonical),
+            "row_count": len(payload) if isinstance(payload, list) else 0,
+            "first_timestamp_ms": first_timestamp_ms,
+            "last_timestamp_ms": last_timestamp_ms,
+            "parser": "lumina_quant.data_sync.binance_futures_api.v1",
+        }
+    )
+
+
 def normalize_aggtrade_row(trade: Mapping[str, Any]) -> dict[str, Any]:
     """Normalize a native Binance or CCXT aggTrade payload into raw schema."""
     if not isinstance(trade, Mapping):
@@ -1226,6 +1261,8 @@ def _normalize_funding_timestamp_ms(timestamp_ms: int) -> int:
     if remainder >= _FUNDING_SETTLEMENT_GRANULARITY_MS - _FUNDING_TIMESTAMP_JITTER_MS:
         return timestamp + (_FUNDING_SETTLEMENT_GRANULARITY_MS - remainder)
     return timestamp
+
+
 def _optional_float_field(value: Any) -> float | None:
     """Parse an optional numeric API field without treating an empty string as data."""
     if value is None or (isinstance(value, str) and not value.strip()):
@@ -1240,6 +1277,7 @@ def _fetch_funding_history(
     until_ms: int,
     retries: int,
     base_wait_sec: float,
+    source_receipts: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     url = "https://fapi.binance.com/fapi/v1/fundingRate"
     out: list[dict[str, Any]] = []
@@ -1264,6 +1302,20 @@ def _fetch_funding_history(
                 break
             raise
         rows = list(data) if isinstance(data, list) else []
+        _append_api_source_receipt(
+            source_receipts,
+            source="Binance USD-M Futures fundingRate API",
+            url=url,
+            params={
+                "symbol": _compact_symbol(symbol),
+                "startTime": cursor,
+                "endTime": end_ms,
+                "limit": 1000,
+            },
+            payload=data,
+            first_timestamp_ms=(int(rows[0].get("fundingTime", 0) or 0) if rows else None),
+            last_timestamp_ms=(int(rows[-1].get("fundingTime", 0) or 0) if rows else None),
+        )
         if not rows:
             break
         out.extend(rows)
@@ -1287,6 +1339,7 @@ def _fetch_price_klines(
     until_ms: int,
     retries: int,
     base_wait_sec: float,
+    source_receipts: list[dict[str, Any]] | None = None,
 ) -> list[list[Any]]:
     endpoint = "markPriceKlines" if price_type == "mark" else "indexPriceKlines"
     url = f"https://fapi.binance.com/fapi/v1/{endpoint}"
@@ -1317,6 +1370,15 @@ def _fetch_price_klines(
                 break
             raise
         rows = list(data) if isinstance(data, list) else []
+        _append_api_source_receipt(
+            source_receipts,
+            source=f"Binance USD-M Futures {endpoint} API",
+            url=url,
+            params=params,
+            payload=data,
+            first_timestamp_ms=int(rows[0][0]) if rows else None,
+            last_timestamp_ms=int(rows[-1][0]) if rows else None,
+        )
         if not rows:
             break
         out.extend(rows)
@@ -1339,6 +1401,7 @@ def _fetch_open_interest_history(
     until_ms: int,
     retries: int,
     base_wait_sec: float,
+    source_receipts: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     url = "https://fapi.binance.com/futures/data/openInterestHist"
     out: list[dict[str, Any]] = []
@@ -1384,6 +1447,21 @@ def _fetch_open_interest_history(
                 continue
             raise
         rows = list(data) if isinstance(data, list) else []
+        _append_api_source_receipt(
+            source_receipts,
+            source="Binance USD-M Futures openInterestHist API",
+            url=url,
+            params={
+                "symbol": _compact_symbol(symbol),
+                "period": str(period),
+                "startTime": cursor,
+                "endTime": request_end_ms,
+                "limit": 500,
+            },
+            payload=data,
+            first_timestamp_ms=(int(rows[0].get("timestamp", 0) or 0) if rows else None),
+            last_timestamp_ms=(int(rows[-1].get("timestamp", 0) or 0) if rows else None),
+        )
         if not rows:
             if int(request_end_ms) >= int(end_ms):
                 break
@@ -1477,6 +1555,7 @@ def sync_futures_feature_points(
     for symbol in symbol_list:
         stream_symbol = normalize_symbol(symbol)
         points: dict[int, dict[str, Any]] = {}
+        source_receipts: list[dict[str, Any]] = []
 
         if include_funding:
             funding_rows = _fetch_funding_history(
@@ -1485,6 +1564,7 @@ def sync_futures_feature_points(
                 until_ms=until_ms,
                 retries=retries,
                 base_wait_sec=base_wait_sec,
+                source_receipts=source_receipts,
             )
             for row in funding_rows:
                 ts = _normalize_funding_timestamp_ms(int(row.get("fundingTime", 0) or 0))
@@ -1517,6 +1597,7 @@ def sync_futures_feature_points(
                 until_ms=until_ms,
                 retries=retries,
                 base_wait_sec=base_wait_sec,
+                source_receipts=source_receipts,
             )
             for row in mark_rows:
                 ts = int(row[0])
@@ -1530,6 +1611,7 @@ def sync_futures_feature_points(
                 until_ms=until_ms,
                 retries=retries,
                 base_wait_sec=base_wait_sec,
+                source_receipts=source_receipts,
             )
             for row in index_rows:
                 ts = int(row[0])
@@ -1543,6 +1625,7 @@ def sync_futures_feature_points(
                 until_ms=until_ms,
                 retries=retries,
                 base_wait_sec=base_wait_sec,
+                source_receipts=source_receipts,
             )
             for row in oi_rows:
                 ts = int(row.get("timestamp", 0) or 0)
@@ -1603,6 +1686,7 @@ def sync_futures_feature_points(
                 upserted_rows=int(upserted),
                 first_timestamp_ms=first_ts,
                 last_timestamp_ms=last_ts,
+                source_receipts=source_receipts,
             )
         )
 

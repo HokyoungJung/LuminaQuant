@@ -95,6 +95,36 @@ def test_run_research_candidates_script_dry_run_skips_outputs(tmp_path: Path):
     assert not (tmp_path / "strategy_factory_report_latest.json").exists()
 
 
+def test_run_research_candidates_explicit_missing_manifest_fails_closed(tmp_path: Path):
+    root = Path(__file__).resolve().parents[1]
+    script = root / "scripts" / "run_research_candidates.py"
+    missing = tmp_path / "missing-manifest.json"
+    env = dict(os.environ)
+    env["LQ_GPU_MODE"] = "cpu"
+    env["LQ_CONFIG_PATH"] = str(root / "config.yaml")
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(script),
+            "--output-dir",
+            str(tmp_path / "reports"),
+            "--manifest",
+            str(missing),
+            "--dry-run",
+        ],
+        cwd=str(tmp_path),
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert f"manifest file not found: {missing}" in result.stderr
+    assert "dry-run mode" not in result.stdout
+
+
 def test_run_research_candidates_script_smoke_with_score_config(tmp_path: Path):
     root = Path(__file__).resolve().parents[1]
     script = root / "scripts" / "run_research_candidates.py"
@@ -230,6 +260,10 @@ def test_run_research_candidates_forwards_max_per_lineage_and_persists_it(
             "family": "cross_sectional",
             "strategy_timeframe": "1h",
             "symbols": ["BTC/USDT", "ETH/USDT", "SOL/USDT"],
+            "effective_split": {
+                "use_lockbox_split": True,
+                "purge_embargo_bars": 1,
+            },
             "hurdle_fields": {"oos": {"pass": True, "score": 5.0}},
             "oos": {"return": 0.08, "sharpe": 1.6, "mdd": 0.05, "trades": 24},
             "return_streams": {"train": [], "val": [], "oos": []},
@@ -257,6 +291,7 @@ def test_run_research_candidates_forwards_max_per_lineage_and_persists_it(
         allow_csv_fallback,
         allow_synthetic_fallback,
         progress_callback,
+        research_config,
     ):
         _ = (
             candidates,
@@ -271,12 +306,16 @@ def test_run_research_candidates_forwards_max_per_lineage_and_persists_it(
             allow_csv_fallback,
             allow_synthetic_fallback,
             progress_callback,
+            research_config,
         )
         return {
             "schema_version": "v2",
             "base_timeframe": "1s",
             "strategy_timeframes": ["1h"],
-            "split": {},
+            "split": {
+                "use_lockbox_split": True,
+                "purge_embargo_bars": 1,
+            },
             "candidates": list(candidates),
             "stage1": {},
             "scoring_config": {},
@@ -316,12 +355,27 @@ def test_run_research_candidates_forwards_max_per_lineage_and_persists_it(
 
     assert MODULE.main() == 0
     assert int(captured["max_per_lineage"]) == 2
+    assert captured["mode"] == "val"
 
     team_report = json.loads(
         (tmp_path / "strategy_factory_report_latest.json").read_text(encoding="utf-8")
     )
     shortlist_config = dict(team_report.get("shortlist_config") or {})
     assert int(shortlist_config.get("max_per_lineage", 0)) == 2
+    assert team_report["selection_contract"]["ranking_split"] == "validation"
+    assert team_report["selection_contract"]["reported_oos_role"] == "locked_report_only"
+    assert shortlist_config["robust_score_params"]["dsr_gate_floor"] == 0.90
+    assert team_report["selected_team"] == []
+    assert [row["candidate_id"] for row in team_report["diagnostic_shortlist"]] == ["cand-a"]
+    assert team_report["diagnostic_shortlist"][0]["validation_hurdle_pass"] is False
+    assert team_report["diagnostic_shortlist"][0]["promotion_eligible"] is False
+    candidate_report = json.loads(
+        (tmp_path / "candidate_research_latest.json").read_text(encoding="utf-8")
+    )
+    assert candidate_report["promotion_eligible"] is False
+    assert candidate_report["selection_contract"]["promotion_eligible"] is False
+    assert candidate_report["candidates"][0]["validation_hurdle_pass"] is False
+    assert candidate_report["candidates"][0]["promotion_eligible"] is False
 
 
 def test_shortlist_robust_score_params_cross_corr_penalty_and_override_precedence():
@@ -331,10 +385,18 @@ def test_shortlist_robust_score_params_cross_corr_penalty_and_override_precedenc
                 "turnover_penalty": 2.2,
                 "cross_corr_penalty": 0.9,
             },
+            "research": {
+                "enforce_selection_reject_gate": True,
+                "dsr_gate_floor": 0.95,
+            },
             "reject_thresholds": {"max_turnover": 1.7},
             "shortlist_selection": {
                 "robust_score_params": {
                     "cross_corr_penalty": 0.4,
+                    "strict_selection_gate": True,
+                    "dsr_gate_floor": 0.91,
+                    "spa_gate_ceiling": 0.04,
+                    "pbo_gate_ceiling": 0.49,
                 }
             },
         }
@@ -345,6 +407,12 @@ def test_shortlist_robust_score_params_cross_corr_penalty_and_override_precedenc
     assert float(params.get("turnover_penalty", 0.0)) == 2.2
     assert float(params.get("turnover_threshold", 0.0)) == 1.7
     assert float(params.get("cross_corr_penalty", 0.0)) == 0.4
+    assert params["strict_selection_gate"] is True
+    assert params["enforce_selection_reject_gate"] is True
+    # Explicit shortlist overrides take precedence over the research section.
+    assert float(params["dsr_gate_floor"]) == 0.91
+    assert float(params["spa_gate_ceiling"]) == 0.04
+    assert float(params["pbo_gate_ceiling"]) == 0.49
 
 
 def test_exact_split_builder_and_passthrough_support():
@@ -377,6 +445,7 @@ def test_exact_split_builder_and_passthrough_support():
         stage1_keep_ratio,
         max_candidates,
         score_config,
+        research_config,
         split,
     ):
         captured.update(
@@ -388,6 +457,7 @@ def test_exact_split_builder_and_passthrough_support():
                 "stage1_keep_ratio": stage1_keep_ratio,
                 "max_candidates": max_candidates,
                 "score_config": score_config,
+                "research_config": research_config,
                 "split": split,
             }
         )
@@ -405,6 +475,7 @@ def test_exact_split_builder_and_passthrough_support():
             max_candidates=16,
             score_config={"candidate_rank_score_weights": {"return_weight": 25.0}},
             exact_split=exact_split,
+            research_config=MODULE._strict_research_config(),
         )
     finally:
         MODULE.run_candidate_research = original
@@ -413,6 +484,7 @@ def test_exact_split_builder_and_passthrough_support():
     assert captured["split"] == exact_split
     assert captured["base_timeframe"] == "1s"
     assert captured["strategy_timeframes"] == ["1m"]
+    assert captured["research_config"].use_lockbox_split is True
 
 
 def test_synthetic_fallback_is_disabled_by_default_and_requires_explicit_opt_in():
@@ -804,6 +876,10 @@ def test_run_research_candidates_writes_stage_progress_artifacts(monkeypatch, tm
             "trade_count": 6,
             "cross_candidate_corr": 0.0,
         },
+        "effective_split": {
+            "use_lockbox_split": True,
+            "purge_embargo_bars": 1,
+        },
     }
 
     def _stub_run_candidate_research(**kwargs):
@@ -1086,7 +1162,10 @@ def test_run_research_candidates_writes_stage_progress_artifacts(monkeypatch, tm
             "schema_version": "v2",
             "base_timeframe": "1m",
             "strategy_timeframes": ["1h"],
-            "split": {},
+            "split": {
+                "use_lockbox_split": True,
+                "purge_embargo_bars": 1,
+            },
             "candidates": [candidate_row],
             "stage1": {"input_count": 1, "selected_count": 1},
             "scoring_config": {},
@@ -1308,6 +1387,11 @@ def test_strict_profile_gates_only_shortlist_and_records_audit(monkeypatch, tmp_
             "oos": {"return": 0.2, "sharpe": 2.0, "mdd": 0.05, "trades": 8},
         },
     ]
+    for row in rows:
+        row["effective_split"] = {
+            "use_lockbox_split": True,
+            "purge_embargo_bars": 1,
+        }
     captured: dict[str, Any] = {}
 
     monkeypatch.setattr(
@@ -1320,7 +1404,10 @@ def test_strict_profile_gates_only_shortlist_and_records_audit(monkeypatch, tmp_
             "schema_version": "v2",
             "base_timeframe": "1s",
             "strategy_timeframes": ["1h"],
-            "split": {},
+            "split": {
+                "use_lockbox_split": True,
+                "purge_embargo_bars": 1,
+            },
             "candidates": list(rows),
             "stage1": {},
             "scoring_config": {},

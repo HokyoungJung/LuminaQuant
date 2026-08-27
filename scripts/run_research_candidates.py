@@ -19,6 +19,7 @@ from lumina_quant.configuration import (
     get_default_runtime_config,
     load_runtime_config,
 )
+from lumina_quant.configuration.schema import ResearchConfig
 from lumina_quant.storage.parquet import load_data_dict_from_parquet
 from lumina_quant.strategy_factory import (
     build_default_candidate_rows,
@@ -34,6 +35,10 @@ from lumina_quant.strategy_factory.research_run_support import research_config_t
 _METALS = {"XAU/USDT", "XAG/USDT", "XPT/USDT", "XPD/USDT"}
 _RESEARCH_PROMOTION_MAX_SPLIT_DRAWDOWN = 0.15
 _RESEARCH_STRICT_LIQUIDATION_COUNT_MAX = 0
+_SHORTLIST_SELECTION_MODE = "val"
+_STRICT_DSR_FLOOR = 0.90
+_STRICT_SPA_CEILING = 0.05
+_STRICT_PBO_CEILING = 0.50
 _TIMEFRAME_MIN_COVERAGE_BARS = {
     "30m": 360,
     "1h": 240,
@@ -50,6 +55,21 @@ _TIMEFRAME_SECONDS = {
 
 def _current_base_config() -> BacktestConfigView:
     return BacktestConfigView(get_default_runtime_config())
+
+
+def _strict_research_config() -> ResearchConfig:
+    """Return the fail-closed diagnostic contract used by this entrypoint."""
+    return ResearchConfig(
+        strict_selection_gate=True,
+        use_lockbox_split=True,
+        purge_embargo_bars=1,
+        hac_inference=True,
+        enforce_selection_reject_gate=True,
+        dsr_gate_floor=_STRICT_DSR_FLOOR,
+        spa_gate_ceiling=_STRICT_SPA_CEILING,
+        pbo_gate_ceiling=_STRICT_PBO_CEILING,
+        max_cross_trial_pbo=_STRICT_PBO_CEILING,
+    )
 
 
 DEFAULT_SHORTLIST_SELECTION_CONFIG: dict[str, Any] = {
@@ -86,6 +106,12 @@ ROBUST_SCORE_PARAM_KEYS: tuple[str, ...] = (
     "weight_exp_clamp_floor",
     "pair_multi_mix_bonus",
     "mdd_risk_penalty_coeff",
+    "dsr_spa_hard_gate",
+    "strict_selection_gate",
+    "enforce_selection_reject_gate",
+    "dsr_gate_floor",
+    "spa_gate_ceiling",
+    "pbo_gate_ceiling",
 )
 _MIN_COVERAGE_BARS = 360
 
@@ -829,11 +855,11 @@ def _run_candidate_research_with_optional_split(
     max_candidates: int,
     score_config: dict[str, Any] | None,
     exact_split: dict[str, str] | None,
-    research_config: RuntimeConfig | None = None,
     min_bundle_bars: int = 360,
     allow_csv_fallback: bool = True,
     allow_synthetic_fallback: bool = False,
     progress_callback: Any = None,
+    research_config: ResearchConfig | None = None,
 ) -> dict[str, Any]:
     kwargs: dict[str, Any] = {
         "candidates": candidates,
@@ -850,7 +876,9 @@ def _run_candidate_research_with_optional_split(
         parameter.kind is inspect.Parameter.VAR_KEYWORD
         for parameter in signature.parameters.values()
     )
-    if research_config is not None and ("research_config" in param_names or supports_var_kwargs):
+    if research_config is not None:
+        if "research_config" not in param_names and not supports_var_kwargs:
+            raise TypeError("candidate research runner does not support required research_config")
         kwargs["research_config"] = research_config
     if progress_callback is not None and (
         "progress_callback" in param_names or supports_var_kwargs
@@ -862,6 +890,8 @@ def _run_candidate_research_with_optional_split(
         kwargs["allow_csv_fallback"] = bool(allow_csv_fallback)
     if "allow_synthetic_fallback" in param_names or supports_var_kwargs:
         kwargs["allow_synthetic_fallback"] = bool(allow_synthetic_fallback)
+    if research_config is not None:
+        kwargs["research_config"] = research_config
     if not exact_split:
         return run_candidate_research(**kwargs)
 
@@ -929,6 +959,8 @@ def _shortlist_robust_score_params(score_config: dict[str, Any] | None) -> dict[
     shortlist_cfg = shortlist_selection if isinstance(shortlist_selection, dict) else {}
     robust_overrides_raw = shortlist_cfg.get("robust_score_params")
     robust_overrides = robust_overrides_raw if isinstance(robust_overrides_raw, dict) else {}
+    research_raw = scope.get("research")
+    research_cfg = research_raw if isinstance(research_raw, dict) else {}
 
     params: dict[str, Any] = {}
     for key in ROBUST_SCORE_PARAM_KEYS:
@@ -939,6 +971,15 @@ def _shortlist_robust_score_params(score_config: dict[str, Any] | None) -> dict[
     for key in ROBUST_SCORE_PARAM_KEYS:
         if key in robust_overrides:
             params[key] = robust_overrides[key]
+    for key in (
+        "strict_selection_gate",
+        "enforce_selection_reject_gate",
+        "dsr_gate_floor",
+        "spa_gate_ceiling",
+        "pbo_gate_ceiling",
+    ):
+        if key in research_cfg and key not in robust_overrides:
+            params[key] = research_cfg[key]
     return params or None
 
 
@@ -979,8 +1020,17 @@ def _write_summary_csv(path: Path, candidates: list[dict[str, Any]]) -> None:
                 "family",
                 "strategy_timeframe",
                 "selection_score",
-                "pass",
+                "selection_split",
+                "validation_hurdle_pass",
+                "promotion_eligible",
                 "hard_reject",
+                "validation_return",
+                "validation_sharpe",
+                "validation_deflated_sharpe",
+                "validation_pbo",
+                "validation_turnover",
+                "validation_mdd",
+                "validation_trade_count",
                 "oos_return",
                 "oos_sharpe",
                 "oos_deflated_sharpe",
@@ -993,6 +1043,7 @@ def _write_summary_csv(path: Path, candidates: list[dict[str, Any]]) -> None:
         )
         writer.writeheader()
         for row in candidates:
+            validation = dict(row.get("validation") or row.get("val") or {})
             oos = dict(row.get("oos") or {})
             writer.writerow(
                 {
@@ -1002,8 +1053,21 @@ def _write_summary_csv(path: Path, candidates: list[dict[str, Any]]) -> None:
                     "family": row.get("family"),
                     "strategy_timeframe": row.get("strategy_timeframe") or row.get("timeframe"),
                     "selection_score": float(row.get("selection_score", 0.0)),
-                    "pass": bool(row.get("pass", False)),
+                    "selection_split": "validation",
+                    "validation_hurdle_pass": bool(
+                        row.get("validation_hurdle_pass", row.get("pass", False))
+                    ),
+                    "promotion_eligible": False,
                     "hard_reject": bool(row.get("hard_reject", False)),
+                    "validation_return": float(validation.get("return", 0.0)),
+                    "validation_sharpe": float(validation.get("sharpe", 0.0)),
+                    "validation_deflated_sharpe": float(validation.get("deflated_sharpe", 0.0)),
+                    "validation_pbo": float(validation.get("pbo", 1.0)),
+                    "validation_turnover": float(validation.get("turnover", 0.0)),
+                    "validation_mdd": float(validation.get("mdd", 0.0)),
+                    "validation_trade_count": float(
+                        validation.get("trade_count", validation.get("trades", 0.0))
+                    ),
                     "oos_return": float(oos.get("return", 0.0)),
                     "oos_sharpe": float(oos.get("sharpe", 0.0)),
                     "oos_deflated_sharpe": float(oos.get("deflated_sharpe", 0.0)),
@@ -1027,12 +1091,16 @@ def _render_shortlist_markdown(
         "",
         f"- Source report: `{report_path}`",
         f"- Candidate count: {len(shortlist)}",
+        "- Selection split: `validation`; reported OOS is a locked, report-only lockbox.",
+        "- Statistical limitation: row-level `approx_pbo` / SPA-like diagnostics do not satisfy family-wide CSCV/PBO or Hansen SPA; this shortlist is not promotion-eligible by itself.",
+        "- Embargo limitation: one boundary bar is a minimum guard, not proof of purging for unknown multi-bar holding/label horizons.",
         "- First-class fallback: `risk_off_cash` / `no_position` remains a valid research output.",
         "",
-        "| # | Name | Strategy | TF | Family | OOS Sharpe | DSR | PBO | Score |",
-        "|---:|---|---|---|---|---:|---:|---:|---:|",
+        "| # | Name | Strategy | TF | Family | Validation Sharpe | Validation DSR | Validation PBO | Report-only OOS Sharpe | Score |",
+        "|---:|---|---|---|---|---:|---:|---:|---:|---:|",
     ]
     for idx, row in enumerate(shortlist, start=1):
+        validation = dict(row.get("validation") or row.get("val") or {})
         oos = dict(row.get("oos") or {})
         lines.append(
             "| "
@@ -1041,10 +1109,11 @@ def _render_shortlist_markdown(
             f"{row.get('strategy_class', '')} | "
             f"{row.get('strategy_timeframe') or row.get('timeframe') or ''} | "
             f"{row.get('family', '')} | "
+            f"{float(validation.get('sharpe', 0.0)):.3f} | "
+            f"{float(validation.get('deflated_sharpe', 0.0)):.3f} | "
+            f"{float(validation.get('pbo', 1.0)):.3f} | "
             f"{float(oos.get('sharpe', 0.0)):.3f} | "
-            f"{float(oos.get('deflated_sharpe', 0.0)):.3f} | "
-            f"{float(oos.get('pbo', 1.0)):.3f} | "
-            f"{float(row.get('selection_score', 0.0)):.3f} |"
+            f"{float(row.get('shortlist_score', row.get('selection_score', 0.0))):.3f} |"
         )
     lines.append("")
     output_path.write_text("\n".join(lines), encoding="utf-8")
@@ -1905,7 +1974,9 @@ def main() -> int:
     ]
 
     manifest_path = Path(str(args.manifest)).resolve() if str(args.manifest).strip() else None
-    if manifest_path and manifest_path.exists():
+    if manifest_path is not None:
+        if not manifest_path.is_file():
+            raise SystemExit(f"[RESEARCH] manifest file not found: {manifest_path}")
         candidates = _load_manifest_candidates(manifest_path)
     else:
         candidates = build_default_candidate_rows(
@@ -1965,9 +2036,6 @@ def main() -> int:
         allow_synthetic_fallback = bool(
             getattr(args, "enable_synthetic_fallback", False)
         ) and not bool(getattr(args, "disable_synthetic_fallback", False))
-        research_config_kwargs = (
-            {"research_config": runtime_config} if runtime_config is not None else {}
-        )
         report = _run_candidate_research_with_optional_split(
             candidates=candidates,
             base_timeframe=str(args.base_timeframe),
@@ -1977,11 +2045,11 @@ def main() -> int:
             max_candidates=max(1, int(args.max_candidates)),
             score_config=score_config_scope or None,
             exact_split=exact_split,
-            **research_config_kwargs,
             min_bundle_bars=max(1, int(getattr(args, "min_bundle_bars", 360))),
             allow_csv_fallback=not bool(getattr(args, "disable_csv_fallback", False)),
             allow_synthetic_fallback=allow_synthetic_fallback,
             progress_callback=progress_writer,
+            research_config=_strict_research_config(),
         )
     except ValueError as exc:
         progress_writer.fail(str(exc))
@@ -2011,14 +2079,33 @@ def main() -> int:
     profile_score_overrides = (
         profile_activation["score_config_research"] if profile_activation is not None else {}
     )
-    shortlist_score_params = _effective_shortlist_robust_score_params(
-        runtime_config, score_config_scope or None
+    shortlist_score_params = dict(
+        _effective_shortlist_robust_score_params(runtime_config, score_config_scope or None) or {}
+    )
+    shortlist_score_params.update(
+        {
+            "strict_selection_gate": True,
+            "enforce_selection_reject_gate": True,
+            "dsr_gate_floor": max(
+                _STRICT_DSR_FLOOR,
+                float(shortlist_score_params.get("dsr_gate_floor", _STRICT_DSR_FLOOR)),
+            ),
+            "spa_gate_ceiling": min(
+                _STRICT_SPA_CEILING,
+                float(shortlist_score_params.get("spa_gate_ceiling", _STRICT_SPA_CEILING)),
+            ),
+            "pbo_gate_ceiling": min(
+                _STRICT_PBO_CEILING,
+                float(shortlist_score_params.get("pbo_gate_ceiling", _STRICT_PBO_CEILING)),
+            ),
+        }
     )
     shortlist_input = list(report.get("candidates") or [])
-    profile_strict_selection = _profile_strict_selection_enabled(
-        runtime_config, score_config_scope or None
-    )
-    shortlist_selection_mode = _strict_shortlist_mode(runtime_config, score_config_scope or None)
+    for row in shortlist_input:
+        row["validation_hurdle_pass"] = row.get("pass") is True
+        row["promotion_eligible"] = False
+    profile_strict_selection = True
+    shortlist_selection_mode = _SHORTLIST_SELECTION_MODE
     profile_caps = _profile_selection_caps(runtime_config)
     routing_requested = _registered_routing_requested(runtime_config, score_config_scope or None)
     proxy_rejected_count = 0
@@ -2092,7 +2179,7 @@ def main() -> int:
             "shortlist_rejected_count": len(shortlist_input) - len(gated_shortlist_input),
         }
     shortlisted = select_diversified_shortlist(
-        gated_shortlist_input,
+        shortlist_input,
         mode=shortlist_selection_mode,
         max_total=int(shortlist_config["max_total"]),
         max_per_family=int(shortlist_config["max_per_family"]),
@@ -2121,6 +2208,48 @@ def main() -> int:
         ),
     }
     report["risk_off_mode"] = risk_off_mode
+    effective_split = dict(report.get("split") or report.get("effective_split") or {})
+    if (
+        effective_split.get("use_lockbox_split") is not True
+        or int(effective_split.get("purge_embargo_bars", 0) or 0) < 1
+    ):
+        raise RuntimeError(
+            "strict research run did not resolve the required lockbox/purge contract"
+        )
+    for row in report.get("candidates") or []:
+        if row.get("error"):
+            continue
+        row_split = dict(
+            row.get("effective_split")
+            or dict(row.get("metadata") or {}).get("effective_split")
+            or {}
+        )
+        if (
+            row_split.get("use_lockbox_split") is not True
+            or int(row_split.get("purge_embargo_bars", 0) or 0) < 1
+        ):
+            raise RuntimeError(
+                "candidate did not resolve the required lockbox/purge contract: "
+                f"{row.get('candidate_id') or row.get('name')}"
+            )
+    selection_contract = {
+        "ranking_split": "validation",
+        "reported_oos_role": "locked_report_only",
+        "use_lockbox_split": True,
+        "purge_embargo_bars": int(effective_split["purge_embargo_bars"]),
+        "dsr_floor": float(shortlist_score_params["dsr_gate_floor"]),
+        "spa_ceiling": float(shortlist_score_params["spa_gate_ceiling"]),
+        "pbo_ceiling": float(shortlist_score_params["pbo_gate_ceiling"]),
+        "promotion_eligible": False,
+        "statistical_limitations": [
+            "Per-row approx_pbo is not family-wide CSCV/PBO.",
+            "Per-row SPA-like p-values are not whole-universe Hansen SPA.",
+            "A complete synchronized candidate-by-time matrix and trial ledger remain required.",
+            "The one-bar boundary purge is not sufficient evidence for candidates with unknown multi-bar label or holding horizons.",
+        ],
+    }
+    report["selection_contract"] = selection_contract
+    report["promotion_eligible"] = False
 
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
 
@@ -2146,7 +2275,9 @@ def main() -> int:
         "split_mode": report.get("split_mode")
         or ("exact" if exact_split is not None else "default"),
         "source_report": str(output_path),
-        "selected_team": shortlisted,
+        # This row-level diagnostic cannot enter promotion/portfolio consumers.
+        "selected_team": [],
+        "diagnostic_shortlist": shortlisted,
         "risk_off_mode": risk_off_mode,
         "candidates": report.get("candidates") or [],
         "stage1": report.get("stage1") or {},
@@ -2155,6 +2286,7 @@ def main() -> int:
             **shortlist_config,
             "robust_score_params": shortlist_score_params or {},
         },
+        "selection_contract": selection_contract,
         "data_sources": report.get("data_sources") or {},
         "research_profile_audit": report.get("research_profile_audit") or {},
     }

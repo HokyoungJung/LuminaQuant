@@ -12,7 +12,9 @@ import pytest
 
 
 def _load_module() -> ModuleType:
-    path = Path(__file__).resolve().parents[1] / "scripts/backfill_binance_public_metrics_history.py"
+    path = (
+        Path(__file__).resolve().parents[1] / "scripts/backfill_binance_public_metrics_history.py"
+    )
     spec = importlib.util.spec_from_file_location("backfill_binance_public_metrics_history", path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -29,9 +31,7 @@ def _archive(*rows: str, member_symbol: str = "BTCUSDT") -> bytes:
     content = (
         "create_time,symbol,sum_open_interest,sum_open_interest_value,"
         "count_toptrader_long_short_ratio,sum_toptrader_long_short_ratio,"
-        "count_long_short_ratio,sum_taker_long_short_vol_ratio\n"
-        + "\n".join(rows)
-        + "\n"
+        "count_long_short_ratio,sum_taker_long_short_vol_ratio\n" + "\n".join(rows) + "\n"
     )
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w") as archive:
@@ -102,9 +102,7 @@ def test_backfill_persists_rows_and_archive_provenance(monkeypatch, tmp_path: Pa
 
     assert captured["symbol"] == "BTC/USDT"
     assert captured["source"] == "binance_public_metrics_archive"
-    assert captured["rows"] == [
-        {"timestamp_ms": 1_780_013_100_000, "open_interest": 2.0}
-    ]
+    assert captured["rows"] == [{"timestamp_ms": 1_780_013_100_000, "open_interest": 2.0}]
     assert payload["missing_archive_count"] == 0
     assert payload["total_persisted_rows"] == 1
     [receipt] = payload["imported_archives"]

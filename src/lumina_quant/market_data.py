@@ -126,7 +126,20 @@ def _resolve_market_root_path(db_path: str | os.PathLike[str] | None = None) -> 
         or DEFAULT_MARKET_DATA_DB_PATH
     ).strip()
     root = Path(configured).expanduser()
-    if root.suffix and root.suffix.lower() != ".parquet":
+    try:
+        root_info = root.lstat()
+    except FileNotFoundError:
+        existing_directory = False
+    else:
+        existing_directory = stat.S_ISDIR(root_info.st_mode)
+        if stat.S_ISLNK(root_info.st_mode):
+            try:
+                existing_directory = stat.S_ISDIR(root.stat().st_mode)
+            except FileNotFoundError:
+                # Preserve a broken logical-root symlink so the repository's
+                # fail-closed generation resolver rejects it.
+                existing_directory = True
+    if root.suffix and root.suffix.lower() != ".parquet" and not existing_directory:
         root = root.parent / "market_parquet"
     return root
 
@@ -511,6 +524,81 @@ def _load_direct_ohlcv(
     if data.is_empty():
         return _empty_ohlcv_frame()
     return data.sort("datetime").unique(subset=["datetime"], keep="last").sort("datetime")
+
+
+def _merge_ohlcv_sources(
+    direct: pl.DataFrame,
+    resampled: pl.DataFrame,
+    *,
+    prefer_resampled: bool,
+) -> pl.DataFrame:
+    if direct.is_empty():
+        return resampled
+    if resampled.is_empty():
+        return direct
+    ordered = [direct, resampled] if prefer_resampled else [resampled, direct]
+    return (
+        pl.concat(ordered, how="vertical")
+        .unique(subset=["datetime"], keep="last", maintain_order=True)
+        .sort("datetime")
+    )
+
+
+def _ohlcv_source_audit(
+    direct: pl.DataFrame,
+    resampled: pl.DataFrame,
+    *,
+    prefer_resampled: bool,
+) -> dict[str, Any]:
+    values = ["open", "high", "low", "close", "volume"]
+    overlap = direct.join(resampled, on="datetime", how="inner", suffix="_resampled")
+    equality = pl.all_horizontal(
+        *[
+            (
+                (pl.col(column) == pl.col(f"{column}_resampled"))
+                | (pl.col(column).is_null() & pl.col(f"{column}_resampled").is_null())
+            ).fill_null(False)
+            for column in values
+        ]
+    )
+    equal_count = int(overlap.filter(equality).height) if not overlap.is_empty() else 0
+    conflicts = overlap.filter(~equality).sort("datetime") if not overlap.is_empty() else overlap
+    conflict_bytes = conflicts.write_csv().encode() if not conflicts.is_empty() else b""
+    first_conflict = conflicts.get_column("datetime").min() if not conflicts.is_empty() else None
+    direct_only = direct.join(
+        resampled.select("datetime"),
+        on="datetime",
+        how="anti",
+    ).height
+    resampled_only = resampled.join(
+        direct.select("datetime"),
+        on="datetime",
+        how="anti",
+    ).height
+    return {
+        "precedence": (
+            "resampled_1s_derived_over_direct_1m"
+            if prefer_resampled
+            else "direct_1m_over_resampled_1s_derived"
+        ),
+        "direct_rows": int(direct.height),
+        "resampled_rows": int(resampled.height),
+        "direct_only_rows": int(direct_only),
+        "resampled_only_rows": int(resampled_only),
+        "overlap_rows": int(overlap.height),
+        "overlap_equal_rows": equal_count,
+        "overlap_conflict_rows": int(conflicts.height),
+        "overlap_conflict_sha256": hashlib.sha256(conflict_bytes).hexdigest(),
+        "first_overlap_conflict_timestamp_ms": (
+            int(first_conflict.replace(tzinfo=UTC).timestamp() * 1000)
+            if first_conflict is not None
+            else None
+        ),
+        "effective_direct_rows": int(
+            direct_only if prefer_resampled else direct_only + overlap.height
+        ),
+        "effective_resampled_rows": int(resampled.height if prefer_resampled else resampled_only),
+    }
 
 
 def load_strict_ohlcv_route(
@@ -1057,7 +1145,8 @@ def _publish_official_funding_day(
             or not isinstance(source_ts, int)
             or source_ts != ts
             or row["exchange"] != exchange
-            or row["symbol"] != symbol
+            or not isinstance(row["symbol"], str)
+            or normalize_symbol(row["symbol"]) != symbol
             or (prior is not None and ts <= prior)
             or _timestamp_ms_to_datetime(ts).date() != parsed_day
             or not isinstance(rate, float)
@@ -1115,6 +1204,7 @@ def _publish_official_funding_day(
                     .map_elements(_utc_iso_from_ms, return_dtype=pl.Utf8)
                     .alias("datetime"),
                     pl.lit("alpha_max_official").alias("source"),
+                    pl.lit(symbol).alias("symbol"),
                 )
             )
             overlap = _align_feature_frame(existing).join(
@@ -1329,15 +1419,15 @@ class MarketDataRepository:
         frame = self.load_ohlcv(exchange=exchange, symbol=symbol, timeframe=timeframe)
         return not frame.is_empty()
 
-    def load_ohlcv(
+    def _load_ohlcv_sources(
         self,
         *,
         exchange: str,
         symbol: str,
         timeframe: str,
-        start_date: Any = None,
-        end_date: Any = None,
-    ) -> pl.DataFrame:
+        start_date: Any,
+        end_date: Any,
+    ) -> tuple[pl.DataFrame, pl.DataFrame]:
         timeframe_token = normalize_timeframe_token(timeframe)
         normalized_exchange = _normalize_exchange(exchange)
         normalized_symbol = normalize_symbol(symbol)
@@ -1357,15 +1447,56 @@ class MarketDataRepository:
                 start_date=start_date,
                 end_date=end_date,
             )
-            if resampled.is_empty():
-                return direct
-            if direct.is_empty():
-                return resampled
-            return (
-                pl.concat([direct, resampled], how="vertical")
-                .unique(subset=["datetime"], keep="last", maintain_order=True)
-                .sort("datetime")
-            )
+            return direct, resampled
+
+    def load_ohlcv(
+        self,
+        *,
+        exchange: str,
+        symbol: str,
+        timeframe: str,
+        start_date: Any = None,
+        end_date: Any = None,
+    ) -> pl.DataFrame:
+        direct, resampled = self._load_ohlcv_sources(
+            exchange=exchange,
+            symbol=symbol,
+            timeframe=timeframe,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        return _merge_ohlcv_sources(
+            direct,
+            resampled,
+            prefer_resampled=self._prefer_1s_derived,
+        )
+
+    def load_ohlcv_with_source_audit(
+        self,
+        *,
+        exchange: str,
+        symbol: str,
+        timeframe: str,
+        start_date: Any = None,
+        end_date: Any = None,
+    ) -> tuple[pl.DataFrame, dict[str, Any]]:
+        direct, resampled = self._load_ohlcv_sources(
+            exchange=exchange,
+            symbol=symbol,
+            timeframe=timeframe,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        merged = _merge_ohlcv_sources(
+            direct,
+            resampled,
+            prefer_resampled=self._prefer_1s_derived,
+        )
+        return merged, _ohlcv_source_audit(
+            direct,
+            resampled,
+            prefer_resampled=self._prefer_1s_derived,
+        )
 
     def load_ohlcv_1s(
         self,

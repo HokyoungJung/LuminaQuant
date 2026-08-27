@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import inspect
 import json
+import sys
 import time
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -14,8 +16,11 @@ from lumina_quant.dashboard.alpha_evidence_service import build_alpha_evidence_p
 import lumina_quant.live.order_gateway as order_gateway
 from lumina_quant.research.run_card import (
     RunCardRealityGateError,
+    atomic_output_path,
     assert_reality_gates_pass,
     build_research_run_card,
+    file_sha256,
+    runtime_provenance,
     stable_payload_hash,
     write_run_card,
 )
@@ -51,6 +56,30 @@ def test_run_card_enforces_reality_gates_and_strict_json(tmp_path) -> None:
     loaded = json.loads(path.read_text(encoding="utf-8"))
     assert loaded["artifact_kind"] == "lumina_research_run_card"
     assert loaded["reality_gates"]["gate_no_real_money_run"] is True
+
+
+def test_research_artifact_helpers_preserve_old_output_and_bind_runtime(tmp_path) -> None:
+    target = tmp_path / "artifact.json"
+    target.write_text("old", encoding="utf-8")
+    with pytest.raises(RuntimeError, match="interrupted"), atomic_output_path(target) as staged:
+        staged.write_text("new", encoding="utf-8")
+        raise RuntimeError("interrupted")
+    assert target.read_text(encoding="utf-8") == "old"
+
+    source = tmp_path / "adapter.py"
+    source.write_text("pass\n", encoding="utf-8")
+    provenance = runtime_provenance(
+        repo_root=Path(__file__).resolve().parents[1],
+        packages=("numpy",),
+        source_files=(source,),
+    )
+    executable = Path(sys.executable).resolve()
+    assert provenance["python"]["executable"]["sha256"] == file_sha256(executable)
+    assert provenance["packages"]["numpy"] == np.__version__
+    assert provenance["source_files"][str(source.resolve())]["sha256"] == file_sha256(source)
+    assert provenance["uv_lock"]["sha256"] == file_sha256(
+        Path(__file__).resolve().parents[1] / "uv.lock"
+    )
 
 
 def test_run_card_blocks_real_mode_and_oos_leakage() -> None:

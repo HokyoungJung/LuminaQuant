@@ -21,6 +21,31 @@ def _metrics(value: float) -> dict[str, float]:
     }
 
 
+def test_run_level_policy_overrides_candidate_split_downgrade() -> None:
+    candidate = {
+        "strategy_timeframe": "1h",
+        "effective_split": {
+            "train_start": "2026-01-01T00:00:00Z",
+            "train_end": "2026-01-10T00:00:00Z",
+            "val_start": "2026-01-11T00:00:00Z",
+            "val_end": "2026-01-20T00:00:00Z",
+            "oos_start": "2026-01-21T00:00:00Z",
+            "oos_end": "2026-01-31T00:00:00Z",
+            "use_lockbox_split": False,
+            "purge_embargo_bars": 0,
+        },
+    }
+    resolved = research_runner._candidate_effective_split(
+        candidate,
+        {"use_lockbox_split": True, "purge_embargo_bars": 2},
+        timeframe="1h",
+    )
+
+    assert resolved is not None
+    assert resolved["use_lockbox_split"] is True
+    assert resolved["purge_embargo_bars"] == 2
+
+
 def test_evaluate_candidate_uses_candidate_effective_split(monkeypatch):
     captured: dict[str, Any] = {}
     candidate_split = {

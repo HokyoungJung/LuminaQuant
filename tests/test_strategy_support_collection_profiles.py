@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import hashlib
+import json
+from types import SimpleNamespace
+
 import urllib.error
 from urllib.parse import urlparse
 from unittest.mock import patch
@@ -69,16 +73,56 @@ def test_collect_strategy_support_data_flags_override_profile_defaults():
     assert "liquidation_long_qty" not in result["features"]
 
 
+def test_collect_strategy_support_data_exposes_per_symbol_source_receipts():
+    source_receipt = {
+        "source": "Binance USD-M Futures markPriceKlines API",
+        "canonical_response_sha256": "a" * 64,
+    }
+    stats = SimpleNamespace(
+        symbol="BTC/USDT",
+        upserted_rows=2,
+        first_timestamp_ms=1_700_000_000_000,
+        last_timestamp_ms=1_700_000_060_000,
+        source_receipts=[source_receipt],
+    )
+
+    with patch(
+        "lumina_quant.data_collector.sync_futures_feature_points",
+        return_value=[stats],
+    ):
+        result = collect_strategy_support_data(
+            db_path="data/market_parquet",
+            exchange_id="binance",
+            symbol_list=["BTC/USDT"],
+            since=1_700_000_000_000,
+            until=1_700_000_060_000,
+            execute=True,
+            include_liquidations=False,
+        )
+
+    assert result["per_symbol"] == [
+        {
+            "symbol": "BTC/USDT",
+            "upserted_rows": 2,
+            "first_timestamp_ms": 1_700_000_000_000,
+            "last_timestamp_ms": 1_700_000_060_000,
+            "source_receipts": [source_receipt],
+        }
+    ]
+
+
 def test_sync_futures_feature_points_skips_disabled_fetchers_and_persists_enabled_fields():
     captured: dict[str, object] = {}
 
-    def _funding_history(**_kwargs):
+    def _funding_history(**kwargs):
+        kwargs["source_receipts"].append({"source": "funding"})
         return [{"fundingTime": 1_735_689_600_016, "fundingRate": "0.0001", "markPrice": "50000"}]
 
     def _price_klines(**_kwargs):
         raise AssertionError("mark/index fetcher should not be called when disabled")
 
-    def _open_interest_history(**_kwargs):
+    def _open_interest_history(**kwargs):
+        kwargs["source_receipts"].append({"source": "open_interest"})
         return [{"timestamp": 1_735_689_900_000, "sumOpenInterestValue": "123456"}]
 
     def _liquidations(**_kwargs):
@@ -133,6 +177,10 @@ def test_sync_futures_feature_points_skips_disabled_fetchers_and_persists_enable
     assert funding_row["funding_fee_quote_per_unit"] == 5.0
     assert "mark_price" not in funding_row
     assert "index_price" not in funding_row
+    assert stats[0].source_receipts == [
+        {"source": "funding"},
+        {"source": "open_interest"},
+    ]
 
 
 def test_sync_futures_feature_points_treats_empty_funding_mark_price_as_missing(tmp_path):
@@ -230,6 +278,59 @@ def test_fetch_price_klines_uses_pair_param_for_index_endpoint():
     params = dict(captured["params"])
     assert params["pair"] == "XAUUSDT"
     assert "symbol" not in params
+
+
+def test_fetch_price_klines_records_canonical_response_provenance():
+    timestamp_ms = 1_700_000_000_000
+    payload = [[timestamp_ms, "1", "2", "0.5", "1.5", "10"]]
+    receipts: list[dict[str, object]] = []
+
+    def _http_get_json(_url, *, params, retries, base_wait_sec):
+        _ = (params, retries, base_wait_sec)
+        return payload
+
+    with patch("lumina_quant.data_sync._http_get_json", side_effect=_http_get_json):
+        rows = _fetch_price_klines(
+            symbol="BTC/USDT",
+            price_type="mark",
+            interval="1m",
+            since_ms=timestamp_ms,
+            until_ms=timestamp_ms,
+            retries=0,
+            base_wait_sec=0.0,
+            source_receipts=receipts,
+        )
+
+    canonical = json.dumps(
+        payload,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode()
+    assert rows == payload
+    assert receipts == [
+        {
+            "source": "Binance USD-M Futures markPriceKlines API",
+            "request_url": (
+                "https://fapi.binance.com/fapi/v1/markPriceKlines?"
+                f"interval=1m&startTime={timestamp_ms}&endTime={timestamp_ms}"
+                "&limit=1500&symbol=BTCUSDT"
+            ),
+            "request_params": {
+                "interval": "1m",
+                "startTime": timestamp_ms,
+                "endTime": timestamp_ms,
+                "limit": 1500,
+                "symbol": "BTCUSDT",
+            },
+            "canonical_response_sha256": hashlib.sha256(canonical).hexdigest(),
+            "canonical_response_byte_count": len(canonical),
+            "row_count": 1,
+            "first_timestamp_ms": timestamp_ms,
+            "last_timestamp_ms": timestamp_ms,
+            "parser": "lumina_quant.data_sync.binance_futures_api.v1",
+        }
+    ]
 
 
 def test_fetch_liquidation_orders_returns_empty_on_unavailable_endpoint():

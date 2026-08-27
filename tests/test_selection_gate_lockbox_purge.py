@@ -178,6 +178,9 @@ def test_select_diversified_shortlist_strict_gate_excludes_weak_dsr():
             "spa_pvalue": 0.9,
         },
         "hurdle_fields": {"oos": {"pass": True, "score": 10.0, "excess_return": 0.05}},
+        "pass": True,
+        "hard_reject": False,
+        "hard_reject_reasons": {},
     }
     off = sel.select_diversified_shortlist([candidate], mode="oos")
     assert len(off) == 1
@@ -274,6 +277,28 @@ def test_candidate_rank_score_uses_val_under_lockbox():
     assert locked > legacy
 
 
+def test_lockbox_rank_score_is_invariant_to_report_only_oos() -> None:
+    base = {
+        "train": {"return": 0.01, "trade_count": 5},
+        "val": {
+            "sharpe": 1.2,
+            "return": 0.02,
+            "deflated_sharpe": 0.8,
+            "pbo": 0.1,
+            "turnover": 0.2,
+            "mdd": 0.03,
+            "active_fold_ratio": 0.9,
+            "inactive_fold_count": 0,
+            "failed_fold_ratio": 0.1,
+        },
+        "effective_split": {"use_lockbox_split": True},
+    }
+    strong_oos = {**base, "oos": {"sharpe": 10.0, "return": 1.0, "turnover": 0.0}}
+    weak_oos = {**base, "oos": {"sharpe": -10.0, "return": -0.9, "turnover": 100.0}}
+
+    assert rr._candidate_rank_score(strong_oos) == rr._candidate_rank_score(weak_oos)
+
+
 def test_hurdle_fields_bind_stage_val_binds_on_validation():
     train = _passing_metrics()
     # validation FAILS the sharpe floor, oos-slot (lockbox) passes
@@ -288,6 +313,81 @@ def test_hurdle_fields_bind_stage_val_binds_on_validation():
     _, passed_oos, reject_oos = rr._hurdle_fields(train, val, reported_oos, scoring_config=None)
     assert passed_oos is True
     assert reject_oos == {}
+
+
+def test_lockbox_hurdle_uses_validation_cost_stress_not_intermediate_oos():
+    payload = rr._CandidateMetricPayload(
+        train_metrics=_passing_metrics(),
+        val_metrics=_passing_metrics(),
+        oos_metrics=_passing_metrics(),
+        oos_stress_x2={"sharpe": -99.0, "return": -0.9},
+        oos_stress_x3={"sharpe": -99.0, "return": -0.9},
+        lockbox_metrics=_passing_metrics(),
+        val_stress_x2={"sharpe": 0.5, "return": 0.01},
+        val_stress_x3={"sharpe": 0.2, "return": 0.005},
+        lockbox_stress_x2={"sharpe": -1.0, "return": -0.1},
+        lockbox_stress_x3={"sharpe": -1.0, "return": -0.1},
+    )
+
+    _, passed, reject = rr._evaluate_candidate_hurdles(
+        payload,
+        scoring_config=None,
+        split={"use_lockbox_split": True},
+    )
+
+    assert passed is True
+    assert reject == {}
+
+
+def test_lockbox_hurdle_rejects_failing_validation_cost_stress():
+    payload = rr._CandidateMetricPayload(
+        train_metrics=_passing_metrics(),
+        val_metrics=_passing_metrics(),
+        oos_metrics=_passing_metrics(),
+        oos_stress_x2={"sharpe": 2.0, "return": 0.1},
+        oos_stress_x3={"sharpe": 2.0, "return": 0.1},
+        lockbox_metrics=_passing_metrics(),
+        val_stress_x2={"sharpe": -0.1, "return": -0.01},
+        val_stress_x3={"sharpe": -0.5, "return": -0.02},
+        lockbox_stress_x2={"sharpe": 2.0, "return": 0.1},
+        lockbox_stress_x3={"sharpe": 2.0, "return": 0.1},
+    )
+
+    fields, passed, reject = rr._evaluate_candidate_hurdles(
+        payload,
+        scoring_config=None,
+        split={"use_lockbox_split": True},
+    )
+
+    assert passed is False
+    assert reject == {"stress_x2_sharpe": -0.1, "stress_x3_sharpe": -0.5}
+    assert fields["val"]["pass"] is False
+    assert fields["oos"]["pass"] is True
+
+
+def test_lockbox_return_stream_oos_matches_lockbox_metrics_window():
+    returns = np.arange(8, dtype=float)
+    timestamps = np.arange(
+        "2026-01-01T00:00",
+        "2026-01-01T00:08",
+        dtype="datetime64[m]",
+    ).astype("datetime64[ms]")
+    masks = {
+        "train": _mask(8, slice(0, 2)),
+        "val": _mask(8, slice(2, 4)),
+        "oos": _mask(8, slice(4, 6)),
+        "lockbox": _mask(8, slice(6, 8)),
+    }
+
+    streams = rr._candidate_return_streams(
+        returns=returns,
+        timestamps=timestamps,
+        split_masks=masks,
+        has_aligned_timestamps=True,
+    )
+
+    assert [point["v"] for point in streams["oos"]] == [6.0, 7.0]
+    assert [point["v"] for point in streams["oos_intermediate"]] == [4.0, 5.0]
 
 
 # ── (c) purge_embargo_bars ─────────────────────────────────────────────────────

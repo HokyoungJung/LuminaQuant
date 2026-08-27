@@ -204,6 +204,7 @@ def collect_strategy_support_data(
             "upserted_rows": int(row.upserted_rows),
             "first_timestamp_ms": row.first_timestamp_ms,
             "last_timestamp_ms": row.last_timestamp_ms,
+            "source_receipts": list(row.source_receipts),
         }
         for row in stats
     ]

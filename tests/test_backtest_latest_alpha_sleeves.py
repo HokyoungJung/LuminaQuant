@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Any, cast
 
 import polars as pl
 
@@ -20,11 +21,28 @@ def _frame(times: list[datetime]) -> pl.DataFrame:
     )
 
 
+def _audit(
+    frame: pl.DataFrame,
+    *,
+    start: datetime,
+    end: datetime,
+) -> dict[str, Any]:
+    return subject.audit_ohlcv_frame(
+        "BTC/USDT",
+        frame,
+        start=start,
+        end=end,
+        max_gap_ratio=0.0,
+    )
+
+
 def test_latest_alpha_sleeve_strategy_catalog_is_complete():
     assert len(subject.NEW_ALPHA_SLEEVE_STRATEGIES) == 19
+    assert "DacapogoBinanceBreakoutStrategy" not in subject.NEW_ALPHA_SLEEVE_STRATEGIES
     assert "FundingDislocationTrendCarryStrategy" in subject.NEW_ALPHA_SLEEVE_STRATEGIES
     assert "MetalEquityDivergenceReversalStrategy" in subject.NEW_ALPHA_SLEEVE_STRATEGIES
     assert subject.FEATURE_SYMBOLS == ("BTC/USDT", "ETH/USDT", "SOL/USDT")
+    assert len(subject._strategy_specs(scope="latest")) == 19
 
 
 def test_strategy_specs_can_expand_live_scope_without_research_only_names():
@@ -79,30 +97,36 @@ def test_main_returns_success_for_unavailable_warnings(monkeypatch):
 
 
 def test_audit_ohlcv_frame_passes_contiguous_real_bars():
+    start = datetime(2026, 6, 1, 0, 0)
+    end = datetime(2026, 6, 1, 0, 3)
     frame = _frame(
         [
-            datetime(2026, 6, 1, 0, 0),
+            start,
             datetime(2026, 6, 1, 0, 1),
             datetime(2026, 6, 1, 0, 2),
         ]
     )
 
-    audit = subject.audit_ohlcv_frame("BTC/USDT", frame, max_gap_ratio=0.0)
+    audit = _audit(frame, start=start, end=end)
 
     assert audit["status"] == "pass"
+    assert audit["window_contract"] == "[start,end)"
+    assert audit["expected_1m_bars"] == 3
     assert audit["missing_1m_bars"] == 0
     assert audit["errors"] == []
 
 
 def test_audit_ohlcv_frame_fails_missing_bar_without_filling():
+    start = datetime(2026, 6, 1, 0, 0)
+    end = datetime(2026, 6, 1, 0, 3)
     frame = _frame(
         [
-            datetime(2026, 6, 1, 0, 0),
+            start,
             datetime(2026, 6, 1, 0, 2),
         ]
     )
 
-    audit = subject.audit_ohlcv_frame("BTC/USDT", frame, max_gap_ratio=0.0)
+    audit = _audit(frame, start=start, end=end)
 
     assert audit["status"] == "fail"
     assert audit["missing_1m_bars"] == 1
@@ -110,16 +134,92 @@ def test_audit_ohlcv_frame_fails_missing_bar_without_filling():
 
 
 def test_audit_ohlcv_frame_warns_but_does_not_impute_zero_volume():
-    frame = _frame([datetime(2026, 6, 1, 0, 0), datetime(2026, 6, 1, 0, 1)])
+    start = datetime(2026, 6, 1, 0, 0)
+    end = datetime(2026, 6, 1, 0, 2)
+    frame = _frame([start, datetime(2026, 6, 1, 0, 1)])
     frame = frame.with_columns(
         pl.when(pl.arange(0, pl.len()) == 1).then(0.0).otherwise(10.0).alias("volume")
     )
 
-    audit = subject.audit_ohlcv_frame("XAU/USDT", frame, max_gap_ratio=0.0)
+    audit = _audit(frame, start=start, end=end)
 
     assert audit["status"] == "pass"
     assert audit["errors"] == []
     assert "volume_zero:1" in audit["warnings"]
+
+
+def test_audit_ohlcv_frame_fails_when_requested_first_bar_is_missing():
+    start = datetime(2026, 6, 1, 0, 0)
+    end = datetime(2026, 6, 1, 0, 3)
+    frame = _frame(
+        [
+            datetime(2026, 6, 1, 0, 1),
+            datetime(2026, 6, 1, 0, 2),
+        ]
+    )
+
+    audit = _audit(frame, start=start, end=end)
+
+    assert audit["status"] == "fail"
+    assert any(str(item).startswith("first_timestamp_mismatch:") for item in audit["errors"])
+    assert "missing_1m_bars:1/3" in audit["errors"]
+
+
+def test_audit_ohlcv_frame_fails_when_requested_last_bar_is_missing():
+    start = datetime(2026, 6, 1, 0, 0)
+    end = datetime(2026, 6, 1, 0, 3)
+    frame = _frame([start, datetime(2026, 6, 1, 0, 1)])
+
+    audit = _audit(frame, start=start, end=end)
+
+    assert audit["status"] == "fail"
+    assert any(str(item).startswith("last_timestamp_mismatch:") for item in audit["errors"])
+    assert "missing_1m_bars:1/3" in audit["errors"]
+
+
+def test_audit_ohlcv_frame_fails_off_requested_minute_grid():
+    start = datetime(2026, 6, 1, 0, 0)
+    end = datetime(2026, 6, 1, 0, 3)
+    frame = _frame(
+        [
+            start,
+            datetime(2026, 6, 1, 0, 1, 30),
+            datetime(2026, 6, 1, 0, 2),
+        ]
+    )
+
+    audit = _audit(frame, start=start, end=end)
+
+    assert audit["status"] == "fail"
+    assert "off_requested_minute_grid:1" in audit["errors"]
+    assert "missing_1m_bars:1/3" in audit["errors"]
+
+
+def test_load_and_audit_uses_last_included_bar_and_attaches_source_lineage():
+    start = datetime(2026, 6, 1, 0, 0)
+    end = datetime(2026, 6, 1, 0, 2)
+    frame = _frame([start, datetime(2026, 6, 1, 0, 1)])
+    captured: dict[str, object] = {}
+
+    class FakeRepo:
+        @staticmethod
+        def load_ohlcv_with_source_audit(**kwargs):
+            captured.update(kwargs)
+            return frame, {"precedence": "direct_1m_over_resampled_1s_derived"}
+
+    data, audits = subject._load_and_audit_data(
+        cast(Any, FakeRepo()),
+        exchange="binance",
+        symbols=("BTC/USDT",),
+        start=start,
+        end=end,
+        max_gap_ratio=0.0,
+    )
+
+    assert captured["start_date"] == start
+    assert captured["end_date"] == datetime(2026, 6, 1, 0, 1)
+    assert data["BTC/USDT"].height == 2
+    assert audits[0]["source_lineage"] == {"precedence": "direct_1m_over_resampled_1s_derived"}
 
 
 def test_feature_audit_fails_when_required_features_are_only_null(monkeypatch):
@@ -215,6 +315,7 @@ def test_feature_audit_accepts_exact_bounded_forward_fill(monkeypatch):
     assert audit["coverage_failures_by_symbol"] == {}
     coverage = audit["symbols"]["BTC/USDT"]["coverage"]["funding_rate"]
     assert coverage["available_bars"] == coverage["expected_bars"]
+    assert coverage["expected_bars"] == 16 * 60
 
 
 def test_run_backtest_wires_feature_database_for_preloaded_frames(monkeypatch):

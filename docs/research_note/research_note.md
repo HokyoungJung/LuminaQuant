@@ -49,6 +49,43 @@ D5 preregistered universe control은 동일 코드/profile/cost/fold calendar에
 Dashboard upstream fix는 current tree에서 frontend 6 files / 86 tests, ESLint, TypeScript, Next production build 16/16 pages를 다시 통과했다. Python clean isolated full suite는 `4,365 passed, 36 skipped, 3 xfailed`, 집중 research suite는 `110 passed`, Ruff check/format과 diff check도 통과했다. 주요 근거는 `var/reports/data_pc_tasks_20260710/{coverage.json,manifest_coverage.json,candidate_grid_verified_summary.json,candidate_grid_analysis.json,monthly_refit_walkforward_110_verified.json,eqflow_analysis.json,eqflow_f1_evaluation.json,allocator_3arm.json,d5_universe_comparison.json,research_artifact_validation.json}`이다.
 
 최종 판정: **do_not_promote / research_only_no_execution / 실배분 0%**. fresh-forward shadow와 완전한 whole-search/turnover provenance 전에는 paper/testnet/live/real-money/order 경로를 열지 않는다.
+## 2026-08-12~15 KST — ≥1분 전략 144개 전수 인벤토리·공통 exact-1m 재평가·문헌 분류
+
+현재 전략 레지스트리 `144`개를 기준으로 cadence/timeframe과 실행 인터페이스를 코드에서 다시 추출했다. `MicroRangeExpansion1sStrategy` 하나는 `1s` 의존이라 사용자 범위에서 제외했다. 명시 cadence/timeframe이 ≥1분인 클래스는 `119`; cadence metadata가 없어 시간 범위를 검증할 수 없는 `24`개는 완전한 레지스트리 회계를 위해 카탈로그에 남기되 `scope_unverified`로 분리했다. 따라서 카탈로그 전략 행은 `143`개지만 “검증된 ≥1분 전략”은 `119`개다. `DacapogoDailySourceStrategy`는 명시적 `1d`, `polars_batch`, 전용 연구 러너, `research_only`, live 미지원으로 등록됐고 공통 event-driven 화면에는 억지로 끼우지 않아 성과가 `not_available`이다. 이름 substring으로 family를 추정하지 않고 candidate-library 의미와 구현을 읽어 override했으며, 최종 family 미해결은 `0`이다. 후보 생성기에는 있지만 레지스트리에 없는 클래스 `12`개는 별도 `candidate_library_definition_not_registered` 목록으로 보존했고 성과 전략 수에 섞지 않았다.
+
+성과 화면은 exact 1m 공통기간 `2026-07-01T00:00:00Z`~`2026-08-12T00:00:00Z`(42일)와 그 안의 cold-start recent `2026-08-01T00:00:00Z`~`2026-08-12T00:00:00Z`(11일)이다. gap-fill/interpolation/synthetic rows는 금지하고, 초기자본 10,000, 종목별 기본 명목 10%, maker 2bp / aggressive taker 4bp + 2.5–7.5bp slippage + 1bp half-spread, bar-volume 10% cap으로 실행했다. 이 화면은 selection provenance가 봉인되지 않았고 recent가 full에 중첩되므로 **독립 OOS 또는 승격 증거가 아니다**. 현재 144개 레지스트리 중 전용 일봉 Dacapogo를 제외한 `143`개가 이 공통화면에 있고, 상태는 full `pass 114 / fail 15 / excluded 12 / resource_excluded 2`, recent `pass 115 / excluded 27 / resource_excluded 1`; raw 거래·순위 적격은 full `89`, recent `86`, 양쪽 비교 가능 `82`, 양쪽 양수 `5`다. 이 raw 공통화면 진단 `5/82`에는 범위 밖 1s 전략과 matched-control 없는 rebalancing 행이 포함된다. 명시적 sub-minute를 제외하고 rebalancing raw 성과를 억제했지만 cadence 미확인 24개와 Dacapogo `not_available` 행을 보존한 catalog-controlled 진단은 `4/80`이다. `scope_status=verified_in_scope`만 남긴 **최종 검증된 ≥1분 controlled scorecard는 `3/67`**이며 Dacapogo의 NA를 0으로 바꾸지 않았다. full raw 적격 중앙 return은 `-18.78%`, recent는 `-5.50%`; 같은 기간 20종 동일가중 시장은 `+7.58%`였으므로 양수 headline도 자동으로 alpha가 아니다.
+
+양쪽 양수 진단값:
+
+| Strategy | Family | Scorecard status | Full | Recent nested | Full/Recent Sharpe | Trades |
+|---|---|---|---:|---:|---:|---:|
+| RebalancingPremiumHarvestStrategy | rebalancing_diversification | raw-only; cadence unverified; matched control missing | raw `+5.98%` | raw `+1.78%` | `3.14 / 5.76` | `45 / 29` |
+| PriceVolumeCorrContinuationStrategy | trend_momentum | verified ≥1m controlled | `+1.07%` | `+0.59%` | `4.69 / 4.63` | `10 / 9` |
+| BitcoinBuyHoldStrategy | benchmark | catalog diagnostic only; cadence unverified | `+0.74%` | `+0.08%` | `1.88 / 1.18` | `1 / 1` |
+| CrossSectionalIntermediateEchoMomentumStrategy | cross_sectional | verified ≥1m controlled | `+0.29%` | `+0.16%` | `0.81 / 1.65` | `35 / 13` |
+| TrendGatedResidualMomentumStrategy | cross_sectional | verified ≥1m controlled | `+0.05%` | `+0.10%` | `0.48 / 2.87` | `5 / 2` |
+
+`RebalancingPremiumHarvestStrategy`는 raw return 1위지만 동일 초기 바스켓 buy-and-hold 대조군이 없다. 참고용 14종 동일가중 시장 바스켓은 같은 full 구간 `+8.68%`로 전략 raw `+5.98%`보다 높았다. 초기 weight까지 동일한 matched control이 아니므로 premium을 수치화할 수 없고, 카탈로그/Obsidian 성과에서는 return·Sharpe·MDD를 `matched_control_missing`/NA로 억제하고 raw 값만 진단 필드에 보존했다. `DisagreementGatedEnsembleStrategy`는 full `+2.07%`였지만 recent `-0.27%`라 양쪽 양수가 아니다. resource exclusion은 full의 `AbnormalReturnContinuationStrategy`(12 GiB 초과), `OvernightSessionReturnRiderStrategy`(반복 30분 초과), recent의 `Alpha101FormulaStrategy`(동시 작업 안전 RSS 상한)이며 NA를 0으로 바꾸지 않았다.
+
+온라인/논문/인증 소스 근거 `38`건은 `docs/research_note/strategy_evidence_20260812.json`에 제목·저자·출판처·URL·지지 범위·한계를 구조화했다. Dacapogo private source snapshot은 인증 접근이 필요한 grade C source-code 근거로만 사용했고 외부 알파·배포 성능으로 취급하지 않았다. 핵심 결론은 다음과 같다.
+
+- Crypto trend/cross-sectional momentum, near-high anchoring, pairs/reversal, order-flow/lead-lag, funding/carry에는 외부 prior가 있지만 paper 성과는 저장소 성과가 아니다. wall-clock horizon, point-in-time universe, borrow/funding, BBO/latency/capacity와 실제 비용을 별도 검증해야 한다.
+- 단일 perp funding/OI/basis/liquidation 방향성 신호는 delta-neutral carry/arbitrage가 아니므로 `derivatives_directional_crowding`으로 분리했다.
+- volatility scaling은 unscaled control을 이긴다고 가정하지 않는다. rebalancing은 동일 바스켓 무리밸런싱 대조군 없이는 premium을 주장하지 않는다.
+- 기존 레지스트리가 정당화 가능한 전략군을 이미 포괄한다. 새 전략 클래스를 더 쓰는 대신 기존 클래스의 paper-aligned ablation `E1`~`E9`를 preregister하고 전체 trial ledger, purged validation, genuine family-wide DSR/CSCV/Hansen SPA, 비용·capacity·locked report-only OOS를 요구한다.
+
+연구 선택 경로도 fail-closed로 수정했다. validation 선택이 locked OOS를 읽지 않게 분리하고, binding cost stress를 validation에 적용하며, OOS는 report-only stream으로 보존했다. non-finite metric과 누락 PBO는 거부하고, shortlist는 모든 후보의 upstream pass/hard-reject를 강제한다. weight cap이 불가능하면 cap을 몰래 완화하지 않고 현금을 명시한다. 현재 row-wise PBO/SPA-like 값은 genuine CSCV/Hansen SPA가 아니므로 선택 artifact에 `promotion_eligible=false`, `selected_team=[]`를 고정했다. 한-bar embargo는 최소값일 뿐 보유기간 전체 leakage proof가 아니다.
+
+산출물:
+- 공통 화면: `var/reports/common_period_reval_20260812/common_period_report.md`, `common_period_summary.json`, `strategy_comparison.csv`
+- 카탈로그/성과: `var/reports/strategy_research_20260812/strategy_catalog.json|csv`, `strategy_scorecards.md`, `family_scorecards.md|csv`, hash manifest
+- Obsidian: Windows vault `MyDB/LuminaQuant/Strategy Research Generated`에 현재 stage를 적용하고 설치본을 다시 읽어 동일성을 확인했다. 전략 `143`, family `14`, evidence `38`, index `1` = note `196`; link `2011`, broken link `0`; catalog/exporter/stage/installed manifest hash가 receipt와 일치한다. 생성 namespace 외 사용자 note는 건드리지 않았다.
+- CodeGraph: `codegraph sync .` 완료, files `1281`, nodes `34693`, edges `111413`, pending `0`, reindex 권고 없음. 구조화 receipt는 `var/reports/strategy_research_20260812/codegraph_receipt.json`에 CLI hash와 전체 status를 저장했다.
+- 최종 snapshot receipt: `var/reports/strategy_research_20260812/strategy_research_delivery_manifest.json`에 HEAD/branch, dirty-status hash, 핵심 코드·테스트·연구·성과·Obsidian receipt SHA-256, CodeGraph 상태, no-promotion 결정을 묶었다.
+
+Dacapogo 일봉 별도 lane도 승격하지 않았다. entry-last 해석은 full `+9.06%`지만 같은 OHLC bar에서 stop-first는 `-8.61%`로 intrabar path ambiguity가 뒤집고, v2 ML은 full `+0.37%`, recent `+0.56%`이나 gate false / locked action `cash`다.
+
+최종 판정은 **do_not_promote / research_only_no_execution / live 배포 불가**다. literal 100% 무결함·무회귀는 유한 테스트로 증명할 수 없다. 더구나 독립 OOS, genuine search-wide multiplicity matrix, matched controls, BBO/funding/capacity, shadow reconciliation이 없으므로 현재 live-ready라고 주장하는 것이 오류다. 최종 변경 범위 focused gate는 `318 passed`, `ruff check .`와 대상 Python `ruff format --check`는 green이다. 별도 560-file/8-shard broad baseline은 `6035 passed / 20 skipped / 41 subtests passed / 3 xfailed / 130 failed`를 그대로 보존했다. 실패는 숨기지 않았다: WSL `/mnt/c` EIO·host-reserve 직접 실패 `109`, 그 선행 실패로 가려진 acquirer 오류 `13`(로컬 reserve 재실행에서는 `167 passed / 7 failed`, 이 중 scratch-cleanup 불변식 6개와 의도적 `/mnt/c` contract 1개), 사용자 수정 acquirer hash `d5f7…` 대 signed policy `d3c6…` 불일치 `7`, 로컬 materialized 1s/1h close 불일치 `1`이다. 이 Alpha-Max·외부 mount·로컬 데이터 gate를 되돌리거나 pass로 바꾸지 않았고, 세부 command·시간·failure nodeid·output hash는 `var/reports/strategy_research_20260812/strategy_research_verification_receipt.json`에 봉인했다.
 
 ## 2026-07-09 KST — 알파 풀 v2c data-PC cost-grid 재측정: 전원 리젝트
 

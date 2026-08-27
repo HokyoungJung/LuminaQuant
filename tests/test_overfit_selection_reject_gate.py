@@ -185,21 +185,13 @@ def test_basket_dedup_collapses_identical_basket_clone_cluster():
 
 
 def _augment_with_scoring_blocks(rows: list[dict]) -> list[dict]:
-    """Attach ``train`` + ``oos`` blocks (``mode='val'`` scores off the ``oos``
-    block) so ``hurdle_score`` is a meaningful, DISTINCT number per clone, mirroring
-    each row's validation Sharpe so the best-scoring clone == highest-val-Sharpe."""
+    """Attach train activity while preserving each row's validation score block."""
     out: list[dict] = []
     for r in rows:
-        vb = r.get("validation") or {}
         out.append(
             {
                 **r,
                 "train": {"total_return": 0.1, "trade_count": 10},
-                "oos": {
-                    "sharpe": float(vb.get("sharpe", 0.0)),
-                    "return": float(vb.get("return", 0.0)),
-                    "pbo": 0.1,
-                },
             }
         )
     return out
@@ -254,7 +246,7 @@ def test_dedup_ordering_fix_keeps_best_even_when_placed_last():
             "strategy_class": cid,  # distinct -> only the symbol-basket cap collapses them
             "family": cid,
             "train": {"total_return": 0.1, "trade_count": 10},
-            "oos": {"sharpe": sharpe, "return": 0.02, "pbo": 0.1},
+            "val": {"sharpe": sharpe, "return": 0.02, "pbo": 0.1},
         }
 
     # Worst-first input order: the two best (c3, c4) are last.

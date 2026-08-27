@@ -4,6 +4,60 @@ import numpy as np
 from lumina_quant.strategy_factory import research_runner
 
 
+def test_binding_hurdles_and_cost_stress_reject_nonfinite_metrics() -> None:
+    config = research_runner._resolve_hurdle_config(
+        scoring_config={
+            "research": {
+                "strict_selection_gate": True,
+                "dsr_gate_floor": 0.9,
+                "spa_gate_ceiling": 0.05,
+            }
+        },
+        oos_sharpe_min=None,
+        max_pbo=None,
+        max_turnover=None,
+        max_drawdown=None,
+    )
+    reasons = research_runner._hurdle_hard_reject_reasons(
+        {
+            "sharpe": float("nan"),
+            "pbo": float("nan"),
+            "turnover": float("nan"),
+            "mdd": float("nan"),
+            "trade_count": float("nan"),
+            "deflated_sharpe": float("nan"),
+            "spa_pvalue": float("nan"),
+        },
+        config=config,
+        scoring_config={
+            "research": {
+                "strict_selection_gate": True,
+                "dsr_gate_floor": 0.9,
+                "spa_gate_ceiling": 0.05,
+            }
+        },
+    )
+    assert set(reasons) == {
+        "oos_sharpe",
+        "pbo",
+        "turnover",
+        "max_drawdown",
+        "trade_count",
+        "deflated_sharpe",
+        "spa_pvalue",
+    }
+    stress = research_runner._apply_cost_stress_hard_rejects(
+        hard_reject={},
+        stress_x2={"sharpe": float("nan")},
+        stress_x3={},
+        scoring_config=None,
+    )
+    assert stress == {
+        "stress_x2_sharpe": "missing_or_nonfinite",
+        "stress_x3_sharpe": "missing_or_nonfinite",
+    }
+
+
 def test_run_candidate_research_scoring_config_defaults_and_override(monkeypatch):
     candidates = [
         {

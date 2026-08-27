@@ -5525,29 +5525,13 @@ class ParquetMarketDataRepository:
             return merged_1s
 
         tf_ms = int(timeframe_to_milliseconds(timeframe_token))
-        source = (
-            merged_1s.lazy()
-            .with_columns(pl.col("datetime").dt.epoch("ms").alias("timestamp_ms"))
-            .with_columns(((pl.col("timestamp_ms") // tf_ms) * tf_ms).alias("bucket_ms"))
+        latest_1s_ms = int(merged_1s.select(pl.col("datetime").dt.epoch("ms").max()).item())
+        complete_through_ms = ((latest_1s_ms // tf_ms) + 1) * tf_ms - 1
+        return resample_1s_frame(
+            merged_1s,
+            timeframe=timeframe_token,
+            complete_through_ms=complete_through_ms,
         )
-
-        # GPU-friendly aggregation: scalar expressions only, no UDF/group_by_dynamic.
-        aggregated = (
-            source.group_by("bucket_ms")
-            .agg(
-                [
-                    pl.col("open").first().alias("open"),
-                    pl.col("high").max().alias("high"),
-                    pl.col("low").min().alias("low"),
-                    pl.col("close").last().alias("close"),
-                    pl.col("volume").sum().alias("volume"),
-                ]
-            )
-            .sort("bucket_ms")
-            .with_columns(pl.from_epoch("bucket_ms", time_unit="ms").alias("datetime"))
-            .select(["datetime", "open", "high", "low", "close", "volume"])
-        )
-        return self._collect_lazy(aggregated)
 
     @staticmethod
     def _iter_chunks(
@@ -5555,16 +5539,31 @@ class ParquetMarketDataRepository:
         start: datetime,
         end: datetime,
         chunk_days: int,
+        alignment_ms: int = 1,
     ) -> list[tuple[datetime, datetime]]:
         if chunk_days <= 0:
             return [(start, end)]
         windows: list[tuple[datetime, datetime]] = []
         cursor = start
         delta = timedelta(days=chunk_days)
+        epoch = datetime(1970, 1, 1)
+        alignment_us = max(1, int(alignment_ms)) * 1_000
         while cursor <= end:
-            chunk_end = min(end, cursor + delta - timedelta(microseconds=1))
-            windows.append((cursor, chunk_end))
-            cursor = chunk_end + timedelta(microseconds=1)
+            candidate = cursor + delta
+            if candidate > end:
+                windows.append((cursor, end))
+                break
+            since_epoch = candidate - epoch
+            candidate_us = (
+                since_epoch.days * 86_400 + since_epoch.seconds
+            ) * 1_000_000 + since_epoch.microseconds
+            aligned_us = ((candidate_us + alignment_us - 1) // alignment_us) * alignment_us
+            next_start = epoch + timedelta(microseconds=aligned_us)
+            if next_start > end:
+                windows.append((cursor, end))
+                break
+            windows.append((cursor, next_start - timedelta(microseconds=1)))
+            cursor = next_start
         return windows
 
     @_generation_guard(exclusive=False)
@@ -5602,6 +5601,7 @@ class ParquetMarketDataRepository:
                 start=start_dt,
                 end=end_dt,
                 chunk_days=max(1, int(chunk_days)),
+                alignment_ms=tf_ms,
             )
         )
         progress_base = dict(progress_context or {})
@@ -5620,8 +5620,15 @@ class ParquetMarketDataRepository:
                 start_date=query_start,
                 end_date=chunk_end,
             )
+            trim_start = chunk_start
+            if timeframe_token != "1s":
+                chunk_start_ms = int(chunk_start.replace(tzinfo=UTC).timestamp() * 1000)
+                trim_start = datetime.fromtimestamp(
+                    (chunk_start_ms // tf_ms) * tf_ms / 1000,
+                    UTC,
+                ).replace(tzinfo=None)
             trimmed = (
-                chunk.filter(pl.col("datetime") >= chunk_start) if not chunk.is_empty() else chunk
+                chunk.filter(pl.col("datetime") >= trim_start) if not chunk.is_empty() else chunk
             )
             trimmed_row_count = int(trimmed.height) if trimmed is not None else 0
             if progress_callback is not None:
@@ -5648,11 +5655,14 @@ class ParquetMarketDataRepository:
         if not frames:
             return self._empty_ohlcv_frame()
 
-        return (
-            pl.concat(frames, how="vertical")
-            .sort("datetime")
-            .unique(subset=["datetime"], keep="last")
-            .sort("datetime")
+        combined = pl.concat(frames, how="vertical").sort("datetime")
+        if timeframe_token == "1s":
+            return combined.unique(subset=["datetime"], keep="last").sort("datetime")
+        latest_bucket_ms = int(combined.select(pl.col("datetime").dt.epoch("ms").max()).item())
+        return resample_1s_frame(
+            combined,
+            timeframe=timeframe_token,
+            complete_through_ms=latest_bucket_ms + tf_ms - 1,
         )
 
     def _resolve_manifest_data_paths(

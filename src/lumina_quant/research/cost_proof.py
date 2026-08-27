@@ -35,7 +35,7 @@ from lumina_quant.strategy_factory.research_metrics import (
 )
 
 SCHEMA = "cost_proof_v2"
-PROFILE_RAW_SHA256 = "a3e9572365d39e3388c97b8b6c094c0bb9d63a3b1fd6d38c918342b435716950"
+PROFILE_RAW_SHA256 = "493e72694744258dbf763a9e1149ec68cd37139cb1da563d58b2e39cd59c7e96"
 COST_LADDER = (10, 15, 20, 30)
 CSCV_SPLITS = 8
 CANDIDATES = (

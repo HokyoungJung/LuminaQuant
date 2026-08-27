@@ -3,6 +3,8 @@ from __future__ import annotations
 import itertools
 import json
 
+import pytest
+
 from lumina_quant.strategies import factory_candidate_set
 from lumina_quant.strategies.factory_candidate_set import (
     build_candidate_set,
@@ -857,11 +859,12 @@ def test_shortlist_filters_weak_single_and_assigns_weights():
         include_weights=True,
     )
 
-    # Weak single strategy is filtered out; mixed strategies remain and get normalized weights.
+    # Weak single strategy is filtered out; the two survivors respect the 35% hard cap.
     assert len(shortlist) == 2
     assert all(float(row.get("portfolio_weight", 0.0)) > 0.0 for row in shortlist)
     total_weight = sum(float(row.get("portfolio_weight", 0.0)) for row in shortlist)
-    assert abs(total_weight - 1.0) < 1e-9
+    assert total_weight == pytest.approx(0.70)
+    assert all(row["unallocated_cash_weight"] == pytest.approx(0.30) for row in shortlist)
 
 
 def test_shortlist_default_blocks_generic_multi_asset_but_keeps_allowlisted_factor_rotation():
