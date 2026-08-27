@@ -27,6 +27,61 @@ def _load_module():
 MODULE = _load_module()
 
 
+def test_relationship_graph_adds_primary_and_cross_family_links(tmp_path: Path) -> None:
+    catalog = {
+        "strategies": [
+            {"strategy": "HybridStrategy", "family": "trend"},
+            {"strategy": "CarryStrategy", "family": "carry"},
+        ],
+        "families": [{"family": "trend"}, {"family": "carry"}],
+    }
+    graph_path = tmp_path / "relationships.json"
+    graph_path.write_text(
+        json.dumps(
+            {
+                "schema": "luminaquant.strategy_relationships.v1",
+                "nodes": [
+                    {"id": "HybridStrategy", "type": "strategy_or_candidate"},
+                    {"id": "CarryStrategy", "type": "strategy_or_candidate"},
+                    {"id": "trend", "type": "family_or_axis"},
+                    {"id": "carry", "type": "family_or_axis"},
+                ],
+                "edges": [
+                    {
+                        "source_id": "HybridStrategy",
+                        "target_id": "trend",
+                        "relation": "member_of",
+                    },
+                    {
+                        "source_id": "HybridStrategy",
+                        "target_id": "carry",
+                        "relation": "cross_family_axis",
+                    },
+                    {
+                        "source_id": "CarryStrategy",
+                        "target_id": "carry",
+                        "relation": "member_of",
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    enriched, identity = MODULE._apply_relationship_graph(catalog, graph_path)
+
+    hybrid = enriched["strategies"][0]
+    assert identity["sha256"]
+    assert hybrid["relationships"] == [
+        {
+            "category": "Families",
+            "direction": "outbound",
+            "relation": "cross_family_axis",
+            "target": "carry",
+        }
+    ]
+
+
 def _catalog() -> dict:
     metrics = {
         "provenance": {

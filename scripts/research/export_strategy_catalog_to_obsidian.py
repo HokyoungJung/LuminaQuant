@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import fcntl
 import hashlib
 import json
@@ -657,6 +658,7 @@ def _index_target(namespace: PurePosixPath) -> str:
 def _strategy_note(row: dict[str, Any], *, namespace: PurePosixPath, generated_at: str) -> str:
     strategy = str(row["strategy"])
     family = str(row["family"])
+    relationships = list(row.get("relationships") or [])
     metrics = dict(row.get("metrics") or {})
     full = dict(metrics.get("full") or {})
     recent = dict(metrics.get("recent") or {})
@@ -698,6 +700,14 @@ def _strategy_note(row: dict[str, Any], *, namespace: PurePosixPath, generated_a
         f"# {strategy}",
         "",
         f"- 전략군: [[{_note_target(namespace, 'Families', family)}|{family}]]",
+        *[
+            (
+                f"- 교차 연결 `{edge['relation']}`: "
+                f"[[{_note_target(namespace, edge['category'], edge['target'])}|"
+                f"{edge['target']}]]"
+            )
+            for edge in relationships
+        ],
         f"- Tier: `{row.get('tier', '')}`",
         f"- 모듈: `{row.get('module', '')}`",
         f"- execution interface: `{row.get('execution_interface', '')}`",
@@ -1113,6 +1123,7 @@ def stage_catalog(
     namespace: PurePosixPath,
     generated_at: str,
     catalog_identity: dict[str, Any] | None = None,
+    relationship_identity: dict[str, Any] | None = None,
 ) -> tuple[Path, dict[str, Any]]:
     namespace = _safe_namespace(str(namespace))
     catalog = _validate_catalog(catalog)
@@ -1213,6 +1224,7 @@ def stage_catalog(
         "catalog_generated_at_utc": str(catalog.get("generated_at_utc") or generated_at),
         "namespace": str(namespace),
         "source_catalog": dict(catalog_identity or _content_identity(catalog_path)),
+        "source_relationships": dict(relationship_identity or {}),
         "exporter": _content_identity(Path(__file__).resolve()),
         "counts": {
             **graph,
@@ -1250,6 +1262,73 @@ def stage_catalog(
     if previous.exists():
         shutil.rmtree(previous)
     return stage_namespace, manifest
+
+
+def _apply_relationship_graph(
+    catalog: dict[str, Any],
+    relationship_path: Path,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    relationship_path = relationship_path.expanduser().resolve(strict=True)
+    payload = json.loads(relationship_path.read_text(encoding="utf-8"))
+    if (
+        not isinstance(payload, dict)
+        or payload.get("schema") != "luminaquant.strategy_relationships.v1"
+        or not isinstance(payload.get("nodes"), list)
+        or not isinstance(payload.get("edges"), list)
+    ):
+        raise ValueError("strategy relationship graph schema is invalid")
+    strategy_names = {str(row["strategy"]) for row in catalog["strategies"]}
+    family_names = {str(row["family"]) for row in catalog["families"]}
+    declared = {
+        str(row.get("id") or "")
+        for row in payload["nodes"]
+        if isinstance(row, dict) and str(row.get("id") or "")
+    }
+    if not strategy_names <= declared or not family_names <= declared:
+        raise ValueError("strategy relationship graph omits catalog nodes")
+    primary_edges: dict[str, set[str]] = {name: set() for name in strategy_names}
+    adjacency: dict[str, list[dict[str, str]]] = {name: [] for name in strategy_names}
+    for raw in payload["edges"]:
+        if not isinstance(raw, dict):
+            raise ValueError("strategy relationship edge must be an object")
+        source = str(raw.get("source_id") or "")
+        target = str(raw.get("target_id") or "")
+        relation = str(raw.get("relation") or "")
+        if source not in declared or target not in declared or not relation:
+            raise ValueError("strategy relationship edge endpoint is invalid")
+        if relation == "member_of" and source in primary_edges:
+            primary_edges[source].add(target)
+            continue
+        for strategy, other, direction in (
+            (source, target, "outbound"),
+            (target, source, "inbound"),
+        ):
+            if strategy not in adjacency or other not in strategy_names | family_names:
+                continue
+            adjacency[strategy].append(
+                {
+                    "category": "Strategies" if other in strategy_names else "Families",
+                    "direction": direction,
+                    "relation": relation,
+                    "target": other,
+                }
+            )
+    expected_primary = {str(row["strategy"]): {str(row["family"])} for row in catalog["strategies"]}
+    if primary_edges != expected_primary:
+        raise ValueError("strategy relationship primary-family membership is incomplete")
+    enriched = copy.deepcopy(catalog)
+    for row in enriched["strategies"]:
+        name = str(row["strategy"])
+        row["relationships"] = sorted(
+            adjacency[name],
+            key=lambda value: (
+                value["category"],
+                value["target"],
+                value["relation"],
+                value["direction"],
+            ),
+        )
+    return enriched, _content_identity(relationship_path)
 
 
 def _manifest_time(manifest: dict[str, Any]) -> datetime:
@@ -1575,6 +1654,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--catalog", required=True)
     parser.add_argument("--staging-root", required=True)
+    parser.add_argument("--relationships", default="")
     parser.add_argument("--namespace", default=_DEFAULT_NAMESPACE)
     parser.add_argument("--vault-root", default="")
     parser.add_argument("--apply", action="store_true")
@@ -1588,6 +1668,7 @@ def export_catalog_snapshot(
     namespace: PurePosixPath,
     vault_root: Path | None,
     apply: bool,
+    relationship_path: Path | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     namespace = _safe_namespace(str(namespace))
     catalog_path = catalog_path.expanduser().resolve()
@@ -1607,6 +1688,12 @@ def export_catalog_snapshot(
     with export_lock_path.open("a+b") as export_lock:
         _acquire_exclusive_flock(export_lock)
         catalog, catalog_identity = _load_catalog_snapshot(catalog_path)
+        relationship_identity: dict[str, Any] | None = None
+        if relationship_path is not None:
+            catalog, relationship_identity = _apply_relationship_graph(
+                catalog,
+                relationship_path,
+            )
         exported_at = _utc_now()
         content_generated_at = str(catalog.get("generated_at_utc") or exported_at)
         stage_namespace, manifest = stage_catalog(
@@ -1616,6 +1703,7 @@ def export_catalog_snapshot(
             namespace=namespace,
             generated_at=content_generated_at,
             catalog_identity=catalog_identity,
+            relationship_identity=relationship_identity,
         )
         if _content_identity(catalog_path) != catalog_identity:
             raise ValueError("strategy catalog changed while the Obsidian snapshot was staged")
@@ -1624,6 +1712,7 @@ def export_catalog_snapshot(
             "namespace": str(namespace),
             "catalog_generated_at_utc": content_generated_at,
             "source_catalog": catalog_identity,
+            "source_relationships": dict(relationship_identity or {}),
             "exporter": _content_identity(Path(__file__).resolve()),
             "counts": manifest["counts"],
         }
@@ -1638,6 +1727,7 @@ def export_catalog_snapshot(
             "stage": str(stage_namespace),
             "counts": manifest["counts"],
             "source_catalog": catalog_identity,
+            "source_relationships": dict(relationship_identity or {}),
             "stage_manifest": stage_manifest_identity,
             "exporter": _content_identity(Path(__file__).resolve()),
             "applied": False,
@@ -1691,6 +1781,7 @@ def main() -> int:
         namespace=namespace,
         vault_root=vault_root,
         apply=bool(args.apply),
+        relationship_path=Path(args.relationships) if str(args.relationships).strip() else None,
     )
     print(f"[OBSIDIAN] notes={manifest['counts']['note_count']}")
     print(f"[OBSIDIAN] links={manifest['counts']['link_count']}")

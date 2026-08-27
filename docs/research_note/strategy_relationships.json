@@ -1,6 +1,754 @@
 {
-  "as_of_utc": "2026-08-23T00:00:00Z",
+  "as_of_utc": "2026-08-27T00:00:00Z",
   "edges": [
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "AbnormalReturnContinuationStrategy",
+      "status": "observed",
+      "target_id": "event_alpha"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "AccelerationRiderStrategy",
+      "status": "observed",
+      "target_id": "trend_momentum"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "cross_family_axis",
+      "source_id": "AdaptiveRegimeMomentumStrategy",
+      "status": "observed",
+      "target_id": "ensemble_regime_router"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "cross_family_axis",
+      "source_id": "AdaptiveRegimeMomentumStrategy",
+      "status": "observed",
+      "target_id": "trend_momentum"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "AdaptiveRegimeMomentumStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "AdaptiveTrendRiderStrategy",
+      "status": "observed",
+      "target_id": "trend_momentum"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "AdfGatedReversionRiderStrategy",
+      "status": "observed",
+      "target_id": "mean_reversion_relative_value"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "Alpha101FormulaStrategy",
+      "status": "observed",
+      "target_id": "formulaic_alpha"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "AlphaZooOptunaHybridLiveStrategy",
+      "status": "observed",
+      "target_id": "ensemble_regime_router"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "AmihudIlliquidityMomentumRiderStrategy",
+      "status": "observed",
+      "target_id": "trend_momentum"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "cross_family_axis",
+      "source_id": "AvgCorrelationCrashGuardOverlayStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "AvgCorrelationCrashGuardOverlayStrategy",
+      "status": "observed",
+      "target_id": "volatility_risk_overlay"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_design",
+      "evidence_refs": [
+        "source:strategy-tree"
+      ],
+      "relation": "overlays",
+      "source_id": "AvgCorrelationCrashGuardOverlayStrategy",
+      "status": "observed",
+      "target_id": "directional_children"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "cross_family_axis",
+      "source_id": "BenchmarkLeadLagContinuationStrategy",
+      "status": "observed",
+      "target_id": "intermarket"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "BenchmarkLeadLagContinuationStrategy",
+      "status": "observed",
+      "target_id": "microstructure_intraday"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "BettingAgainstBetaStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_methodology",
+      "evidence_refs": [
+        "eval:common-period-screen"
+      ],
+      "relation": "benchmark_for",
+      "source_id": "BitcoinBuyHoldStrategy",
+      "status": "observed",
+      "target_id": "crypto_directional_strategies"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "BitcoinBuyHoldStrategy",
+      "status": "observed",
+      "target_id": "benchmark"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "cross_family_axis",
+      "source_id": "BreadthRegimeTrendTimerStrategy",
+      "status": "observed",
+      "target_id": "ensemble_regime_router"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "cross_family_axis",
+      "source_id": "BreadthRegimeTrendTimerStrategy",
+      "status": "observed",
+      "target_id": "trend_momentum"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "BreadthRegimeTrendTimerStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "cross_family_axis",
+      "source_id": "BullBearRegimeRotationStrategy",
+      "status": "observed",
+      "target_id": "ensemble_regime_router"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "BullBearRegimeRotationStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_design",
+      "evidence_refs": [
+        "source:strategy-tree"
+      ],
+      "relation": "parent_of",
+      "source_id": "BullBearRegimeRotationStrategy",
+      "status": "observed",
+      "target_id": "RegimeRouterConfirmedRotationStrategy"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "CalendarSeasonalityOverlayStrategy",
+      "status": "observed",
+      "target_id": "seasonality"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "cross_family_axis",
+      "source_id": "CarryTrendConfluenceRiderStrategy",
+      "status": "observed",
+      "target_id": "trend_momentum"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "CarryTrendConfluenceRiderStrategy",
+      "status": "observed",
+      "target_id": "derivatives_directional_crowding"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "CompositeTrendStrategy",
+      "status": "observed",
+      "target_id": "trend_momentum"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "CompressionBreakoutContinuationStrategy",
+      "status": "observed",
+      "target_id": "breakout"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "ConfidenceGatedTrendStrategy",
+      "status": "observed",
+      "target_id": "trend_momentum"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "CrossAssetDiversifiedTrendStrategy",
+      "status": "observed",
+      "target_id": "trend_momentum"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "CrossCryptoSlowDiffusionStrategy",
+      "status": "observed",
+      "target_id": "intermarket"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "CrossSectionalCapitalGainsOverhangStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "CrossSectionalCloseLocationAccumulationStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "CrossSectionalDownsideBetaAsymmetryStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "CrossSectionalEquityMomentumStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "CrossSectionalFlowShareRotationStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "cross_family_axis",
+      "source_id": "CrossSectionalFundingMomentumCarryStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "cross_family_axis",
+      "source_id": "CrossSectionalFundingMomentumCarryStrategy",
+      "status": "observed",
+      "target_id": "trend_momentum"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "CrossSectionalFundingMomentumCarryStrategy",
+      "status": "observed",
+      "target_id": "derivatives_directional_crowding"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_methodology",
+      "evidence_refs": [
+        "source:strategy-tree"
+      ],
+      "relation": "not_equivalent_to",
+      "source_id": "CrossSectionalFundingMomentumCarryStrategy",
+      "status": "observed",
+      "target_id": "spot_perp_cash_and_carry"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "CrossSectionalIntermediateEchoMomentumStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_design",
+      "evidence_refs": [
+        "source:strategy-tree"
+      ],
+      "relation": "variant_of",
+      "source_id": "CrossSectionalIntermediateEchoMomentumStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional_momentum"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_design",
+      "evidence_refs": [
+        "source:strategy-tree"
+      ],
+      "relation": "closest_related",
+      "source_id": "CrossSectionalNearHighAnchoringStrategy",
+      "status": "observed",
+      "target_id": "NearHighMomentumStrategy"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "CrossSectionalNearHighAnchoringStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "hypothesis",
+      "evidence_class": "hypothesis",
+      "evidence_refs": [
+        "hypothesis:near-high-low"
+      ],
+      "relation": "hypothesized_complement_of",
+      "source_id": "CrossSectionalNearLowRecoveryStrategy",
+      "status": "proposed",
+      "target_id": "CrossSectionalNearHighAnchoringStrategy"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "CrossSectionalNearLowRecoveryStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "CrossSectionalOffSessionTugOfWarStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "CrossSectionalPathConvexityStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "CrossSectionalPriceDelayPremiumStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "CrossSectionalRegressionTrendQualityStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "CrossSectionalSeasonalPersistenceStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "CrossSectionalShortTermReversalStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "CrossSectionalTimeUnderWaterStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "CryptoFxAlphaZooStateStrategy",
+      "status": "observed",
+      "target_id": "formulaic_alpha"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "CusumChangePointTrendRiderStrategy",
+      "status": "observed",
+      "target_id": "trend_momentum"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_artifact",
+      "evidence_refs": [
+        "eval:dacapogo-locked-validation"
+      ],
+      "relation": "decision",
+      "source_id": "DacapogoDailySourceStrategy",
+      "status": "observed",
+      "target_id": "cash_zero_of_thirteen_locked_validation_folds"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_provenance",
+      "evidence_refs": [
+        "artifact:dacapogo-source"
+      ],
+      "relation": "derived_from",
+      "source_id": "DacapogoDailySourceStrategy",
+      "status": "observed",
+      "target_id": "authenticated_dacapogo_source_snapshot"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "DacapogoDailySourceStrategy",
+      "status": "observed",
+      "target_id": "breakout"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "DeepLearningForecastGateStrategy",
+      "status": "observed",
+      "target_id": "ensemble_regime_router"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "DerivativesFlowSqueezeStrategy",
+      "status": "observed",
+      "target_id": "derivatives_directional_crowding"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "cross_family_axis",
+      "source_id": "DisagreementGatedEnsembleStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "DisagreementGatedEnsembleStrategy",
+      "status": "observed",
+      "target_id": "ensemble_regime_router"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_design",
+      "evidence_refs": [
+        "source:strategy-tree"
+      ],
+      "relation": "parent_of",
+      "source_id": "DisagreementGatedEnsembleStrategy",
+      "status": "observed",
+      "target_id": "RegimeAdaptiveDisagreementEnsembleStrategy"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "DispersionConditionedReversionStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "cross_family_axis",
+      "source_id": "DiversifiedMultiFactorEnsembleStrategy",
+      "status": "observed",
+      "target_id": "ensemble_regime_router"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "DiversifiedMultiFactorEnsembleStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "DonchianAtrTrendStrategy",
+      "status": "observed",
+      "target_id": "trend_momentum"
+    },
     {
       "confidence": "medium",
       "evidence_class": "observed_design",
@@ -13,6 +761,1480 @@
       "target_id": "RollingBreakoutStrategy"
     },
     {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "DownsideTailRiskPremiumStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "DualMomentumDefensiveRotationStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "DualMomentumIndexRotationStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "EquityBenchmarkResidualReversalStrategy",
+      "status": "observed",
+      "target_id": "mean_reversion_relative_value"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "cross_family_axis",
+      "source_id": "EquityMetalRiskRegimeRotationStrategy",
+      "status": "observed",
+      "target_id": "intermarket"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "EquityMetalRiskRegimeRotationStrategy",
+      "status": "observed",
+      "target_id": "ensemble_regime_router"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "FalseBreakoutReversalStrategy",
+      "status": "observed",
+      "target_id": "mean_reversion_relative_value"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "FundingDislocationTrendCarryStrategy",
+      "status": "observed",
+      "target_id": "derivatives_directional_crowding"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "FundingHarvestCarryStrategy",
+      "status": "observed",
+      "target_id": "derivatives_directional_crowding"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_design",
+      "evidence_refs": [
+        "source:strategy-tree"
+      ],
+      "relation": "overlaps_feature",
+      "source_id": "FundingHarvestCarryStrategy",
+      "status": "observed",
+      "target_id": "CrossSectionalFundingMomentumCarryStrategy"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "GarchInnovationRiderStrategy",
+      "status": "observed",
+      "target_id": "breakout"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_design",
+      "evidence_refs": [
+        "source:strategy-tree"
+      ],
+      "relation": "closest_related",
+      "source_id": "GoldSilverRatioMeanReversionStrategy",
+      "status": "observed",
+      "target_id": "MetalsRelativeValueBasketStrategy"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "GoldSilverRatioMeanReversionStrategy",
+      "status": "observed",
+      "target_id": "mean_reversion_relative_value"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "GoldSilverRatioTrendStrategy",
+      "status": "observed",
+      "target_id": "breakout"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "HourlyShockReversionStrategy",
+      "status": "observed",
+      "target_id": "mean_reversion_relative_value"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "cross_family_axis",
+      "source_id": "HurstRegimeGatedStrategy",
+      "status": "observed",
+      "target_id": "ensemble_regime_router"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "HurstRegimeGatedStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "IdiosyncraticSkewInnovationStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "IdiosyncraticVolatilityStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "InformationDiscretenessMomentumStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "cross_family_axis",
+      "source_id": "IntermarketLeadLagContinuationStrategy",
+      "status": "observed",
+      "target_id": "microstructure_intraday"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_design",
+      "evidence_refs": [
+        "source:strategy-tree"
+      ],
+      "relation": "domain_variant_of",
+      "source_id": "IntermarketLeadLagContinuationStrategy",
+      "status": "observed",
+      "target_id": "lead_lag_continuation"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "IntermarketLeadLagContinuationStrategy",
+      "status": "observed",
+      "target_id": "intermarket"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "IntradayFlowPressureRiderStrategy",
+      "status": "observed",
+      "target_id": "microstructure_intraday"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "IntradaySeasonalMomentumRiderStrategy",
+      "status": "observed",
+      "target_id": "trend_momentum"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "KalmanTrendRiderStrategy",
+      "status": "observed",
+      "target_id": "trend_momentum"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_design",
+      "evidence_refs": [
+        "eval:g003-selection-v11"
+      ],
+      "relation": "variant_of",
+      "source_id": "Kalman_pair_candidates",
+      "status": "observed",
+      "target_id": "pair_relative_value"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "LagConvergenceStrategy",
+      "status": "observed",
+      "target_id": "intermarket"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "cross_family_axis",
+      "source_id": "LastDayLiquidityRegimeStrategy",
+      "status": "observed",
+      "target_id": "microstructure_intraday"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "cross_family_axis",
+      "source_id": "LastDayLiquidityRegimeStrategy",
+      "status": "observed",
+      "target_id": "seasonality"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "LastDayLiquidityRegimeStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "cross_family_axis",
+      "source_id": "LeadLagSpilloverStrategy",
+      "status": "observed",
+      "target_id": "intermarket"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "LeadLagSpilloverStrategy",
+      "status": "observed",
+      "target_id": "microstructure_intraday"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "LeveragedTrendTimingRiderStrategy",
+      "status": "observed",
+      "target_id": "trend_momentum"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "LiquidationCascadeReversionStrategy",
+      "status": "observed",
+      "target_id": "mean_reversion_relative_value"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "LiquidityShockReversionStrategy",
+      "status": "observed",
+      "target_id": "mean_reversion_relative_value"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "LongRunOverreactionReversalStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "LotterySkewnessStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "LowTurnoverTrendPersistenceStrategy",
+      "status": "observed",
+      "target_id": "trend_momentum"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "LowVolatilityMomentumStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "MeanReversionStdStrategy",
+      "status": "observed",
+      "target_id": "mean_reversion_relative_value"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "MetalEquityDivergenceReversalStrategy",
+      "status": "observed",
+      "target_id": "mean_reversion_relative_value"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "MetalsRelativeValueBasketStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_scope",
+      "evidence_refs": [
+        "source:strategy-tree"
+      ],
+      "relation": "excluded_from",
+      "source_id": "MicroRangeExpansion1sStrategy",
+      "status": "observed",
+      "target_id": "greater_equal_one_minute_catalog"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "cross_family_axis",
+      "source_id": "MomentumCrashDynamicScalingOverlayStrategy",
+      "status": "observed",
+      "target_id": "trend_momentum"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "MomentumCrashDynamicScalingOverlayStrategy",
+      "status": "observed",
+      "target_id": "volatility_risk_overlay"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_design",
+      "evidence_refs": [
+        "source:strategy-tree"
+      ],
+      "relation": "overlays",
+      "source_id": "MomentumCrashDynamicScalingOverlayStrategy",
+      "status": "observed",
+      "target_id": "momentum_children"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "MovingAverageCrossStrategy",
+      "status": "observed",
+      "target_id": "trend_momentum"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "cross_family_axis",
+      "source_id": "MultiTimeframeTrendEnsembleStrategy",
+      "status": "observed",
+      "target_id": "ensemble_regime_router"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "MultiTimeframeTrendEnsembleStrategy",
+      "status": "observed",
+      "target_id": "trend_momentum"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "NearHighMomentumStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "OpenInterestTrendConfirmationRiderStrategy",
+      "status": "observed",
+      "target_id": "derivatives_directional_crowding"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "OpeningRangeBreakoutRiderStrategy",
+      "status": "observed",
+      "target_id": "breakout"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "OpeningRangeContinuationStrategy",
+      "status": "observed",
+      "target_id": "breakout"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "OrderBookImbalanceReversionStrategy",
+      "status": "observed",
+      "target_id": "microstructure_intraday"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_methodology",
+      "evidence_refs": [
+        "artifact:strategy-smoke-registry"
+      ],
+      "relation": "requires_evidence",
+      "source_id": "OrderBookImbalanceReversionStrategy",
+      "status": "observed",
+      "target_id": "point_in_time_orderbook"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "OvernightSessionReturnRiderStrategy",
+      "status": "observed",
+      "target_id": "seasonality"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_design",
+      "evidence_refs": [
+        "eval:g003-selection-v11"
+      ],
+      "relation": "variant_of",
+      "source_id": "PCA_residual_statarb_candidates",
+      "status": "observed",
+      "target_id": "residual_relative_value"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "PairSpreadZScoreStrategy",
+      "status": "observed",
+      "target_id": "mean_reversion_relative_value"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "PairTradingZScoreStrategy",
+      "status": "observed",
+      "target_id": "mean_reversion_relative_value"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_design",
+      "evidence_refs": [
+        "source:strategy-tree"
+      ],
+      "relation": "overlaps_signal_axis",
+      "source_id": "PairTradingZscoreStrategy",
+      "status": "observed",
+      "target_id": "PairSpreadZscoreStrategy"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "PairsSpreadMeanReversionStrategy",
+      "status": "observed",
+      "target_id": "mean_reversion_relative_value"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "PanicReboundMeanReversionStrategy",
+      "status": "observed",
+      "target_id": "mean_reversion_relative_value"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "PermutationEntropyTrendRiderStrategy",
+      "status": "observed",
+      "target_id": "trend_momentum"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "PerpCrowdingCarryStrategy",
+      "status": "observed",
+      "target_id": "derivatives_directional_crowding"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "PriceVolumeCorrContinuationStrategy",
+      "status": "observed",
+      "target_id": "trend_momentum"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_design",
+      "evidence_refs": [
+        "source:strategy-tree"
+      ],
+      "relation": "variant_of",
+      "source_id": "PriceVolumeCorrContinuationStrategy",
+      "status": "observed",
+      "target_id": "trend_momentum"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "ProfitMoonshotBreakoutStrategy",
+      "status": "observed",
+      "target_id": "breakout"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "ProfitMoonshotReversionStrategy",
+      "status": "observed",
+      "target_id": "mean_reversion_relative_value"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "ProfitMoonshotTrendStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "PullbackTrendContinuationStrategy",
+      "status": "observed",
+      "target_id": "trend_momentum"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "RareEventScoreStrategy",
+      "status": "observed",
+      "target_id": "mean_reversion_relative_value"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "RealizedSemivarianceTrendRiderStrategy",
+      "status": "observed",
+      "target_id": "trend_momentum"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "RealizedVolTermStructureStrategy",
+      "status": "observed",
+      "target_id": "mean_reversion_relative_value"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "RebalancingPremiumHarvestStrategy",
+      "status": "observed",
+      "target_id": "rebalancing_diversification"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_methodology",
+      "evidence_refs": [
+        "eval:common-period-screen"
+      ],
+      "relation": "requires_control",
+      "source_id": "RebalancingPremiumHarvestStrategy",
+      "status": "observed",
+      "target_id": "matched_no_rebalance_basket"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "cross_family_axis",
+      "source_id": "RegimeAdaptiveDisagreementEnsembleStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "RegimeAdaptiveDisagreementEnsembleStrategy",
+      "status": "observed",
+      "target_id": "ensemble_regime_router"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "cross_family_axis",
+      "source_id": "RegimeBreakoutCandidateStrategy",
+      "status": "observed",
+      "target_id": "breakout"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "cross_family_axis",
+      "source_id": "RegimeBreakoutCandidateStrategy",
+      "status": "observed",
+      "target_id": "ensemble_regime_router"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "RegimeBreakoutCandidateStrategy",
+      "status": "observed",
+      "target_id": "trend_momentum"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "cross_family_axis",
+      "source_id": "RegimeRouterConfirmedRotationStrategy",
+      "status": "observed",
+      "target_id": "ensemble_regime_router"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "RegimeRouterConfirmedRotationStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "ResearchOnlyDailyCrossSectionalNearHighAnchoringStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "ResearchOnlyDailyLowTurnoverTrendPersistenceStrategy",
+      "status": "observed",
+      "target_id": "trend_momentum"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "ResearchOnlyFourHourFundingHarvestCarryStrategy",
+      "status": "observed",
+      "target_id": "derivatives_directional_crowding"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "ResidualEquityMomentumStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "ResidualMomentumRotationStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "RollingBreakoutStrategy",
+      "status": "observed",
+      "target_id": "trend_momentum"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "RoundNumberBarrierStrategy",
+      "status": "observed",
+      "target_id": "mean_reversion_relative_value"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "RsiStrategy",
+      "status": "observed",
+      "target_id": "mean_reversion_relative_value"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "SeasonalMicroBreakoutRiderStrategy",
+      "status": "observed",
+      "target_id": "breakout"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "SelectionGatedMomentumStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "SelectionGatedReversionStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "cross_family_axis",
+      "source_id": "SemisLeadLagRotationStrategy",
+      "status": "observed",
+      "target_id": "intermarket"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "cross_family_axis",
+      "source_id": "SemisLeadLagRotationStrategy",
+      "status": "observed",
+      "target_id": "microstructure_intraday"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "SemisLeadLagRotationStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "SessionFilteredPairCarryStrategy",
+      "status": "observed",
+      "target_id": "mean_reversion_relative_value"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "SilentVolumeShockResolutionStrategy",
+      "status": "observed",
+      "target_id": "trend_momentum"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_design",
+      "evidence_refs": [
+        "source:strategy-tree"
+      ],
+      "relation": "closest_related",
+      "source_id": "SlowCrossSectionalLeadLagStrategy",
+      "status": "observed",
+      "target_id": "CrossCryptoSlowDiffusionStrategy"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_design",
+      "evidence_refs": [
+        "source:strategy-tree"
+      ],
+      "relation": "closest_related",
+      "source_id": "SlowCrossSectionalLeadLagStrategy",
+      "status": "observed",
+      "target_id": "LeadLagSpilloverStrategy"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "cross_family_axis",
+      "source_id": "SlowCrossSectionalLeadLagStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "SlowCrossSectionalLeadLagStrategy",
+      "status": "observed",
+      "target_id": "microstructure_intraday"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "SpectralCycleRiderStrategy",
+      "status": "observed",
+      "target_id": "seasonality"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "SpreadStressLiquidityReversionStrategy",
+      "status": "observed",
+      "target_id": "mean_reversion_relative_value"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_design",
+      "evidence_refs": [
+        "source:strategy-tree"
+      ],
+      "relation": "causal_opposite_of",
+      "source_id": "StationarityGatedResidualReversionStrategy",
+      "status": "observed",
+      "target_id": "TrendGatedResidualMomentumStrategy"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "StationarityGatedResidualReversionStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "SystematicCoskewnessPremiumStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "cross_family_axis",
+      "source_id": "TailIndexRegimeRiderStrategy",
+      "status": "observed",
+      "target_id": "volatility_risk_overlay"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "TailIndexRegimeRiderStrategy",
+      "status": "observed",
+      "target_id": "trend_momentum"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "TakerFlowExhaustionReversalStrategy",
+      "status": "observed",
+      "target_id": "microstructure_intraday"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "TakerFlowImbalanceContinuationStrategy",
+      "status": "observed",
+      "target_id": "microstructure_intraday"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "TimeframePairZScoreReversionStrategy",
+      "status": "observed",
+      "target_id": "mean_reversion_relative_value"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_design",
+      "evidence_refs": [
+        "source:strategy-tree"
+      ],
+      "relation": "variant_of",
+      "source_id": "TimeframePairZscoreReversionStrategy",
+      "status": "observed",
+      "target_id": "PairTradingZscoreStrategy"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "TopCapTimeSeriesMomentumStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_design",
+      "evidence_refs": [
+        "source:strategy-tree"
+      ],
+      "relation": "overlaps_signal_axis",
+      "source_id": "TopCapTimeSeriesMomentumStrategy",
+      "status": "observed",
+      "target_id": "DonchianAtrTrendStrategy"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "TrendEfficiencyMomentumStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "TrendGatedResidualMomentumStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_design",
+      "evidence_refs": [
+        "source:strategy-tree"
+      ],
+      "relation": "residualizes",
+      "source_id": "TrendGatedResidualMomentumStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional_momentum"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_design",
+      "evidence_refs": [
+        "source:strategy-tree"
+      ],
+      "relation": "closest_related",
+      "source_id": "VPINToxicityStrategy",
+      "status": "observed",
+      "target_id": "taker_flow_exhaustion"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "VWAPCompressionReversionStrategy",
+      "status": "observed",
+      "target_id": "mean_reversion_relative_value"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "VarianceRatioTrendRiderStrategy",
+      "status": "observed",
+      "target_id": "trend_momentum"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "VolCompressionVWAPReversionStrategy",
+      "status": "observed",
+      "target_id": "mean_reversion_relative_value"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "VolCompressionVwapReversionStrategy",
+      "status": "observed",
+      "target_id": "mean_reversion_relative_value"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "cross_family_axis",
+      "source_id": "VolManagedMomentumCrashGateStrategy",
+      "status": "observed",
+      "target_id": "volatility_risk_overlay"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "VolManagedMomentumCrashGateStrategy",
+      "status": "observed",
+      "target_id": "trend_momentum"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "VolManagedRiskOverlayStrategy",
+      "status": "observed",
+      "target_id": "volatility_risk_overlay"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_design",
+      "evidence_refs": [
+        "source:strategy-tree"
+      ],
+      "relation": "overlays",
+      "source_id": "VolManagedRiskOverlayStrategy",
+      "status": "observed",
+      "target_id": "trend_children"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "cross_family_axis",
+      "source_id": "VolOfVolRegimeTrendGateStrategy",
+      "status": "observed",
+      "target_id": "volatility_risk_overlay"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "VolOfVolRegimeTrendGateStrategy",
+      "status": "observed",
+      "target_id": "trend_momentum"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "VolatilityBreakoutRiderStrategy",
+      "status": "observed",
+      "target_id": "breakout"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "VolatilityCompressionReversionStrategy",
+      "status": "observed",
+      "target_id": "mean_reversion_relative_value"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "VolatilitySqueezeBreakoutRiderStrategy",
+      "status": "observed",
+      "target_id": "breakout"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "VolatilitySqueezeBreakoutStrategy",
+      "status": "observed",
+      "target_id": "breakout"
+    },
+    {
       "confidence": "medium",
       "evidence_class": "observed_design",
       "evidence_refs": [
@@ -22,6 +2244,61 @@
       "source_id": "VolatilitySqueezeBreakoutStrategy",
       "status": "observed",
       "target_id": "CompressionBreakoutContinuationStrategy"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "VolumeClockMomentumRiderStrategy",
+      "status": "observed",
+      "target_id": "trend_momentum"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "VpinToxicityRiderStrategy",
+      "status": "observed",
+      "target_id": "microstructure_intraday"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": [
+        "catalog:strategy-research-20260827"
+      ],
+      "relation": "member_of",
+      "source_id": "VwapReversionStrategy",
+      "status": "observed",
+      "target_id": "mean_reversion_relative_value"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_lineage",
+      "evidence_refs": [
+        "artifact:state-distilled"
+      ],
+      "relation": "superseded_by_hypothesis",
+      "source_id": "calendar_primary_profit_moonshot",
+      "status": "observed",
+      "target_id": "state_distilled_leadership_unwind"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_artifact",
+      "evidence_refs": [
+        "eval:g003-selection-v11"
+      ],
+      "relation": "overlays",
+      "source_id": "crypto_kill_switch_overlay_turtle_1d_v1",
+      "status": "observed",
+      "target_id": "crypto_turtle_20_10_atr_v1"
     },
     {
       "confidence": "high",
@@ -47,380 +2324,6 @@
     },
     {
       "confidence": "high",
-      "evidence_class": "observed_artifact",
-      "evidence_refs": [
-        "artifact:g003-selection-rejected"
-      ],
-      "relation": "rejected_because",
-      "source_id": "g003_selection_v11",
-      "status": "observed",
-      "target_id": "minimum_six_survivors_not_met"
-    },
-    {
-      "confidence": "medium",
-      "evidence_class": "observed_design",
-      "evidence_refs": [
-        "source:strategy-tree"
-      ],
-      "relation": "overlaps_signal_axis",
-      "source_id": "TopCapTimeSeriesMomentumStrategy",
-      "status": "observed",
-      "target_id": "DonchianAtrTrendStrategy"
-    },
-    {
-      "confidence": "medium",
-      "evidence_class": "observed_design",
-      "evidence_refs": [
-        "source:strategy-tree"
-      ],
-      "relation": "variant_of",
-      "source_id": "PriceVolumeCorrContinuationStrategy",
-      "status": "observed",
-      "target_id": "trend_momentum"
-    },
-    {
-      "confidence": "medium",
-      "evidence_class": "observed_design",
-      "evidence_refs": [
-        "source:strategy-tree"
-      ],
-      "relation": "variant_of",
-      "source_id": "CrossSectionalIntermediateEchoMomentumStrategy",
-      "status": "observed",
-      "target_id": "cross_sectional_momentum"
-    },
-    {
-      "confidence": "medium",
-      "evidence_class": "observed_design",
-      "evidence_refs": [
-        "source:strategy-tree"
-      ],
-      "relation": "residualizes",
-      "source_id": "TrendGatedResidualMomentumStrategy",
-      "status": "observed",
-      "target_id": "cross_sectional_momentum"
-    },
-    {
-      "confidence": "medium",
-      "evidence_class": "observed_design",
-      "evidence_refs": [
-        "source:strategy-tree"
-      ],
-      "relation": "causal_opposite_of",
-      "source_id": "StationarityGatedResidualReversionStrategy",
-      "status": "observed",
-      "target_id": "TrendGatedResidualMomentumStrategy"
-    },
-    {
-      "confidence": "medium",
-      "evidence_class": "observed_design",
-      "evidence_refs": [
-        "source:strategy-tree"
-      ],
-      "relation": "closest_related",
-      "source_id": "CrossSectionalNearHighAnchoringStrategy",
-      "status": "observed",
-      "target_id": "NearHighMomentumStrategy"
-    },
-    {
-      "confidence": "hypothesis",
-      "evidence_class": "hypothesis",
-      "evidence_refs": [
-        "hypothesis:near-high-low"
-      ],
-      "relation": "hypothesized_complement_of",
-      "source_id": "CrossSectionalNearLowRecoveryStrategy",
-      "status": "proposed",
-      "target_id": "CrossSectionalNearHighAnchoringStrategy"
-    },
-    {
-      "confidence": "medium",
-      "evidence_class": "observed_methodology",
-      "evidence_refs": [
-        "eval:common-period-screen"
-      ],
-      "relation": "requires_control",
-      "source_id": "RebalancingPremiumHarvestStrategy",
-      "status": "observed",
-      "target_id": "matched_no_rebalance_basket"
-    },
-    {
-      "confidence": "medium",
-      "evidence_class": "observed_methodology",
-      "evidence_refs": [
-        "eval:common-period-screen"
-      ],
-      "relation": "benchmark_for",
-      "source_id": "BitcoinBuyHoldStrategy",
-      "status": "observed",
-      "target_id": "crypto_directional_strategies"
-    },
-    {
-      "confidence": "medium",
-      "evidence_class": "observed_design",
-      "evidence_refs": [
-        "source:strategy-tree"
-      ],
-      "relation": "overlaps_signal_axis",
-      "source_id": "PairTradingZscoreStrategy",
-      "status": "observed",
-      "target_id": "PairSpreadZscoreStrategy"
-    },
-    {
-      "confidence": "medium",
-      "evidence_class": "observed_design",
-      "evidence_refs": [
-        "source:strategy-tree"
-      ],
-      "relation": "variant_of",
-      "source_id": "TimeframePairZscoreReversionStrategy",
-      "status": "observed",
-      "target_id": "PairTradingZscoreStrategy"
-    },
-    {
-      "confidence": "medium",
-      "evidence_class": "observed_design",
-      "evidence_refs": [
-        "eval:g003-selection-v11"
-      ],
-      "relation": "variant_of",
-      "source_id": "Kalman_pair_candidates",
-      "status": "observed",
-      "target_id": "pair_relative_value"
-    },
-    {
-      "confidence": "medium",
-      "evidence_class": "observed_design",
-      "evidence_refs": [
-        "eval:g003-selection-v11"
-      ],
-      "relation": "variant_of",
-      "source_id": "PCA_residual_statarb_candidates",
-      "status": "observed",
-      "target_id": "residual_relative_value"
-    },
-    {
-      "confidence": "medium",
-      "evidence_class": "observed_design",
-      "evidence_refs": [
-        "source:strategy-tree"
-      ],
-      "relation": "closest_related",
-      "source_id": "GoldSilverRatioMeanReversionStrategy",
-      "status": "observed",
-      "target_id": "MetalsRelativeValueBasketStrategy"
-    },
-    {
-      "confidence": "medium",
-      "evidence_class": "observed_design",
-      "evidence_refs": [
-        "source:strategy-tree"
-      ],
-      "relation": "closest_related",
-      "source_id": "SlowCrossSectionalLeadLagStrategy",
-      "status": "observed",
-      "target_id": "LeadLagSpilloverStrategy"
-    },
-    {
-      "confidence": "medium",
-      "evidence_class": "observed_design",
-      "evidence_refs": [
-        "source:strategy-tree"
-      ],
-      "relation": "closest_related",
-      "source_id": "SlowCrossSectionalLeadLagStrategy",
-      "status": "observed",
-      "target_id": "CrossCryptoSlowDiffusionStrategy"
-    },
-    {
-      "confidence": "medium",
-      "evidence_class": "observed_design",
-      "evidence_refs": [
-        "source:strategy-tree"
-      ],
-      "relation": "domain_variant_of",
-      "source_id": "IntermarketLeadLagContinuationStrategy",
-      "status": "observed",
-      "target_id": "lead_lag_continuation"
-    },
-    {
-      "confidence": "medium",
-      "evidence_class": "observed_methodology",
-      "evidence_refs": [
-        "source:strategy-tree"
-      ],
-      "relation": "not_equivalent_to",
-      "source_id": "CrossSectionalFundingMomentumCarryStrategy",
-      "status": "observed",
-      "target_id": "spot_perp_cash_and_carry"
-    },
-    {
-      "confidence": "medium",
-      "evidence_class": "observed_design",
-      "evidence_refs": [
-        "source:strategy-tree"
-      ],
-      "relation": "overlaps_feature",
-      "source_id": "FundingHarvestCarryStrategy",
-      "status": "observed",
-      "target_id": "CrossSectionalFundingMomentumCarryStrategy"
-    },
-    {
-      "confidence": "medium",
-      "evidence_class": "observed_methodology",
-      "evidence_refs": [
-        "artifact:strategy-smoke-registry"
-      ],
-      "relation": "requires_evidence",
-      "source_id": "OrderBookImbalanceReversionStrategy",
-      "status": "observed",
-      "target_id": "point_in_time_orderbook"
-    },
-    {
-      "confidence": "medium",
-      "evidence_class": "observed_design",
-      "evidence_refs": [
-        "source:strategy-tree"
-      ],
-      "relation": "closest_related",
-      "source_id": "VPINToxicityStrategy",
-      "status": "observed",
-      "target_id": "taker_flow_exhaustion"
-    },
-    {
-      "confidence": "medium",
-      "evidence_class": "observed_design",
-      "evidence_refs": [
-        "source:strategy-tree"
-      ],
-      "relation": "parent_of",
-      "source_id": "DisagreementGatedEnsembleStrategy",
-      "status": "observed",
-      "target_id": "RegimeAdaptiveDisagreementEnsembleStrategy"
-    },
-    {
-      "confidence": "medium",
-      "evidence_class": "observed_design",
-      "evidence_refs": [
-        "source:strategy-tree"
-      ],
-      "relation": "parent_of",
-      "source_id": "BullBearRegimeRotationStrategy",
-      "status": "observed",
-      "target_id": "RegimeRouterConfirmedRotationStrategy"
-    },
-    {
-      "confidence": "medium",
-      "evidence_class": "observed_design",
-      "evidence_refs": [
-        "source:strategy-tree"
-      ],
-      "relation": "overlays",
-      "source_id": "VolManagedRiskOverlayStrategy",
-      "status": "observed",
-      "target_id": "trend_children"
-    },
-    {
-      "confidence": "medium",
-      "evidence_class": "observed_design",
-      "evidence_refs": [
-        "source:strategy-tree"
-      ],
-      "relation": "overlays",
-      "source_id": "MomentumCrashDynamicScalingOverlayStrategy",
-      "status": "observed",
-      "target_id": "momentum_children"
-    },
-    {
-      "confidence": "medium",
-      "evidence_class": "observed_design",
-      "evidence_refs": [
-        "source:strategy-tree"
-      ],
-      "relation": "overlays",
-      "source_id": "AvgCorrelationCrashGuardOverlayStrategy",
-      "status": "observed",
-      "target_id": "directional_children"
-    },
-    {
-      "confidence": "high",
-      "evidence_class": "observed_artifact",
-      "evidence_refs": [
-        "eval:g003-selection-v11"
-      ],
-      "relation": "overlays",
-      "source_id": "crypto_kill_switch_overlay_turtle_1d_v1",
-      "status": "observed",
-      "target_id": "crypto_turtle_20_10_atr_v1"
-    },
-    {
-      "confidence": "high",
-      "evidence_class": "observed_artifact",
-      "evidence_refs": [
-        "eval:g003-selection-v11"
-      ],
-      "relation": "overlays",
-      "source_id": "tradfi_kill_switch_overlay_ma_rotation_1d_v1",
-      "status": "observed",
-      "target_id": "tradfi_ma_score_vol_target_1d_v1"
-    },
-    {
-      "confidence": "medium",
-      "evidence_class": "observed_lineage",
-      "evidence_refs": [
-        "artifact:state-distilled"
-      ],
-      "relation": "superseded_by_hypothesis",
-      "source_id": "calendar_primary_profit_moonshot",
-      "status": "observed",
-      "target_id": "state_distilled_leadership_unwind"
-    },
-    {
-      "confidence": "high",
-      "evidence_class": "observed_metric",
-      "evidence_refs": [
-        "artifact:state-distilled"
-      ],
-      "relation": "failed_to_beat",
-      "source_id": "state_distilled_leadership_unwind",
-      "status": "observed",
-      "target_id": "current_base_reference"
-    },
-    {
-      "confidence": "medium",
-      "evidence_class": "observed_scope",
-      "evidence_refs": [
-        "source:strategy-tree"
-      ],
-      "relation": "excluded_from",
-      "source_id": "MicroRangeExpansion1sStrategy",
-      "status": "observed",
-      "target_id": "greater_equal_one_minute_catalog"
-    },
-    {
-      "confidence": "high",
-      "evidence_class": "observed_provenance",
-      "evidence_refs": [
-        "artifact:dacapogo-source"
-      ],
-      "relation": "derived_from",
-      "source_id": "DacapogoDailySourceStrategy",
-      "status": "observed",
-      "target_id": "authenticated_dacapogo_source_snapshot"
-    },
-    {
-      "confidence": "high",
-      "evidence_class": "observed_artifact",
-      "evidence_refs": [
-        "eval:dacapogo-locked-validation"
-      ],
-      "relation": "decision",
-      "source_id": "DacapogoDailySourceStrategy",
-      "status": "observed",
-      "target_id": "cash_zero_of_thirteen_locked_validation_folds"
-    },
-    {
-      "confidence": "high",
       "evidence_class": "observed_provenance",
       "evidence_refs": [
         "artifact:parity-candidate-v10"
@@ -429,6 +2332,28 @@
       "source_id": "exact_native_parity_candidate_v10",
       "status": "observed",
       "target_id": "alpha_max_g003"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_provenance",
+      "evidence_refs": [
+        "artifact:parity-v6-interrupted"
+      ],
+      "relation": "interrupted_not_strategy_rejected",
+      "source_id": "exact_native_parity_oracle_v6",
+      "status": "observed",
+      "target_id": "alpha_max_g003"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_artifact",
+      "evidence_refs": [
+        "artifact:g003-selection-rejected"
+      ],
+      "relation": "rejected_because",
+      "source_id": "g003_selection_v11",
+      "status": "observed",
+      "target_id": "minimum_six_survivors_not_met"
     },
     {
       "confidence": "high",
@@ -445,28 +2370,79 @@
       "confidence": "high",
       "evidence_class": "observed_provenance",
       "evidence_refs": [
-        "artifact:parity-v6-interrupted"
-      ],
-      "relation": "interrupted_not_strategy_rejected",
-      "source_id": "exact_native_parity_oracle_v6",
-      "status": "observed",
-      "target_id": "alpha_max_g003"
-    },
-    {
-      "confidence": "high",
-      "evidence_class": "observed_provenance",
-      "evidence_refs": [
         "artifact:prelock-v7-non-admitted"
       ],
       "relation": "non_admitted_not_strategy_rejected",
       "source_id": "prelock_supervisor_v7",
       "status": "observed",
       "target_id": "alpha_max_g003"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_metric",
+      "evidence_refs": [
+        "artifact:state-distilled"
+      ],
+      "relation": "failed_to_beat",
+      "source_id": "state_distilled_leadership_unwind",
+      "status": "observed",
+      "target_id": "current_base_reference"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_artifact",
+      "evidence_refs": [
+        "eval:g003-selection-v11"
+      ],
+      "relation": "overlays",
+      "source_id": "tradfi_kill_switch_overlay_ma_rotation_1d_v1",
+      "status": "observed",
+      "target_id": "tradfi_ma_score_vol_target_1d_v1"
     }
   ],
   "nodes": [
     {
+      "id": "AbnormalReturnContinuationStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "AccelerationRiderStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "AdaptiveRegimeMomentumStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "AdaptiveTrendRiderStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "AdfGatedReversionRiderStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "Alpha101FormulaStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "AlphaZooOptunaHybridLiveStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "AmihudIlliquidityMomentumRiderStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
       "id": "AvgCorrelationCrashGuardOverlayStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "BenchmarkLeadLagContinuationStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "BettingAgainstBetaStrategy",
       "type": "strategy_or_candidate"
     },
     {
@@ -474,7 +2450,23 @@
       "type": "strategy_or_candidate"
     },
     {
+      "id": "BreadthRegimeTrendTimerStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
       "id": "BullBearRegimeRotationStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "CalendarSeasonalityOverlayStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "CarryTrendConfluenceRiderStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "CompositeTrendStrategy",
       "type": "strategy_or_candidate"
     },
     {
@@ -482,7 +2474,35 @@
       "type": "strategy_or_candidate"
     },
     {
+      "id": "ConfidenceGatedTrendStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "CrossAssetDiversifiedTrendStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
       "id": "CrossCryptoSlowDiffusionStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "CrossSectionalCapitalGainsOverhangStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "CrossSectionalCloseLocationAccumulationStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "CrossSectionalDownsideBetaAsymmetryStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "CrossSectionalEquityMomentumStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "CrossSectionalFlowShareRotationStrategy",
       "type": "strategy_or_candidate"
     },
     {
@@ -502,7 +2522,51 @@
       "type": "strategy_or_candidate"
     },
     {
+      "id": "CrossSectionalOffSessionTugOfWarStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "CrossSectionalPathConvexityStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "CrossSectionalPriceDelayPremiumStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "CrossSectionalRegressionTrendQualityStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "CrossSectionalSeasonalPersistenceStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "CrossSectionalShortTermReversalStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "CrossSectionalTimeUnderWaterStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "CryptoFxAlphaZooStateStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "CusumChangePointTrendRiderStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
       "id": "DacapogoDailySourceStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "DeepLearningForecastGateStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "DerivativesFlowSqueezeStrategy",
       "type": "strategy_or_candidate"
     },
     {
@@ -510,7 +2574,43 @@
       "type": "strategy_or_candidate"
     },
     {
+      "id": "DispersionConditionedReversionStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "DiversifiedMultiFactorEnsembleStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
       "id": "DonchianAtrTrendStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "DownsideTailRiskPremiumStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "DualMomentumDefensiveRotationStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "DualMomentumIndexRotationStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "EquityBenchmarkResidualReversalStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "EquityMetalRiskRegimeRotationStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "FalseBreakoutReversalStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "FundingDislocationTrendCarryStrategy",
       "type": "strategy_or_candidate"
     },
     {
@@ -518,7 +2618,35 @@
       "type": "strategy_or_candidate"
     },
     {
+      "id": "GarchInnovationRiderStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
       "id": "GoldSilverRatioMeanReversionStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "GoldSilverRatioTrendStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "HourlyShockReversionStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "HurstRegimeGatedStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "IdiosyncraticSkewInnovationStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "IdiosyncraticVolatilityStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "InformationDiscretenessMomentumStrategy",
       "type": "strategy_or_candidate"
     },
     {
@@ -526,11 +2654,67 @@
       "type": "strategy_or_candidate"
     },
     {
+      "id": "IntradayFlowPressureRiderStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "IntradaySeasonalMomentumRiderStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "KalmanTrendRiderStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
       "id": "Kalman_pair_candidates",
       "type": "control_evidence_or_state"
     },
     {
+      "id": "LagConvergenceStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "LastDayLiquidityRegimeStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
       "id": "LeadLagSpilloverStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "LeveragedTrendTimingRiderStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "LiquidationCascadeReversionStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "LiquidityShockReversionStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "LongRunOverreactionReversalStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "LotterySkewnessStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "LowTurnoverTrendPersistenceStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "LowVolatilityMomentumStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "MeanReversionStdStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "MetalEquityDivergenceReversalStrategy",
       "type": "strategy_or_candidate"
     },
     {
@@ -546,7 +2730,27 @@
       "type": "strategy_or_candidate"
     },
     {
+      "id": "MovingAverageCrossStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "MultiTimeframeTrendEnsembleStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
       "id": "NearHighMomentumStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "OpenInterestTrendConfirmationRiderStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "OpeningRangeBreakoutRiderStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "OpeningRangeContinuationStrategy",
       "type": "strategy_or_candidate"
     },
     {
@@ -554,11 +2758,23 @@
       "type": "strategy_or_candidate"
     },
     {
+      "id": "OvernightSessionReturnRiderStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
       "id": "PCA_residual_statarb_candidates",
       "type": "control_evidence_or_state"
     },
     {
+      "id": "PairSpreadZScoreStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
       "id": "PairSpreadZscoreStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "PairTradingZScoreStrategy",
       "type": "strategy_or_candidate"
     },
     {
@@ -566,7 +2782,51 @@
       "type": "strategy_or_candidate"
     },
     {
+      "id": "PairsSpreadMeanReversionStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "PanicReboundMeanReversionStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "PermutationEntropyTrendRiderStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "PerpCrowdingCarryStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
       "id": "PriceVolumeCorrContinuationStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "ProfitMoonshotBreakoutStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "ProfitMoonshotReversionStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "ProfitMoonshotTrendStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "PullbackTrendContinuationStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "RareEventScoreStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "RealizedSemivarianceTrendRiderStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "RealizedVolTermStructureStrategy",
       "type": "strategy_or_candidate"
     },
     {
@@ -578,7 +2838,31 @@
       "type": "strategy_or_candidate"
     },
     {
+      "id": "RegimeBreakoutCandidateStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
       "id": "RegimeRouterConfirmedRotationStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "ResearchOnlyDailyCrossSectionalNearHighAnchoringStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "ResearchOnlyDailyLowTurnoverTrendPersistenceStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "ResearchOnlyFourHourFundingHarvestCarryStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "ResidualEquityMomentumStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "ResidualMomentumRotationStrategy",
       "type": "strategy_or_candidate"
     },
     {
@@ -586,11 +2870,71 @@
       "type": "strategy_or_candidate"
     },
     {
+      "id": "RoundNumberBarrierStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "RsiStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "SeasonalMicroBreakoutRiderStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "SelectionGatedMomentumStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "SelectionGatedReversionStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "SemisLeadLagRotationStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "SessionFilteredPairCarryStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "SilentVolumeShockResolutionStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
       "id": "SlowCrossSectionalLeadLagStrategy",
       "type": "strategy_or_candidate"
     },
     {
+      "id": "SpectralCycleRiderStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "SpreadStressLiquidityReversionStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
       "id": "StationarityGatedResidualReversionStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "SystematicCoskewnessPremiumStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "TailIndexRegimeRiderStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "TakerFlowExhaustionReversalStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "TakerFlowImbalanceContinuationStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "TimeframePairZScoreReversionStrategy",
       "type": "strategy_or_candidate"
     },
     {
@@ -602,6 +2946,10 @@
       "type": "strategy_or_candidate"
     },
     {
+      "id": "TrendEfficiencyMomentumStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
       "id": "TrendGatedResidualMomentumStrategy",
       "type": "strategy_or_candidate"
     },
@@ -610,11 +2958,59 @@
       "type": "strategy_or_candidate"
     },
     {
+      "id": "VWAPCompressionReversionStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "VarianceRatioTrendRiderStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "VolCompressionVWAPReversionStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "VolCompressionVwapReversionStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "VolManagedMomentumCrashGateStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
       "id": "VolManagedRiskOverlayStrategy",
       "type": "strategy_or_candidate"
     },
     {
+      "id": "VolOfVolRegimeTrendGateStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "VolatilityBreakoutRiderStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "VolatilityCompressionReversionStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "VolatilitySqueezeBreakoutRiderStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
       "id": "VolatilitySqueezeBreakoutStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "VolumeClockMomentumRiderStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "VpinToxicityRiderStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "VwapReversionStrategy",
       "type": "strategy_or_candidate"
     },
     {
@@ -626,12 +3022,24 @@
       "type": "control_evidence_or_state"
     },
     {
+      "id": "benchmark",
+      "type": "family_or_axis"
+    },
+    {
+      "id": "breakout",
+      "type": "family_or_axis"
+    },
+    {
       "id": "calendar_primary_profit_moonshot",
       "type": "control_evidence_or_state"
     },
     {
       "id": "cash_zero_of_thirteen_locked_validation_folds",
       "type": "control_evidence_or_state"
+    },
+    {
+      "id": "cross_sectional",
+      "type": "family_or_axis"
     },
     {
       "id": "cross_sectional_momentum",
@@ -654,8 +3062,20 @@
       "type": "control_evidence_or_state"
     },
     {
+      "id": "derivatives_directional_crowding",
+      "type": "family_or_axis"
+    },
+    {
       "id": "directional_children",
       "type": "control_evidence_or_state"
+    },
+    {
+      "id": "ensemble_regime_router",
+      "type": "family_or_axis"
+    },
+    {
+      "id": "event_alpha",
+      "type": "family_or_axis"
     },
     {
       "id": "exact_native_parity_candidate_v10",
@@ -664,6 +3084,10 @@
     {
       "id": "exact_native_parity_oracle_v6",
       "type": "control_evidence_or_state"
+    },
+    {
+      "id": "formulaic_alpha",
+      "type": "family_or_axis"
     },
     {
       "id": "future_funding_boundary_8ms",
@@ -678,12 +3102,24 @@
       "type": "control_evidence_or_state"
     },
     {
+      "id": "intermarket",
+      "type": "family_or_axis"
+    },
+    {
       "id": "lead_lag_continuation",
       "type": "family_or_axis"
     },
     {
       "id": "matched_no_rebalance_basket",
       "type": "control_evidence_or_state"
+    },
+    {
+      "id": "mean_reversion_relative_value",
+      "type": "family_or_axis"
+    },
+    {
+      "id": "microstructure_intraday",
+      "type": "family_or_axis"
     },
     {
       "id": "minimum_six_survivors_not_met",
@@ -710,7 +3146,15 @@
       "type": "control_evidence_or_state"
     },
     {
+      "id": "rebalancing_diversification",
+      "type": "family_or_axis"
+    },
+    {
       "id": "residual_relative_value",
+      "type": "family_or_axis"
+    },
+    {
+      "id": "seasonality",
       "type": "family_or_axis"
     },
     {
@@ -740,12 +3184,18 @@
     {
       "id": "trend_momentum",
       "type": "family_or_axis"
+    },
+    {
+      "id": "volatility_risk_overlay",
+      "type": "family_or_axis"
     }
   ],
   "rules": {
     "all_endpoints_declared": true,
     "hypotheses_require_fresh_evaluation": true,
-    "observed_does_not_imply_performance": true
+    "observed_does_not_imply_performance": true,
+    "every_catalog_strategy_has_primary_family_edge": true,
+    "cross_family_hybrids_have_explicit_axis_edges": true
   },
   "schema": "luminaquant.strategy_relationships.v1"
 }
