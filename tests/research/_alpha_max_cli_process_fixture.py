@@ -384,14 +384,21 @@ class AlphaMaxCliProcessHarness:
         runner._compute_alpha_max_admission_from_seals = admission_stub
 
         def training_stub(
-            _preflight,
+            preflight,
             *,
             manifest_receipt: evidence.AlphaMaxManifestReceipt,
             **_kwargs,
         ) -> tuple[tuple[str, ...], tuple[float, ...], evidence.AlphaMaxNativeFinalizationReceipt]:
+            train_window = preflight.phase_windows["train"]
+            train_start = datetime.fromisoformat(
+                train_window.start_utc.replace("Z", "+00:00")
+            ).astimezone(UTC)
+            train_end = datetime.fromisoformat(
+                train_window.end_utc.replace("Z", "+00:00")
+            ).astimezone(UTC)
             calendar = tuple(
-                (datetime(2024, 1, 1, tzinfo=UTC) + timedelta(days=index)).date().isoformat()
-                for index in range(300)
+                (train_start + timedelta(days=index + 1)).date().isoformat()
+                for index in range((train_end - train_start).days)
             )
             component_index = (
                 "component_carry_1x",
@@ -421,7 +428,7 @@ class AlphaMaxCliProcessHarness:
                 "finalization_barrier_keys": [],
             }
             native = evidence.build_alpha_max_native_finalization_receipt(
-                boundary_utc=datetime(2025, 6, 1, tzinfo=UTC),
+                boundary_utc=train_end,
                 finalized_children={manifest_receipt.row_id: 1},
                 native_coverage_by_child={manifest_receipt.row_id: native_coverage},
                 discarded_signal_count=0,
@@ -510,6 +517,79 @@ class AlphaMaxCliProcessHarness:
             )
 
         runner._alpha_max_build_fold_inputs = fold_inputs_stub
+
+        def prepared_checkpoint_stub(
+            prepared: runner._AlphaMaxPreparedReplayRow,
+            *,
+            domain: str,
+        ) -> bytes:
+            return (
+                _canonical_bytes(
+                    {
+                        "artifact_kind": "alpha_max_fixture_prepared_checkpoint.v1",
+                        "domain": domain,
+                        "gross_hex": prepared.gross.hex(),
+                        "row_id": prepared.manifest_receipt.row_id,
+                    }
+                )
+                + b"\n"
+            )
+
+        def restore_prepared_checkpoint_stub(
+            payload: bytes,
+            *,
+            manifest: evidence.AlphaMaxManifestReceipt,
+            domain: str,
+            gross: float,
+            capsule_output_root: Path,
+            **_kwargs,
+        ) -> runner._AlphaMaxPreparedReplayRow:
+            parsed = runner._strict_json_object(payload)
+            if parsed != {
+                "artifact_kind": "alpha_max_fixture_prepared_checkpoint.v1",
+                "domain": domain,
+                "gross_hex": gross.hex(),
+                "row_id": manifest.row_id,
+            }:
+                raise AssertionError("fixture_prepared_checkpoint_mismatch")
+            if domain == "historical_exposed_evaluation":
+                for fold_id in runner._ALPHA_MAX_HISTORICAL_FOLD_IDS[1:]:
+                    relative = f"capsules/prelock_final_refit/{manifest.row_id}/{fold_id}.json"
+                    capsule_bytes = (
+                        _canonical_bytes(
+                            {
+                                "artifact_kind": "alpha_max_fixture_historical_capsule.v1",
+                                "fold_id": fold_id,
+                                "manifest_sha256": manifest.sha256,
+                                "row_id": manifest.row_id,
+                            }
+                        )
+                        + b"\n"
+                    )
+                    path = capsule_output_root / relative
+                    if path.exists():
+                        if path.read_bytes() != capsule_bytes:
+                            raise AssertionError("fixture_historical_capsule_mismatch")
+                    else:
+                        runner._write_bundle_file_atomic(
+                            capsule_output_root,
+                            relative,
+                            capsule_bytes,
+                        )
+            return runner._AlphaMaxPreparedReplayRow(
+                manifest_receipt=manifest,
+                fold_inputs=tuple(
+                    SimpleNamespace(
+                        fold_id=fold_id,
+                        capsule_receipt=_CapsuleReceiptStub(fold_id, manifest.row_id),
+                    )
+                    for fold_id in runner._alpha_max_fold_ids(domain)
+                ),
+                gross=gross,
+            )
+
+        runner._alpha_max_prepared_row_checkpoint_bytes = prepared_checkpoint_stub
+        runner._alpha_max_restore_prepared_row_checkpoint = restore_prepared_checkpoint_stub
 
         def primary_stream(row_id: str) -> evidence.AlphaMaxPrimaryReturnStream:
             value = object.__new__(evidence.AlphaMaxPrimaryReturnStream)

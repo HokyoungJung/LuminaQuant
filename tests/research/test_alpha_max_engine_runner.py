@@ -895,6 +895,60 @@ def test_exact_indicator_loader_consumes_only_requested_subwindow() -> None:
     assert loader._reader.paths == [june.relative_path]
 
 
+def test_bounded_raw_loader_reuses_authenticated_month_frame_across_days() -> None:
+    symbol = "ADAUSDT"
+    start = datetime(2025, 6, 1, tzinfo=UTC)
+    end = start + timedelta(days=2)
+    timestamps = [start + timedelta(hours=4 * offset) for offset in range(12)]
+    frame = pl.DataFrame(
+        {
+            "datetime": timestamps,
+            "open": [100.0] * len(timestamps),
+            "high": [101.0] * len(timestamps),
+            "low": [99.0] * len(timestamps),
+            "close": [100.0] * len(timestamps),
+            "volume": [0.1] * len(timestamps),
+        }
+    )
+    entry = AlphaMaxTreeEntry(
+        relative_path="raw/ADAUSDT/2025-06.parquet",
+        byte_count=1,
+        mode=0o444,
+        mtime_ns=1,
+        minimum_timestamp_ms=int(start.timestamp() * 1000),
+        maximum_timestamp_ms=int((end - timedelta(seconds=1)).timestamp() * 1000),
+        row_count=frame.height,
+        maximum_gap_ms=14_400_000,
+        sha256="a" * 64,
+    )
+
+    class Reader:
+        def __init__(self) -> None:
+            self.paths: list[str] = []
+
+        def read_entry(self, value: AlphaMaxTreeEntry) -> pl.DataFrame:
+            self.paths.append(value.relative_path)
+            return frame
+
+        def close(self) -> None:
+            return None
+
+    loader = object.__new__(alpha_max_runner._AlphaMaxBoundedRawLoader)
+    loader._seal = SimpleNamespace(start_utc=start, end_utc=end)
+    loader._admitted_symbols = (symbol,)
+    loader._entries = MappingProxyType({(symbol, "2025-06.parquet"): entry})
+    loader._frame_cache = {}
+    loader._reader = Reader()
+
+    first = loader.load_day(start, start + timedelta(days=1))[symbol]
+    second = loader.load_day(start + timedelta(days=1), end)[symbol]
+
+    assert first.height == second.height == 6
+    assert first.get_column("datetime")[0] == start
+    assert second.get_column("datetime")[0] == start + timedelta(days=1)
+    assert loader._reader.paths == [entry.relative_path]
+
+
 def _assert_bit_exact(actual: object, expected: object) -> None:
     if isinstance(expected, float):
         assert type(actual) is float
@@ -1398,12 +1452,8 @@ def test_exact_native_day_restart_matches_uninterrupted_capsule(
 
     def finalize(*_args: object, **_kwargs: object) -> SimpleNamespace:
         finalizations.append(1)
-        coverage = _native_finalization_coverage_stub(
-            [("BTCUSDT", "2024-01-02")]
-        )
-        coverage["finalization_completed_native_keys"] = [
-            ["BTCUSDT", "2024-01-02"]
-        ]
+        coverage = _native_finalization_coverage_stub([("BTCUSDT", "2024-01-02")])
+        coverage["finalization_completed_native_keys"] = [["BTCUSDT", "2024-01-02"]]
         coverage["finalization_barrier_keys"] = []
         return SimpleNamespace(
             discarded_signal_count=0,
@@ -1445,9 +1495,9 @@ def test_exact_native_day_restart_matches_uninterrupted_capsule(
         expected_phase_id="warmup",
     )
     assert restored == uninterrupted.capsule
-    assert uninterrupted.finalized_children["component"][
-        "finalization_completed_native_keys"
-    ] == (("BTCUSDT", "2024-01-02"),)
+    assert uninterrupted.finalized_children["component"]["finalization_completed_native_keys"] == (
+        ("BTCUSDT", "2024-01-02"),
+    )
     assert uninterrupted.capsule["state"] == {
         "handoffs": 1,
         "release_groups": 11,
@@ -1577,6 +1627,73 @@ def test_root_validation_parallelizes_independent_roots_and_preserves_order(
 
     assert seals == {("warmup", "raw"): ("warmup", "raw")}
     assert failures == ("train_feature_root:poisoned",)
+
+
+def test_root_validation_caps_parallelism_and_matches_serial_bytes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    observed_worker_counts: list[int] = []
+    real_executor = alpha_max_runner.ThreadPoolExecutor
+
+    def recording_executor(*, max_workers: int, thread_name_prefix: str):
+        observed_worker_counts.append(max_workers)
+        return real_executor(
+            max_workers=max_workers,
+            thread_name_prefix=thread_name_prefix,
+        )
+
+    def seal(
+        root_id: str,
+        root_kind: str,
+        root_path: str,
+        **_kwargs: object,
+    ) -> tuple[str, str, str]:
+        return root_id, root_kind, root_path
+
+    monkeypatch.setattr(alpha_max_runner, "ThreadPoolExecutor", recording_executor)
+    monkeypatch.setattr(alpha_max_runner, "seal_alpha_max_root_tree", seal)
+    roots = tuple(
+        (f"root-{index}", "raw" if index % 2 == 0 else "feature", f"/sealed/{index}")
+        for index in range(6)
+    )
+    availability = {"raw": {}, "feature": {}}
+
+    serial = alpha_max_runner._alpha_max_root_validation(
+        roots,
+        exchange="binance",
+        availability_start_by_kind=availability,
+        availability_end_by_kind=availability,
+        max_workers=1,
+    )
+    parallel = alpha_max_runner._alpha_max_root_validation(
+        roots,
+        exchange="binance",
+        availability_start_by_kind=availability,
+        availability_end_by_kind=availability,
+    )
+
+    def result_bytes(result: object) -> bytes:
+        seals, failures = result
+        return alpha_max_runner._canonical_bytes(
+            {
+                "failures": list(failures),
+                "seals": [[list(key), list(value)] for key, value in sorted(seals.items())],
+            }
+        )
+
+    assert observed_worker_counts == [4]
+    assert result_bytes(serial) == result_bytes(parallel)
+    with pytest.raises(
+        AlphaMaxRuntimeContractError,
+        match="alpha_max_root_worker_count_invalid",
+    ):
+        alpha_max_runner._alpha_max_root_validation(
+            roots,
+            exchange="binance",
+            availability_start_by_kind=availability,
+            availability_end_by_kind=availability,
+            max_workers=5,
+        )
 
 
 def test_exact_tick_reducer_matches_one_second_engine_state(

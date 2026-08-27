@@ -3,7 +3,9 @@ from __future__ import annotations
 import copy
 import gc
 import hashlib
+import mmap
 import os
+import stat
 from pathlib import Path
 from types import MappingProxyType, SimpleNamespace
 
@@ -26,9 +28,18 @@ def _sha256(payload: bytes) -> str:
 
 def _indicator_day_descriptor(root: Path) -> dict[str, object]:
     parent = root.parent.stat()
-    receipt = {
+    config_receipt = {
         "byte_count": 1,
         "path": str((root.parent / "identity.json").resolve()),
+        "sha256": "a" * 64,
+    }
+    manifest_receipt = {
+        "byte_count": 1,
+        "path": str(
+            (
+                root.parent / "output/manifests/validation_train_fit/component_carry_1x.json"
+            ).resolve()
+        ),
         "sha256": "a" * 64,
     }
     root_binding = {
@@ -51,9 +62,9 @@ def _indicator_day_descriptor(root: Path) -> dict[str, object]:
         "window_seconds": 1,
         "windows_per_day": 86_400,
         "terminal_windows": 31_622_400,
-        "config": receipt,
+        "config": config_receipt,
         "contract_manifest": {"byte_count": 1, "sha256": "a" * 64},
-        "manifest": receipt,
+        "manifest": manifest_receipt,
         "admitted_symbols": list(evidence.ALPHA_MAX_CANDIDATE_SYMBOLS),
         "raw_roots": [root_binding],
         "feature_roots": [{**root_binding, "root_kind": "feature"}],
@@ -431,6 +442,107 @@ def test_indicator_day_checkpoint_descriptor_accepts_ordered_admitted_subset(
     store = runner._AlphaMaxIndicatorDayCheckpointStore(root, descriptor=descriptor)
 
     assert store._descriptor["admitted_symbols"] == list(evidence.ALPHA_MAX_CANDIDATE_SYMBOLS[:5])
+
+
+def test_indicator_day_checkpoint_rejects_protected_path_overlap(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    descriptor = _indicator_day_descriptor(root)
+
+    with pytest.raises(
+        runner.AlphaMaxRuntimeContractError,
+        match="alpha_max_indicator_checkpoint_path_overlap",
+    ):
+        runner._AlphaMaxIndicatorDayCheckpointStore(root, descriptor=descriptor)
+    assert not root.exists()
+
+
+def test_indicator_day_checkpoint_rejects_symlinked_parent_alias(tmp_path: Path) -> None:
+    protected = tmp_path / "protected"
+    protected.mkdir()
+    (protected / "subdir").mkdir()
+    alias = tmp_path / "alias"
+    alias.symlink_to(protected, target_is_directory=True)
+    root = alias / "subdir/checkpoint"
+    descriptor = _indicator_day_descriptor(root)
+    descriptor["raw_roots"][0]["path"] = str(protected.resolve())
+
+    with pytest.raises(
+        runner.AlphaMaxRuntimeContractError,
+        match="alpha_max_indicator_checkpoint_parent_invalid",
+    ):
+        runner._AlphaMaxIndicatorDayCheckpointStore(root, descriptor=descriptor)
+    assert not root.exists()
+
+
+def test_indicator_day_checkpoint_rejects_postconstruction_ancestor_alias(
+    tmp_path: Path,
+) -> None:
+    container = tmp_path / "container"
+    parent = container / "subdir"
+    parent.mkdir(parents=True)
+    root = parent / "checkpoint"
+    store = runner._AlphaMaxIndicatorDayCheckpointStore(
+        root,
+        descriptor=_indicator_day_descriptor(root),
+    )
+    protected = tmp_path / "protected"
+    protected.mkdir()
+    moved = protected / "container"
+    container.rename(moved)
+    container.symlink_to(moved, target_is_directory=True)
+
+    with pytest.raises(
+        runner.AlphaMaxRuntimeContractError,
+        match="alpha_max_indicator_checkpoint_parent_replaced",
+    ):
+        store.load_latest(
+            start_utc=store._start_utc,
+            end_utc=store._end_utc,
+        )
+
+
+def test_indicator_day_checkpoint_holds_exclusive_writer_lock(tmp_path: Path) -> None:
+    root = tmp_path / "checkpoint"
+    descriptor = _indicator_day_descriptor(root)
+    first = runner._AlphaMaxIndicatorDayCheckpointStore(root, descriptor=descriptor)
+
+    with pytest.raises(
+        runner.AlphaMaxRuntimeContractError,
+        match="alpha_max_indicator_checkpoint_lock_unavailable",
+    ):
+        runner._AlphaMaxIndicatorDayCheckpointStore(root, descriptor=descriptor)
+
+    lock_path = tmp_path / ".checkpoint.alpha-max-indicator.lock"
+    displaced_lock = tmp_path / ".checkpoint.alpha-max-indicator.lock.displaced"
+    lock_path.rename(displaced_lock)
+    lock_path.write_bytes(b"")
+    with pytest.raises(
+        runner.AlphaMaxRuntimeContractError,
+        match="alpha_max_indicator_checkpoint_parent_replaced",
+    ):
+        first.load_latest(
+            start_utc=first._start_utc,
+            end_utc=first._end_utc,
+        )
+    with pytest.raises(
+        runner.AlphaMaxRuntimeContractError,
+        match="alpha_max_indicator_checkpoint_lock_unavailable",
+    ):
+        runner._AlphaMaxIndicatorDayCheckpointStore(root, descriptor=descriptor)
+    lock_path.unlink()
+    displaced_lock.rename(lock_path)
+
+    first.__del__()
+    del first
+    gc.collect()
+    restarted = runner._AlphaMaxIndicatorDayCheckpointStore(root, descriptor=descriptor)
+    assert (
+        restarted.load_latest(
+            start_utc=restarted._start_utc,
+            end_utc=restarted._end_utc,
+        )
+        is None
+    )
 
 
 def test_indicator_day_checkpoint_store_rejects_root_and_days_replacement(
@@ -989,6 +1101,7 @@ def _v2_cell_descriptor(
         "physical_schedule_sha256": _sha256(runner._canonical_bytes(schedule)),
         "python": {},
         "root_seals": [],
+        "runtime_identity": runner._alpha_max_indicator_runtime_binding(),
         "runtime_contract_sha256": "a" * 64,
         "thread_contract": {},
         "universe": {},
@@ -1207,6 +1320,422 @@ def test_v2_prelock_descriptor_requires_prior_trial_blob_binding(
         runner._alpha_max_validate_checkpoint_descriptor(descriptor)
 
 
+def test_v2_checkpoint_rejects_loaded_native_identity_mismatch(tmp_path: Path) -> None:
+    output = (tmp_path / "prelock-output").resolve()
+    checkpoint = (tmp_path / "prelock-checkpoint").resolve()
+    descriptor = _v2_cell_descriptor(checkpoint, output, domain="validation")
+    descriptor["runtime_identity"]["extension_sha256"] = "f" * 64
+
+    with pytest.raises(
+        runner.AlphaMaxRuntimeContractError,
+        match="alpha_max_checkpoint_runtime_identity_mismatch",
+    ):
+        runner._AlphaMaxCellCheckpointStore(
+            checkpoint,
+            output_root=output,
+            descriptor=descriptor,
+            config_bytes=b'{"config":"test"}\n',
+        )
+    assert not checkpoint.exists()
+
+
+def test_loaded_mapping_identity_rejects_path_replacement(tmp_path: Path) -> None:
+    mapped_path = (tmp_path / "mapped-native.so").resolve()
+    mapped_path.write_bytes(b"x" * 4096)
+    fd = os.open(mapped_path, os.O_RDONLY)
+    mapping = mmap.mmap(fd, 4096, access=mmap.ACCESS_READ)
+    os.close(fd)
+    try:
+        status = mapped_path.stat()
+        assert runner._alpha_max_loaded_mapping_identity(mapped_path) == (
+            status.st_dev,
+            status.st_ino,
+        )
+        displaced = tmp_path / "mapped-native-original.so"
+        mapped_path.rename(displaced)
+        mapped_path.write_bytes(b"y" * 4096)
+        with pytest.raises(
+            runner.AlphaMaxRuntimeContractError,
+            match="alpha_max_indicator_native_identity_invalid",
+        ):
+            runner._alpha_max_loaded_mapping_identity(mapped_path)
+        assert displaced.read_bytes() == b"x" * 4096
+    finally:
+        mapping.close()
+
+
+def test_loaded_mapping_identity_binds_builtin_function_address() -> None:
+    from lumina_quant import _compute
+
+    extension_path = Path(_compute.__file__).resolve(strict=True)
+    status = extension_path.stat()
+    assert runner._alpha_max_loaded_mapping_identity(
+        extension_path,
+        (
+            _compute.fold_alpha_max_native_bars,
+            _compute.build_info,
+            _compute.kernel_src_hash,
+        ),
+    ) == (status.st_dev, status.st_ino)
+    with pytest.raises(
+        runner.AlphaMaxRuntimeContractError,
+        match="alpha_max_indicator_native_identity_invalid",
+    ):
+        runner._alpha_max_loaded_mapping_identity(extension_path, (len,))
+
+
+def test_precompute_checkpoint_store_seals_reloads_and_rejects_tamper(
+    tmp_path: Path,
+) -> None:
+    output = (tmp_path / "prelock-output").resolve()
+    checkpoint = (tmp_path / "prelock-checkpoint").resolve()
+    descriptor = _v2_cell_descriptor(checkpoint, output, domain="validation")
+    config_bytes = b'{"config":"test"}\n'
+    store = runner._AlphaMaxCellCheckpointStore(
+        checkpoint,
+        output_root=output,
+        descriptor=descriptor,
+        config_bytes=config_bytes,
+    )
+    payload = (
+        runner._canonical_bytes(
+            {
+                "artifact_kind": "test_precompute_payload.v1",
+                "component_id": "component_carry_1x",
+                "values": ["0x0.0p+0"],
+            }
+        )
+        + b"\n"
+    )
+
+    assert (
+        store.load_precompute(
+            unit_kind="training_component",
+            unit_id="component_carry_1x",
+        )
+        is None
+    )
+    assert (
+        store.seal_precompute(
+            unit_kind="training_component",
+            unit_id="component_carry_1x",
+            data_bytes=payload,
+        )
+        == payload
+    )
+    unit = (
+        checkpoint
+        / "precompute/units"
+        / store._precompute_store._unit_name(
+            "training_component",
+            "component_carry_1x",
+        )
+    )
+    assert stat.S_IMODE(unit.stat().st_mode) == 0o555
+    assert stat.S_IMODE((unit / "DATA.json").stat().st_mode) == 0o444
+    assert stat.S_IMODE((unit / "SEALED.json").stat().st_mode) == 0o444
+    unit_seal = runner._strict_json_object((unit / "SEALED.json").read_bytes())
+    assert unit_seal["runtime_identity_sha256"] == store._runtime_identity_sha256
+    store.__del__()
+    del store
+    gc.collect()
+
+    restarted = runner._AlphaMaxCellCheckpointStore(
+        checkpoint,
+        output_root=output,
+        descriptor=descriptor,
+        config_bytes=config_bytes,
+    )
+    assert (
+        restarted.load_precompute(
+            unit_kind="training_component",
+            unit_id="component_carry_1x",
+        )
+        == payload
+    )
+    os.chmod(unit / "DATA.json", 0o644)
+    (unit / "DATA.json").write_bytes(payload.replace(b"carry", b"trend"))
+    os.chmod(unit / "DATA.json", 0o444)
+    with pytest.raises(
+        runner.AlphaMaxRuntimeContractError,
+        match="alpha_max_precompute_unit_seal_invalid",
+    ):
+        restarted.load_precompute(
+            unit_kind="training_component",
+            unit_id="component_carry_1x",
+        )
+
+
+def test_precompute_checkpoint_rejects_units_directory_replacement(tmp_path: Path) -> None:
+    output = (tmp_path / "prelock-output").resolve()
+    checkpoint = (tmp_path / "prelock-checkpoint").resolve()
+    descriptor = _v2_cell_descriptor(checkpoint, output, domain="validation")
+    store = runner._AlphaMaxCellCheckpointStore(
+        checkpoint,
+        output_root=output,
+        descriptor=descriptor,
+        config_bytes=b'{"config":"test"}\n',
+    )
+    precompute = checkpoint / "precompute"
+    units = precompute / "units"
+    displaced = precompute / "units-displaced"
+    victim = tmp_path / "unclassified-units"
+    victim.mkdir()
+    units.rename(displaced)
+    units.symlink_to(victim, target_is_directory=True)
+
+    with pytest.raises(
+        runner.AlphaMaxRuntimeContractError,
+        match="alpha_max_precompute_root_invalid",
+    ):
+        store.load_precompute(
+            unit_kind="training_component",
+            unit_id="component_carry_1x",
+        )
+    assert not tuple(victim.iterdir())
+
+    units.unlink()
+    displaced.rename(units)
+
+
+def test_cell_checkpoint_rejects_cells_directory_replacement(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    context = _build_context(tmp_path, monkeypatch)
+    output = (tmp_path / "prelock-output").resolve()
+    checkpoint = (tmp_path / "prelock-checkpoint").resolve()
+    descriptor = _v2_cell_descriptor(checkpoint, output, domain="validation")
+    store = runner._AlphaMaxCellCheckpointStore(
+        checkpoint,
+        output_root=output,
+        descriptor=descriptor,
+        config_bytes=context.preflight.config_bytes,
+    )
+    cells = checkpoint / "cells"
+    displaced = checkpoint / "cells-displaced"
+    victim = tmp_path / "unclassified-cells"
+    victim.mkdir()
+    cells.rename(displaced)
+    cells.symlink_to(victim, target_is_directory=True)
+
+    with pytest.raises(
+        runner.AlphaMaxRuntimeContractError,
+        match="alpha_max_checkpoint_root_invalid",
+    ):
+        store.load(
+            row_id=context.cell.row_id,
+            nominal_cost_bps=20,
+            preflight=context.preflight,
+            prepared=context.prepared,
+        )
+    assert not tuple(victim.iterdir())
+
+    cells.unlink()
+    displaced.rename(cells)
+
+
+def test_cell_checkpoint_root_lock_survives_lock_path_replacement(tmp_path: Path) -> None:
+    output = (tmp_path / "prelock-output").resolve()
+    checkpoint = (tmp_path / "prelock-checkpoint").resolve()
+    descriptor = _v2_cell_descriptor(checkpoint, output, domain="validation")
+    config_bytes = b'{"config":"test"}\n'
+    store = runner._AlphaMaxCellCheckpointStore(
+        checkpoint,
+        output_root=output,
+        descriptor=descriptor,
+        config_bytes=config_bytes,
+    )
+    lock_path = tmp_path / ".prelock-output.alpha-max-restart.lock"
+    displaced_lock = tmp_path / ".prelock-output.alpha-max-restart.lock.displaced"
+    lock_path.rename(displaced_lock)
+    lock_path.write_bytes(b"")
+
+    with pytest.raises(
+        runner.AlphaMaxRuntimeContractError,
+        match="alpha_max_checkpoint_root_invalid",
+    ):
+        store.load_precompute(
+            unit_kind="training_component",
+            unit_id="component_carry_1x",
+        )
+    with pytest.raises(
+        runner.AlphaMaxRuntimeContractError,
+        match="alpha_max_checkpoint_lock_unavailable",
+    ):
+        runner._AlphaMaxCellCheckpointStore(
+            checkpoint,
+            output_root=output,
+            descriptor=descriptor,
+            config_bytes=config_bytes,
+        )
+
+    lock_path.unlink()
+    displaced_lock.rename(lock_path)
+
+
+def test_precompute_checkpoint_rejects_unknown_and_cleans_exact_staging(
+    tmp_path: Path,
+) -> None:
+    output = (tmp_path / "prelock-output").resolve()
+    checkpoint = (tmp_path / "prelock-checkpoint").resolve()
+    descriptor = _v2_cell_descriptor(checkpoint, output, domain="validation")
+    config_bytes = b'{"config":"test"}\n'
+    store = runner._AlphaMaxCellCheckpointStore(
+        checkpoint,
+        output_root=output,
+        descriptor=descriptor,
+        config_bytes=config_bytes,
+    )
+    precompute = checkpoint / "precompute"
+    valid_name = store._precompute_store._unit_name(
+        "training_component",
+        "component_carry_1x",
+    )
+    store.__del__()
+    del store
+    gc.collect()
+
+    staging = precompute / "units" / f".{valid_name}.staging-abcdefgh"
+    staging.mkdir()
+    (staging / "DATA.json").write_bytes(b"partial")
+    restarted = runner._AlphaMaxCellCheckpointStore(
+        checkpoint,
+        output_root=output,
+        descriptor=descriptor,
+        config_bytes=config_bytes,
+    )
+    assert not staging.exists()
+    restarted.__del__()
+    del restarted
+    gc.collect()
+
+    victim = tmp_path / "unclassified-work"
+    victim.mkdir()
+    symlink_stage = precompute / "units" / f".{valid_name}.staging-ijklmnop"
+    symlink_stage.symlink_to(victim, target_is_directory=True)
+    with pytest.raises(
+        runner.AlphaMaxRuntimeContractError,
+        match="alpha_max_precompute_inventory_invalid",
+    ):
+        runner._AlphaMaxCellCheckpointStore(
+            checkpoint,
+            output_root=output,
+            descriptor=descriptor,
+            config_bytes=config_bytes,
+        )
+    assert symlink_stage.is_symlink()
+    assert victim.is_dir()
+    symlink_stage.unlink()
+
+    hardlink_stage = precompute / "units" / f".{valid_name}.staging-qrstuvwx"
+    hardlink_stage.mkdir()
+    outside_file = victim / "outside.json"
+    outside_file.write_bytes(b"unclassified")
+    os.link(outside_file, hardlink_stage / "DATA.json")
+    with pytest.raises(
+        runner.AlphaMaxRuntimeContractError,
+        match="alpha_max_precompute_inventory_invalid",
+    ):
+        runner._AlphaMaxCellCheckpointStore(
+            checkpoint,
+            output_root=output,
+            descriptor=descriptor,
+            config_bytes=config_bytes,
+        )
+    assert outside_file.read_bytes() == b"unclassified"
+    assert (hardlink_stage / "DATA.json").exists()
+    (hardlink_stage / "DATA.json").unlink()
+    hardlink_stage.rmdir()
+
+    (precompute / "units" / "unknown-unit").mkdir()
+    with pytest.raises(
+        runner.AlphaMaxRuntimeContractError,
+        match="alpha_max_precompute_inventory_invalid",
+    ):
+        runner._AlphaMaxCellCheckpointStore(
+            checkpoint,
+            output_root=output,
+            descriptor=descriptor,
+            config_bytes=config_bytes,
+        )
+
+
+def test_prepared_checkpoint_restart_republishes_exact_capsule_bytes_and_rejects_corruption(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    context = _build_context(tmp_path, monkeypatch)
+    checkpoint_bytes = runner._alpha_max_prepared_row_checkpoint_bytes(
+        context.prepared,
+        domain="validation",
+    )
+    original_envelopes = {
+        value.fold_id: Path(value.capsule_receipt.path).read_bytes()
+        for value in context.prepared.fold_inputs
+    }
+    root_seals = {
+        (seal.root_id, seal.root_kind): seal
+        for value in context.prepared.fold_inputs
+        for seal in (*value.raw_root_seals, *value.feature_root_seals)
+    }
+    restored_root = (tmp_path / "restored-output").resolve()
+    restored_root.mkdir()
+
+    class RestoredFoldInput:
+        def __init__(self, **values: object) -> None:
+            self.__dict__.update(values)
+
+    monkeypatch.setattr(runner, "_AlphaMaxFoldReplayInput", RestoredFoldInput)
+    monkeypatch.setattr(
+        runner,
+        "_AlphaMaxBoundedRawLoader",
+        lambda *_args, **_kwargs: object(),
+    )
+    monkeypatch.setattr(
+        runner,
+        "_alpha_max_phase_lookup",
+        lambda *_args, **_kwargs: object(),
+    )
+
+    restored = runner._alpha_max_restore_prepared_row_checkpoint(
+        checkpoint_bytes,
+        preflight=context.preflight,
+        manifest=context.manifest,
+        admitted_symbols=evidence.ALPHA_MAX_CANDIDATE_SYMBOLS[:9],
+        root_seals=root_seals,
+        domain="validation",
+        gross=1.0,
+        capsule_output_root=restored_root,
+    )
+
+    assert tuple(value.fold_id for value in restored.fold_inputs) == tuple(original_envelopes)
+    for value in restored.fold_inputs:
+        assert Path(value.capsule_receipt.path).read_bytes() == original_envelopes[value.fold_id]
+        assert value.capsule_receipt.sha256 == _sha256(original_envelopes[value.fold_id])
+
+    corrupted = runner._strict_json_object(checkpoint_bytes)
+    corrupted["fold_capsules"][0]["envelope_base64"] = "Y29ycnVwdA=="
+    corrupted_bytes = runner._canonical_bytes(corrupted) + b"\n"
+    rejected_root = (tmp_path / "rejected-output").resolve()
+    rejected_root.mkdir()
+    with pytest.raises(
+        runner.AlphaMaxRuntimeContractError,
+        match="alpha_max_prepared_checkpoint_capsule_mismatch",
+    ):
+        runner._alpha_max_restore_prepared_row_checkpoint(
+            corrupted_bytes,
+            preflight=context.preflight,
+            manifest=context.manifest,
+            admitted_symbols=evidence.ALPHA_MAX_CANDIDATE_SYMBOLS[:9],
+            root_seals=root_seals,
+            domain="validation",
+            gross=1.0,
+            capsule_output_root=rejected_root,
+        )
+    assert not tuple(rejected_root.rglob("*.json"))
+
+
 def test_historical_checkpoint_store_round_trip_binds_ten_fold_cell_and_prelock(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1244,6 +1773,7 @@ def test_historical_checkpoint_store_round_trip_binds_ten_fold_cell_and_prelock(
     assert seal["domain"] == "historical_exposed_evaluation"
     assert seal["fold_count"] == 10
     assert seal["fold_ids"] == list(runner._ALPHA_MAX_HISTORICAL_FOLD_IDS)
+    assert seal["runtime_identity_sha256"] == store._runtime_identity_sha256
     assert seal["physical_schedule_sha256"] == descriptor["physical_schedule_sha256"]
     assert seal["prelock_binding"] == descriptor["prelock_binding"]
     store.__del__()
@@ -1436,6 +1966,30 @@ def test_resumable_inventory_rejects_unknown_file_and_cleans_only_named_temp(
     ) == {"inputs/config.json": b"{}\n"}
 
 
+def test_historical_resumable_inventory_rejects_unknown_regular_file(
+    tmp_path: Path,
+) -> None:
+    root = (tmp_path / "historical-run").resolve()
+    root.mkdir()
+    activation_paths = runner._alpha_max_historical_activation_paths()
+    assert len(activation_paths) == 155
+    for relative in sorted(activation_paths):
+        runner._write_bundle_file(root, relative, b"{}\n")
+    unknown = root / "stale-output.json"
+    unknown.write_bytes(b"{}\n")
+
+    with pytest.raises(
+        runner.AlphaMaxRuntimeContractError,
+        match=r"alpha_max_resumable_inventory_unknown:stale-output\.json",
+    ):
+        runner._alpha_max_collect_existing_artifacts(
+            root,
+            allowed_paths=activation_paths,
+            required_paths=activation_paths,
+        )
+    assert unknown.read_bytes() == b"{}\n"
+
+
 def test_checkpoint_store_rejects_replaced_descriptor_parent(
     tmp_path: Path,
 ) -> None:
@@ -1572,7 +2126,7 @@ def test_cell_is_loadable_after_crash_immediately_after_atomic_directory_rename(
     original_fsync = runner._fsync_directory
 
     def crash_after_rename(path: Path) -> None:
-        if Path(path).name == "cells" and cell_path.exists():
+        if Path(path).resolve() == (checkpoint / "cells").resolve() and cell_path.exists():
             raise RuntimeError("injected crash after directory rename")
         original_fsync(path)
 

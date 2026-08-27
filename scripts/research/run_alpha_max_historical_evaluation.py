@@ -6,7 +6,10 @@ from __future__ import annotations
 import argparse
 from collections.abc import Sequence
 
-from lumina_quant.alpha_max_process_boundary import reject_ambient_lq_environment
+from lumina_quant.alpha_max_process_boundary import (
+    alpha_max_bootstrap_implementation_inventory,
+    reject_ambient_lq_environment,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -24,7 +27,11 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _execute(args: argparse.Namespace) -> int:
+def _execute(
+    args: argparse.Namespace,
+    *,
+    bootstrap_implementation_inventory: list[dict[str, object]],
+) -> int:
     from lumina_quant.research.alpha_max_engine_runner import run_alpha_max_historical_process
 
     result = run_alpha_max_historical_process(
@@ -35,14 +42,19 @@ def _execute(args: argparse.Namespace) -> int:
         exchange=args.exchange,
         output_root=args.output_root,
         checkpoint_root=args.checkpoint_root,
+        bootstrap_implementation_inventory=bootstrap_implementation_inventory,
     )
     return result.exit_code
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     reject_ambient_lq_environment()
+    bootstrap_inventory = alpha_max_bootstrap_implementation_inventory()
     args = build_parser().parse_args(argv)
-    return _execute(args)
+    return _execute(
+        args,
+        bootstrap_implementation_inventory=bootstrap_inventory,
+    )
 
 
 if __name__ == "__main__":

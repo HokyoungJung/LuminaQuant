@@ -452,7 +452,11 @@ def test_historical_cli_forwards_checkpoint_root_exactly(monkeypatch) -> None:
     monkeypatch.setattr(
         module,
         "_execute",
-        lambda args: seen.update(vars(args)) or 0,
+        lambda args, **kwargs: (
+            seen.update(vars(args))
+            or seen.update(bootstrap_inventory=kwargs["bootstrap_implementation_inventory"])
+            or 0
+        ),
     )
     checkpoint_root = "/historical/checkpoint-root"
     assert (
@@ -477,6 +481,7 @@ def test_historical_cli_forwards_checkpoint_root_exactly(monkeypatch) -> None:
         == 0
     )
     assert seen["checkpoint_root"] == checkpoint_root
+    assert seen["bootstrap_inventory"]
 
 
 def test_prelock_invalid_roots_leave_no_output_or_stage(tmp_path: Path) -> None:
@@ -885,7 +890,10 @@ def _run_physical_schedule_child(temp_root: Path) -> None:
             "selection/prelock.json": b"{}\n",
         }[relative]
 
-    runner._snapshot_bundle_tree = lambda _path: snapshot
+    real_snapshot_bundle_tree = runner._snapshot_bundle_tree
+    runner._snapshot_bundle_tree = lambda path, **kwargs: (
+        snapshot if Path(path).resolve() == prelock else real_snapshot_bundle_tree(path, **kwargs)
+    )
     runner._validate_prelock_snapshot = lambda _snapshot: ("1" * 64, seal_bytes)
     runner._validate_complete_alpha_max_prelock_matrix = lambda *_args, **_kwargs: None
     runner._alpha_max_root_validation = lambda *_args, **_kwargs: (root_seals, ())
@@ -912,14 +920,87 @@ def _run_physical_schedule_child(temp_root: Path) -> None:
         prelock_champion=None,
         selected_candidate_id=None,
     )
+    retained_manifests: dict[str, object] = {}
 
     def retained_row(_snapshot, *, row_id: str):
         index = runner._ALPHA_MAX_RESOLVABLE_ROWS.index(row_id) + 1
-        return SimpleNamespace(sha256=f"{index:064x}"), SimpleNamespace(), SimpleNamespace(), 1.0
+        manifest = SimpleNamespace(
+            row_id=row_id,
+            phase="prelock_final_refit",
+            path=f"/fixture/manifests/{row_id}.json",
+            sha256=f"{index:064x}",
+            byte_count=index,
+        )
+        retained_manifests[manifest.path] = manifest
+        return (
+            manifest,
+            SimpleNamespace(),
+            SimpleNamespace(),
+            1.0,
+        )
 
     runner._alpha_max_prelock_final_row_artifacts = retained_row
+    runner.seal_alpha_max_manifest_activation = lambda *_args, manifest_path, **_kwargs: (
+        SimpleNamespace(manifest_receipt=retained_manifests[str(manifest_path)])
+    )
     runner._AlphaMaxBoundedRawLoader = lambda *_args, **_kwargs: SimpleNamespace()
     runner._alpha_max_build_fold_inputs = lambda *_args, domain, **_kwargs: fold_inputs(domain)
+    runner._alpha_max_prepared_row_checkpoint_bytes = lambda prepared, *, domain: (
+        runner._canonical_bytes(
+            {
+                "artifact_kind": "fixture_prepared_checkpoint.v1",
+                "domain": domain,
+                "gross_hex": prepared.gross.hex(),
+                "row_id": prepared.manifest_receipt.row_id,
+            }
+        )
+        + b"\n"
+    )
+
+    def restore_prepared_checkpoint(
+        payload: bytes,
+        *,
+        manifest: object,
+        domain: str,
+        gross: float,
+        **kwargs: object,
+    ) -> object:
+        assert runner._strict_json_object(payload) == {
+            "artifact_kind": "fixture_prepared_checkpoint.v1",
+            "domain": domain,
+            "gross_hex": gross.hex(),
+            "row_id": manifest.row_id,
+        }
+        if domain == "historical_exposed_evaluation":
+            capsule_root = Path(kwargs["capsule_output_root"])
+            for fold_id in runner._ALPHA_MAX_HISTORICAL_FOLD_IDS[1:]:
+                relative = f"capsules/prelock_final_refit/{manifest.row_id}/{fold_id}.json"
+                capsule_bytes = (
+                    runner._canonical_bytes(
+                        {
+                            "artifact_kind": "fixture_historical_capsule.v1",
+                            "fold_id": fold_id,
+                            "row_id": manifest.row_id,
+                        }
+                    )
+                    + b"\n"
+                )
+                path = capsule_root / relative
+                if path.exists():
+                    assert path.read_bytes() == capsule_bytes
+                else:
+                    runner._write_bundle_file_atomic(
+                        capsule_root,
+                        relative,
+                        capsule_bytes,
+                    )
+        return runner._AlphaMaxPreparedReplayRow(
+            manifest_receipt=manifest,
+            fold_inputs=fold_inputs(domain),
+            gross=gross,
+        )
+
+    runner._alpha_max_restore_prepared_row_checkpoint = restore_prepared_checkpoint
     runner.rank_alpha_max_historical_report = lambda _rows: SimpleNamespace(
         canonical_bytes=b'{"rows":[]}\n'
     )
@@ -950,12 +1031,30 @@ def _run_physical_schedule_child(temp_root: Path) -> None:
             self.output_root = Path(output_root).resolve()
             self.display_output_root = self.output_root
             self._physical_schedule_sha256 = descriptor["physical_schedule_sha256"]
+            self.descriptor_sha256 = "f" * 64
+            self._precompute: dict[tuple[str, str], bytes] = {}
 
         def load(self, **_kwargs: object) -> None:
             return None
 
+        def bind_output_root(self) -> Path:
+            return self.output_root
+
         def seal(self, evidence_value: object, **_kwargs: object) -> object:
             return evidence_value
+
+        def load_precompute(self, *, unit_kind: str, unit_id: str) -> bytes | None:
+            return self._precompute.get((unit_kind, unit_id))
+
+        def seal_precompute(
+            self,
+            *,
+            unit_kind: str,
+            unit_id: str,
+            data_bytes: bytes,
+        ) -> bytes:
+            self._precompute[(unit_kind, unit_id)] = data_bytes
+            return data_bytes
 
     runner._AlphaMaxCellCheckpointStore = InstrumentedCellCheckpointStore
     write_order: list[str] = []
@@ -1043,9 +1142,7 @@ def _run_physical_schedule_child(temp_root: Path) -> None:
         )
     except runner.AlphaMaxRuntimeContractError as exc:
         overwrite_error = str(exc)
-    assert overwrite_error == (
-        "alpha_max_historical_input_invalid:prelock_execution_inputs:alpha_max_output_root_exists"
-    )
+    assert overwrite_error == "alpha_max_output_root_recovered_sealed"
 
     duplicate_error = None
     try:
@@ -1100,8 +1197,9 @@ def test_p04_child_process_preserves_prelock_and_refuses_overwrite(
     physical_schedule_child_payload: dict[str, object],
 ) -> None:
     assert physical_schedule_child_payload["prelock_marker"] == "prelock-read-only\n"
-    assert physical_schedule_child_payload["overwrite_error"] == (
-        "alpha_max_historical_input_invalid:prelock_execution_inputs:alpha_max_output_root_exists"
+    assert (
+        physical_schedule_child_payload["overwrite_error"]
+        == "alpha_max_output_root_recovered_sealed"
     )
 
 
@@ -1235,7 +1333,7 @@ def test_p09_public_historical_process_is_one_touch_and_append_only(
     public_process_payload: dict[str, object],
 ) -> None:
     p09 = public_process_payload["p09"]
-    assert "alpha_max_output_root_exists" in p09["overwrite_error"]
+    assert "alpha_max_output_root_recovered_sealed" in p09["overwrite_error"]
     assert "alpha_max_historical_completion_duplicate" in p09["duplicate_error"]
     assert p09["duplicate_output_absent"] is True
     assert p09["immutable"] is True

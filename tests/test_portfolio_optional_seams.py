@@ -944,9 +944,7 @@ def test_funding_boundary_resolver_normalizes_epoch_ms_latest_time_to_utc():
 
     portfolio, _ = _portfolio(funding_boundary_resolver=_BatchResolver())
     portfolio.current_positions["BTC"] = 1.0
-    portfolio._last_funding_ts["BTC"] = datetime(
-        2026, 7, 10, 0, 0, tzinfo=UTC
-    ).timestamp()
+    portfolio._last_funding_ts["BTC"] = datetime(2026, 7, 10, 0, 0, tzinfo=UTC).timestamp()
 
     portfolio._apply_funding(int(expected.timestamp() * 1000))
 
