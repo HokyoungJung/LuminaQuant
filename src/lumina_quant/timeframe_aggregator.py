@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import math
 from collections import defaultdict, deque
+from collections.abc import Iterable
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
@@ -13,6 +16,16 @@ from lumina_quant.market_data import normalize_timeframe_token, timeframe_to_mil
 _DEFAULT_TIMEFRAMES = ("20s", "1m", "5m", "15m", "1h", "4h", "1d")
 _DEFAULT_LOOKBACK = 4096
 _DEFAULT_1S_LOOKBACK = 20_000
+
+
+@dataclass(frozen=True, slots=True)
+class NativeBarRelease:
+    """One completed native bar and the raw timestamp that released it."""
+
+    release_timestamp_ms: int
+    symbol: str
+    timeframe: str
+    bar: tuple[Any, float, float, float, float, float]
 
 
 class TimeframeAggregator:
@@ -190,7 +203,7 @@ class TimeframeAggregator:
         low_price: float,
         close_price: float,
         volume: float,
-    ) -> None:
+    ) -> tuple[Any, float, float, float, float, float] | None:
         bucket_ms = (int(ts_ms) // int(tf_ms)) * int(tf_ms)
         working = self._working[symbol].get(timeframe)
         if working is None:
@@ -203,10 +216,11 @@ class TimeframeAggregator:
                 "close": float(close_price),
                 "volume": float(volume),
             }
-            return
+            return None
 
         if int(working.get("bucket_ms", bucket_ms)) != bucket_ms:
-            self._ensure_history(symbol, timeframe).append(self._to_bar_tuple(working))
+            completed = self._to_bar_tuple(working)
+            self._ensure_history(symbol, timeframe).append(completed)
             self._working[symbol][timeframe] = {
                 "bucket_ms": bucket_ms,
                 "time": self._bucket_time(bucket_ms),
@@ -216,12 +230,73 @@ class TimeframeAggregator:
                 "close": float(close_price),
                 "volume": float(volume),
             }
-            return
+            return completed
 
         working["high"] = max(float(working["high"]), float(high_price))
         working["low"] = min(float(working["low"]), float(low_price))
         working["close"] = float(close_price)
         working["volume"] = float(working["volume"]) + float(volume)
+        return None
+
+    def update_from_canonical_1s_rows_exact(
+        self,
+        symbol: str,
+        rows_1s: Iterable[tuple[int, float, float, float, float, float]],
+    ) -> tuple[NativeBarRelease, ...]:
+        """Fold canonical rows once and report exact native-bar release times."""
+        key = str(symbol)
+        releases: list[NativeBarRelease] = []
+        last_seen = self._last_seen_ms.get(key)
+        for row in rows_1s:
+            if (
+                type(row) is not tuple
+                or len(row) != 6
+                or type(row[0]) is not int
+                or any(type(value) is not float for value in row[1:])
+            ):
+                raise ValueError("canonical_1s_row_invalid")
+            ts_ms, open_price, high_price, low_price, close_price, volume = row
+            if (
+                abs(ts_ms) < 100_000_000_000
+                or (last_seen is not None and ts_ms <= last_seen)
+                or not all(
+                    math.isfinite(value)
+                    for value in (open_price, high_price, low_price, close_price, volume)
+                )
+                or min(open_price, high_price, low_price, close_price) <= 0.0
+                or volume < 0.0
+                or high_price < low_price
+                or high_price < max(open_price, close_price)
+                or low_price > min(open_price, close_price)
+            ):
+                raise ValueError("canonical_1s_row_invalid")
+            last_seen = ts_ms
+            self._last_seen_ms[key] = ts_ms
+            self._ensure_history(key, "1s").append(row)
+            for timeframe, tf_ms in self._timeframe_ms.items():
+                if timeframe == "1s":
+                    continue
+                completed = self._update_aggregated_timeframe(
+                    symbol=key,
+                    timeframe=timeframe,
+                    tf_ms=tf_ms,
+                    ts_ms=ts_ms,
+                    open_price=open_price,
+                    high_price=high_price,
+                    low_price=low_price,
+                    close_price=close_price,
+                    volume=volume,
+                )
+                if completed is not None:
+                    releases.append(
+                        NativeBarRelease(
+                            release_timestamp_ms=ts_ms,
+                            symbol=key,
+                            timeframe=timeframe,
+                            bar=completed,
+                        )
+                    )
+        return tuple(releases)
 
     def update_from_1s_batch(
         self,

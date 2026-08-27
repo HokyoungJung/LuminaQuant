@@ -1,15 +1,21 @@
+import json
 import logging
 import math
 import os
 from collections import deque
-from dataclasses import replace
-from datetime import UTC, date, datetime
+from collections.abc import Iterator, Mapping
+from dataclasses import dataclass, replace
+from datetime import UTC, date, datetime, timedelta
 
+import numpy as np
 import polars as pl
+from lumina_quant.backtesting._config_view import wrapped_runtime_config
 from lumina_quant.backtesting.execution_model import (
     ExecutionModel,
     ExecutionModelConfig,
+    ExecutionPricingTrace,
     _config_from_attrs,
+    execution_pricing_trace_sha256,
 )
 from lumina_quant.core.events import FillEvent, OrderEvent
 from lumina_quant.core.order_policy import (
@@ -28,10 +34,197 @@ from lumina_quant.services.portfolio import PortfolioPerformanceService, Portfol
 LOGGER = logging.getLogger(__name__)
 
 
+def _canonical_attribution_timeindex(value) -> str | int | float | None:
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, date):
+        return value.isoformat()
+    if value is None or type(value) in {str, int}:
+        return value
+    if type(value) is float and math.isfinite(value):
+        return value
+    raise TypeError("fill_application_timeindex_unsupported")
+
+
+@dataclass(frozen=True, slots=True)
+class FillApplicationAttribution(Mapping[str, object]):
+    """Immutable reconciliation of one real pricing trace into portfolio state."""
+
+    record_type: str
+    pricing_trace_hash: str
+    pricing_trace: ExecutionPricingTrace
+    timeindex: str | int | float | None
+    symbol: str
+    direction: str
+    order_id: str | None
+    client_order_id: str | None
+    position_side: str | None
+    status: str | None
+    reduce_only: bool
+    model_quantity: float
+    model_fill_cost: float
+    model_commission: float
+    applied_quantity: float
+    applied_fill_cost: float
+    applied_commission: float
+    reduce_only_scale: float
+    application_status: str
+    zero_applied_reason: str | None
+
+    def to_payload(self) -> dict[str, object]:
+        """Return strict structured JSON evidence; never repr/stringify the trace."""
+        if type(self) is not FillApplicationAttribution:
+            raise TypeError("fill_application must be an exact FillApplicationAttribution")
+        if self.record_type != "fill_application_attribution":
+            raise ValueError("fill_application_record_type")
+        if self.pricing_trace_hash != execution_pricing_trace_sha256(self.pricing_trace):
+            raise ValueError("fill_application_pricing_trace_hash_mismatch")
+        if self.application_status not in {"applied_unchanged", "applied_scaled", "rejected"}:
+            raise ValueError("fill_application_status")
+        if self.application_status == "rejected" and not self.zero_applied_reason:
+            raise ValueError("fill_application_rejection_reason")
+        if self.application_status != "rejected" and self.zero_applied_reason is not None:
+            raise ValueError("fill_application_unexpected_rejection_reason")
+        if type(self.reduce_only) is not bool:
+            raise TypeError("fill_application_reduce_only")
+        numeric_fields = (
+            "model_quantity",
+            "model_fill_cost",
+            "model_commission",
+            "applied_quantity",
+            "applied_fill_cost",
+            "applied_commission",
+            "reduce_only_scale",
+        )
+        for name in numeric_fields:
+            value = getattr(self, name)
+            if type(value) is not float or not math.isfinite(value):
+                raise ValueError(f"fill_application_nonfinite:{name}")
+        if not math.isclose(
+            self.model_quantity,
+            self.pricing_trace.executed_qty,
+            rel_tol=0.0,
+            abs_tol=1e-12,
+        ):
+            raise ValueError("fill_application_model_quantity_mismatch")
+        if not math.isclose(
+            self.model_fill_cost,
+            self.pricing_trace.fill_price * self.pricing_trace.executed_qty,
+            rel_tol=0.0,
+            abs_tol=1e-12,
+        ):
+            raise ValueError("fill_application_model_cost_mismatch")
+        if not math.isclose(
+            self.model_commission,
+            self.pricing_trace.commission,
+            rel_tol=0.0,
+            abs_tol=1e-12,
+        ):
+            raise ValueError("fill_application_model_commission_mismatch")
+        if self.application_status == "applied_unchanged":
+            if self.reduce_only_scale != 1.0 or any(
+                not math.isclose(applied, model, rel_tol=0.0, abs_tol=1e-12)
+                for applied, model in (
+                    (self.applied_quantity, self.model_quantity),
+                    (self.applied_fill_cost, self.model_fill_cost),
+                    (self.applied_commission, self.model_commission),
+                )
+            ):
+                raise ValueError("fill_application_unchanged_mismatch")
+        elif self.application_status == "applied_scaled":
+            if not 0.0 < self.reduce_only_scale < 1.0:
+                raise ValueError("fill_application_scale_bounds")
+            if any(
+                not math.isclose(
+                    applied,
+                    model * self.reduce_only_scale,
+                    rel_tol=0.0,
+                    abs_tol=1e-12,
+                )
+                for applied, model in (
+                    (self.applied_quantity, self.model_quantity),
+                    (self.applied_fill_cost, self.model_fill_cost),
+                    (self.applied_commission, self.model_commission),
+                )
+            ):
+                raise ValueError("fill_application_scaled_mismatch")
+        elif (
+            self.reduce_only_scale != 0.0
+            or self.applied_quantity != 0.0
+            or self.applied_fill_cost != 0.0
+            or self.applied_commission != 0.0
+        ):
+            raise ValueError("fill_application_rejection_nonzero")
+        for name in ("symbol", "direction"):
+            if type(getattr(self, name)) is not str or not getattr(self, name):
+                raise ValueError(f"fill_application_required:{name}")
+        for name in ("order_id", "client_order_id", "position_side", "status"):
+            value = getattr(self, name)
+            if value is not None and type(value) is not str:
+                raise TypeError(f"fill_application_invalid:{name}")
+
+        return {
+            "record_type": self.record_type,
+            "pricing_trace_hash": self.pricing_trace_hash,
+            "pricing_trace": self.pricing_trace.to_payload(),
+            "timeindex": _canonical_attribution_timeindex(self.timeindex),
+            "symbol": self.symbol,
+            "direction": self.direction,
+            "order_id": self.order_id,
+            "client_order_id": self.client_order_id,
+            "position_side": self.position_side,
+            "status": self.status,
+            "reduce_only": self.reduce_only,
+            "model_quantity": self.model_quantity,
+            "model_fill_cost": self.model_fill_cost,
+            "model_commission": self.model_commission,
+            "applied_quantity": self.applied_quantity,
+            "applied_fill_cost": self.applied_fill_cost,
+            "applied_commission": self.applied_commission,
+            "reduce_only_scale": self.reduce_only_scale,
+            "application_status": self.application_status,
+            "zero_applied_reason": self.zero_applied_reason,
+        }
+
+    def canonical_json_bytes(self) -> bytes:
+        return json.dumps(
+            self.to_payload(),
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode("utf-8")
+
+    def __getitem__(self, key: str) -> object:
+        return self.to_payload()[key]
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self.to_payload())
+
+    def __len__(self) -> int:
+        return len(self.to_payload())
+
+
 class Portfolio:
     """The Portfolio class handles the positions and market value.
     Refactored to use Polars for equity curve storage.
     """
+
+    _LOCKED_OPTIONAL_SEAM_ATTRS = frozenset(
+        {
+            "_fill_application_attribution_sink",
+            "_funding_boundary_resolver",
+            "_full_event_equity_sink",
+            "_reporting_sampling_timeframe",
+        }
+    )
+
+    def __setattr__(self, name, value):
+        if name in self._LOCKED_OPTIONAL_SEAM_ATTRS and getattr(
+            self, "_optional_seams_locked", False
+        ):
+            raise AttributeError(f"{name} is constructor-bound and cannot be reassigned")
+        super().__setattr__(name, value)
 
     def __init__(
         self,
@@ -43,10 +236,46 @@ class Portfolio:
         track_metrics=True,
         record_trades=True,
         sampling_timeframe=None,
+        *,
+        fill_application_attribution_sink=None,
+        funding_boundary_resolver=None,
+        full_event_equity_sink=None,
+        reporting_sampling_timeframe=None,
     ):
         self.bars = bars
         self.events = events
         self.config = config
+        if fill_application_attribution_sink is not None and not callable(
+            fill_application_attribution_sink
+        ):
+            raise TypeError("fill_application_attribution_sink must be callable")
+        if funding_boundary_resolver is not None and not any(
+            callable(getattr(funding_boundary_resolver, name, None))
+            for name in ("resolve_batch", "resolve")
+        ):
+            raise TypeError(
+                "funding_boundary_resolver must expose callable resolve_batch or resolve"
+            )
+        if full_event_equity_sink is not None and not callable(full_event_equity_sink):
+            raise TypeError("full_event_equity_sink must be callable")
+        normalized_reporting_sampling_timeframe = None
+        if reporting_sampling_timeframe is not None:
+            try:
+                normalized_reporting_sampling_timeframe = normalize_timeframe_token(
+                    reporting_sampling_timeframe
+                )
+                reporting_interval_ms = int(
+                    timeframe_to_milliseconds(normalized_reporting_sampling_timeframe)
+                )
+                if reporting_interval_ms <= 0:
+                    raise ValueError("nonpositive reporting interval")
+            except Exception as exc:
+                raise ValueError("reporting_sampling_timeframe_invalid") from exc
+        self._fill_application_attribution_sink = fill_application_attribution_sink
+        self._funding_boundary_resolver = funding_boundary_resolver
+        self._full_event_equity_sink = full_event_equity_sink
+        self._reporting_sampling_timeframe = normalized_reporting_sampling_timeframe
+        self._optional_seams_locked = True
         self.symbol_list = self.bars.symbol_list
         self._single_symbol = len(self.symbol_list) == 1
         self.record_history = bool(record_history)
@@ -61,9 +290,18 @@ class Portfolio:
         self._sampling_interval_ms = None
         if self.sampling_timeframe:
             try:
-                self._sampling_interval_ms = int(timeframe_to_milliseconds(self.sampling_timeframe))
+                effective_sampling_timeframe = (
+                    self._reporting_sampling_timeframe or self.sampling_timeframe
+                )
+                self._sampling_interval_ms = int(
+                    timeframe_to_milliseconds(effective_sampling_timeframe)
+                )
             except Exception:
                 self._sampling_interval_ms = None
+        elif self._reporting_sampling_timeframe:
+            self._sampling_interval_ms = int(
+                timeframe_to_milliseconds(self._reporting_sampling_timeframe)
+            )
         self._last_sample_timestamp_ms = None
         self.start_date = start_date
         self.initial_capital = self.config.INITIAL_CAPITAL
@@ -126,7 +364,7 @@ class Portfolio:
         # Phase 4 unified cost model — funding and liquidation delegate to this.
         # BacktestConfigView carries ._rt (RuntimeConfig); use from_runtime for production.
         # Plain class configs (unit tests) use _config_from_attrs.
-        _rt = getattr(config, "_rt", None)
+        _rt = wrapped_runtime_config(config)
         self.execution_model = ExecutionModel(
             ExecutionModelConfig.from_runtime(_rt)
             if _rt is not None
@@ -162,6 +400,22 @@ class Portfolio:
         self.strategy_quality = StrategyQualityOverlay(config)
         # Initialize first record
         self.update_initial_record()
+
+    @property
+    def fill_application_attribution_sink(self):
+        return self._fill_application_attribution_sink
+
+    @property
+    def funding_boundary_resolver(self):
+        return self._funding_boundary_resolver
+
+    @property
+    def full_event_equity_sink(self):
+        return self._full_event_equity_sink
+
+    @property
+    def reporting_sampling_timeframe(self):
+        return self._reporting_sampling_timeframe
 
     def construct_current_holdings(self):
         d = dict.fromkeys(self.symbol_list, 0.0)
@@ -275,7 +529,7 @@ class Portfolio:
         value = getattr(config, upper_attr, sentinel)
         if value is not sentinel:
             return bool(value)
-        runtime = getattr(config, "_rt", None)
+        runtime = wrapped_runtime_config(config)
         if runtime is not None:
             section_obj = getattr(runtime, section, None)
             if section_obj is not None:
@@ -291,6 +545,398 @@ class Portfolio:
         signal_meta = dict(raw.get("signal_metadata") or {})
         nested = str(signal_meta.get("component_id") or "").strip()
         return nested or None
+
+    @staticmethod
+    def _scalar_from_value(value) -> float | None:
+        if value is None:
+            return None
+        if isinstance(value, (int, float)):
+            parsed = float(value)
+            return parsed if math.isfinite(parsed) else None
+        if isinstance(value, (tuple, list)):
+            for item in value:
+                scalar = Portfolio._scalar_from_value(item)
+                if scalar is not None:
+                    return scalar
+            return None
+        if isinstance(value, dict):
+            for key in ("value", "price", "rate", "close"):
+                if key in value:
+                    scalar = Portfolio._scalar_from_value(value[key])
+                    if scalar is not None:
+                        return scalar
+            return None
+        for attr in ("value", "price", "rate", "close"):
+            if hasattr(value, attr):
+                scalar = Portfolio._scalar_from_value(getattr(value, attr))
+                if scalar is not None:
+                    return scalar
+        try:
+            parsed = float(value)
+        except Exception:
+            return None
+        return parsed if math.isfinite(parsed) else None
+
+    @staticmethod
+    def _event_optional_str(event, name: str) -> str | None:
+        value = getattr(event, name, None)
+        if value is None:
+            return None
+        if type(value) is not str:
+            raise TypeError(f"fill_application_event_field_invalid:{name}")
+        return value
+
+    @staticmethod
+    def _event_required_str(event, name: str) -> str:
+        value = getattr(event, name, None)
+        if type(value) is not str or not value:
+            raise TypeError(f"fill_application_event_field_invalid:{name}")
+        return value
+
+    @staticmethod
+    def _is_synthetic_liquidation_fill(event) -> bool:
+        metadata = getattr(event, "metadata", None)
+        return (
+            getattr(event, "exchange", None) == "SIM_LIQUIDATION"
+            and getattr(event, "status", None) == "LIQUIDATED"
+            and isinstance(metadata, Mapping)
+            and metadata.get("reason") == "maintenance_margin_breach"
+        )
+
+    @staticmethod
+    def _require_pricing_trace(event) -> ExecutionPricingTrace:
+        metadata = getattr(event, "metadata", None)
+        if not isinstance(metadata, Mapping):
+            raise RuntimeError("attributed FillEvent metadata is missing")
+        trace = metadata.get("cost_attribution")
+        if type(trace) is not ExecutionPricingTrace:
+            raise RuntimeError("attributed FillEvent has no exact ExecutionPricingTrace")
+        # Structural/canonical validation occurs before any portfolio mutation.
+        trace.to_payload()
+
+        quantity = float(getattr(event, "quantity", 0.0) or 0.0)
+        fill_cost = getattr(event, "fill_cost", None)
+        commission = getattr(event, "commission", None)
+        if quantity <= 0.0 or not math.isfinite(quantity):
+            raise ValueError("attributed FillEvent quantity is not positive and finite")
+        if fill_cost is None or commission is None:
+            raise ValueError("attributed FillEvent cost fields are missing")
+        fill_cost = float(fill_cost)
+        commission = float(commission)
+        if not math.isfinite(fill_cost) or not math.isfinite(commission):
+            raise ValueError("attributed FillEvent cost fields are non-finite")
+        if not math.isclose(quantity, trace.executed_qty, rel_tol=0.0, abs_tol=1e-12):
+            raise ValueError("attributed FillEvent quantity does not match pricing trace")
+        if not math.isclose(
+            fill_cost,
+            trace.fill_price * trace.executed_qty,
+            rel_tol=0.0,
+            abs_tol=1e-12,
+        ):
+            raise ValueError("attributed FillEvent fill_cost does not match pricing trace")
+        if not math.isclose(commission, trace.commission, rel_tol=0.0, abs_tol=1e-12):
+            raise ValueError("attributed FillEvent commission does not match pricing trace")
+        direction = Portfolio._event_required_str(event, "direction")
+        if direction.upper() != trace.direction:
+            raise ValueError("attributed FillEvent direction does not match pricing trace")
+        if getattr(event, "order_id", None) != trace.order_id:
+            raise ValueError("attributed FillEvent order_id does not match pricing trace")
+        if getattr(event, "client_order_id", None) != trace.client_order_id:
+            raise ValueError("attributed FillEvent client_order_id does not match pricing trace")
+        return trace
+
+    def _build_fill_application_attribution_record(
+        self,
+        original_event,
+        applied_event,
+        pricing_trace: ExecutionPricingTrace,
+        *,
+        application_status: str,
+        zero_applied_reason: str | None,
+    ) -> FillApplicationAttribution:
+        model_quantity = float(getattr(original_event, "quantity", 0.0) or 0.0)
+        model_fill_cost = float(getattr(original_event, "fill_cost", 0.0) or 0.0)
+        model_commission = float(getattr(original_event, "commission", 0.0) or 0.0)
+        applied_quantity = (
+            float(getattr(applied_event, "quantity", 0.0) or 0.0) if applied_event else 0.0
+        )
+        applied_fill_cost = (
+            float(getattr(applied_event, "fill_cost", 0.0) or 0.0) if applied_event else 0.0
+        )
+        applied_commission = (
+            float(getattr(applied_event, "commission", 0.0) or 0.0) if applied_event else 0.0
+        )
+        scale = 0.0
+        if application_status == "applied_unchanged":
+            scale = 1.0
+        elif model_quantity > 0.0 and applied_quantity > 0.0:
+            scale = abs(applied_quantity / model_quantity)
+        metadata = getattr(original_event, "metadata", None)
+        reduce_only = metadata.get("reduce_only", False) if isinstance(metadata, Mapping) else False
+        if type(reduce_only) is not bool:
+            raise TypeError("fill_application_reduce_only_metadata_invalid")
+        record = FillApplicationAttribution(
+            record_type="fill_application_attribution",
+            pricing_trace_hash=execution_pricing_trace_sha256(pricing_trace),
+            pricing_trace=pricing_trace,
+            timeindex=_canonical_attribution_timeindex(getattr(original_event, "timeindex", None)),
+            symbol=self._event_required_str(original_event, "symbol"),
+            direction=self._event_required_str(original_event, "direction").upper(),
+            order_id=self._event_optional_str(original_event, "order_id"),
+            client_order_id=self._event_optional_str(original_event, "client_order_id"),
+            position_side=self._event_optional_str(original_event, "position_side"),
+            status=self._event_optional_str(original_event, "status"),
+            reduce_only=reduce_only,
+            model_quantity=model_quantity,
+            model_fill_cost=model_fill_cost,
+            model_commission=model_commission,
+            applied_quantity=applied_quantity,
+            applied_fill_cost=applied_fill_cost,
+            applied_commission=applied_commission,
+            reduce_only_scale=scale,
+            application_status=application_status,
+            zero_applied_reason=zero_applied_reason,
+        )
+        record.to_payload()
+        return record
+
+    def _emit_fill_application_attribution(
+        self,
+        original_event,
+        applied_event,
+        pricing_trace: ExecutionPricingTrace,
+        *,
+        application_status: str,
+        zero_applied_reason: str | None,
+    ) -> None:
+        sink = self.fill_application_attribution_sink
+        if sink is None:
+            return
+        sink(
+            self._build_fill_application_attribution_record(
+                original_event,
+                applied_event,
+                pricing_trace,
+                application_status=application_status,
+                zero_applied_reason=zero_applied_reason,
+            )
+        )
+
+    def _reduce_only_zero_reason(self, event) -> str | None:
+        metadata = getattr(event, "metadata", None) or {}
+        if not bool(metadata.get("reduce_only", False)):
+            return None
+        quantity = float(getattr(event, "quantity", 0.0) or 0.0)
+        if quantity <= 0.0:
+            return "zero_quantity"
+        old_qty = float(self.current_positions.get(event.symbol, 0.0) or 0.0)
+        fill_dir = 1.0 if event.direction == "BUY" else -1.0
+        if abs(old_qty) <= 1e-12:
+            return "reduce_only_flat"
+        if old_qty * fill_dir > 0.0:
+            return "reduce_only_wrong_side"
+        return None
+
+    def _apply_funding_boundary_resolution(self, latest_datetime, *, now_ts: float):
+        raw_point_accessor = getattr(self.bars, "get_latest_raw_point", None)
+        if not callable(raw_point_accessor):
+            raise AttributeError("funding_boundary_resolver requires bars.get_latest_raw_point")
+        resolver = self.funding_boundary_resolver
+        resolve_batch_fn = getattr(resolver, "resolve_batch", None)
+        resolve_fn = getattr(resolver, "resolve", None)
+        if not callable(resolve_batch_fn) and not callable(resolve_fn):
+            raise TypeError(
+                "funding_boundary_resolver must expose callable resolve_batch or resolve"
+            )
+        interval_seconds = int(self.execution_model.cfg.funding_interval_hours * 3600)
+        pending_payments: list[tuple[str, int, float]] = []
+        pending_anchors: dict[str, float] = {}
+        requests: list[dict[str, object]] = []
+        used_batch_resolution = False
+
+        for symbol in self.symbol_list:
+            qty = float(self.current_positions.get(symbol, 0.0))
+            if abs(qty) < 1e-12:
+                continue
+            last_ts = self._last_funding_ts.get(symbol)
+            if last_ts is None:
+                pending_anchors[symbol] = now_ts
+                continue
+            if now_ts <= last_ts:
+                continue
+
+            start_index = int(last_ts // interval_seconds) + 1
+            end_index = int(now_ts // interval_seconds) + 1
+            for boundary_index in range(start_index, end_index):
+                qty = float(self.current_positions.get(symbol, 0.0))
+                if abs(qty) < 1e-12:
+                    break
+                boundary_seconds = float(boundary_index * interval_seconds)
+                boundary_ms = int(boundary_seconds * 1000.0)
+                requests.append(
+                    {
+                        "symbol": symbol,
+                        "boundary_ms": boundary_ms,
+                        "qty": qty,
+                        "latest_datetime": latest_datetime,
+                    }
+                )
+
+        if requests and callable(resolve_batch_fn):
+            used_batch_resolution = True
+            # Production contract: one complete causal batch is sealed by the
+            # resolver before Portfolio applies any cash mutation.  The first
+            # positional argument is the immutable request sequence; only the raw
+            # accessor and exact ExecutionModel are supplied as keyword capabilities.
+            resolved_batch = resolve_batch_fn(
+                tuple(requests),
+                raw_point_accessor=raw_point_accessor,
+                execution_model=self.execution_model,
+            )
+            if not isinstance(resolved_batch, (tuple, list)):
+                raise TypeError("funding_boundary_resolver batch result must be a sequence")
+            requested_by_key = {
+                (str(request["symbol"]), int(request["boundary_ms"])): request
+                for request in requests
+            }
+            paid_by_key: dict[tuple[str, int], float] = {}
+            for resolved in resolved_batch:
+                if isinstance(resolved, Mapping):
+                    symbol = resolved.get("symbol")
+                    boundary_ms = resolved.get("boundary_ms")
+                    payment_raw = resolved.get("payment")
+                    qty_raw = resolved.get("qty")
+                else:
+                    symbol = getattr(resolved, "symbol", None)
+                    boundary_ms = getattr(resolved, "boundary_ms", None)
+                    payment_raw = getattr(resolved, "payment", None)
+                    qty_raw = getattr(resolved, "qty", None)
+                if type(symbol) is not str or type(boundary_ms) is not int:
+                    raise ValueError("funding_boundary_batch_identity_invalid")
+                key = (symbol, boundary_ms)
+                request = requested_by_key.get(key)
+                if request is None or key in paid_by_key:
+                    raise ValueError("funding_boundary_batch_bijection_invalid")
+                if (
+                    type(payment_raw) is not float
+                    or not math.isfinite(payment_raw)
+                    or type(qty_raw) is not float
+                    or not math.isfinite(qty_raw)
+                ):
+                    raise ValueError("funding_boundary_batch_paid_row_invalid")
+                if not math.isclose(
+                    qty_raw,
+                    float(request["qty"]),
+                    rel_tol=0.0,
+                    abs_tol=1e-12,
+                ):
+                    raise ValueError("funding_boundary_batch_quantity_mismatch")
+                paid_by_key[key] = payment_raw
+            if set(paid_by_key) != set(requested_by_key):
+                raise ValueError("funding_boundary_batch_bijection_invalid")
+            for request in requests:
+                symbol = str(request["symbol"])
+                boundary_ms = int(request["boundary_ms"])
+                pending_payments.append(
+                    (
+                        symbol,
+                        boundary_ms // (interval_seconds * 1000),
+                        paid_by_key[(symbol, boundary_ms)],
+                    )
+                )
+
+        elif requests:
+            # Backward-compatible legacy resolver path.  Resolution remains
+            # portfolio-atomic: all rows are collected and validated before cash.
+            for request in requests:
+                resolved = resolve_fn(
+                    symbol=request["symbol"],
+                    boundary_ms=request["boundary_ms"],
+                    qty=request["qty"],
+                    latest_datetime=request["latest_datetime"],
+                    raw_point_accessor=raw_point_accessor,
+                )
+                if resolved is None:
+                    raise ValueError("funding_boundary_resolver returned no boundary resolution")
+
+                if isinstance(resolved, dict):
+                    payment = self._scalar_from_value(resolved.get("payment"))
+                    rate_value = self._scalar_from_value(
+                        resolved.get("rate")
+                        if "rate" in resolved
+                        else resolved.get("rate_point")
+                        if "rate_point" in resolved
+                        else resolved.get("boundary_rate")
+                    )
+                    price_value = self._scalar_from_value(
+                        resolved.get("price")
+                        if "price" in resolved
+                        else resolved.get("price_point")
+                        if "price_point" in resolved
+                        else resolved.get("boundary_price")
+                    )
+                else:
+                    payment = self._scalar_from_value(getattr(resolved, "payment", None))
+                    rate_value = self._scalar_from_value(
+                        getattr(resolved, "rate", None)
+                        if hasattr(resolved, "rate")
+                        else getattr(resolved, "rate_point", None)
+                        if hasattr(resolved, "rate_point")
+                        else getattr(resolved, "boundary_rate", None)
+                    )
+                    price_value = self._scalar_from_value(
+                        getattr(resolved, "price", None)
+                        if hasattr(resolved, "price")
+                        else getattr(resolved, "price_point", None)
+                        if hasattr(resolved, "price_point")
+                        else getattr(resolved, "boundary_price", None)
+                    )
+
+                if payment is None:
+                    if rate_value is None or price_value is None:
+                        raise ValueError(
+                            "funding_boundary_resolver must provide rate/price or payment"
+                        )
+                    payment = self.execution_model.compute_funding_payment(
+                        signed_qty=float(request["qty"]),
+                        price=price_value,
+                        periods=1,
+                        rate=rate_value,
+                    )
+
+                pending_payments.append(
+                    (
+                        str(request["symbol"]),
+                        int(request["boundary_ms"]) // (interval_seconds * 1000),
+                        float(payment),
+                    )
+                )
+
+        if not pending_payments and not pending_anchors:
+            return
+
+        if used_batch_resolution:
+            # Alpha batch settlement is one exact ledger reconciliation.  fsum
+            # avoids order-sensitive cancellation and the cash mutation occurs once.
+            batch_total = math.fsum(payment for _, _, payment in pending_payments)
+            self.current_holdings["cash"] -= batch_total
+            self.current_holdings["total"] -= batch_total
+            self.current_holdings["funding"] += batch_total
+            self.total_funding_paid += batch_total
+            for symbol, boundary_index, _ in pending_payments:
+                self._last_funding_ts[symbol] = float(boundary_index * interval_seconds)
+        else:
+            # Preserve legacy resolver arithmetic/order exactly.
+            for symbol, boundary_index, payment in pending_payments:
+                boundary_seconds = float(boundary_index * interval_seconds)
+                self.current_holdings["cash"] -= payment
+                self.current_holdings["total"] -= payment
+                self.current_holdings["funding"] += payment
+                self.total_funding_paid += payment
+                self._last_funding_ts[symbol] = boundary_seconds
+
+        for symbol, anchor_ts in pending_anchors.items():
+            self._last_funding_ts[symbol] = anchor_ts
 
     def update_timeindex(self, event):
         """Updates the positions from the current locations to the
@@ -382,6 +1028,77 @@ class Portfolio:
             )
         )
 
+    def update_timeindex_inert_batch(
+        self,
+        timestamp_ms: np.ndarray,
+        closes_by_symbol: Mapping[str, np.ndarray],
+    ) -> None:
+        """Record exact consecutive non-boundary marks with immutable positions."""
+        if (
+            type(timestamp_ms) is not np.ndarray
+            or timestamp_ms.dtype != np.dtype(np.int64)
+            or timestamp_ms.ndim != 1
+            or timestamp_ms.size == 0
+            or tuple(closes_by_symbol) != tuple(self.symbol_list)
+            or self.strategy_quality.enabled
+        ):
+            raise ValueError("inert_equity_batch_invalid")
+        if timestamp_ms.size > 1 and not bool(np.all(np.diff(timestamp_ms) == 1000)):
+            raise ValueError("inert_equity_batch_timeline_invalid")
+        first_day = datetime.fromtimestamp(int(timestamp_ms[0]) / 1000.0, UTC).date()
+        last_day = datetime.fromtimestamp(int(timestamp_ms[-1]) / 1000.0, UTC).date()
+        current_day = (
+            self._current_day.date()
+            if isinstance(self._current_day, datetime)
+            else self._current_day
+        )
+        if (
+            first_day != last_day
+            or current_day != first_day
+            or (
+                self._sampling_interval_ms
+                and bool(np.any(timestamp_ms % int(self._sampling_interval_ms) == 0))
+            )
+        ):
+            raise ValueError("inert_equity_batch_boundary_invalid")
+
+        cash = float(self.current_holdings["cash"])
+        totals = np.full(timestamp_ms.shape, cash, dtype=np.float64)
+        final_market_values: dict[str, float] = {}
+        for symbol in self.symbol_list:
+            closes = closes_by_symbol[symbol]
+            if (
+                type(closes) is not np.ndarray
+                or closes.dtype != np.dtype(np.float64)
+                or closes.shape != timestamp_ms.shape
+                or not bool(np.all(np.isfinite(closes)))
+                or not bool(np.all(closes > 0.0))
+            ):
+                raise ValueError("inert_equity_batch_close_invalid")
+            quantity = float(self.current_positions[symbol])
+            market_values = closes * quantity if quantity != 0.0 else np.zeros_like(closes)
+            totals = totals + market_values
+            final_market_values[symbol] = quantity * float(closes[-1]) if quantity != 0.0 else 0.0
+        if not bool(np.all(np.isfinite(totals))):
+            raise ValueError("inert_equity_batch_total_invalid")
+
+        points = np.column_stack((timestamp_ms.astype(np.float64) / 1000.0, totals))
+        sink = self._full_event_equity_sink
+        batch_sink = getattr(sink, "update_batch", None)
+        if callable(batch_sink):
+            batch_sink(points)
+        elif sink is not None:
+            for point in points:
+                sink((float(point[0]), float(point[1])))
+        self._equity_points.extend(
+            (float(point[0]), float(point[1])) for point in points[-self._equity_points.maxlen :]
+        )
+        self.strategy_quality.bar_index += int(timestamp_ms.size) - 1
+        self.strategy_quality.next_bar(int(timestamp_ms[-1]))
+        for symbol, market_value in final_market_values.items():
+            self.current_holdings[symbol] = market_value
+        self.current_holdings["total"] = float(totals[-1])
+
     def _to_timestamp_ms(self, value):
         if value is None:
             return None
@@ -423,6 +1140,23 @@ class Portfolio:
         # which the cached position-invariant liquidation price depends on — drop
         # the cache entry so the next bar recomputes it against fresh inputs.
         self._liq_price_cache.pop(fill.symbol, None)
+
+        alpha_funding_anchor = None
+        if self.funding_boundary_resolver is not None:
+            fill_time = getattr(fill, "timeindex", None)
+            if type(fill_time) is int and fill_time >= 100_000_000_000:
+                # MarketWindowEvent canonicalizes its event clock to exact
+                # epoch milliseconds.  Preserve that exact anchor instead of
+                # forcing the Alpha-Max engine through a datetime-only seam.
+                alpha_funding_anchor = fill_time / 1000.0
+            elif (
+                isinstance(fill_time, datetime)
+                and fill_time.tzinfo is not None
+                and fill_time.utcoffset() == timedelta(0)
+            ):
+                alpha_funding_anchor = float(fill_time.timestamp())
+            else:
+                raise ValueError("funding_boundary_fill_timestamp_invalid")
 
         fill_dir = 0
         if fill.direction == "BUY":
@@ -473,6 +1207,8 @@ class Portfolio:
         if old_qty == 0 or (old_qty > 0 > new_qty) or (old_qty < 0 < new_qty):
             self.entry_prices[fill.symbol] = fill_price
             self._pending_liquidation.discard(fill.symbol)
+            if alpha_funding_anchor is not None:
+                self._last_funding_ts[fill.symbol] = alpha_funding_anchor
             return
 
         # Adding to existing direction updates VWAP entry.
@@ -547,11 +1283,68 @@ class Portfolio:
 
     def update_fill(self, event):
         if event.type == "FILL":
+            pricing_trace: ExecutionPricingTrace | None = None
+            attribution_sink = self.fill_application_attribution_sink
+            synthetic_liquidation = self._is_synthetic_liquidation_fill(event)
+            if attribution_sink is not None:
+                metadata = getattr(event, "metadata", None)
+                if synthetic_liquidation:
+                    if isinstance(metadata, Mapping) and "cost_attribution" in metadata:
+                        raise RuntimeError(
+                            "synthetic liquidation must not carry an execution pricing trace"
+                        )
+                else:
+                    pricing_trace = self._require_pricing_trace(event)
+
+            applied_event = event
+            application_status = "applied_unchanged"
+            zero_applied_reason = None
             if self.enforce_reduce_only:
+                zero_applied_reason = self._reduce_only_zero_reason(event)
                 clamped = self._clamp_reduce_only_fill(event)
                 if clamped is None:
+                    if pricing_trace is not None:
+                        self._emit_fill_application_attribution(
+                            event,
+                            None,
+                            pricing_trace,
+                            application_status="rejected",
+                            zero_applied_reason=zero_applied_reason or "zero_quantity",
+                        )
                     return
-                event = clamped
+                applied_event = clamped
+                if clamped is not event:
+                    application_status = "applied_scaled"
+            elif float(getattr(event, "quantity", 0.0) or 0.0) <= 0.0:
+                application_status = "rejected"
+                zero_applied_reason = "zero_quantity"
+                if pricing_trace is not None:
+                    self._emit_fill_application_attribution(
+                        event,
+                        None,
+                        pricing_trace,
+                        application_status=application_status,
+                        zero_applied_reason=zero_applied_reason,
+                    )
+                if attribution_sink is not None:
+                    return
+            elif pricing_trace is not None:
+                self._emit_fill_application_attribution(
+                    event,
+                    applied_event,
+                    pricing_trace,
+                    application_status=application_status,
+                    zero_applied_reason=zero_applied_reason,
+                )
+            if self.enforce_reduce_only and pricing_trace is not None:
+                self._emit_fill_application_attribution(
+                    event,
+                    applied_event,
+                    pricing_trace,
+                    application_status=application_status,
+                    zero_applied_reason=zero_applied_reason,
+                )
+            event = applied_event
             old_qty = float(self.current_positions.get(event.symbol, 0.0) or 0.0)
             fill_dir = 1.0 if event.direction == "BUY" else -1.0
             new_qty = old_qty + fill_dir * float(event.quantity)
@@ -654,6 +1447,12 @@ class Portfolio:
 
         now_ts = self._to_unix_seconds(latest_datetime)
         if now_ts is None:
+            return
+        if self.funding_boundary_resolver is not None:
+            self._apply_funding_boundary_resolution(
+                datetime.fromtimestamp(now_ts, tz=UTC),
+                now_ts=now_ts,
+            )
             return
 
         for symbol in self.symbol_list:
@@ -1024,7 +1823,14 @@ class Portfolio:
                     "position_qty": qty,
                     "entry_price": entry_price,
                     "liquidation_price": liq_price,
+                    "trigger_price": trigger_price,
+                    "bar_high": bar_high,
+                    "bar_low": bar_low,
                     "close_price": close_price,
+                    "fill_cost": fill_cost,
+                    "commission": commission,
+                    "leverage": leverage,
+                    "reason": "maintenance_margin_breach",
                     "configured_margin_mode": configured_margin_mode,
                     "modeled_margin_mode": modeled_margin_mode,
                 }
@@ -1056,7 +1862,10 @@ class Portfolio:
         ts = self._to_unix_seconds(latest_datetime)
         if ts is None:
             return
-        self._equity_points.append((float(ts), float(total)))
+        point = (float(ts), float(total))
+        self._equity_points.append(point)
+        if self._full_event_equity_sink is not None:
+            self._full_event_equity_sink(point)
 
     def get_rolling_loss_pct(self, window_seconds=3600):
         if window_seconds <= 0 or len(self._equity_points) < 2:
@@ -1491,4 +2300,4 @@ class Portfolio:
         # print(f"Trade log saved to '{filename}'")
 
 
-__all__ = ["Portfolio"]
+__all__ = ["FillApplicationAttribution", "Portfolio"]

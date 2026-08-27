@@ -1,18 +1,202 @@
 import logging
+import math
 import os
 import random
 from abc import ABC, abstractmethod
 from copy import deepcopy
+from dataclasses import dataclass, fields
+from datetime import date, datetime
 from typing import Any
 
+from lumina_quant.backtesting._config_view import wrapped_runtime_config
 from lumina_quant.backtesting.execution_model import (
     ExecutionModel,
     ExecutionModelConfig,
+    ExecutionPricingTrace,
+    FillResult,
     _config_from_attrs,
 )
 from lumina_quant.core.events import FillEvent
 
 LOGGER = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True, slots=True)
+class NoFillAttempt:
+    """Immutable handler evidence for a called calculation that executed nothing."""
+
+    record_type: str
+    reason: str
+    timeindex: Any
+    symbol: str
+    direction: str
+    requested_qty: float
+    executed_qty: float
+    unfilled_qty: float
+    raw_price: float
+    bar_volume: float
+    cap_ratio: float | None
+    order_id: str | None
+    order_kind: str
+    client_order_id: str | None
+    parent_order_id: str | None
+    remainder_of_order_id: str | None
+    oco_group: str | None
+    trigger_price: float | None
+    position_side: str | None
+    reduce_only: bool
+    is_maker: bool
+    rng_consumed: bool
+
+    def to_payload(self) -> dict[str, object]:
+        """Return a strict JSON-compatible checkpoint payload."""
+        if type(self) is not NoFillAttempt:
+            raise TypeError("no_fill_attempt must be an exact NoFillAttempt")
+        payload: dict[str, object] = {}
+        float_fields = {
+            "requested_qty",
+            "executed_qty",
+            "unfilled_qty",
+            "raw_price",
+            "bar_volume",
+            "cap_ratio",
+            "trigger_price",
+        }
+        bool_fields = {"reduce_only", "is_maker", "rng_consumed"}
+        for field in fields(NoFillAttempt):
+            value = getattr(self, field.name)
+            if field.name in float_fields:
+                if value is None and field.name in {"cap_ratio", "trigger_price"}:
+                    payload[field.name] = None
+                    continue
+                if type(value) is not float or not math.isfinite(value):
+                    raise ValueError(f"no_fill_attempt_invalid:{field.name}")
+                payload[field.name] = value
+                continue
+            if field.name in bool_fields:
+                if type(value) is not bool:
+                    raise ValueError(f"no_fill_attempt_invalid:{field.name}")
+                payload[field.name] = value
+                continue
+            if field.name == "timeindex":
+                payload[field.name] = _canonical_evidence_timeindex(value)
+                continue
+            if value is not None and type(value) is not str:
+                raise ValueError(f"no_fill_attempt_invalid:{field.name}")
+            payload[field.name] = value
+
+        if self.record_type != "no_fill_attempt":
+            raise ValueError("no_fill_attempt_record_type")
+        if self.executed_qty != 0.0:
+            raise ValueError("no_fill_attempt_nonzero_execution")
+        if self.requested_qty < 0.0 or self.unfilled_qty < 0.0:
+            raise ValueError("no_fill_attempt_quantity_bounds")
+        if not math.isclose(
+            self.requested_qty,
+            self.unfilled_qty,
+            rel_tol=0.0,
+            abs_tol=1e-12,
+        ):
+            raise ValueError("no_fill_attempt_quantity_reconciliation")
+        if self.rng_consumed is self.is_maker:
+            raise ValueError("no_fill_attempt_rng_flag")
+        if not self.reason or not self.symbol or not self.direction or not self.order_kind:
+            raise ValueError("no_fill_attempt_required_field")
+        if self.direction not in {"BUY", "SELL"}:
+            raise ValueError("no_fill_attempt_direction")
+        if self.order_kind not in {"MKT", "LMT", "STOP", "TAKE_PROFIT", "TRAIL_STOP"}:
+            raise ValueError("no_fill_attempt_order_kind")
+        if self.is_maker is not (self.order_kind == "LMT"):
+            raise ValueError("no_fill_attempt_maker_kind")
+        expected_reason = (
+            "liquidity_cap_zero_limit"
+            if self.order_kind == "LMT"
+            else "liquidity_cap_zero_conditional"
+            if self.order_kind in {"STOP", "TAKE_PROFIT", "TRAIL_STOP"}
+            else "liquidity_cap_zero_market"
+        )
+        if self.reason != expected_reason:
+            raise ValueError("no_fill_attempt_reason")
+        return payload
+
+    @classmethod
+    def from_payload(cls, payload: object) -> NoFillAttempt:
+        """Restore one exact checkpoint record, rejecting partial/extra schemas."""
+        if type(payload) is not dict:
+            raise TypeError("no_fill_attempt_state_record must be an exact dict")
+        expected = tuple(field.name for field in fields(cls))
+        if set(payload) != set(expected):
+            raise ValueError("no_fill_attempt_state_schema")
+        record = cls(**{name: payload[name] for name in expected})
+        record.to_payload()
+        return record
+
+
+@dataclass(frozen=True, slots=True)
+class CapacityObservation:
+    """Immutable positive-request capacity inputs captured at engine queue time."""
+
+    record_type: str
+    timeindex: Any
+    symbol: str
+    requested_qty: float
+    raw_price: float
+    bar_volume: float
+    equity_before: float
+
+    def to_payload(self) -> dict[str, object]:
+        if type(self) is not CapacityObservation:
+            raise TypeError("capacity_observation must be an exact CapacityObservation")
+        if self.record_type != "capacity_observation":
+            raise ValueError("capacity_observation_record_type")
+        if not self.symbol:
+            raise ValueError("capacity_observation_symbol")
+        for name in ("requested_qty", "raw_price", "bar_volume", "equity_before"):
+            value = getattr(self, name)
+            if type(value) is not float or not math.isfinite(value):
+                raise ValueError(f"capacity_observation_invalid:{name}")
+        if self.requested_qty <= 0.0 or self.raw_price <= 0.0 or self.equity_before <= 0.0:
+            raise ValueError("capacity_observation_nonpositive")
+        if self.bar_volume < 0.0:
+            raise ValueError("capacity_observation_negative_volume")
+        return {
+            "bar_volume": self.bar_volume,
+            "equity_before": self.equity_before,
+            "raw_price": self.raw_price,
+            "record_type": self.record_type,
+            "requested_qty": self.requested_qty,
+            "symbol": self.symbol,
+            "timeindex": _canonical_evidence_timeindex(self.timeindex),
+        }
+
+    @classmethod
+    def from_payload(cls, payload: object) -> CapacityObservation:
+        if type(payload) is not dict or set(payload) != {
+            "bar_volume",
+            "equity_before",
+            "raw_price",
+            "record_type",
+            "requested_qty",
+            "symbol",
+            "timeindex",
+        }:
+            raise ValueError("capacity_observation_state_schema")
+        record = cls(**payload)
+        record.to_payload()
+        return record
+
+
+def _canonical_evidence_timeindex(value: object) -> str | int | float | None:
+    """Normalize event time without repr/default-string serializer fallbacks."""
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, date):
+        return value.isoformat()
+    if value is None or type(value) in {str, int}:
+        return value
+    if type(value) is float and math.isfinite(value):
+        return value
+    raise TypeError("no_fill_attempt_timeindex_unsupported")
 
 
 def _env_flag(name: str, default: bool = False) -> bool:
@@ -46,7 +230,42 @@ class SimulatedExecutionHandler(ExecutionHandler):
     LMT orders are supported with strict-cross fill rules (see ExecutionModel docstring).
     """
 
-    def __init__(self, events: Any, bars: Any, config: Any):
+    _LOCKED_ATTRIBUTION_SEAMS = frozenset(
+        {
+            "_attribution_seams_locked",
+            "_record_cost_attribution",
+            "_pricing_attribution_sink",
+        }
+    )
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        if name in self._LOCKED_ATTRIBUTION_SEAMS and getattr(
+            self, "_attribution_seams_locked", False
+        ):
+            raise AttributeError(f"{name} is constructor-bound and cannot be reassigned")
+        super().__setattr__(name, value)
+
+    def __init__(
+        self,
+        events: Any,
+        bars: Any,
+        config: Any,
+        *,
+        record_cost_attribution: bool = False,
+    ):
+        if type(record_cost_attribution) is not bool:
+            raise TypeError("record_cost_attribution must be an exact bool")
+        self._attribution_seams_locked = False
+        self._record_cost_attribution = record_cost_attribution
+        self._pending_pricing_trace: ExecutionPricingTrace | None = None
+        self._pricing_trace_evidence: list[ExecutionPricingTrace] = []
+        self._pricing_attribution_sink = (
+            self._capture_pricing_trace if record_cost_attribution else None
+        )
+        self._no_fill_attempt_evidence: list[NoFillAttempt] = []
+        self._capacity_observation_evidence: list[CapacityObservation] = []
+        self._capacity_equity_context: float | None = None
+        self._attribution_seams_locked = True
         self.events = events
         self.bars = bars
         self.config = config
@@ -62,7 +281,7 @@ class SimulatedExecutionHandler(ExecutionHandler):
         # Phase 4 unified cost model — replaces FillModel + LiquidityModel for fills.
         # BacktestConfigView carries ._rt (RuntimeConfig); production path uses from_runtime.
         # Plain mock configs (unit tests) fall back to _config_from_attrs.
-        _rt = getattr(config, "_rt", None)
+        _rt = wrapped_runtime_config(config)
         self.execution_model = ExecutionModel(
             ExecutionModelConfig.from_runtime(_rt)
             if _rt is not None
@@ -73,6 +292,207 @@ class SimulatedExecutionHandler(ExecutionHandler):
         # Store conditional orders: { order_id: { 'symbol':..., 'type':..., 'trigger_price':..., 'parent_id':...} }
         # For simplicity, just list of order dicts
         self.active_orders: list[dict[str, Any]] = []
+
+    @property
+    def record_cost_attribution(self) -> bool:
+        """Whether constructor-owned execution-cost evidence is enabled."""
+        return self._record_cost_attribution
+
+    @property
+    def pricing_attribution_sink(self):
+        """Exact local sink passed to every canonical fill calculation when ON."""
+        return self._pricing_attribution_sink
+
+    @property
+    def pricing_trace_evidence(self) -> tuple[ExecutionPricingTrace, ...]:
+        """Return an immutable snapshot of every positive execution pricing trace."""
+        return tuple(self._pricing_trace_evidence)
+
+    @property
+    def no_fill_attempt_evidence(self) -> tuple[NoFillAttempt, ...]:
+        """Return an immutable snapshot of zero-execution pricing attempts."""
+        return tuple(self._no_fill_attempt_evidence)
+
+    @property
+    def capacity_observation_evidence(self) -> tuple[CapacityObservation, ...]:
+        """Return all positive-request inputs captured before queued fills apply."""
+        return tuple(self._capacity_observation_evidence)
+
+    def set_capacity_equity_context(self, equity_before: object) -> None:
+        """Set the current engine-queue equity for one open-order sweep."""
+        if not self.record_cost_attribution:
+            return
+        if type(equity_before) not in {int, float}:
+            raise TypeError("capacity_equity_context_invalid")
+        parsed = float(equity_before)
+        if not math.isfinite(parsed) or parsed <= 0.0:
+            raise ValueError("capacity_equity_context_invalid")
+        self._capacity_equity_context = parsed
+
+    def clear_capacity_equity_context(self) -> None:
+        self._capacity_equity_context = None
+
+    def drain_no_fill_attempt_evidence(self) -> tuple[NoFillAttempt, ...]:
+        """Atomically return and clear pending zero-execution evidence."""
+        evidence = tuple(self._no_fill_attempt_evidence)
+        self._no_fill_attempt_evidence.clear()
+        return evidence
+
+    def _capture_pricing_trace(self, trace: ExecutionPricingTrace) -> None:
+        if type(trace) is not ExecutionPricingTrace:
+            raise TypeError("execution pricing sink received an invalid trace")
+        if self._pending_pricing_trace is not None:
+            raise RuntimeError("execution pricing sink received more than one trace")
+        self._pending_pricing_trace = trace
+        self._pricing_trace_evidence.append(trace)
+
+    @staticmethod
+    def _remainder_parent_order_id(order: dict[str, Any]) -> str | None:
+        order_id = order.get("order_id")
+        if order_id is None:
+            return None
+        normalized = str(order_id)
+        return normalized[:-2] if normalized.endswith("-R") else None
+
+    @staticmethod
+    def _order_trigger_price(order: dict[str, Any]) -> float | None:
+        order_kind = str(order.get("type") or "").upper()
+        if order_kind == "LMT":
+            value = order.get("limit_price")
+        elif order_kind in {"STOP", "TAKE_PROFIT", "TRAIL_STOP"}:
+            value = order.get("stop_price")
+        else:
+            return None
+        return float(value) if value is not None else None
+
+    @staticmethod
+    def _no_fill_reason(order_kind: str) -> str:
+        if order_kind == "LMT":
+            return "liquidity_cap_zero_limit"
+        if order_kind in {"STOP", "TAKE_PROFIT", "TRAIL_STOP"}:
+            return "liquidity_cap_zero_conditional"
+        return "liquidity_cap_zero_market"
+
+    def _emit_no_fill_attempt(
+        self,
+        *,
+        event: Any,
+        order: dict[str, Any],
+        result: FillResult,
+        requested_qty: float,
+        raw_price: float,
+        bar_volume: float,
+        is_maker: bool,
+        apply_liquidity_cap: bool,
+    ) -> None:
+        order_kind = str(order.get("type") or "MKT").upper()
+        self._no_fill_attempt_evidence.append(
+            NoFillAttempt(
+                record_type="no_fill_attempt",
+                reason=self._no_fill_reason(order_kind),
+                timeindex=_canonical_evidence_timeindex(event.time),
+                symbol=str(order.get("symbol") or ""),
+                direction=str(order.get("direction") or "").upper(),
+                requested_qty=float(requested_qty),
+                executed_qty=0.0,
+                unfilled_qty=float(result.unfilled_qty),
+                raw_price=float(raw_price),
+                bar_volume=float(bar_volume),
+                cap_ratio=float(self.execution_model.cfg.max_bar_volume_ratio)
+                if apply_liquidity_cap
+                else None,
+                order_id=str(order["order_id"]) if order.get("order_id") is not None else None,
+                order_kind=order_kind,
+                client_order_id=str(order["client_order_id"])
+                if order.get("client_order_id") is not None
+                else None,
+                parent_order_id=str(order["parent_order_id"])
+                if order.get("parent_order_id") is not None
+                else None,
+                remainder_of_order_id=self._remainder_parent_order_id(order),
+                oco_group=str(order["oco_group"]) if order.get("oco_group") is not None else None,
+                trigger_price=self._order_trigger_price(order),
+                position_side=str(order["position_side"])
+                if order.get("position_side") is not None
+                else None,
+                reduce_only=bool(order.get("reduce_only", False)),
+                is_maker=bool(is_maker),
+                rng_consumed=not bool(is_maker),
+            )
+        )
+
+    def _compute_fill_for_order(
+        self,
+        *,
+        event: Any,
+        order: dict[str, Any],
+        raw_price: float,
+        qty: float,
+        bar_volume: float,
+        volatility: float,
+        is_maker: bool,
+        apply_liquidity_cap: bool,
+        order_notional: float | None = None,
+    ) -> tuple[FillResult, ExecutionPricingTrace | None]:
+        if self._pending_pricing_trace is not None:
+            raise RuntimeError("unconsumed execution pricing trace")
+        if qty > 0.0 and self.record_cost_attribution:
+            if self._capacity_equity_context is None:
+                raise RuntimeError("capacity equity context missing")
+            observation = CapacityObservation(
+                record_type="capacity_observation",
+                timeindex=_canonical_evidence_timeindex(event.time),
+                symbol=str(order.get("symbol") or ""),
+                requested_qty=float(qty),
+                raw_price=float(raw_price),
+                bar_volume=float(bar_volume),
+                equity_before=self._capacity_equity_context,
+            )
+            observation.to_payload()
+            self._capacity_observation_evidence.append(observation)
+        result = self.execution_model.compute_fill(
+            raw_price=float(raw_price),
+            qty=float(qty),
+            direction=str(order["direction"]),
+            bar_volume=float(bar_volume),
+            volatility=float(volatility),
+            is_maker=bool(is_maker),
+            apply_liquidity_cap=bool(apply_liquidity_cap),
+            order_notional=order_notional,
+            order_kind=str(order.get("type") or "MKT"),
+            trigger_price=self._order_trigger_price(order),
+            order_id=str(order["order_id"]) if order.get("order_id") is not None else None,
+            client_order_id=str(order["client_order_id"])
+            if order.get("client_order_id") is not None
+            else None,
+            parent_order_id=str(order["parent_order_id"])
+            if order.get("parent_order_id") is not None
+            else None,
+            remainder_of_order_id=self._remainder_parent_order_id(order),
+            oco_group=str(order["oco_group"]) if order.get("oco_group") is not None else None,
+            attribution_sink=self.pricing_attribution_sink,
+        )
+        pricing_trace = self._pending_pricing_trace
+        self._pending_pricing_trace = None
+        if self.record_cost_attribution:
+            if result.executed_qty > 0.0 and pricing_trace is None:
+                raise RuntimeError("positive fill produced no execution pricing trace")
+            if result.executed_qty <= 0.0:
+                if pricing_trace is not None:
+                    raise RuntimeError("zero execution unexpectedly produced a pricing trace")
+                self._emit_no_fill_attempt(
+                    event=event,
+                    order=order,
+                    result=result,
+                    requested_qty=float(qty),
+                    raw_price=float(raw_price),
+                    bar_volume=float(bar_volume),
+                    is_maker=bool(is_maker),
+                    apply_liquidity_cap=bool(apply_liquidity_cap),
+                )
+        elif pricing_trace is not None:
+            raise RuntimeError("disabled execution attribution captured a pricing trace")
+        return result, pricing_trace
 
     def get_state(self) -> dict[str, Any]:
         state = {
@@ -85,11 +505,36 @@ class SimulatedExecutionHandler(ExecutionHandler):
         latency_get_state = getattr(self.latency_model, "get_state", None)
         if callable(latency_get_state):
             state["latency_model"] = latency_get_state()
+        if self.record_cost_attribution:
+            state["no_fill_attempt_evidence"] = [
+                record.to_payload() for record in self._no_fill_attempt_evidence
+            ]
+            state["capacity_observation_evidence"] = [
+                record.to_payload() for record in self._capacity_observation_evidence
+            ]
         return state
 
     def set_state(self, state: dict[str, Any] | None) -> None:
         if not isinstance(state, dict):
             return
+        evidence_key = "no_fill_attempt_evidence"
+        capacity_key = "capacity_observation_evidence"
+        if not self.record_cost_attribution and (evidence_key in state or capacity_key in state):
+            raise ValueError("no_fill_attempt_state_requires_attribution")
+        restored_evidence: list[NoFillAttempt] = []
+        if self.record_cost_attribution and evidence_key in state:
+            raw_evidence = state[evidence_key]
+            if type(raw_evidence) is not list:
+                raise TypeError("no_fill_attempt_state_must_be_an_exact_list")
+            # Validate the complete evidence batch before mutating handler state.
+            restored_evidence = [NoFillAttempt.from_payload(item) for item in raw_evidence]
+        restored_capacity: list[CapacityObservation] = []
+        if self.record_cost_attribution and capacity_key in state:
+            raw_capacity = state[capacity_key]
+            if type(raw_capacity) is not list:
+                raise TypeError("capacity_observation_state_must_be_an_exact_list")
+            restored_capacity = [CapacityObservation.from_payload(item) for item in raw_capacity]
+
         active_orders = state.get("active_orders")
         if isinstance(active_orders, list):
             self.active_orders = deepcopy(active_orders)
@@ -109,6 +554,11 @@ class SimulatedExecutionHandler(ExecutionHandler):
         latency_set_state = getattr(self.latency_model, "set_state", None)
         if isinstance(latency_state, dict) and callable(latency_set_state):
             latency_set_state(latency_state)
+        if self.record_cost_attribution:
+            # Replacement, not extension, prevents replay duplication on repeated restore.
+            self._no_fill_attempt_evidence = restored_evidence
+            self._capacity_observation_evidence = restored_capacity
+            self._capacity_equity_context = None
 
     def _next_order_id(self) -> str:
         self._order_seq += 1
@@ -349,7 +799,7 @@ class SimulatedExecutionHandler(ExecutionHandler):
         value = getattr(config, upper_attr, None)
         if value is not None:
             return bool(value)
-        runtime = getattr(config, "_rt", None)
+        runtime = wrapped_runtime_config(config)
         execution = getattr(runtime, "execution", None) if runtime is not None else None
         if execution is not None:
             return bool(getattr(execution, runtime_field, False))
@@ -388,6 +838,7 @@ class SimulatedExecutionHandler(ExecutionHandler):
             # Pre-computed fill result for MKT and LMT (computed inside their branches
             # so we don't double-consume the rng in the unified triggered block).
             _fill_result = None
+            _pricing_trace = None
 
             # ── MKT ORDER (Next Open) ─────────────────────────────────────────
             if order["type"] == "MKT" and order["status"] == "PENDING":
@@ -398,10 +849,11 @@ class SimulatedExecutionHandler(ExecutionHandler):
                 triggered = True
 
                 original_qty = order["quantity"]
-                _fill_result = self.execution_model.compute_fill(
+                _fill_result, _pricing_trace = self._compute_fill_for_order(
+                    event=event,
+                    order=order,
                     raw_price=float(exec_price),
                     qty=float(original_qty),
-                    direction=str(order["direction"]),
                     bar_volume=float(bar_volume),
                     volatility=float(volatility),
                     is_maker=False,
@@ -454,10 +906,11 @@ class SimulatedExecutionHandler(ExecutionHandler):
 
                 if triggered:
                     original_qty = order["quantity"]
-                    _fill_result = self.execution_model.compute_fill(
+                    _fill_result, _pricing_trace = self._compute_fill_for_order(
+                        event=event,
+                        order=order,
                         raw_price=float(exec_price),
                         qty=float(original_qty),
-                        direction=str(order["direction"]),
                         bar_volume=float(bar_volume),
                         volatility=0.0,  # LMT fills at exact price — no slippage
                         is_maker=True,
@@ -561,10 +1014,11 @@ class SimulatedExecutionHandler(ExecutionHandler):
                     # (aggressive fill). With apply_liquidity_cap_to_conditional_fills
                     # the cap applies and the excess chases as a MKT remainder.
                     _cond_qty = float(order["quantity"])
-                    cond_result = self.execution_model.compute_fill(
+                    cond_result, _pricing_trace = self._compute_fill_for_order(
+                        event=event,
+                        order=order,
                         raw_price=float(exec_price),
                         qty=_cond_qty,
-                        direction=str(order["direction"]),
                         bar_volume=float(bar_volume),
                         volatility=float(volatility),
                         is_maker=False,
@@ -608,6 +1062,19 @@ class SimulatedExecutionHandler(ExecutionHandler):
                     if cond_result.executed_qty <= 0.0:
                         continue
 
+                fill_metadata = {
+                    "reduce_only": order.get("reduce_only", False),
+                    "signal_metadata": dict(order.get("metadata") or {}),
+                    "component_id": str(
+                        dict(order.get("metadata") or {}).get("component_id") or ""
+                    ).strip()
+                    or None,
+                }
+                if self.record_cost_attribution:
+                    if _pricing_trace is None:
+                        raise RuntimeError("positive FillEvent has no execution pricing trace")
+                    fill_metadata["cost_attribution"] = _pricing_trace
+
                 fill_event = FillEvent(
                     timeindex=event.time,
                     symbol=order["symbol"],
@@ -620,14 +1087,7 @@ class SimulatedExecutionHandler(ExecutionHandler):
                     client_order_id=order.get("client_order_id"),
                     position_side=order.get("position_side"),
                     status="FILLED",
-                    metadata={
-                        "reduce_only": order.get("reduce_only", False),
-                        "signal_metadata": dict(order.get("metadata") or {}),
-                        "component_id": str(
-                            dict(order.get("metadata") or {}).get("component_id") or ""
-                        ).strip()
-                        or None,
-                    },
+                    metadata=fill_metadata,
                 )
                 self.events.put(fill_event)
 
@@ -719,5 +1179,6 @@ class LatencyModel:
 __all__ = [
     "ExecutionHandler",
     "LatencyModel",
+    "NoFillAttempt",
     "SimulatedExecutionHandler",
 ]

@@ -1,0 +1,162 @@
+{
+  "aggregate_resolution": {
+    "all_named_incumbents_unavailable": true,
+    "resolved_count": 0,
+    "unavailable_count": 3
+  },
+  "audit_scope": {
+    "faithful_replay_definition": "one complete actual-engine strategy/portfolio manifest executable on the frozen roots/calendar/universe/cost cells without selecting a nearby row, re-optimizing, or inferring missing timing/weight/gross semantics",
+    "path_policy": "only the exact ordered source/report paths embedded per row; no glob, latest-file discovery, ambient filesystem search, or runtime fallback",
+    "rows": [
+      "incumbent_track_a_dynamic_conviction_switch",
+      "incumbent_cross_asset_lead_lag_momentum",
+      "incumbent_cross_candidate_hybrid_v3_5"
+    ]
+  },
+  "baseline_commit": "252910e54e280cc593365484cbc99d6ca87893f9",
+  "rows": [
+    {
+      "frozen_audit_files": [
+        {
+          "content_sha256": "0f9b110dc2a957cd4272dc7b0998838567ca4e69f8eb7df49504e34add6efe0e",
+          "exact_token": "_dynamic_conviction_switch_candidates",
+          "exact_token_occurrences": 2,
+          "git_blob_oid": "89403977626d25cc6b03e8a41ae4a1601b0c50e6",
+          "path": "scripts/research/run_alpha_zoo_69_asset_monthly_refit_walkforward.py",
+          "representation_evidence": "lines 1604+ construct fold-local CandidateResult selectors over precomputed candidate.returns and validation snapshots; no ArtifactPortfolioModeStrategy or engine manifest is materialized for this label"
+        },
+        {
+          "content_sha256": "3399452e9fb3cb7d9fe0074deed40c266e4f37eeae247b940b5d54eb966b495c",
+          "exact_token": "dynamic_conviction_switch:t0.85_risk_capped_fallback_val_ret02_calmar80_gate_val_mdd20_scaled",
+          "exact_token_occurrences": 15,
+          "git_blob_oid": "bfe48254c9aafb736efc0bb7ffeeba6feaf9c16f",
+          "path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_85_asset_dynamic_scaled_20260605/alpha_zoo_85_asset_dynamic_scaled_full_v2_20260605.json",
+          "representation_evidence": "15 exact label occurrences across aggregate/fold report records; report exposes returns/metrics and selected labels, but no strategy_class, strategy_params, portfolio_mode, or engine_manifest"
+        }
+      ],
+      "mdd_comparator_eligible": false,
+      "missing_actual_engine_fields": [
+        "strategy_class",
+        "strategy_params",
+        "native_timeframe",
+        "portfolio_member_manifests",
+        "allocation_weights",
+        "gross_rule"
+      ],
+      "representation": "fold_local_offline_selector_and_scaled_candidate_return_series",
+      "required_actual_engine_fields": [
+        "strategy_class",
+        "strategy_params",
+        "symbols",
+        "native_timeframe",
+        "portfolio_member_manifests",
+        "allocation_weights",
+        "gross_rule"
+      ],
+      "resolution_reason": "offline_fold_local_selector_has_no_frozen_actual_engine_manifest_and_cannot_be_translated_without inventing member/weight/timing semantics",
+      "resolution_status": "incumbent_replay_unavailable",
+      "row_id": "incumbent_track_a_dynamic_conviction_switch",
+      "selection_eligible": false,
+      "source_id": "dynamic_conviction_switch:t0.85_risk_capped_fallback_val_ret02_calmar80_gate_val_mdd20_scaled"
+    },
+    {
+      "frozen_audit_files": [
+        {
+          "content_sha256": "a1a999cd085ed43f974890b82f73b3acf45ce9056687ea6fb3a37dedf69725d0",
+          "exact_token": "cross_asset_lead_lag_momentum",
+          "exact_token_occurrences": 4,
+          "git_blob_oid": "cb871ec10451111b41ba2b2fbf6e794076329748",
+          "path": "scripts/research/run_alpha_zoo_clean_new_alpha_discovery.py",
+          "representation_evidence": "family expands _lead_lag_rows over leaders, symbols, 3 lookbacks, 2 thresholds, 2 lag fractions, 2 holds, and leverage choices, then vector-simulates each signal; the family id is not one unique candidate manifest"
+        },
+        {
+          "content_sha256": "c4637e6b180154501aa0d914043f191d8b04b3cfa0faec0be6103bba6bf529ba",
+          "exact_token": "cross_asset_lead_lag_momentum",
+          "exact_token_occurrences": 2027,
+          "git_blob_oid": "530c3981ed9d7712c178a1f9b6b3a0e30f48dcee",
+          "path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_new_alpha_discovery_20260607_feature_bounded/clean_new_alpha_discovery_latest.json",
+          "representation_evidence": "2027 family occurrences identify many parameterized fold rows; no unique source candidate id and no strategy_class, strategy_params, portfolio_mode, or engine_manifest"
+        }
+      ],
+      "mdd_comparator_eligible": false,
+      "missing_actual_engine_fields": [
+        "unique_candidate_id",
+        "strategy_class",
+        "strategy_params",
+        "portfolio_member_manifests",
+        "allocation_weights",
+        "gross_rule"
+      ],
+      "representation": "non_unique_family_of_vectorized_parameter_sweep_rows",
+      "required_actual_engine_fields": [
+        "unique_candidate_id",
+        "strategy_class",
+        "strategy_params",
+        "symbols",
+        "native_timeframe",
+        "portfolio_member_manifests",
+        "allocation_weights",
+        "gross_rule"
+      ],
+      "resolution_reason": "family_only_source_id_maps_to_many parameterized rows and choosing one would be an unfrozen proxy rather than faithful replay",
+      "resolution_status": "incumbent_replay_unavailable",
+      "row_id": "incumbent_cross_asset_lead_lag_momentum",
+      "selection_eligible": false,
+      "source_id": "cross_asset_lead_lag_momentum"
+    },
+    {
+      "frozen_audit_files": [
+        {
+          "content_sha256": "0f9b110dc2a957cd4272dc7b0998838567ca4e69f8eb7df49504e34add6efe0e",
+          "exact_token": "cross_candidate_hybrid:hybrid_v3_5",
+          "exact_token_occurrences": 4,
+          "git_blob_oid": "89403977626d25cc6b03e8a41ae4a1601b0c50e6",
+          "path": "scripts/research/run_alpha_zoo_69_asset_monthly_refit_walkforward.py",
+          "representation_evidence": "_cross_candidate_hybrid_candidates lines 1482+ produces a fold-local Optuna blend and _candidate_eval wraps v35.row/v35.returns; the non-leaf portfolio family has no actual-engine manifest"
+        },
+        {
+          "content_sha256": "9f0b40c81b39dadf1d4c87a08372f5064d4a7b95f95a7d7d64ddd33e71d76cbc",
+          "exact_token": "cross_candidate_hybrid:hybrid_v3_5",
+          "exact_token_occurrences": 65,
+          "git_blob_oid": "d54ca8e453b7d158f99aa913827092afb4d047f0",
+          "path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_asset_tf_leverage_20260603/asset_tf_leverage_walkforward_latest.json",
+          "representation_evidence": "65 exact label occurrences record changing fold-local hybrid rows/returns; no strategy_class, strategy_params, portfolio_mode, or engine_manifest"
+        }
+      ],
+      "mdd_comparator_eligible": false,
+      "missing_actual_engine_fields": [
+        "strategy_class",
+        "strategy_params",
+        "native_timeframe",
+        "portfolio_member_manifests",
+        "allocation_weights",
+        "gross_rule"
+      ],
+      "representation": "fold_local_optuna_blend_of_candidate_return_series",
+      "required_actual_engine_fields": [
+        "strategy_class",
+        "strategy_params",
+        "symbols",
+        "native_timeframe",
+        "portfolio_member_manifests",
+        "allocation_weights",
+        "gross_rule"
+      ],
+      "resolution_reason": "offline_fold_local_return_blend_has_no frozen actual-engine member manifest and cannot be replayed without re-optimizing or inventing execution semantics",
+      "resolution_status": "incumbent_replay_unavailable",
+      "row_id": "incumbent_cross_candidate_hybrid_v3_5",
+      "selection_eligible": false,
+      "source_id": "cross_candidate_hybrid:hybrid_v3_5"
+    }
+  ],
+  "runtime_contract": {
+    "all_three_rows_are_attempted_as_explicit_unavailable_rows_on_every_cost_cell": true,
+    "dynamic_incumbent_resolution_forbidden": true,
+    "embed_json_value_identically": true,
+    "incumbent_comparison_status": "unavailable",
+    "later_research_may_create_new_trial_but_may_not_mutate_this_audit": true,
+    "nearby_proxy_forbidden": true,
+    "selection_and_mdd_comparator_membership": "excluded"
+  },
+  "schema": "alpha_max_incumbent_resolution.v1"
+}

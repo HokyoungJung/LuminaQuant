@@ -1,0 +1,317 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.14"
+
+jobs:
+  gpu-ci-config:
+    runs-on: ubuntu-latest
+    outputs:
+      enabled: ${{ steps.flags.outputs.enabled }}
+      required: ${{ steps.flags.outputs.required }}
+      runs_on_json: ${{ steps.flags.outputs.runs_on_json }}
+    env:
+      LQ_GPU_CI_RUNS_ON_JSON: ${{ vars.LQ_GPU_CI_RUNS_ON_JSON }}
+      LQ_GPU_CI_REQUIRED: ${{ vars.LQ_GPU_CI_REQUIRED }}
+    steps:
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - id: flags
+        run: |
+          python - <<'PY'
+          import json
+          import os
+
+          runs_on_json = os.getenv("LQ_GPU_CI_RUNS_ON_JSON", "").strip()
+          default_runs_on_json = json.dumps("ubuntu-latest")
+          required = os.getenv("LQ_GPU_CI_REQUIRED", "").strip().lower() in {"1", "true", "yes", "on"}
+          enabled = bool(runs_on_json)
+
+          if enabled:
+              parsed = json.loads(runs_on_json)
+              if not isinstance(parsed, (str, list)):
+                  raise SystemExit("LQ_GPU_CI_RUNS_ON_JSON must decode to a string or a list of runner labels.")
+
+          github_output = os.environ["GITHUB_OUTPUT"]
+          with open(github_output, "a", encoding="utf-8") as handle:
+              handle.write(f"enabled={'true' if enabled else 'false'}\n")
+              handle.write(f"required={'true' if required else 'false'}\n")
+              handle.write(f"runs_on_json={runs_on_json or default_runs_on_json}\n")
+
+          if required and not enabled:
+              raise SystemExit(
+                  "LQ_GPU_CI_REQUIRED=true but LQ_GPU_CI_RUNS_ON_JSON is not configured. "
+                  "Configure a self-hosted/GPU runner label JSON first."
+              )
+
+          print(
+              json.dumps(
+                  {
+                      "enabled": enabled,
+                      "required": required,
+                      "runs_on_json": runs_on_json or default_runs_on_json,
+                  },
+                  indent=2,
+                  sort_keys=True,
+              )
+          )
+          PY
+
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      LQ_GPU_MODE: cpu
+      LQ__EXECUTION__GPU_MODE: cpu
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          # Alpha-max trial accounting binds the prior family to an immutable
+          # baseline Git blob, so the quality job requires that commit object.
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Sync dependencies
+        run: uv sync --extra optimize --extra dev --extra live --extra dashboard
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dashboard frontend dependencies
+        working-directory: apps/dashboard_web
+        run: npm install --no-fund --no-audit
+
+      - name: Ruff lint check
+        run: uv run ruff check .
+
+      - name: Ruff format check
+        run: uv run ruff format --check .
+
+      - name: Build native extensions (maturin)
+        run: uv run python scripts/build_native_backends.py
+
+      - name: Architecture gate (live data decoupling)
+        run: bash scripts/ci/architecture_gate_live_data.sh
+
+      - name: Architecture gate (market-window parity contract)
+        run: bash scripts/ci/architecture_gate_market_window_contract.sh
+
+      - name: Raw-first periodic preload contract tests
+        run: |
+          uv run pytest -q \
+            tests/test_periodic_loop_config_contract.py \
+            tests/test_collector_periodic_loop_runtime.py \
+            tests/test_materializer_periodic_loop_timeframe_resolution.py \
+            tests/test_live_fail_fast_missing_committed_data.py \
+            tests/test_live_no_empty_window_degradation.py \
+            tests/test_market_window_schema_parity.py \
+            tests/test_market_window_emission_parity_live_vs_backtest.py \
+            tests/test_market_window_payload_flag.py \
+            tests/test_market_window_payload_rollout_gates.py \
+            tests/test_market_window_parity_flag_validation.py \
+            tests/test_run_backtest_data_mode_contract.py \
+            tests/test_optimize_data_mode_contract.py \
+            tests/test_backtest_optimize_loader_entrypoint.py \
+            tests/test_collect_binance_aggtrades_raw.py \
+            tests/test_materialize_from_raw.py \
+            tests/test_market_data_loader_modes.py \
+            tests/test_raw_first_lineage.py \
+            tests/test_raw_first_lineage_contract.py
+
+      - name: Architecture check
+        run: uv run python scripts/check_architecture.py
+
+      - name: Hardcoded parameter audit
+        run: uv run python scripts/audit_hardcoded_params.py
+
+      - name: Documentation verification (EN/KR + docs)
+        run: uv run python scripts/verify_docs.py
+
+      - name: Dashboard frontend lint
+        working-directory: apps/dashboard_web
+        run: npm run lint
+
+      - name: Dashboard frontend tests
+        working-directory: apps/dashboard_web
+        run: npm run test
+
+      - name: Dashboard frontend typecheck
+        working-directory: apps/dashboard_web
+        run: npm run typecheck
+
+      - name: Dashboard frontend build
+        working-directory: apps/dashboard_web
+        run: npm run build
+
+      - name: Bytecode sanity check
+        run: uv run python -m compileall -q src apps scripts tests
+
+      - name: Run full pytest suite
+        run: uv run pytest -q
+
+      - name: Golden numeric parity gate
+        # Explicitly runs the golden-comparator integration tests so the enforced
+        # numeric pins are visible in CI (audit V1: ci.yml previously had zero
+        # `golden` references and the event-driven engine goldens — ma_cross_* /
+        # buyholdstrategy_* — were compared by NOTHING in pytest). These also run
+        # inside the full suite above; this named, fast-failing step guarantees
+        # the engine + walk-forward goldens stay wired even if collection changes.
+        run: |
+          uv run pytest -q \
+            tests/integration/test_engine_golden.py \
+            tests/integration/test_walk_forward_golden.py
+
+      - name: Install pytest-cov for coverage gate
+        run: uv pip install pytest-cov
+
+      - name: Coverage gate (financial-core + live/exchanges/core)
+        # Runs the suite ONCE collecting branch coverage for the research-side
+        # financial-core packages AND the live/exchanges/core packages — the
+        # ~4,600 riskiest live-trading lines that previously had NO coverage floor
+        # and could silently decay (audit V2). Two independent floors are enforced
+        # from the single .coverage data file via `coverage report --include ...
+        # --fail-under`, so each group is gated on its OWN measured coverage (a
+        # single combined --cov-fail-under would let the well-covered research
+        # group mask decay in the live group). The 70% financial-core floor is
+        # unchanged (same 6 packages, same threshold). The 65% live/exchanges/core
+        # floor sits below the measured branch coverage (>=69%) with margin for
+        # full-suite vs targeted-subset variance — ratchet it up as coverage grows.
+        # pytest-cov is installed above; --cov is NOT added to pyproject.toml
+        # addopts so local runs are unaffected. --cov-report=term-missing prints
+        # per-file (per-package) coverage.
+        run: |
+          uv run pytest -q \
+            --cov=lumina_quant.backtesting \
+            --cov=lumina_quant.optimization \
+            --cov=lumina_quant.risk_manager \
+            --cov=lumina_quant.services \
+            --cov=lumina_quant.strategy_factory \
+            --cov=lumina_quant.alpha_zoo \
+            --cov=lumina_quant.live \
+            --cov=lumina_quant.exchanges \
+            --cov=lumina_quant.core \
+            --cov-branch \
+            --cov-report=term-missing
+          echo "::group::financial-core coverage floor (70%)"
+          uv run coverage report \
+            --include="*/lumina_quant/backtesting/*,*/lumina_quant/optimization/*,*/lumina_quant/risk_manager/*,*/lumina_quant/services/*,*/lumina_quant/strategy_factory/*,*/lumina_quant/alpha_zoo/*" \
+            --fail-under=70
+          echo "::endgroup::"
+          echo "::group::live/exchanges/core coverage floor (65%)"
+          uv run coverage report \
+            --include="*/lumina_quant/live/*,*/lumina_quant/exchanges/*,*/lumina_quant/core/*" \
+            --fail-under=65
+          echo "::endgroup::"
+
+      - name: Generate benchmark smoke data
+        # The perf/8GB smoke gate needs OHLCV CSVs; the repo ships none (data/ is
+        # gitignored). Generate BTCUSDT/ETHUSDT via the repo's own generator so the
+        # benchmark has real symbols to run — benchmark_backtest now fails loudly
+        # (rather than silently skipping) when no symbol data is present.
+        run: uv run python generate_data.py
+
+      - name: Benchmark smoke + 8GB baseline gate
+        env:
+          LQ_GPU_MODE: cpu
+          LQ__EXECUTION__GPU_MODE: cpu
+        run: |
+          mkdir -p "$RUNNER_TEMP/lq-benchmarks"
+          /usr/bin/time -v \
+            uv run python scripts/benchmark_backtest.py --iters 1 --warmup 0 --output "$RUNNER_TEMP/lq-benchmarks/ci_smoke.json" \
+            2>&1 | tee "$RUNNER_TEMP/lq-benchmarks/ci_smoke.time.log"
+          uv run python scripts/verify_8gb_baseline.py \
+            --benchmark "$RUNNER_TEMP/lq-benchmarks/ci_smoke.json" \
+            --time-log "$RUNNER_TEMP/lq-benchmarks/ci_smoke.time.log" \
+            --oom-log "$RUNNER_TEMP/lq-benchmarks/ci_smoke.time.log" \
+            --skip-dmesg \
+            --output "$RUNNER_TEMP/lq-benchmarks/ci_smoke_8gb_gate.json"
+
+  gpu-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Sync GPU dependencies
+        run: uv sync --extra dev --extra gpu
+
+      - name: GPU contract tests
+        run: |
+          uv run pytest -q \
+            tests/test_compute_engine.py \
+            tests/test_verify_polars_gpu_runtime_script.py
+
+      - name: Verify GPU contract (skip-safe on non-GPU runners)
+        run: |
+          mkdir -p "$RUNNER_TEMP/lq-benchmarks"
+          uv run python scripts/ci/verify_polars_gpu_runtime.py \
+            --mode auto \
+            --output-json "$RUNNER_TEMP/lq-benchmarks/ci_gpu_contract.json"
+
+  gpu-runtime-smoke:
+    needs:
+      - gpu-ci-config
+      - quality
+      - gpu-contract
+    if: ${{ needs.gpu-ci-config.outputs.enabled == 'true' }}
+    runs-on: ${{ fromJSON(needs.gpu-ci-config.outputs.runs_on_json) }}
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Sync GPU dependencies
+        run: uv sync --extra dev --extra gpu
+
+      - name: NVIDIA inventory
+        run: nvidia-smi
+
+      - name: Verify strict Polars GPU runtime
+        env:
+          LQ_GPU_MODE: forced-gpu
+          LQ_GPU_VERBOSE: "1"
+        run: |
+          mkdir -p "$RUNNER_TEMP/lq-benchmarks"
+          uv run python scripts/ci/verify_polars_gpu_runtime.py \
+            --require-gpu \
+            --mode forced-gpu \
+            --output-json "$RUNNER_TEMP/lq-benchmarks/ci_gpu_runtime.json"

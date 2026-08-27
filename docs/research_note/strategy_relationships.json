@@ -1,0 +1,751 @@
+{
+  "as_of_utc": "2026-08-23T00:00:00Z",
+  "edges": [
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_design",
+      "evidence_refs": [
+        "source:strategy-tree"
+      ],
+      "relation": "variant_of",
+      "source_id": "DonchianAtrTrendStrategy",
+      "status": "observed",
+      "target_id": "RollingBreakoutStrategy"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_design",
+      "evidence_refs": [
+        "source:strategy-tree"
+      ],
+      "relation": "variant_of",
+      "source_id": "VolatilitySqueezeBreakoutStrategy",
+      "status": "observed",
+      "target_id": "CompressionBreakoutContinuationStrategy"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_artifact",
+      "evidence_refs": [
+        "eval:g003-selection-v11"
+      ],
+      "relation": "evaluates",
+      "source_id": "crypto_turtle_20_10_atr_v1",
+      "status": "observed",
+      "target_id": "DonchianAtrTrendStrategy"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_artifact",
+      "evidence_refs": [
+        "eval:g003-selection-v11"
+      ],
+      "relation": "quality_survivor_in",
+      "source_id": "crypto_turtle_20_10_atr_v1",
+      "status": "observed",
+      "target_id": "g003_selection_v11"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_artifact",
+      "evidence_refs": [
+        "artifact:g003-selection-rejected"
+      ],
+      "relation": "rejected_because",
+      "source_id": "g003_selection_v11",
+      "status": "observed",
+      "target_id": "minimum_six_survivors_not_met"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_design",
+      "evidence_refs": [
+        "source:strategy-tree"
+      ],
+      "relation": "overlaps_signal_axis",
+      "source_id": "TopCapTimeSeriesMomentumStrategy",
+      "status": "observed",
+      "target_id": "DonchianAtrTrendStrategy"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_design",
+      "evidence_refs": [
+        "source:strategy-tree"
+      ],
+      "relation": "variant_of",
+      "source_id": "PriceVolumeCorrContinuationStrategy",
+      "status": "observed",
+      "target_id": "trend_momentum"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_design",
+      "evidence_refs": [
+        "source:strategy-tree"
+      ],
+      "relation": "variant_of",
+      "source_id": "CrossSectionalIntermediateEchoMomentumStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional_momentum"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_design",
+      "evidence_refs": [
+        "source:strategy-tree"
+      ],
+      "relation": "residualizes",
+      "source_id": "TrendGatedResidualMomentumStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional_momentum"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_design",
+      "evidence_refs": [
+        "source:strategy-tree"
+      ],
+      "relation": "causal_opposite_of",
+      "source_id": "StationarityGatedResidualReversionStrategy",
+      "status": "observed",
+      "target_id": "TrendGatedResidualMomentumStrategy"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_design",
+      "evidence_refs": [
+        "source:strategy-tree"
+      ],
+      "relation": "closest_related",
+      "source_id": "CrossSectionalNearHighAnchoringStrategy",
+      "status": "observed",
+      "target_id": "NearHighMomentumStrategy"
+    },
+    {
+      "confidence": "hypothesis",
+      "evidence_class": "hypothesis",
+      "evidence_refs": [
+        "hypothesis:near-high-low"
+      ],
+      "relation": "hypothesized_complement_of",
+      "source_id": "CrossSectionalNearLowRecoveryStrategy",
+      "status": "proposed",
+      "target_id": "CrossSectionalNearHighAnchoringStrategy"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_methodology",
+      "evidence_refs": [
+        "eval:common-period-screen"
+      ],
+      "relation": "requires_control",
+      "source_id": "RebalancingPremiumHarvestStrategy",
+      "status": "observed",
+      "target_id": "matched_no_rebalance_basket"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_methodology",
+      "evidence_refs": [
+        "eval:common-period-screen"
+      ],
+      "relation": "benchmark_for",
+      "source_id": "BitcoinBuyHoldStrategy",
+      "status": "observed",
+      "target_id": "crypto_directional_strategies"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_design",
+      "evidence_refs": [
+        "source:strategy-tree"
+      ],
+      "relation": "overlaps_signal_axis",
+      "source_id": "PairTradingZscoreStrategy",
+      "status": "observed",
+      "target_id": "PairSpreadZscoreStrategy"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_design",
+      "evidence_refs": [
+        "source:strategy-tree"
+      ],
+      "relation": "variant_of",
+      "source_id": "TimeframePairZscoreReversionStrategy",
+      "status": "observed",
+      "target_id": "PairTradingZscoreStrategy"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_design",
+      "evidence_refs": [
+        "eval:g003-selection-v11"
+      ],
+      "relation": "variant_of",
+      "source_id": "Kalman_pair_candidates",
+      "status": "observed",
+      "target_id": "pair_relative_value"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_design",
+      "evidence_refs": [
+        "eval:g003-selection-v11"
+      ],
+      "relation": "variant_of",
+      "source_id": "PCA_residual_statarb_candidates",
+      "status": "observed",
+      "target_id": "residual_relative_value"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_design",
+      "evidence_refs": [
+        "source:strategy-tree"
+      ],
+      "relation": "closest_related",
+      "source_id": "GoldSilverRatioMeanReversionStrategy",
+      "status": "observed",
+      "target_id": "MetalsRelativeValueBasketStrategy"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_design",
+      "evidence_refs": [
+        "source:strategy-tree"
+      ],
+      "relation": "closest_related",
+      "source_id": "SlowCrossSectionalLeadLagStrategy",
+      "status": "observed",
+      "target_id": "LeadLagSpilloverStrategy"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_design",
+      "evidence_refs": [
+        "source:strategy-tree"
+      ],
+      "relation": "closest_related",
+      "source_id": "SlowCrossSectionalLeadLagStrategy",
+      "status": "observed",
+      "target_id": "CrossCryptoSlowDiffusionStrategy"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_design",
+      "evidence_refs": [
+        "source:strategy-tree"
+      ],
+      "relation": "domain_variant_of",
+      "source_id": "IntermarketLeadLagContinuationStrategy",
+      "status": "observed",
+      "target_id": "lead_lag_continuation"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_methodology",
+      "evidence_refs": [
+        "source:strategy-tree"
+      ],
+      "relation": "not_equivalent_to",
+      "source_id": "CrossSectionalFundingMomentumCarryStrategy",
+      "status": "observed",
+      "target_id": "spot_perp_cash_and_carry"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_design",
+      "evidence_refs": [
+        "source:strategy-tree"
+      ],
+      "relation": "overlaps_feature",
+      "source_id": "FundingHarvestCarryStrategy",
+      "status": "observed",
+      "target_id": "CrossSectionalFundingMomentumCarryStrategy"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_methodology",
+      "evidence_refs": [
+        "artifact:strategy-smoke-registry"
+      ],
+      "relation": "requires_evidence",
+      "source_id": "OrderBookImbalanceReversionStrategy",
+      "status": "observed",
+      "target_id": "point_in_time_orderbook"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_design",
+      "evidence_refs": [
+        "source:strategy-tree"
+      ],
+      "relation": "closest_related",
+      "source_id": "VPINToxicityStrategy",
+      "status": "observed",
+      "target_id": "taker_flow_exhaustion"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_design",
+      "evidence_refs": [
+        "source:strategy-tree"
+      ],
+      "relation": "parent_of",
+      "source_id": "DisagreementGatedEnsembleStrategy",
+      "status": "observed",
+      "target_id": "RegimeAdaptiveDisagreementEnsembleStrategy"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_design",
+      "evidence_refs": [
+        "source:strategy-tree"
+      ],
+      "relation": "parent_of",
+      "source_id": "BullBearRegimeRotationStrategy",
+      "status": "observed",
+      "target_id": "RegimeRouterConfirmedRotationStrategy"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_design",
+      "evidence_refs": [
+        "source:strategy-tree"
+      ],
+      "relation": "overlays",
+      "source_id": "VolManagedRiskOverlayStrategy",
+      "status": "observed",
+      "target_id": "trend_children"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_design",
+      "evidence_refs": [
+        "source:strategy-tree"
+      ],
+      "relation": "overlays",
+      "source_id": "MomentumCrashDynamicScalingOverlayStrategy",
+      "status": "observed",
+      "target_id": "momentum_children"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_design",
+      "evidence_refs": [
+        "source:strategy-tree"
+      ],
+      "relation": "overlays",
+      "source_id": "AvgCorrelationCrashGuardOverlayStrategy",
+      "status": "observed",
+      "target_id": "directional_children"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_artifact",
+      "evidence_refs": [
+        "eval:g003-selection-v11"
+      ],
+      "relation": "overlays",
+      "source_id": "crypto_kill_switch_overlay_turtle_1d_v1",
+      "status": "observed",
+      "target_id": "crypto_turtle_20_10_atr_v1"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_artifact",
+      "evidence_refs": [
+        "eval:g003-selection-v11"
+      ],
+      "relation": "overlays",
+      "source_id": "tradfi_kill_switch_overlay_ma_rotation_1d_v1",
+      "status": "observed",
+      "target_id": "tradfi_ma_score_vol_target_1d_v1"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_lineage",
+      "evidence_refs": [
+        "artifact:state-distilled"
+      ],
+      "relation": "superseded_by_hypothesis",
+      "source_id": "calendar_primary_profit_moonshot",
+      "status": "observed",
+      "target_id": "state_distilled_leadership_unwind"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_metric",
+      "evidence_refs": [
+        "artifact:state-distilled"
+      ],
+      "relation": "failed_to_beat",
+      "source_id": "state_distilled_leadership_unwind",
+      "status": "observed",
+      "target_id": "current_base_reference"
+    },
+    {
+      "confidence": "medium",
+      "evidence_class": "observed_scope",
+      "evidence_refs": [
+        "source:strategy-tree"
+      ],
+      "relation": "excluded_from",
+      "source_id": "MicroRangeExpansion1sStrategy",
+      "status": "observed",
+      "target_id": "greater_equal_one_minute_catalog"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_provenance",
+      "evidence_refs": [
+        "artifact:dacapogo-source"
+      ],
+      "relation": "derived_from",
+      "source_id": "DacapogoDailySourceStrategy",
+      "status": "observed",
+      "target_id": "authenticated_dacapogo_source_snapshot"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_artifact",
+      "evidence_refs": [
+        "eval:dacapogo-locked-validation"
+      ],
+      "relation": "decision",
+      "source_id": "DacapogoDailySourceStrategy",
+      "status": "observed",
+      "target_id": "cash_zero_of_thirteen_locked_validation_folds"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_provenance",
+      "evidence_refs": [
+        "artifact:parity-candidate-v10"
+      ],
+      "relation": "validates_execution_parity_not_performance",
+      "source_id": "exact_native_parity_candidate_v10",
+      "status": "observed",
+      "target_id": "alpha_max_g003"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_provenance",
+      "evidence_refs": [
+        "artifact:prelock-attempt-v1"
+      ],
+      "relation": "infrastructure_failed_because",
+      "source_id": "prelock_attempt_v1",
+      "status": "observed",
+      "target_id": "future_funding_boundary_8ms"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_provenance",
+      "evidence_refs": [
+        "artifact:parity-v6-interrupted"
+      ],
+      "relation": "interrupted_not_strategy_rejected",
+      "source_id": "exact_native_parity_oracle_v6",
+      "status": "observed",
+      "target_id": "alpha_max_g003"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_provenance",
+      "evidence_refs": [
+        "artifact:prelock-v7-non-admitted"
+      ],
+      "relation": "non_admitted_not_strategy_rejected",
+      "source_id": "prelock_supervisor_v7",
+      "status": "observed",
+      "target_id": "alpha_max_g003"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "AvgCorrelationCrashGuardOverlayStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "BitcoinBuyHoldStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "BullBearRegimeRotationStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "CompressionBreakoutContinuationStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "CrossCryptoSlowDiffusionStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "CrossSectionalFundingMomentumCarryStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "CrossSectionalIntermediateEchoMomentumStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "CrossSectionalNearHighAnchoringStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "CrossSectionalNearLowRecoveryStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "DacapogoDailySourceStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "DisagreementGatedEnsembleStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "DonchianAtrTrendStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "FundingHarvestCarryStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "GoldSilverRatioMeanReversionStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "IntermarketLeadLagContinuationStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "Kalman_pair_candidates",
+      "type": "control_evidence_or_state"
+    },
+    {
+      "id": "LeadLagSpilloverStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "MetalsRelativeValueBasketStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "MicroRangeExpansion1sStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "MomentumCrashDynamicScalingOverlayStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "NearHighMomentumStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "OrderBookImbalanceReversionStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "PCA_residual_statarb_candidates",
+      "type": "control_evidence_or_state"
+    },
+    {
+      "id": "PairSpreadZscoreStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "PairTradingZscoreStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "PriceVolumeCorrContinuationStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "RebalancingPremiumHarvestStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "RegimeAdaptiveDisagreementEnsembleStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "RegimeRouterConfirmedRotationStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "RollingBreakoutStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "SlowCrossSectionalLeadLagStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "StationarityGatedResidualReversionStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "TimeframePairZscoreReversionStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "TopCapTimeSeriesMomentumStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "TrendGatedResidualMomentumStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "VPINToxicityStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "VolManagedRiskOverlayStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "VolatilitySqueezeBreakoutStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "alpha_max_g003",
+      "type": "control_evidence_or_state"
+    },
+    {
+      "id": "authenticated_dacapogo_source_snapshot",
+      "type": "control_evidence_or_state"
+    },
+    {
+      "id": "calendar_primary_profit_moonshot",
+      "type": "control_evidence_or_state"
+    },
+    {
+      "id": "cash_zero_of_thirteen_locked_validation_folds",
+      "type": "control_evidence_or_state"
+    },
+    {
+      "id": "cross_sectional_momentum",
+      "type": "family_or_axis"
+    },
+    {
+      "id": "crypto_directional_strategies",
+      "type": "control_evidence_or_state"
+    },
+    {
+      "id": "crypto_kill_switch_overlay_turtle_1d_v1",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "crypto_turtle_20_10_atr_v1",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "current_base_reference",
+      "type": "control_evidence_or_state"
+    },
+    {
+      "id": "directional_children",
+      "type": "control_evidence_or_state"
+    },
+    {
+      "id": "exact_native_parity_candidate_v10",
+      "type": "control_evidence_or_state"
+    },
+    {
+      "id": "exact_native_parity_oracle_v6",
+      "type": "control_evidence_or_state"
+    },
+    {
+      "id": "future_funding_boundary_8ms",
+      "type": "control_evidence_or_state"
+    },
+    {
+      "id": "g003_selection_v11",
+      "type": "evaluation"
+    },
+    {
+      "id": "greater_equal_one_minute_catalog",
+      "type": "control_evidence_or_state"
+    },
+    {
+      "id": "lead_lag_continuation",
+      "type": "family_or_axis"
+    },
+    {
+      "id": "matched_no_rebalance_basket",
+      "type": "control_evidence_or_state"
+    },
+    {
+      "id": "minimum_six_survivors_not_met",
+      "type": "control_evidence_or_state"
+    },
+    {
+      "id": "momentum_children",
+      "type": "control_evidence_or_state"
+    },
+    {
+      "id": "pair_relative_value",
+      "type": "family_or_axis"
+    },
+    {
+      "id": "point_in_time_orderbook",
+      "type": "control_evidence_or_state"
+    },
+    {
+      "id": "prelock_attempt_v1",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "prelock_supervisor_v7",
+      "type": "control_evidence_or_state"
+    },
+    {
+      "id": "residual_relative_value",
+      "type": "family_or_axis"
+    },
+    {
+      "id": "spot_perp_cash_and_carry",
+      "type": "control_evidence_or_state"
+    },
+    {
+      "id": "state_distilled_leadership_unwind",
+      "type": "control_evidence_or_state"
+    },
+    {
+      "id": "taker_flow_exhaustion",
+      "type": "control_evidence_or_state"
+    },
+    {
+      "id": "tradfi_kill_switch_overlay_ma_rotation_1d_v1",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "tradfi_ma_score_vol_target_1d_v1",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "trend_children",
+      "type": "control_evidence_or_state"
+    },
+    {
+      "id": "trend_momentum",
+      "type": "family_or_axis"
+    }
+  ],
+  "rules": {
+    "all_endpoints_declared": true,
+    "hypotheses_require_fresh_evaluation": true,
+    "observed_does_not_imply_performance": true
+  },
+  "schema": "luminaquant.strategy_relationships.v1"
+}

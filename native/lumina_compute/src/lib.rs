@@ -12,10 +12,12 @@
 //! Computation logic is bit-identical to the replaced ctypes crates.
 //! Module name: lumina_quant._compute  (set via pyproject.toml module-name)
 
+use numpy::ndarray::{Array1, Array2};
+use numpy::{
+    IntoPyArray, PyArray1, PyArray2, PyReadonlyArray1, PyReadonlyArray2, PyUntypedArrayMethods,
+};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use numpy::{IntoPyArray, PyArray1, PyArray2, PyReadonlyArray1, PyReadonlyArray2, PyUntypedArrayMethods};
-use numpy::ndarray::{Array1, Array2};
 
 // ============================================================================
 // Metrics helpers  (logic from native/rust_metrics/src/lib.rs)
@@ -123,7 +125,11 @@ fn candidate_scores(
         }
         let downside = (downside_sum / count as f64).sqrt();
         let raw_score = mean / (std + downside + 1e-9);
-        let score = if raw_score.is_finite() { raw_score } else { 0.0 };
+        let score = if raw_score.is_finite() {
+            raw_score
+        } else {
+            0.0
+        };
         out[col] = (1.0 - prior_ratio) * score + prior_ratio * priors[col];
     }
 }
@@ -142,7 +148,11 @@ fn softmax(scores: &[f64], weights: &mut [f64]) {
     }
     let mut total = 0.0;
     for (idx, weight) in weights.iter_mut().enumerate() {
-        let clean = if scores[idx].is_finite() { scores[idx] } else { -1e9 };
+        let clean = if scores[idx].is_finite() {
+            scores[idx]
+        } else {
+            -1e9
+        };
         let clipped = clean.clamp(-20.0, 20.0);
         let value = (clipped - max_value).exp();
         *weight = value;
@@ -164,7 +174,11 @@ fn argmax(values: &[f64]) -> usize {
     let mut best_idx = 0usize;
     let mut best_value = f64::NEG_INFINITY;
     for (idx, &value) in values.iter().enumerate() {
-        let clean = if value.is_finite() { value } else { f64::NEG_INFINITY };
+        let clean = if value.is_finite() {
+            value
+        } else {
+            f64::NEG_INFINITY
+        };
         if clean > best_value {
             best_value = clean;
             best_idx = idx;
@@ -225,7 +239,11 @@ fn mean_range_column(
         sum += row_value(returns, cols, row, col);
         count += 1;
     }
-    if count == 0 { 0.0 } else { sum / count as f64 }
+    if count == 0 {
+        0.0
+    } else {
+        sum / count as f64
+    }
 }
 
 fn mean_abs_tail(values: &[f64], end_count: usize, window: usize) -> f64 {
@@ -239,7 +257,11 @@ fn mean_abs_tail(values: &[f64], end_count: usize, window: usize) -> f64 {
         sum += value.abs();
         count += 1;
     }
-    if count == 0 { 0.0 } else { sum / count as f64 }
+    if count == 0 {
+        0.0
+    } else {
+        sum / count as f64
+    }
 }
 
 fn mean_tail(values: &[f64], end_count: usize, window: usize) -> f64 {
@@ -253,7 +275,11 @@ fn mean_tail(values: &[f64], end_count: usize, window: usize) -> f64 {
         sum += value;
         count += 1;
     }
-    if count == 0 { 0.0 } else { sum / count as f64 }
+    if count == 0 {
+        0.0
+    } else {
+        sum / count as f64
+    }
 }
 
 // ============================================================================
@@ -424,7 +450,11 @@ fn evaluate_metrics(
         return Ok((-999.0, 0.0, 0.0));
     }
 
-    let periods = if annual_periods <= 0 { 252 } else { annual_periods } as f64;
+    let periods = if annual_periods <= 0 {
+        252
+    } else {
+        annual_periods
+    } as f64;
 
     let mut mean_r = 0.0;
     for pair in bars.windows(2) {
@@ -536,10 +566,8 @@ fn simulate_symbol_fold<'py>(
         prev_signal = signal_s[idx];
 
         let denom = np_maximum_price(close_s[idx]);
-        let long_liq =
-            signal_s[idx] > 0.0 && ((low_s[idx] / denom) - 1.0) * leverage <= -0.95;
-        let short_liq =
-            signal_s[idx] < 0.0 && ((high_s[idx] / denom) - 1.0) * leverage >= 0.95;
+        let long_liq = signal_s[idx] > 0.0 && ((low_s[idx] / denom) - 1.0) * leverage <= -0.95;
+        let short_liq = signal_s[idx] < 0.0 && ((high_s[idx] / denom) - 1.0) * leverage >= 0.95;
         liquidation[idx] = u8::from(long_liq || short_liq);
 
         equity *= 1.0 + value;
@@ -701,7 +729,11 @@ fn trailing_state_signal<'py>(
         let mut exited = false;
         if state > 0.0 {
             let next_stop = price - trail_atr_mult * atr_value;
-            stop = if stop.is_finite() { stop.max(next_stop) } else { next_stop };
+            stop = if stop.is_finite() {
+                stop.max(next_stop)
+            } else {
+                next_stop
+            };
             if can_exit && (bool_at(lx, idx) || price < stop) {
                 state = 0.0;
                 stop = f64::NAN;
@@ -711,7 +743,11 @@ fn trailing_state_signal<'py>(
             }
         } else if state < 0.0 {
             let next_stop = price + trail_atr_mult * atr_value;
-            stop = if stop.is_finite() { stop.min(next_stop) } else { next_stop };
+            stop = if stop.is_finite() {
+                stop.min(next_stop)
+            } else {
+                next_stop
+            };
             if can_exit && (bool_at(sx, idx) || price > stop) {
                 state = 0.0;
                 stop = f64::NAN;
@@ -847,8 +883,7 @@ fn evaluate_hybrid_optuna_portfolio<'py>(
                 default_weight_ratio * base + (1.0 - default_weight_ratio) * score_weights[col];
         }
 
-        let high_vol_feature =
-            recent_cross_section_vol(returns, rows, cols, t, short_vol_window_i);
+        let high_vol_feature = recent_cross_section_vol(returns, rows, cols, t, short_vol_window_i);
         if high_vol_feature > high_vol_threshold && high_vol_idx_i < cols {
             weights[high_vol_idx_i] += high_vol_weight_boost;
         }
@@ -912,14 +947,12 @@ fn evaluate_hybrid_optuna_portfolio<'py>(
         if hist_count >= bias_window_i {
             let ens_bias = mean_tail(&history, hist_count, bias_window_i);
             let model_start = t.saturating_sub(bias_window_i);
-            let model_bias =
-                mean_range_column(returns, rows, cols, model_start, t, default_idx);
+            let model_bias = mean_range_column(returns, rows, cols, model_start, t, default_idx);
             let combined_bias =
                 bias_combine_ratio * model_bias + (1.0 - bias_combine_ratio) * ens_bias;
             let denom_abs = mean_abs_tail(&history, hist_count, bias_window_i) + 1e-9;
             if combined_bias < 0.0 {
-                let reduction =
-                    bias_correction_alpha * (combined_bias.abs() / denom_abs).min(0.80);
+                let reduction = bias_correction_alpha * (combined_bias.abs() / denom_abs).min(0.80);
                 exposure = (1.0 - reduction).max(0.0);
             }
         }
@@ -1038,8 +1071,16 @@ fn aggregate_raw_aggtrades_to_1s<'py>(
         ts,
         pr,
         qt,
-        if has_range_start_ms != 0 { Some(range_start_ms) } else { None },
-        if has_range_end_ms != 0 { Some(range_end_ms) } else { None },
+        if has_range_start_ms != 0 {
+            Some(range_start_ms)
+        } else {
+            None
+        },
+        if has_range_end_ms != 0 {
+            Some(range_end_ms)
+        } else {
+            None
+        },
         complete_through_ms,
     );
     if buckets.is_empty() {
@@ -1173,6 +1214,282 @@ fn append_ohlcv_1s_wal<'py>(
     Ok(len as i32)
 }
 
+/// Fold canonical 1-second OHLCV rows into completed alpha-max native bars.
+///
+/// `timeframe_ms` is the ordered, unique set of supported (4h/1d) timeframes.
+/// The working arrays carry one slot per timeframe. An inactive slot must have
+/// a zero bucket and zero OHLCV values. The returned release arrays are
+/// `(release_timestamp_ms, timeframe_index, bucket_ms, open, high, low,
+/// close, volume)` and the returned state is `(last_seen_ms, active,
+/// bucket_ms, open, high, low, close, volume)`.
+#[allow(clippy::too_many_arguments)]
+#[pyfunction]
+fn fold_alpha_max_native_bars<'py>(
+    py: Python<'py>,
+    timestamps_ms: PyReadonlyArray1<'py, i64>,
+    open: PyReadonlyArray1<'py, f64>,
+    high: PyReadonlyArray1<'py, f64>,
+    low: PyReadonlyArray1<'py, f64>,
+    close: PyReadonlyArray1<'py, f64>,
+    volume: PyReadonlyArray1<'py, f64>,
+    timeframe_ms: PyReadonlyArray1<'py, i64>,
+    last_seen_ms: i64,
+    working_active: PyReadonlyArray1<'py, u8>,
+    working_bucket_ms: PyReadonlyArray1<'py, i64>,
+    working_open: PyReadonlyArray1<'py, f64>,
+    working_high: PyReadonlyArray1<'py, f64>,
+    working_low: PyReadonlyArray1<'py, f64>,
+    working_close: PyReadonlyArray1<'py, f64>,
+    working_volume: PyReadonlyArray1<'py, f64>,
+) -> PyResult<(
+    (
+        Bound<'py, PyArray1<i64>>,
+        Bound<'py, PyArray1<i64>>,
+        Bound<'py, PyArray1<i64>>,
+        Bound<'py, PyArray1<f64>>,
+        Bound<'py, PyArray1<f64>>,
+        Bound<'py, PyArray1<f64>>,
+        Bound<'py, PyArray1<f64>>,
+        Bound<'py, PyArray1<f64>>,
+    ),
+    (
+        i64,
+        Bound<'py, PyArray1<u8>>,
+        Bound<'py, PyArray1<i64>>,
+        Bound<'py, PyArray1<f64>>,
+        Bound<'py, PyArray1<f64>>,
+        Bound<'py, PyArray1<f64>>,
+        Bound<'py, PyArray1<f64>>,
+        Bound<'py, PyArray1<f64>>,
+    ),
+)> {
+    fn contiguous_i64<'a>(
+        values: &'a PyReadonlyArray1<'_, i64>,
+        name: &str,
+    ) -> PyResult<&'a [i64]> {
+        values
+            .as_slice()
+            .map_err(|e| PyValueError::new_err(format!("{name} must be C-contiguous: {e}")))
+    }
+    fn contiguous_f64<'a>(
+        values: &'a PyReadonlyArray1<'_, f64>,
+        name: &str,
+    ) -> PyResult<&'a [f64]> {
+        values
+            .as_slice()
+            .map_err(|e| PyValueError::new_err(format!("{name} must be C-contiguous: {e}")))
+    }
+    fn contiguous_u8<'a>(values: &'a PyReadonlyArray1<'_, u8>, name: &str) -> PyResult<&'a [u8]> {
+        values
+            .as_slice()
+            .map_err(|e| PyValueError::new_err(format!("{name} must be C-contiguous: {e}")))
+    }
+
+    let ts = contiguous_i64(&timestamps_ms, "timestamps_ms")?;
+    let op = contiguous_f64(&open, "open")?;
+    let hi = contiguous_f64(&high, "high")?;
+    let lo = contiguous_f64(&low, "low")?;
+    let cl = contiguous_f64(&close, "close")?;
+    let vo = contiguous_f64(&volume, "volume")?;
+    let tfs = contiguous_i64(&timeframe_ms, "timeframe_ms")?;
+    let active = contiguous_u8(&working_active, "working_active")?;
+    let buckets = contiguous_i64(&working_bucket_ms, "working_bucket_ms")?;
+    let work_open = contiguous_f64(&working_open, "working_open")?;
+    let work_high = contiguous_f64(&working_high, "working_high")?;
+    let work_low = contiguous_f64(&working_low, "working_low")?;
+    let work_close = contiguous_f64(&working_close, "working_close")?;
+    let work_volume = contiguous_f64(&working_volume, "working_volume")?;
+    let rows = ts.len();
+    if rows == 0
+        || [op.len(), hi.len(), lo.len(), cl.len(), vo.len()]
+            .iter()
+            .any(|len| *len != rows)
+    {
+        return Err(PyValueError::new_err(
+            "canonical OHLCV arrays must be non-empty and equal length",
+        ));
+    }
+    let slots = tfs.len();
+    if slots == 0
+        || [
+            active.len(),
+            buckets.len(),
+            work_open.len(),
+            work_high.len(),
+            work_low.len(),
+            work_close.len(),
+            work_volume.len(),
+        ]
+        .iter()
+        .any(|len| *len != slots)
+    {
+        return Err(PyValueError::new_err(
+            "timeframe and working arrays must be non-empty and equal length",
+        ));
+    }
+    for (index, tf) in tfs.iter().enumerate() {
+        if (*tf != 14_400_000 && *tf != 86_400_000) || tfs[..index].contains(tf) {
+            return Err(PyValueError::new_err(
+                "timeframe_ms must contain unique supported 4h/1d values",
+            ));
+        }
+    }
+    let mut next_active = active.to_vec();
+    let mut next_bucket = buckets.to_vec();
+    let mut next_open = work_open.to_vec();
+    let mut next_high = work_high.to_vec();
+    let mut next_low = work_low.to_vec();
+    let mut next_close = work_close.to_vec();
+    let mut next_volume = work_volume.to_vec();
+    let every_slot_inactive = active.iter().all(|value| *value == 0);
+    if (last_seen_ms == -1) != every_slot_inactive {
+        return Err(PyValueError::new_err(
+            "last_seen_ms -1 requires every working slot inactive",
+        ));
+    }
+    if last_seen_ms < -1
+        || (last_seen_ms >= 0 && (last_seen_ms < 100_000_000_000 || last_seen_ms % 1_000 != 0))
+    {
+        return Err(PyValueError::new_err(
+            "last_seen_ms must be -1 or a realistic 1000ms-aligned timestamp",
+        ));
+    }
+    if last_seen_ms >= 0 && active.iter().any(|value| *value != 1) {
+        return Err(PyValueError::new_err(
+            "nonnegative last_seen_ms requires every working slot active",
+        ));
+    }
+    for index in 0..slots {
+        if next_active[index] > 1 {
+            return Err(PyValueError::new_err(
+                "working_active must contain only 0 or 1",
+            ));
+        }
+        if next_active[index] == 0 {
+            if next_bucket[index] != 0
+                || next_open[index] != 0.0
+                || next_high[index] != 0.0
+                || next_low[index] != 0.0
+                || next_close[index] != 0.0
+                || next_volume[index] != 0.0
+            {
+                return Err(PyValueError::new_err(
+                    "inactive working state must be canonical zeros",
+                ));
+            }
+            continue;
+        }
+        if last_seen_ms < 0
+            || next_bucket[index] != (last_seen_ms / tfs[index]) * tfs[index]
+            || next_bucket[index] % tfs[index] != 0
+            || !next_open[index].is_finite()
+            || !next_high[index].is_finite()
+            || !next_low[index].is_finite()
+            || !next_close[index].is_finite()
+            || !next_volume[index].is_finite()
+            || next_open[index] <= 0.0
+            || next_high[index] < next_low[index]
+            || next_low[index] <= 0.0
+            || next_close[index] <= 0.0
+            || next_volume[index] < 0.0
+            || next_high[index] < next_open[index].max(next_close[index])
+            || next_low[index] > next_open[index].min(next_close[index])
+        {
+            return Err(PyValueError::new_err("working state is invalid"));
+        }
+    }
+    let (mut release_ts, mut release_tf_index, mut release_bucket) =
+        (Vec::new(), Vec::new(), Vec::new());
+    let (
+        mut release_open,
+        mut release_high,
+        mut release_low,
+        mut release_close,
+        mut release_volume,
+    ) = (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new());
+    let mut cursor = last_seen_ms;
+    for index in 0..rows {
+        let timestamp = ts[index];
+        if timestamp < 100_000_000_000 || timestamp % 1_000 != 0 || timestamp <= cursor {
+            return Err(PyValueError::new_err(
+                "timestamps_ms must be strictly increasing, 1000ms-aligned, and after last_seen_ms",
+            ));
+        }
+        let (row_open, row_high, row_low, row_close, row_volume) =
+            (op[index], hi[index], lo[index], cl[index], vo[index]);
+        if !row_open.is_finite()
+            || !row_high.is_finite()
+            || !row_low.is_finite()
+            || !row_close.is_finite()
+            || !row_volume.is_finite()
+            || row_open <= 0.0
+            || row_high < row_low
+            || row_low <= 0.0
+            || row_close <= 0.0
+            || row_volume < 0.0
+            || row_high < row_open.max(row_close)
+            || row_low > row_open.min(row_close)
+        {
+            return Err(PyValueError::new_err("canonical OHLCV row is invalid"));
+        }
+        for tf_index in 0..slots {
+            let bucket = (timestamp / tfs[tf_index]) * tfs[tf_index];
+            if next_active[tf_index] == 0 {
+                next_active[tf_index] = 1;
+                next_bucket[tf_index] = bucket;
+                next_open[tf_index] = row_open;
+                next_high[tf_index] = row_high;
+                next_low[tf_index] = row_low;
+                next_close[tf_index] = row_close;
+                next_volume[tf_index] = row_volume;
+            } else if next_bucket[tf_index] != bucket {
+                release_ts.push(timestamp);
+                release_tf_index.push(tf_index as i64);
+                release_bucket.push(next_bucket[tf_index]);
+                release_open.push(next_open[tf_index]);
+                release_high.push(next_high[tf_index]);
+                release_low.push(next_low[tf_index]);
+                release_close.push(next_close[tf_index]);
+                release_volume.push(next_volume[tf_index]);
+                next_bucket[tf_index] = bucket;
+                next_open[tf_index] = row_open;
+                next_high[tf_index] = row_high;
+                next_low[tf_index] = row_low;
+                next_close[tf_index] = row_close;
+                next_volume[tf_index] = row_volume;
+            } else {
+                next_high[tf_index] = next_high[tf_index].max(row_high);
+                next_low[tf_index] = next_low[tf_index].min(row_low);
+                next_close[tf_index] = row_close;
+                next_volume[tf_index] += row_volume;
+            }
+        }
+        cursor = timestamp;
+    }
+    Ok((
+        (
+            Array1::from(release_ts).into_pyarray(py),
+            Array1::from(release_tf_index).into_pyarray(py),
+            Array1::from(release_bucket).into_pyarray(py),
+            Array1::from(release_open).into_pyarray(py),
+            Array1::from(release_high).into_pyarray(py),
+            Array1::from(release_low).into_pyarray(py),
+            Array1::from(release_close).into_pyarray(py),
+            Array1::from(release_volume).into_pyarray(py),
+        ),
+        (
+            cursor,
+            Array1::from(next_active).into_pyarray(py),
+            Array1::from(next_bucket).into_pyarray(py),
+            Array1::from(next_open).into_pyarray(py),
+            Array1::from(next_high).into_pyarray(py),
+            Array1::from(next_low).into_pyarray(py),
+            Array1::from(next_close).into_pyarray(py),
+            Array1::from(next_volume).into_pyarray(py),
+        ),
+    ))
+}
+
 // ============================================================================
 // Module registration
 // ============================================================================
@@ -1188,5 +1505,6 @@ fn _compute(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(evaluate_hybrid_optuna_portfolio, m)?)?;
     m.add_function(wrap_pyfunction!(aggregate_raw_aggtrades_to_1s, m)?)?;
     m.add_function(wrap_pyfunction!(append_ohlcv_1s_wal, m)?)?;
+    m.add_function(wrap_pyfunction!(fold_alpha_max_native_bars, m)?)?;
     Ok(())
 }

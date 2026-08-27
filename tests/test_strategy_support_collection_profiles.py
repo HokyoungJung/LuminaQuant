@@ -4,6 +4,8 @@ import urllib.error
 from urllib.parse import urlparse
 from unittest.mock import patch
 
+import pytest
+
 from lumina_quant.data_collector import collect_strategy_support_data
 from lumina_quant.data_sync import (
     _http_get_json,
@@ -131,6 +133,77 @@ def test_sync_futures_feature_points_skips_disabled_fetchers_and_persists_enable
     assert funding_row["funding_fee_quote_per_unit"] == 5.0
     assert "mark_price" not in funding_row
     assert "index_price" not in funding_row
+
+
+def test_sync_futures_feature_points_treats_empty_funding_mark_price_as_missing(tmp_path):
+    captured: dict[str, object] = {}
+
+    def _funding_history(**_kwargs):
+        return [
+            {
+                "fundingTime": 1_735_689_600_000,
+                "fundingRate": "0.0001",
+                "markPrice": "",
+            }
+        ]
+
+    def _upsert(_db_path, *, rows, **_kwargs):
+        captured["rows"] = list(rows)
+        return len(captured["rows"])
+
+    with (
+        patch("lumina_quant.data_sync._fetch_funding_history", side_effect=_funding_history),
+        patch("lumina_quant.data_sync.upsert_futures_feature_points_rows", side_effect=_upsert),
+    ):
+        stats = sync_futures_feature_points(
+            db_path=str(tmp_path / "features"),
+            exchange_id="binance",
+            symbol_list=["BTC/USDT"],
+            since_ms=1_735_689_600_000,
+            until_ms=1_735_689_600_000,
+            include_mark_index=False,
+            include_open_interest=False,
+            include_liquidations=False,
+        )
+
+    assert len(stats) == 1
+    assert captured["rows"] == [
+        {
+            "funding_fee_quote_per_unit": None,
+            "funding_fee_rate": 0.0001,
+            "funding_mark_price": None,
+            "funding_rate": 0.0001,
+            "timestamp_ms": 1_735_689_600_000,
+        }
+    ]
+
+
+def test_sync_futures_feature_points_rejects_empty_funding_rate(tmp_path):
+    def _funding_history(**_kwargs):
+        return [
+            {
+                "fundingTime": 1_735_689_600_000,
+                "fundingRate": "",
+                "markPrice": "50000",
+            }
+        ]
+
+    with (
+        patch("lumina_quant.data_sync._fetch_funding_history", side_effect=_funding_history),
+        patch("lumina_quant.data_sync.upsert_futures_feature_points_rows") as upsert,
+        pytest.raises(ValueError, match="could not convert string to float"),
+    ):
+        sync_futures_feature_points(
+            db_path=str(tmp_path / "features"),
+            exchange_id="binance",
+            symbol_list=["BTC/USDT"],
+            since_ms=1_735_689_600_000,
+            until_ms=1_735_689_600_000,
+            include_mark_index=False,
+            include_open_interest=False,
+            include_liquidations=False,
+        )
+    upsert.assert_not_called()
 
 
 def test_fetch_price_klines_uses_pair_param_for_index_endpoint():

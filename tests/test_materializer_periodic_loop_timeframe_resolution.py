@@ -6,9 +6,10 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
+import pytest
 from lumina_quant.backtesting.cli_contract import RawFirstDataMissingError
-from lumina_quant.storage.parquet import ParquetMarketDataRepository
 from lumina_quant.services.materialize_from_raw import MaterializedCommit
+from lumina_quant.storage.parquet import ParquetMarketDataRepository
 
 _SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "materialize_market_windows.py"
 _SPEC = importlib.util.spec_from_file_location("materialize_script_module", _SCRIPT_PATH)
@@ -54,6 +55,14 @@ def test_materializer_parser_defaults_use_runtime_config(monkeypatch):
     assert materialize_script._resolve_periodic_enabled("", once=False) is (
         config.storage.materializer_periodic_enabled
     )
+def test_materializer_help_resolves_storage_defaults(monkeypatch, capsys):
+    monkeypatch.setattr(sys, "argv", [str(_SCRIPT_PATH), "--help"])
+
+    with pytest.raises(SystemExit) as exc_info:
+        materialize_script._parse_args()
+
+    assert exc_info.value.code == 0
+    assert "--required-timeframes" in capsys.readouterr().out
 
 
 def test_materializer_periodic_loop_resolves_required_timeframes(monkeypatch):

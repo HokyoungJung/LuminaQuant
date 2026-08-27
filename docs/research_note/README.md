@@ -1,28 +1,24 @@
-# research_note
+# Alpha-research knowledge graph
 
-Canonical research-note directory. Use this stable name instead of strategy/date-specific document names.
+This directory records alpha-research facts and hypotheses without converting either into allocation or routing authority.
 
-## Files
+## Current authority
 
-- `research_note.md` — current cumulative strategy research note and research journal. New entries go at the top in latest-first order.
-- `research_history.md` — global research inventory/source ledger. Regenerate/update only when source families or global chronology change.
-- `state_distilled.md` — archived predecessor note for the state-distilled non-calendar lane.
+- **Binding selection decision:** `strategy_evidence_index.json` → `eval:g003-selection-v11`. G003 selection-v11 executed 24 candidates, accepted 16 allowed exclusions, produced 20 active panels and one Turtle quality survivor; six were required. No allocation was emitted, locked OOS was not launched, and order routing is `false`.
+- **Status rules:** `evaluation_contract.md`. An execution pass is not a quality survivor or promotion.
+- **Human map:** `strategy_taxonomy.md`; **typed graph:** `strategy_relationships.json`; **claim/source registry:** `strategy_evidence_index.json`.
 
-## Update rule
+## Evidence boundaries
 
-1. Prepend the newest research diary entry to `research_note.md` under **Research journal — latest first**.
-2. Keep strategy names, artifact families, dates, and decisions inside the entry body, not in the filename.
-3. Keep session checkpoints in `.omx/notepad.md` and detailed handoffs in `docs/session_handoff_*.md`.
-4. Keep large generated evidence under `var/reports/`.
-5. If the global source ledger changes, update `research_history.md` and the matching `var/reports/.../research_history/` artifacts, or explicitly document why regeneration was unnecessary.
+The structured files are the current canonical graph. `research_note.md` and `research_history.md` are immutable-style provenance/history, not current-status authority. Their historic conclusions are not silently promoted into this graph. `strategy_evidence_20260812.json`, when present, is literature/design-prior evidence only, never repository performance.
 
-## Latest diary index
+Operational recovery, parity, resume, and handoff documents are archives/provenance leaves. They can establish sealing, causality, interruption, completeness, or routing state; they cannot establish alpha profitability. In particular, interrupted infrastructure is not strategy rejection.
 
-- 2026-06-28 KST — 최신 데이터 포함 전체 WF 재평가 정정; 85/110 universes to 2026-06-28T10:09Z, full 10-fold ranking updated.
-- 2026-06-21 KST — H35 executable shadow/testnet adoption checkpoint, fresh-forward evidence, and live decision template.
+## Reading order
 
-- 2026-05-28 KST — standardized live refits on refreshed data, latest 8 complete weeks as validation, Optuna full-parameter tuning, and train+validation final refit.
-- 2026-05-28 KST — canonicalized research-note paths to `docs/research_note/` and added stable latest-first diary rules.
-- 2026-05-27 KST — live `MARKET_WINDOW` hot-path optimized with a trusted internal canonical-row fast path; real-money gates remain false.
-- 2026-05-27 KST — Python-wrapped Rust live state-signal acceleration added for deterministic Alpha Zoo state machines.
-- 2026-05-27 KST — repo-wide format/Rust hygiene baseline and cleanup contract refreshed.
+1. Read the contract.
+2. Find a stable strategy/candidate/evaluation ID in the evidence index.
+3. Follow graph edges; `hypothesis` edges are proposals, not results.
+4. Read source paths and windows before comparing metrics.
+
+The `143` versus `144` registry snapshots remain an explicit missing-evidence flag, not a reconciled count. All paths and hashes are preserved verbatim from observed receipts.

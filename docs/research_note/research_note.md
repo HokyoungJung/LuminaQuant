@@ -1,4 +1,55 @@
 # Research Note
+## 2026-08-23 — G003 integrated alpha-research decision and restartable native replay
+
+Current canonical navigation moved to `README.md`, `strategy_taxonomy.md`,
+`strategy_relationships.json`, `strategy_evidence_index.json`, and
+`evaluation_contract.md`. This diary remains chronological provenance rather
+than the current status authority.
+
+G003 selection-v11 completed 24 candidate runs with 16 allowed data exclusions
+and 20 active return panels. Only `crypto_turtle_20_10_atr_v1` survived its
+positive-quality gate; the preregistered floor was six. The suite was rejected,
+no allocator portfolio was emitted, and locked OOS was not launched.
+Post-activation `19/19` and registry `127 pass + 16 exclusions` are execution
+smokes, not promotion evidence. The earlier 144-strategy snapshot and later
+143-row registry report remain explicitly unreconciled by commit/scope.
+
+The checkpointless parity-v10 oracle was stopped at modeled `21.97%` progress
+and sealed non-reusable under receipt
+`f1793acc435a626f2e42fdbad739a12decfa8f8c33f1a39c9fed57e86161dd24`.
+Its separately sealed exact-native candidate remains execution provenance, not
+official acceptance or performance evidence. The integrated replacement moves
+only authenticated canonical 1-second OHLCV folding into Rust/PyO3; Python
+retains release grouping, strategy/event ordering, final handoff,
+finalization, capsule serialization, and economic semantics. Whole UTC days
+are the parity restart unit and whole row/cost cells are the prelock/historical
+restart unit.
+
+Research priorities are now explicit: fresh sealed price-volume continuation;
+Turtle versus one equal-gross crash/correlation guard; echo/residual momentum
+orthogonality; matched rebalancing controls; and a preregistered
+stationarity-gated residual momentum/reversion switch. These are hypotheses,
+not observed performance. Official parity, prelock, historical, and
+observability acceptance remain pending. `order_routing_enabled=false`.
+
+## 2026-07-10 KST — 최신 upstream task 전수 실행: evaluability v3 / defect v5 / eq-flow / dashboard
+
+`private/main`을 `49bdd52a`까지 fast-forward하고, 새 task 원문 `alpha_pool_evaluability_v3_handoff.md`, `systematic_defect_fix_v5_handoff.md`, `eqflow_complements_handoff.md`와 dashboard UI/UX fix를 현재 data-PC에서 검증했다. 이번 추가 구현은 strict profile을 실제 candidate CLI까지 전달하고, cost override를 score JSON보다 우선시키며, 등록된 research strategy를 shared generic momentum proxy 대신 registry simulator로 라우팅하고, validation/whole-search evidence가 없으면 fail-closed하도록 만든다. locked-OOS는 보고 전용으로 남겼고 post-OOS variant의 paper/live/real alias와 실배분 경로는 모두 닫았다.
+
+Coverage-first 결과는 로컬 128-symbol store의 384 symbol-timeframe pair 중 기본 360-bar 기준 72 pair가 충분했다(1h 35, 4h 27, 1d 10). 이 교집합으로 만든 raw manifest는 1h 828 + 4h 730 + 1d 468 = 비용 셀당 2,026 rows다. `offsession_tugofwar_1h_tow_42d_fade`와 `stationarity_gated_residual_reversion_4h_strict_adf`는 handoff의 regression-locked `do_not_rerun_as_is` 대상이다. 기계적으로 확장된 raw grid에 포함된 사실을 숨기지 않고 모든 비용의 8 rows를 보존했지만, authoritative gate와 allocator에서는 미리 정해진 known-null quarantine으로 제외했다. 따라서 protocol gate 분모는 1h 827 + 4h 729 + 1d 468 = 2,024 rows다.
+
+`configs/profiles/backtest_cost_realistic.yaml`, validation selection, DSR `0.90` / SPA `0.05` / PBO `0.50`, cost override `10/15/20/30bps`로 12개 timeframe-cost cell을 모두 실행했다. Symbol/timeframe preflight에서는 protocol manifest `2,024/2,024` rows가 evaluable이었지만, 실제 split/window 요구까지 적용한 runtime에서는 네 비용마다 실제 평가 `510`, `insufficient_data` `1,514`, hard reject `2,024`, pass `0`, strict shortlist `0`으로 동일하게 닫혔다. raw reports는 비용마다 2,026/2,026 rows와 각 row의 `metadata.missing_symbols`를 보존한다. analyzer 총계도 8,096 rows에서 `PASS=0`, `NEAR-MISS=0`, `DEAD=2,040`, `INSUFFICIENT=6,056`이다. 20bps routing audit에서는 새 29개 strategy class가 모두 존재했고, 데이터로 평가된 102 rows 전부 `registry_simulator`, `generic_fallback_proxy=0`이었다.
+
+110-symbol monthly-refit은 11 folds, raw 1,921 candidate-fold rows / 199 labels를 보존했다. whole-search DSR/SPA/PBO evidence가 없는 상태에서 strict gate를 추정값으로 우회하지 않아 admitted fold/aggregate는 둘 다 0이다. Eq-flow 진단은 C1 correlation guard가 한 fold도 engage하지 않아 기대한 July trim을 재현하지 못했고 밴드를 현장에서 튜닝하지 않았다. B2와 A3a는 각각 16/16 variant가 raw compounded return을 개선했고 8/16이 max MDD를 줄였으며, A3a의 raw/effective selection·scale 결정값을 fold마다 직렬화했다. A3b bar weighting은 199 labels 중 197개의 순위를 바꿨다. D4는 March/July를 cash로 gate해 raw compounded return을 `-13.35%`에서 `+17.32%`, max MDD를 `25.45%`에서 `9.76%`로 바꿨지만 사전 기대 Sep/Dec/Apr shape와 달라 승격하지 않았다.
+
+F1은 current 110-symbol locked-OOS daily NET stream, tradfi open-impulse stream, state-VWAP dense-pair stream을 정확한 34 common dates로 materialize했다. 월별 두 sleeve의 turnover evidence가 unknown이고 두 source artifact도 promotion-ready가 아니다. native quality에서 양수 sleeve가 하나뿐이라 `min_sleeves=2`를 못 채워 children `0`, cash `100%`로 fail-closed했다. 별도 alpha-pool 3-arm은 20bps 4h train+validation의 165 streams / 11 families를 base M2, MR1 turnover+Ledoit-Wolf, family meta-momentum으로 동일 입력 재생했다. native quality children은 각 27개였지만 upstream strict admission이 0이므로 세 arm의 effective children은 전부 0, cash 100%다. locked-OOS report-only raw return도 base `-0.18%`, MR1 `-0.27%`, family tilt `-0.27%`로 개선 근거가 없다.
+
+D5 preregistered universe control은 동일 코드/profile/cost/fold calendar에서 roster만 85와 110으로 바꿨고 모든 control equality가 참이다. 주 label raw compounded locked-OOS는 85-symbol `+3.23%`에서 110-symbol `-4.11%`로 바뀌었다. June은 `-14.45%` 대 `+2.57%`로 sign flip, July는 `+0.57%` 대 `-9.41%`다. 결론은 `universe_sensitive_do_not_promote`다.
+
+Dashboard upstream fix는 current tree에서 frontend 6 files / 86 tests, ESLint, TypeScript, Next production build 16/16 pages를 다시 통과했다. Python clean isolated full suite는 `4,365 passed, 36 skipped, 3 xfailed`, 집중 research suite는 `110 passed`, Ruff check/format과 diff check도 통과했다. 주요 근거는 `var/reports/data_pc_tasks_20260710/{coverage.json,manifest_coverage.json,candidate_grid_verified_summary.json,candidate_grid_analysis.json,monthly_refit_walkforward_110_verified.json,eqflow_analysis.json,eqflow_f1_evaluation.json,allocator_3arm.json,d5_universe_comparison.json,research_artifact_validation.json}`이다.
+
+최종 판정: **do_not_promote / research_only_no_execution / 실배분 0%**. fresh-forward shadow와 완전한 whole-search/turnover provenance 전에는 paper/testnet/live/real-money/order 경로를 열지 않는다.
+
 ## 2026-07-09 KST — 알파 풀 v2c data-PC cost-grid 재측정: 전원 리젝트
 
 `private/main` 최신 `28a06e02`(alpha-pool-expansion-v2c)까지 가져온 뒤 추가 핸드오프 `alpha_pool_expansion_v2c_handoff.md`를 같은 research-only/data-PC 경계로 실행했다. v2c 전략 후보는 기본 candidate library에서 9개 `strategy_class`만 필터링해 구성했다: 54개 후보 row. 10번째 family meta-momentum lane은 `@register` 전략 row가 아니라 `quality_gated_allocation.py`의 오프라인 allocator manifest route라 별도 3-arm 측정으로 기록했다. 실행 경계는 유지했다: real-money/paper/testnet/live/order execution 전부 0회, 신규 배분 0%.
@@ -1107,7 +1158,7 @@ The live adapter now reconstructs `18` selected source sleeves, watches all `69`
 
 Limit/no-fill/slippage policy is unchanged and remains paper/testnet only: `LMT` default, `one_tick_worse`, market fallback disabled, max chase attempts `0`, missing/high-spread/high-slippage BBO guard skips without market conversion, and realized all-in round-trip cost must stay within the `10bps` replay/gate assumption before any real-money review. Safety flags remain `paper_testnet_only=true`, `ready_for_real=false`, `real_money_execution=false`, and `real_execution_allowed=false`.
 
-Verification after the correction passed: targeted eligibility/live adapter suites `23 passed`; `ruff format --check .`; `ruff check .`; `compileall`; docs verification `117` markdown files; architecture check; hardcoded-parameter audit `new=0`; `git diff --check`; artifact invariant script confirmed no train-ineligible selected live gross; and full `pytest -q` `1539 passed` with max RSS `2,756,628 KiB` (<8GB).
+Verification after the correction passed: targeted eligibility/live adapter suites `23 passed`; `ruff format --check .`; `ruff check .`; `compileall`; docs verification `117` markdown files; architecture check; hardcoded-parameter audit `new=0`; `git diff --check`; artifact invariant script confirmed no train-ineligible selected live gross; and full `pytest -q` `1539 passed` with max RSS `2,756,628 KiB` (<8GB). static dependency review was refreshed and reported high impact because the research/live artifacts and default live profile changed; the change is intentional and covered by the verification above.
 
 ## 2026-05-30 KST — 69-asset per-profile Optuna rebuild after broad-blend audit
 
@@ -2902,3 +2953,12 @@ Best raw/shadow candidate is `lagged_shadow_leaf_router:core_warmup4_avg2_val05_
 - Full cross-session contract and continuation order: `docs/research_note/g060_g061_terminal_authority_v3_resume_plan_20260722.md`.
 - Methodology clarification: `HokyoungJung/Market-Cap-Weighted-Indices` is not directly integrated. Existing TopCap and turnover/flow-share work is adjacent, not equivalent to point-in-time market-cap weighting. A later port must use point-in-time constituent/capitalization evidence, remain research/shadow-only, and pass clean walk-forward plus cost/funding gates. Current pipeline work increases correctness and provenance; it does not tune headline performance.
 
+
+## 2026-07-11 — Alpha-Max Revision 5.14 local implementation complete; data-PC replay pending
+
+- Completed the repository-side Alpha-Max experiment implementation on `feat/alpha-max-20260710` after integrating the latest fetched `private/main`. The immutable prior-trial blob, embedded 21-node registry, exact incumbent audit, validation-only selection, and report-only historical boundary remain frozen and hash bound; runtime reads no `.omx`/`.omc` research artifact.
+- Added strict raw/feature/config/manifest activation, indicator-only warmup and fresh economic scoring, exact native completed/barrier/finalization receipt coverage, causal funding and execution attribution, full-event ruin/liquidation evidence, frozen matrix orchestration, separate prelock/historical CLIs, immutable sealed bundles, and descriptor-bound observability export.
+- Fixed the real near-high aggregator lifecycle so all admitted symbols for a completed daily key are collected before an atomic barrier closes or a genuinely expired missing cross-section fails.
+- Local integrity and subprocess control-flow verification passed; expensive market replay in the subprocess harness remains deterministic because this machine does not contain the complete frozen phase roots. The actual 816 validation and 680 historical physical fold replays are intentionally delegated to the data PC under `docs/research_note/alpha_max_data_pc_runbook_20260711.md`.
+- Decision: **no performance claim and no promotion**. Real-money allocation remains `0%`; paper/testnet/live approval remains absent; a one-touch exposed historical report is still report-only and genuinely fresh confirmation remains mandatory.
+- Normative handoff: `docs/research_note/alpha_max_final_delivery_20260711.md`, `docs/research_note/alpha_max_data_pc_runbook_20260711.md`, and `docs/research_note/alpha_max_final_sha256_20260711.txt`.

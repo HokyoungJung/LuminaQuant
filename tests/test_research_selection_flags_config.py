@@ -123,11 +123,14 @@ def test_shipped_config_yaml_full_load_is_byte_identical_to_head():
         fp.write(head_text)
         head_path = fp.name
     try:
-        head_cfg = load_runtime_config(head_path)
+        # This test compares YAML semantics only.  Passing an explicit empty
+        # environment prevents a repository-local .env from being loaded for
+        # the working-tree path but not for the temporary HEAD copy.
+        head_cfg = load_runtime_config(head_path, env={})
     finally:
         os.remove(head_path)
 
-    working_cfg = load_runtime_config("config.yaml")
+    working_cfg = load_runtime_config("config.yaml", env={})
     assert dataclasses.asdict(working_cfg) == dataclasses.asdict(head_cfg)
 
 

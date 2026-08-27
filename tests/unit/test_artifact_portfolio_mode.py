@@ -1300,6 +1300,161 @@ def test_manifest_portfolio_mode_resolves_valid_manifest(tmp_path: Path) -> None
     assert component.strategy_class == "MovingAverageCrossStrategy"
     assert component.params["short_window"] == 4
     assert definition.source_artifacts["manifest_source_artifact:survivors"].endswith("source.json")
+    assert [receipt.artifact_id for receipt in definition.artifact_read_receipts] == [
+        "artifact_portfolio_manifest",
+        "source:survivors",
+    ]
+    assert definition.artifact_read_receipts[0].canonical_path == str(manifest_path.resolve())
+    assert definition.artifact_read_receipts[0].byte_count == manifest_path.stat().st_size
+
+
+def test_manifest_portfolio_mode_preserves_manifest_child_order(tmp_path: Path) -> None:
+    manifest_path = _write_manifest(tmp_path)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    lighter = json.loads(json.dumps(manifest["children"][0]))
+    lighter.update(
+        {
+            "candidate_id": "lighter-first",
+            "name": "Lighter First",
+            "weight": 0.25,
+            "leaf_gross": 0.25,
+            "netting_group": "lighter-first",
+        }
+    )
+    heavier = json.loads(json.dumps(manifest["children"][0]))
+    heavier.update(
+        {
+            "candidate_id": "heavier-second",
+            "name": "Heavier Second",
+            "weight": 0.75,
+            "leaf_gross": 0.75,
+            "netting_group": "heavier-second",
+        }
+    )
+    manifest["children"] = [lighter, heavier]
+    manifest["artifact_kind"] = "alpha_max_engine_portfolio_manifest.v1"
+    manifest["cash_weight"] = 0.0
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    definition = MODULE.resolve_portfolio_mode_definition(f"manifest:{manifest_path}")
+
+    assert [component.component_id for component in definition.components] == [
+        "lighter-first",
+        "heavier-second",
+    ]
+    assert [component.weight for component in definition.components] == [0.25, 0.75]
+
+
+def test_generic_manifest_portfolio_mode_keeps_weight_descending_order(tmp_path: Path) -> None:
+    manifest_path = _write_manifest(tmp_path)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    lighter = json.loads(json.dumps(manifest["children"][0]))
+    lighter.update(
+        {
+            "candidate_id": "lighter-first",
+            "name": "Lighter First",
+            "weight": 0.25,
+            "leaf_gross": 0.25,
+            "netting_group": "lighter-first",
+        }
+    )
+    heavier = json.loads(json.dumps(manifest["children"][0]))
+    heavier.update(
+        {
+            "candidate_id": "heavier-second",
+            "name": "Heavier Second",
+            "weight": 0.75,
+            "leaf_gross": 0.75,
+            "netting_group": "heavier-second",
+        }
+    )
+    manifest["children"] = [lighter, heavier]
+    manifest["cash_weight"] = 0.0
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    definition = MODULE.resolve_portfolio_mode_definition(f"manifest:{manifest_path}")
+
+    assert [component.component_id for component in definition.components] == [
+        "heavier-second",
+        "lighter-first",
+    ]
+    assert [component.weight for component in definition.components] == [0.75, 0.25]
+
+
+def test_manifest_portfolio_mode_exposes_generic_sorted_source_receipts(
+    tmp_path: Path,
+) -> None:
+    manifest_path = _write_manifest(tmp_path)
+    source_alpha = tmp_path / "alpha.json"
+    source_zeta = tmp_path / "zeta.json"
+    source_alpha.write_text(json.dumps({"ready": True, "payload": "alpha"}), encoding="utf-8")
+    source_zeta.write_text(json.dumps({"ready": True, "payload": "zeta"}), encoding="utf-8")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["source_artifacts"] = [
+        {
+            "id": "zeta",
+            "path": str(source_zeta),
+            "sha256": _manifest_source_sha(source_zeta),
+            "max_age_hours": 876000,
+            "ready": True,
+            "portfolio_ready": True,
+        },
+        {
+            "id": "alpha",
+            "path": str(source_alpha),
+            "sha256": _manifest_source_sha(source_alpha),
+            "max_age_hours": 876000,
+            "ready": True,
+            "portfolio_ready": True,
+        },
+    ]
+    manifest["children"][0]["source_artifact_id"] = "zeta"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    definition = MODULE.resolve_portfolio_mode_definition(f"manifest:{manifest_path}")
+
+    assert "manifest_fail_closed_to_cash" not in definition.source_artifacts
+    assert [receipt.artifact_id for receipt in definition.artifact_read_receipts] == [
+        "artifact_portfolio_manifest",
+        "source:alpha",
+        "source:zeta",
+    ]
+    assert {
+        receipt.artifact_id: receipt.sha256 for receipt in definition.artifact_read_receipts
+    } == {
+        "artifact_portfolio_manifest": _manifest_source_sha(manifest_path),
+        "source:alpha": _manifest_source_sha(source_alpha),
+        "source:zeta": _manifest_source_sha(source_zeta),
+    }
+
+
+def test_manifest_portfolio_mode_preserves_receipt_tuple_identity_through_overrides(
+    tmp_path: Path,
+) -> None:
+    manifest_path = _write_manifest(tmp_path)
+    definition = MODULE.resolve_portfolio_mode_definition(f"manifest:{manifest_path}")
+
+    copied = MODULE._apply_component_param_overrides(definition, {"leaf-a": {"short_window": 5}})
+
+    assert copied.components[0].params["short_window"] == 5
+    assert copied.artifact_read_receipts is definition.artifact_read_receipts
+
+
+def test_manifest_portfolio_mode_fail_closed_definition_has_empty_receipts(
+    tmp_path: Path,
+) -> None:
+    manifest_path = _write_manifest(tmp_path, source_updates={"sha256": "bad"})
+
+    definition = MODULE.resolve_portfolio_mode_definition(f"manifest:{manifest_path}")
+
+    assert definition.components == ()
+    assert definition.artifact_read_receipts == ()
+
+
+def test_non_manifest_portfolio_mode_defaults_to_empty_receipts() -> None:
+    definition = MODULE.resolve_portfolio_mode_definition("risk_off_mode")
+
+    assert definition.artifact_read_receipts == ()
 
 
 def test_manifest_portfolio_mode_allows_lagged_completed_shadow_oos(

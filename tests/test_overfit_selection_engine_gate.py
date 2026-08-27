@@ -3,9 +3,9 @@ walk-forward runner (``scripts/research/run_alpha_zoo_69_asset_monthly_refit_wal
 
 These pin the config-gated seam without running the (data-dependent) walk-forward:
 the OFF-path is a strict identity no-op (byte-identical admit boundary), basket
-dedup collapses identical-symbol clones, the reject floors resolve from CLI and
-from a strict RuntimeConfig, and the reject axis stays inert until the upstream
-per-candidate DSR/SPA/PBO metric plumbing lands (``reject_ready`` TODO).
+dedup collapses identical-symbol clones, reject floors resolve from CLI or
+RuntimeConfig, and per-candidate DSR/SPA/PBO evidence fail-closes whenever the
+strict profile arms both rejection and overfit-stat emission.
 """
 
 from __future__ import annotations
@@ -78,14 +78,17 @@ def test_dedupe_flag_collapses_identical_symbol_basket_clones(eng):
     assert [r["candidate_id"] for r in out] == ["a", "b", "d"]
 
 
-def test_enforce_flag_reject_axis_is_inert_until_metrics_land(eng):
-    """--enforce-selection-reject-gate resolves the floors but does NOT over-reject
-    today's DSR-less engine rows: ``reject_ready`` is False, so the reject axis is
-    a documented no-op while basket dedup (if requested) still applies."""
+def test_enforce_flag_arms_fail_closed_reject_axis(eng):
+    """--enforce-selection-reject-gate always arms the reject axis.
+
+    This fixture carries complete evidence and permissive CLI-default floors, so
+    it remains admitted; a missing DSR/SPA/PBO field is covered by the dedicated
+    fail-closed tests in the monthly runner suite.
+    """
     eng._configure_selection_gate(_args(enforce_selection_reject_gate=True))
     state = eng._SELECTION_GATE_STATE
-    assert state["reject_ready"] is False
-    assert state["robust_score_params"] is not None  # resolved + ready for the hook
+    assert state["reject_ready"] is True
+    assert state["robust_score_params"] is not None
     out = eng._apply_selection_gate_rows(_rows(), mode="val")
     assert [r["candidate_id"] for r in out] == ["a", "b", "c", "d"]
 
@@ -100,6 +103,7 @@ def test_strict_profile_config_resolves_reject_floors(eng):
         "spa_gate_ceiling": 0.05,
         "pbo_gate_ceiling": 0.50,
     }
+    assert state["reject_ready"] is True
     # Reset the module holder so test order cannot leak an armed gate.
     eng._configure_selection_gate(_args())
     assert eng._SELECTION_GATE_STATE["enabled"] is False
@@ -116,9 +120,9 @@ def test_strict_profile_config_arms_basket_dedup_caps(eng):
         state["max_per_lineage"],
         state["max_per_family_basket"],
     ) == (2, 1, 1)
-    # And dedup actually fires end-to-end on the clone cluster.
+    # Strict evidence and thresholds apply before dedup; only d clears all three.
     out = eng._apply_selection_gate_rows(_rows(), mode="val")
-    assert [r["candidate_id"] for r in out] == ["a", "b", "d"]
+    assert [r["candidate_id"] for r in out] == ["d"]
     eng._configure_selection_gate(_args())  # reset
     assert eng._SELECTION_GATE_STATE["enabled"] is False
 

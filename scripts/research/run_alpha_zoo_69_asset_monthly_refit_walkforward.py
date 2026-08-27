@@ -93,25 +93,10 @@ PREPARED_RETURNS_CACHE_SIZE = max(
 # ``--config`` / ``LQ_CONFIG_PATH`` -- see ``_configure_selection_gate``, called
 # once from ``main`` after ``parse_args``.
 #
-# ``reject_ready`` is intentionally False: while the E1 emission below now stamps
-# per-candidate ``spa_pvalue`` + ``approx_pbo`` into the ``validation`` block when
-# ``emit_candidate_overfit_stats`` is armed (``_candidate_overfit_stats`` /
-# ``_evaluate_candidate``), this runner's ``_period_metrics`` still does NOT compute
-# the whole-search-deflated ``deflated_sharpe`` -- that needs the search-global
-# ``num_trials`` this per-fold call site cannot know, so it is stamped at the
-# data-PC aggregation layer (see ``docs/research_note/overfit_selection_gate_integration.md``).
-# With DSR absent the 0.90 ``dsr_gate_floor`` would over-reject every DSR-less row,
-# so the reject axis stays inert. The reject logic itself is fully implemented +
-# unit-proven against the recorded artifact in
-# ``tests/test_overfit_selection_reject_gate.py`` (via
-# ``selection.apply_selection_reject_and_dedup`` /
-# ``selection.passes_dsr_spa_hard_gate``). TODO(overfit-gates): once the data-PC
-# stamps ``deflated_sharpe`` (deflated against the WHOLE-SEARCH trial count -- the
-# honest num_trials basis, consistent with the cross-trial CSCV/PBO below) into the
-# ``validation`` block alongside the E1 ``spa_pvalue`` / ``approx_pbo``, flip
-# ``reject_ready`` to True to activate the resolved reject floors. Basket dedup
-# (Step 3) needs no such plumbing (it keys off ``symbols`` only) and is active
-# whenever ``--dedupe-baskets`` / a cap is set.
+# ``reject_ready`` is armed whenever strict rejection is requested. Candidate
+# overfit-stat emission controls whether this runner can populate evidence, but it
+# never weakens enforcement: absent whole-search DSR, SPA, or PBO evidence rejects
+# fail-closed instead of degrading to dedup-only admission.
 #
 # WORKED REFERENCE (overfit_selection_gate handoff): this repo's engine is NOT
 # the canonical selection/aggregation pipeline -- production selection, per-fold
@@ -278,7 +263,7 @@ def _configure_selection_gate(args: argparse.Namespace) -> None:
     _SELECTION_GATE_STATE.update(
         {
             "enabled": bool(enforce or dedupe_active),
-            "reject_ready": False,  # TODO(overfit-gates): flip once metrics land.
+            "reject_ready": bool(enforce),
             "robust_score_params": {
                 "enforce_selection_reject_gate": True,
                 "dsr_gate_floor": dsr_floor,
@@ -311,8 +296,29 @@ def _apply_selection_gate_rows(
     from lumina_quant.strategy_factory.selection import apply_selection_reject_and_dedup
 
     robust_score_params = state["robust_score_params"] if state.get("reject_ready") else None
+    gated_rows = list(rows)
+    if state.get("reject_ready"):
+
+        def _has_required_reject_evidence(row: Mapping[str, Any]) -> bool:
+            metrics = row.get("validation") or row.get("val") or {}
+            if not isinstance(metrics, Mapping):
+                return False
+            required = (
+                metrics.get("deflated_sharpe"),
+                metrics.get("spa_pvalue"),
+                metrics.get("pbo", metrics.get("approx_pbo")),
+            )
+            try:
+                return all(value is not None and math.isfinite(float(value)) for value in required)
+            except TypeError, ValueError:
+                return False
+
+        # The shared gate treats missing PBO as zero for legacy callers.  Strict
+        # walk-forward admission instead fails closed on every required evidence
+        # axis before delegating thresholds and basket caps to that shared gate.
+        gated_rows = [row for row in gated_rows if _has_required_reject_evidence(row)]
     return apply_selection_reject_and_dedup(
-        rows,
+        gated_rows,
         mode=mode,
         robust_score_params=robust_score_params,
         max_per_symbol_basket=state.get("max_per_symbol_basket"),
@@ -2202,7 +2208,6 @@ def _dynamic_conviction_switch_candidates(
     sat_best_score = -float("inf")
     sat_strict_fallback: CandidateResult | None = None
     sat_risk_capped_fallback: CandidateResult | None = None
-    sat_applied_flag = False
 
     def _sat_validation_budget_scale(
         candidate: CandidateResult,
@@ -2311,11 +2316,6 @@ def _dynamic_conviction_switch_candidates(
         if sat_aggressive_pool:
             sat_best_aggressive = max(sat_aggressive_pool, key=_sat_conviction_score)
             sat_best_score = _sat_conviction_score(sat_best_aggressive)
-        sat_applied_flag = any(
-            _candidate_validation_snapshot(candidate, fold)["validation_return"]
-            > VAL_SATURATION_CEILING
-            for candidate in [*aggressive_pool, *fallback_pool]
-        )
 
     out: list[CandidateResult] = []
     for threshold in (0.85, 0.90, 0.95, 1.00):
@@ -2549,6 +2549,11 @@ def _dynamic_conviction_switch_candidates(
                                     "dm_crash_mu": float(dm_mu),
                                     "dm_crash_bear": int(dm_bear),
                                     "dm_crash_rebound": int(dm_rebound),
+                                    "post_oos_research_variant": True,
+                                    "requires_fresh_forward_shadow": True,
+                                    "ready_for_paper": False,
+                                    "ready_for_real": False,
+                                    "real_money_execution": False,
                                 },
                             )
                         )
@@ -2584,6 +2589,22 @@ def _dynamic_conviction_switch_candidates(
                                     sat_scale_snapshot["validation"]["mdd"]
                                 ),
                             }
+                            raw_selected_validation_return = _candidate_validation_snapshot(
+                                sat_selected, fold
+                            )["validation_return"]
+                            effective_selected_validation_return = _saturate_validation_return(
+                                raw_selected_validation_return
+                            )
+                            raw_scaled_validation_return = sat_scaled_snap["validation_return"]
+                            effective_scaled_validation_return = _saturate_validation_return(
+                                raw_scaled_validation_return
+                            )
+                            saturation_selection_changed = (
+                                sat_selected.candidate_label != selected.candidate_label
+                            )
+                            saturation_scale_changed = not math.isclose(
+                                sat_scale, scale, rel_tol=0.0, abs_tol=1e-12
+                            )
                             out.append(
                                 _emit_dynamic_candidate(
                                     label_suffix=(
@@ -2605,7 +2626,43 @@ def _dynamic_conviction_switch_candidates(
                                         "target_validation_mdd": float(target_mdd),
                                         "max_risk_scale": float(max_scale),
                                         "val_saturation_ceiling": VAL_SATURATION_CEILING,
-                                        "val_saturation_applied": bool(sat_applied_flag),
+                                        "raw_selected_validation_return": (
+                                            raw_selected_validation_return
+                                        ),
+                                        "effective_saturated_validation_return": (
+                                            effective_selected_validation_return
+                                        ),
+                                        "raw_scaled_validation_return": (
+                                            raw_scaled_validation_return
+                                        ),
+                                        "effective_saturated_scaled_validation_return": (
+                                            effective_scaled_validation_return
+                                        ),
+                                        "val_saturation_selection_changed": (
+                                            saturation_selection_changed
+                                        ),
+                                        "val_saturation_scale_changed": saturation_scale_changed,
+                                        "val_saturation_applied": bool(
+                                            not math.isclose(
+                                                raw_selected_validation_return,
+                                                effective_selected_validation_return,
+                                                rel_tol=0.0,
+                                                abs_tol=1e-12,
+                                            )
+                                            or not math.isclose(
+                                                raw_scaled_validation_return,
+                                                effective_scaled_validation_return,
+                                                rel_tol=0.0,
+                                                abs_tol=1e-12,
+                                            )
+                                            or saturation_selection_changed
+                                            or saturation_scale_changed
+                                        ),
+                                        "post_oos_research_variant": True,
+                                        "requires_fresh_forward_shadow": True,
+                                        "ready_for_paper": False,
+                                        "ready_for_real": False,
+                                        "real_money_execution": False,
                                     },
                                 )
                             )
@@ -5521,6 +5578,11 @@ def _lagged_shadow_leaf_router_candidates(
                 "avg_correlation_crash_guard_overlay_registered_band",
             ],
             "pre_registered_corr_guard_after_diagnostic_commit": True,
+            "post_oos_research_variant": True,
+            "requires_fresh_forward_shadow": True,
+            "ready_for_paper": False,
+            "ready_for_real": False,
+            "real_money_execution": False,
         }
         out.append(
             _candidate_eval(
@@ -7149,6 +7211,11 @@ def _regime_gated_static_guarded_twin(
     )
     notes.append("locked_oos_cash_when_regime_gate_fails_train_validation_identical_to_base")
     row["guardrail_notes"] = notes
+    row["post_oos_research_variant"] = True
+    row["requires_fresh_forward_shadow"] = True
+    row["ready_for_paper"] = False
+    row["ready_for_real"] = False
+    row["real_money_execution"] = False
     return _candidate_eval(
         family=family,
         label=f"{family}:static_guarded_regime_gated",
@@ -7455,6 +7522,106 @@ def _fold_feature_cache(
     )
 
 
+_EQFLOW_DECISION_ROW_FIELDS = (
+    "corr_guard_engaged",
+    "corr_guard_rho",
+    "corr_guard_z",
+    "corr_guard_window",
+    "corr_guard_z_enter",
+    "corr_guard_abs_floor",
+    "corr_guard_derisk_scale",
+    "corr_guard_min_symbols",
+    "corr_guard_decimation",
+    "dm_crash_mu",
+    "dm_crash_bear",
+    "dm_crash_rebound",
+    "val_saturation_ceiling",
+    "val_saturation_applied",
+    "raw_selected_validation_return",
+    "effective_saturated_validation_return",
+    "raw_scaled_validation_return",
+    "effective_saturated_scaled_validation_return",
+    "val_saturation_selection_changed",
+    "val_saturation_scale_changed",
+    "regime_gate_passed",
+    "regime_gate_validation_return",
+    "regime_gate_validation_mdd",
+)
+_EQFLOW_F1_CANDIDATE_LABELS = frozenset(
+    {
+        "codex_lagged_leaf_router_grid:"
+        "h4_avg1_tr-0.02_tmdd0.50_val0.00_vmdd0.25_lagged_plus_val025_fallback_mdd20_cap2",
+        "tradfi_intraday_session_v1:open_impulse_close_top10_mdd15",
+    }
+)
+
+
+def _eqflow_variants_active() -> bool:
+    return any(_EQFLOW_VARIANT_STATE.values())
+
+
+def _locked_oos_daily_points(
+    series: pd.Series, window: tuple[pd.Timestamp, pd.Timestamp], *, value_key: str
+) -> list[dict[str, Any]]:
+    values = series.astype(float).sort_index()
+    mask = _window_mask(values.index, window)
+    values = values.iloc[np.flatnonzero(mask)]
+    if values.empty:
+        return []
+    utc_index = _as_utc_datetime_index(values.index)
+    daily = pd.Series(values.to_numpy(dtype=float), index=utc_index).groupby(utc_index.normalize())
+    points: list[dict[str, Any]] = []
+    for timestamp, day_values in daily:
+        point = {
+            "timestamp": timestamp.isoformat().replace("+00:00", "Z"),
+            "date": timestamp.date().isoformat(),
+        }
+        if value_key == "net_return":
+            point[value_key] = float((1.0 + day_values).prod() - 1.0)
+        else:
+            point[value_key] = float(day_values.sum())
+        points.append(point)
+    return points
+
+
+def _locked_oos_turnover_evidence(
+    row: Mapping[str, Any], window: tuple[pd.Timestamp, pd.Timestamp]
+) -> dict[str, Any]:
+    turnover = row.get("turnover_series")
+    if isinstance(turnover, pd.Series):
+        return {
+            "status": "available",
+            "kind": "daily_sum",
+            "points": _locked_oos_daily_points(turnover, window, value_key="turnover"),
+        }
+    if isinstance(turnover, (int, float, np.integer, np.floating)) and not isinstance(
+        turnover, bool
+    ):
+        return {"status": "available", "kind": "scalar", "value": turnover}
+    return {"status": "unknown", "value": None}
+
+
+def _eqflow_f1_stream_fields(
+    candidate: CandidateResult, fold: MonthlyFold, row: Mapping[str, Any]
+) -> dict[str, Any]:
+    if (
+        not _eqflow_variants_active()
+        or candidate.candidate_label not in _EQFLOW_F1_CANDIDATE_LABELS
+    ):
+        return {}
+    return {
+        "locked_oos_daily_net_returns": _locked_oos_daily_points(
+            candidate.returns, fold.locked_oos, value_key="net_return"
+        ),
+        "locked_oos_daily_net_returns_provenance": {
+            "locked_oos": True,
+            "net_under_runner_cost_model": True,
+            "not_for_same_fold_selection": True,
+        },
+        "locked_oos_turnover_evidence": _locked_oos_turnover_evidence(row, fold.locked_oos),
+    }
+
+
 def _evaluate_candidate(candidate: CandidateResult, fold: MonthlyFold) -> dict[str, Any]:
     train = _period_metrics(candidate.returns, fold.train)
     validation = _period_metrics(candidate.returns, fold.validation)
@@ -7479,7 +7646,15 @@ def _evaluate_candidate(candidate: CandidateResult, fold: MonthlyFold) -> dict[s
     uses_locked_oos_for_selection = bool(row.get("uses_locked_oos_for_selection", False))
     nested_hybrid_dependency = _row_references_non_leaf_material(row)
     moonshot_label_namespace = _row_uses_moonshot_namespace(row, candidate.candidate_label)
-    return {
+    clean_promotion_eligible = (
+        not uses_locked_oos_for_selection
+        and not post_oos_research_variant
+        and not requires_fresh_forward_shadow
+        and not source_post_oos_research_variant
+        and not nested_hybrid_dependency
+        and not moonshot_label_namespace
+    )
+    evaluated_row = {
         "fold_id": fold.fold_id,
         "family": candidate.family,
         "candidate_label": candidate.candidate_label,
@@ -7530,15 +7705,12 @@ def _evaluate_candidate(candidate: CandidateResult, fold: MonthlyFold) -> dict[s
         "requires_fresh_forward_shadow": requires_fresh_forward_shadow,
         "nested_hybrid_dependency": nested_hybrid_dependency,
         "moonshot_label_namespace": moonshot_label_namespace,
-        "clean_promotion_eligible": not uses_locked_oos_for_selection
-        and not post_oos_research_variant
-        and not requires_fresh_forward_shadow
-        and not source_post_oos_research_variant
-        and not nested_hybrid_dependency
-        and not moonshot_label_namespace,
-        "ready_for_paper": bool(row.get("ready_for_paper") or row.get("paper_testnet_candidate")),
-        "ready_for_real": bool(row.get("ready_for_real", False)),
-        "real_money_execution": bool(row.get("real_money_execution", False)),
+        "clean_promotion_eligible": clean_promotion_eligible,
+        "ready_for_paper": clean_promotion_eligible
+        and bool(row.get("ready_for_paper") or row.get("paper_testnet_candidate")),
+        "ready_for_real": clean_promotion_eligible and bool(row.get("ready_for_real", False)),
+        "real_money_execution": clean_promotion_eligible
+        and bool(row.get("real_money_execution", False)),
         "selected_candidate_label": row.get("selected_candidate_label"),
         "aggressive_candidate_label": row.get("aggressive_candidate_label"),
         "fallback_candidate_label": row.get("fallback_candidate_label"),
@@ -7603,6 +7775,11 @@ def _evaluate_candidate(candidate: CandidateResult, fold: MonthlyFold) -> dict[s
         "dynamic_input_labels": row.get("dynamic_input_labels") or [],
         "robust_core_input_labels": row.get("robust_core_input_labels") or [],
     }
+    evaluated_row.update(
+        {field: row[field] for field in _EQFLOW_DECISION_ROW_FIELDS if field in row}
+    )
+    evaluated_row.update(_eqflow_f1_stream_fields(candidate, fold, row))
+    return evaluated_row
 
 
 # --- A3b (partial_fold_bar_count_weighting) pre-registered constant ---------
@@ -7633,11 +7810,13 @@ def _partial_fold_weighting_fields(
         else 0.0
     )
     positive = float(sum(w for r, w in zip(oos_returns, weights) if r > 0.0))
+    full_fold_returns = [r for r, w in zip(oos_returns, weights) if w >= 1.0]
     full_fold_mdds = [m for m, w in zip(oos_mdds, weights) if w >= 1.0]
     return {
         "fold_bar_weights": weights,
         "bar_weighted_compounded_oos_return": compounded,
         "bar_weighted_positive_oos_folds": positive,
+        "min_full_fold_oos_return": min(full_fold_returns) if full_fold_returns else None,
         "max_full_fold_oos_mdd": max(full_fold_mdds) if full_fold_mdds else None,
     }
 
@@ -7912,8 +8091,8 @@ def _aggregate_rows(fold_rows: Sequence[Mapping[str, Any]]) -> list[dict[str, An
             key=lambda row: (
                 _safe_float(row["bar_weighted_compounded_oos_return"]),
                 _safe_float(row["bar_weighted_positive_oos_folds"]),
-                _safe_float(row["min_oos_return"]),
-                -_safe_float(row["max_oos_mdd"]),
+                _safe_float(row.get("min_full_fold_oos_return")),
+                -_safe_float(row.get("max_full_fold_oos_mdd")),
             ),
             reverse=True,
         )
@@ -7953,6 +8132,17 @@ def _demoted_nested_or_historical_rankings(
     ]
 
 
+def _record_fold_evaluations(
+    payload: dict[str, Any], rows: Sequence[Mapping[str, Any]]
+) -> list[dict[str, Any]]:
+    """Persist pre-gate evidence only when the selection gate is explicitly enabled."""
+    if _SELECTION_GATE_STATE.get("enabled"):
+        payload["all_evaluated_fold_candidate_rows"].extend(rows)
+    admitted_rows = _apply_selection_gate_rows(rows, mode="val")
+    payload["fold_candidate_rows"].extend(admitted_rows)
+    return admitted_rows
+
+
 def _refresh_payload_derived_reports(payload: dict[str, Any]) -> None:
     """Refresh aggregate reports that depend on fold candidate rows."""
     rows = list(payload.get("fold_candidate_rows") or [])
@@ -7962,6 +8152,10 @@ def _refresh_payload_derived_reports(payload: dict[str, Any]) -> None:
     payload["aggregate_rankings"] = aggregate
     payload["clean_promotion_rankings"] = clean
     payload["demoted_nested_or_historical_rankings"] = demoted
+    if "all_evaluated_fold_candidate_rows" in payload:
+        payload["all_evaluated_aggregate_rankings"] = _aggregate_rows(
+            payload["all_evaluated_fold_candidate_rows"]
+        )
     payload["locked_oos_report_rankings_policy"] = {
         "usage": "diagnostic_only_not_selection_weighting_sizing_or_live_promotion",
         "selection_inputs": "train_validation_only",
@@ -7998,6 +8192,14 @@ def _sanitize_research_dependency_flags(
         if row.get("post_oos_research_variant")
         or row.get("requires_fresh_forward_shadow")
         or row.get("source_post_oos_research_variant")
+        or str(row.get("candidate_label")).endswith(
+            (
+                "_eqcorr_guard",
+                "_scaled_dm_crash_scaled",
+                "_scaled_val_sat80",
+                ":static_guarded_regime_gated",
+            )
+        )
     }
     post_oos_prefixes = ("mdd30_", "risk_enhanced_blend:")
 
@@ -8018,12 +8220,26 @@ def _sanitize_research_dependency_flags(
         label = str(row.get("candidate_label"))
         nested_hybrid_dependency = _row_references_non_leaf_material(row)
         moonshot_label_namespace = _row_uses_moonshot_namespace(row, label)
-        contaminated = label in post_oos_labels or any(
-            label.startswith(prefix) for prefix in post_oos_prefixes
+        eqflow_post_oos_twin = (
+            label.endswith("_eqcorr_guard")
+            or label.endswith("_scaled_dm_crash_scaled")
+            or label.endswith("_scaled_val_sat80")
+            or label.endswith(":static_guarded_regime_gated")
+        )
+        contaminated = (
+            eqflow_post_oos_twin
+            or label in post_oos_labels
+            or any(label.startswith(prefix) for prefix in post_oos_prefixes)
         )
         if contaminated:
             row["post_oos_research_variant"] = True
             row["requires_fresh_forward_shadow"] = True
+            row["ready_for_paper"] = False
+            row["ready_for_real"] = False
+            row["real_money_execution"] = False
+            row["paper_testnet_candidate"] = False
+            row["allow_real_money"] = False
+            row["real_execution_allowed"] = False
         uses_oos = bool(row.get("uses_locked_oos_for_selection", False))
         row["nested_hybrid_dependency"] = nested_hybrid_dependency
         row["moonshot_label_namespace"] = moonshot_label_namespace
@@ -8046,9 +8262,20 @@ def _recompute_payload_from_existing(
 ) -> dict[str, Any]:
     """Fast path: recompute clean flags, rankings, audits, and markdown inputs."""
     out = dict(payload)
-    rows = _sanitize_research_dependency_flags(list(payload.get("fold_candidate_rows") or []))
-    rows = _append_preregistered_lagged_leaf_router_rows(rows)
-    out["fold_candidate_rows"] = rows
+    raw_rows = payload.get("all_evaluated_fold_candidate_rows")
+    if _SELECTION_GATE_STATE.get("enabled") and isinstance(raw_rows, list):
+        sanitized_raw_rows = _sanitize_research_dependency_flags(raw_rows)
+        out["all_evaluated_fold_candidate_rows"] = sanitized_raw_rows
+        admitted_rows: list[dict[str, Any]] = []
+        fold_groups: dict[str, list[dict[str, Any]]] = {}
+        for row in sanitized_raw_rows:
+            fold_groups.setdefault(str(row.get("fold_id", "")), []).append(row)
+        for fold_rows in fold_groups.values():
+            admitted_rows.extend(_apply_selection_gate_rows(fold_rows, mode="val"))
+        out["fold_candidate_rows"] = admitted_rows
+    else:
+        rows = _sanitize_research_dependency_flags(list(payload.get("fold_candidate_rows") or []))
+        out["fold_candidate_rows"] = _append_preregistered_lagged_leaf_router_rows(rows)
     _refresh_payload_derived_reports(out)
     out["recomputed_from_existing_rows"] = True
     out["recompute_note"] = (
@@ -8435,9 +8662,12 @@ def _append_preregistered_lagged_leaf_router_rows(
                 "requires_fresh_forward_shadow": True,
                 "nested_hybrid_dependency": False,
                 "clean_promotion_eligible": False,
-                "ready_for_paper": True,
+                "ready_for_paper": False,
                 "ready_for_real": False,
                 "real_money_execution": False,
+                "paper_testnet_candidate": False,
+                "allow_real_money": False,
+                "real_execution_allowed": False,
                 "selection_reasons": [],
             }
         )
@@ -8539,9 +8769,12 @@ def _row_level_leaf_selector_rows(
                     "requires_fresh_forward_shadow": True,
                     "nested_hybrid_dependency": False,
                     "clean_promotion_eligible": False,
-                    "ready_for_paper": True,
+                    "ready_for_paper": False,
                     "ready_for_real": False,
                     "real_money_execution": False,
+                    "paper_testnet_candidate": False,
+                    "allow_real_money": False,
+                    "real_execution_allowed": False,
                     "weights": {selected_label: 1.0},
                     "final_weights": {selected_label: 1.0},
                     "selection_reasons": [],
@@ -8889,6 +9122,14 @@ def run_walkforward(args: argparse.Namespace) -> dict[str, Any]:
         "fold_candidate_rows": fold_candidate_rows,
         "aggregate_rankings": [],
         "clean_promotion_rankings": [],
+        **(
+            {
+                "all_evaluated_fold_candidate_rows": [],
+                "all_evaluated_aggregate_rankings": [],
+            }
+            if _SELECTION_GATE_STATE.get("enabled")
+            else {}
+        ),
         "demoted_nested_or_historical_rankings": [],
         "recomputed_from_existing_rows": False,
         "output_paths": {"json": str(output_json), "markdown": str(output_md)},
@@ -9110,8 +9351,7 @@ def run_walkforward(args: argparse.Namespace) -> dict[str, Any]:
         # max_cross_trial_pbo=<config>, enabled=<config>) to drop the run tail.
         # NOTE(overfit-gates): Step 7 (funding-in-returns -- folding perp funding
         # into the per-candidate return stream) is DEFERRED, not implemented here.
-        admitted_rows = _apply_selection_gate_rows(rows, mode="val")
-        fold_candidate_rows.extend(admitted_rows)
+        _record_fold_evaluations(payload, rows)
         _update_lagged_shadow_leaf_prior_returns(lagged_shadow_leaf_prior_returns, rows)
         lagged_shadow_leaf_completed_folds.append(fold.fold_id)
         _update_bridge_prior_utilities(bridge_prior_completed_utilities, rows)

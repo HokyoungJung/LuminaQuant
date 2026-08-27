@@ -1226,6 +1226,11 @@ def _normalize_funding_timestamp_ms(timestamp_ms: int) -> int:
     if remainder >= _FUNDING_SETTLEMENT_GRANULARITY_MS - _FUNDING_TIMESTAMP_JITTER_MS:
         return timestamp + (_FUNDING_SETTLEMENT_GRANULARITY_MS - remainder)
     return timestamp
+def _optional_float_field(value: Any) -> float | None:
+    """Parse an optional numeric API field without treating an empty string as data."""
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return None
+    return float(value)
 
 
 def _fetch_funding_history(
@@ -1485,12 +1490,9 @@ def sync_futures_feature_points(
                 ts = _normalize_funding_timestamp_ms(int(row.get("fundingTime", 0) or 0))
                 if ts <= 0:
                     continue
-                funding_rate = (
-                    float(row.get("fundingRate")) if row.get("fundingRate") is not None else None
-                )
-                funding_mark_price = (
-                    float(row.get("markPrice")) if row.get("markPrice") is not None else None
-                )
+                raw_funding_rate = row.get("fundingRate")
+                funding_rate = float(raw_funding_rate) if raw_funding_rate is not None else None
+                funding_mark_price = _optional_float_field(row.get("markPrice"))
                 _merge_feature_point(
                     points,
                     ts,

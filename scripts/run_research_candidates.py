@@ -6,19 +6,30 @@ import argparse
 import csv
 import inspect
 import json
+import math
+import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from collections.abc import Mapping
 
-from lumina_quant.configuration import BacktestConfigView, get_default_runtime_config
+from lumina_quant.configuration import (
+    BacktestConfigView,
+    RuntimeConfig,
+    get_default_runtime_config,
+    load_runtime_config,
+)
 from lumina_quant.storage.parquet import load_data_dict_from_parquet
 from lumina_quant.strategy_factory import (
     build_default_candidate_rows,
     run_candidate_research,
 )
-from lumina_quant.strategy_factory.selection import select_diversified_shortlist
+from lumina_quant.strategy_factory.selection import (
+    apply_selection_reject_and_dedup,
+    select_diversified_shortlist,
+)
 from lumina_quant.symbols import CANONICAL_STRATEGY_TIMEFRAMES, canonicalize_symbol_list
+from lumina_quant.strategy_factory.research_run_support import research_config_to_overrides
 
 _METALS = {"XAU/USDT", "XAG/USDT", "XPT/USDT", "XPD/USDT"}
 _RESEARCH_PROMOTION_MAX_SPLIT_DRAWDOWN = 0.15
@@ -221,6 +232,17 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-candidates", type=int, default=512)
     parser.add_argument("--top-k", type=int, default=40)
     parser.add_argument("--score-config", default="", help="Optional scoring config JSON path.")
+    parser.add_argument(
+        "--config",
+        default="",
+        help="RuntimeConfig profile YAML path for this research process.",
+    )
+    parser.add_argument(
+        "--cost-rate-bps-override",
+        type=float,
+        default=None,
+        help="Finite non-negative research cost-rate override in basis points; requires config.",
+    )
     parser.add_argument(
         "--train-start", default="", help="Exact split train window start (ISO/date)."
     )
@@ -647,6 +669,156 @@ def _timeframes_from_candidates(
     return out or list(fallback)
 
 
+def _load_runtime_config_for_args(
+    args: argparse.Namespace,
+) -> tuple[RuntimeConfig | None, str | None]:
+    config_token = str(getattr(args, "config", "") or "").strip()
+    if not config_token:
+        config_token = str(os.environ.get("LQ_CONFIG_PATH", "") or "").strip()
+    cost_override = getattr(args, "cost_rate_bps_override", None)
+    if cost_override is not None:
+        if not config_token:
+            raise ValueError("--cost-rate-bps-override requires --config or LQ_CONFIG_PATH")
+        if not math.isfinite(float(cost_override)) or float(cost_override) < 0.0:
+            raise ValueError("--cost-rate-bps-override must be finite and non-negative")
+    if not config_token:
+        return None, None
+
+    config_path = Path(config_token).resolve()
+    try:
+        runtime_config = load_runtime_config(str(config_path))
+    except (FileNotFoundError, TypeError, ValueError) as exc:
+        raise ValueError(f"failed to load --config {config_path}: {exc}") from exc
+    if cost_override is not None:
+        runtime_config.research.cost_rate_bps_override = float(cost_override)
+    return runtime_config, str(config_path)
+
+
+def _profile_selection_caps(runtime_config: RuntimeConfig | None) -> dict[str, int | None]:
+    if runtime_config is None:
+        return {
+            "max_per_symbol_basket": None,
+            "max_per_lineage": None,
+            "max_per_family_basket": None,
+        }
+    research = runtime_config.research
+
+    def _cap(name: str) -> int | None:
+        value = getattr(research, name, None)
+        if value is None:
+            return None
+        return _safe_int(value, 1, minimum=1)
+
+    return {
+        "max_per_symbol_basket": _cap("max_per_symbol_basket"),
+        "max_per_lineage": _cap("max_per_lineage"),
+        "max_per_family_basket": _cap("max_per_family_basket"),
+    }
+
+
+def _score_config_research(score_config: Mapping[str, Any] | None) -> Mapping[str, Any]:
+    if not isinstance(score_config, Mapping):
+        return {}
+    research = score_config.get("research")
+    return research if isinstance(research, Mapping) else {}
+
+
+def _effective_score_config_research(
+    runtime_config: RuntimeConfig | None,
+    score_config: Mapping[str, Any] | None,
+) -> Mapping[str, Any]:
+    profile_research: dict[str, Any] = {}
+    if runtime_config is not None:
+        profile_research.update(
+            research_config_to_overrides(runtime_config)["score_config_research"]
+        )
+    effective = dict(profile_research)
+    effective.update(_score_config_research(score_config))
+    for key in ("cost_rate_multiplier", "cost_rate_bps_override"):
+        if key in profile_research:
+            effective[key] = profile_research[key]
+    return effective
+
+
+def _profile_strict_selection_enabled(
+    runtime_config: RuntimeConfig | None,
+    score_config: Mapping[str, Any] | None = None,
+) -> bool:
+    effective = _effective_score_config_research(runtime_config, score_config)
+    return bool(
+        effective.get("strict_selection_gate", False)
+        or effective.get("enforce_selection_reject_gate", False)
+    )
+
+
+def _strict_shortlist_mode(
+    runtime_config: RuntimeConfig | None,
+    score_config: Mapping[str, Any] | None = None,
+) -> str:
+    if not _profile_strict_selection_enabled(runtime_config, score_config):
+        return "oos"
+    if runtime_config is None:
+        return "oos"
+    split = research_config_to_overrides(runtime_config)["split"]
+    return "val" if bool(split.get("use_lockbox_split", False)) else "oos"
+
+
+def _registered_routing_requested(
+    runtime_config: RuntimeConfig | None,
+    score_config: Mapping[str, Any] | None = None,
+) -> bool:
+    effective = _effective_score_config_research(runtime_config, score_config)
+    return bool(effective.get("route_unmapped_registered_strategies", False))
+
+
+def _candidate_evaluation_mode(candidate: Mapping[str, Any]) -> str:
+    for key in ("meta", "metadata"):
+        metadata = candidate.get(key)
+        if isinstance(metadata, Mapping):
+            mode = metadata.get("evaluation_mode")
+            if isinstance(mode, str):
+                return mode
+    return ""
+
+
+def _has_actual_validation_metrics(candidate: Mapping[str, Any]) -> bool:
+    for key in ("validation", "val"):
+        metrics = candidate.get(key)
+        if not isinstance(metrics, Mapping):
+            continue
+        if any(
+            field in metrics and metrics.get(field) is not None
+            for field in (
+                "return",
+                "total_return",
+                "sharpe",
+                "mdd",
+                "trades",
+                "deflated_sharpe",
+                "spa_pvalue",
+                "pbo",
+                "approx_pbo",
+            )
+        ):
+            return True
+    return False
+
+
+def _effective_cost_rate_bps(candidates: list[dict[str, Any]]) -> list[float]:
+    rates: set[float] = set()
+    for candidate in candidates:
+        metadata = candidate.get("metadata")
+        if not isinstance(metadata, Mapping):
+            continue
+        try:
+            cost_rate = float(metadata.get("cost_rate"))
+        except TypeError, ValueError:
+            continue
+        if math.isfinite(cost_rate):
+            rates.add(cost_rate * 10_000.0)
+    return sorted(rates)
+
+
 def _run_candidate_research_with_optional_split(
     *,
     candidates: list[dict[str, Any]],
@@ -657,6 +829,7 @@ def _run_candidate_research_with_optional_split(
     max_candidates: int,
     score_config: dict[str, Any] | None,
     exact_split: dict[str, str] | None,
+    research_config: RuntimeConfig | None = None,
     min_bundle_bars: int = 360,
     allow_csv_fallback: bool = True,
     allow_synthetic_fallback: bool = False,
@@ -677,6 +850,8 @@ def _run_candidate_research_with_optional_split(
         parameter.kind is inspect.Parameter.VAR_KEYWORD
         for parameter in signature.parameters.values()
     )
+    if research_config is not None and ("research_config" in param_names or supports_var_kwargs):
+        kwargs["research_config"] = research_config
     if progress_callback is not None and (
         "progress_callback" in param_names or supports_var_kwargs
     ):
@@ -764,6 +939,31 @@ def _shortlist_robust_score_params(score_config: dict[str, Any] | None) -> dict[
     for key in ROBUST_SCORE_PARAM_KEYS:
         if key in robust_overrides:
             params[key] = robust_overrides[key]
+    return params or None
+
+
+def _effective_shortlist_robust_score_params(
+    runtime_config: RuntimeConfig | None,
+    score_config: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    profile_activation = (
+        research_config_to_overrides(runtime_config) if runtime_config is not None else None
+    )
+    params = dict(
+        profile_activation["robust_score_params"] if profile_activation is not None else {}
+    )
+    params.update(_shortlist_robust_score_params(score_config) or {})
+
+    effective_research = _effective_score_config_research(runtime_config, score_config)
+    for key in (
+        "strict_selection_gate",
+        "enforce_selection_reject_gate",
+        "dsr_gate_floor",
+        "spa_gate_ceiling",
+        "pbo_gate_ceiling",
+    ):
+        if key in effective_research:
+            params[key] = effective_research[key]
     return params or None
 
 
@@ -1687,6 +1887,10 @@ class _ResearchProgressWriter:
 
 def main() -> int:
     args = _build_parser().parse_args()
+    try:
+        runtime_config, runtime_config_path = _load_runtime_config_for_args(args)
+    except ValueError as exc:
+        raise SystemExit(f"[RESEARCH] {exc}")
     score_config: dict[str, Any] | None = None
     if str(args.score_config).strip():
         try:
@@ -1761,6 +1965,9 @@ def main() -> int:
         allow_synthetic_fallback = bool(
             getattr(args, "enable_synthetic_fallback", False)
         ) and not bool(getattr(args, "disable_synthetic_fallback", False))
+        research_config_kwargs = (
+            {"research_config": runtime_config} if runtime_config is not None else {}
+        )
         report = _run_candidate_research_with_optional_split(
             candidates=candidates,
             base_timeframe=str(args.base_timeframe),
@@ -1770,6 +1977,7 @@ def main() -> int:
             max_candidates=max(1, int(args.max_candidates)),
             score_config=score_config_scope or None,
             exact_split=exact_split,
+            **research_config_kwargs,
             min_bundle_bars=max(1, int(getattr(args, "min_bundle_bars", 360))),
             allow_csv_fallback=not bool(getattr(args, "disable_csv_fallback", False)),
             allow_synthetic_fallback=allow_synthetic_fallback,
@@ -1797,10 +2005,95 @@ def main() -> int:
         score_config_scope or None,
         top_k=max(1, int(args.top_k)),
     )
-    shortlist_score_params = _shortlist_robust_score_params(score_config_scope or None)
+    profile_activation = (
+        research_config_to_overrides(runtime_config) if runtime_config is not None else None
+    )
+    profile_score_overrides = (
+        profile_activation["score_config_research"] if profile_activation is not None else {}
+    )
+    shortlist_score_params = _effective_shortlist_robust_score_params(
+        runtime_config, score_config_scope or None
+    )
+    shortlist_input = list(report.get("candidates") or [])
+    profile_strict_selection = _profile_strict_selection_enabled(
+        runtime_config, score_config_scope or None
+    )
+    shortlist_selection_mode = _strict_shortlist_mode(runtime_config, score_config_scope or None)
+    profile_caps = _profile_selection_caps(runtime_config)
+    routing_requested = _registered_routing_requested(runtime_config, score_config_scope or None)
+    proxy_rejected_count = 0
+    missing_validation_rejected_count = 0
+    strict_shortlist_input = shortlist_input
+    if profile_strict_selection and shortlist_selection_mode == "val":
+        strict_shortlist_input = [
+            row for row in strict_shortlist_input if _has_actual_validation_metrics(row)
+        ]
+        missing_validation_rejected_count = len(shortlist_input) - len(strict_shortlist_input)
+    if profile_strict_selection and routing_requested:
+        before_proxy_filter = len(strict_shortlist_input)
+        strict_shortlist_input = [
+            row
+            for row in strict_shortlist_input
+            if _candidate_evaluation_mode(row) != "generic_fallback_proxy"
+        ]
+        proxy_rejected_count = before_proxy_filter - len(strict_shortlist_input)
+    if profile_strict_selection:
+        gated_shortlist_input = apply_selection_reject_and_dedup(
+            strict_shortlist_input,
+            mode=shortlist_selection_mode,
+            robust_score_params=shortlist_score_params,
+            max_per_symbol_basket=profile_caps["max_per_symbol_basket"],
+            max_per_lineage=profile_caps["max_per_lineage"],
+            max_per_family_basket=profile_caps["max_per_family_basket"],
+            enabled=True,
+        )
+    else:
+        gated_shortlist_input = strict_shortlist_input
+
+    shortlist_weights_enabled = bool(shortlist_config["include_weights"]) and not (
+        profile_strict_selection and shortlist_selection_mode == "val"
+    )
+    if runtime_config is not None or profile_strict_selection or routing_requested:
+        runtime_research = runtime_config.research if runtime_config is not None else None
+        score_research = _score_config_research(score_config_scope or None)
+        report["research_profile_audit"] = {
+            "config_path": runtime_config_path,
+            "cost_rate_bps_override": (
+                getattr(runtime_research, "cost_rate_bps_override", None)
+                if runtime_research is not None
+                else score_research.get("cost_rate_bps_override")
+            ),
+            "resolved_cost": {
+                "cost_rate_multiplier": profile_score_overrides.get(
+                    "cost_rate_multiplier",
+                    score_research.get("cost_rate_multiplier"),
+                ),
+                "cost_rate_bps_override": profile_score_overrides.get(
+                    "cost_rate_bps_override",
+                    score_research.get("cost_rate_bps_override"),
+                ),
+                "effective_cost_rate_bps": _effective_cost_rate_bps(shortlist_input),
+            },
+            "strict_selection_enabled": profile_strict_selection,
+            "shortlist_selection_mode": shortlist_selection_mode,
+            "portfolio_weights_enabled": shortlist_weights_enabled,
+            "registered_routing_requested": routing_requested,
+            "generic_fallback_proxy_rejected_count": proxy_rejected_count,
+            "missing_validation_rejected_count": missing_validation_rejected_count,
+            "strict_thresholds": {
+                key: shortlist_score_params.get(key)
+                for key in ("dsr_gate_floor", "spa_gate_ceiling", "pbo_gate_ceiling")
+            }
+            if shortlist_score_params
+            else {},
+            "dedup_caps": dict(profile_caps),
+            "shortlist_input_count": len(shortlist_input),
+            "shortlist_gated_count": len(gated_shortlist_input),
+            "shortlist_rejected_count": len(shortlist_input) - len(gated_shortlist_input),
+        }
     shortlisted = select_diversified_shortlist(
-        report.get("candidates") or [],
-        mode="oos",
+        gated_shortlist_input,
+        mode=shortlist_selection_mode,
         max_total=int(shortlist_config["max_total"]),
         max_per_family=int(shortlist_config["max_per_family"]),
         max_per_timeframe=int(shortlist_config["max_per_timeframe"]),
@@ -1811,7 +2104,7 @@ def main() -> int:
         single_min_trades=int(shortlist_config["single_min_trades"]),
         allow_multi_asset=bool(shortlist_config["allow_multi_asset"]),
         max_per_lineage=int(shortlist_config["max_per_lineage"]),
-        include_weights=bool(shortlist_config["include_weights"]),
+        include_weights=shortlist_weights_enabled,
         weight_temperature=float(shortlist_config["weight_temperature"]),
         max_weight=float(shortlist_config["max_weight"]),
         robust_score_params=shortlist_score_params,
@@ -1863,6 +2156,7 @@ def main() -> int:
             "robust_score_params": shortlist_score_params or {},
         },
         "data_sources": report.get("data_sources") or {},
+        "research_profile_audit": report.get("research_profile_audit") or {},
     }
     if coverage_summary is not None:
         team_report["coverage_rebuild"] = coverage_summary

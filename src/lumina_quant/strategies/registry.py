@@ -101,6 +101,16 @@ TimeframePairZScoreReversionStrategy = _optional_strategy_class(
     "timeframe_pair_zscore_reversion", "TimeframePairZScoreReversionStrategy"
 )
 
+ResearchOnlyDailyLowTurnoverTrendPersistenceStrategy = _optional_strategy_class(
+    "alpha_max_research_sleeves", "ResearchOnlyDailyLowTurnoverTrendPersistenceStrategy"
+)
+ResearchOnlyDailyCrossSectionalNearHighAnchoringStrategy = _optional_strategy_class(
+    "alpha_max_research_sleeves", "ResearchOnlyDailyCrossSectionalNearHighAnchoringStrategy"
+)
+ResearchOnlyFourHourFundingHarvestCarryStrategy = _optional_strategy_class(
+    "alpha_max_research_sleeves", "ResearchOnlyFourHourFundingHarvestCarryStrategy"
+)
+
 StrategyClass = type[Strategy]
 
 DEFAULT_STRATEGY_NAME = "RsiStrategy" if RsiStrategy is not None else "MeanReversionStdStrategy"
@@ -149,6 +159,18 @@ if TakerFlowExhaustionReversalStrategy is not None:
     _RAW_STRATEGY_MAP["TakerFlowExhaustionReversalStrategy"] = TakerFlowExhaustionReversalStrategy
 if TimeframePairZScoreReversionStrategy is not None:
     _RAW_STRATEGY_MAP["TimeframePairZScoreReversionStrategy"] = TimeframePairZScoreReversionStrategy
+if ResearchOnlyDailyLowTurnoverTrendPersistenceStrategy is not None:
+    _RAW_STRATEGY_MAP["ResearchOnlyDailyLowTurnoverTrendPersistenceStrategy"] = (
+        ResearchOnlyDailyLowTurnoverTrendPersistenceStrategy
+    )
+if ResearchOnlyDailyCrossSectionalNearHighAnchoringStrategy is not None:
+    _RAW_STRATEGY_MAP["ResearchOnlyDailyCrossSectionalNearHighAnchoringStrategy"] = (
+        ResearchOnlyDailyCrossSectionalNearHighAnchoringStrategy
+    )
+if ResearchOnlyFourHourFundingHarvestCarryStrategy is not None:
+    _RAW_STRATEGY_MAP["ResearchOnlyFourHourFundingHarvestCarryStrategy"] = (
+        ResearchOnlyFourHourFundingHarvestCarryStrategy
+    )
 
 _STRATEGY_MAP: dict[str, StrategyClass] = {
     name: cast(StrategyClass, cls) for name, cls in _RAW_STRATEGY_MAP.items() if cls is not None
@@ -226,6 +248,9 @@ _STRATEGY_TIER_HINTS: dict[str, str] = {
     # enforced by tests/test_strategy_tier_guard.py.
     "CrossSectionalNearHighAnchoringStrategy": "research_only",
     "LowTurnoverTrendPersistenceStrategy": "research_only",
+    "ResearchOnlyDailyLowTurnoverTrendPersistenceStrategy": "research_only",
+    "ResearchOnlyDailyCrossSectionalNearHighAnchoringStrategy": "research_only",
+    "ResearchOnlyFourHourFundingHarvestCarryStrategy": "research_only",
     "RebalancingPremiumHarvestStrategy": "research_only",
     "SlowCrossSectionalLeadLagStrategy": "research_only",
     "StationarityGatedResidualReversionStrategy": "research_only",
@@ -461,7 +486,11 @@ def get_live_strategy_names(*, include_opt_in: bool = True) -> list[str]:
 
 
 def resolve_strategy_class(
-    name: str | None, default_name: str = DEFAULT_STRATEGY_NAME, *, strict: bool = True
+    name: str | None,
+    default_name: str = DEFAULT_STRATEGY_NAME,
+    *,
+    strict: bool = True,
+    discover_plugins: bool = True,
 ) -> StrategyClass:
     """Resolve a strategy class by registered name.
 
@@ -469,8 +498,10 @@ def resolve_strategy_class(
     config used to silently backtest/live-run the default strategy instead).
     The default-name fallback chain applies only when ``name`` is empty/None,
     or when ``strict=False`` is explicitly requested by legacy callers.
+    ``discover_plugins=False`` selects only the import-time curated registry for
+    descriptor-isolated runtimes that forbid filesystem discovery.
     """
-    strategy_map = get_strategy_map()
+    strategy_map = get_strategy_map() if discover_plugins else dict(_STRATEGY_MAP)
     requested = str(name or "").strip()
     if requested in strategy_map:
         return strategy_map[requested]

@@ -1,17 +1,27 @@
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
+import os
+from collections.abc import Mapping
 from collections import deque
 from datetime import UTC, datetime
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from types import SimpleNamespace
+from typing import Any, cast
 
 from lumina_quant.core.events import SignalEvent
+from lumina_quant.core.strategy_input import StrategyInputContext
 from lumina_quant.portfolio_split_contract import FOLLOWUP_ROOT
 from lumina_quant.strategy import Strategy
 from lumina_quant.strategies import resolve_strategy_class
+from lumina_quant.utils.artifact_read_receipt import (
+    ArtifactReadReceipt,
+    read_artifact_bytes,
+    read_artifact_json,
+)
 from lumina_quant.utils.numeric import safe_float
 
 GROUP_ROOT = FOLLOWUP_ROOT / "portfolio_incumbent_autoresearch_grouped"
@@ -84,6 +94,13 @@ DEFAULT_ARTIFACT_PORTFOLIO_MANIFEST_PATH = (
 )
 MANIFEST_PORTFOLIO_MODE_PREFIX = "manifest:"
 MANIFEST_PORTFOLIO_GROSS_CAP = 2.25
+_ALPHA_MAX_STATIC_STRATEGY_CLASSES = frozenset(
+    {
+        "ResearchOnlyDailyCrossSectionalNearHighAnchoringStrategy",
+        "ResearchOnlyDailyLowTurnoverTrendPersistenceStrategy",
+        "ResearchOnlyFourHourFundingHarvestCarryStrategy",
+    }
+)
 _MANIFEST_FORBIDDEN_OOS_KEYS = (
     "uses_current_fold_oos",
     "uses_locked_oos_for_selection",
@@ -192,6 +209,7 @@ class PortfolioModeDefinition:
     cash_weight: float
     source_artifacts: dict[str, str]
     watch_symbols: tuple[str, ...] = ()
+    artifact_read_receipts: tuple[ArtifactReadReceipt, ...] = ()
 
     @property
     def symbols(self) -> list[str]:
@@ -228,6 +246,16 @@ class _SignalCaptureQueue:
         self._items.clear()
         return out
 
+    def empty(self) -> bool:
+        return not self._items
+
+    def snapshot(self) -> list[Any]:
+        return list(self._items)
+
+    def restore(self, items: list[Any]) -> None:
+        self._items.clear()
+        self._items.extend(items)
+
 
 def _read_json(path: Path) -> dict[str, Any]:
     payload = json.loads(path.read_text(encoding="utf-8"))
@@ -261,7 +289,7 @@ def _resolve_manifest_path(raw_path: Any, *, base_dir: Path | None = None) -> Pa
     path = Path(str(raw_path or "")).expanduser()
     if not path.is_absolute():
         path = (base_dir or Path.cwd()) / path
-    return path.resolve()
+    return Path(os.path.abspath(os.fspath(path)))
 
 
 def _selection_inputs_are_train_validation_or_lagged_shadow_only(inputs: Any) -> bool:
@@ -295,44 +323,57 @@ def _manifest_fail_closed_definition(
 
 def _validate_manifest_source_artifacts(
     payload: dict[str, Any], *, manifest_path: Path
-) -> tuple[dict[str, Path], str | None]:
+) -> tuple[dict[str, Path], tuple[ArtifactReadReceipt, ...], str | None]:
     artifacts: dict[str, Path] = {}
+    receipts_by_id: dict[str, ArtifactReadReceipt] = {}
     base_dir = manifest_path.parent
     raw_artifacts = payload.get("source_artifacts")
     if not isinstance(raw_artifacts, list | tuple):
-        return {}, "source_artifacts_not_list"
+        return {}, (), "source_artifacts_not_list"
     for artifact in raw_artifacts:
         if not isinstance(artifact, dict):
-            return {}, "source_artifact_not_object"
+            return {}, (), "source_artifact_not_object"
         artifact_id = str(artifact.get("id") or artifact.get("artifact_id") or "").strip()
         raw_path = artifact.get("path")
         if not artifact_id or not raw_path:
-            return {}, "source_artifact_missing_id_or_path"
+            return {}, (), "source_artifact_missing_id_or_path"
+        if artifact_id in artifacts:
+            return {}, (), f"source_artifact_duplicate:{artifact_id}"
         source_path = _resolve_manifest_path(raw_path, base_dir=base_dir)
-        if not source_path.exists():
-            return {}, f"source_artifact_missing:{artifact_id}"
-        if not source_path.is_file():
-            return {}, f"source_artifact_not_file:{artifact_id}"
         expected_sha = str(artifact.get("sha256") or "").strip()
         if not expected_sha:
-            return {}, f"source_artifact_sha_missing:{artifact_id}"
+            return {}, (), f"source_artifact_sha_missing:{artifact_id}"
         try:
-            actual_sha = _file_sha256(source_path)
+            receipt, _payload = read_artifact_bytes(
+                source_path, artifact_id=f"source:{artifact_id}"
+            )
+        except FileNotFoundError:
+            return {}, (), f"source_artifact_missing:{artifact_id}"
+        except IsADirectoryError:
+            return {}, (), f"source_artifact_not_file:{artifact_id}"
+        except ValueError as exc:
+            reason = str(exc)
+            if reason.startswith("artifact_not_regular:"):
+                return {}, (), f"source_artifact_not_file:{artifact_id}"
+            return {}, (), f"source_artifact_unreadable:{artifact_id}"
         except OSError:
-            return {}, f"source_artifact_unreadable:{artifact_id}"
-        if actual_sha != expected_sha:
-            return {}, f"source_artifact_sha_mismatch:{artifact_id}"
+            return {}, (), f"source_artifact_unreadable:{artifact_id}"
+        if receipt.sha256 != expected_sha:
+            return {}, (), f"source_artifact_sha_mismatch:{artifact_id}"
         max_age_hours = _safe_float(artifact.get("max_age_hours"), 0.0)
         if max_age_hours <= 0.0:
-            return {}, f"source_artifact_freshness_missing:{artifact_id}"
-        mtime = datetime.fromtimestamp(source_path.stat().st_mtime, UTC)
+            return {}, (), f"source_artifact_freshness_missing:{artifact_id}"
+        mtime_ns = receipt.post_fstat_identity[5]
+        mtime = datetime.fromtimestamp(mtime_ns / 1_000_000_000, UTC)
         age_hours = (datetime.now(UTC) - mtime).total_seconds() / 3600.0
         if age_hours > max_age_hours:
-            return {}, f"source_artifact_stale:{artifact_id}"
+            return {}, (), f"source_artifact_stale:{artifact_id}"
         if artifact.get("ready") is not True or artifact.get("portfolio_ready") is not True:
-            return {}, f"source_artifact_not_ready:{artifact_id}"
+            return {}, (), f"source_artifact_not_ready:{artifact_id}"
         artifacts[artifact_id] = source_path
-    return artifacts, None
+        receipts_by_id[artifact_id] = receipt
+    receipts = tuple(receipts_by_id[artifact_id] for artifact_id in sorted(receipts_by_id))
+    return artifacts, receipts, None
 
 
 def _manifest_correlation_ok(provenance: Any) -> bool:
@@ -365,12 +406,32 @@ def _manifest_definition_from_path(
 ) -> PortfolioModeDefinition:
     artifacts = dict(source_artifacts)
     artifacts["artifact_portfolio_manifest_path"] = str(manifest_path)
-    if not manifest_path.exists():
+    try:
+        manifest_receipt, payload = read_artifact_json(
+            manifest_path, artifact_id="artifact_portfolio_manifest"
+        )
+        artifacts["artifact_portfolio_manifest_path"] = manifest_receipt.canonical_path
+    except FileNotFoundError:
         return _manifest_fail_closed_definition(
             token=token, source_artifacts=artifacts, reason="manifest_missing"
         )
-    try:
-        payload = _read_json(manifest_path)
+    except IsADirectoryError:
+        return _manifest_fail_closed_definition(
+            token=token, source_artifacts=artifacts, reason="manifest_unreadable:IsADirectoryError"
+        )
+    except ValueError as exc:
+        reason = str(exc)
+        if reason.startswith("artifact_not_regular:"):
+            return _manifest_fail_closed_definition(
+                token=token,
+                source_artifacts=artifacts,
+                reason="manifest_unreadable:not_regular",
+            )
+        return _manifest_fail_closed_definition(
+            token=token,
+            source_artifacts=artifacts,
+            reason=f"manifest_unreadable:{type(exc).__name__}",
+        )
     except Exception as exc:  # defensive fail-closed boundary for live routing
         return _manifest_fail_closed_definition(
             token=token,
@@ -400,7 +461,7 @@ def _manifest_definition_from_path(
             reason="manifest_correlation_provenance_invalid",
         )
 
-    source_paths, source_error = _validate_manifest_source_artifacts(
+    source_paths, source_receipts, source_error = _validate_manifest_source_artifacts(
         payload, manifest_path=manifest_path
     )
     if source_error is not None:
@@ -499,8 +560,9 @@ def _manifest_definition_from_path(
             return _manifest_fail_closed_definition(
                 token=token, source_artifacts=artifacts, reason=f"child_invalid:{child_id}"
             )
-        if not isinstance(child.get("symbols"), list | tuple) or not [
-            symbol for symbol in child.get("symbols") if str(symbol).strip()
+        child_symbols = child.get("symbols")
+        if not isinstance(child_symbols, list | tuple) or not [
+            symbol for symbol in child_symbols if str(symbol).strip()
         ]:
             return _manifest_fail_closed_definition(
                 token=token, source_artifacts=artifacts, reason=f"child_invalid:{child_id}"
@@ -541,7 +603,11 @@ def _manifest_definition_from_path(
                 weight=weight,
                 source=f"{token}:manifest:{source_id or 'inline'}",
             )
-        except TypeError, ValueError:
+        except TypeError:
+            return _manifest_fail_closed_definition(
+                token=token, source_artifacts=artifacts, reason=f"child_invalid:{child_id}"
+            )
+        except ValueError:
             return _manifest_fail_closed_definition(
                 token=token, source_artifacts=artifacts, reason=f"child_invalid:{child_id}"
             )
@@ -552,12 +618,14 @@ def _manifest_definition_from_path(
             token=token, source_artifacts=artifacts, reason="manifest_no_positive_children"
         )
     cash_weight = _safe_float(payload.get("cash_weight"), max(0.0, 1.0 - gross))
+    sort_by_weight = payload.get("artifact_kind") != "alpha_max_engine_portfolio_manifest.v1"
     return PortfolioModeDefinition(
         portfolio_mode=token,
-        components=tuple(_merge_components(components)),
+        components=tuple(_merge_components(components, sort_by_weight=sort_by_weight)),
         cash_weight=float(max(0.0, min(1.0, cash_weight))),
         source_artifacts=artifacts,
         watch_symbols=(),
+        artifact_read_receipts=(manifest_receipt, *source_receipts),
     )
 
 
@@ -2107,7 +2175,11 @@ def _expand_reference(
     return components, cash_weight
 
 
-def _merge_components(components: list[PortfolioModeComponent]) -> list[PortfolioModeComponent]:
+def _merge_components(
+    components: list[PortfolioModeComponent],
+    *,
+    sort_by_weight: bool = True,
+) -> list[PortfolioModeComponent]:
     merged: dict[str, PortfolioModeComponent] = {}
     for component in components:
         existing = merged.get(component.component_id)
@@ -2123,7 +2195,10 @@ def _merge_components(components: list[PortfolioModeComponent]) -> list[Portfoli
             weight=float(existing.weight + component.weight),
             source=f"{existing.source}+{component.source}",
         )
-    return sorted(merged.values(), key=lambda item: item.weight, reverse=True)
+    values = list(merged.values())
+    if not sort_by_weight:
+        return values
+    return sorted(values, key=lambda item: item.weight, reverse=True)
 
 
 def _component_param_override(
@@ -2184,6 +2259,7 @@ def _apply_component_param_overrides(
         cash_weight=float(definition.cash_weight),
         source_artifacts=dict(definition.source_artifacts),
         watch_symbols=tuple(definition.watch_symbols),
+        artifact_read_receipts=definition.artifact_read_receipts,
     )
 
 
@@ -2321,6 +2397,7 @@ def resolve_portfolio_mode_definition(portfolio_mode: str) -> PortfolioModeDefin
         cash_weight=float(max(0.0, min(1.0, cash_weight))),
         source_artifacts=source_artifacts,
         watch_symbols=watch_symbols,
+        artifact_read_receipts=(),
     )
 
 
@@ -2346,6 +2423,38 @@ def _child_uses_timeframe_aggregator(child: Any) -> bool:
     return any(str(token).strip().lower() == "aggregator" for token in tokens)
 
 
+_RESEARCH_CAPSULE_KIND = "artifact_portfolio_mode.research_indicator_state"
+_RESEARCH_CAPSULE_VERSION = 1
+
+
+def _canonical_json_value(value: Any) -> Any:
+    try:
+        encoded = json.dumps(
+            value,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        )
+    except (TypeError, ValueError) as exc:
+        raise ValueError("research indicator capsule must be JSON-canonicalizable") from exc
+    return json.loads(encoded)
+
+
+def _canonical_sha256(value: Any) -> str:
+    encoded = json.dumps(
+        _canonical_json_value(value),
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _capsule_payload_sha256(payload: dict[str, Any]) -> str:
+    payload_without_hash = {key: value for key, value in payload.items() if key != "sha256"}
+    return _canonical_sha256(payload_without_hash)
+
+
 class ArtifactPortfolioModeStrategy(Strategy):
     preferred_contract = "context"
 
@@ -2356,6 +2465,7 @@ class ArtifactPortfolioModeStrategy(Strategy):
         *,
         portfolio_mode: str,
         component_param_overrides: dict[str, Any] | None = None,
+        decision_cadence_seconds: int = 60,
     ):
         self.bars = bars
         self.events = events
@@ -2364,15 +2474,35 @@ class ArtifactPortfolioModeStrategy(Strategy):
             resolve_portfolio_mode_definition(self.portfolio_mode),
             component_param_overrides,
         )
+        alpha_static_registry = tuple(
+            receipt.artifact_id for receipt in self.definition.artifact_read_receipts
+        ) == ("artifact_portfolio_manifest", "source:alpha_max_config") and all(
+            component.strategy_class in _ALPHA_MAX_STATIC_STRATEGY_CLASSES
+            for component in self.definition.components
+        )
         self.symbol_list = list(self.definition.symbols)
-        self.decision_cadence_seconds = 60
+        self.decision_cadence_seconds = int(decision_cadence_seconds)
+        if self.decision_cadence_seconds < 1:
+            raise ValueError("decision_cadence_seconds must be >= 1")
         self._children: list[tuple[PortfolioModeComponent, Any, _SignalCaptureQueue]] = []
         required_features: set[str] = set()
         required_timeframes: set[str] = set()
         uses_timeframe_aggregator = False
         for component in self.definition.components:
-            strategy_cls = resolve_strategy_class(
-                component.strategy_class, default_name=component.strategy_class
+            if alpha_static_registry:
+                strategy_cls = resolve_strategy_class(
+                    component.strategy_class,
+                    default_name=component.strategy_class,
+                    discover_plugins=False,
+                )
+            else:
+                strategy_cls = resolve_strategy_class(
+                    component.strategy_class,
+                    default_name=component.strategy_class,
+                )
+            strategy_cls = cast(
+                Any,
+                strategy_cls,
             )
             child_queue = _SignalCaptureQueue()
             child_bars = _BarsSubsetProxy(self.bars, list(component.symbols))
@@ -2414,6 +2544,192 @@ class ArtifactPortfolioModeStrategy(Strategy):
             setter = getattr(child, "set_state", None)
             if callable(setter) and isinstance(child_state, dict):
                 setter(child_state)
+
+    def _child_capsule_handlers(
+        self,
+    ) -> list[tuple[PortfolioModeComponent, Any, Any, Any]]:
+        handlers: list[tuple[PortfolioModeComponent, Any, Any, Any]] = []
+        component_id_counts: dict[str, int] = {}
+        for component, _child, _queue in self._children:
+            component_id_counts[component.component_id] = (
+                component_id_counts.get(component.component_id, 0) + 1
+            )
+        duplicate_ids = sorted(
+            component_id for component_id, count in component_id_counts.items() if count > 1
+        )
+        if duplicate_ids:
+            raise ValueError(f"duplicate research indicator child ids: {duplicate_ids}")
+        for component, child, _queue in self._children:
+            getter = getattr(child, "get_research_indicator_state", None)
+            setter = getattr(child, "set_research_indicator_state", None)
+            if not callable(getter) or not callable(setter):
+                raise ValueError(
+                    f"research indicator capsule child is not capable: {component.component_id}"
+                )
+            handlers.append((component, child, getter, setter))
+        return handlers
+
+    def get_research_indicator_state(self) -> dict[str, Any]:
+        children: list[dict[str, Any]] = []
+        for component, _child, getter, _setter in self._child_capsule_handlers():
+            child_state = _canonical_json_value(getter())
+            children.append(
+                {
+                    "component_id": component.component_id,
+                    "sha256": _canonical_sha256(child_state),
+                    "state": child_state,
+                }
+            )
+        children.sort(key=lambda item: str(item["component_id"]))
+        payload: dict[str, Any] = {
+            "kind": _RESEARCH_CAPSULE_KIND,
+            "schema_version": _RESEARCH_CAPSULE_VERSION,
+            "portfolio_mode": self.portfolio_mode,
+            "children": children,
+        }
+        payload["sha256"] = _capsule_payload_sha256(payload)
+        return payload
+
+    def _validate_research_indicator_state(
+        self, capsule: Any
+    ) -> tuple[list[tuple[PortfolioModeComponent, Any, Any, Any]], dict[str, Any]]:
+        if not isinstance(capsule, dict):
+            raise ValueError("research indicator capsule must be a dict")
+        payload = dict(capsule)
+        if payload.get("kind") != _RESEARCH_CAPSULE_KIND:
+            raise ValueError("research indicator capsule kind mismatch")
+        if payload.get("schema_version") != _RESEARCH_CAPSULE_VERSION:
+            raise ValueError("research indicator capsule schema mismatch")
+        if str(payload.get("portfolio_mode") or "") != self.portfolio_mode:
+            raise ValueError("research indicator capsule portfolio_mode mismatch")
+        expected_sha = str(payload.get("sha256") or "")
+        if not expected_sha or expected_sha != _capsule_payload_sha256(payload):
+            raise ValueError("research indicator capsule sha256 mismatch")
+        raw_children = payload.get("children")
+        if not isinstance(raw_children, list):
+            raise ValueError("research indicator capsule children must be a list")
+
+        child_states: dict[str, Any] = {}
+        seen: set[str] = set()
+        for entry in raw_children:
+            if not isinstance(entry, dict):
+                raise ValueError("research indicator capsule child must be a dict")
+            component_id = str(entry.get("component_id") or "")
+            if not component_id:
+                raise ValueError("research indicator capsule child id is required")
+            if component_id in seen:
+                raise ValueError(f"duplicate research indicator child id: {component_id}")
+            seen.add(component_id)
+            if "state" not in entry:
+                raise ValueError(f"research indicator child state missing: {component_id}")
+            state = _canonical_json_value(entry["state"])
+            if str(entry.get("sha256") or "") != _canonical_sha256(state):
+                raise ValueError(f"research indicator child sha256 mismatch: {component_id}")
+            child_states[component_id] = state
+
+        expected_ids = {component.component_id for component, _child, _queue in self._children}
+        if seen != expected_ids:
+            missing = sorted(expected_ids - seen)
+            extra = sorted(seen - expected_ids)
+            raise ValueError(
+                f"research indicator capsule child id mismatch: missing={missing} extra={extra}"
+            )
+        return self._child_capsule_handlers(), child_states
+
+    def set_research_indicator_state(self, capsule: Any) -> None:
+        handlers, child_states = self._validate_research_indicator_state(capsule)
+        rollback_states: dict[str, Any] = {}
+        for component, _child, getter, _setter in handlers:
+            rollback_states[component.component_id] = _canonical_json_value(getter())
+
+        try:
+            for component, _child, _getter, setter in handlers:
+                setter(child_states[component.component_id])
+        except Exception:
+            for component, _child, _getter, setter in reversed(handlers):
+                setter(rollback_states[component.component_id])
+            raise
+
+    def _checked_child_methods(self, *, method_name: str, capability_name: str) -> dict[str, Any]:
+        handlers: dict[str, Any] = {}
+        duplicate_ids: set[str] = set()
+        for component, child, _queue in self._children:
+            component_id = component.component_id
+            if component_id in handlers:
+                duplicate_ids.add(component_id)
+                continue
+            method = getattr(child, method_name, None)
+            if not callable(method):
+                raise ValueError(f"{capability_name} child is not capable: {component_id}")
+            handlers[component_id] = method
+        if duplicate_ids:
+            raise ValueError(f"duplicate {capability_name} child ids: {sorted(duplicate_ids)}")
+        expected_ids = {component.component_id for component, _child, _queue in self._children}
+        if set(handlers) != expected_ids:
+            missing = sorted(expected_ids - set(handlers))
+            extra = sorted(set(handlers) - expected_ids)
+            raise ValueError(
+                f"{capability_name} child id mismatch: missing={missing} extra={extra}"
+            )
+        return handlers
+
+    def validate_research_warmup_ready(self) -> None:
+        handlers = self._checked_child_methods(
+            method_name="validate_research_warmup_ready",
+            capability_name="research warmup",
+        )
+        for validator in handlers.values():
+            validator()
+
+    def finalize_completed_native_buckets(self, watermark: Any) -> dict[str, Any]:
+        finalizers = self._checked_child_methods(
+            method_name="finalize_completed_native_buckets",
+            capability_name="completed native bucket",
+        )
+        rollback_getters = self._checked_child_methods(
+            method_name="get_native_finalization_rollback_state",
+            capability_name="native finalization rollback getter",
+        )
+        rollback_setters = self._checked_child_methods(
+            method_name="set_native_finalization_rollback_state",
+            capability_name="native finalization rollback setter",
+        )
+        expected_ids = tuple(component.component_id for component, _child, _queue in self._children)
+        if (
+            tuple(finalizers) != expected_ids
+            or tuple(rollback_getters) != expected_ids
+            or tuple(rollback_setters) != expected_ids
+        ):
+            raise ValueError("completed native bucket child ordering mismatch")
+
+        rollback_states: dict[str, Any] = {}
+        rollback_queues: dict[str, list[Any]] = {}
+        queues: dict[str, _SignalCaptureQueue] = {}
+        for component, _child, child_queue in self._children:
+            component_id = component.component_id
+            rollback_states[component_id] = copy.deepcopy(rollback_getters[component_id]())
+            queues[component_id] = child_queue
+            rollback_queues[component_id] = copy.deepcopy(child_queue.snapshot())
+
+        results: dict[str, Any] = {}
+        try:
+            for component, _child, _queue in self._children:
+                component_id = component.component_id
+                results[component_id] = _canonical_json_value(finalizers[component_id](watermark))
+        except Exception as exc:
+            rollback_errors: list[Exception] = []
+            for component, _child, _queue in reversed(self._children):
+                component_id = component.component_id
+                try:
+                    rollback_setters[component_id](copy.deepcopy(rollback_states[component_id]))
+                except Exception as rollback_exc:  # pragma: no cover - defensive fail-closed path
+                    rollback_errors.append(rollback_exc)
+                finally:
+                    queues[component_id].restore(copy.deepcopy(rollback_queues[component_id]))
+            if rollback_errors:
+                raise RuntimeError("completed native bucket rollback failed") from exc
+            raise
+        return results
 
     def _component_client_order_id(
         self, *, component: PortfolioModeComponent, signal: SignalEvent
@@ -2523,6 +2839,84 @@ class ArtifactPortfolioModeStrategy(Strategy):
                 handler(context)
             else:
                 child.calculate_signals_window(context.event, context.aggregator)
+            self._drain_child_queue(component, child_queue)
+
+    def calculate_signals_completed_native_release(
+        self,
+        *,
+        release_timestamp_ms: int,
+        bars_by_timeframe: Mapping[
+            str,
+            Mapping[str, tuple[Any, float, float, float, float, float]],
+        ],
+        feature_lookup: Any,
+    ) -> None:
+        """Replay one prevalidated completed-native release without economics."""
+        if (
+            type(release_timestamp_ms) is not int
+            or release_timestamp_ms < 100_000_000_000
+            or not isinstance(bars_by_timeframe, Mapping)
+            or not bars_by_timeframe
+        ):
+            raise ValueError("completed_native_release_invalid")
+        prepared: list[
+            tuple[
+                PortfolioModeComponent,
+                Any,
+                _SignalCaptureQueue,
+                str,
+                Mapping[str, tuple[Any, float, float, float, float, float]],
+            ]
+        ] = []
+        consumed_timeframes: set[str] = set()
+        for component, child, child_queue in self._children:
+            timeframe = getattr(child, "native_timeframe", None)
+            timeframe_ms = getattr(child, "native_timeframe_ms", None)
+            if type(timeframe) is not str or type(timeframe_ms) is not int or timeframe_ms <= 0:
+                raise ValueError("completed_native_release_child_invalid")
+            bars = bars_by_timeframe.get(timeframe)
+            if bars is None:
+                continue
+            if tuple(bars) != component.symbols:
+                raise ValueError("completed_native_release_symbols_invalid")
+            for symbol, bar in bars.items():
+                if (
+                    symbol not in component.symbols
+                    or type(bar) is not tuple
+                    or len(bar) != 6
+                    or any(type(value) is not float for value in bar[1:])
+                ):
+                    raise ValueError("completed_native_release_bar_invalid")
+            prepared.append((component, child, child_queue, timeframe, bars))
+            consumed_timeframes.add(timeframe)
+        if not prepared or consumed_timeframes != set(bars_by_timeframe):
+            raise ValueError("completed_native_release_timeframes_invalid")
+
+        for component, child, child_queue, _timeframe, bars in prepared:
+            event = SimpleNamespace(
+                type="MARKET_WINDOW",
+                time=release_timestamp_ms,
+                event_time_watermark_ms=release_timestamp_ms,
+                completed_native_bars=True,
+                bars_1s={symbol: (bar,) for symbol, bar in bars.items()},
+            )
+            handler = getattr(child, "calculate_signals_context", None)
+            if callable(handler):
+                handler(
+                    StrategyInputContext(
+                        event=event,
+                        aggregator=None,
+                        feature_lookup=feature_lookup,
+                        data_handler=self.bars,
+                        provider_metadata={
+                            "data_handler_class": type(self.bars).__name__,
+                            "execution_handler_class": None,
+                            "market_data_source": "alpha_max_completed_native_release",
+                        },
+                    )
+                )
+            else:
+                child.calculate_signals_window(event, None)
             self._drain_child_queue(component, child_queue)
 
 

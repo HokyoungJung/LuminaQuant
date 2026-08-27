@@ -12,7 +12,6 @@ logs/
 !scripts/ops/start_live_session.sh
 !scripts/ops/stop_live_session.sh
 !scripts/ops/install_shell_aliases.sh
-uv.lock
 .python-version
 *.code-workspace
 

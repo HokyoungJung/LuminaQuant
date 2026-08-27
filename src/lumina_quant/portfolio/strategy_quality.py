@@ -166,20 +166,25 @@ class StrategyQualityOverlay:
         self.bar_index = int(state.get("bar_index") or 0)
         self._turnover_day = str(state.get("turnover_day") or "")
         self._daily_turnover = float(state.get("daily_turnover") or 0.0)
-        window = max(1, int(getattr(self.config, "STRATEGY_QUALITY_HEALTH_WINDOW_TRADES", 20)))
+        raw_health = dict(state.get("health") or {})
         health: dict[str, _StrategyHealth] = {}
-        for key, raw in dict(state.get("health") or {}).items():
-            if not isinstance(raw, dict):
-                continue
-            values = deque(maxlen=window)
-            for item in list(raw.get("returns") or [])[-window:]:
-                parsed = _safe_float(item)
-                if parsed is not None:
-                    values.append(parsed)
-            health[str(key)] = _StrategyHealth(
-                returns=values,
-                cooldown_until_bar=int(raw.get("cooldown_until_bar") or 0),
+        if raw_health:
+            window = max(
+                1,
+                int(getattr(self.config, "STRATEGY_QUALITY_HEALTH_WINDOW_TRADES", 20)),
             )
+            for key, raw in raw_health.items():
+                if not isinstance(raw, dict):
+                    continue
+                values = deque(maxlen=window)
+                for item in list(raw.get("returns") or [])[-window:]:
+                    parsed = _safe_float(item)
+                    if parsed is not None:
+                        values.append(parsed)
+                health[str(key)] = _StrategyHealth(
+                    returns=values,
+                    cooldown_until_bar=int(raw.get("cooldown_until_bar") or 0),
+                )
         self._health = health
         self._entry = {
             str(key): dict(value)
