@@ -7131,6 +7131,51 @@ def _alpha_max_training_prefix_from_checkpoint(
     return capsule
 
 
+def _alpha_max_prepare_training_indicator_prefixes(
+    preflight: AlphaMaxRuntimePreflight,
+    *,
+    output_root: Path,
+    component_ids: tuple[str, ...],
+    manifests: Mapping[str, AlphaMaxManifestReceipt],
+    admitted_symbols: tuple[str, ...],
+    root_seals: Mapping[tuple[str, str], AlphaMaxRootSeal],
+    checkpoint_store: _AlphaMaxPrecomputeCheckpointStore,
+) -> None:
+    """Build and seal warmup state serially before training workers are forked."""
+    for component_id in component_ids:
+        manifest = manifests.get(component_id)
+        if type(manifest) is not AlphaMaxManifestReceipt:
+            raise AlphaMaxRuntimeContractError("alpha_max_training_prefix_component_invalid")
+        payload = checkpoint_store.load(unit_kind="training_prefix", unit_id=component_id)
+        if payload is None:
+            capsule = _alpha_max_build_indicator_prefix(
+                preflight,
+                manifest_output_root=output_root,
+                phase="validation_train_fit",
+                manifest_receipt=manifest,
+                admitted_symbols=admitted_symbols,
+                root_seals=root_seals,
+                phase_ids=("warmup",),
+            )
+            payload = (
+                _canonical_bytes(
+                    {
+                        "artifact_kind": "alpha_max_training_component_prefix_checkpoint.v1",
+                        "component_id": component_id,
+                        "manifest": _alpha_max_manifest_checkpoint_identity(manifest),
+                        "state": _alpha_max_capsule_state_payload(capsule),
+                    }
+                )
+                + b"\n"
+            )
+            payload = checkpoint_store.seal(
+                unit_kind="training_prefix", unit_id=component_id, data_bytes=payload
+            )
+        _alpha_max_training_prefix_from_checkpoint(
+            payload, component_id=component_id, manifest=manifest
+        )
+
+
 def _alpha_max_training_day_from_checkpoint(
     payload: bytes,
     *,
@@ -7259,29 +7304,7 @@ def _alpha_max_replay_training_component_returns(
     component_id = manifest_receipt.row_id
     sealed_prefix = checkpoint_store.load(unit_kind="training_prefix", unit_id=component_id)
     if sealed_prefix is None:
-        warmup_capsule = _alpha_max_build_indicator_prefix(
-            preflight,
-            manifest_output_root=output_root,
-            phase="validation_train_fit",
-            manifest_receipt=manifest_receipt,
-            admitted_symbols=admitted_symbols,
-            root_seals=root_seals,
-            phase_ids=("warmup",),
-        )
-        prefix_bytes = (
-            _canonical_bytes(
-                {
-                    "artifact_kind": "alpha_max_training_component_prefix_checkpoint.v1",
-                    "component_id": component_id,
-                    "manifest": _alpha_max_manifest_checkpoint_identity(manifest_receipt),
-                    "state": _alpha_max_capsule_state_payload(warmup_capsule),
-                }
-            )
-            + b"\n"
-        )
-        sealed_prefix = checkpoint_store.seal(
-            unit_kind="training_prefix", unit_id=component_id, data_bytes=prefix_bytes
-        )
+        raise AlphaMaxRuntimeContractError("alpha_max_training_prefix_missing")
     warmup_capsule = _alpha_max_training_prefix_from_checkpoint(
         sealed_prefix, component_id=component_id, manifest=manifest_receipt
     )
@@ -8273,6 +8296,11 @@ class _AlphaMaxPrecomputeCheckpointStore:
             open_root_status = os.fstat(self._root_fd)
             open_units_status = os.fstat(self._units_fd)
             status = open_root_status
+            failed_status: os.stat_result | None
+            try:
+                failed_status = os.stat("FAILED.json", dir_fd=self._root_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                failed_status = None
             if (
                 (int(display_root_status.st_dev), int(display_root_status.st_ino))
                 != self._root_identity
@@ -8288,6 +8316,20 @@ class _AlphaMaxPrecomputeCheckpointStore:
                 or stat.S_ISLNK(status.st_mode)
                 or stat.S_ISLNK(display_root_status.st_mode)
                 or stat.S_ISLNK(display_units_status.st_mode)
+                or (
+                    failed_status is None
+                    and (
+                        stat.S_IMODE(status.st_mode) != 0o700
+                        or stat.S_IMODE(display_root_status.st_mode) != 0o700
+                    )
+                )
+                or (
+                    failed_status is not None
+                    and (
+                        stat.S_IMODE(status.st_mode) != 0o500
+                        or stat.S_IMODE(display_root_status.st_mode) != 0o500
+                    )
+                )
                 or not {path.name for path in self._root.iterdir()}
                 <= {"ATTEMPT.json", "FAILED.json", "units"}
                 or not stat.S_ISDIR(open_units_status.st_mode)
@@ -8305,16 +8347,19 @@ class _AlphaMaxPrecomputeCheckpointStore:
                 or attempt_status.st_mode & 0o222
             ):
                 raise AlphaMaxRuntimeContractError("alpha_max_precompute_descriptor_mismatch")
-            failed = self._root / "FAILED.json"
-            if failed.exists() or failed.is_symlink():
+            if failed_status is not None:
                 payload = _strict_json_object(
                     _alpha_max_read_regular_at(self._root_fd, "FAILED.json", expected_mode=0o400)
                 )
+                failed_after = os.stat("FAILED.json", dir_fd=self._root_fd, follow_symlinks=False)
                 if payload != {
                     "artifact_kind": "alpha_max_precompute_attempt_failed.v1",
                     "attempt_descriptor_sha256": self._attempt_descriptor_sha256,
                     "success": False,
-                }:
+                } or (
+                    _alpha_max_stat_identity(failed_status)
+                    != _alpha_max_stat_identity(failed_after)
+                ):
                     raise AlphaMaxRuntimeContractError(
                         "alpha_max_precompute_failure_marker_invalid"
                     )
@@ -8479,7 +8524,6 @@ class _AlphaMaxPrecomputeCheckpointStore:
         """Durably reject semantic-failure progress; SIGKILL cannot call this."""
         with self._transaction():
             self._validate_root()
-            marker = self._root / "FAILED.json"
             payload = (
                 _canonical_bytes(
                     {
@@ -8490,12 +8534,72 @@ class _AlphaMaxPrecomputeCheckpointStore:
                 )
                 + b"\n"
             )
-            if marker.exists() or marker.is_symlink():
+            try:
+                marker_status = os.stat("FAILED.json", dir_fd=self._root_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                marker_status = None
+            except OSError as exc:
+                raise AlphaMaxRuntimeContractError("alpha_max_precompute_root_invalid") from exc
+            if marker_status is not None:
                 raise AlphaMaxRuntimeContractError("alpha_max_precompute_attempt_poisoned")
-            _write_bundle_file(marker.parent, marker.name, payload)
-            os.chmod(marker, 0o400)
-            _alpha_max_fsync_regular_nofollow(marker)
-            _fsync_directory(marker.parent)
+            fd = -1
+            try:
+                fd = os.open(
+                    "FAILED.json",
+                    os.O_WRONLY
+                    | os.O_CREAT
+                    | os.O_EXCL
+                    | getattr(os, "O_CLOEXEC", 0)
+                    | getattr(os, "O_NOFOLLOW", 0),
+                    0o400,
+                    dir_fd=self._root_fd,
+                )
+                offset = 0
+                while offset < len(payload):
+                    written = os.write(fd, payload[offset:])
+                    if written <= 0:
+                        raise OSError("alpha_max_precompute_failure_marker_write_invalid")
+                    offset += written
+                os.fsync(fd)
+                os.fchmod(fd, 0o400)
+                os.fsync(fd)
+                opened = os.fstat(fd)
+                entry = os.stat("FAILED.json", dir_fd=self._root_fd, follow_symlinks=False)
+                if (
+                    not stat.S_ISREG(opened.st_mode)
+                    or stat.S_ISLNK(entry.st_mode)
+                    or stat.S_IMODE(opened.st_mode) != 0o400
+                    or opened.st_nlink != 1
+                    or entry.st_nlink != 1
+                    or _alpha_max_stat_identity(entry) != _alpha_max_stat_identity(opened)
+                ):
+                    raise AlphaMaxRuntimeContractError(
+                        "alpha_max_precompute_failure_marker_invalid"
+                    )
+                os.fchmod(self._root_fd, 0o500)
+                os.fsync(self._root_fd)
+                root_after = os.fstat(self._root_fd)
+                display_after = self._display_root.lstat()
+                marker_after = os.stat("FAILED.json", dir_fd=self._root_fd, follow_symlinks=False)
+                if (
+                    stat.S_IMODE(root_after.st_mode) != 0o500
+                    or stat.S_IMODE(display_after.st_mode) != 0o500
+                    or (int(root_after.st_dev), int(root_after.st_ino)) != self._root_identity
+                    or (int(display_after.st_dev), int(display_after.st_ino)) != self._root_identity
+                    or _alpha_max_stat_identity(marker_after) != _alpha_max_stat_identity(opened)
+                ):
+                    raise AlphaMaxRuntimeContractError(
+                        "alpha_max_precompute_failure_marker_invalid"
+                    )
+            except FileExistsError as exc:
+                raise AlphaMaxRuntimeContractError("alpha_max_precompute_attempt_poisoned") from exc
+            except OSError as exc:
+                raise AlphaMaxRuntimeContractError(
+                    "alpha_max_precompute_failure_marker_invalid"
+                ) from exc
+            finally:
+                if fd >= 0:
+                    os.close(fd)
 
 
 class _AlphaMaxCellCheckpointStore:
@@ -12765,6 +12869,20 @@ def run_alpha_max_prelock_process(
             if component_id not in whole_component_bytes
         )
         if missing_component_ids:
+            training_store = checkpoint_store.training_precompute_store()
+            try:
+                _alpha_max_prepare_training_indicator_prefixes(
+                    run_preflight,
+                    output_root=root,
+                    component_ids=missing_component_ids,
+                    manifests=component_manifests,
+                    admitted_symbols=admitted_symbols,
+                    root_seals=root_seals,
+                    checkpoint_store=training_store,
+                )
+            except AlphaMaxRuntimeContractError, TypeError, ValueError:
+                training_store.poison()
+                raise
             global _ALPHA_MAX_TRAINING_WORKER_CONTEXT
             _ALPHA_MAX_TRAINING_WORKER_CONTEXT = (
                 run_preflight,

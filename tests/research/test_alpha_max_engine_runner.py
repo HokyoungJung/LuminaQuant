@@ -109,6 +109,127 @@ def test_prelock_training_worker_cap_is_bounded_and_uses_processes() -> None:
     assert alpha_max_runner.ProcessPoolExecutor is not alpha_max_runner.ThreadPoolExecutor
 
 
+def test_parent_prepares_only_missing_training_prefixes_in_canonical_order(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    component_ids = (
+        "component_carry_1x",
+        "component_near_high_1x",
+        "component_trend_1x",
+    )
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_bytes(b"{}\n")
+    receipt, _payload = alpha_max_evidence.read_artifact_bytes(
+        manifest_path, artifact_id="alpha_max_engine_portfolio_manifest"
+    )
+    manifests = {
+        component_id: AlphaMaxManifestReceipt(
+            row_id=component_id,
+            phase="validation_train_fit",
+            relative_path=f"manifests/validation_train_fit/{component_id}.json",
+            sha256=receipt.sha256,
+            byte_count=receipt.byte_count,
+            activation_receipt=receipt,
+        )
+        for component_id in component_ids
+    }
+    existing = b'{"sealed":"resume"}\n'
+    stored = {"component_near_high_1x": existing}
+    built: list[str] = []
+    parsed: list[tuple[str, bytes]] = []
+
+    class Store:
+        def load(self, *, unit_id: str, **_kwargs: object) -> bytes | None:
+            return stored.get(unit_id)
+
+        def seal(self, *, unit_id: str, data_bytes: bytes, **_kwargs: object) -> bytes:
+            assert unit_id not in stored
+            stored[unit_id] = data_bytes
+            return data_bytes
+
+    def build(
+        *_args: object, manifest_receipt: AlphaMaxManifestReceipt, **_kwargs: object
+    ) -> object:
+        built.append(manifest_receipt.row_id)
+        return object()
+
+    monkeypatch.setattr(alpha_max_runner, "_alpha_max_build_indicator_prefix", build)
+    monkeypatch.setattr(alpha_max_runner, "_alpha_max_capsule_state_payload", lambda _capsule: {})
+    monkeypatch.setattr(
+        alpha_max_runner,
+        "_alpha_max_training_prefix_from_checkpoint",
+        lambda payload, *, component_id, **_kwargs: parsed.append((component_id, payload)),
+    )
+    alpha_max_runner._alpha_max_prepare_training_indicator_prefixes(
+        SimpleNamespace(),
+        output_root=tmp_path,
+        component_ids=component_ids,
+        manifests=manifests,
+        admitted_symbols=("BTCUSDT",),
+        root_seals={},
+        checkpoint_store=Store(),
+    )
+    assert built == ["component_carry_1x", "component_trend_1x"]
+    assert [component_id for component_id, _payload in parsed] == list(component_ids)
+    assert parsed[1] == ("component_near_high_1x", existing)
+
+
+def test_worker_rejects_missing_training_prefix_without_building(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_bytes(b"{}\n")
+    receipt, _payload = alpha_max_evidence.read_artifact_bytes(
+        manifest_path, artifact_id="alpha_max_engine_portfolio_manifest"
+    )
+    manifest = AlphaMaxManifestReceipt(
+        row_id="component_carry_1x",
+        phase="validation_train_fit",
+        relative_path="manifests/validation_train_fit/component_carry_1x.json",
+        sha256=receipt.sha256,
+        byte_count=receipt.byte_count,
+        activation_receipt=receipt,
+    )
+    monkeypatch.setattr(
+        alpha_max_runner,
+        "_alpha_max_build_indicator_prefix",
+        lambda *_args, **_kwargs: pytest.fail("worker attempted prefix construction"),
+    )
+
+    class Store:
+        def load(self, **_kwargs: object) -> None:
+            return None
+
+    start = datetime(2024, 1, 1, tzinfo=UTC)
+    monkeypatch.setattr(alpha_max_runner, "_AlphaMaxBoundedRawLoader", lambda *_args: object())
+    monkeypatch.setattr(
+        alpha_max_runner, "AlphaMaxFundingBoundaryResolver", lambda *_args: object()
+    )
+    monkeypatch.setattr(alpha_max_runner, "_alpha_max_phase_lookup", lambda *_args: object())
+    monkeypatch.setattr(
+        alpha_max_runner, "_alpha_max_expected_root_sequence", lambda _phase: ("train",)
+    )
+    with pytest.raises(AlphaMaxRuntimeContractError, match="alpha_max_training_prefix_missing"):
+        alpha_max_runner._alpha_max_replay_training_component_returns(
+            SimpleNamespace(
+                phase_windows={
+                    "train": SimpleNamespace(
+                        start_utc=start.isoformat().replace("+00:00", "Z"),
+                        end_utc=(start + timedelta(days=2)).isoformat().replace("+00:00", "Z"),
+                    )
+                }
+            ),
+            output_root=tmp_path,
+            manifest_receipt=manifest,
+            admitted_symbols=("BTCUSDT",),
+            root_seals={
+                ("train", "raw"): SimpleNamespace(path=str(tmp_path / "raw")),
+                ("train", "feature"): SimpleNamespace(path=str(tmp_path / "feature")),
+            },
+            checkpoint_store=Store(),
+        )
+
+
 def test_real_process_caps_skew_preserve_canonical_component_bytes(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -376,7 +497,7 @@ def test_training_component_replay_resumes_sealed_days_with_funding_carry(
     }
 
     def store(root: Path) -> InterruptingStore:
-        return InterruptingStore(
+        result = InterruptingStore(
             root,
             attempt_descriptor_sha256="a" * 64,
             attempt_role="prelock",
@@ -384,6 +505,12 @@ def test_training_component_replay_resumes_sealed_days_with_funding_carry(
             runtime_identity_sha256="b" * 64,
             training_day_ids=day_ids,
         )
+        result.seal(
+            unit_kind="training_prefix",
+            unit_id=component_id,
+            data_bytes=b'{"prefix":true}\n',
+        )
+        return result
 
     uninterrupted = store((tmp_path / "uninterrupted").resolve())
     expected = alpha_max_runner._alpha_max_replay_training_component_returns(
@@ -428,6 +555,7 @@ def test_prelock_worker_caps_order_publication_and_failure_taxonomy(
     published: list[str] = []
     poisoned: list[bool] = []
     worker_output_snapshots: list[tuple[str, ...]] = []
+    prepared_prefixes: list[tuple[str, ...]] = []
 
     class Journal:
         _display_root = tmp_path / "journal"
@@ -476,6 +604,7 @@ def test_prelock_worker_caps_order_publication_and_failure_taxonomy(
             worker_counts.append(max_workers)
 
         def __enter__(self) -> Executor:
+            assert prepared_prefixes == [component_ids]
             return self
 
         def __exit__(self, *_args: object) -> None:
@@ -580,6 +709,11 @@ def test_prelock_worker_caps_order_publication_and_failure_taxonomy(
         lambda *_args, row, **_kwargs: SimpleNamespace(row_id=row["row_id"], path="manifest.json"),
     )
     monkeypatch.setattr(alpha_max_runner, "_validate_alpha_max_root_seals", lambda **_kwargs: None)
+    monkeypatch.setattr(
+        alpha_max_runner,
+        "_alpha_max_prepare_training_indicator_prefixes",
+        lambda *_args, component_ids, **_kwargs: prepared_prefixes.append(component_ids),
+    )
     monkeypatch.setattr(alpha_max_runner, "_alpha_max_phase_lookup", lambda *_args: object())
     monkeypatch.setattr(
         alpha_max_runner, "_alpha_max_expected_root_sequence", lambda _phase: ("train",)
@@ -619,21 +753,35 @@ def test_prelock_worker_caps_order_publication_and_failure_taxonomy(
     )
     for cap in (1, 2, 3, 4):
         published.clear()
+        prepared_prefixes.clear()
         with pytest.raises(RuntimeError, match="stop-after-parent-publication"):
             alpha_max_runner.run_alpha_max_prelock_process(**kwargs, max_training_workers=cap)
         assert published == list(component_ids)
     assert worker_counts == [1, 2, 3, 3]
     assert worker_output_snapshots == [(), (), (), ()]
 
+    prepared_prefixes.clear()
     Executor.mode = AlphaMaxRuntimeContractError("semantic-worker-failure")
     with pytest.raises(AlphaMaxRuntimeContractError, match="semantic-worker-failure"):
         alpha_max_runner.run_alpha_max_prelock_process(**kwargs, max_training_workers=3)
     assert poisoned
     poisoned.clear()
+    prepared_prefixes.clear()
     Executor.mode = alpha_max_runner.BrokenProcessPool("abrupt-worker-exit")
     with pytest.raises(alpha_max_runner.BrokenProcessPool, match="abrupt-worker-exit"):
         alpha_max_runner.run_alpha_max_prelock_process(**kwargs, max_training_workers=3)
     assert not poisoned
+    Executor.mode = None
+    monkeypatch.setattr(
+        alpha_max_runner,
+        "_alpha_max_prepare_training_indicator_prefixes",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AlphaMaxRuntimeContractError("semantic-prefix-failure")
+        ),
+    )
+    with pytest.raises(AlphaMaxRuntimeContractError, match="semantic-prefix-failure"):
+        alpha_max_runner.run_alpha_max_prelock_process(**kwargs, max_training_workers=3)
+    assert poisoned
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]

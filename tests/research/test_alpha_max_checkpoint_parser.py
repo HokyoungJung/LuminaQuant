@@ -1549,6 +1549,108 @@ def test_precompute_checkpoint_store_seals_reloads_and_rejects_tamper(
         )
 
 
+def test_precompute_poison_is_immutable_and_fails_closed(tmp_path: Path) -> None:
+    journal = runner._AlphaMaxPrecomputeCheckpointStore(
+        (tmp_path / "journal").resolve(),
+        attempt_descriptor_sha256="a" * 64,
+        attempt_role="prelock",
+        domain="validation",
+        runtime_identity_sha256="b" * 64,
+    )
+    journal.poison()
+    marker = tmp_path / "journal/FAILED.json"
+    assert stat.S_IMODE((tmp_path / "journal").stat().st_mode) == 0o500
+    assert stat.S_IMODE(marker.stat().st_mode) == 0o400
+    assert marker.stat().st_nlink == 1
+    assert runner._strict_json_object(marker.read_bytes()) == {
+        "artifact_kind": "alpha_max_precompute_attempt_failed.v1",
+        "attempt_descriptor_sha256": "a" * 64,
+        "success": False,
+    }
+    for operation in (
+        lambda: journal.load(unit_kind="training_prefix", unit_id="component_carry_1x"),
+        lambda: journal.seal(
+            unit_kind="training_prefix",
+            unit_id="component_carry_1x",
+            data_bytes=b"{}\n",
+        ),
+        journal.poison,
+    ):
+        with pytest.raises(
+            runner.AlphaMaxRuntimeContractError,
+            match="alpha_max_precompute_attempt_poisoned",
+        ):
+            operation()
+    with pytest.raises(PermissionError):
+        os.unlink(marker)
+    replacement = tmp_path / "replacement"
+    replacement.write_bytes(b"replacement")
+    with pytest.raises(PermissionError):
+        os.replace(replacement, marker)
+    symlink = tmp_path / "replacement-link"
+    os.symlink("ATTEMPT.json", symlink)
+    with pytest.raises(PermissionError):
+        os.replace(symlink, marker)
+
+
+def test_precompute_poison_rejects_hardlink_marker_replacement(tmp_path: Path) -> None:
+    root = (tmp_path / "journal").resolve()
+    journal = runner._AlphaMaxPrecomputeCheckpointStore(
+        root,
+        attempt_descriptor_sha256="a" * 64,
+        attempt_role="prelock",
+        domain="validation",
+        runtime_identity_sha256="b" * 64,
+    )
+    victim = tmp_path / "unclassified-failure-marker.json"
+    victim.write_bytes(b"{}\n")
+    os.link(victim, root / "FAILED.json")
+    with pytest.raises(
+        runner.AlphaMaxRuntimeContractError,
+        match="alpha_max_precompute_root_invalid",
+    ):
+        journal.load(unit_kind="training_prefix", unit_id="component_carry_1x")
+
+
+@pytest.mark.parametrize(
+    ("root_mode", "marker"),
+    (
+        (0o500, False),
+        (0o700, True),
+    ),
+)
+def test_precompute_rejects_tampered_failure_mode_combinations(
+    tmp_path: Path,
+    root_mode: int,
+    marker: bool,
+) -> None:
+    root = (tmp_path / "journal").resolve()
+    journal = runner._AlphaMaxPrecomputeCheckpointStore(
+        root,
+        attempt_descriptor_sha256="a" * 64,
+        attempt_role="prelock",
+        domain="validation",
+        runtime_identity_sha256="b" * 64,
+    )
+    if marker:
+        (root / "FAILED.json").write_bytes(
+            runner._canonical_bytes(
+                {
+                    "artifact_kind": "alpha_max_precompute_attempt_failed.v1",
+                    "attempt_descriptor_sha256": "a" * 64,
+                    "success": False,
+                }
+            )
+            + b"\n"
+        )
+        os.chmod(root / "FAILED.json", 0o400)
+    os.chmod(root, root_mode)
+    with pytest.raises(
+        runner.AlphaMaxRuntimeContractError, match="alpha_max_precompute_root_invalid"
+    ):
+        journal.load(unit_kind="training_prefix", unit_id="component_carry_1x")
+
+
 def test_precompute_checkpoint_rejects_units_directory_replacement(tmp_path: Path) -> None:
     output = (tmp_path / "prelock-output").resolve()
     checkpoint = (tmp_path / "prelock-checkpoint").resolve()
