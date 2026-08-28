@@ -2468,8 +2468,12 @@ def _validate_manifest_bytes(
             )
             if component.weight != expected_weight:
                 raise AlphaMaxRuntimeContractError("portfolio_manifest_activation_mismatch")
+    try:
+        canonical_manifest_path = str(Path(manifest_path).resolve(strict=True))
+    except OSError as exc:
+        raise AlphaMaxRuntimeContractError("portfolio_manifest_activation_mismatch") from exc
     return AlphaMaxExpectedDefinition(
-        portfolio_mode=f"manifest:{manifest_path}",
+        portfolio_mode=f"manifest:{canonical_manifest_path}",
         artifact_kind="alpha_max_engine_portfolio_manifest.v1",
         candidate_symbols=preflight.candidate_symbols,
         admitted_symbols=admitted_symbols,
@@ -2793,6 +2797,43 @@ def _activation_mismatch(exc: BaseException | None = None) -> AlphaMaxRuntimeCon
     return error
 
 
+def _artifact_read_receipts_equivalent(
+    actual: ArtifactReadReceipt,
+    retained: ArtifactReadReceipt,
+) -> bool:
+    if type(actual) is not ArtifactReadReceipt or type(retained) is not ArtifactReadReceipt:
+        return False
+    if actual == retained:
+        return True
+    if (
+        actual.artifact_id != retained.artifact_id
+        or actual.canonical_path != retained.canonical_path
+        or actual.sha256 != retained.sha256
+        or actual.byte_count != retained.byte_count
+        or actual.pre_fstat_identity != retained.pre_fstat_identity
+        or actual.post_fstat_identity != retained.post_fstat_identity
+    ):
+        return False
+    actual_requested = Path(actual.requested_path)
+    retained_requested = Path(retained.requested_path)
+    proc_requested = (
+        actual_requested
+        if _is_proc_fd_anchored_path(actual_requested)
+        else retained_requested
+        if _is_proc_fd_anchored_path(retained_requested)
+        else None
+    )
+    physical_requested = (
+        retained_requested if proc_requested is actual_requested else actual_requested
+    )
+    if proc_requested is None or str(physical_requested) != actual.canonical_path:
+        return False
+    try:
+        return str(proc_requested.resolve(strict=True)) == actual.canonical_path
+    except OSError:
+        return False
+
+
 def _assert_definition_matches(
     strategy: ArtifactPortfolioModeStrategy,
     seal: AlphaMaxArtifactSeal,
@@ -2809,7 +2850,15 @@ def _assert_definition_matches(
         or "manifest_fail_closed_reason" in definition.source_artifacts
         or tuple(receipt.artifact_id for receipt in definition.artifact_read_receipts)
         != ("artifact_portfolio_manifest", "source:alpha_max_config")
-        or definition.artifact_read_receipts != seal.consumer_receipts
+        or len(definition.artifact_read_receipts) != len(seal.consumer_receipts)
+        or any(
+            not _artifact_read_receipts_equivalent(actual, retained)
+            for actual, retained in zip(
+                definition.artifact_read_receipts,
+                seal.consumer_receipts,
+                strict=True,
+            )
+        )
         or len(definition.components) != len(expected.components)
     ):
         raise _activation_mismatch()

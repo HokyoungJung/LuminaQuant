@@ -181,6 +181,52 @@ def _assert_zero_economic_events(observed: list[str], resolver) -> None:
     assert resolver.ledger == ()
 
 
+def test_proc_fd_manifest_activation_preserves_canonical_portfolio_mode(
+    tmp_path: Path,
+) -> None:
+    harness = _build_harness(tmp_path)
+    physical = runner.seal_alpha_max_manifest_activation(
+        harness.preflight,
+        output_root=harness.output_root,
+        phase=harness.manifest_phase,
+        manifest_path=harness.manifest_path,
+        admitted_symbols=harness.admitted,
+    )
+    root_fd = os.open(harness.output_root, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        proc_root = Path(f"/proc/self/fd/{root_fd}")
+        proc_manifest = (
+            proc_root / "manifests" / harness.manifest_phase / harness.manifest_path.name
+        )
+        anchored = runner.seal_alpha_max_manifest_activation(
+            harness.preflight,
+            output_root=proc_root,
+            phase=harness.manifest_phase,
+            manifest_path=proc_manifest,
+            admitted_symbols=harness.admitted,
+        )
+        activation = construct_alpha_max_engine(
+            harness.preflight,
+            output_root=str(proc_root),
+            phase=harness.manifest_phase,
+            manifest_path=str(proc_manifest),
+            admitted_symbols=harness.admitted,
+            phase_id=harness.phase_id,
+            nominal_cost_bps=30,
+            raw_root=str(harness.raw_root),
+            ordered_lookup=harness.lookup,
+            funding_resolver=harness.resolver,
+            data_dict=harness.data_dict,
+        )
+    finally:
+        os.close(root_fd)
+    assert (
+        anchored.expected_definition.portfolio_mode == physical.expected_definition.portfolio_mode
+    )
+    assert anchored.expected_definition.portfolio_mode == f"manifest:{harness.manifest_path}"
+    assert activation.artifact_seal == anchored
+
+
 @pytest.mark.parametrize(
     "phase_id",
     (
