@@ -6,6 +6,7 @@ import hashlib
 import mmap
 import os
 import stat
+from datetime import UTC, datetime
 from pathlib import Path
 from types import MappingProxyType, SimpleNamespace
 
@@ -1051,6 +1052,79 @@ def _parse(context, payload=None, **overrides):
     )
 
 
+def test_training_day_checkpoint_rejects_tamper_and_out_of_order(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    context = _build_context(tmp_path, monkeypatch)
+    day = datetime(2024, 1, 1, tzinfo=UTC)
+    carry = runner._AlphaMaxDailyCarry(
+        strategy_state={},
+        portfolio_state={},
+        execution_state={},
+        engine_state={},
+        handler_rows=(),
+        handler_timestamps_ms=(),
+        funding_ledger=(),
+    )
+    payload = runner._alpha_max_training_day_checkpoint_bytes(
+        component_id=context.manifest.row_id,
+        manifest=context.manifest,
+        prefix_sha256="a" * 64,
+        day_start=day,
+        carry=carry,
+        calendar_day="2024-01-02",
+        endpoint_equity=10_100.0,
+        daily_return=0.01,
+        ordinal=1,
+        previous_data_sha256="",
+    )
+    restored, endpoint, daily_return = runner._alpha_max_training_day_from_checkpoint(
+        payload,
+        component_id=context.manifest.row_id,
+        manifest=context.manifest,
+        prefix_sha256="a" * 64,
+        expected_day_start=day,
+        ordinal=1,
+        previous_data_sha256="",
+    )
+    assert restored == carry
+    assert (endpoint, daily_return) == (10_100.0, 0.01)
+    with pytest.raises(runner.AlphaMaxRuntimeContractError):
+        runner._alpha_max_training_day_from_checkpoint(
+            payload,
+            component_id=context.manifest.row_id,
+            manifest=context.manifest,
+            prefix_sha256="a" * 64,
+            expected_day_start=day,
+            ordinal=2,
+            previous_data_sha256="",
+        )
+
+
+def test_precompute_transaction_lock_replacement_is_rejected(tmp_path: Path) -> None:
+    output = (tmp_path / "output").resolve()
+    checkpoint = (tmp_path / "checkpoint").resolve()
+    descriptor = _v2_cell_descriptor(checkpoint, output, domain="validation")
+    store = runner._AlphaMaxCellCheckpointStore(
+        checkpoint,
+        output_root=output,
+        descriptor=descriptor,
+        config_bytes=b'{"config":"test"}\n',
+    )
+    journal = store.training_precompute_store()
+    lock = checkpoint / "precompute/units/.transaction.lock"
+    replacement = lock.with_suffix(".replacement")
+    replacement.write_bytes(b"")
+    os.chmod(replacement, 0o600)
+    replacement.replace(lock)
+    with pytest.raises(
+        runner.AlphaMaxRuntimeContractError,
+        match="transaction_lock",
+    ):
+        journal.load(unit_kind="training_prefix", unit_id="component_carry_1x")
+
+
 def _v2_cell_descriptor(
     checkpoint: Path,
     output: Path,
@@ -1095,7 +1169,16 @@ def _v2_cell_descriptor(
             ],
             "target": str(output),
         },
-        "phase_windows": {},
+        "phase_windows": (
+            {}
+            if role == "historical"
+            else {
+                "train": {
+                    "start_utc": "2024-01-01T00:00:00Z",
+                    "end_utc": "2024-01-03T00:00:00Z",
+                }
+            }
+        ),
         "physical_fold_run_count": len(schedule),
         "physical_schedule": schedule,
         "physical_schedule_sha256": _sha256(runner._canonical_bytes(schedule)),

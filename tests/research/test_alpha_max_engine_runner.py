@@ -3,9 +3,11 @@ from __future__ import annotations
 import hashlib
 import inspect
 import json
+import multiprocessing
 import os
 import struct
 import threading
+import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import MappingProxyType, SimpleNamespace
@@ -17,6 +19,7 @@ import pytest
 import lumina_quant.research.alpha_max_evidence as alpha_max_evidence
 import lumina_quant.research.alpha_max_engine_runner as alpha_max_runner
 
+from lumina_quant.core.events import OrderEvent, SignalEvent
 from lumina_quant.research.alpha_max_engine_runner import (
     ALPHA_MAX_COST_CELL_BPS,
     AlphaMaxAttributionCollector,
@@ -53,8 +56,584 @@ from lumina_quant.backtesting.backtest import Backtest
 from lumina_quant.backtesting.data_windowed_parquet import HistoricParquetWindowedDataHandler
 from lumina_quant.backtesting.execution_sim import SimulatedExecutionHandler
 from lumina_quant.backtesting.portfolio_backtest import Portfolio
-from lumina_quant.core.events import OrderEvent, SignalEvent
 from lumina_quant.strategies.artifact_portfolio_mode import ArtifactPortfolioModeStrategy
+
+
+_PRODUCTION_WORKER_TELEMETRY: str | None = None
+
+
+def _production_worker_replay_probe(
+    _preflight: object,
+    *,
+    output_root: Path,
+    manifest_receipt: AlphaMaxManifestReceipt,
+    **_kwargs: object,
+) -> tuple[tuple[str, ...], tuple[float, ...], object]:
+    """Fork-safe replacement for expensive replay; production worker stays real."""
+    if _PRODUCTION_WORKER_TELEMETRY is None:
+        raise RuntimeError("worker_telemetry_missing")
+    if tuple(output_root.iterdir()):
+        raise RuntimeError("worker_output_publication")
+    fd = os.open(_PRODUCTION_WORKER_TELEMETRY, os.O_WRONLY | os.O_APPEND)
+    try:
+        os.write(fd, f"{manifest_receipt.row_id}:{os.getpid()}\n".encode())
+    finally:
+        os.close(fd)
+    time.sleep(
+        {
+            "component_carry_1x": 0.15,
+            "component_near_high_1x": 0.05,
+            "component_trend_1x": 0.10,
+        }[manifest_receipt.row_id]
+    )
+    return (("2024-01-01",), (0.01,), object())
+
+
+def _production_worker_checkpoint_probe(
+    *,
+    component_id: str,
+    calendar: tuple[str, ...],
+    returns: tuple[float, ...],
+    **_kwargs: object,
+) -> bytes:
+    return alpha_max_runner._canonical_bytes(
+        {"calendar": list(calendar), "component_id": component_id, "returns": list(returns)}
+    )
+
+
+def test_prelock_training_worker_cap_is_bounded_and_uses_processes() -> None:
+    parameter = inspect.signature(alpha_max_runner.run_alpha_max_prelock_process).parameters[
+        "max_training_workers"
+    ]
+    assert parameter.default == 4
+    assert alpha_max_runner.ProcessPoolExecutor is not alpha_max_runner.ThreadPoolExecutor
+
+
+def test_real_process_caps_skew_preserve_canonical_component_bytes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    output_root = tmp_path / "worker-output"
+    output_root.mkdir()
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_bytes(b"{}\n")
+    manifest_read, _payload = alpha_max_evidence.read_artifact_bytes(
+        manifest_path,
+        artifact_id="alpha_max_engine_portfolio_manifest",
+    )
+    component_ids = (
+        "component_carry_1x",
+        "component_near_high_1x",
+        "component_trend_1x",
+    )
+    manifests = MappingProxyType(
+        {
+            component_id: AlphaMaxManifestReceipt(
+                row_id=component_id,
+                phase="validation_train_fit",
+                relative_path=f"manifests/validation_train_fit/{component_id}.json",
+                sha256=manifest_read.sha256,
+                byte_count=manifest_read.byte_count,
+                activation_receipt=manifest_read,
+            )
+            for component_id in component_ids
+        }
+    )
+    journal = alpha_max_runner._AlphaMaxPrecomputeCheckpointStore(
+        (tmp_path / "journal").resolve(),
+        attempt_descriptor_sha256="a" * 64,
+        attempt_role="prelock",
+        domain="validation",
+        runtime_identity_sha256="b" * 64,
+        training_day_ids=(),
+    )
+    output_parent_fd = os.open(output_root.parent, os.O_RDONLY | os.O_DIRECTORY)
+    output_fd = os.open(output_root, os.O_RDONLY | os.O_DIRECTORY)
+    output_status = os.fstat(output_fd)
+    store_binding = (
+        journal._display_root,
+        journal._attempt_descriptor_sha256,
+        journal._attempt_role,
+        journal._domain,
+        journal._runtime_identity_sha256,
+        journal._training_day_ids,
+        journal._transaction_lock_identity,
+        (),
+        {},
+        output_parent_fd,
+        output_fd,
+        (output_status.st_dev, output_status.st_ino),
+        output_root.name,
+    )
+    monkeypatch.setattr(
+        alpha_max_runner,
+        "_verify_alpha_max_checkpoint_implementation_inventory",
+        lambda value: value,
+    )
+    monkeypatch.setattr(alpha_max_runner, "_alpha_max_indicator_runtime_binding", lambda: {})
+    monkeypatch.setattr(
+        alpha_max_runner,
+        "_alpha_max_replay_training_component_returns",
+        _production_worker_replay_probe,
+    )
+    monkeypatch.setattr(
+        alpha_max_runner,
+        "_alpha_max_training_component_checkpoint_bytes",
+        _production_worker_checkpoint_probe,
+    )
+    expected: tuple[bytes, ...] | None = None
+    try:
+        for cap in (1, 2, 3, 4):
+            telemetry = tmp_path / f"workers-{cap}.log"
+            telemetry.write_bytes(b"")
+            global _PRODUCTION_WORKER_TELEMETRY
+            _PRODUCTION_WORKER_TELEMETRY = str(telemetry)
+            alpha_max_runner._ALPHA_MAX_TRAINING_WORKER_CONTEXT = (
+                SimpleNamespace(),
+                output_root,
+                {},
+                ("BTCUSDT",),
+                store_binding,
+                manifests,
+            )
+            with alpha_max_runner.ProcessPoolExecutor(
+                max_workers=min(cap, len(component_ids)),
+                mp_context=multiprocessing.get_context("fork"),
+            ) as executor:
+                observed = tuple(
+                    executor.map(
+                        alpha_max_runner._alpha_max_replay_training_component_worker,
+                        component_ids,
+                    )
+                )
+            assert tuple(component_id for component_id, _payload in observed) == component_ids
+            worker_pids = {
+                int(line.split(":", 1)[1]) for line in telemetry.read_text().splitlines()
+            }
+            assert len(worker_pids) == min(cap, 3)
+            assert list(output_root.iterdir()) == []
+            payloads = tuple(payload for _component_id, payload in observed)
+            if expected is None:
+                expected = payloads
+            else:
+                assert payloads == expected
+    finally:
+        alpha_max_runner._ALPHA_MAX_TRAINING_WORKER_CONTEXT = None
+        _PRODUCTION_WORKER_TELEMETRY = None
+        os.close(output_fd)
+        os.close(output_parent_fd)
+
+
+def test_training_component_replay_resumes_sealed_days_with_funding_carry(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """A real precompute journal resumes immutable daily replay units exactly."""
+    start = datetime(2024, 1, 1, tzinfo=UTC)
+    end = start + timedelta(days=253)
+    component_id = "component_carry_1x"
+    manifest_path = (tmp_path / "manifest.json").resolve()
+    manifest_path.write_bytes(b"{}\n")
+    manifest_read, _payload = alpha_max_evidence.read_artifact_bytes(
+        manifest_path,
+        artifact_id="alpha_max_engine_portfolio_manifest",
+    )
+    manifest = AlphaMaxManifestReceipt(
+        row_id=component_id,
+        phase="validation_train_fit",
+        relative_path="manifests/validation_train_fit/component_carry_1x.json",
+        sha256=manifest_read.sha256,
+        byte_count=manifest_read.byte_count,
+        activation_receipt=manifest_read,
+    )
+    day_ids = tuple(
+        f"{component_id}--{(start + timedelta(days=index)):%Y%m%d}" for index in range(252)
+    )
+    ledger_row = alpha_max_evidence.AlphaMaxFundingBoundaryLedgerRow(
+        symbol="BTCUSDT",
+        boundary_ms=1,
+        rate_source_timestamp_ms=1,
+        price_row_timestamp_ms=1,
+        price_close_timestamp_ms=1,
+        qty=1.0,
+        rate=0.001,
+        price=100.0,
+        payment=-0.1,
+    )
+    restored_ledgers: list[tuple[object, ...]] = []
+
+    class Loader:
+        def __init__(self, *_args: object) -> None:
+            pass
+
+        def load_day(self, day_start: datetime, day_end: datetime) -> dict[str, object]:
+            return {"day": day_start.date().isoformat(), "end": day_end}
+
+    class Resolver:
+        def __init__(self, *_args: object, **_kwargs: object) -> None:
+            pass
+
+        @classmethod
+        def from_checkpoint(cls, *_args: object, ledger: tuple[object, ...]) -> Resolver:
+            restored_ledgers.append(ledger)
+            return cls()
+
+    class Tracker:
+        def __init__(self, *_args: object, reporting_end: datetime, **_kwargs: object) -> None:
+            self.reporting_endpoints = tuple(
+                SimpleNamespace(timestamp=reporting_end, equity=10_000.0 + offset)
+                for offset in range(1, 7)
+            )
+
+        def bind_backtest(self, _backtest: object) -> None:
+            pass
+
+        def finalize(self) -> None:
+            pass
+
+    class InterruptingStore(alpha_max_runner._AlphaMaxPrecomputeCheckpointStore):
+        crash_once = False
+
+        def seal(self, *, unit_kind: str, unit_id: str, data_bytes: bytes) -> bytes:
+            sealed = super().seal(unit_kind=unit_kind, unit_id=unit_id, data_bytes=data_bytes)
+            if self.crash_once and unit_kind == "training_day":
+                self.crash_once = False
+                raise RuntimeError("crash-after-sealed-day")
+            return sealed
+
+    def carry() -> object:
+        return alpha_max_runner._AlphaMaxDailyCarry(
+            strategy_state={"strategy": 1},
+            portfolio_state={"portfolio": 1},
+            execution_state={"execution": 1},
+            engine_state={"engine": 1},
+            handler_rows=(),
+            handler_timestamps_ms=(),
+            funding_ledger=(ledger_row,),
+        )
+
+    def activation(*_args: object, **_kwargs: object) -> object:
+        return SimpleNamespace(
+            backtest=SimpleNamespace(execution_handler=SimpleNamespace(pricing_trace_evidence=()))
+        )
+
+    monkeypatch.setattr(alpha_max_runner, "_AlphaMaxBoundedRawLoader", Loader)
+    monkeypatch.setattr(alpha_max_runner, "AlphaMaxFundingBoundaryResolver", Resolver)
+    monkeypatch.setattr(
+        alpha_max_runner, "AlphaMaxAttributionCollector", lambda: SimpleNamespace(applications=())
+    )
+    monkeypatch.setattr(
+        alpha_max_runner,
+        "AlphaMaxStreamingEquityTracker",
+        lambda: SimpleNamespace(finalize=lambda: None),
+    )
+    monkeypatch.setattr(alpha_max_runner, "_AlphaMaxFoldEquityFanout", Tracker)
+    monkeypatch.setattr(alpha_max_runner, "construct_alpha_max_engine", activation)
+    monkeypatch.setattr(
+        alpha_max_runner, "_run_alpha_max_exact_tick_reducer", lambda _activation: None
+    )
+    monkeypatch.setattr(
+        alpha_max_runner, "validate_alpha_max_engine_activation", lambda *_args, **_kwargs: None
+    )
+    monkeypatch.setattr(
+        alpha_max_runner, "_capture_alpha_max_daily_carry", lambda _activation: carry()
+    )
+    monkeypatch.setattr(alpha_max_runner, "_restore_alpha_max_daily_carry", lambda *_args: None)
+    monkeypatch.setattr(
+        alpha_max_runner,
+        "_settle_alpha_max_day_boundary",
+        lambda _activation, _tracker, day_end, *, scoring_boundary: (
+            {"finalization": day_end.isoformat()} if scoring_boundary else None
+        ),
+    )
+    monkeypatch.setattr(
+        alpha_max_runner, "_alpha_max_build_indicator_prefix", lambda *_args, **_kwargs: object()
+    )
+    monkeypatch.setattr(
+        alpha_max_runner,
+        "_alpha_max_training_prefix_from_checkpoint",
+        lambda *_args, **_kwargs: object(),
+    )
+    monkeypatch.setattr(
+        alpha_max_runner, "_alpha_max_capsule_state_payload", lambda _capsule: {"prefix": True}
+    )
+    monkeypatch.setattr(alpha_max_runner, "_alpha_max_phase_lookup", lambda *_args: object())
+    monkeypatch.setattr(
+        alpha_max_runner, "_alpha_max_expected_root_sequence", lambda _phase: ("train",)
+    )
+    monkeypatch.setattr(alpha_max_runner, "_validate_alpha_max_root_seals", lambda **_kwargs: None)
+
+    preflight = SimpleNamespace(
+        phase_windows={
+            "train": SimpleNamespace(
+                start_utc=start.isoformat().replace("+00:00", "Z"),
+                end_utc=end.isoformat().replace("+00:00", "Z"),
+            )
+        }
+    )
+    roots = {
+        ("train", "raw"): SimpleNamespace(path=str(tmp_path / "raw")),
+        ("train", "feature"): SimpleNamespace(path=str(tmp_path / "feature")),
+    }
+
+    def store(root: Path) -> InterruptingStore:
+        return InterruptingStore(
+            root,
+            attempt_descriptor_sha256="a" * 64,
+            attempt_role="prelock",
+            domain="validation",
+            runtime_identity_sha256="b" * 64,
+            training_day_ids=day_ids,
+        )
+
+    uninterrupted = store((tmp_path / "uninterrupted").resolve())
+    expected = alpha_max_runner._alpha_max_replay_training_component_returns(
+        preflight,
+        output_root=tmp_path,
+        manifest_receipt=manifest,
+        admitted_symbols=("BTCUSDT",),
+        root_seals=roots,
+        checkpoint_store=uninterrupted,
+    )
+    interrupted = store((tmp_path / "interrupted").resolve())
+    interrupted.crash_once = True
+    with pytest.raises(RuntimeError, match="crash-after-sealed-day"):
+        alpha_max_runner._alpha_max_replay_training_component_returns(
+            preflight,
+            output_root=tmp_path,
+            manifest_receipt=manifest,
+            admitted_symbols=("BTCUSDT",),
+            root_seals=roots,
+            checkpoint_store=interrupted,
+        )
+    actual = alpha_max_runner._alpha_max_replay_training_component_returns(
+        preflight,
+        output_root=tmp_path,
+        manifest_receipt=manifest,
+        admitted_symbols=("BTCUSDT",),
+        root_seals=roots,
+        checkpoint_store=interrupted,
+    )
+    assert actual == expected
+    assert interrupted.load(unit_kind="training_day", unit_id=day_ids[0]) is not None
+    assert restored_ledgers and all(ledger == (ledger_row,) for ledger in restored_ledgers)
+
+
+def test_prelock_worker_caps_order_publication_and_failure_taxonomy(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """The parent alone publishes ordered results; only semantic failures poison."""
+    component_ids = ("component_carry_1x", "component_near_high_1x", "component_trend_1x")
+    worker_counts: list[int] = []
+    published: list[str] = []
+    poisoned: list[bool] = []
+    worker_output_snapshots: list[tuple[str, ...]] = []
+
+    class Journal:
+        _display_root = tmp_path / "journal"
+        _attempt_descriptor_sha256 = "a" * 64
+        _attempt_role = "prelock"
+        _domain = "validation"
+        _runtime_identity_sha256 = "b" * 64
+        _training_day_ids: tuple[str, ...] = ()
+        _transaction_lock_identity = (1, 1)
+
+        def poison(self) -> None:
+            poisoned.append(True)
+
+    class Store:
+        descriptor_sha256 = "c" * 64
+        _runtime_identity = {}
+
+        def __init__(self, *_args: object, **_kwargs: object) -> None:
+            self.output_root = (tmp_path / "output").resolve()
+            self.output_root.mkdir(exist_ok=True)
+            self._display_output_root = self.output_root
+            self._output_parent_fd = os.open(self.output_root.parent, os.O_RDONLY | os.O_DIRECTORY)
+            self._bound_output_fd = os.open(self.output_root, os.O_RDONLY | os.O_DIRECTORY)
+            status = os.fstat(self._bound_output_fd)
+            self._bound_output_identity = (status.st_dev, status.st_ino)
+            self.journal = Journal()
+
+        def bind_output_root(self) -> Path:
+            return self.output_root
+
+        def training_precompute_store(self) -> Journal:
+            return self.journal
+
+        def load_precompute(self, **_kwargs: object) -> None:
+            return None
+
+        def seal_precompute(self, *, unit_id: str, data_bytes: bytes, **_kwargs: object) -> bytes:
+            published.append(unit_id)
+            assert data_bytes == f"worker:{unit_id}".encode()
+            return data_bytes
+
+    class Executor:
+        mode: Exception | None = None
+
+        def __init__(self, *, max_workers: int, **_kwargs: object) -> None:
+            worker_counts.append(max_workers)
+
+        def __enter__(self) -> Executor:
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            pass
+
+        def map(self, _worker: object, ids: tuple[str, ...]):
+            assert tuple(ids) == component_ids
+            worker_output_snapshots.append(
+                tuple(sorted(path.name for path in (tmp_path / "output").iterdir()))
+            )
+            if self.mode is not None:
+                raise self.mode
+            # Deliberately complete out of order; map's contract restores input order.
+            return iter(
+                (
+                    ("component_carry_1x", b"worker:component_carry_1x"),
+                    ("component_near_high_1x", b"worker:component_near_high_1x"),
+                    ("component_trend_1x", b"worker:component_trend_1x"),
+                )
+            )
+
+    preflight = SimpleNamespace(
+        config_bytes=b"{}\n",
+        phase_windows={},
+    )
+    admission = SimpleNamespace(
+        artifact=SimpleNamespace(
+            admitted_symbols=("BTCUSDT",),
+            sha256="d" * 64,
+        )
+    )
+    roots = {
+        (phase, kind): SimpleNamespace(path=str(tmp_path / f"{phase}-{kind}"))
+        for phase in ("warmup", "train", "purge", "validation", "embargo")
+        for kind in ("raw", "feature")
+    }
+    sentinel = RuntimeError("stop-after-parent-publication")
+
+    monkeypatch.setattr(alpha_max_runner, "ProcessPoolExecutor", Executor)
+    monkeypatch.setattr(
+        alpha_max_runner, "_alpha_max_checkpoint_implementation_inventory", lambda: []
+    )
+    monkeypatch.setattr(
+        alpha_max_runner,
+        "_verify_alpha_max_checkpoint_implementation_inventory",
+        lambda value: value,
+    )
+    monkeypatch.setattr(
+        alpha_max_runner, "preflight_alpha_max_runtime_contract", lambda _config: preflight
+    )
+    monkeypatch.setattr(
+        alpha_max_runner,
+        "seal_alpha_max_contract_manifest",
+        lambda _path: SimpleNamespace(
+            feature_availability_start_by_symbol={},
+            raw_availability_start_by_symbol={},
+            feature_availability_end_by_symbol={},
+            raw_availability_end_by_symbol={},
+        ),
+    )
+    monkeypatch.setattr(
+        alpha_max_runner, "_alpha_max_root_validation", lambda *_args, **_kwargs: (roots, ())
+    )
+    monkeypatch.setattr(
+        alpha_max_runner, "_validate_alpha_max_adjacent_feature_roots", lambda *_args: None
+    )
+    monkeypatch.setattr(
+        alpha_max_runner, "_compute_alpha_max_admission_from_seals", lambda **_kwargs: admission
+    )
+    monkeypatch.setattr(
+        alpha_max_runner,
+        "_alpha_max_current_nodes",
+        lambda _preflight: [{"row_id": component_id} for component_id in component_ids],
+    )
+    monkeypatch.setattr(
+        alpha_max_runner, "_validate_admitted_symbols", lambda _preflight, symbols: symbols
+    )
+    monkeypatch.setattr(
+        alpha_max_runner, "build_alpha_max_train_liquidity_buckets", lambda _admission: object()
+    )
+    monkeypatch.setattr(
+        alpha_max_runner, "_require_exact_explicit_path", lambda _path: str(tmp_path / "prior.json")
+    )
+    monkeypatch.setattr(
+        alpha_max_runner, "read_alpha_max_prior_trial_blob_input", lambda _path: b"{}"
+    )
+    monkeypatch.setattr(alpha_max_runner, "build_alpha_max_trial_ledger", lambda *_args: object())
+    monkeypatch.setattr(alpha_max_runner, "_strict_json_object", lambda _payload: {})
+    monkeypatch.setattr(alpha_max_runner, "_validated_output_target", lambda _path: None)
+    monkeypatch.setattr(
+        alpha_max_runner, "_alpha_max_prelock_checkpoint_descriptor", lambda **_kwargs: {}
+    )
+    monkeypatch.setattr(alpha_max_runner, "_AlphaMaxCellCheckpointStore", Store)
+    monkeypatch.setattr(
+        alpha_max_runner,
+        "_alpha_max_create_or_resume_run_root",
+        lambda output_root, **_kwargs: output_root,
+    )
+    monkeypatch.setattr(
+        alpha_max_runner,
+        "_alpha_max_materialize_manifest_receipt",
+        lambda *_args, row, **_kwargs: SimpleNamespace(row_id=row["row_id"], path="manifest.json"),
+    )
+    monkeypatch.setattr(alpha_max_runner, "_validate_alpha_max_root_seals", lambda **_kwargs: None)
+    monkeypatch.setattr(alpha_max_runner, "_alpha_max_phase_lookup", lambda *_args: object())
+    monkeypatch.setattr(
+        alpha_max_runner, "_alpha_max_expected_root_sequence", lambda _phase: ("train",)
+    )
+    parse_calls = 0
+
+    def parse_component(
+        *_args: object, **_kwargs: object
+    ) -> tuple[tuple[str, ...], tuple[float, ...], object]:
+        nonlocal parse_calls
+        parse_calls += 1
+        if parse_calls % 4 == 0:
+            raise sentinel
+        return (("2024-01-02",), (0.0,), {"finalization": "exact"})
+
+    monkeypatch.setattr(
+        alpha_max_runner, "_alpha_max_training_component_from_checkpoint", parse_component
+    )
+
+    kwargs = dict(
+        config="config.json",
+        contract_manifest="contract.json",
+        prior_trial_blob="prior.json",
+        exchange="binance",
+        output_root=tmp_path / "output",
+        checkpoint_root=tmp_path / "checkpoint",
+        warmup_raw_root="warmup-raw",
+        warmup_feature_root="warmup-feature",
+        train_raw_root="train-raw",
+        train_feature_root="train-feature",
+        purge_raw_root="purge-raw",
+        purge_feature_root="purge-feature",
+        validation_raw_root="validation-raw",
+        validation_feature_root="validation-feature",
+        embargo_raw_root="embargo-raw",
+        embargo_feature_root="embargo-feature",
+    )
+    for cap in (1, 2, 3, 4):
+        published.clear()
+        with pytest.raises(RuntimeError, match="stop-after-parent-publication"):
+            alpha_max_runner.run_alpha_max_prelock_process(**kwargs, max_training_workers=cap)
+        assert published == list(component_ids)
+    assert worker_counts == [1, 2, 3, 3]
+    assert worker_output_snapshots == [(), (), (), ()]
+
+    Executor.mode = AlphaMaxRuntimeContractError("semantic-worker-failure")
+    with pytest.raises(AlphaMaxRuntimeContractError, match="semantic-worker-failure"):
+        alpha_max_runner.run_alpha_max_prelock_process(**kwargs, max_training_workers=3)
+    assert poisoned
+    poisoned.clear()
+    Executor.mode = alpha_max_runner.BrokenProcessPool("abrupt-worker-exit")
+    with pytest.raises(alpha_max_runner.BrokenProcessPool, match="abrupt-worker-exit"):
+        alpha_max_runner.run_alpha_max_prelock_process(**kwargs, max_training_workers=3)
+    assert not poisoned
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]

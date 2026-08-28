@@ -22,6 +22,7 @@ import hashlib
 import io
 import json
 import math
+import multiprocessing
 import os
 import queue
 import re
@@ -30,7 +31,9 @@ import sys
 import tempfile
 import types
 from collections.abc import Mapping, Sequence
-from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from concurrent.futures.process import BrokenProcessPool
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from itertools import pairwise
@@ -71,6 +74,7 @@ from lumina_quant.research.alpha_max_evidence import (
     AlphaMaxDailyQuoteNotional,
     AlphaMaxEquityEndpoint,
     AlphaMaxFoldRunEvidence,
+    AlphaMaxFundingBoundaryLedgerRow,
     AlphaMaxFundingBoundaryResolver,
     AlphaMaxGateDecision,
     AlphaMaxManifestReceipt,
@@ -6972,6 +6976,260 @@ def _alpha_max_daily_returns_from_primary_stream(
     return tuple(calendar), tuple(returns)
 
 
+def _alpha_max_training_day_checkpoint_bytes(
+    *,
+    component_id: str,
+    manifest: AlphaMaxManifestReceipt,
+    prefix_sha256: str,
+    day_start: datetime,
+    carry: _AlphaMaxDailyCarry,
+    calendar_day: str,
+    endpoint_equity: float,
+    daily_return: float,
+    ordinal: int,
+    previous_data_sha256: str,
+) -> bytes:
+    """Encode the complete, typed continuation state for one settled UTC day."""
+    if (
+        type(carry) is not _AlphaMaxDailyCarry
+        or not math.isfinite(endpoint_equity)
+        or endpoint_equity <= 0.0
+        or not math.isfinite(daily_return)
+        or ordinal <= 0
+        or re.fullmatch(r"[0-9a-f]{64}|", previous_data_sha256) is None
+    ):
+        raise AlphaMaxRuntimeContractError("alpha_max_training_day_checkpoint_invalid")
+    ledger = [
+        {
+            "boundary_ms": value.boundary_ms,
+            "payment": value.payment,
+            "price": value.price,
+            "price_close_timestamp_ms": value.price_close_timestamp_ms,
+            "price_row_timestamp_ms": value.price_row_timestamp_ms,
+            "qty": value.qty,
+            "rate": value.rate,
+            "rate_source_timestamp_ms": value.rate_source_timestamp_ms,
+            "symbol": value.symbol,
+        }
+        for value in carry.funding_ledger
+    ]
+    state = {
+        "strategy_state": carry.strategy_state,
+        "portfolio_state": carry.portfolio_state,
+        "execution_state": carry.execution_state,
+        "engine_state": carry.engine_state,
+        "handler_rows": carry.handler_rows,
+        "handler_timestamps_ms": carry.handler_timestamps_ms,
+        "funding_ledger": ledger,
+    }
+    value = {
+        "artifact_kind": "alpha_max_training_component_day_checkpoint.v1",
+        "calendar_day": calendar_day,
+        "carry": _alpha_max_indicator_checkpoint_encode(state),
+        "component_id": component_id,
+        "day_start_utc": day_start.isoformat().replace("+00:00", "Z"),
+        "daily_return_hex": daily_return.hex(),
+        "endpoint_equity_hex": endpoint_equity.hex(),
+        "manifest": _alpha_max_manifest_checkpoint_identity(manifest),
+        "next_day_start_utc": (day_start + timedelta(days=1)).isoformat().replace("+00:00", "Z"),
+        "ordinal": ordinal,
+        "prefix_sha256": prefix_sha256,
+        "previous_data_sha256": previous_data_sha256,
+    }
+    return _canonical_bytes(value) + b"\n"
+
+
+def _alpha_max_training_prefix_from_checkpoint(
+    payload: bytes,
+    *,
+    component_id: str,
+    manifest: AlphaMaxManifestReceipt,
+) -> AlphaMaxIndicatorCapsule:
+    value = _strict_json_object(payload)
+    if (
+        payload != _canonical_bytes(value) + b"\n"
+        or set(value) != {"artifact_kind", "component_id", "manifest", "state"}
+        or value["artifact_kind"] != "alpha_max_training_component_prefix_checkpoint.v1"
+        or value["component_id"] != component_id
+        or value["manifest"] != _alpha_max_manifest_checkpoint_identity(manifest)
+        or type(value["state"]) is not dict
+    ):
+        raise AlphaMaxRuntimeContractError("alpha_max_training_prefix_checkpoint_invalid")
+    state = value["state"]
+    required = set(
+        _alpha_max_capsule_state_payload(
+            AlphaMaxIndicatorCapsule(
+                portfolio_mode="x",
+                phase_id="x",
+                manifest_sha256="x",
+                capsule_sha256="x",
+                capsule=MappingProxyType({}),
+                finalized_children=MappingProxyType({}),
+                native_finalization_sha256="x",
+                windows_processed=0,
+                discarded_signal_count=0,
+            )
+        )
+    )
+    if set(state) != required:
+        raise AlphaMaxRuntimeContractError("alpha_max_training_prefix_checkpoint_invalid")
+    string_fields = (
+        "portfolio_mode",
+        "phase_id",
+        "manifest_sha256",
+        "capsule_sha256",
+        "native_finalization_sha256",
+    )
+    count_fields = (
+        "windows_processed",
+        "discarded_signal_count",
+        "market_event_count",
+        "funding_event_count",
+        "order_event_count",
+        "fill_event_count",
+        "trade_count",
+    )
+    if (
+        any(type(state[field]) is not str or not state[field] for field in string_fields)
+        or any(type(state[field]) is not int or state[field] < 0 for field in count_fields)
+        or any(state[field] != 0 for field in count_fields[2:])
+        or type(state["capsule"]) is not dict
+        or type(state["finalized_children"]) is not dict
+    ):
+        raise AlphaMaxRuntimeContractError("alpha_max_training_prefix_checkpoint_invalid")
+    capsule = AlphaMaxIndicatorCapsule(
+        portfolio_mode=state["portfolio_mode"],
+        phase_id=state["phase_id"],
+        manifest_sha256=state["manifest_sha256"],
+        capsule_sha256=state["capsule_sha256"],
+        capsule=_freeze_json(state["capsule"]),
+        finalized_children=_freeze_json(state["finalized_children"]),
+        native_finalization_sha256=state["native_finalization_sha256"],
+        windows_processed=state["windows_processed"],
+        discarded_signal_count=state["discarded_signal_count"],
+        market_event_count=state["market_event_count"],
+        funding_event_count=state["funding_event_count"],
+        order_event_count=state["order_event_count"],
+        fill_event_count=state["fill_event_count"],
+        trade_count=state["trade_count"],
+    )
+    if (
+        capsule.manifest_sha256 != manifest.sha256
+        or capsule.phase_id != "warmup"
+        or _canonical_bytes(
+            {
+                "artifact_kind": value["artifact_kind"],
+                "component_id": component_id,
+                "manifest": value["manifest"],
+                "state": _alpha_max_capsule_state_payload(capsule),
+            }
+        )
+        + b"\n"
+        != payload
+    ):
+        raise AlphaMaxRuntimeContractError("alpha_max_training_prefix_checkpoint_invalid")
+    return capsule
+
+
+def _alpha_max_training_day_from_checkpoint(
+    payload: bytes,
+    *,
+    component_id: str,
+    manifest: AlphaMaxManifestReceipt,
+    prefix_sha256: str,
+    expected_day_start: datetime,
+    ordinal: int,
+    previous_data_sha256: str,
+) -> tuple[_AlphaMaxDailyCarry, float, float]:
+    value = _strict_json_object(payload)
+    if payload != _canonical_bytes(value) + b"\n" or set(value) != {
+        "artifact_kind",
+        "calendar_day",
+        "carry",
+        "component_id",
+        "day_start_utc",
+        "daily_return_hex",
+        "endpoint_equity_hex",
+        "manifest",
+        "next_day_start_utc",
+        "ordinal",
+        "prefix_sha256",
+        "previous_data_sha256",
+    }:
+        raise AlphaMaxRuntimeContractError("alpha_max_training_day_checkpoint_invalid")
+    if (
+        value["artifact_kind"] != "alpha_max_training_component_day_checkpoint.v1"
+        or value["component_id"] != component_id
+        or value["manifest"] != _alpha_max_manifest_checkpoint_identity(manifest)
+        or value["prefix_sha256"] != prefix_sha256
+        or value["ordinal"] != ordinal
+        or value["previous_data_sha256"] != previous_data_sha256
+        or value["day_start_utc"] != expected_day_start.isoformat().replace("+00:00", "Z")
+        or value["next_day_start_utc"]
+        != (expected_day_start + timedelta(days=1)).isoformat().replace("+00:00", "Z")
+        or value["calendar_day"] != (expected_day_start + timedelta(days=1)).date().isoformat()
+    ):
+        raise AlphaMaxRuntimeContractError("alpha_max_training_day_checkpoint_identity_invalid")
+    try:
+        endpoint_equity = float.fromhex(value["endpoint_equity_hex"])
+        daily_return = float.fromhex(value["daily_return_hex"])
+    except (TypeError, ValueError) as exc:
+        raise AlphaMaxRuntimeContractError(
+            "alpha_max_training_day_checkpoint_float_invalid"
+        ) from exc
+    if (
+        not math.isfinite(endpoint_equity)
+        or endpoint_equity <= 0.0
+        or not math.isfinite(daily_return)
+        or endpoint_equity.hex() != value["endpoint_equity_hex"]
+        or daily_return.hex() != value["daily_return_hex"]
+    ):
+        raise AlphaMaxRuntimeContractError("alpha_max_training_day_checkpoint_float_invalid")
+    state = _alpha_max_indicator_checkpoint_decode(value["carry"])
+    if type(state) is not dict or set(state) != {
+        "strategy_state",
+        "portfolio_state",
+        "execution_state",
+        "engine_state",
+        "handler_rows",
+        "handler_timestamps_ms",
+        "funding_ledger",
+    }:
+        raise AlphaMaxRuntimeContractError("alpha_max_training_day_checkpoint_carry_invalid")
+    try:
+        ledger = tuple(AlphaMaxFundingBoundaryLedgerRow(**row) for row in state["funding_ledger"])
+        carry = _AlphaMaxDailyCarry(
+            strategy_state=state["strategy_state"],
+            portfolio_state=state["portfolio_state"],
+            execution_state=state["execution_state"],
+            engine_state=state["engine_state"],
+            handler_rows=state["handler_rows"],
+            handler_timestamps_ms=state["handler_timestamps_ms"],
+            funding_ledger=ledger,
+        )
+    except (TypeError, ValueError) as exc:
+        raise AlphaMaxRuntimeContractError(
+            "alpha_max_training_day_checkpoint_carry_invalid"
+        ) from exc
+    if (
+        _alpha_max_training_day_checkpoint_bytes(
+            component_id=component_id,
+            manifest=manifest,
+            prefix_sha256=prefix_sha256,
+            day_start=expected_day_start,
+            carry=carry,
+            calendar_day=value["calendar_day"],
+            endpoint_equity=endpoint_equity,
+            daily_return=daily_return,
+            ordinal=ordinal,
+            previous_data_sha256=previous_data_sha256,
+        )
+        != payload
+    ):
+        raise AlphaMaxRuntimeContractError("alpha_max_training_day_checkpoint_roundtrip_invalid")
+    return carry, endpoint_equity, daily_return
+
+
 def _alpha_max_replay_training_component_returns(
     preflight: AlphaMaxRuntimePreflight,
     *,
@@ -6979,21 +7237,13 @@ def _alpha_max_replay_training_component_returns(
     manifest_receipt: AlphaMaxManifestReceipt,
     admitted_symbols: tuple[str, ...],
     root_seals: Mapping[tuple[str, str], AlphaMaxRootSeal],
+    checkpoint_store: _AlphaMaxPrecomputeCheckpointStore,
 ) -> tuple[
     tuple[str, ...],
     tuple[float, ...],
     AlphaMaxNativeFinalizationReceipt,
 ]:
     """Replay one component at nominal 20 bps over train with fresh daily engines."""
-    warmup_capsule = _alpha_max_build_indicator_prefix(
-        preflight,
-        manifest_output_root=output_root,
-        phase="validation_train_fit",
-        manifest_receipt=manifest_receipt,
-        admitted_symbols=admitted_symbols,
-        root_seals=root_seals,
-        phase_ids=("warmup",),
-    )
     train_window = preflight.phase_windows["train"]
     train_start = datetime.fromisoformat(train_window.start_utc.replace("Z", "+00:00")).astimezone(
         UTC
@@ -7006,22 +7256,93 @@ def _alpha_max_replay_training_component_returns(
     lookup = _alpha_max_phase_lookup(root_seals, "train")
     loader = _AlphaMaxBoundedRawLoader(raw_seal, admitted_symbols)
     resolver = AlphaMaxFundingBoundaryResolver(lookup, admitted_symbols)
-    collector = AlphaMaxAttributionCollector()
-    aggregate = AlphaMaxStreamingEquityTracker()
-    tracker = _AlphaMaxFoldEquityFanout(
-        aggregate,
-        aggregate_scale=1.0,
-        reporting_start=train_start,
-        reporting_end=train_end,
+    component_id = manifest_receipt.row_id
+    sealed_prefix = checkpoint_store.load(unit_kind="training_prefix", unit_id=component_id)
+    if sealed_prefix is None:
+        warmup_capsule = _alpha_max_build_indicator_prefix(
+            preflight,
+            manifest_output_root=output_root,
+            phase="validation_train_fit",
+            manifest_receipt=manifest_receipt,
+            admitted_symbols=admitted_symbols,
+            root_seals=root_seals,
+            phase_ids=("warmup",),
+        )
+        prefix_bytes = (
+            _canonical_bytes(
+                {
+                    "artifact_kind": "alpha_max_training_component_prefix_checkpoint.v1",
+                    "component_id": component_id,
+                    "manifest": _alpha_max_manifest_checkpoint_identity(manifest_receipt),
+                    "state": _alpha_max_capsule_state_payload(warmup_capsule),
+                }
+            )
+            + b"\n"
+        )
+        sealed_prefix = checkpoint_store.seal(
+            unit_kind="training_prefix", unit_id=component_id, data_bytes=prefix_bytes
+        )
+    warmup_capsule = _alpha_max_training_prefix_from_checkpoint(
+        sealed_prefix, component_id=component_id, manifest=manifest_receipt
     )
+    prefix_sha256 = _sha256(sealed_prefix)
     carry: _AlphaMaxDailyCarry | None = None
-    traces: list[ExecutionPricingTrace] = []
     native_finalization: AlphaMaxNativeFinalizationReceipt | None = None
     day_start = train_start
+    calendar: list[str] = []
+    returns: list[float] = []
+    prior_equity = 10_000.0
+    previous_data_sha256 = ""
+    ordinal = 1
+    while day_start + timedelta(days=1) < train_end:
+        unit_id = f"{component_id}--{day_start:%Y%m%d}"
+        payload = checkpoint_store.load(unit_kind="training_day", unit_id=unit_id)
+        if payload is None:
+            break
+        carry, endpoint_equity, daily_return = _alpha_max_training_day_from_checkpoint(
+            payload,
+            component_id=component_id,
+            manifest=manifest_receipt,
+            prefix_sha256=prefix_sha256,
+            expected_day_start=day_start,
+            ordinal=ordinal,
+            previous_data_sha256=previous_data_sha256,
+        )
+        if daily_return != endpoint_equity / prior_equity - 1.0:
+            raise AlphaMaxRuntimeContractError(
+                "alpha_max_training_day_checkpoint_economics_invalid"
+            )
+        calendar.append((day_start + timedelta(days=1)).date().isoformat())
+        returns.append(daily_return)
+        prior_equity = endpoint_equity
+        previous_data_sha256 = _sha256(payload)
+        day_start += timedelta(days=1)
+        ordinal += 1
+    probe_day = day_start + timedelta(days=1)
+    while probe_day + timedelta(days=1) < train_end:
+        if (
+            checkpoint_store.load(
+                unit_kind="training_day",
+                unit_id=f"{component_id}--{probe_day:%Y%m%d}",
+            )
+            is not None
+        ):
+            raise AlphaMaxRuntimeContractError("alpha_max_training_day_checkpoint_gap")
+        probe_day += timedelta(days=1)
     while day_start < train_end:
         day_end = day_start + timedelta(days=1)
         if carry is not None:
-            resolver = resolver.carry_forward()
+            resolver = AlphaMaxFundingBoundaryResolver.from_checkpoint(
+                lookup, admitted_symbols, ledger=carry.funding_ledger
+            )
+        collector = AlphaMaxAttributionCollector()
+        aggregate = AlphaMaxStreamingEquityTracker()
+        tracker = _AlphaMaxFoldEquityFanout(
+            aggregate,
+            aggregate_scale=1.0,
+            reporting_start=day_start,
+            reporting_end=day_end,
+        )
         data_dict = loader.load_day(day_start, day_end)
         activation = construct_alpha_max_engine(
             preflight,
@@ -7049,7 +7370,7 @@ def _alpha_max_replay_training_component_returns(
         tracker.bind_backtest(activation.backtest)
         validate_alpha_max_engine_activation(activation, _expected_daily_carry=carry)
         _run_alpha_max_exact_tick_reducer(activation)
-        traces.extend(activation.backtest.execution_handler.pricing_trace_evidence)
+        traces = activation.backtest.execution_handler.pricing_trace_evidence
         day_finalization = _settle_alpha_max_day_boundary(
             activation,
             tracker,
@@ -7061,15 +7382,71 @@ def _alpha_max_replay_training_component_returns(
                 raise AlphaMaxRuntimeContractError("alpha_max_train_native_finalization_duplicate")
             native_finalization = day_finalization
         carry = _capture_alpha_max_daily_carry(activation)
+        applications = collector.applications
+        if len(traces) != len(applications) or any(
+            application.pricing_trace_hash != execution_pricing_trace_sha256(trace)
+            for trace, application in zip(traces, applications, strict=True)
+        ):
+            raise AlphaMaxRuntimeContractError("alpha_max_pricing_application_bijection_failed")
+        aggregate.finalize()
+        endpoints = tracker.reporting_endpoints
+        if len(endpoints) != 6 or endpoints[-1].timestamp != day_end:
+            raise AlphaMaxRuntimeContractError("alpha_max_train_component_calendar_invalid")
+        endpoint_equity = endpoints[-1].equity
+        daily_return = endpoint_equity / prior_equity - 1.0
+        if not math.isfinite(daily_return):
+            raise AlphaMaxRuntimeContractError("alpha_max_train_component_return_nonfinite")
+        calendar.append(day_end.date().isoformat())
+        returns.append(daily_return)
+        if day_end < train_end:
+            day_payload = _alpha_max_training_day_checkpoint_bytes(
+                component_id=component_id,
+                manifest=manifest_receipt,
+                prefix_sha256=prefix_sha256,
+                day_start=day_start,
+                carry=carry,
+                calendar_day=day_end.date().isoformat(),
+                endpoint_equity=endpoint_equity,
+                daily_return=daily_return,
+                ordinal=ordinal,
+                previous_data_sha256=previous_data_sha256,
+            )
+            restored_carry, restored_equity, restored_return = (
+                _alpha_max_training_day_from_checkpoint(
+                    day_payload,
+                    component_id=component_id,
+                    manifest=manifest_receipt,
+                    prefix_sha256=prefix_sha256,
+                    expected_day_start=day_start,
+                    ordinal=ordinal,
+                    previous_data_sha256=previous_data_sha256,
+                )
+            )
+            if (
+                not _exact_state_equal(restored_carry.strategy_state, carry.strategy_state)
+                or not _exact_state_equal(restored_carry.portfolio_state, carry.portfolio_state)
+                or not _exact_state_equal(restored_carry.execution_state, carry.execution_state)
+                or not _exact_state_equal(restored_carry.engine_state, carry.engine_state)
+                or restored_carry.handler_rows != carry.handler_rows
+                or restored_carry.handler_timestamps_ms != carry.handler_timestamps_ms
+                or restored_carry.funding_ledger != carry.funding_ledger
+                or restored_equity != endpoint_equity
+                or restored_return != daily_return
+            ):
+                raise AlphaMaxRuntimeContractError(
+                    "alpha_max_training_day_checkpoint_roundtrip_invalid"
+                )
+            checkpoint_store.seal(
+                unit_kind="training_day",
+                unit_id=f"{component_id}--{day_start:%Y%m%d}",
+                data_bytes=day_payload,
+            )
+            previous_data_sha256 = _sha256(day_payload)
+        prior_equity = endpoint_equity
+        ordinal += 1
         day_start = day_end
     if carry is None or native_finalization is None:
         raise AlphaMaxRuntimeContractError("alpha_max_train_component_replay_empty")
-    applications = collector.applications
-    if len(traces) != len(applications) or any(
-        application.pricing_trace_hash != execution_pricing_trace_sha256(trace)
-        for trace, application in zip(traces, applications, strict=True)
-    ):
-        raise AlphaMaxRuntimeContractError("alpha_max_pricing_application_bijection_failed")
     _validate_alpha_max_root_seals(
         raw_root=raw_seal.path,
         phase_id="train",
@@ -7077,22 +7454,8 @@ def _alpha_max_replay_training_component_returns(
         raw_root_seals=(raw_seal,),
         feature_root_seals=feature_seals,
         required=True,
-        repeat_hash=True,
+        repeat_hash=False,
     )
-    aggregate.finalize()
-    endpoints = tracker.reporting_endpoints
-    if len(endpoints) % 6 or endpoints[-1].timestamp != train_end:
-        raise AlphaMaxRuntimeContractError("alpha_max_train_component_calendar_invalid")
-    calendar: list[str] = []
-    returns: list[float] = []
-    prior_equity = 10_000.0
-    for endpoint in endpoints[5::6]:
-        daily_return = endpoint.equity / prior_equity - 1.0
-        if not math.isfinite(daily_return):
-            raise AlphaMaxRuntimeContractError("alpha_max_train_component_return_nonfinite")
-        calendar.append(endpoint.timestamp.date().isoformat())
-        returns.append(daily_return)
-        prior_equity = endpoint.equity
     if len(calendar) < 252 or len(calendar) != len(set(calendar)):
         raise AlphaMaxRuntimeContractError("alpha_max_train_component_calendar_invalid")
     return tuple(calendar), tuple(returns), native_finalization
@@ -7696,6 +8059,8 @@ class _AlphaMaxPrecomputeCheckpointStore:
         "_root_fd",
         "_root_identity",
         "_runtime_identity_sha256",
+        "_training_day_ids",
+        "_transaction_lock_identity",
         "_units",
         "_units_fd",
         "_units_identity",
@@ -7709,6 +8074,8 @@ class _AlphaMaxPrecomputeCheckpointStore:
         attempt_role: str,
         domain: str,
         runtime_identity_sha256: str,
+        training_day_ids: tuple[str, ...] = (),
+        transaction_lock_identity: tuple[int, int] | None = None,
     ) -> None:
         if (
             not isinstance(root, Path)
@@ -7724,6 +8091,15 @@ class _AlphaMaxPrecomputeCheckpointStore:
             }
         ):
             raise AlphaMaxRuntimeContractError("alpha_max_precompute_descriptor_invalid")
+        if (
+            type(training_day_ids) is not tuple
+            or len(training_day_ids) != len(set(training_day_ids))
+            or any(
+                re.fullmatch(r"component_(?:carry|near_high|trend)_1x--\d{8}", value) is None
+                for value in training_day_ids
+            )
+        ):
+            raise AlphaMaxRuntimeContractError("alpha_max_precompute_training_schedule_invalid")
         self._display_root = root
         self._root = root
         self._units = root / "units"
@@ -7733,6 +8109,7 @@ class _AlphaMaxPrecomputeCheckpointStore:
         self._attempt_role = attempt_role
         self._domain = domain
         self._runtime_identity_sha256 = runtime_identity_sha256
+        self._training_day_ids = training_day_ids
         descriptor = {
             "artifact_kind": "alpha_max_precompute_checkpoint_attempt.v1",
             "attempt_descriptor_sha256": attempt_descriptor_sha256,
@@ -7759,6 +8136,25 @@ class _AlphaMaxPrecomputeCheckpointStore:
             _alpha_max_require_open_identity(self._units_fd, units_status, directory=True)
             self._root_identity = (int(root_status.st_dev), int(root_status.st_ino))
             self._units_identity = (int(units_status.st_dev), int(units_status.st_ino))
+            lock_status = os.stat(".transaction.lock", dir_fd=self._units_fd, follow_symlinks=False)
+            if (
+                not stat.S_ISREG(lock_status.st_mode)
+                or stat.S_ISLNK(lock_status.st_mode)
+                or stat.S_IMODE(lock_status.st_mode) != 0o600
+                or lock_status.st_nlink != 1
+            ):
+                raise AlphaMaxRuntimeContractError("alpha_max_precompute_transaction_lock_invalid")
+            self._transaction_lock_identity = (
+                int(lock_status.st_dev),
+                int(lock_status.st_ino),
+            )
+            if (
+                transaction_lock_identity is not None
+                and self._transaction_lock_identity != transaction_lock_identity
+            ):
+                raise AlphaMaxRuntimeContractError(
+                    "alpha_max_precompute_transaction_lock_identity_mismatch"
+                )
             self._root = Path(f"/proc/self/fd/{self._root_fd}")
             self._units = Path(f"/proc/self/fd/{self._units_fd}")
             self._validate_root()
@@ -7785,10 +8181,16 @@ class _AlphaMaxPrecomputeCheckpointStore:
         if self._attempt_role == "historical":
             return tuple(("historical_row", row_id) for row_id in _ALPHA_MAX_RESOLVABLE_ROWS)
         return (
+            *(("training_prefix", component_id) for component_id in component_ids),
+            *(("training_day", day_id) for day_id in self._training_day_ids),
             *(("training_component", component_id) for component_id in component_ids),
             *(("validation_row", row_id) for row_id in _ALPHA_MAX_RESOLVABLE_ROWS),
             *(("final_refit_row", row_id) for row_id in _ALPHA_MAX_RESOLVABLE_ROWS),
         )
+
+    @staticmethod
+    def _is_training_day_unit(unit_kind: str, unit_id: str) -> bool:
+        return unit_kind == "training_day" and type(unit_id) is str
 
     def _unit_name(self, unit_kind: str, unit_id: str) -> str:
         if type(unit_kind) is not str or type(unit_id) is not str:
@@ -7810,6 +8212,8 @@ class _AlphaMaxPrecomputeCheckpointStore:
         )
         try:
             (stage / "units").mkdir(mode=0o700)
+            _write_bundle_file(stage / "units", ".transaction.lock", b"")
+            os.chmod(stage / "units/.transaction.lock", 0o600)
             _write_bundle_file(stage, "ATTEMPT.json", self._descriptor_bytes)
             os.chmod(stage / "ATTEMPT.json", 0o444)
             _fsync_directory(stage / "units")
@@ -7819,6 +8223,48 @@ class _AlphaMaxPrecomputeCheckpointStore:
         except Exception:
             _cleanup_partial_bundle(stage)
             raise
+
+    @contextmanager
+    def _transaction(self) -> Any:
+        """Serialize short cross-process journal operations, never replay."""
+        try:
+            fd = os.open(
+                ".transaction.lock",
+                os.O_RDWR | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0),
+                dir_fd=self._units_fd,
+            )
+            lock_status = os.stat(".transaction.lock", dir_fd=self._units_fd, follow_symlinks=False)
+            open_status = os.fstat(fd)
+            if (
+                (int(lock_status.st_dev), int(lock_status.st_ino))
+                != self._transaction_lock_identity
+                or (int(open_status.st_dev), int(open_status.st_ino))
+                != self._transaction_lock_identity
+                or lock_status.st_nlink != 1
+                or stat.S_ISLNK(lock_status.st_mode)
+                or stat.S_IMODE(lock_status.st_mode) != 0o600
+            ):
+                raise AlphaMaxRuntimeContractError("alpha_max_precompute_transaction_lock_invalid")
+            fcntl.flock(fd, fcntl.LOCK_EX)
+            lock_after = os.stat(".transaction.lock", dir_fd=self._units_fd, follow_symlinks=False)
+            if (
+                (int(lock_after.st_dev), int(lock_after.st_ino)) != self._transaction_lock_identity
+                or (int(os.fstat(fd).st_dev), int(os.fstat(fd).st_ino))
+                != self._transaction_lock_identity
+                or lock_after.st_nlink != 1
+            ):
+                raise AlphaMaxRuntimeContractError("alpha_max_precompute_transaction_lock_invalid")
+        except OSError as exc:
+            raise AlphaMaxRuntimeContractError(
+                "alpha_max_precompute_transaction_lock_invalid"
+            ) from exc
+        try:
+            yield
+        finally:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_UN)
+            finally:
+                os.close(fd)
 
     def _validate_root(self) -> None:
         try:
@@ -7842,7 +8288,8 @@ class _AlphaMaxPrecomputeCheckpointStore:
                 or stat.S_ISLNK(status.st_mode)
                 or stat.S_ISLNK(display_root_status.st_mode)
                 or stat.S_ISLNK(display_units_status.st_mode)
-                or {path.name for path in self._root.iterdir()} != {"ATTEMPT.json", "units"}
+                or not {path.name for path in self._root.iterdir()}
+                <= {"ATTEMPT.json", "FAILED.json", "units"}
                 or not stat.S_ISDIR(open_units_status.st_mode)
             ):
                 raise AlphaMaxRuntimeContractError("alpha_max_precompute_root_invalid")
@@ -7858,20 +8305,40 @@ class _AlphaMaxPrecomputeCheckpointStore:
                 or attempt_status.st_mode & 0o222
             ):
                 raise AlphaMaxRuntimeContractError("alpha_max_precompute_descriptor_mismatch")
+            failed = self._root / "FAILED.json"
+            if failed.exists() or failed.is_symlink():
+                payload = _strict_json_object(
+                    _alpha_max_read_regular_at(self._root_fd, "FAILED.json", expected_mode=0o400)
+                )
+                if payload != {
+                    "artifact_kind": "alpha_max_precompute_attempt_failed.v1",
+                    "attempt_descriptor_sha256": self._attempt_descriptor_sha256,
+                    "success": False,
+                }:
+                    raise AlphaMaxRuntimeContractError(
+                        "alpha_max_precompute_failure_marker_invalid"
+                    )
+                raise AlphaMaxRuntimeContractError("alpha_max_precompute_attempt_poisoned")
             allowed_names = {
                 self._unit_name(unit_kind, unit_id) for unit_kind, unit_id in self._allowed_units()
             }
             for path in self._units.iterdir():
+                if path.name == ".transaction.lock":
+                    status = path.lstat()
+                    if (
+                        not stat.S_ISREG(status.st_mode)
+                        or stat.S_ISLNK(status.st_mode)
+                        or stat.S_IMODE(status.st_mode) != 0o600
+                        or status.st_nlink != 1
+                    ):
+                        raise AlphaMaxRuntimeContractError("alpha_max_precompute_inventory_invalid")
+                    continue
                 if path.name.startswith(".") and ".staging-" in path.name:
                     base = path.name[1:].split(".staging-", 1)[0]
-                    if (
-                        base not in allowed_names
-                        or re.fullmatch(
-                            rf"\.{re.escape(base)}\.staging-[a-z0-9_]{{8}}",
-                            path.name,
-                        )
-                        is None
-                    ):
+                    if (base not in allowed_names) or re.fullmatch(
+                        rf"\.{re.escape(base)}\.staging-[a-z0-9_]{{8}}",
+                        path.name,
+                    ) is None:
                         raise AlphaMaxRuntimeContractError("alpha_max_precompute_inventory_invalid")
                     _alpha_max_cleanup_recognized_staging_bundle(
                         path,
@@ -7905,7 +8372,7 @@ class _AlphaMaxPrecomputeCheckpointStore:
             "unit_name": self._unit_name(unit_kind, unit_id),
         }
 
-    def load(self, *, unit_kind: str, unit_id: str) -> bytes | None:
+    def _load_unlocked(self, *, unit_kind: str, unit_id: str) -> bytes | None:
         self._validate_root()
         target = self._units / self._unit_name(unit_kind, unit_id)
         if not target.exists() and not target.is_symlink():
@@ -7953,7 +8420,7 @@ class _AlphaMaxPrecomputeCheckpointStore:
             raise AlphaMaxRuntimeContractError("alpha_max_precompute_unit_seal_invalid")
         return data_bytes
 
-    def seal(self, *, unit_kind: str, unit_id: str, data_bytes: bytes) -> bytes:
+    def _seal_unlocked(self, *, unit_kind: str, unit_id: str, data_bytes: bytes) -> bytes:
         self._validate_root()
         if type(data_bytes) is not bytes:
             raise TypeError("alpha_max_precompute_data_bytes_invalid")
@@ -7991,10 +8458,44 @@ class _AlphaMaxPrecomputeCheckpointStore:
         except Exception:
             _cleanup_partial_bundle(stage)
             raise
-        loaded = self.load(unit_kind=unit_kind, unit_id=unit_id)
+        loaded = self._load_unlocked(unit_kind=unit_kind, unit_id=unit_id)
         if loaded != data_bytes:
             raise AlphaMaxRuntimeContractError("alpha_max_precompute_publish_invalid")
         return loaded
+
+    def load(self, *, unit_kind: str, unit_id: str) -> bytes | None:
+        with self._transaction():
+            return self._load_unlocked(unit_kind=unit_kind, unit_id=unit_id)
+
+    def seal(self, *, unit_kind: str, unit_id: str, data_bytes: bytes) -> bytes:
+        with self._transaction():
+            return self._seal_unlocked(
+                unit_kind=unit_kind,
+                unit_id=unit_id,
+                data_bytes=data_bytes,
+            )
+
+    def poison(self) -> None:
+        """Durably reject semantic-failure progress; SIGKILL cannot call this."""
+        with self._transaction():
+            self._validate_root()
+            marker = self._root / "FAILED.json"
+            payload = (
+                _canonical_bytes(
+                    {
+                        "artifact_kind": "alpha_max_precompute_attempt_failed.v1",
+                        "attempt_descriptor_sha256": self._attempt_descriptor_sha256,
+                        "success": False,
+                    }
+                )
+                + b"\n"
+            )
+            if marker.exists() or marker.is_symlink():
+                raise AlphaMaxRuntimeContractError("alpha_max_precompute_attempt_poisoned")
+            _write_bundle_file(marker.parent, marker.name, payload)
+            os.chmod(marker, 0o400)
+            _alpha_max_fsync_regular_nofollow(marker)
+            _fsync_directory(marker.parent)
 
 
 class _AlphaMaxCellCheckpointStore:
@@ -8191,12 +8692,50 @@ class _AlphaMaxCellCheckpointStore:
                 allow_missing_precompute=True,
             )
             if self._descriptor_v2:
+                nonterminal_days: tuple[str, ...] = ()
+                if self._attempt_role == "prelock":
+                    train_window = descriptor["phase_windows"]["train"]
+                    train_start = datetime.fromisoformat(
+                        str(train_window["start_utc"]).replace("Z", "+00:00")
+                    ).astimezone(UTC)
+                    train_end = datetime.fromisoformat(
+                        str(train_window["end_utc"]).replace("Z", "+00:00")
+                    ).astimezone(UTC)
+                    if train_start >= train_end or any(
+                        value != 0
+                        for value in (
+                            train_start.hour,
+                            train_start.minute,
+                            train_start.second,
+                            train_start.microsecond,
+                            train_end.hour,
+                            train_end.minute,
+                            train_end.second,
+                            train_end.microsecond,
+                        )
+                    ):
+                        raise AlphaMaxRuntimeContractError(
+                            "alpha_max_precompute_training_schedule_invalid"
+                        )
+                    nonterminal_days = tuple(
+                        f"{component_id}--{day:%Y%m%d}"
+                        for component_id in (
+                            "component_carry_1x",
+                            "component_near_high_1x",
+                            "component_trend_1x",
+                        )
+                        for day in (
+                            train_start + timedelta(days=index)
+                            for index in range((train_end - train_start).days - 1)
+                        )
+                    )
                 self._precompute_store = _AlphaMaxPrecomputeCheckpointStore(
                     self._root / "precompute",
                     attempt_descriptor_sha256=self._descriptor_sha256,
                     attempt_role=self._attempt_role,
                     domain=self._domain,
                     runtime_identity_sha256=self._runtime_identity_sha256,
+                    training_day_ids=nonterminal_days,
                 )
                 self._validate_root(
                     descriptor_bytes=descriptor_bytes,
@@ -8429,6 +8968,15 @@ class _AlphaMaxCellCheckpointStore:
         self._verify_runtime_identity()
         self._validate_open_checkpoint_identity()
         return self._precompute_store.load(unit_kind=unit_kind, unit_id=unit_id)
+
+    def training_precompute_store(self) -> _AlphaMaxPrecomputeCheckpointStore:
+        """Expose the descriptor-bound journal to daily training replay only."""
+        if self._precompute_store is None:
+            raise AlphaMaxRuntimeContractError("alpha_max_precompute_store_unavailable")
+        _verify_alpha_max_checkpoint_implementation_inventory(self._implementation_inventory)
+        self._verify_runtime_identity()
+        self._validate_open_checkpoint_identity()
+        return self._precompute_store
 
     def seal_precompute(
         self,
@@ -11917,6 +12465,99 @@ def _alpha_max_trend_liquidity_falsifier_artifact(
     return falsifier.canonical_bytes
 
 
+_ALPHA_MAX_TRAINING_WORKER_CONTEXT: (
+    tuple[
+        AlphaMaxRuntimePreflight,
+        Path,
+        Mapping[tuple[str, str], AlphaMaxRootSeal],
+        tuple[str, ...],
+        tuple[
+            Path,
+            str,
+            str,
+            str,
+            str,
+            tuple[str, ...],
+            tuple[int, int],
+            tuple[dict[str, object], ...],
+            Mapping[str, object],
+            int,
+            int,
+            tuple[int, int],
+            str,
+        ],
+        Mapping[str, AlphaMaxManifestReceipt],
+    ]
+    | None
+) = None
+
+
+def _alpha_max_replay_training_component_worker(component_id: str) -> tuple[str, bytes]:
+    """Fork-only replay; the parent remains the canonical component publisher."""
+    context = _ALPHA_MAX_TRAINING_WORKER_CONTEXT
+    if context is None or type(component_id) is not str:
+        raise AlphaMaxRuntimeContractError("alpha_max_training_worker_context_invalid")
+    preflight, _output_root, root_seals, admitted_symbols, store_binding, manifests = context
+    manifest = manifests.get(component_id)
+    if type(manifest) is not AlphaMaxManifestReceipt:
+        raise AlphaMaxRuntimeContractError("alpha_max_training_worker_component_invalid")
+    reject_ambient_lq_environment()
+    store = _AlphaMaxPrecomputeCheckpointStore(
+        store_binding[0],
+        attempt_descriptor_sha256=store_binding[1],
+        attempt_role=store_binding[2],
+        domain=store_binding[3],
+        runtime_identity_sha256=store_binding[4],
+        training_day_ids=store_binding[5],
+        transaction_lock_identity=store_binding[6],
+    )
+    _verify_alpha_max_checkpoint_implementation_inventory(list(store_binding[7]))
+    if _alpha_max_indicator_runtime_binding() != store_binding[8]:
+        raise AlphaMaxRuntimeContractError("alpha_max_training_worker_runtime_identity_invalid")
+    output_parent_fd, output_fd, output_identity, output_name = store_binding[9:]
+    try:
+        output_entry = os.stat(output_name, dir_fd=output_parent_fd, follow_symlinks=False)
+        output_opened = os.fstat(output_fd)
+    except OSError as exc:
+        raise AlphaMaxRuntimeContractError(
+            "alpha_max_training_worker_output_authority_invalid"
+        ) from exc
+    if (
+        (int(output_entry.st_dev), int(output_entry.st_ino)) != output_identity
+        or (int(output_opened.st_dev), int(output_opened.st_ino)) != output_identity
+        or not stat.S_ISDIR(output_entry.st_mode)
+        or stat.S_ISLNK(output_entry.st_mode)
+    ):
+        raise AlphaMaxRuntimeContractError("alpha_max_training_worker_output_authority_invalid")
+    calendar, returns, native_finalization = _alpha_max_replay_training_component_returns(
+        preflight,
+        output_root=Path(f"/proc/self/fd/{output_fd}"),
+        manifest_receipt=manifest,
+        admitted_symbols=admitted_symbols,
+        root_seals=root_seals,
+        checkpoint_store=store,
+    )
+    try:
+        output_entry = os.stat(output_name, dir_fd=output_parent_fd, follow_symlinks=False)
+        output_opened = os.fstat(output_fd)
+    except OSError as exc:
+        raise AlphaMaxRuntimeContractError(
+            "alpha_max_training_worker_output_authority_invalid"
+        ) from exc
+    if (int(output_entry.st_dev), int(output_entry.st_ino)) != output_identity or (
+        int(output_opened.st_dev),
+        int(output_opened.st_ino),
+    ) != output_identity:
+        raise AlphaMaxRuntimeContractError("alpha_max_training_worker_output_authority_invalid")
+    return component_id, _alpha_max_training_component_checkpoint_bytes(
+        component_id=component_id,
+        manifest=manifest,
+        calendar=calendar,
+        returns=returns,
+        native_finalization=native_finalization,
+    )
+
+
 def run_alpha_max_prelock_process(
     *,
     config: str | os.PathLike[str],
@@ -11936,6 +12577,7 @@ def run_alpha_max_prelock_process(
     embargo_raw_root: str,
     embargo_feature_root: str,
     bootstrap_implementation_inventory: list[dict[str, object]] | None = None,
+    max_training_workers: int = _ALPHA_MAX_MAX_PARALLEL_WORKERS,
 ) -> AlphaMaxCommandResult:
     """Run the physical prelock boundary from explicit frozen inputs only.
 
@@ -11944,6 +12586,11 @@ def run_alpha_max_prelock_process(
     matrix whose gates found no survivor.
     """
     reject_ambient_lq_environment()
+    if (
+        type(max_training_workers) is not int
+        or not 1 <= max_training_workers <= _ALPHA_MAX_MAX_PARALLEL_WORKERS
+    ):
+        raise AlphaMaxRuntimeContractError("alpha_max_training_worker_count_invalid")
     implementation_inventory = _verify_alpha_max_checkpoint_implementation_inventory(
         _alpha_max_checkpoint_implementation_inventory()
         if bootstrap_implementation_inventory is None
@@ -12092,6 +12739,7 @@ def run_alpha_max_prelock_process(
         train_calendar: tuple[str, ...] | None = None
         train_returns: dict[str, tuple[float, ...]] = {}
         train_native_finalizations: dict[str, AlphaMaxNativeFinalizationReceipt] = {}
+        whole_component_bytes: dict[str, bytes] = {}
         for component_id in component_ids:
             row = rows_by_id[component_id]
             manifest = _alpha_max_materialize_manifest_receipt(
@@ -12109,47 +12757,119 @@ def run_alpha_max_prelock_process(
                 unit_kind="training_component",
                 unit_id=component_id,
             )
-            if checkpoint_bytes is None:
-                calendar, values, native_finalization = (
-                    _alpha_max_replay_training_component_returns(
-                        run_preflight,
-                        output_root=root,
-                        manifest_receipt=manifest,
-                        admitted_symbols=admitted_symbols,
-                        root_seals=root_seals,
+            if checkpoint_bytes is not None:
+                whole_component_bytes[component_id] = checkpoint_bytes
+        missing_component_ids = tuple(
+            component_id
+            for component_id in component_ids
+            if component_id not in whole_component_bytes
+        )
+        if missing_component_ids:
+            global _ALPHA_MAX_TRAINING_WORKER_CONTEXT
+            _ALPHA_MAX_TRAINING_WORKER_CONTEXT = (
+                run_preflight,
+                root,
+                root_seals,
+                admitted_symbols,
+                (
+                    checkpoint_store.training_precompute_store()._display_root,
+                    checkpoint_store.training_precompute_store()._attempt_descriptor_sha256,
+                    checkpoint_store.training_precompute_store()._attempt_role,
+                    checkpoint_store.training_precompute_store()._domain,
+                    checkpoint_store.training_precompute_store()._runtime_identity_sha256,
+                    checkpoint_store.training_precompute_store()._training_day_ids,
+                    checkpoint_store.training_precompute_store()._transaction_lock_identity,
+                    tuple(implementation_inventory),
+                    checkpoint_store._runtime_identity,
+                    checkpoint_store._output_parent_fd,
+                    checkpoint_store._bound_output_fd,
+                    checkpoint_store._bound_output_identity,
+                    checkpoint_store._display_output_root.name,
+                ),
+                MappingProxyType(component_manifests),
+            )
+            try:
+                with ProcessPoolExecutor(
+                    max_workers=min(max_training_workers, len(missing_component_ids)),
+                    mp_context=multiprocessing.get_context("fork"),
+                ) as executor:
+                    completed = dict(
+                        executor.map(
+                            _alpha_max_replay_training_component_worker,
+                            missing_component_ids,
+                        )
                     )
+            except BrokenProcessPool:
+                # A killed worker cannot have made a semantic claim; immutable
+                # completed day units remain the only resumable progress.
+                raise
+            except AlphaMaxRuntimeContractError, TypeError, ValueError:
+                checkpoint_store.training_precompute_store().poison()
+                raise
+            finally:
+                _ALPHA_MAX_TRAINING_WORKER_CONTEXT = None
+            try:
+                if tuple(completed) != missing_component_ids:
+                    raise AlphaMaxRuntimeContractError("alpha_max_training_worker_result_invalid")
+                train_raw_seal = root_seals[("train", "raw")]
+                _validate_alpha_max_root_seals(
+                    raw_root=train_raw_seal.path,
+                    phase_id="train",
+                    ordered_lookup=_alpha_max_phase_lookup(root_seals, "train"),
+                    raw_root_seals=(train_raw_seal,),
+                    feature_root_seals=tuple(
+                        root_seals[(root_id, "feature")]
+                        for root_id in _alpha_max_expected_root_sequence("train")
+                    ),
+                    required=True,
+                    repeat_hash=True,
                 )
-                checkpoint_bytes = checkpoint_store.seal_precompute(
-                    unit_kind="training_component",
-                    unit_id=component_id,
-                    data_bytes=_alpha_max_training_component_checkpoint_bytes(
+                for component_id in missing_component_ids:
+                    whole_component_bytes[component_id] = checkpoint_store.seal_precompute(
+                        unit_kind="training_component",
+                        unit_id=component_id,
+                        data_bytes=completed[component_id],
+                    )
+                    _alpha_max_training_component_from_checkpoint(
+                        whole_component_bytes[component_id],
+                        preflight=run_preflight,
+                        component_id=component_id,
+                        manifest=component_manifests[component_id],
+                    )
+            except AlphaMaxRuntimeContractError, TypeError, ValueError:
+                checkpoint_store.training_precompute_store().poison()
+                raise
+        try:
+            for component_id in component_ids:
+                manifest = component_manifests[component_id]
+                checkpoint_bytes = whole_component_bytes[component_id]
+                calendar, values, native_finalization = (
+                    _alpha_max_training_component_from_checkpoint(
+                        checkpoint_bytes,
+                        preflight=run_preflight,
                         component_id=component_id,
                         manifest=manifest,
-                        calendar=calendar,
-                        returns=values,
-                        native_finalization=native_finalization,
-                    ),
+                    )
                 )
-            calendar, values, native_finalization = _alpha_max_training_component_from_checkpoint(
-                checkpoint_bytes,
-                preflight=run_preflight,
-                component_id=component_id,
-                manifest=manifest,
-            )
+                if train_calendar is None:
+                    train_calendar = calendar
+                elif calendar != train_calendar:
+                    raise AlphaMaxRuntimeContractError(
+                        "alpha_max_train_component_calendar_mismatch"
+                    )
+                train_returns[component_id] = values
+                train_native_finalizations[component_id] = native_finalization
             if train_calendar is None:
-                train_calendar = calendar
-            elif calendar != train_calendar:
-                raise AlphaMaxRuntimeContractError("alpha_max_train_component_calendar_mismatch")
-            train_returns[component_id] = values
-            train_native_finalizations[component_id] = native_finalization
-        if train_calendar is None:
-            raise AlphaMaxRuntimeContractError("alpha_max_train_component_replay_empty")
-        train_fit = _alpha_max_fit_weights(
-            nodes,
-            phase="train",
-            calendar=train_calendar,
-            component_returns=MappingProxyType(train_returns),
-        )
+                raise AlphaMaxRuntimeContractError("alpha_max_train_component_replay_empty")
+            train_fit = _alpha_max_fit_weights(
+                nodes,
+                phase="train",
+                calendar=train_calendar,
+                component_returns=MappingProxyType(train_returns),
+            )
+        except AlphaMaxRuntimeContractError, KeyError, TypeError, ValueError:
+            checkpoint_store.training_precompute_store().poison()
+            raise
 
         scaled_ids = {"full_equal_risk_scaled", "full_shrunk_hrp_scaled"}
         prepared: dict[str, _AlphaMaxPreparedReplayRow] = {}

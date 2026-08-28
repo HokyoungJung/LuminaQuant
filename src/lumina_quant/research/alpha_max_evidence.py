@@ -1188,6 +1188,21 @@ class AlphaMaxFundingBoundaryResolver:
         object.__setattr__(carried, "_ledger", self._ledger)
         return carried
 
+    @classmethod
+    def from_checkpoint(
+        cls,
+        ordered_lookup: AlphaMaxOrderedFundingLookup,
+        admitted_symbols: tuple[str, ...],
+        *,
+        ledger: tuple[AlphaMaxFundingBoundaryLedgerRow, ...],
+    ) -> AlphaMaxFundingBoundaryResolver:
+        """Restore a validated immutable funding prefix into a fresh resolver."""
+        cls._validate_prior_ledger(ledger, admitted_symbols=admitted_symbols)
+        restored = cls(ordered_lookup, admitted_symbols)
+        object.__setattr__(restored, "_ledger", ledger)
+        cls._validate_prior_ledger(restored._ledger, admitted_symbols=admitted_symbols)
+        return restored
+
     def _validate_symbols_before_lookup(
         self, requests: Sequence[AlphaMaxFundingBoundaryRequest]
     ) -> None:

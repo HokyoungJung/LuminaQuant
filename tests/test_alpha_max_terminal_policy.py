@@ -29,12 +29,12 @@ from lumina_quant.alpha_max_terminal_policy import (
 ROOT = Path(__file__).parents[1]
 POLICY = ROOT / "configs/research/alpha_max_terminal_authority_policy_v1.json"
 EXPECTED_V3_PINS = {
-    "acquirer_sha256": "d3c674ecf28c5869eab43f9903b4479185b36faca108919868c2f2c31662db70",
+    "acquirer_sha256": "ca4ac7a60de70bd87924971d7f5b179c516250a22566a0d5964326ebe4496ae3",
     "alignment_receipt_sha256": "8687b52180502a11de9fbe317a19d00bb4492c464b3bf33d4eda2437683ca812",
     "availability_sha256": "214e5da198307d8d32b30f69fb6b1f09002e0b31888dc476ed16060f79de9719",
     "contract_sha256": "ae272f70f65797b4c8a87c29b7f8e64511617f8e0f2d4bd841b2d1addb7d1220",
     "historical_sha256": "951290033c7efd9b59ba5418e38d96fbdcf3885211915b29010b79ae545f3fb0",
-    "phase_wrapper_sha256": "0db198af0b743df0bdb6d3700ed8f0bc53cc28373846ba890e1ac70edc287ce1",
+    "phase_wrapper_sha256": "73f3fc0f0d876bcb7759dd8ebbe42c03ed2c6b6a1dbb2b52023cf34db24753fc",
     "portfolio_sha256": "2f267451c4df6b6b7471d972b7756327e41c82522ae2ef4b9198fbf6aa8b5e9c",
     "prelock_sha256": "838d633ae34d44443dad4990a79f4d8caa95f7102ffe2a649ed341b1bed16ad0",
     "preparer_sha256": "ea26b902bcec4458340e4c345fa648a3db9104e1b337fd42460d9a9461a738ac",
@@ -116,7 +116,7 @@ def test_frozen_acquirer_wrapper_and_lock_bytes_are_pinned() -> None:
         / "scripts/research/run_alpha_max_phase_preparation_from_eligible_source.py": EXPECTED_V3_PINS[
             "phase_wrapper_sha256"
         ],
-        ROOT / "uv.lock": "603d057f5c520b1864944ea2ab131d2ac8af0dce065bdde0a2bac854f238a92a",
+        ROOT / "uv.lock": "3d856ac1ba0e28c4ea4e465e6dd4519dd141e8b7cd54c848a48285607371449c",
     }
     for path, expected_sha256 in frozen.items():
         assert hashlib.sha256(path.read_bytes()).hexdigest() == expected_sha256
