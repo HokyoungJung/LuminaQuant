@@ -13413,9 +13413,17 @@ def run_alpha_max_prelock_process(
                         for result in results
                     )
                     or tuple(result[0] for result in results) != missing_component_ids
-                    or any(result[1] != "complete" or result[3] for result in results)
                 ):
                     raise AlphaMaxRuntimeContractError("alpha_max_training_worker_result_invalid")
+                failures = tuple(
+                    f"{component_id}:{token or status}"
+                    for component_id, status, _payload, token in results
+                    if status != "complete" or token
+                )
+                if failures:
+                    raise AlphaMaxRuntimeContractError(
+                        "alpha_max_training_worker_result_invalid:" + ",".join(failures)
+                    )
                 completed = {
                     component_id: payload for component_id, _status, payload, _token in results
                 }
