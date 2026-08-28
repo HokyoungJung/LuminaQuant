@@ -438,6 +438,55 @@ class AlphaMaxCliProcessHarness:
 
         runner._alpha_max_replay_training_component_returns = training_stub
 
+        def primitive_training_worker_results(
+            items: tuple[tuple[str, bytes, str], ...],
+            *,
+            max_training_workers: int,
+        ) -> tuple[tuple[str, str, bytes, str], ...]:
+            """Return the production transport envelope without inherited state."""
+            if not 1 <= max_training_workers <= 4:
+                raise AssertionError("training_worker_cap_invalid")
+            results = []
+            for component_id, binding_bytes, binding_sha256 in items:
+                if _sha256(binding_bytes) != binding_sha256:
+                    raise AssertionError("training_worker_binding_sha256_invalid")
+                binding = json.loads(binding_bytes)
+                if (
+                    binding_bytes != runner._canonical_bytes(binding) + b"\n"
+                    or binding["component_id"] != component_id
+                ):
+                    raise AssertionError("training_worker_binding_invalid")
+                output_root = Path(binding["output"]["root"])
+                preflight = runner.preflight_alpha_max_runtime_contract(
+                    output_root / "inputs/config.json"
+                )
+                manifest = runner._alpha_max_manifest_receipt_from_path(
+                    output_root / binding["manifest"]["relative_path"],
+                    root=output_root,
+                    phase="validation_train_fit",
+                )
+                calendar, returns, native = training_stub(
+                    preflight,
+                    manifest_receipt=manifest,
+                )
+                results.append(
+                    (
+                        component_id,
+                        "complete",
+                        runner._alpha_max_training_component_checkpoint_bytes(
+                            component_id=component_id,
+                            manifest=manifest,
+                            calendar=calendar,
+                            returns=returns,
+                            native_finalization=native,
+                        ),
+                        "",
+                    )
+                )
+            return tuple(results)
+
+        runner._run_alpha_max_training_component_workers = primitive_training_worker_results
+
         def capsule_for(
             *, manifest_sha256: str, phase_id: str, row_id: str
         ) -> runner.AlphaMaxIndicatorCapsule:
@@ -828,11 +877,24 @@ class AlphaMaxCliProcessHarness:
             domain = kwargs["domain"]
             self.matrix_invocations.append((self.run_label, domain))
             checkpoint_store = kwargs["checkpoint_store"]
+            descriptor = (
+                runner._strict_json_object((checkpoint_store._root / "ATTEMPT.json").read_bytes())
+                if type(checkpoint_store) is runner._AlphaMaxCellCheckpointStore
+                else {}
+            )
             if domain == "validation":
                 if (
                     type(checkpoint_store) is not runner._AlphaMaxCellCheckpointStore
                     or checkpoint_store._attempt_role != "prelock"
-                    or not checkpoint_store._descriptor_v2
+                    or descriptor.get("artifact_kind")
+                    != "alpha_max_restartable_attempt_descriptor.v3"
+                    or descriptor.get("training_worker_transport")
+                    != {
+                        "binding_schema": "alpha_max_training_component_worker_binding.v1",
+                        "maximum_component_processes": 3,
+                        "result_statuses": ["complete", "semantic_failure"],
+                        "start_method": "spawn",
+                    }
                 ):
                     raise AssertionError("prelock_checkpoint_descriptor_invalid")
                 # Validation replay stubs deliberately use a compact fixture
@@ -845,7 +907,15 @@ class AlphaMaxCliProcessHarness:
                 if (
                     checkpoint_store._domain != "historical_exposed_evaluation"
                     or checkpoint_store._attempt_role != "historical"
-                    or not checkpoint_store._descriptor_v2
+                    or descriptor.get("artifact_kind")
+                    != "alpha_max_restartable_attempt_descriptor.v3"
+                    or descriptor.get("training_worker_transport")
+                    != {
+                        "binding_schema": "alpha_max_training_component_worker_binding.v1",
+                        "maximum_component_processes": 3,
+                        "result_statuses": ["complete", "semantic_failure"],
+                        "start_method": "spawn",
+                    }
                 ):
                     raise AssertionError("historical_checkpoint_descriptor_invalid")
 

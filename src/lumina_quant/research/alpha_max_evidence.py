@@ -150,6 +150,7 @@ __all__ = [
     "materialize_alpha_max_manifest",
     "normalize_alpha_max_prior_trial_node",
     "parse_alpha_max_cost_cell_pre_gate_evidence",
+    "parse_alpha_max_root_seal",
     "rank_alpha_max_historical_report",
     "read_alpha_max_prior_trial_blob",
     "read_alpha_max_prior_trial_blob_input",
@@ -4257,6 +4258,107 @@ class AlphaMaxRootSeal:
             content_sha256=self.content_sha256,
             file_count=len(self.entries),
         )
+
+
+def parse_alpha_max_root_seal(
+    payload: bytes,
+    *,
+    expected_root_id: str,
+    expected_root_kind: str,
+    expected_sha256: str,
+) -> AlphaMaxRootSeal:
+    """Parse an exact canonical root seal without accepting JSON aliases."""
+    value = _alpha_max_strict_json_object(payload, field="root_seal")
+    required = {
+        "artifact_kind",
+        "availability_sha256",
+        "availability_end_by_symbol",
+        "availability_start_by_symbol",
+        "content_sha256",
+        "end_utc",
+        "entries",
+        "exchange",
+        "file_count",
+        "inventory_sha256",
+        "path",
+        "root_id",
+        "root_kind",
+        "start_utc",
+        "symbols",
+    }
+    if (
+        payload != _canonical_json_bytes(value, newline=True)
+        or set(value) != required
+        or value["artifact_kind"] != "alpha_max_root_seal.v2"
+        or value["root_id"] != expected_root_id
+        or value["root_kind"] != expected_root_kind
+        or _sha256_bytes(payload) != _require_sha256(expected_sha256, field="root_seal_sha256")
+        or type(value["file_count"]) is not int
+        or type(value["entries"]) is not list
+        or value["file_count"] != len(value["entries"])
+        or type(value["symbols"]) is not list
+        or type(value["availability_start_by_symbol"]) is not dict
+        or type(value["availability_end_by_symbol"]) is not dict
+    ):
+        raise ValueError("alpha_max_root_seal_parse_invalid")
+    entry_keys = {
+        "byte_count",
+        "maximum_timestamp_ms",
+        "maximum_gap_ms",
+        "minimum_timestamp_ms",
+        "mode",
+        "mtime_ns",
+        "relative_path",
+        "row_count",
+        "sha256",
+    }
+    try:
+
+        def parse_utc(text: object) -> datetime:
+            if type(text) is not str:
+                raise ValueError
+            result = datetime.fromisoformat(text.replace("Z", "+00:00"))
+            if (
+                result.tzinfo is None
+                or result.utcoffset() != timedelta(0)
+                or result.isoformat().replace("+00:00", "Z") != text
+            ):
+                raise ValueError
+            return result
+
+        def parse_boundaries(raw: dict[str, Any]) -> Mapping[str, datetime]:
+            if set(raw) != set(ALPHA_MAX_CANDIDATE_SYMBOLS):
+                raise ValueError
+            return MappingProxyType(
+                {symbol: parse_utc(raw[symbol]) for symbol in ALPHA_MAX_CANDIDATE_SYMBOLS}
+            )
+
+        entries = tuple(
+            AlphaMaxTreeEntry(**entry)
+            for entry in value["entries"]
+            if type(entry) is dict and set(entry) == entry_keys
+        )
+        if len(entries) != len(value["entries"]):
+            raise ValueError
+        return AlphaMaxRootSeal(
+            root_id=value["root_id"],
+            root_kind=value["root_kind"],
+            path=value["path"],
+            exchange=value["exchange"],
+            symbols=tuple(value["symbols"]),
+            start_utc=parse_utc(value["start_utc"]),
+            end_utc=parse_utc(value["end_utc"]),
+            availability_start_by_symbol=parse_boundaries(value["availability_start_by_symbol"]),
+            availability_end_by_symbol=parse_boundaries(value["availability_end_by_symbol"]),
+            availability_sha256=value["availability_sha256"],
+            entries=entries,
+            inventory_sha256=value["inventory_sha256"],
+            content_sha256=value["content_sha256"],
+            canonical_bytes=payload,
+            sha256=expected_sha256,
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError("alpha_max_root_seal_parse_invalid") from exc
 
 
 def seal_alpha_max_root_tree(

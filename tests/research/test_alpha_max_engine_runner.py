@@ -3,11 +3,11 @@ from __future__ import annotations
 import hashlib
 import inspect
 import json
-import multiprocessing
 import os
 import struct
+import subprocess
+import sys
 import threading
-import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import MappingProxyType, SimpleNamespace
@@ -57,48 +57,6 @@ from lumina_quant.backtesting.data_windowed_parquet import HistoricParquetWindow
 from lumina_quant.backtesting.execution_sim import SimulatedExecutionHandler
 from lumina_quant.backtesting.portfolio_backtest import Portfolio
 from lumina_quant.strategies.artifact_portfolio_mode import ArtifactPortfolioModeStrategy
-
-
-_PRODUCTION_WORKER_TELEMETRY: str | None = None
-
-
-def _production_worker_replay_probe(
-    _preflight: object,
-    *,
-    output_root: Path,
-    manifest_receipt: AlphaMaxManifestReceipt,
-    **_kwargs: object,
-) -> tuple[tuple[str, ...], tuple[float, ...], object]:
-    """Fork-safe replacement for expensive replay; production worker stays real."""
-    if _PRODUCTION_WORKER_TELEMETRY is None:
-        raise RuntimeError("worker_telemetry_missing")
-    if tuple(output_root.iterdir()):
-        raise RuntimeError("worker_output_publication")
-    fd = os.open(_PRODUCTION_WORKER_TELEMETRY, os.O_WRONLY | os.O_APPEND)
-    try:
-        os.write(fd, f"{manifest_receipt.row_id}:{os.getpid()}\n".encode())
-    finally:
-        os.close(fd)
-    time.sleep(
-        {
-            "component_carry_1x": 0.15,
-            "component_near_high_1x": 0.05,
-            "component_trend_1x": 0.10,
-        }[manifest_receipt.row_id]
-    )
-    return (("2024-01-01",), (0.01,), object())
-
-
-def _production_worker_checkpoint_probe(
-    *,
-    component_id: str,
-    calendar: tuple[str, ...],
-    returns: tuple[float, ...],
-    **_kwargs: object,
-) -> bytes:
-    return alpha_max_runner._canonical_bytes(
-        {"calendar": list(calendar), "component_id": component_id, "returns": list(returns)}
-    )
 
 
 def test_prelock_training_worker_cap_is_bounded_and_uses_processes() -> None:
@@ -230,118 +188,50 @@ def test_worker_rejects_missing_training_prefix_without_building(
         )
 
 
-def test_real_process_caps_skew_preserve_canonical_component_bytes(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+def test_spawn_worker_runner_completes_from_a_threaded_parent() -> None:
+    """The production runner uses a fresh spawn pool, never forked state."""
+    result: list[tuple[tuple[str, str, bytes, str], ...]] = []
+    assert pl.DataFrame({"value": [1]}).select(pl.col("value").sum()).item() == 1
+
+    def invoke() -> None:
+        result.append(
+            alpha_max_runner._run_alpha_max_training_component_workers(
+                (("invalid", b"{}\n", "0" * 64),),
+                max_training_workers=1,
+            )
+        )
+
+    # Keep a Python thread live while native libraries have already been imported.
+    ready = threading.Event()
+    release = threading.Event()
+    native_thread = threading.Thread(target=lambda: (ready.set(), release.wait(10)))
+    native_thread.start()
+    assert ready.wait(2)
+    parent = threading.Thread(target=invoke)
+    parent.start()
+    parent.join(30)
+    release.set()
+    native_thread.join(2)
+    assert not parent.is_alive(), "spawn worker runner deadlocked"
+    assert result == [
+        (("invalid", "semantic_failure", b"", "alpha_max_training_worker_binding_invalid"),)
+    ]
+
+
+def test_spawn_workers_reconstruct_real_authorities_in_a_clean_subprocess(
+    tmp_path: Path,
 ) -> None:
-    output_root = tmp_path / "worker-output"
-    output_root.mkdir()
-    manifest_path = tmp_path / "manifest.json"
-    manifest_path.write_bytes(b"{}\n")
-    manifest_read, _payload = alpha_max_evidence.read_artifact_bytes(
-        manifest_path,
-        artifact_id="alpha_max_engine_portfolio_manifest",
+    fixture = Path(__file__).with_name("_alpha_max_valid_spawn_fixture.py")
+    completed = subprocess.run(
+        [sys.executable, str(fixture), str(tmp_path)],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        check=True,
+        text=True,
+        timeout=180,
     )
-    component_ids = (
-        "component_carry_1x",
-        "component_near_high_1x",
-        "component_trend_1x",
-    )
-    manifests = MappingProxyType(
-        {
-            component_id: AlphaMaxManifestReceipt(
-                row_id=component_id,
-                phase="validation_train_fit",
-                relative_path=f"manifests/validation_train_fit/{component_id}.json",
-                sha256=manifest_read.sha256,
-                byte_count=manifest_read.byte_count,
-                activation_receipt=manifest_read,
-            )
-            for component_id in component_ids
-        }
-    )
-    journal = alpha_max_runner._AlphaMaxPrecomputeCheckpointStore(
-        (tmp_path / "journal").resolve(),
-        attempt_descriptor_sha256="a" * 64,
-        attempt_role="prelock",
-        domain="validation",
-        runtime_identity_sha256="b" * 64,
-        training_day_ids=(),
-    )
-    output_parent_fd = os.open(output_root.parent, os.O_RDONLY | os.O_DIRECTORY)
-    output_fd = os.open(output_root, os.O_RDONLY | os.O_DIRECTORY)
-    output_status = os.fstat(output_fd)
-    store_binding = (
-        journal._display_root,
-        journal._attempt_descriptor_sha256,
-        journal._attempt_role,
-        journal._domain,
-        journal._runtime_identity_sha256,
-        journal._training_day_ids,
-        journal._transaction_lock_identity,
-        (),
-        {},
-        output_parent_fd,
-        output_fd,
-        (output_status.st_dev, output_status.st_ino),
-        output_root.name,
-    )
-    monkeypatch.setattr(
-        alpha_max_runner,
-        "_verify_alpha_max_checkpoint_implementation_inventory",
-        lambda value: value,
-    )
-    monkeypatch.setattr(alpha_max_runner, "_alpha_max_indicator_runtime_binding", lambda: {})
-    monkeypatch.setattr(
-        alpha_max_runner,
-        "_alpha_max_replay_training_component_returns",
-        _production_worker_replay_probe,
-    )
-    monkeypatch.setattr(
-        alpha_max_runner,
-        "_alpha_max_training_component_checkpoint_bytes",
-        _production_worker_checkpoint_probe,
-    )
-    expected: tuple[bytes, ...] | None = None
-    try:
-        for cap in (1, 2, 3, 4):
-            telemetry = tmp_path / f"workers-{cap}.log"
-            telemetry.write_bytes(b"")
-            global _PRODUCTION_WORKER_TELEMETRY
-            _PRODUCTION_WORKER_TELEMETRY = str(telemetry)
-            alpha_max_runner._ALPHA_MAX_TRAINING_WORKER_CONTEXT = (
-                SimpleNamespace(),
-                output_root,
-                {},
-                ("BTCUSDT",),
-                store_binding,
-                manifests,
-            )
-            with alpha_max_runner.ProcessPoolExecutor(
-                max_workers=min(cap, len(component_ids)),
-                mp_context=multiprocessing.get_context("fork"),
-            ) as executor:
-                observed = tuple(
-                    executor.map(
-                        alpha_max_runner._alpha_max_replay_training_component_worker,
-                        component_ids,
-                    )
-                )
-            assert tuple(component_id for component_id, _payload in observed) == component_ids
-            worker_pids = {
-                int(line.split(":", 1)[1]) for line in telemetry.read_text().splitlines()
-            }
-            assert len(worker_pids) == min(cap, 3)
-            assert list(output_root.iterdir()) == []
-            payloads = tuple(payload for _component_id, payload in observed)
-            if expected is None:
-                expected = payloads
-            else:
-                assert payloads == expected
-    finally:
-        alpha_max_runner._ALPHA_MAX_TRAINING_WORKER_CONTEXT = None
-        _PRODUCTION_WORKER_TELEMETRY = None
-        os.close(output_fd)
-        os.close(output_parent_fd)
+    report = json.loads(completed.stdout)
+    assert report["pid_counts"] == [1, 2, 3, 3]
 
 
 def test_training_component_replay_resumes_sealed_days_with_funding_carry(
@@ -559,12 +449,15 @@ def test_prelock_worker_caps_order_publication_and_failure_taxonomy(
 
     class Journal:
         _display_root = tmp_path / "journal"
+        _descriptor_sha256 = "a" * 64
         _attempt_descriptor_sha256 = "a" * 64
         _attempt_role = "prelock"
         _domain = "validation"
         _runtime_identity_sha256 = "b" * 64
         _training_day_ids: tuple[str, ...] = ()
         _transaction_lock_identity = (1, 1)
+        _root_identity = (1, 1)
+        _units_identity = (1, 1)
 
         def poison(self) -> None:
             poisoned.append(True)
@@ -574,6 +467,10 @@ def test_prelock_worker_caps_order_publication_and_failure_taxonomy(
         _runtime_identity = {}
 
         def __init__(self, *_args: object, **_kwargs: object) -> None:
+            self._display_root = (tmp_path / "checkpoint").resolve()
+            self._display_root.mkdir(exist_ok=True)
+            precompute_root = self._display_root / "precompute"
+            precompute_root.mkdir(exist_ok=True)
             self.output_root = (tmp_path / "output").resolve()
             self.output_root.mkdir(exist_ok=True)
             self._display_output_root = self.output_root
@@ -582,6 +479,11 @@ def test_prelock_worker_caps_order_publication_and_failure_taxonomy(
             status = os.fstat(self._bound_output_fd)
             self._bound_output_identity = (status.st_dev, status.st_ino)
             self.journal = Journal()
+            precompute_status = precompute_root.stat()
+            self.journal._root_identity = (
+                precompute_status.st_dev,
+                precompute_status.st_ino,
+            )
 
         def bind_output_root(self) -> Path:
             return self.output_root
@@ -610,8 +512,8 @@ def test_prelock_worker_caps_order_publication_and_failure_taxonomy(
         def __exit__(self, *_args: object) -> None:
             pass
 
-        def map(self, _worker: object, ids: tuple[str, ...]):
-            assert tuple(ids) == component_ids
+        def map(self, _worker: object, items: tuple[tuple[str, bytes, str], ...]):
+            assert tuple(item[0] for item in items) == component_ids
             worker_output_snapshots.append(
                 tuple(sorted(path.name for path in (tmp_path / "output").iterdir()))
             )
@@ -620,9 +522,24 @@ def test_prelock_worker_caps_order_publication_and_failure_taxonomy(
             # Deliberately complete out of order; map's contract restores input order.
             return iter(
                 (
-                    ("component_carry_1x", b"worker:component_carry_1x"),
-                    ("component_near_high_1x", b"worker:component_near_high_1x"),
-                    ("component_trend_1x", b"worker:component_trend_1x"),
+                    (
+                        "component_carry_1x",
+                        "complete",
+                        b"worker:component_carry_1x",
+                        "",
+                    ),
+                    (
+                        "component_near_high_1x",
+                        "complete",
+                        b"worker:component_near_high_1x",
+                        "",
+                    ),
+                    (
+                        "component_trend_1x",
+                        "complete",
+                        b"worker:component_trend_1x",
+                        "",
+                    ),
                 )
             )
 
@@ -636,8 +553,18 @@ def test_prelock_worker_caps_order_publication_and_failure_taxonomy(
             sha256="d" * 64,
         )
     )
+
+    class RootSeal:
+        def __init__(self, phase: str, kind: str) -> None:
+            self.path = str(tmp_path / f"{phase}-{kind}")
+            self._phase = phase
+            self._kind = kind
+
+        def to_payload(self) -> dict[str, object]:
+            return {"root_id": self._phase, "root_kind": self._kind}
+
     roots = {
-        (phase, kind): SimpleNamespace(path=str(tmp_path / f"{phase}-{kind}"))
+        (phase, kind): RootSeal(phase, kind)
         for phase in ("warmup", "train", "purge", "validation", "embargo")
         for kind in ("raw", "feature")
     }
@@ -703,10 +630,29 @@ def test_prelock_worker_caps_order_publication_and_failure_taxonomy(
         "_alpha_max_create_or_resume_run_root",
         lambda output_root, **_kwargs: output_root,
     )
+
+    def manifest_receipt(
+        *_args: object, row: dict[str, str], **_kwargs: object
+    ) -> AlphaMaxManifestReceipt:
+        path = tmp_path / f"{row['row_id']}.json"
+        path.write_bytes(b"{}\n")
+        receipt, _payload = alpha_max_evidence.read_artifact_bytes(
+            path,
+            artifact_id="alpha_max_engine_portfolio_manifest",
+        )
+        return AlphaMaxManifestReceipt(
+            row_id=row["row_id"],
+            phase="validation_train_fit",
+            relative_path=path.name,
+            sha256=receipt.sha256,
+            byte_count=receipt.byte_count,
+            activation_receipt=receipt,
+        )
+
     monkeypatch.setattr(
         alpha_max_runner,
         "_alpha_max_materialize_manifest_receipt",
-        lambda *_args, row, **_kwargs: SimpleNamespace(row_id=row["row_id"], path="manifest.json"),
+        manifest_receipt,
     )
     monkeypatch.setattr(alpha_max_runner, "_validate_alpha_max_root_seals", lambda **_kwargs: None)
     monkeypatch.setattr(
@@ -725,7 +671,7 @@ def test_prelock_worker_caps_order_publication_and_failure_taxonomy(
     ) -> tuple[tuple[str, ...], tuple[float, ...], object]:
         nonlocal parse_calls
         parse_calls += 1
-        if parse_calls % 4 == 0:
+        if parse_calls % 7 == 0:
             raise sentinel
         return (("2024-01-02",), (0.0,), {"finalization": "exact"})
 

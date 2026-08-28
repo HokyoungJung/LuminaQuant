@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import os
 import hashlib
+import platform
+import sys
 from pathlib import Path
 
 __all__ = [
@@ -11,6 +13,7 @@ __all__ = [
     "AmbientLQEnvironmentError",
     "alpha_max_bootstrap_implementation_inventory",
     "reject_ambient_lq_environment",
+    "require_alpha_max_fresh_process_runtime",
 ]
 
 
@@ -27,6 +30,12 @@ def reject_ambient_lq_environment() -> None:
     offending = tuple(sorted(key for key in os.environ if key.startswith("LQ_")))
     if offending:
         raise AmbientLQEnvironmentError(f"ambient_lq_environment:{','.join(offending)}")
+
+
+def require_alpha_max_fresh_process_runtime() -> None:
+    """Require the CPython runtime supported by the spawn-only boundary."""
+    if platform.python_implementation() != "CPython" or sys.version_info[:2] < (3, 14):
+        raise AlphaMaxRuntimeContractError("alpha_max_fresh_process_runtime_invalid")
 
 
 def alpha_max_bootstrap_implementation_inventory() -> list[dict[str, object]]:

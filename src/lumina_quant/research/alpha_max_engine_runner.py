@@ -45,6 +45,7 @@ import numpy as np
 from lumina_quant.alpha_max_process_boundary import (
     AlphaMaxRuntimeContractError,
     AmbientLQEnvironmentError,
+    require_alpha_max_fresh_process_runtime,
     reject_ambient_lq_environment,
 )
 from lumina_quant.backtesting._config_view import register_alpha_max_backtest_config_type
@@ -110,6 +111,7 @@ from lumina_quant.research.alpha_max_evidence import (
     canonical_alpha_max_row_bytes,
     compute_alpha_max_train_admission_from_daily_summaries,
     parse_alpha_max_cost_cell_pre_gate_evidence,
+    parse_alpha_max_root_seal,
     rank_alpha_max_historical_report,
     read_alpha_max_prior_trial_blob_input,
     seal_alpha_max_contract_manifest,
@@ -2154,7 +2156,20 @@ _ALPHA_MAX_FALSE_MANIFEST_KEYS: Final[tuple[str, ...]] = (
 
 def _activation_identity(path: Path, *, expected_directory: bool) -> AlphaMaxAncestorIdentity:
     try:
-        status = path.lstat()
+        if _is_proc_fd_anchored_path(path):
+            descriptor = int(path.parts[4])
+            relative_parts = path.parts[5:]
+            status = (
+                os.fstat(descriptor)
+                if not relative_parts
+                else os.stat(
+                    os.path.join(*relative_parts),
+                    dir_fd=descriptor,
+                    follow_symlinks=False,
+                )
+            )
+        else:
+            status = path.lstat()
     except OSError as exc:
         raise AlphaMaxRuntimeContractError("portfolio_manifest_activation_mismatch") from exc
     if stat.S_ISLNK(status.st_mode):
@@ -7141,7 +7156,7 @@ def _alpha_max_prepare_training_indicator_prefixes(
     root_seals: Mapping[tuple[str, str], AlphaMaxRootSeal],
     checkpoint_store: _AlphaMaxPrecomputeCheckpointStore,
 ) -> None:
-    """Build and seal warmup state serially before training workers are forked."""
+    """Build and seal warmup state serially before spawned workers start."""
     for component_id in component_ids:
         manifest = manifests.get(component_id)
         if type(manifest) is not AlphaMaxManifestReceipt:
@@ -7707,7 +7722,7 @@ def _alpha_max_prelock_checkpoint_descriptor(
         artifact_id="checkpoint-python-executable",
     )
     descriptor = {
-        "artifact_kind": "alpha_max_restartable_attempt_descriptor.v2",
+        "artifact_kind": "alpha_max_restartable_attempt_descriptor.v3",
         "attempt_role": "prelock",
         "domain": "validation",
         "checkpoint_unit": "whole_row_cost_cell",
@@ -7770,6 +7785,12 @@ def _alpha_max_prelock_checkpoint_descriptor(
                 "RAYON_NUM_THREADS",
             )
         },
+        "training_worker_transport": {
+            "binding_schema": "alpha_max_training_component_worker_binding.v1",
+            "maximum_component_processes": 3,
+            "result_statuses": ["complete", "semantic_failure"],
+            "start_method": "spawn",
+        },
         "universe": {
             "admitted_symbols": list(admitted_symbols),
             "candidate_symbols": list(preflight.candidate_symbols),
@@ -7780,13 +7801,7 @@ def _alpha_max_prelock_checkpoint_descriptor(
         descriptor["prior_trial_blob"] = dict(prior_trial_binding)
     if _include_v2_bindings:
         return descriptor
-    return {
-        "artifact_kind": "alpha_max_restartable_attempt_descriptor.v1",
-        "attempt_role": "prelock",
-        "implementation_inventory": implementation_inventory,
-        "checkpoint": descriptor["checkpoint"],
-        "output": descriptor["output"],
-    }
+    return descriptor
 
 
 def _alpha_max_historical_checkpoint_descriptor(
@@ -7824,7 +7839,7 @@ def _alpha_max_historical_checkpoint_descriptor(
     ]
     descriptor.update(
         {
-            "artifact_kind": "alpha_max_restartable_attempt_descriptor.v2",
+            "artifact_kind": "alpha_max_restartable_attempt_descriptor.v3",
             "attempt_role": "historical",
             "domain": domain,
             "physical_fold_run_count": len(schedule),
@@ -7840,30 +7855,9 @@ def _alpha_max_historical_checkpoint_descriptor(
 
 
 def _alpha_max_validate_checkpoint_descriptor(descriptor: Mapping[str, object]) -> tuple[str, str]:
-    """Versioned descriptor parser; v1 remains validation/prelock-only."""
+    """Parse only the spawn-bound restartable descriptor schema."""
     kind = descriptor.get("artifact_kind")
-    if kind == "alpha_max_restartable_attempt_descriptor.v1":
-        if (
-            set(descriptor)
-            != {
-                "artifact_kind",
-                "attempt_role",
-                "implementation_inventory",
-                "checkpoint",
-                "output",
-            }
-            or descriptor.get("attempt_role") != "prelock"
-        ):
-            raise AlphaMaxRuntimeContractError("alpha_max_checkpoint_descriptor_role_invalid")
-        for field in ("implementation_inventory", "checkpoint", "output"):
-            if type(descriptor.get(field)) is not (
-                list if field == "implementation_inventory" else dict
-            ):
-                raise AlphaMaxRuntimeContractError(
-                    "alpha_max_checkpoint_descriptor_binding_invalid"
-                )
-        return "prelock", "validation"
-    if kind != "alpha_max_restartable_attempt_descriptor.v2":
+    if kind != "alpha_max_restartable_attempt_descriptor.v3":
         raise AlphaMaxRuntimeContractError("alpha_max_checkpoint_descriptor_version_invalid")
     required = {
         "artifact_kind",
@@ -7888,6 +7882,7 @@ def _alpha_max_validate_checkpoint_descriptor(descriptor: Mapping[str, object]) 
         "runtime_identity",
         "runtime_contract_sha256",
         "thread_contract",
+        "training_worker_transport",
         "universe",
     }
     role = descriptor.get("attempt_role")
@@ -7919,6 +7914,13 @@ def _alpha_max_validate_checkpoint_descriptor(descriptor: Mapping[str, object]) 
         or descriptor.get("physical_schedule_sha256")
         != _sha256(_canonical_bytes(expected_schedule))
         or descriptor.get("order_routing_enabled") is not False
+        or descriptor.get("training_worker_transport")
+        != {
+            "binding_schema": "alpha_max_training_component_worker_binding.v1",
+            "maximum_component_processes": 3,
+            "result_statuses": ["complete", "semantic_failure"],
+            "start_method": "spawn",
+        }
     ):
         raise AlphaMaxRuntimeContractError("alpha_max_checkpoint_descriptor_schedule_invalid")
     for field in ("config", "contract_manifest", "checkpoint", "output", "python", "universe"):
@@ -8134,13 +8136,14 @@ class _AlphaMaxPrecomputeCheckpointStore:
         self._runtime_identity_sha256 = runtime_identity_sha256
         self._training_day_ids = training_day_ids
         descriptor = {
-            "artifact_kind": "alpha_max_precompute_checkpoint_attempt.v1",
+            "artifact_kind": "alpha_max_precompute_checkpoint_attempt.v2",
             "attempt_descriptor_sha256": attempt_descriptor_sha256,
             "attempt_role": attempt_role,
             "checkpoint_unit": "whole_authenticated_precompute_unit",
             "domain": domain,
             "order_routing_enabled": False,
             "runtime_identity_sha256": runtime_identity_sha256,
+            "training_worker_binding_schema": "alpha_max_training_component_worker_binding.v1",
             "unit_schedule": [
                 {"unit_id": unit_id, "unit_kind": unit_kind}
                 for unit_kind, unit_id in self._allowed_units()
@@ -8182,10 +8185,13 @@ class _AlphaMaxPrecomputeCheckpointStore:
             self._units = Path(f"/proc/self/fd/{self._units_fd}")
             self._validate_root()
         except Exception:
-            self.__del__()
+            self.close()
             raise
 
     def __del__(self) -> None:
+        self.close()
+
+    def close(self) -> None:
         for field in ("_units_fd", "_root_fd"):
             fd = getattr(self, field, -1)
             if fd >= 0:
@@ -8194,6 +8200,12 @@ class _AlphaMaxPrecomputeCheckpointStore:
                 except OSError:
                     pass
                 setattr(self, field, -1)
+
+    def __enter__(self) -> _AlphaMaxPrecomputeCheckpointStore:
+        return self
+
+    def __exit__(self, _exc_type: object, _exc: object, _traceback: object) -> None:
+        self.close()
 
     def _allowed_units(self) -> tuple[tuple[str, str], ...]:
         component_ids = (
@@ -8654,7 +8666,7 @@ class _AlphaMaxCellCheckpointStore:
         descriptor_bytes = _canonical_bytes(dict(descriptor)) + b"\n"
         self._descriptor_sha256 = _sha256(descriptor_bytes)
         self._descriptor_v2 = (
-            descriptor.get("artifact_kind") == "alpha_max_restartable_attempt_descriptor.v2"
+            descriptor.get("artifact_kind") == "alpha_max_restartable_attempt_descriptor.v3"
         )
         self._attempt_role, self._domain = _alpha_max_validate_checkpoint_descriptor(descriptor)
         self._runtime_identity = (
@@ -12569,97 +12581,574 @@ def _alpha_max_trend_liquidity_falsifier_artifact(
     return falsifier.canonical_bytes
 
 
-_ALPHA_MAX_TRAINING_WORKER_CONTEXT: (
-    tuple[
-        AlphaMaxRuntimePreflight,
-        Path,
-        Mapping[tuple[str, str], AlphaMaxRootSeal],
-        tuple[str, ...],
-        tuple[
-            Path,
-            str,
-            str,
-            str,
-            str,
-            tuple[str, ...],
-            tuple[int, int],
-            tuple[dict[str, object], ...],
-            Mapping[str, object],
-            int,
-            int,
-            tuple[int, int],
-            str,
-        ],
-        Mapping[str, AlphaMaxManifestReceipt],
-    ]
-    | None
-) = None
+type _AlphaMaxTrainingWorkerItem = tuple[str, bytes, str]
+type _AlphaMaxTrainingWorkerResult = tuple[str, str, bytes, str]
+_ALPHA_MAX_COMPONENT_IDS: Final[tuple[str, ...]] = (
+    "component_carry_1x",
+    "component_near_high_1x",
+    "component_trend_1x",
+)
 
 
-def _alpha_max_replay_training_component_worker(component_id: str) -> tuple[str, bytes]:
-    """Fork-only replay; the parent remains the canonical component publisher."""
-    context = _ALPHA_MAX_TRAINING_WORKER_CONTEXT
-    if context is None or type(component_id) is not str:
-        raise AlphaMaxRuntimeContractError("alpha_max_training_worker_context_invalid")
-    preflight, _output_root, root_seals, admitted_symbols, store_binding, manifests = context
-    manifest = manifests.get(component_id)
-    if type(manifest) is not AlphaMaxManifestReceipt:
-        raise AlphaMaxRuntimeContractError("alpha_max_training_worker_component_invalid")
-    reject_ambient_lq_environment()
-    store = _AlphaMaxPrecomputeCheckpointStore(
-        store_binding[0],
-        attempt_descriptor_sha256=store_binding[1],
-        attempt_role=store_binding[2],
-        domain=store_binding[3],
-        runtime_identity_sha256=store_binding[4],
-        training_day_ids=store_binding[5],
-        transaction_lock_identity=store_binding[6],
-    )
-    _verify_alpha_max_checkpoint_implementation_inventory(list(store_binding[7]))
-    if _alpha_max_indicator_runtime_binding() != store_binding[8]:
-        raise AlphaMaxRuntimeContractError("alpha_max_training_worker_runtime_identity_invalid")
-    output_parent_fd, output_fd, output_identity, output_name = store_binding[9:]
-    try:
-        output_entry = os.stat(output_name, dir_fd=output_parent_fd, follow_symlinks=False)
-        output_opened = os.fstat(output_fd)
-    except OSError as exc:
-        raise AlphaMaxRuntimeContractError(
-            "alpha_max_training_worker_output_authority_invalid"
-        ) from exc
+@dataclass(frozen=True, slots=True)
+class _AlphaMaxTrainingWorkerBinding:
+    component_id: str
+    attempt_descriptor_path: str
+    attempt_descriptor_sha256: str
+    output_parent: str
+    output_parent_identity: tuple[int, int]
+    output_root: str
+    output_root_identity: tuple[int, int]
+    manifest_identity: Mapping[str, object]
+    precompute_root: str
+    precompute_root_identity: tuple[int, int]
+    precompute_units_identity: tuple[int, int]
+    precompute_transaction_lock_identity: tuple[int, int]
+    precompute_descriptor_sha256: str
+    root_seal_bytes: tuple[bytes, ...]
+    python_version: tuple[int, int, int]
+    python_cache_tag: str
+
+
+def _alpha_max_training_worker_binding_bytes(
+    *,
+    component_id: str,
+    attempt_descriptor: Mapping[str, object],
+    checkpoint_store: _AlphaMaxCellCheckpointStore,
+    manifest: AlphaMaxManifestReceipt,
+    root_seals: Mapping[tuple[str, str], AlphaMaxRootSeal],
+) -> bytes:
+    store = checkpoint_store.training_precompute_store()
+    precompute_display_root = checkpoint_store._display_root / "precompute"
+    precompute_display_status = precompute_display_root.lstat()
     if (
-        (int(output_entry.st_dev), int(output_entry.st_ino)) != output_identity
-        or (int(output_opened.st_dev), int(output_opened.st_ino)) != output_identity
-        or not stat.S_ISDIR(output_entry.st_mode)
-        or stat.S_ISLNK(output_entry.st_mode)
+        stat.S_ISLNK(precompute_display_status.st_mode)
+        or not stat.S_ISDIR(precompute_display_status.st_mode)
+        or (
+            int(precompute_display_status.st_dev),
+            int(precompute_display_status.st_ino),
+        )
+        != store._root_identity
     ):
-        raise AlphaMaxRuntimeContractError("alpha_max_training_worker_output_authority_invalid")
-    calendar, returns, native_finalization = _alpha_max_replay_training_component_returns(
-        preflight,
-        output_root=Path(f"/proc/self/fd/{output_fd}"),
-        manifest_receipt=manifest,
-        admitted_symbols=admitted_symbols,
-        root_seals=root_seals,
-        checkpoint_store=store,
+        raise AlphaMaxRuntimeContractError("alpha_max_training_worker_precompute_identity_invalid")
+    required = (("train", "raw"), ("warmup", "feature"), ("train", "feature"))
+    if component_id not in _ALPHA_MAX_COMPONENT_IDS or manifest.row_id != component_id:
+        raise AlphaMaxRuntimeContractError("alpha_max_training_worker_component_invalid")
+    payload = {
+        "artifact_kind": "alpha_max_training_component_worker_binding.v1",
+        "attempt": {
+            "descriptor_path": str(checkpoint_store._display_root / "ATTEMPT.json"),
+            "descriptor_sha256": checkpoint_store.descriptor_sha256,
+        },
+        "component_id": component_id,
+        "manifest": _alpha_max_manifest_checkpoint_identity(manifest),
+        "output": {
+            "parent": str(checkpoint_store._display_output_root.parent),
+            "parent_identity": [
+                int(os.fstat(checkpoint_store._output_parent_fd).st_dev),
+                int(os.fstat(checkpoint_store._output_parent_fd).st_ino),
+            ],
+            "root": str(checkpoint_store._display_output_root),
+            "root_identity": list(checkpoint_store._bound_output_identity),
+        },
+        "precompute": {
+            "descriptor_sha256": store._descriptor_sha256,
+            "root": str(precompute_display_root),
+            "root_identity": list(store._root_identity),
+            "transaction_lock_identity": list(store._transaction_lock_identity),
+            "units_identity": list(store._units_identity),
+        },
+        "required_root_seals": [root_seals[key].to_payload() for key in required],
+        "transport": {
+            "maximum_component_processes": 3,
+            "python_cache_tag": sys.implementation.cache_tag,
+            "python_version": list(sys.version_info[:3]),
+            "start_method": "spawn",
+        },
+    }
+    return _canonical_bytes(payload) + b"\n"
+
+
+def _parse_alpha_max_training_worker_binding(
+    payload: bytes,
+    *,
+    expected_component_id: str,
+    expected_sha256: str,
+) -> _AlphaMaxTrainingWorkerBinding:
+    value = _strict_json_object(payload)
+    required = {
+        "artifact_kind",
+        "attempt",
+        "component_id",
+        "manifest",
+        "output",
+        "precompute",
+        "required_root_seals",
+        "transport",
+    }
+    if (
+        payload != _canonical_bytes(value) + b"\n"
+        or _sha256(payload) != expected_sha256
+        or set(value) != required
+        or value["artifact_kind"] != "alpha_max_training_component_worker_binding.v1"
+        or value["component_id"] != expected_component_id
+        or expected_component_id not in _ALPHA_MAX_COMPONENT_IDS
+        or type(value["attempt"]) is not dict
+        or set(value["attempt"]) != {"descriptor_path", "descriptor_sha256"}
+        or type(value["manifest"]) is not dict
+        or set(value["manifest"]) != {"byte_count", "phase", "relative_path", "row_id", "sha256"}
+        or type(value["output"]) is not dict
+        or set(value["output"]) != {"parent", "parent_identity", "root", "root_identity"}
+        or type(value["precompute"]) is not dict
+        or set(value["precompute"])
+        != {
+            "descriptor_sha256",
+            "root",
+            "root_identity",
+            "transaction_lock_identity",
+            "units_identity",
+        }
+        or type(value["required_root_seals"]) is not list
+        or len(value["required_root_seals"]) != 3
+        or value["transport"]
+        != {
+            "maximum_component_processes": 3,
+            "python_cache_tag": sys.implementation.cache_tag,
+            "python_version": list(sys.version_info[:3]),
+            "start_method": "spawn",
+        }
+    ):
+        raise AlphaMaxRuntimeContractError("alpha_max_training_worker_binding_invalid")
+
+    def identity(raw: object) -> tuple[int, int]:
+        if (
+            type(raw) is not list
+            or len(raw) != 2
+            or any(type(item) is not int or item < 0 for item in raw)
+        ):
+            raise AlphaMaxRuntimeContractError("alpha_max_training_worker_binding_invalid")
+        return raw[0], raw[1]
+
+    for field in ("descriptor_path",):
+        if (
+            type(value["attempt"][field]) is not str
+            or not Path(value["attempt"][field]).is_absolute()
+        ):
+            raise AlphaMaxRuntimeContractError("alpha_max_training_worker_binding_invalid")
+    for field in ("parent", "root"):
+        if (
+            type(value["output"][field]) is not str
+            or not Path(value["output"][field]).is_absolute()
+        ):
+            raise AlphaMaxRuntimeContractError("alpha_max_training_worker_binding_invalid")
+    for field in ("root",):
+        if (
+            type(value["precompute"][field]) is not str
+            or not Path(value["precompute"][field]).is_absolute()
+        ):
+            raise AlphaMaxRuntimeContractError("alpha_max_training_worker_binding_invalid")
+    for digest in (
+        value["attempt"]["descriptor_sha256"],
+        value["manifest"]["sha256"],
+        value["precompute"]["descriptor_sha256"],
+    ):
+        if type(digest) is not str or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+            raise AlphaMaxRuntimeContractError("alpha_max_training_worker_binding_invalid")
+    try:
+        for raw_path in (
+            value["attempt"]["descriptor_path"],
+            value["output"]["parent"],
+            value["output"]["root"],
+            value["precompute"]["root"],
+        ):
+            if _require_exact_explicit_path(raw_path) != str(Path(raw_path).resolve(strict=True)):
+                raise ValueError
+        if (
+            Path(value["output"]["root"]).parent != Path(value["output"]["parent"])
+            or Path(value["attempt"]["descriptor_path"]).name != "ATTEMPT.json"
+            or Path(value["precompute"]["root"]).name != "precompute"
+            or value["manifest"]
+            != {
+                "byte_count": value["manifest"]["byte_count"],
+                "phase": "validation_train_fit",
+                "relative_path": f"manifests/validation_train_fit/{expected_component_id}.json",
+                "row_id": expected_component_id,
+                "sha256": value["manifest"]["sha256"],
+            }
+            or type(value["manifest"]["byte_count"]) is not int
+            or value["manifest"]["byte_count"] <= 0
+        ):
+            raise ValueError
+    except (OSError, TypeError, ValueError) as exc:
+        raise AlphaMaxRuntimeContractError("alpha_max_training_worker_binding_invalid") from exc
+    required_seals = (("train", "raw"), ("warmup", "feature"), ("train", "feature"))
+    if any(type(seal) is not dict for seal in value["required_root_seals"]):
+        raise AlphaMaxRuntimeContractError("alpha_max_training_worker_binding_invalid")
+    seals = tuple(_canonical_bytes(seal) + b"\n" for seal in value["required_root_seals"])
+    try:
+        parsed_seals = tuple(
+            parse_alpha_max_root_seal(
+                seal_bytes,
+                expected_root_id=root_id,
+                expected_root_kind=root_kind,
+                expected_sha256=_sha256(seal_bytes),
+            )
+            for (root_id, root_kind), seal_bytes in zip(required_seals, seals, strict=True)
+        )
+        if tuple((seal.root_id, seal.root_kind) for seal in parsed_seals) != required_seals:
+            raise ValueError
+    except (TypeError, ValueError) as exc:
+        raise AlphaMaxRuntimeContractError("alpha_max_training_worker_binding_invalid") from exc
+    return _AlphaMaxTrainingWorkerBinding(
+        component_id=expected_component_id,
+        attempt_descriptor_path=value["attempt"]["descriptor_path"],
+        attempt_descriptor_sha256=value["attempt"]["descriptor_sha256"],
+        output_parent=value["output"]["parent"],
+        output_parent_identity=identity(value["output"]["parent_identity"]),
+        output_root=value["output"]["root"],
+        output_root_identity=identity(value["output"]["root_identity"]),
+        manifest_identity=MappingProxyType(value["manifest"]),
+        precompute_root=value["precompute"]["root"],
+        precompute_root_identity=identity(value["precompute"]["root_identity"]),
+        precompute_units_identity=identity(value["precompute"]["units_identity"]),
+        precompute_transaction_lock_identity=identity(
+            value["precompute"]["transaction_lock_identity"]
+        ),
+        precompute_descriptor_sha256=value["precompute"]["descriptor_sha256"],
+        root_seal_bytes=seals,
+        python_version=tuple(value["transport"]["python_version"]),
+        python_cache_tag=value["transport"]["python_cache_tag"],
+    )
+
+
+def _alpha_max_validate_training_binding_descriptor(
+    binding: _AlphaMaxTrainingWorkerBinding,
+    descriptor: Mapping[str, object],
+) -> None:
+    """Intersect every path and immutable authority in a worker binding with v3."""
+    checkpoint = descriptor["checkpoint"]
+    output = descriptor["output"]
+    universe = descriptor["universe"]
+    if (
+        type(checkpoint) is not dict
+        or type(output) is not dict
+        or type(universe) is not dict
+        or binding.attempt_descriptor_path != str(Path(checkpoint["root"]) / "ATTEMPT.json")
+        or binding.output_parent != output["parent"]
+        or binding.output_parent_identity != tuple(output["parent_identity"])
+        or binding.output_root != output["target"]
+        or binding.precompute_root != str(Path(checkpoint["root"]) / "precompute")
+        or Path(binding.precompute_root).parent != Path(checkpoint["root"])
+        or tuple(checkpoint["parent_identity"])
+        != (
+            int(Path(checkpoint["parent"]).stat().st_dev),
+            int(Path(checkpoint["parent"]).stat().st_ino),
+        )
+        or universe.get("candidate_symbols") != list(ALPHA_MAX_CANDIDATE_SYMBOLS)
+        or type(universe.get("admitted_symbols")) is not list
+        or universe.get("sha256") != _sha256(_canonical_bytes(universe["admitted_symbols"]))
+    ):
+        raise AlphaMaxRuntimeContractError("alpha_max_training_worker_descriptor_binding_invalid")
+    required = (("train", "raw"), ("warmup", "feature"), ("train", "feature"))
+    parsed = tuple(
+        parse_alpha_max_root_seal(
+            raw,
+            expected_root_id=root_id,
+            expected_root_kind=root_kind,
+            expected_sha256=_sha256(raw),
+        )
+        for (root_id, root_kind), raw in zip(required, binding.root_seal_bytes, strict=True)
+    )
+    summaries = descriptor["root_seals"]
+    if type(summaries) is not list:
+        raise AlphaMaxRuntimeContractError("alpha_max_training_worker_descriptor_binding_invalid")
+    expected_summaries = tuple(
+        {
+            "availability_sha256": seal.availability_sha256,
+            "content_sha256": seal.content_sha256,
+            "inventory_sha256": seal.inventory_sha256,
+            "path": seal.path,
+            "root_id": seal.root_id,
+            "root_kind": seal.root_kind,
+            "seal_sha256": seal.sha256,
+        }
+        for seal in parsed
+    )
+    actual_by_identity = {
+        (row.get("root_id"), row.get("root_kind")): row for row in summaries if type(row) is dict
+    }
+    actual_summaries = tuple(actual_by_identity.get(identity) for identity in required)
+    if actual_summaries != expected_summaries:
+        raise AlphaMaxRuntimeContractError("alpha_max_training_worker_root_seal_invalid")
+
+
+def _alpha_max_revalidate_training_worker_authorities(
+    binding: _AlphaMaxTrainingWorkerBinding,
+    *,
+    parent_fd: int,
+    output_fd: int,
+    store: _AlphaMaxPrecomputeCheckpointStore,
+) -> None:
+    """Reject post-replay replacement of every authority retained by the child."""
+    output_name = Path(binding.output_root).name
+    try:
+        output_named = os.stat(output_name, dir_fd=parent_fd, follow_symlinks=False)
+        precompute_named = Path(binding.precompute_root).lstat()
+        units_named = (Path(binding.precompute_root) / "units").lstat()
+        lock_named = (Path(binding.precompute_root) / "units/.transaction.lock").lstat()
+        descriptor_named = (Path(binding.precompute_root) / "ATTEMPT.json").lstat()
+        store._validate_root()
+    except OSError as exc:
+        raise AlphaMaxRuntimeContractError("alpha_max_training_worker_authority_changed") from exc
+    if (
+        (int(os.fstat(parent_fd).st_dev), int(os.fstat(parent_fd).st_ino))
+        != binding.output_parent_identity
+        or (int(os.fstat(output_fd).st_dev), int(os.fstat(output_fd).st_ino))
+        != binding.output_root_identity
+        or (int(output_named.st_dev), int(output_named.st_ino)) != binding.output_root_identity
+        or (int(precompute_named.st_dev), int(precompute_named.st_ino))
+        != binding.precompute_root_identity
+        or (int(units_named.st_dev), int(units_named.st_ino)) != binding.precompute_units_identity
+        or (int(lock_named.st_dev), int(lock_named.st_ino))
+        != binding.precompute_transaction_lock_identity
+        or int(descriptor_named.st_nlink) != 1
+        or descriptor_named.st_mode & 0o222
+        or store._descriptor_sha256 != binding.precompute_descriptor_sha256
+    ):
+        raise AlphaMaxRuntimeContractError("alpha_max_training_worker_authority_changed")
+
+
+def _alpha_max_replay_training_component_worker(
+    item: _AlphaMaxTrainingWorkerItem,
+) -> _AlphaMaxTrainingWorkerResult:
+    """Spawn worker with only primitive transport and fresh local authority."""
+    component_id = (
+        item[0] if type(item) is tuple and len(item) == 3 and type(item[0]) is str else ""
     )
     try:
-        output_entry = os.stat(output_name, dir_fd=output_parent_fd, follow_symlinks=False)
-        output_opened = os.fstat(output_fd)
-    except OSError as exc:
-        raise AlphaMaxRuntimeContractError(
-            "alpha_max_training_worker_output_authority_invalid"
-        ) from exc
-    if (int(output_entry.st_dev), int(output_entry.st_ino)) != output_identity or (
-        int(output_opened.st_dev),
-        int(output_opened.st_ino),
-    ) != output_identity:
-        raise AlphaMaxRuntimeContractError("alpha_max_training_worker_output_authority_invalid")
-    return component_id, _alpha_max_training_component_checkpoint_bytes(
-        component_id=component_id,
-        manifest=manifest,
-        calendar=calendar,
-        returns=returns,
-        native_finalization=native_finalization,
-    )
+        if (
+            type(item) is not tuple
+            or len(item) != 3
+            or type(item[1]) is not bytes
+            or type(item[2]) is not str
+        ):
+            raise AlphaMaxRuntimeContractError("alpha_max_training_worker_item_invalid")
+        reject_ambient_lq_environment()
+        require_alpha_max_fresh_process_runtime()
+        if multiprocessing.get_start_method() != "spawn":
+            raise AlphaMaxRuntimeContractError("alpha_max_training_worker_start_method_invalid")
+        binding = _parse_alpha_max_training_worker_binding(
+            item[1], expected_component_id=item[0], expected_sha256=item[2]
+        )
+        receipt, descriptor_bytes = read_artifact_bytes(
+            Path(binding.attempt_descriptor_path), artifact_id="training-attempt"
+        )
+        descriptor = _strict_json_object(descriptor_bytes)
+        if (
+            receipt.sha256 != binding.attempt_descriptor_sha256
+            or descriptor_bytes != _canonical_bytes(descriptor) + b"\n"
+        ):
+            raise AlphaMaxRuntimeContractError("alpha_max_training_worker_attempt_invalid")
+        role, domain = _alpha_max_validate_checkpoint_descriptor(descriptor)
+        if (
+            role != "prelock"
+            or domain != "validation"
+            or descriptor["order_routing_enabled"] is not False
+        ):
+            raise AlphaMaxRuntimeContractError("alpha_max_training_worker_attempt_invalid")
+        _alpha_max_validate_training_binding_descriptor(binding, descriptor)
+        _verify_alpha_max_checkpoint_implementation_inventory(
+            descriptor["implementation_inventory"]
+        )
+        if descriptor["python"]["cache_tag"] != binding.python_cache_tag or descriptor["python"][
+            "version"
+        ] != list(binding.python_version):
+            raise AlphaMaxRuntimeContractError("alpha_max_training_worker_python_invalid")
+        executable_receipt, _executable = read_artifact_bytes(
+            Path(sys.executable).resolve(strict=True), artifact_id="training-python-executable"
+        )
+        if (
+            executable_receipt.canonical_path != descriptor["python"]["executable"]
+            or executable_receipt.sha256 != descriptor["python"]["sha256"]
+            or executable_receipt.byte_count != descriptor["python"]["byte_count"]
+        ):
+            raise AlphaMaxRuntimeContractError("alpha_max_training_worker_python_invalid")
+        parent_fd = _alpha_max_open_directory_at(binding.output_parent)
+        output_fd = -1
+        store: _AlphaMaxPrecomputeCheckpointStore | None = None
+        try:
+            if (
+                int(os.fstat(parent_fd).st_dev),
+                int(os.fstat(parent_fd).st_ino),
+            ) != binding.output_parent_identity:
+                raise AlphaMaxRuntimeContractError(
+                    "alpha_max_training_worker_output_authority_invalid"
+                )
+            output_name = Path(binding.output_root).name
+            output_status = os.stat(output_name, dir_fd=parent_fd, follow_symlinks=False)
+            output_fd = _alpha_max_open_directory_at(output_name, dir_fd=parent_fd)
+            if (
+                int(output_status.st_dev),
+                int(output_status.st_ino),
+            ) != binding.output_root_identity or (
+                int(os.fstat(output_fd).st_dev),
+                int(os.fstat(output_fd).st_ino),
+            ) != binding.output_root_identity:
+                raise AlphaMaxRuntimeContractError(
+                    "alpha_max_training_worker_output_authority_invalid"
+                )
+            output_root = Path(f"/proc/self/fd/{output_fd}")
+            preflight = preflight_alpha_max_runtime_contract(output_root / "inputs/config.json")
+            restart_receipt, restart_bytes = read_artifact_bytes(
+                output_root / "inputs/restart_attempt.json",
+                artifact_id="training-restart-attempt",
+            )
+            restart_binding = _strict_json_object(restart_bytes)
+            if (
+                restart_bytes != _canonical_bytes(restart_binding) + b"\n"
+                or restart_receipt.sha256 != _sha256(restart_bytes)
+                or restart_binding
+                != {
+                    "artifact_kind": "alpha_max_restartable_attempt_binding.v1",
+                    "attempt_descriptor_sha256": binding.attempt_descriptor_sha256,
+                }
+                or preflight.config_receipt.sha256 != descriptor["config"]["sha256"]
+                or preflight.config_receipt.byte_count != descriptor["config"]["byte_count"]
+                or preflight.runtime_contract_sha256 != descriptor["runtime_contract_sha256"]
+                or _alpha_max_indicator_runtime_binding() != descriptor["runtime_identity"]
+                or {
+                    key: os.environ.get(key)
+                    for key in (
+                        "OMP_NUM_THREADS",
+                        "OPENBLAS_NUM_THREADS",
+                        "POLARS_MAX_THREADS",
+                        "RAYON_NUM_THREADS",
+                    )
+                }
+                != descriptor["thread_contract"]
+            ):
+                raise AlphaMaxRuntimeContractError("alpha_max_training_worker_runtime_invalid")
+            manifest_path = output_root / str(binding.manifest_identity["relative_path"])
+            manifest = _alpha_max_manifest_receipt_from_path(
+                manifest_path, root=output_root, phase="validation_train_fit"
+            )
+            if _alpha_max_manifest_checkpoint_identity(manifest) != dict(binding.manifest_identity):
+                raise AlphaMaxRuntimeContractError("alpha_max_training_worker_manifest_invalid")
+            seal_alpha_max_manifest_activation(
+                preflight,
+                output_root=output_root,
+                phase="validation_train_fit",
+                manifest_path=manifest_path,
+                admitted_symbols=tuple(descriptor["universe"]["admitted_symbols"]),
+            )
+            required = (("train", "raw"), ("warmup", "feature"), ("train", "feature"))
+            seals = {
+                key: parse_alpha_max_root_seal(
+                    raw,
+                    expected_root_id=key[0],
+                    expected_root_kind=key[1],
+                    expected_sha256=_sha256(raw),
+                )
+                for key, raw in zip(required, binding.root_seal_bytes, strict=True)
+            }
+            _precompute_receipt, precompute_bytes = read_artifact_bytes(
+                Path(binding.precompute_root) / "ATTEMPT.json",
+                artifact_id="training-precompute-attempt",
+            )
+            precompute_descriptor = _strict_json_object(precompute_bytes)
+            if (
+                precompute_bytes != _canonical_bytes(precompute_descriptor) + b"\n"
+                or _sha256(precompute_bytes) != binding.precompute_descriptor_sha256
+                or precompute_descriptor.get("artifact_kind")
+                != "alpha_max_precompute_checkpoint_attempt.v2"
+                or precompute_descriptor.get("attempt_descriptor_sha256")
+                != binding.attempt_descriptor_sha256
+                or precompute_descriptor.get("order_routing_enabled") is not False
+                or precompute_descriptor.get("training_worker_binding_schema")
+                != "alpha_max_training_component_worker_binding.v1"
+                or type(precompute_descriptor.get("unit_schedule")) is not list
+            ):
+                raise AlphaMaxRuntimeContractError("alpha_max_training_worker_precompute_invalid")
+            training_days = tuple(
+                item["unit_id"]
+                for item in precompute_descriptor["unit_schedule"]
+                if type(item) is dict
+                and item.get("unit_kind") == "training_day"
+                and type(item.get("unit_id")) is str
+            )
+            store = _AlphaMaxPrecomputeCheckpointStore(
+                Path(binding.precompute_root),
+                attempt_descriptor_sha256=binding.attempt_descriptor_sha256,
+                attempt_role=role,
+                domain=domain,
+                runtime_identity_sha256=_alpha_max_checkpoint_runtime_identity_sha256(
+                    descriptor["runtime_identity"]
+                ),
+                training_day_ids=training_days,
+                transaction_lock_identity=binding.precompute_transaction_lock_identity,
+            )
+            if (
+                store._root_identity != binding.precompute_root_identity
+                or store._units_identity != binding.precompute_units_identity
+                or store._descriptor_sha256 != binding.precompute_descriptor_sha256
+            ):
+                raise AlphaMaxRuntimeContractError(
+                    "alpha_max_training_worker_precompute_identity_invalid"
+                )
+            calendar, returns, native = _alpha_max_replay_training_component_returns(
+                preflight,
+                output_root=output_root,
+                manifest_receipt=manifest,
+                admitted_symbols=tuple(descriptor["universe"]["admitted_symbols"]),
+                root_seals=seals,
+                checkpoint_store=store,
+            )
+            result = _alpha_max_training_component_checkpoint_bytes(
+                component_id=component_id,
+                manifest=manifest,
+                calendar=calendar,
+                returns=returns,
+                native_finalization=native,
+            )
+            _alpha_max_training_component_from_checkpoint(
+                result, preflight=preflight, component_id=component_id, manifest=manifest
+            )
+            _alpha_max_revalidate_training_worker_authorities(
+                binding, parent_fd=parent_fd, output_fd=output_fd, store=store
+            )
+            return component_id, "complete", result, ""
+        finally:
+            if store is not None:
+                store.close()
+            if output_fd >= 0:
+                os.close(output_fd)
+            os.close(parent_fd)
+    except BaseException as exc:
+        token = (
+            str(exc)
+            if type(exc) is AlphaMaxRuntimeContractError
+            and re.fullmatch(r"[a-z0-9_:-]{1,128}", str(exc)) is not None
+            else type(exc).__name__
+        )
+        return component_id, "semantic_failure", b"", token
+
+
+def _run_alpha_max_training_component_workers(
+    items: tuple[_AlphaMaxTrainingWorkerItem, ...], *, max_training_workers: int
+) -> tuple[_AlphaMaxTrainingWorkerResult, ...]:
+    if (
+        not 1 <= max_training_workers <= _ALPHA_MAX_MAX_PARALLEL_WORKERS
+        or not items
+        or len(items) > 3
+    ):
+        raise AlphaMaxRuntimeContractError("alpha_max_training_worker_count_invalid")
+    if tuple(item[0] for item in items) != tuple(sorted(item[0] for item in items)):
+        raise AlphaMaxRuntimeContractError("alpha_max_training_worker_item_order_invalid")
+    with ProcessPoolExecutor(
+        max_workers=min(max_training_workers, len(items), 3),
+        mp_context=multiprocessing.get_context("spawn"),
+    ) as executor:
+        return tuple(executor.map(_alpha_max_replay_training_component_worker, items))
 
 
 def run_alpha_max_prelock_process(
@@ -12690,6 +13179,7 @@ def run_alpha_max_prelock_process(
     matrix whose gates found no survivor.
     """
     reject_ambient_lq_environment()
+    require_alpha_max_fresh_process_runtime()
     if (
         type(max_training_workers) is not int
         or not 1 <= max_training_workers <= _ALPHA_MAX_MAX_PARALLEL_WORKERS
@@ -12883,40 +13373,28 @@ def run_alpha_max_prelock_process(
             except AlphaMaxRuntimeContractError, TypeError, ValueError:
                 training_store.poison()
                 raise
-            global _ALPHA_MAX_TRAINING_WORKER_CONTEXT
-            _ALPHA_MAX_TRAINING_WORKER_CONTEXT = (
-                run_preflight,
-                root,
-                root_seals,
-                admitted_symbols,
-                (
-                    checkpoint_store.training_precompute_store()._display_root,
-                    checkpoint_store.training_precompute_store()._attempt_descriptor_sha256,
-                    checkpoint_store.training_precompute_store()._attempt_role,
-                    checkpoint_store.training_precompute_store()._domain,
-                    checkpoint_store.training_precompute_store()._runtime_identity_sha256,
-                    checkpoint_store.training_precompute_store()._training_day_ids,
-                    checkpoint_store.training_precompute_store()._transaction_lock_identity,
-                    tuple(implementation_inventory),
-                    checkpoint_store._runtime_identity,
-                    checkpoint_store._output_parent_fd,
-                    checkpoint_store._bound_output_fd,
-                    checkpoint_store._bound_output_identity,
-                    checkpoint_store._display_output_root.name,
-                ),
-                MappingProxyType(component_manifests),
-            )
             try:
-                with ProcessPoolExecutor(
-                    max_workers=min(max_training_workers, len(missing_component_ids)),
-                    mp_context=multiprocessing.get_context("fork"),
-                ) as executor:
-                    completed = dict(
-                        executor.map(
-                            _alpha_max_replay_training_component_worker,
-                            missing_component_ids,
-                        )
+                items = tuple(
+                    (
+                        component_id,
+                        _alpha_max_training_worker_binding_bytes(
+                            component_id=component_id,
+                            attempt_descriptor=attempt_descriptor,
+                            checkpoint_store=checkpoint_store,
+                            manifest=component_manifests[component_id],
+                            root_seals=root_seals,
+                        ),
+                        "",
                     )
+                    for component_id in missing_component_ids
+                )
+                items = tuple(
+                    (component_id, binding, _sha256(binding))
+                    for component_id, binding, _unused in items
+                )
+                results = _run_alpha_max_training_component_workers(
+                    items, max_training_workers=max_training_workers
+                )
             except BrokenProcessPool:
                 # A killed worker cannot have made a semantic claim; immutable
                 # completed day units remain the only resumable progress.
@@ -12924,11 +13402,30 @@ def run_alpha_max_prelock_process(
             except AlphaMaxRuntimeContractError, TypeError, ValueError:
                 checkpoint_store.training_precompute_store().poison()
                 raise
-            finally:
-                _ALPHA_MAX_TRAINING_WORKER_CONTEXT = None
             try:
-                if tuple(completed) != missing_component_ids:
+                if (
+                    any(
+                        type(result) is not tuple
+                        or len(result) != 4
+                        or result[1] not in {"complete", "semantic_failure"}
+                        or type(result[2]) is not bytes
+                        or type(result[3]) is not str
+                        for result in results
+                    )
+                    or tuple(result[0] for result in results) != missing_component_ids
+                    or any(result[1] != "complete" or result[3] for result in results)
+                ):
                     raise AlphaMaxRuntimeContractError("alpha_max_training_worker_result_invalid")
+                completed = {
+                    component_id: payload for component_id, _status, payload, _token in results
+                }
+                for component_id in missing_component_ids:
+                    _alpha_max_training_component_from_checkpoint(
+                        completed[component_id],
+                        preflight=run_preflight,
+                        component_id=component_id,
+                        manifest=component_manifests[component_id],
+                    )
                 train_raw_seal = root_seals[("train", "raw")]
                 _validate_alpha_max_root_seals(
                     raw_root=train_raw_seal.path,

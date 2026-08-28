@@ -387,6 +387,12 @@ _EXPECTED_DANGEROUS_SITES = Counter(
         ): 1,
         (
             "alpha_max_engine_runner.py",
+            "_alpha_max_replay_training_component_worker",
+            "os.environ",
+            None,
+        ): 1,
+        (
+            "alpha_max_engine_runner.py",
             "_alpha_max_indicator_day_checkpoint_descriptor",
             "os.environ",
             None,

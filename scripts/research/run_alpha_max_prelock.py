@@ -8,6 +8,7 @@ from collections.abc import Sequence
 
 from lumina_quant.alpha_max_process_boundary import (
     alpha_max_bootstrap_implementation_inventory,
+    require_alpha_max_fresh_process_runtime,
     reject_ambient_lq_environment,
 )
 
@@ -69,6 +70,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     # This dependency-free gate runs before importing the runtime/configuration
     # graph, parser construction, or any user-controlled filesystem operation.
     reject_ambient_lq_environment()
+    require_alpha_max_fresh_process_runtime()
     bootstrap_inventory = alpha_max_bootstrap_implementation_inventory()
     args = build_parser().parse_args(argv)
     return _execute(

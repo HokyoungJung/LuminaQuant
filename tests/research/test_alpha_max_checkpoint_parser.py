@@ -699,6 +699,124 @@ def _fake_root_seal(tmp_path: Path, root_id: str, root_kind: str):
     return seal
 
 
+def test_root_seal_parser_requires_exact_canonical_spawn_transport_bytes(
+    tmp_path: Path,
+) -> None:
+    start, end = evidence._ROOT_INTERVALS["train"]
+    root = (tmp_path / "train-raw").resolve()
+    root.mkdir()
+    availability_start = MappingProxyType(
+        dict.fromkeys(evidence.ALPHA_MAX_CANDIDATE_SYMBOLS, start)
+    )
+    availability_end = MappingProxyType(dict.fromkeys(evidence.ALPHA_MAX_CANDIDATE_SYMBOLS, end))
+    entries = []
+    for symbol in evidence.ALPHA_MAX_CANDIDATE_SYMBOLS:
+        partition_start = start.replace(day=1)
+        while partition_start < end:
+            partition_end = (
+                partition_start.replace(year=partition_start.year + 1, month=1)
+                if partition_start.month == 12
+                else partition_start.replace(month=partition_start.month + 1)
+            )
+            owned_start = max(start, partition_start)
+            owned_end = min(end, partition_end)
+            row_count = int((owned_end - owned_start).total_seconds())
+            entries.append(
+                evidence.AlphaMaxTreeEntry(
+                    relative_path=(
+                        f"market_ohlcv_1s/binance/{symbol}/{partition_start:%Y-%m}.parquet"
+                    ),
+                    byte_count=1,
+                    mode=0o444,
+                    mtime_ns=0,
+                    minimum_timestamp_ms=evidence._epoch_ms(owned_start),
+                    maximum_timestamp_ms=evidence._epoch_ms(owned_end) - 1000,
+                    row_count=row_count,
+                    maximum_gap_ms=1000,
+                    sha256=_sha256(f"{symbol}:{partition_start:%Y-%m}".encode()),
+                )
+            )
+            partition_start = partition_end
+    ordered_entries = tuple(sorted(entries, key=lambda entry: entry.relative_path))
+    inventory_payload = [
+        {
+            "byte_count": entry.byte_count,
+            "maximum_timestamp_ms": entry.maximum_timestamp_ms,
+            "maximum_gap_ms": entry.maximum_gap_ms,
+            "minimum_timestamp_ms": entry.minimum_timestamp_ms,
+            "mode": entry.mode,
+            "mtime_ns": entry.mtime_ns,
+            "relative_path": entry.relative_path,
+            "row_count": entry.row_count,
+        }
+        for entry in ordered_entries
+    ]
+    content_payload = [
+        {
+            "byte_count": entry.byte_count,
+            "maximum_timestamp_ms": entry.maximum_timestamp_ms,
+            "maximum_gap_ms": entry.maximum_gap_ms,
+            "minimum_timestamp_ms": entry.minimum_timestamp_ms,
+            "relative_path": entry.relative_path,
+            "row_count": entry.row_count,
+            "sha256": entry.sha256,
+        }
+        for entry in ordered_entries
+    ]
+    inventory_sha256 = evidence._sha256_bytes(
+        evidence._canonical_json_bytes(inventory_payload, newline=True)
+    )
+    content_sha256 = evidence._sha256_bytes(
+        evidence._canonical_json_bytes(content_payload, newline=True)
+    )
+    availability_sha256 = evidence._alpha_max_availability_sha256(
+        availability_start, availability_end
+    )
+    payload = {
+        "artifact_kind": "alpha_max_root_seal.v2",
+        "availability_end_by_symbol": {
+            symbol: end.isoformat().replace("+00:00", "Z")
+            for symbol in evidence.ALPHA_MAX_CANDIDATE_SYMBOLS
+        },
+        "availability_sha256": availability_sha256,
+        "availability_start_by_symbol": {
+            symbol: start.isoformat().replace("+00:00", "Z")
+            for symbol in evidence.ALPHA_MAX_CANDIDATE_SYMBOLS
+        },
+        "content_sha256": content_sha256,
+        "end_utc": end.isoformat().replace("+00:00", "Z"),
+        "entries": [entry.to_payload() for entry in ordered_entries],
+        "exchange": "binance",
+        "file_count": len(ordered_entries),
+        "inventory_sha256": inventory_sha256,
+        "path": str(root),
+        "root_id": "train",
+        "root_kind": "raw",
+        "start_utc": start.isoformat().replace("+00:00", "Z"),
+        "symbols": list(evidence.ALPHA_MAX_CANDIDATE_SYMBOLS),
+    }
+    raw = runner._canonical_bytes(payload) + b"\n"
+    parsed = evidence.parse_alpha_max_root_seal(
+        raw,
+        expected_root_id="train",
+        expected_root_kind="raw",
+        expected_sha256=_sha256(raw),
+    )
+    assert parsed.canonical_bytes == raw
+    for tampered in (
+        raw.replace(b'"root_id":"train"', b'"root_id":"warmup"'),
+        raw.replace(b"\n", b" \n"),
+        raw[:-1],
+    ):
+        with pytest.raises(ValueError, match="alpha_max_root_seal_parse_invalid"):
+            evidence.parse_alpha_max_root_seal(
+                tampered,
+                expected_root_id="train",
+                expected_root_kind="raw",
+                expected_sha256=_sha256(tampered),
+            )
+
+
 def _native_finalization(fold_id: str, row_id: str):
     _start, end = evidence._ALPHA_MAX_FOLD_INTERVALS[fold_id]
     completed = [["BTCUSDT", end.date().isoformat()]]
@@ -1105,7 +1223,7 @@ def test_training_day_checkpoint_rejects_tamper_and_out_of_order(
 def test_precompute_transaction_lock_replacement_is_rejected(tmp_path: Path) -> None:
     output = (tmp_path / "output").resolve()
     checkpoint = (tmp_path / "checkpoint").resolve()
-    descriptor = _v2_cell_descriptor(checkpoint, output, domain="validation")
+    descriptor = _v3_cell_descriptor(checkpoint, output, domain="validation")
     store = runner._AlphaMaxCellCheckpointStore(
         checkpoint,
         output_root=output,
@@ -1125,7 +1243,7 @@ def test_precompute_transaction_lock_replacement_is_rejected(tmp_path: Path) -> 
         journal.load(unit_kind="training_prefix", unit_id="component_carry_1x")
 
 
-def _v2_cell_descriptor(
+def _v3_cell_descriptor(
     checkpoint: Path,
     output: Path,
     *,
@@ -1142,7 +1260,7 @@ def _v2_cell_descriptor(
         for row_id, nominal, fold_id in runner._alpha_max_physical_fold_schedule(domain)
     ]
     descriptor: dict[str, object] = {
-        "artifact_kind": "alpha_max_restartable_attempt_descriptor.v2",
+        "artifact_kind": "alpha_max_restartable_attempt_descriptor.v3",
         "attempt_role": role,
         "domain": domain,
         "checkpoint_unit": "whole_row_cost_cell",
@@ -1187,6 +1305,12 @@ def _v2_cell_descriptor(
         "runtime_identity": runner._alpha_max_indicator_runtime_binding(),
         "runtime_contract_sha256": "a" * 64,
         "thread_contract": {},
+        "training_worker_transport": {
+            "binding_schema": "alpha_max_training_component_worker_binding.v1",
+            "maximum_component_processes": 3,
+            "result_statuses": ["complete", "semantic_failure"],
+            "start_method": "spawn",
+        },
         "universe": {},
     }
     if role == "historical":
@@ -1306,27 +1430,7 @@ def test_checkpoint_store_seals_and_reloads_exact_typed_cell(
     context = _build_context(tmp_path, monkeypatch)
     output = (tmp_path / "official-output").resolve()
     checkpoint = (tmp_path / "checkpoint").resolve()
-    descriptor = {
-        "artifact_kind": "alpha_max_restartable_attempt_descriptor.v1",
-        "attempt_role": "prelock",
-        "implementation_inventory": runner._alpha_max_checkpoint_implementation_inventory(),
-        "checkpoint": {
-            "parent": str(checkpoint.parent),
-            "parent_identity": [
-                checkpoint.parent.stat().st_dev,
-                checkpoint.parent.stat().st_ino,
-            ],
-            "root": str(checkpoint),
-        },
-        "output": {
-            "parent": str(output.parent),
-            "parent_identity": [
-                output.parent.stat().st_dev,
-                output.parent.stat().st_ino,
-            ],
-            "target": str(output),
-        },
-    }
+    descriptor = _v3_cell_descriptor(checkpoint, output, domain="validation")
     store = runner._AlphaMaxCellCheckpointStore(
         checkpoint,
         output_root=output,
@@ -1347,7 +1451,7 @@ def test_checkpoint_store_seals_and_reloads_exact_typed_cell(
         "SEALED.json",
     )
     seal = __import__("json").loads((cell_path / "SEALED.json").read_bytes())
-    assert seal["artifact_kind"] == "alpha_max_restartable_cost_cell_seal.v1"
+    assert seal["artifact_kind"] == "alpha_max_restartable_cost_cell_seal.v2"
     assert set(seal) == {
         "artifact_kind",
         "attempt_descriptor_sha256",
@@ -1357,11 +1461,17 @@ def test_checkpoint_store_seals_and_reloads_exact_typed_cell(
         "config_sha256",
         "domain",
         "evidence_sha256",
+        "fold_count",
+        "fold_ids",
+        "fold_run_set_sha256",
         "manifest_sha256",
         "nominal_cost_bps",
+        "physical_schedule_sha256",
+        "prelock_binding",
         "root_receipt_identities",
         "row_id",
         "runtime_contract_sha256",
+        "runtime_identity_sha256",
         "success",
     }
     store.__del__()
@@ -1385,10 +1495,10 @@ def test_checkpoint_store_seals_and_reloads_exact_typed_cell(
     assert loaded == context.cell
 
 
-def test_v2_prelock_descriptor_requires_prior_trial_blob_binding(
+def test_v3_prelock_descriptor_requires_prior_trial_blob_binding(
     tmp_path: Path,
 ) -> None:
-    descriptor = _v2_cell_descriptor(
+    descriptor = _v3_cell_descriptor(
         (tmp_path / "prelock-checkpoint").resolve(),
         (tmp_path / "prelock-output").resolve(),
         domain="validation",
@@ -1403,10 +1513,10 @@ def test_v2_prelock_descriptor_requires_prior_trial_blob_binding(
         runner._alpha_max_validate_checkpoint_descriptor(descriptor)
 
 
-def test_v2_checkpoint_rejects_loaded_native_identity_mismatch(tmp_path: Path) -> None:
+def test_v3_checkpoint_rejects_loaded_native_identity_mismatch(tmp_path: Path) -> None:
     output = (tmp_path / "prelock-output").resolve()
     checkpoint = (tmp_path / "prelock-checkpoint").resolve()
-    descriptor = _v2_cell_descriptor(checkpoint, output, domain="validation")
+    descriptor = _v3_cell_descriptor(checkpoint, output, domain="validation")
     descriptor["runtime_identity"]["extension_sha256"] = "f" * 64
 
     with pytest.raises(
@@ -1472,7 +1582,7 @@ def test_precompute_checkpoint_store_seals_reloads_and_rejects_tamper(
 ) -> None:
     output = (tmp_path / "prelock-output").resolve()
     checkpoint = (tmp_path / "prelock-checkpoint").resolve()
-    descriptor = _v2_cell_descriptor(checkpoint, output, domain="validation")
+    descriptor = _v3_cell_descriptor(checkpoint, output, domain="validation")
     config_bytes = b'{"config":"test"}\n'
     store = runner._AlphaMaxCellCheckpointStore(
         checkpoint,
@@ -1654,7 +1764,7 @@ def test_precompute_rejects_tampered_failure_mode_combinations(
 def test_precompute_checkpoint_rejects_units_directory_replacement(tmp_path: Path) -> None:
     output = (tmp_path / "prelock-output").resolve()
     checkpoint = (tmp_path / "prelock-checkpoint").resolve()
-    descriptor = _v2_cell_descriptor(checkpoint, output, domain="validation")
+    descriptor = _v3_cell_descriptor(checkpoint, output, domain="validation")
     store = runner._AlphaMaxCellCheckpointStore(
         checkpoint,
         output_root=output,
@@ -1690,7 +1800,7 @@ def test_cell_checkpoint_rejects_cells_directory_replacement(
     context = _build_context(tmp_path, monkeypatch)
     output = (tmp_path / "prelock-output").resolve()
     checkpoint = (tmp_path / "prelock-checkpoint").resolve()
-    descriptor = _v2_cell_descriptor(checkpoint, output, domain="validation")
+    descriptor = _v3_cell_descriptor(checkpoint, output, domain="validation")
     store = runner._AlphaMaxCellCheckpointStore(
         checkpoint,
         output_root=output,
@@ -1723,7 +1833,7 @@ def test_cell_checkpoint_rejects_cells_directory_replacement(
 def test_cell_checkpoint_root_lock_survives_lock_path_replacement(tmp_path: Path) -> None:
     output = (tmp_path / "prelock-output").resolve()
     checkpoint = (tmp_path / "prelock-checkpoint").resolve()
-    descriptor = _v2_cell_descriptor(checkpoint, output, domain="validation")
+    descriptor = _v3_cell_descriptor(checkpoint, output, domain="validation")
     config_bytes = b'{"config":"test"}\n'
     store = runner._AlphaMaxCellCheckpointStore(
         checkpoint,
@@ -1764,7 +1874,7 @@ def test_precompute_checkpoint_rejects_unknown_and_cleans_exact_staging(
 ) -> None:
     output = (tmp_path / "prelock-output").resolve()
     checkpoint = (tmp_path / "prelock-checkpoint").resolve()
-    descriptor = _v2_cell_descriptor(checkpoint, output, domain="validation")
+    descriptor = _v3_cell_descriptor(checkpoint, output, domain="validation")
     config_bytes = b'{"config":"test"}\n'
     store = runner._AlphaMaxCellCheckpointStore(
         checkpoint,
@@ -1932,7 +2042,7 @@ def test_historical_checkpoint_store_round_trip_binds_ten_fold_cell_and_prelock(
     )
     output = (tmp_path / "historical-output").resolve()
     checkpoint = (tmp_path / "historical-checkpoint").resolve()
-    descriptor = _v2_cell_descriptor(
+    descriptor = _v3_cell_descriptor(
         checkpoint,
         output,
         domain="historical_exposed_evaluation",
@@ -2003,7 +2113,7 @@ def test_historical_checkpoint_descriptor_rejects_role_and_schedule_aliases(
 ) -> None:
     output = (tmp_path / "historical-output").resolve()
     checkpoint = (tmp_path / "historical-checkpoint").resolve()
-    descriptor = _v2_cell_descriptor(
+    descriptor = _v3_cell_descriptor(
         checkpoint,
         output,
         domain="historical_exposed_evaluation",
@@ -2040,7 +2150,7 @@ def test_historical_checkpoint_descriptor_rejects_role_and_schedule_aliases(
         runner._alpha_max_validate_checkpoint_descriptor(wrong_prelock)
 
 
-def test_prelock_v1_descriptor_rejects_historical_v2_fields(tmp_path: Path) -> None:
+def test_legacy_v1_descriptor_is_version_invalid(tmp_path: Path) -> None:
     output = (tmp_path / "output").resolve()
     checkpoint = (tmp_path / "checkpoint").resolve()
     descriptor = {
@@ -2058,12 +2168,10 @@ def test_prelock_v1_descriptor_rejects_historical_v2_fields(tmp_path: Path) -> N
             "target": str(output),
         },
     }
-    assert runner._alpha_max_validate_checkpoint_descriptor(descriptor) == (
-        "prelock",
-        "validation",
-    )
-    descriptor["domain"] = "historical_exposed_evaluation"
-    with pytest.raises(runner.AlphaMaxRuntimeContractError):
+    with pytest.raises(
+        runner.AlphaMaxRuntimeContractError,
+        match="alpha_max_checkpoint_descriptor_version_invalid",
+    ):
         runner._alpha_max_validate_checkpoint_descriptor(descriptor)
 
 
@@ -2074,27 +2182,7 @@ def test_checkpoint_store_rejects_duplicate_key_evidence(
     context = _build_context(tmp_path, monkeypatch)
     output = (tmp_path / "official-output").resolve()
     checkpoint = (tmp_path / "checkpoint").resolve()
-    descriptor = {
-        "artifact_kind": "alpha_max_restartable_attempt_descriptor.v1",
-        "attempt_role": "prelock",
-        "implementation_inventory": runner._alpha_max_checkpoint_implementation_inventory(),
-        "checkpoint": {
-            "parent": str(checkpoint.parent),
-            "parent_identity": [
-                checkpoint.parent.stat().st_dev,
-                checkpoint.parent.stat().st_ino,
-            ],
-            "root": str(checkpoint),
-        },
-        "output": {
-            "parent": str(output.parent),
-            "parent_identity": [
-                output.parent.stat().st_dev,
-                output.parent.stat().st_ino,
-            ],
-            "target": str(output),
-        },
-    }
+    descriptor = _v3_cell_descriptor(checkpoint, output, domain="validation")
     store = runner._AlphaMaxCellCheckpointStore(
         checkpoint,
         output_root=output,
@@ -2184,27 +2272,7 @@ def test_checkpoint_store_rejects_replaced_descriptor_parent(
     output_parent.mkdir()
     checkpoint = checkpoint_parent / "checkpoint"
     output = output_parent / "output"
-    descriptor = {
-        "artifact_kind": "alpha_max_restartable_attempt_descriptor.v1",
-        "attempt_role": "prelock",
-        "implementation_inventory": runner._alpha_max_checkpoint_implementation_inventory(),
-        "checkpoint": {
-            "parent": str(checkpoint_parent),
-            "parent_identity": [
-                checkpoint_parent.stat().st_dev,
-                checkpoint_parent.stat().st_ino,
-            ],
-            "root": str(checkpoint),
-        },
-        "output": {
-            "parent": str(output_parent),
-            "parent_identity": [
-                output_parent.stat().st_dev,
-                output_parent.stat().st_ino,
-            ],
-            "target": str(output),
-        },
-    }
+    descriptor = _v3_cell_descriptor(checkpoint, output, domain="validation")
     displaced = tmp_path / "checkpoint-parent-original"
     checkpoint_parent.rename(displaced)
     checkpoint_parent.mkdir()
@@ -2231,27 +2299,7 @@ def test_run_root_creation_stays_in_bound_output_parent_after_path_replacement(
     output_parent.mkdir()
     checkpoint = checkpoint_parent / "checkpoint"
     output = output_parent / "output"
-    descriptor = {
-        "artifact_kind": "alpha_max_restartable_attempt_descriptor.v1",
-        "attempt_role": "prelock",
-        "implementation_inventory": runner._alpha_max_checkpoint_implementation_inventory(),
-        "checkpoint": {
-            "parent": str(checkpoint_parent),
-            "parent_identity": [
-                checkpoint_parent.stat().st_dev,
-                checkpoint_parent.stat().st_ino,
-            ],
-            "root": str(checkpoint),
-        },
-        "output": {
-            "parent": str(output_parent),
-            "parent_identity": [
-                output_parent.stat().st_dev,
-                output_parent.stat().st_ino,
-            ],
-            "target": str(output),
-        },
-    }
+    descriptor = _v3_cell_descriptor(checkpoint, output, domain="validation")
     store = runner._AlphaMaxCellCheckpointStore(
         checkpoint,
         output_root=output,
@@ -2280,27 +2328,7 @@ def test_cell_is_loadable_after_crash_immediately_after_atomic_directory_rename(
     context = _build_context(tmp_path, monkeypatch)
     output = (tmp_path / "official-output").resolve()
     checkpoint = (tmp_path / "checkpoint").resolve()
-    descriptor = {
-        "artifact_kind": "alpha_max_restartable_attempt_descriptor.v1",
-        "attempt_role": "prelock",
-        "implementation_inventory": runner._alpha_max_checkpoint_implementation_inventory(),
-        "checkpoint": {
-            "parent": str(checkpoint.parent),
-            "parent_identity": [
-                checkpoint.parent.stat().st_dev,
-                checkpoint.parent.stat().st_ino,
-            ],
-            "root": str(checkpoint),
-        },
-        "output": {
-            "parent": str(output.parent),
-            "parent_identity": [
-                output.parent.stat().st_dev,
-                output.parent.stat().st_ino,
-            ],
-            "target": str(output),
-        },
-    }
+    descriptor = _v3_cell_descriptor(checkpoint, output, domain="validation")
     store = runner._AlphaMaxCellCheckpointStore(
         checkpoint,
         output_root=output,
