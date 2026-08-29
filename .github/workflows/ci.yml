@@ -95,7 +95,7 @@ jobs:
         run: uv sync --group dev --extra optimize --extra research-ml --extra live-binance --extra live-mt5 --extra live-polymarket --extra dashboard
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "20"
 
