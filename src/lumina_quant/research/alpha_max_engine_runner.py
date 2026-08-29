@@ -780,11 +780,14 @@ class _AlphaMaxFoldEquityFanout(AlphaMaxStreamingEquityTracker):
             raise AlphaMaxRuntimeContractError("alpha_max_reporting_backtest_missing")
         portfolio = self._backtest.portfolio
         cash = float(portfolio.current_holdings["cash"])
-        market_values = {
-            symbol: float(portfolio.current_positions[symbol])
-            * self._completed_native_close(symbol, boundary_ms)
-            for symbol in portfolio.symbol_list
-        }
+        market_values: dict[str, float] = {}
+        for symbol in portfolio.symbol_list:
+            position = float(portfolio.current_positions[symbol])
+            market_values[symbol] = (
+                0.0
+                if position == 0.0
+                else position * self._completed_native_close(symbol, boundary_ms)
+            )
         total = cash + math.fsum(market_values.values())
         if not math.isfinite(total):
             raise AlphaMaxRuntimeContractError("alpha_max_reporting_endpoint_nonfinite")
@@ -12879,7 +12882,11 @@ def _alpha_max_replay_training_component_worker(
                 os.close(output_fd)
             os.close(parent_fd)
     except BaseException as exc:
-        raw_token = str(exc) if type(exc) is AlphaMaxRuntimeContractError else type(exc).__name__
+        raw_token = (
+            str(exc)
+            if type(exc) in {AlphaMaxRuntimeContractError, ValueError}
+            else type(exc).__name__
+        )
         token = (
             raw_token
             if re.fullmatch(r"[a-z0-9_:-]{1,128}", raw_token) is not None

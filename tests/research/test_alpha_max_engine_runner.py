@@ -1413,6 +1413,12 @@ def test_actual_backtest_construction_binds_all_alpha_runtime_seams(
                 ),
             ),
         )
+    # Symbols with no position do not require a price.  A newly listed symbol
+    # can legitimately have no completed native bar at an early fold boundary.
+    aggregator_state = aggregator.get_state()
+    aggregator_state["history"].pop(admitted[-1])
+    aggregator_state["working"].pop(admitted[-1])
+    aggregator.set_state(aggregator_state)
     activation.backtest.timeframe_aggregator = aggregator
     activation.backtest.portfolio.current_holdings["cash"] = 1_000.0
     activation.backtest.portfolio.current_positions[admitted[0]] = 2.0
