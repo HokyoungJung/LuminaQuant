@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+
 from datetime import timedelta
 from pathlib import Path
 from types import MappingProxyType
@@ -203,3 +204,46 @@ def test_sealed_raw_reader_retains_original_root_across_path_swap(tmp_path, monk
         reader.close()
 
     assert frame.get_column("close").to_list() == [100.0] * 20
+
+
+def test_sealed_raw_reader_rejects_descriptor_hash_mismatch(tmp_path, monkeypatch) -> None:
+    _root, seal, entry, _target = _sealed_raw_fixture(tmp_path, monkeypatch)
+    reader = runner._AlphaMaxSealedRawReader(seal)
+    object.__setattr__(entry, "sha256", "0" * 64)
+    try:
+        with pytest.raises(
+            runner.AlphaMaxRuntimeContractError,
+            match="alpha_max_sealed_raw_hash_mismatch",
+        ):
+            reader.read_entry(entry)
+    finally:
+        reader.close()
+
+
+def test_sealed_raw_reader_revalidates_descriptor_after_parquet_read(tmp_path, monkeypatch) -> None:
+    _root, seal, entry, target = _sealed_raw_fixture(tmp_path, monkeypatch)
+    observed_sources = []
+
+    def mutate_after_hash(source):
+        observed_sources.append(source)
+        assert source.tell() == 0
+        assert source.fileno() >= 0
+        observed = target.stat()
+        os.utime(
+            target,
+            ns=(observed.st_atime_ns, observed.st_mtime_ns + 1_000_000),
+        )
+        return pl.DataFrame()
+
+    monkeypatch.setattr(pl, "read_parquet", mutate_after_hash)
+    reader = runner._AlphaMaxSealedRawReader(seal)
+    try:
+        with pytest.raises(
+            runner.AlphaMaxRuntimeContractError,
+            match="alpha_max_sealed_raw_changed_during_read",
+        ):
+            reader.read_entry(entry)
+    finally:
+        reader.close()
+
+    assert len(observed_sources) == 1

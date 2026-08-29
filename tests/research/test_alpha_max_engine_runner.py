@@ -1622,6 +1622,31 @@ def test_bounded_raw_loader_reuses_authenticated_month_frame_across_days() -> No
     assert loader._reader.paths == [entry.relative_path]
 
 
+def test_bounded_raw_loader_close_releases_cached_month_frames() -> None:
+    class Reader:
+        def __init__(self) -> None:
+            self.closed = False
+
+        def close(self) -> None:
+            self.closed = True
+
+    loader = object.__new__(alpha_max_runner._AlphaMaxBoundedRawLoader)
+    loader._frame_cache = {"ADAUSDT": ("2025-06.parquet", pl.DataFrame({"close": [100.0]}))}
+    reader = Reader()
+    loader._reader = reader
+
+    loader.close()
+
+    assert reader.closed is True
+    assert loader._frame_cache == {}
+    assert loader._reader is None
+    with pytest.raises(
+        AlphaMaxRuntimeContractError,
+        match="alpha_max_bounded_raw_loader_closed",
+    ):
+        loader._read_entry_cached("ADAUSDT", object())
+
+
 def _assert_bit_exact(actual: object, expected: object) -> None:
     if isinstance(expected, float):
         assert type(actual) is float
@@ -2439,7 +2464,7 @@ def test_exact_tick_reducer_matches_one_second_engine_state(
     }
 
     def activation(tracker: AlphaMaxStreamingEquityTracker):
-        return construct_alpha_max_engine(
+        result = construct_alpha_max_engine(
             preflight,
             output_root=str(root),
             phase="validation_train_fit",
@@ -2455,6 +2480,7 @@ def test_exact_tick_reducer_matches_one_second_engine_state(
             _chunk_start_utc=start,
             _chunk_end_utc=start + timedelta(days=1),
         )
+        return result
 
     reference_tracker = AlphaMaxStreamingEquityTracker()
     reference = activation(reference_tracker)
@@ -3547,14 +3573,78 @@ def test_trend_liquidity_falsifier_is_wired_to_prelock_and_historical_artifact_p
     assert "historical_trend_liquidity_falsifier" in historical_source
 
 
-def test_indicator_incremental_checkpoint_is_opt_in_and_final_only() -> None:
-    """The operational journal is deliberately not part of capsule output."""
-    parameters = inspect.signature(
-        alpha_max_runner._build_alpha_max_indicator_capsule_incremental
-    ).parameters
+def test_indicator_capsule_requires_exact_bounded_loader_and_keeps_checkpoint_external() -> None:
+    """Indicator replay has one exact-native path; the journal stays out of capsules."""
+    parameters = inspect.signature(alpha_max_runner.build_alpha_max_indicator_capsule).parameters
+    assert parameters["bounded_raw_loader"].default is inspect.Parameter.empty
+    assert "data_dict" not in parameters
     assert parameters["checkpoint_store"].default is None
-    assert (
-        "checkpoint_store"
-        in inspect.signature(alpha_max_runner.build_alpha_max_indicator_capsule).parameters
-    )
     assert "checkpoint" not in alpha_max_runner.AlphaMaxIndicatorCapsule.__dataclass_fields__
+
+
+@pytest.mark.parametrize(
+    ("mask", "offset", "expected"),
+    (
+        (np.array([], dtype=bool), 0, None),
+        (np.array([False, False, False]), 17, None),
+        (np.array([True, False, True]), 3, 3),
+        (np.array([False, False, True, True]), 9, 11),
+        (np.array([[False, False], [True, False]]), 5, 7),
+    ),
+)
+def test_first_true_index_preserves_flattened_first_match_without_match_array(
+    mask: np.ndarray, offset: int, expected: int | None
+) -> None:
+    assert alpha_max_runner._alpha_max_first_true_index(mask, offset=offset) == expected
+
+
+def test_exact_tick_reducer_fails_closed_when_columnar_contract_is_invalid(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class InvalidColumnarHandler:
+        def alpha_max_exact_columnar_view(self) -> object:
+            raise ValueError("alpha_max_columnar_rows_invalid")
+
+    generic_replay_called = False
+
+    def generic_replay() -> None:
+        nonlocal generic_replay_called
+        generic_replay_called = True
+
+    handler = InvalidColumnarHandler()
+    backtest = SimpleNamespace(
+        data_handler=handler,
+        record_history=False,
+        track_metrics=False,
+        record_trades=False,
+        portfolio=SimpleNamespace(strategy_quality=SimpleNamespace(enabled=False)),
+        timeframe_aggregator=None,
+        strategy=SimpleNamespace(required_timeframes=()),
+        _resolve_required_lookbacks=lambda: {},
+        _run_backtest=generic_replay,
+    )
+    activation = SimpleNamespace(backtest=backtest)
+    monkeypatch.setattr(
+        alpha_max_runner, "HistoricParquetWindowedDataHandler", InvalidColumnarHandler
+    )
+
+    with pytest.raises(AlphaMaxRuntimeContractError, match="alpha_max_tick_columnar_view_invalid"):
+        alpha_max_runner._run_alpha_max_exact_tick_reducer(activation)
+
+    assert generic_replay_called is False
+
+
+def test_checkpoint_schema_rejects_legacy_descriptor_versions() -> None:
+    assert (
+        "_include_v2_bindings"
+        not in inspect.signature(
+            alpha_max_runner._alpha_max_prelock_checkpoint_descriptor
+        ).parameters
+    )
+    with pytest.raises(
+        AlphaMaxRuntimeContractError,
+        match="alpha_max_checkpoint_descriptor_version_invalid",
+    ):
+        alpha_max_runner._alpha_max_validate_checkpoint_descriptor(
+            {"artifact_kind": "alpha_max_restartable_attempt_descriptor.v2"}
+        )

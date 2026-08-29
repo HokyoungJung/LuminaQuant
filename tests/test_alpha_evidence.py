@@ -16,7 +16,7 @@ def _factor_panel(periods: int = 10) -> pd.DataFrame:
     rows = []
     splits = ["train"] * 4 + ["validation"] * 4 + ["locked_oos"] * 2
     for idx, split in enumerate(splits[:periods]):
-        timestamp = pd.Timestamp("2026-01-01") + pd.Timedelta(hours=idx)
+        timestamp = pd.Timestamp("2026-01-01") + pd.to_timedelta(idx, unit="h")
         for rank, symbol in enumerate(("A", "B", "C", "D"), start=1):
             # Perfect positive cross-sectional relationship each period.
             rows.append(

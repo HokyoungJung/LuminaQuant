@@ -39,7 +39,7 @@
 ## 런타임 활성화
 
 ```bash
-uv sync --extra optimize --extra dev --extra live
+uv sync --extra optimize --extra dev --extra live-binance --extra live-mt5 --extra live-polymarket
 winget install --id Rustlang.Rustup -e --accept-source-agreements --accept-package-agreements --disable-interactivity
 export PATH="$PATH:/c/Users/<user>/.cargo/bin"
 ```

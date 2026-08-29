@@ -6,7 +6,7 @@ This quickstart is the fastest path to validate LuminaQuant on an **8GB RAM base
 
 ```bash
 uv python pin 3.13
-uv sync --extra optimize --extra dev --extra live
+uv sync --extra optimize --extra dev --extra live-binance --extra live-mt5 --extra live-polymarket
 ```
 
 Optional (Linux x86_64 + CUDA 12):

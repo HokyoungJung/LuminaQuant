@@ -5,7 +5,7 @@ Thanks for contributing.
 ## 1) Development Setup
 
 ```bash
-uv sync --extra optimize --extra dev --extra live
+uv sync --extra optimize --extra research-ml --extra dev --extra live-binance --extra live-mt5 --extra live-polymarket
 ```
 
 Optional extras:

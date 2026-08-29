@@ -561,6 +561,10 @@ class AlphaMaxCliProcessHarness:
                 SimpleNamespace(
                     fold_id=fold_id,
                     capsule_receipt=_CapsuleReceiptStub(fold_id, manifest_receipt.row_id),
+                    bounded_raw_loader=SimpleNamespace(
+                        clear_cache=lambda: None,
+                        close=lambda: None,
+                    ),
                 )
                 for fold_id in runner._alpha_max_fold_ids(domain)
             )
@@ -631,6 +635,10 @@ class AlphaMaxCliProcessHarness:
                     SimpleNamespace(
                         fold_id=fold_id,
                         capsule_receipt=_CapsuleReceiptStub(fold_id, manifest.row_id),
+                        bounded_raw_loader=SimpleNamespace(
+                            clear_cache=lambda: None,
+                            close=lambda: None,
+                        ),
                     )
                     for fold_id in runner._alpha_max_fold_ids(domain)
                 ),

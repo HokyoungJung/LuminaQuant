@@ -19,7 +19,6 @@ import ctypes
 import errno
 import fcntl
 import hashlib
-import io
 import json
 import math
 import multiprocessing
@@ -183,16 +182,16 @@ __all__ = [
 
 
 ALPHA_MAX_RUNTIME_CONTRACT_SHA256: Final[str] = (
-    "b3859443c842cf8b04d04ed32923e6c6a8207af18e26f68a717ba623b4edfef9"
+    "a6c945e43870c3d45e0f5f745e689eb75d68d82e0da07d22918df29e14ada753"
 )
 ALPHA_MAX_CONFIG_PAYLOAD_SHA256: Final[str] = (
-    "b062e3805d94087cc18cd22634918815503f94dd73f8fa8ac1979e7aef535f85"
+    "44cc454556f11d5bf66f8992e41343b0ada0ca8803a771342756057138e3cd44"
 )
 ALPHA_MAX_CONFIG_CANONICAL_SHA256: Final[str] = (
-    "691bf756519be1984ebb331142dce1b8787783d8da1d3e9911fbdd8d7d0d4ac3"
+    "3f54ec513402204602fc14233e59f3be0dcbef4f2e89f7cd065133305d023f1c"
 )
 ALPHA_MAX_CONFIG_FILE_SHA256: Final[str] = (
-    "2f267451c4df6b6b7471d972b7756327e41c82522ae2ef4b9198fbf6aa8b5e9c"
+    "01d1c783d8393966d356024ab41349b540339184384eb72ef2952ae11f4dad04"
 )
 ALPHA_MAX_INCUMBENT_RESOLUTION_AUDIT_SHA256: Final[str] = (
     "5133bc40116399fe7af32e75a1ecc52a4f385dc8a0b5d3a4a9585e2437615ed8"
@@ -350,11 +349,11 @@ _EXPECTED_BACKTEST_CONSTRUCTOR: Final[dict[str, object]] = {
         "fill_application_attribution_sink": "collector.record_application",
         "funding_boundary_resolver": "phase_owned_AlphaMaxFundingBoundaryResolver_by_identity",
     },
-    "record_history": True,
-    "record_trades": True,
+    "record_history": False,
+    "record_trades": False,
     "strategy_timeframe": "1s",
     "strict_data_handler_construction": True,
-    "track_metrics": True,
+    "track_metrics": False,
     "warmup_bars": 0,
 }
 _EXPECTED_PORTFOLIO_STRATEGY_CONSTRUCTOR: Final[dict[str, object]] = {
@@ -1291,7 +1290,7 @@ class AlphaMaxIndicatorPhaseInput:
     raw_root: str
     ordered_lookup: AlphaMaxOrderedFundingLookup
     watermark: object
-    data_dict: Mapping[str, object] | None = None
+    bounded_raw_loader: _AlphaMaxBoundedRawLoader
 
     def __post_init__(self) -> None:
         _alpha_max_current_root_id(self.phase_id)
@@ -1300,8 +1299,8 @@ class AlphaMaxIndicatorPhaseInput:
         _require_exact_explicit_path(self.raw_root)
         if type(self.ordered_lookup) is not AlphaMaxOrderedFundingLookup:
             raise TypeError("alpha_max_ordered_lookup_identity_invalid")
-        if self.data_dict is not None and not isinstance(self.data_dict, Mapping):
-            raise TypeError("alpha_max_indicator_phase_data_dict_invalid")
+        if type(self.bounded_raw_loader) is not _AlphaMaxBoundedRawLoader:
+            raise TypeError("alpha_max_bounded_raw_loader_identity_invalid")
 
 
 @dataclass(frozen=True, slots=True)
@@ -1430,6 +1429,14 @@ class _AlphaMaxPreparedReplayRow:
     manifest_receipt: AlphaMaxManifestReceipt
     fold_inputs: tuple[_AlphaMaxFoldReplayInput, ...]
     gross: float
+
+    def clear_raw_cache(self) -> None:
+        for fold_input in self.fold_inputs:
+            fold_input.bounded_raw_loader.clear_cache()
+
+    def close(self) -> None:
+        for fold_input in self.fold_inputs:
+            fold_input.bounded_raw_loader.close()
 
 
 class _AlphaMaxRowExecutor(Protocol):
@@ -2111,9 +2118,9 @@ def build_alpha_max_engine_constructor_plan(
         config=config,
         strategy_timeframe="1s",
         warmup_bars=0,
-        record_history=True,
-        track_metrics=True,
-        record_trades=True,
+        record_history=False,
+        track_metrics=False,
+        record_trades=False,
         strict_data_handler_construction=True,
         data_handler_kwargs=MappingProxyType(
             {
@@ -3031,9 +3038,9 @@ def validate_alpha_max_engine_activation(
             or activation.chunk_end_utc - activation.chunk_start_utc != timedelta(days=1)
             or plan.strategy_timeframe != "1s"
             or plan.warmup_bars != 0
-            or plan.record_history is not True
-            or plan.track_metrics is not True
-            or plan.record_trades is not True
+            or plan.record_history is not False
+            or plan.track_metrics is not False
+            or plan.record_trades is not False
             or plan.strict_data_handler_construction is not True
             or lookup.ordered_root_ids != _alpha_max_expected_root_sequence(activation.phase_id)
         ):
@@ -3058,9 +3065,9 @@ def validate_alpha_max_engine_activation(
             or backtest.portfolio_cls is not Portfolio
             or backtest.execution_handler_cls is not SimulatedExecutionHandler
             or backtest.strict_data_handler_construction is not True
-            or backtest.record_history is not True
-            or backtest.track_metrics is not True
-            or backtest.record_trades is not True
+            or backtest.record_history is not False
+            or backtest.track_metrics is not False
+            or backtest.record_trades is not False
             or backtest.strategy_timeframe != "1s"
             or backtest.warmup_bars != 0
             or type(backtest.data_handler) is not HistoricParquetWindowedDataHandler
@@ -4951,277 +4958,6 @@ def create_alpha_max_indicator_day_checkpoint_store(
     return _AlphaMaxIndicatorDayCheckpointStore(checkpoint_root, descriptor=descriptor)
 
 
-def _build_alpha_max_indicator_capsule_incremental(
-    preflight: AlphaMaxRuntimePreflight,
-    *,
-    output_root: str | os.PathLike[str],
-    phase: str,
-    manifest_path: str | os.PathLike[str],
-    admitted_symbols: tuple[str, ...],
-    phase_id: str,
-    raw_root: str | os.PathLike[str],
-    ordered_lookup: AlphaMaxOrderedFundingLookup,
-    watermark: object,
-    data_dict: Mapping[str, object] | None = None,
-    prior_indicator_capsule: AlphaMaxIndicatorCapsule | None = None,
-    bounded_raw_loader: _AlphaMaxBoundedRawLoader | None = None,
-    checkpoint_store: _AlphaMaxIndicatorDayCheckpointStore | None = None,
-) -> AlphaMaxIndicatorCapsule:
-    """Prime research indicators with the real windowed handler and no economics."""
-    reject_ambient_lq_environment()
-    _validate_preflight(preflight)
-    admitted = _validate_admitted_symbols(preflight, admitted_symbols)
-    if type(ordered_lookup) is not AlphaMaxOrderedFundingLookup:
-        raise TypeError("alpha_max_ordered_lookup_identity_invalid")
-    if ordered_lookup.ordered_root_ids != _alpha_max_expected_root_sequence(phase_id):
-        raise AlphaMaxRuntimeContractError("alpha_max_feature_root_sequence_mismatch")
-    seal = seal_alpha_max_manifest_activation(
-        preflight,
-        output_root=output_root,
-        phase=phase,
-        manifest_path=manifest_path,
-        admitted_symbols=admitted,
-    )
-    config = build_alpha_max_backtest_config(
-        preflight,
-        phase_id=phase_id,
-        admitted_symbols=admitted,
-        nominal_cost_bps=20,
-    )
-    if _alpha_max_watermark_ms(watermark) != _alpha_max_watermark_ms(config.END_DATE):
-        raise AlphaMaxRuntimeContractError("alpha_max_warmup_watermark_mismatch")
-    start_utc = datetime.fromisoformat(config.START_DATE.replace("Z", "+00:00")).astimezone(UTC)
-    end_utc = datetime.fromisoformat(config.END_DATE.replace("Z", "+00:00")).astimezone(UTC)
-    carry = None
-    if checkpoint_store is not None:
-        if type(checkpoint_store) is not _AlphaMaxIndicatorDayCheckpointStore:
-            raise TypeError("alpha_max_indicator_checkpoint_store_invalid")
-        carry = checkpoint_store.load_latest(start_utc=start_utc, end_utc=end_utc)
-    initial_day_start = start_utc if carry is None else carry.next_day_start_utc
-    if initial_day_start >= end_utc:
-        raise AlphaMaxRuntimeContractError("alpha_max_indicator_checkpoint_terminal_carry_invalid")
-    if bounded_raw_loader is not None:
-        if type(bounded_raw_loader) is not _AlphaMaxBoundedRawLoader:
-            raise TypeError("alpha_max_bounded_raw_loader_identity_invalid")
-        if data_dict is not None:
-            raise AlphaMaxRuntimeContractError("alpha_max_bounded_raw_loader_data_conflict")
-        if (
-            bounded_raw_loader.seal.path != _require_exact_explicit_path(raw_root)
-            or bounded_raw_loader.seal.root_id != _alpha_max_current_root_id(phase_id)
-            or bounded_raw_loader.seal.symbols != ALPHA_MAX_CANDIDATE_SYMBOLS
-        ):
-            raise AlphaMaxRuntimeContractError("alpha_max_bounded_raw_loader_scope_invalid")
-        data_dict = bounded_raw_loader.load_day(
-            initial_day_start, min(initial_day_start + timedelta(days=1), end_utc)
-        )
-    events = FastQueue()
-    handler = HistoricParquetWindowedDataHandler(
-        events,
-        _require_exact_explicit_path(raw_root),
-        admitted,
-        initial_day_start,
-        min(initial_day_start + timedelta(days=1), end_utc),
-        data_dict,
-        backtest_poll_seconds=1,
-        backtest_window_seconds=1,
-        feature_db_path=None,
-        feature_exchange="binance",
-        feature_lookup=ordered_lookup,
-        market_window_parity_v2_enabled=True,
-    )
-    strategy = ArtifactPortfolioModeStrategy(
-        handler,
-        events,
-        portfolio_mode=seal.expected_definition.portfolio_mode,
-        decision_cadence_seconds=1,
-    )
-    repeated = seal_alpha_max_manifest_activation(
-        preflight,
-        output_root=output_root,
-        phase=phase,
-        manifest_path=manifest_path,
-        admitted_symbols=admitted,
-    )
-    if (
-        repeated != seal
-        or handler.symbol_list is not admitted
-        or getattr(handler, "_feature_lookup", None) is not ordered_lookup
-        or strategy.required_timeframes != seal.expected_definition.native_timeframes
-    ):
-        raise _activation_mismatch()
-    _assert_definition_matches(strategy, seal)
-    _assert_child_identities(strategy, admitted, seal.expected_definition)
-
-    if phase_id == "warmup":
-        if prior_indicator_capsule is not None:
-            raise AlphaMaxRuntimeContractError("alpha_max_warmup_prior_capsule_forbidden")
-    else:
-        if type(prior_indicator_capsule) is not AlphaMaxIndicatorCapsule:
-            raise TypeError("alpha_max_prior_indicator_capsule_required")
-        restored = _validate_alpha_max_indicator_capsule(
-            prior_indicator_capsule,
-            seal=seal,
-            expected_phase_id=_alpha_max_capsule_predecessor(phase_id),
-        )
-        strategy.set_research_indicator_state(copy.deepcopy(restored))
-        strategy.validate_research_warmup_ready()
-        actual_state = strategy.get_research_indicator_state()
-        if type(actual_state) is not dict or _canonical_bytes(actual_state) != _canonical_bytes(
-            restored
-        ):
-            raise AlphaMaxRuntimeContractError("alpha_max_indicator_capsule_restore_mismatch")
-
-    aggregator = TimeframeAggregator(timeframes=list(strategy.required_timeframes))
-    windows_processed = 0 if carry is None else carry.windows_processed
-    discarded_signals = 0 if carry is None else carry.discarded_signal_count
-    if carry is not None:
-        strategy.set_state(copy.deepcopy(carry.strategy_state))
-        aggregator.set_state(copy.deepcopy(carry.aggregator_state))
-        if not _exact_state_equal(
-            strategy.get_state(), carry.strategy_state
-        ) or not _exact_state_equal(aggregator.get_state(), carry.aggregator_state):
-            raise AlphaMaxRuntimeContractError("alpha_max_indicator_checkpoint_restore_mismatch")
-    day_start = initial_day_start
-    while day_start < end_utc:
-        if day_start != initial_day_start:
-            if bounded_raw_loader is None:
-                break
-            strategy_state = copy.deepcopy(strategy.get_state())
-            aggregator_state = copy.deepcopy(aggregator.get_state())
-            previous_handler = handler
-            previous_strategy = strategy
-            day_end = min(day_start + timedelta(days=1), end_utc)
-            next_data = bounded_raw_loader.load_day(day_start, day_end)
-            events = FastQueue()
-            handler = HistoricParquetWindowedDataHandler(
-                events,
-                _require_exact_explicit_path(raw_root),
-                admitted,
-                day_start,
-                day_end,
-                next_data,
-                backtest_poll_seconds=1,
-                backtest_window_seconds=1,
-                feature_db_path=None,
-                feature_exchange="binance",
-                feature_lookup=ordered_lookup,
-                market_window_parity_v2_enabled=True,
-            )
-            strategy = ArtifactPortfolioModeStrategy(
-                handler,
-                events,
-                portfolio_mode=seal.expected_definition.portfolio_mode,
-                decision_cadence_seconds=1,
-            )
-            strategy.set_state(copy.deepcopy(strategy_state))
-            aggregator = TimeframeAggregator(timeframes=list(strategy.required_timeframes))
-            aggregator.set_state(copy.deepcopy(aggregator_state))
-            repeated = seal_alpha_max_manifest_activation(
-                preflight,
-                output_root=output_root,
-                phase=phase,
-                manifest_path=manifest_path,
-                admitted_symbols=admitted,
-            )
-            if (
-                repeated != seal
-                or handler is previous_handler
-                or strategy is previous_strategy
-                or handler.symbol_list is not admitted
-                or getattr(handler, "_feature_lookup", None) is not ordered_lookup
-                or not _exact_state_equal(strategy.get_state(), strategy_state)
-                or not _exact_state_equal(aggregator.get_state(), aggregator_state)
-            ):
-                raise _activation_mismatch()
-            _assert_definition_matches(strategy, seal)
-            _assert_child_identities(strategy, admitted, seal.expected_definition)
-        while handler.continue_backtest:
-            handler.update_bars()
-            while True:
-                try:
-                    event = events.get(False)
-                except queue.Empty:
-                    break
-                if str(getattr(event, "type", "")).upper() != "MARKET_WINDOW":
-                    raise AlphaMaxRuntimeContractError("alpha_max_warmup_handler_event_invalid")
-                bars_1s = getattr(event, "bars_1s", {}) or {}
-                aggregator.update_from_1s_batch(bars_1s)
-                context = StrategyInputContext(
-                    event=event,
-                    aggregator=aggregator,
-                    feature_lookup=ordered_lookup,
-                    data_handler=handler,
-                    execution_handler=None,
-                    exchange=None,
-                    provider_metadata={
-                        "data_handler_class": type(handler).__name__,
-                        "execution_handler_class": None,
-                        "market_data_source": "alpha_max_indicator_only",
-                    },
-                )
-                strategy.calculate_signals_context(context)
-                windows_processed += 1
-                discarded_signals += _drain_indicator_events(events)
-        day_end = min(day_start + timedelta(days=1), end_utc)
-        if checkpoint_store is not None and day_end < end_utc:
-            if handler.continue_backtest or not events.empty():
-                raise AlphaMaxRuntimeContractError("alpha_max_indicator_checkpoint_queue_not_empty")
-            checkpoint_store.seal(
-                _AlphaMaxIndicatorDayCarry(
-                    next_day_start_utc=day_end,
-                    strategy_state=copy.deepcopy(strategy.get_state()),
-                    aggregator_state=copy.deepcopy(aggregator.get_state()),
-                    windows_processed=windows_processed,
-                    discarded_signal_count=discarded_signals,
-                )
-            )
-        day_start += timedelta(days=1)
-
-    finalization = _finalize_alpha_max_native_boundary(
-        strategy,
-        seal.expected_definition,
-        watermark,
-        admitted_symbol_count=len(admitted_symbols),
-        require_exact_counts=True,
-    )
-    finalized = dict(finalization.native_coverage_by_child)
-    discarded_signals += finalization.discarded_signal_count
-    strategy.validate_research_warmup_ready()
-    discarded_signals += _drain_indicator_events(events)
-    raw_capsule = strategy.get_research_indicator_state()
-    if type(raw_capsule) is not dict:
-        raise AlphaMaxRuntimeContractError("alpha_max_indicator_capsule_invalid")
-    capsule_sha = str(raw_capsule.get("sha256") or "")
-    capsule_scope = {key: value for key, value in raw_capsule.items() if key != "sha256"}
-    if capsule_sha != _sha256(_canonical_bytes(capsule_scope)):
-        raise AlphaMaxRuntimeContractError("alpha_max_indicator_capsule_hash_mismatch")
-    frozen_capsule = _freeze_json(raw_capsule)
-    frozen_finalized = _freeze_json(finalized)
-    if not isinstance(frozen_capsule, Mapping) or not isinstance(frozen_finalized, Mapping):
-        raise AlphaMaxRuntimeContractError("alpha_max_indicator_capsule_invalid")
-    return AlphaMaxIndicatorCapsule(
-        portfolio_mode=seal.expected_definition.portfolio_mode,
-        phase_id=phase_id,
-        manifest_sha256=seal.manifest_receipt.sha256,
-        capsule_sha256=capsule_sha,
-        capsule=frozen_capsule,
-        finalized_children=frozen_finalized,
-        native_finalization_sha256=finalization.sha256,
-        windows_processed=(
-            windows_processed
-            + (0 if prior_indicator_capsule is None else prior_indicator_capsule.windows_processed)
-        ),
-        discarded_signal_count=(
-            discarded_signals
-            + (
-                0
-                if prior_indicator_capsule is None
-                else prior_indicator_capsule.discarded_signal_count
-            )
-        ),
-    )
-
-
 class _AlphaMaxIndicatorBarsProxy:
     """Minimal bars capability for exact completed-native indicator replay."""
 
@@ -5680,35 +5416,12 @@ def build_alpha_max_indicator_capsule(
     raw_root: str | os.PathLike[str],
     ordered_lookup: AlphaMaxOrderedFundingLookup,
     watermark: object,
-    data_dict: Mapping[str, object] | None = None,
     prior_indicator_capsule: AlphaMaxIndicatorCapsule | None = None,
-    bounded_raw_loader: _AlphaMaxBoundedRawLoader | None = None,
+    bounded_raw_loader: _AlphaMaxBoundedRawLoader,
     checkpoint_store: _AlphaMaxIndicatorDayCheckpointStore | None = None,
     checkpoint_candidate_identity: Mapping[str, object] | None = None,
 ) -> AlphaMaxIndicatorCapsule:
     """Prime exact native indicators without constructing economic events."""
-    if bounded_raw_loader is None:
-        if checkpoint_store is not None:
-            raise AlphaMaxRuntimeContractError(
-                "alpha_max_indicator_checkpoint_requires_bounded_native_loader"
-            )
-        return _build_alpha_max_indicator_capsule_incremental(
-            preflight,
-            output_root=output_root,
-            phase=phase,
-            manifest_path=manifest_path,
-            admitted_symbols=admitted_symbols,
-            phase_id=phase_id,
-            raw_root=raw_root,
-            ordered_lookup=ordered_lookup,
-            watermark=watermark,
-            data_dict=data_dict,
-            prior_indicator_capsule=prior_indicator_capsule,
-            bounded_raw_loader=None,
-            checkpoint_store=checkpoint_store,
-        )
-    if data_dict is not None:
-        raise AlphaMaxRuntimeContractError("alpha_max_bounded_raw_loader_data_conflict")
     return _build_alpha_max_indicator_capsule_exact_native(
         preflight,
         output_root=output_root,
@@ -5743,8 +5456,11 @@ def _alpha_max_fold_calendar(
 
 
 def _alpha_max_first_true_index(mask: np.ndarray, *, offset: int) -> int | None:
-    matches = np.flatnonzero(mask)
-    return None if not matches.size else offset + int(matches[0])
+    flat = np.asarray(mask, dtype=bool).reshape(-1)
+    if flat.size == 0:
+        return None
+    index = int(np.argmax(flat))
+    return offset + index if bool(flat[index]) else None
 
 
 def _alpha_max_next_tick_action_index(
@@ -5991,8 +5707,7 @@ def _run_alpha_max_exact_tick_reducer(activation: AlphaMaxEngineActivation) -> N
         or activation.backtest.record_trades
         or activation.backtest.portfolio.strategy_quality.enabled
     ):
-        activation.backtest._run_backtest()
-        return
+        raise AlphaMaxRuntimeContractError("alpha_max_tick_reducer_observability_unsupported")
     retained_aggregator = activation.backtest.timeframe_aggregator
     retained_aggregator_state = (
         None if retained_aggregator is None else copy.deepcopy(retained_aggregator.get_state())
@@ -6006,16 +5721,7 @@ def _run_alpha_max_exact_tick_reducer(activation: AlphaMaxEngineActivation) -> N
     try:
         view = handler.alpha_max_exact_columnar_view()
     except (TypeError, ValueError) as exc:
-        if str(exc) not in {
-            "alpha_max_columnar_view_state_invalid",
-            "alpha_max_columnar_rows_identity_invalid",
-            "alpha_max_columnar_rows_invalid",
-            "alpha_max_columnar_timeline_mismatch",
-        }:
-            raise
-        activation.backtest.timeframe_aggregator = retained_aggregator
-        activation.backtest._run_backtest()
-        return
+        raise AlphaMaxRuntimeContractError("alpha_max_tick_columnar_view_invalid") from exc
     if tuple(view) != activation.admitted_symbols:
         raise AlphaMaxRuntimeContractError("alpha_max_tick_symbol_order_invalid")
     row_count = len(view[activation.admitted_symbols[0]][0])
@@ -6946,19 +6652,23 @@ def _alpha_max_build_indicator_prefix(
     for phase_id in phase_ids:
         root_id = _alpha_max_current_root_id(phase_id)
         raw_seal = root_seals[(root_id, "raw")]
-        capsule = build_alpha_max_indicator_capsule(
-            preflight,
-            output_root=str(manifest_output_root),
-            phase=phase,
-            manifest_path=manifest_receipt.path,
-            admitted_symbols=admitted_symbols,
-            phase_id=phase_id,
-            raw_root=raw_seal.path,
-            ordered_lookup=_alpha_max_phase_lookup(root_seals, phase_id),
-            watermark=preflight.phase_windows[phase_id].end_utc,
-            prior_indicator_capsule=capsule,
-            bounded_raw_loader=_AlphaMaxBoundedRawLoader(raw_seal, admitted_symbols),
-        )
+        loader = _AlphaMaxBoundedRawLoader(raw_seal, admitted_symbols)
+        try:
+            capsule = build_alpha_max_indicator_capsule(
+                preflight,
+                output_root=str(manifest_output_root),
+                phase=phase,
+                manifest_path=manifest_receipt.path,
+                admitted_symbols=admitted_symbols,
+                phase_id=phase_id,
+                raw_root=raw_seal.path,
+                ordered_lookup=_alpha_max_phase_lookup(root_seals, phase_id),
+                watermark=preflight.phase_windows[phase_id].end_utc,
+                prior_indicator_capsule=capsule,
+                bounded_raw_loader=loader,
+            )
+        finally:
+            loader.close()
     if type(capsule) is not AlphaMaxIndicatorCapsule:
         raise AlphaMaxRuntimeContractError("alpha_max_indicator_prefix_empty")
     return capsule
@@ -7614,7 +7324,7 @@ def _alpha_max_prepare_validation_row(
         root_seals=root_seals,
         phase_ids=("warmup", "train", "purge"),
     )
-    return _AlphaMaxPreparedReplayRow(
+    prepared = _AlphaMaxPreparedReplayRow(
         manifest_receipt=manifest,
         fold_inputs=_alpha_max_build_fold_inputs(
             preflight,
@@ -7629,6 +7339,8 @@ def _alpha_max_prepare_validation_row(
         ),
         gross=gross,
     )
+    prepared.clear_raw_cache()
+    return prepared
 
 
 def _alpha_max_checkpoint_implementation_inventory() -> list[dict[str, object]]:
@@ -7722,7 +7434,6 @@ def _alpha_max_prelock_checkpoint_descriptor(
     checkpoint_root: str | os.PathLike[str],
     implementation_inventory: list[dict[str, object]],
     prior_trial_binding: Mapping[str, object] | None = None,
-    _include_v2_bindings: bool = False,
 ) -> dict[str, object]:
     target, parent = _validated_output_target(output_root)
     checkpoint = Path(_require_exact_explicit_path(checkpoint_root))
@@ -7865,8 +7576,6 @@ def _alpha_max_prelock_checkpoint_descriptor(
     }
     if prior_trial_binding is not None:
         descriptor["prior_trial_blob"] = dict(prior_trial_binding)
-    if _include_v2_bindings:
-        return descriptor
     return descriptor
 
 
@@ -7891,7 +7600,6 @@ def _alpha_max_historical_checkpoint_descriptor(
         output_root=output_root,
         checkpoint_root=checkpoint_root,
         implementation_inventory=implementation_inventory,
-        _include_v2_bindings=True,
     )
     domain = "historical_exposed_evaluation"
     schedule = [
@@ -8693,7 +8401,6 @@ class _AlphaMaxCellCheckpointStore:
         "_checkpoint_parent_fd",
         "_config_path",
         "_descriptor_sha256",
-        "_descriptor_v2",
         "_display_output_root",
         "_display_root",
         "_domain",
@@ -8731,39 +8438,14 @@ class _AlphaMaxCellCheckpointStore:
             raise AlphaMaxRuntimeContractError("alpha_max_checkpoint_parent_invalid")
         descriptor_bytes = _canonical_bytes(dict(descriptor)) + b"\n"
         self._descriptor_sha256 = _sha256(descriptor_bytes)
-        self._descriptor_v2 = (
-            descriptor.get("artifact_kind") == "alpha_max_restartable_attempt_descriptor.v3"
-        )
         self._attempt_role, self._domain = _alpha_max_validate_checkpoint_descriptor(descriptor)
-        self._runtime_identity = (
-            copy.deepcopy(descriptor["runtime_identity"]) if self._descriptor_v2 else None
+        self._runtime_identity = copy.deepcopy(descriptor["runtime_identity"])
+        self._runtime_identity_sha256 = _alpha_max_checkpoint_runtime_identity_sha256(
+            self._runtime_identity
         )
-        self._runtime_identity_sha256 = (
-            _alpha_max_checkpoint_runtime_identity_sha256(self._runtime_identity)
-            if self._descriptor_v2
-            else ""
-        )
-        if self._descriptor_v2 and self._runtime_identity != _alpha_max_indicator_runtime_binding():
+        if self._runtime_identity != _alpha_max_indicator_runtime_binding():
             raise AlphaMaxRuntimeContractError("alpha_max_checkpoint_runtime_identity_mismatch")
-        self._physical_schedule_sha256 = (
-            descriptor["physical_schedule_sha256"]
-            if self._descriptor_v2
-            else _sha256(
-                _canonical_bytes(
-                    [
-                        {
-                            "fold_id": fold_id,
-                            "nominal_cost_bps": nominal,
-                            "row_id": row_id,
-                            "seed": alpha_max_common_rng_seed(fold_id, nominal),
-                        }
-                        for row_id, nominal, fold_id in _alpha_max_physical_fold_schedule(
-                            self._domain
-                        )
-                    ]
-                )
-            )
-        )
+        self._physical_schedule_sha256 = descriptor["physical_schedule_sha256"]
         self._prelock_binding = descriptor.get("prelock_binding")
         self._precompute_store: _AlphaMaxPrecomputeCheckpointStore | None = None
         self._implementation_inventory = _verify_alpha_max_checkpoint_implementation_inventory(
@@ -8873,57 +8555,56 @@ class _AlphaMaxCellCheckpointStore:
                 config_bytes=config_bytes,
                 allow_missing_precompute=True,
             )
-            if self._descriptor_v2:
-                nonterminal_days: tuple[str, ...] = ()
-                if self._attempt_role == "prelock":
-                    train_window = descriptor["phase_windows"]["train"]
-                    train_start = datetime.fromisoformat(
-                        str(train_window["start_utc"]).replace("Z", "+00:00")
-                    ).astimezone(UTC)
-                    train_end = datetime.fromisoformat(
-                        str(train_window["end_utc"]).replace("Z", "+00:00")
-                    ).astimezone(UTC)
-                    if train_start >= train_end or any(
-                        value != 0
-                        for value in (
-                            train_start.hour,
-                            train_start.minute,
-                            train_start.second,
-                            train_start.microsecond,
-                            train_end.hour,
-                            train_end.minute,
-                            train_end.second,
-                            train_end.microsecond,
-                        )
-                    ):
-                        raise AlphaMaxRuntimeContractError(
-                            "alpha_max_precompute_training_schedule_invalid"
-                        )
-                    nonterminal_days = tuple(
-                        f"{component_id}--{day:%Y%m%d}"
-                        for component_id in (
-                            "component_carry_1x",
-                            "component_near_high_1x",
-                            "component_trend_1x",
-                        )
-                        for day in (
-                            train_start + timedelta(days=index)
-                            for index in range((train_end - train_start).days - 1)
-                        )
+            nonterminal_days: tuple[str, ...] = ()
+            if self._attempt_role == "prelock":
+                train_window = descriptor["phase_windows"]["train"]
+                train_start = datetime.fromisoformat(
+                    str(train_window["start_utc"]).replace("Z", "+00:00")
+                ).astimezone(UTC)
+                train_end = datetime.fromisoformat(
+                    str(train_window["end_utc"]).replace("Z", "+00:00")
+                ).astimezone(UTC)
+                if train_start >= train_end or any(
+                    value != 0
+                    for value in (
+                        train_start.hour,
+                        train_start.minute,
+                        train_start.second,
+                        train_start.microsecond,
+                        train_end.hour,
+                        train_end.minute,
+                        train_end.second,
+                        train_end.microsecond,
                     )
-                self._precompute_store = _AlphaMaxPrecomputeCheckpointStore(
-                    self._root / "precompute",
-                    attempt_descriptor_sha256=self._descriptor_sha256,
-                    attempt_role=self._attempt_role,
-                    domain=self._domain,
-                    runtime_identity_sha256=self._runtime_identity_sha256,
-                    training_day_ids=nonterminal_days,
+                ):
+                    raise AlphaMaxRuntimeContractError(
+                        "alpha_max_precompute_training_schedule_invalid"
+                    )
+                nonterminal_days = tuple(
+                    f"{component_id}--{day:%Y%m%d}"
+                    for component_id in (
+                        "component_carry_1x",
+                        "component_near_high_1x",
+                        "component_trend_1x",
+                    )
+                    for day in (
+                        train_start + timedelta(days=index)
+                        for index in range((train_end - train_start).days - 1)
+                    )
                 )
-                self._validate_root(
-                    descriptor_bytes=descriptor_bytes,
-                    config_bytes=config_bytes,
-                    allow_missing_precompute=False,
-                )
+            self._precompute_store = _AlphaMaxPrecomputeCheckpointStore(
+                self._root / "precompute",
+                attempt_descriptor_sha256=self._descriptor_sha256,
+                attempt_role=self._attempt_role,
+                domain=self._domain,
+                runtime_identity_sha256=self._runtime_identity_sha256,
+                training_day_ids=nonterminal_days,
+            )
+            self._validate_root(
+                descriptor_bytes=descriptor_bytes,
+                config_bytes=config_bytes,
+                allow_missing_precompute=False,
+            )
         except Exception:
             for field in ("_cells_fd", "_root_fd"):
                 fd = getattr(self, field, -1)
@@ -9059,7 +8740,7 @@ class _AlphaMaxCellCheckpointStore:
                 or stat.S_ISLNK(display_cells_status.st_mode)
             ):
                 raise AlphaMaxRuntimeContractError("alpha_max_checkpoint_root_invalid")
-            if self._descriptor_v2 and allow_missing_precompute:
+            if allow_missing_precompute:
                 for path in self._root.iterdir():
                     if re.fullmatch(r"\.precompute\.staging-[a-z0-9_]{8}", path.name):
                         _alpha_max_cleanup_recognized_staging_bundle(
@@ -9072,8 +8753,8 @@ class _AlphaMaxCellCheckpointStore:
             base_names = {"ATTEMPT.json", "cells", "inputs"}
             expected_names = (
                 (base_names, base_names | {"precompute"})
-                if self._descriptor_v2 and allow_missing_precompute
-                else (base_names | ({"precompute"} if self._descriptor_v2 else set()),)
+                if allow_missing_precompute
+                else (base_names | {"precompute"},)
             )
             if names not in expected_names:
                 raise AlphaMaxRuntimeContractError("alpha_max_checkpoint_inventory_invalid")
@@ -9179,7 +8860,7 @@ class _AlphaMaxCellCheckpointStore:
         )
 
     def _verify_runtime_identity(self) -> None:
-        if self._descriptor_v2 and self._runtime_identity != _alpha_max_indicator_runtime_binding():
+        if self._runtime_identity != _alpha_max_indicator_runtime_binding():
             raise AlphaMaxRuntimeContractError("alpha_max_checkpoint_runtime_identity_mismatch")
 
     def _validate_open_checkpoint_identity(self) -> None:
@@ -9261,23 +8942,6 @@ class _AlphaMaxCellCheckpointStore:
     ) -> dict[str, object]:
         capsules, roots = self._current_receipts(prepared)
         fold_ids = list(_alpha_max_fold_ids(self._domain))
-        if not self._descriptor_v2:
-            return {
-                "artifact_kind": "alpha_max_restartable_cost_cell_seal.v1",
-                "attempt_descriptor_sha256": self._descriptor_sha256,
-                "byte_count": len(evidence_bytes),
-                "capsule_receipt_sha256s": sorted(capsules),
-                "cell_name": self._cell_name(row_id, nominal_cost_bps),
-                "config_sha256": preflight.config_receipt.sha256,
-                "domain": self._domain,
-                "evidence_sha256": _sha256(evidence_bytes),
-                "manifest_sha256": prepared.manifest_receipt.sha256,
-                "nominal_cost_bps": nominal_cost_bps,
-                "root_receipt_identities": sorted(roots),
-                "row_id": row_id,
-                "runtime_contract_sha256": preflight.runtime_contract_sha256,
-                "success": True,
-            }
         return {
             "artifact_kind": "alpha_max_restartable_cost_cell_seal.v2",
             "attempt_descriptor_sha256": self._descriptor_sha256,
@@ -9909,36 +9573,39 @@ def _alpha_max_complete_domain_matrix(
                 prepared = prepared_rows[row_id]
             except KeyError as exc:
                 raise AlphaMaxRuntimeContractError("alpha_max_matrix_row_not_prepared") from exc
-            for nominal in ALPHA_MAX_COST_CELL_BPS:
-                existing = (
-                    None
-                    if checkpoint_store is None
-                    else checkpoint_store.load(
-                        row_id=row_id,
-                        nominal_cost_bps=nominal,
-                        preflight=preflight,
-                        prepared=prepared,
-                    )
-                )
-                if existing is None:
-                    existing = _replay_alpha_max_cost_cell_pre_gate(
-                        preflight,
-                        output_root=output_root,
-                        phase=phase,
-                        manifest_receipt=prepared.manifest_receipt,
-                        admitted_symbols=admitted_symbols,
-                        row_id=row_id,
-                        domain=domain,
-                        nominal_cost_bps=nominal,
-                        fold_inputs=prepared.fold_inputs,
-                    )
-                    if checkpoint_store is not None:
-                        existing = checkpoint_store.seal(
-                            existing,
+            try:
+                for nominal in ALPHA_MAX_COST_CELL_BPS:
+                    existing = (
+                        None
+                        if checkpoint_store is None
+                        else checkpoint_store.load(
+                            row_id=row_id,
+                            nominal_cost_bps=nominal,
                             preflight=preflight,
                             prepared=prepared,
                         )
-                pre_gates[(row_id, nominal)] = existing
+                    )
+                    if existing is None:
+                        existing = _replay_alpha_max_cost_cell_pre_gate(
+                            preflight,
+                            output_root=output_root,
+                            phase=phase,
+                            manifest_receipt=prepared.manifest_receipt,
+                            admitted_symbols=admitted_symbols,
+                            row_id=row_id,
+                            domain=domain,
+                            nominal_cost_bps=nominal,
+                            fold_inputs=prepared.fold_inputs,
+                        )
+                        if checkpoint_store is not None:
+                            existing = checkpoint_store.seal(
+                                existing,
+                                preflight=preflight,
+                                prepared=prepared,
+                            )
+                    pre_gates[(row_id, nominal)] = existing
+            finally:
+                prepared.close()
 
     replay_rows(non_scaled_ids)
     if scaled_row_factory is not None:
@@ -10125,8 +9792,8 @@ def build_alpha_max_final_refit_indicator_capsule(
             raw_root=phase_input.raw_root,
             ordered_lookup=phase_input.ordered_lookup,
             watermark=phase_input.watermark,
-            data_dict=phase_input.data_dict,
             prior_indicator_capsule=capsule,
+            bounded_raw_loader=phase_input.bounded_raw_loader,
         )
     if type(capsule) is not AlphaMaxIndicatorCapsule or capsule.phase_id != "embargo":
         raise AlphaMaxRuntimeContractError("alpha_max_final_refit_prefix_incomplete")
@@ -10468,21 +10135,32 @@ class _AlphaMaxSealedRawReader:
             ):
                 raise AlphaMaxRuntimeContractError("alpha_max_sealed_raw_identity_invalid")
 
-            digest = hashlib.sha256()
-            payload = bytearray()
-            while True:
-                chunk = os.read(descriptor, 1024 * 1024)
-                if not chunk:
-                    break
-                payload.extend(chunk)
-                digest.update(chunk)
-                if len(payload) > entry.byte_count:
-                    raise AlphaMaxRuntimeContractError("alpha_max_sealed_raw_size_mismatch")
-            after = os.fstat(descriptor)
-            if _alpha_max_raw_file_identity(after) != _alpha_max_raw_file_identity(opened_file):
-                raise AlphaMaxRuntimeContractError("alpha_max_sealed_raw_changed_during_read")
-            if len(payload) != entry.byte_count or digest.hexdigest() != entry.sha256:
-                raise AlphaMaxRuntimeContractError("alpha_max_sealed_raw_hash_mismatch")
+            with os.fdopen(descriptor, "rb", closefd=False) as source:
+                digest = hashlib.sha256()
+                byte_count = 0
+                while chunk := source.read(1024 * 1024):
+                    byte_count += len(chunk)
+                    digest.update(chunk)
+                    if byte_count > entry.byte_count:
+                        raise AlphaMaxRuntimeContractError("alpha_max_sealed_raw_size_mismatch")
+                after = os.fstat(descriptor)
+                if _alpha_max_raw_file_identity(after) != _alpha_max_raw_file_identity(opened_file):
+                    raise AlphaMaxRuntimeContractError("alpha_max_sealed_raw_changed_during_read")
+                if byte_count != entry.byte_count or digest.hexdigest() != entry.sha256:
+                    raise AlphaMaxRuntimeContractError("alpha_max_sealed_raw_hash_mismatch")
+                source.seek(0)
+                try:
+                    import polars as pl
+
+                    frame = pl.read_parquet(source)
+                except Exception as exc:
+                    raise AlphaMaxRuntimeContractError(
+                        "alpha_max_sealed_raw_parquet_invalid"
+                    ) from exc
+                after = os.fstat(descriptor)
+                if _alpha_max_raw_file_identity(after) != _alpha_max_raw_file_identity(opened_file):
+                    raise AlphaMaxRuntimeContractError("alpha_max_sealed_raw_changed_during_read")
+                return frame
         except OSError as exc:
             raise AlphaMaxRuntimeContractError("alpha_max_sealed_raw_read_failed") from exc
         finally:
@@ -10490,13 +10168,6 @@ class _AlphaMaxSealedRawReader:
                 os.close(descriptor)
             for directory_fd in reversed(opened_directories):
                 os.close(directory_fd)
-
-        try:
-            import polars as pl
-
-            return pl.read_parquet(io.BytesIO(payload))
-        except Exception as exc:
-            raise AlphaMaxRuntimeContractError("alpha_max_sealed_raw_parquet_invalid") from exc
 
 
 def _alpha_max_load_raw_admission_summary(
@@ -10784,21 +10455,35 @@ class _AlphaMaxBoundedRawLoader:
         self._reader = _AlphaMaxSealedRawReader(seal)
 
     def __del__(self) -> None:
+        self.close()
+
+    def clear_cache(self) -> None:
+        cache = getattr(self, "_frame_cache", None)
+        if cache is not None:
+            cache.clear()
+
+    def close(self) -> None:
+        self.clear_cache()
         reader = getattr(self, "_reader", None)
-        if reader is not None:
-            reader.close()
+        if reader is None:
+            return
+        self._reader = None
+        reader.close()
 
     @property
     def seal(self) -> AlphaMaxRootSeal:
         return self._seal
 
     def _read_entry_cached(self, symbol: str, entry: AlphaMaxTreeEntry) -> object:
+        reader = self._reader
+        if reader is None:
+            raise AlphaMaxRuntimeContractError("alpha_max_bounded_raw_loader_closed")
         relative_path = entry.relative_path
         cached = self._frame_cache.get(symbol)
         if cached is not None and cached[0] == relative_path:
             return cached[1]
         try:
-            frame = self._reader.read_entry(entry)
+            frame = reader.read_entry(entry)
         except AlphaMaxRuntimeContractError as exc:
             raise AlphaMaxRuntimeContractError("alpha_max_bounded_raw_read_failed") from exc
         self._frame_cache[symbol] = (relative_path, frame)
@@ -13380,7 +13065,6 @@ def run_alpha_max_prelock_process(
             "path": prior_trial_path,
             "sha256": _sha256(prior_bytes),
         },
-        _include_v2_bindings=True,
     )
     checkpoint_store = _AlphaMaxCellCheckpointStore(
         checkpoint_root,
@@ -13603,14 +13287,17 @@ def run_alpha_max_prelock_process(
                     root_seals=root_seals,
                     retained_manifest=manifest,
                 )
-                checkpoint_bytes = checkpoint_store.seal_precompute(
-                    unit_kind="validation_row",
-                    unit_id=row_id,
-                    data_bytes=_alpha_max_prepared_row_checkpoint_bytes(
-                        current,
-                        domain="validation",
-                    ),
-                )
+                try:
+                    checkpoint_bytes = checkpoint_store.seal_precompute(
+                        unit_kind="validation_row",
+                        unit_id=row_id,
+                        data_bytes=_alpha_max_prepared_row_checkpoint_bytes(
+                            current,
+                            domain="validation",
+                        ),
+                    )
+                finally:
+                    current.close()
             prepared[row_id] = _alpha_max_restore_prepared_row_checkpoint(
                 checkpoint_bytes,
                 preflight=run_preflight,
@@ -13653,14 +13340,17 @@ def run_alpha_max_prelock_process(
                     root_seals=root_seals,
                     retained_manifest=manifest,
                 )
-                checkpoint_bytes = checkpoint_store.seal_precompute(
-                    unit_kind="validation_row",
-                    unit_id=row_id,
-                    data_bytes=_alpha_max_prepared_row_checkpoint_bytes(
-                        current,
-                        domain="validation",
-                    ),
-                )
+                try:
+                    checkpoint_bytes = checkpoint_store.seal_precompute(
+                        unit_kind="validation_row",
+                        unit_id=row_id,
+                        data_bytes=_alpha_max_prepared_row_checkpoint_bytes(
+                            current,
+                            domain="validation",
+                        ),
+                    )
+                finally:
+                    current.close()
             return _alpha_max_restore_prepared_row_checkpoint(
                 checkpoint_bytes,
                 preflight=run_preflight,
@@ -14624,10 +14314,11 @@ def run_alpha_max_historical_process(
                 or activation.manifest_receipt.byte_count != manifest.byte_count
             ):
                 raise AlphaMaxRuntimeContractError("alpha_max_final_manifest_activation_mismatch")
-        _AlphaMaxBoundedRawLoader(
+        loader = _AlphaMaxBoundedRawLoader(
             root_seals[("historical_exposed_evaluation", "raw")],
             admitted_symbols,
         )
+        loader.close()
         _validated_output_target(output_root)
     except (OSError, TypeError, ValueError) as exc:
         raise AlphaMaxRuntimeContractError(
@@ -14702,14 +14393,18 @@ def run_alpha_max_historical_process(
                     ),
                     gross=gross,
                 )
-                checkpoint_bytes = checkpoint_store.seal_precompute(
-                    unit_kind="historical_row",
-                    unit_id=row_id,
-                    data_bytes=_alpha_max_prepared_row_checkpoint_bytes(
-                        current,
-                        domain="historical_exposed_evaluation",
-                    ),
-                )
+                try:
+                    current.clear_raw_cache()
+                    checkpoint_bytes = checkpoint_store.seal_precompute(
+                        unit_kind="historical_row",
+                        unit_id=row_id,
+                        data_bytes=_alpha_max_prepared_row_checkpoint_bytes(
+                            current,
+                            domain="historical_exposed_evaluation",
+                        ),
+                    )
+                finally:
+                    current.close()
             prepared[row_id] = _alpha_max_restore_prepared_row_checkpoint(
                 checkpoint_bytes,
                 preflight=preflight,

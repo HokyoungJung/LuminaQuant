@@ -1686,9 +1686,10 @@ class ParquetMarketDataRepository:
             frame.select(_OHLCV_COLUMNS)
             .with_columns(
                 [
-                    ParquetMarketDataRepository._coerce_datetime_expr(pl.col("datetime")).alias(
-                        "datetime"
-                    ),
+                    ParquetMarketDataRepository._coerce_datetime_expr(
+                        pl.col("datetime"),
+                        frame.schema["datetime"],
+                    ).alias("datetime"),
                     pl.col("open").cast(pl.Float64),
                     pl.col("high").cast(pl.Float64),
                     pl.col("low").cast(pl.Float64),
@@ -2080,18 +2081,29 @@ class ParquetMarketDataRepository:
         )
 
     @staticmethod
-    def _coerce_datetime_expr(expr: pl.Expr) -> pl.Expr:
-        parsed = expr.cast(pl.Utf8, strict=False).str.to_datetime(
-            strict=False,
-            time_zone="UTC",
-        )
-        as_datetime = expr.cast(pl.Datetime(time_zone="UTC"), strict=False)
-        return (
-            pl.coalesce([as_datetime, parsed])
-            .dt.convert_time_zone("UTC")
-            .dt.replace_time_zone(None)
-            .cast(pl.Datetime(time_unit="ms"))
-        )
+    def _coerce_datetime_expr(expr: pl.Expr, dtype: pl.DataType) -> pl.Expr:
+        if isinstance(dtype, pl.Datetime):
+            if dtype.time_zone is not None:
+                return (
+                    expr.dt.convert_time_zone("UTC")
+                    .dt.replace_time_zone(None)
+                    .cast(pl.Datetime(time_unit="ms"))
+                )
+            return expr.cast(pl.Datetime(time_unit="ms"))
+        if dtype == pl.Date:
+            return expr.cast(pl.Datetime(time_unit="ms"))
+        if dtype == pl.String:
+            return (
+                expr.str.to_datetime(strict=False, time_zone="UTC")
+                .dt.convert_time_zone("UTC")
+                .dt.replace_time_zone(None)
+                .cast(pl.Datetime(time_unit="ms"))
+            )
+        if dtype.is_integer():
+            return pl.from_epoch(expr.cast(pl.Int64), time_unit="ms").cast(
+                pl.Datetime(time_unit="ms")
+            )
+        raise TypeError(f"unsupported OHLCV datetime dtype: {dtype}")
 
     @staticmethod
     def _ensure_ohlcv_frame(
@@ -2112,9 +2124,10 @@ class ParquetMarketDataRepository:
 
         casted = frame.select(required).with_columns(
             [
-                ParquetMarketDataRepository._coerce_datetime_expr(pl.col("datetime")).alias(
-                    "datetime"
-                ),
+                ParquetMarketDataRepository._coerce_datetime_expr(
+                    pl.col("datetime"),
+                    frame.schema["datetime"],
+                ).alias("datetime"),
                 pl.col("open").cast(pl.Float64),
                 pl.col("high").cast(pl.Float64),
                 pl.col("low").cast(pl.Float64),
@@ -4664,11 +4677,14 @@ class ParquetMarketDataRepository:
         if not frames:
             return self._empty_ohlcv_frame()
 
+        concatenated = pl.concat(frames, how="vertical_relaxed")
         merged = (
-            pl.concat(frames, how="vertical_relaxed")
-            .with_columns(
+            concatenated.with_columns(
                 [
-                    self._coerce_datetime_expr(pl.col("datetime")).alias("datetime"),
+                    self._coerce_datetime_expr(
+                        pl.col("datetime"),
+                        concatenated.schema["datetime"],
+                    ).alias("datetime"),
                     pl.col("open").cast(pl.Float64),
                     pl.col("high").cast(pl.Float64),
                     pl.col("low").cast(pl.Float64),

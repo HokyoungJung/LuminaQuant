@@ -5,7 +5,9 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any
 
+import numpy as np
 import polars as pl
+from lumina_quant._compute import grouped_fsum
 from lumina_quant.data.native_raw_first_backend import (
     RAW_FIRST_BACKEND_AUTO,
     RAW_FIRST_BACKEND_PYTHON,
@@ -339,19 +341,34 @@ def resample_1s_frame(
         output = frame_1s.select(list(_OHLCV_COLUMNS))
     else:
         bucket_ms = int(timeframe_to_milliseconds(token))
+        bucketed = frame_1s.with_columns(
+            pl.col("datetime").dt.epoch("ms").alias("timestamp_ms")
+        ).with_columns(((pl.col("timestamp_ms") // bucket_ms) * bucket_ms).alias("bucket_ms"))
+        volume_buckets, volume_sums = grouped_fsum(
+            np.ascontiguousarray(bucketed.get_column("bucket_ms").to_numpy(), dtype=np.int64),
+            np.ascontiguousarray(bucketed.get_column("volume").to_numpy(), dtype=np.float64),
+        )
+        volume_frame = pl.DataFrame(
+            {
+                "bucket_ms": volume_buckets,
+                "volume": volume_sums,
+            },
+            schema={
+                "bucket_ms": pl.Int64,
+                "volume": pl.Float64,
+            },
+        )
         output = (
-            frame_1s.with_columns(pl.col("datetime").dt.epoch("ms").alias("timestamp_ms"))
-            .with_columns(((pl.col("timestamp_ms") // bucket_ms) * bucket_ms).alias("bucket_ms"))
-            .group_by("bucket_ms")
+            bucketed.group_by("bucket_ms")
             .agg(
                 [
                     pl.col("open").first().alias("open"),
                     pl.col("high").max().alias("high"),
                     pl.col("low").min().alias("low"),
                     pl.col("close").last().alias("close"),
-                    pl.col("volume").sum().alias("volume"),
                 ]
             )
+            .join(volume_frame, on="bucket_ms", how="inner", validate="1:1")
             .sort("bucket_ms")
             .with_columns(pl.from_epoch("bucket_ms", time_unit="ms").alias("datetime"))
             .select(list(_OHLCV_COLUMNS))

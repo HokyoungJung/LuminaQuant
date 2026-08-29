@@ -247,6 +247,28 @@ def test_read_csv_ohlcv_rejects_files_without_timestamp_evidence(tmp_path: Path)
     assert frame.is_empty()
 
 
+def test_read_csv_ohlcv_accepts_epoch_millisecond_datetime_column(tmp_path: Path):
+    csv_path = tmp_path / "BTCUSDT.csv"
+    csv_path.write_text(
+        "\n".join(
+            [
+                "datetime,open,high,low,close,volume",
+                "1767225600000,100,101,99,100.5,10",
+                "1767225601000,101,102,100,101.5,12",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    frame = research_runner._read_csv_ohlcv(csv_path)
+
+    assert frame.schema["datetime"] == pl.Datetime("ms")
+    assert frame["datetime"].dt.epoch("ms").to_list() == [
+        1_767_225_600_000,
+        1_767_225_601_000,
+    ]
+
+
 def test_load_bundle_cache_uses_synthetic_fallback_when_other_sources_are_missing(monkeypatch):
     bundle = research_runner.SeriesBundle(
         symbol="BTC/USDT",

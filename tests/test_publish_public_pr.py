@@ -273,7 +273,7 @@ def test_content_sensitive_detection_allows_public_safe_ci_workflow(tmp_path, mo
                 "jobs:",
                 "  quality:",
                 "    steps:",
-                "      - run: uv sync --extra optimize --extra dev --extra live --extra dashboard",
+                "      - run: uv sync --extra optimize --extra dev --extra live-binance --extra live-mt5 --extra live-polymarket --extra dashboard",
                 "      - run: uv run python scripts/check_architecture.py",
                 "      - run: uv run pytest -q",
                 "      - run: cd apps/dashboard_web && npm run build",

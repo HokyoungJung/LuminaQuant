@@ -2,7 +2,7 @@
 #
 # Docker is out of scope for the supported runtime profile (see docs/DEPLOYMENT.md,
 # which documents a uv-only systemd install); this image mirrors that documented
-# `uv sync --extra optimize --extra live` + `lq live` flow for parity/experiments.
+# `uv sync --extra optimize --extra live-binance --extra live-polymarket` + `lq live` flow for parity/experiments.
 #
 #   Build:  docker build -t lumina-quant .
 #   Run:    docker run --env-file .env lumina-quant
@@ -31,11 +31,11 @@ WORKDIR /app
 # fails closed if uv.lock is out of sync with pyproject.toml and installs the
 # exact checksummed wheels (including the bundled-C-library ta-lib wheel).
 COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-install-project --extra live --extra optimize
+RUN uv sync --frozen --no-install-project --extra live-binance --extra live-polymarket --extra optimize
 
 # Copy the source and install the project itself against the locked env.
 COPY . .
-RUN uv sync --frozen --extra live --extra optimize
+RUN uv sync --frozen --extra live-binance --extra live-polymarket --extra optimize
 
 # Structured logs / crash-recovery state live under these (mount to persist).
 RUN mkdir -p logs data

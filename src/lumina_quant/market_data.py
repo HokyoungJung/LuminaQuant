@@ -1447,7 +1447,7 @@ class MarketDataRepository:
                 start_date=start_date,
                 end_date=end_date,
             )
-            return direct, resampled
+            return _ensure_ohlcv_frame(direct), _ensure_ohlcv_frame(resampled)
 
     def load_ohlcv(
         self,

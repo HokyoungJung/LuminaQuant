@@ -30,9 +30,9 @@ build_screen_payload = _SCREEN_MODULE.build_screen_payload
 
 def _sample_panel(periods: int = 36) -> pd.DataFrame:
     rows = []
-    symbols = ["BTC/USDT", "ETH/USDT", "SOL/USDT", "EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCHF"]
+    symbols = ["BTC/USDT", "ETH/USDT", "SOL/USDT", "EURUSD", "GBPUSD", "USDJPY"]
     for t in range(periods):
-        ts = pd.Timestamp("2026-01-01") + pd.Timedelta(hours=t)
+        ts = pd.Timestamp("2026-01-01") + pd.to_timedelta(t, unit="h")
         for symbol in symbols:
             base = 100.0
             drift = 0.001 * t
@@ -134,7 +134,7 @@ def test_valid_factor_card_records_gate_only_oos_provenance() -> None:
 def _wide_current_tail_panel(periods: int = 80) -> pd.DataFrame:
     rows = []
     for t in range(periods):
-        ts = pd.Timestamp("2025-01-01") + pd.Timedelta(hours=t)
+        ts = pd.Timestamp("2025-01-01") + pd.to_timedelta(t, unit="h")
         row = {"datetime": ts}
         for prefix, drift in (("btcusdt", 0.001), ("ethusdt", 0.003), ("solusdt", -0.002)):
             close = 100.0 * (1.0 + drift * t)

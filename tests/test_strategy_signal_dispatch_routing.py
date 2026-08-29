@@ -1029,7 +1029,7 @@ def test_strict_event_simulator_rejects_every_invalid_datetime_interval(
             [value.replace(tzinfo=None) for value in aligned["datetime"]],
             dtype="datetime64[ns]",
         )
-        aligned["datetime"][corruption_index] = np.datetime64("NaT")
+        aligned["datetime"][corruption_index] = np.datetime64("NaT", "ms")
     elif kind == "repeated":
         assert corruption_index is not None
         aligned["datetime"][corruption_index] = aligned["datetime"][corruption_index - 1]

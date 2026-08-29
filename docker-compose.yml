@@ -1,5 +1,5 @@
 # Docker is out of scope for the supported runtime (see docs/DEPLOYMENT.md); this
-# compose file mirrors the documented `uv sync --extra optimize --extra live` +
+# compose file mirrors the documented `uv sync --extra optimize --extra live-binance --extra live-polymarket` +
 # `lq live` install for parity/experimentation only.
 #
 #   docker compose up --build

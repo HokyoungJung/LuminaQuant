@@ -61,7 +61,6 @@ __all__ = [
     "ALPHA_MAX_PERIODS_PER_YEAR",
     "AlphaMaxActualEngineRunReceipt",
     "AlphaMaxAdmissionArtifact",
-    "AlphaMaxAdmissionCandidateInput",
     "AlphaMaxAdmissionComputation",
     "AlphaMaxAdmissionDailyCandidateInput",
     "AlphaMaxCapacityDiagnostics",
@@ -90,7 +89,6 @@ __all__ = [
     "AlphaMaxPrelockArtifact",
     "AlphaMaxPrelockSeal",
     "AlphaMaxPrimaryReturnStream",
-    "AlphaMaxRawObservation",
     "AlphaMaxReconciliationEvidence",
     "AlphaMaxRootReceipt",
     "AlphaMaxRootSeal",
@@ -144,7 +142,6 @@ __all__ = [
     "canonical_alpha_max_row_bytes",
     "compute_alpha_max_capacity_diagnostics",
     "compute_alpha_max_metric_statistics",
-    "compute_alpha_max_train_admission",
     "compute_alpha_max_train_admission_from_daily_summaries",
     "compute_alpha_max_turnover_rpt",
     "materialize_alpha_max_manifest",
@@ -1641,32 +1638,6 @@ class AlphaMaxManifestMaterialization:
         if not isinstance(parsed, dict):  # pragma: no cover - construction invariant
             raise AssertionError("materialized manifest was not an object")
         return parsed
-
-    @property
-    def manifest_path(self) -> str:
-        return self.path
-
-    @property
-    def manifest_sha256(self) -> str:
-        return self.sha256
-
-    @property
-    def manifest_bytes(self) -> bytes:
-        return self.canonical_bytes
-
-    def __getitem__(self, key: str) -> Any:
-        aliases = {
-            "path": self.path,
-            "manifest_path": self.path,
-            "sha256": self.sha256,
-            "manifest_sha256": self.sha256,
-            "bytes": self.canonical_bytes,
-            "canonical_bytes": self.canonical_bytes,
-            "manifest_bytes": self.canonical_bytes,
-            "payload": self.payload,
-            "strategy_params": self.strategy_params,
-        }
-        return aliases[key]
 
 
 def _validate_frozen_row(row: Mapping[str, Any]) -> tuple[dict[str, Any], tuple[str, ...]]:
@@ -4806,65 +4777,6 @@ def seal_alpha_max_contract_manifest(
 
 
 @dataclass(frozen=True, slots=True)
-class AlphaMaxRawObservation:
-    """One exact train-owned raw observation used by the admission computation."""
-
-    timestamp: datetime
-    close: float
-    volume: float
-
-    def __post_init__(self) -> None:
-        timestamp = _utc(self.timestamp, field="admission_observation_timestamp")
-        train_start, train_end = _ROOT_INTERVALS["train"]
-        if not train_start <= timestamp < train_end:
-            raise ValueError("alpha_max_admission_observation_outside_train")
-        close = _alpha_max_finite_number(
-            self.close,
-            field="admission_observation_close",
-            positive=True,
-        )
-        volume = _alpha_max_finite_number(
-            self.volume,
-            field="admission_observation_volume",
-            nonnegative=True,
-        )
-        object.__setattr__(self, "timestamp", timestamp)
-        object.__setattr__(self, "close", close)
-        object.__setattr__(self, "volume", volume)
-
-
-@dataclass(frozen=True, slots=True)
-class AlphaMaxAdmissionCandidateInput:
-    symbol: str
-    train_observations: tuple[AlphaMaxRawObservation, ...]
-    consecutive_completed_daily_bars_before_train: int
-    causal_funding_coverage_complete: bool
-    unresolved_daily_cross_section_count: int
-    partition_integrity_complete: bool = True
-
-    def __post_init__(self) -> None:
-        if self.symbol not in ALPHA_MAX_CANDIDATE_SYMBOLS:
-            raise ValueError("alpha_max_admission_input_symbol_invalid")
-        if type(self.train_observations) is not tuple or any(
-            type(value) is not AlphaMaxRawObservation for value in self.train_observations
-        ):
-            raise TypeError("alpha_max_admission_observations_must_be_exact_tuple")
-        _admission_nonnegative_int(
-            self.consecutive_completed_daily_bars_before_train,
-            field="consecutive_completed_daily_bars_before_train",
-        )
-        _admission_nonnegative_int(
-            self.unresolved_daily_cross_section_count,
-            field="unresolved_daily_cross_section_count",
-        )
-        if (
-            type(self.causal_funding_coverage_complete) is not bool
-            or type(self.partition_integrity_complete) is not bool
-        ):
-            raise TypeError("alpha_max_admission_input_coverage_must_be_bool")
-
-
-@dataclass(frozen=True, slots=True)
 class AlphaMaxDailyQuoteNotional:
     day: date
     quote_notional_usdt: float
@@ -5005,75 +4917,6 @@ class AlphaMaxAdmissionComputation:
 
     def to_payload(self) -> dict[str, Any]:
         return json.loads(self.canonical_bytes)
-
-
-def compute_alpha_max_train_admission(
-    inputs: Mapping[str, AlphaMaxAdmissionCandidateInput],
-    *,
-    input_root_hashes: Mapping[str, str],
-    candidate_symbols: Sequence[str] = ALPHA_MAX_CANDIDATE_SYMBOLS,
-) -> AlphaMaxAdmissionComputation:
-    """Compatibility raw-row API that collapses and discards one day at a time."""
-    if tuple(candidate_symbols) != ALPHA_MAX_CANDIDATE_SYMBOLS:
-        raise ValueError("alpha_max_candidate_symbols_mismatch")
-    if type(inputs) is not dict or tuple(sorted(inputs)) != ALPHA_MAX_CANDIDATE_SYMBOLS:
-        raise ValueError("alpha_max_admission_input_coverage_mismatch")
-
-    summarized: dict[str, AlphaMaxAdmissionDailyCandidateInput] = {}
-    for symbol in ALPHA_MAX_CANDIDATE_SYMBOLS:
-        candidate = inputs[symbol]
-        if type(candidate) is not AlphaMaxAdmissionCandidateInput or candidate.symbol != symbol:
-            raise ValueError("alpha_max_admission_input_identity_mismatch")
-        observations = candidate.train_observations
-        timestamps = tuple(value.timestamp for value in observations)
-        if any(left >= right for left, right in pairwise(timestamps)):
-            raise ValueError("alpha_max_admission_observations_not_strictly_increasing")
-
-        daily_rows: list[AlphaMaxDailyQuoteNotional] = []
-        current_timestamps: list[datetime] = []
-        current_closes: list[float] = []
-        current_volumes: list[float] = []
-        current_day: date | None = None
-        for observation in observations:
-            observation_day = observation.timestamp.date()
-            if current_day is not None and observation_day != current_day:
-                daily_rows.append(
-                    build_alpha_max_daily_quote_notional(
-                        tuple(current_timestamps),
-                        tuple(current_closes),
-                        tuple(current_volumes),
-                    )
-                )
-                current_timestamps.clear()
-                current_closes.clear()
-                current_volumes.clear()
-            current_day = observation_day
-            current_timestamps.append(observation.timestamp)
-            current_closes.append(observation.close)
-            current_volumes.append(observation.volume)
-        if current_timestamps:
-            daily_rows.append(
-                build_alpha_max_daily_quote_notional(
-                    tuple(current_timestamps),
-                    tuple(current_closes),
-                    tuple(current_volumes),
-                )
-            )
-        summarized[symbol] = AlphaMaxAdmissionDailyCandidateInput(
-            symbol=symbol,
-            daily_quote_notional=tuple(daily_rows),
-            consecutive_completed_daily_bars_before_train=(
-                candidate.consecutive_completed_daily_bars_before_train
-            ),
-            causal_funding_coverage_complete=candidate.causal_funding_coverage_complete,
-            unresolved_daily_cross_section_count=(candidate.unresolved_daily_cross_section_count),
-            partition_integrity_complete=candidate.partition_integrity_complete,
-        )
-    return compute_alpha_max_train_admission_from_daily_summaries(
-        summarized,
-        input_root_hashes=input_root_hashes,
-        candidate_symbols=candidate_symbols,
-    )
 
 
 def compute_alpha_max_train_admission_from_daily_summaries(
@@ -10732,11 +10575,6 @@ class AlphaMaxStreamingEquityEvidence:
 
     def __post_init__(self) -> None:
         _validate_alpha_max_streaming_equity_evidence(self)
-
-    @property
-    def ruin(self) -> bool:
-        """Compatibility alias; canonical evidence uses ``ruin_detected``."""
-        return self.ruin_detected
 
     def to_payload(self) -> dict[str, Any]:
         return json.loads(self.canonical_bytes)

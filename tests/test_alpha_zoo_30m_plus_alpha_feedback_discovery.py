@@ -87,7 +87,7 @@ def test_native_30m_loader_builds_base_before_resampling(tmp_path: Path) -> None
 
     assert MODULE.BAR_CONSTRUCTION == "native_1s_to_30m_base_then_requested_timeframe"
     assert len(base) == 3
-    assert base["datetime"].diff().dropna().eq(pd.Timedelta(minutes=30)).all()
+    assert base["datetime"].diff().dropna().eq(pd.to_timedelta(30, unit="min")).all()
     assert len(bars[("TESTUSDT", "30m")]) > len(bars[("TESTUSDT", "1h")])
     assert bars[("TESTUSDT", "30m")].iloc[0]["close"] == 129.5
 

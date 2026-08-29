@@ -726,7 +726,14 @@ def _run_physical_schedule_child(temp_root: Path) -> None:
 
     def fold_inputs(domain: str) -> tuple[SimpleNamespace, ...]:
         return tuple(
-            SimpleNamespace(fold_id=fold_id) for fold_id in runner._alpha_max_fold_ids(domain)
+            SimpleNamespace(
+                fold_id=fold_id,
+                bounded_raw_loader=SimpleNamespace(
+                    clear_cache=lambda: None,
+                    close=lambda: None,
+                ),
+            )
+            for fold_id in runner._alpha_max_fold_ids(domain)
         )
 
     def prepared_rows(domain: str) -> dict[str, object]:
@@ -943,7 +950,10 @@ def _run_physical_schedule_child(temp_root: Path) -> None:
     runner.seal_alpha_max_manifest_activation = lambda *_args, manifest_path, **_kwargs: (
         SimpleNamespace(manifest_receipt=retained_manifests[str(manifest_path)])
     )
-    runner._AlphaMaxBoundedRawLoader = lambda *_args, **_kwargs: SimpleNamespace()
+    runner._AlphaMaxBoundedRawLoader = lambda *_args, **_kwargs: SimpleNamespace(
+        clear_cache=lambda: None,
+        close=lambda: None,
+    )
     runner._alpha_max_build_fold_inputs = lambda *_args, domain, **_kwargs: fold_inputs(domain)
     runner._alpha_max_prepared_row_checkpoint_bytes = lambda prepared, *, domain: (
         runner._canonical_bytes(

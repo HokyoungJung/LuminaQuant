@@ -91,7 +91,7 @@ def _admission_payload(
 class _FakeFeatureLookup:
     points_by_path: dict[
         str,
-        dict[str, FeaturePoint | None | dict[int, FeaturePoint | None]],
+        dict[str, FeaturePoint | dict[int, FeaturePoint | None] | None],
     ] = {}
     calls: list[tuple[str, str, str, int]] = []
 

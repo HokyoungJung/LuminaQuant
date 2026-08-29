@@ -410,7 +410,11 @@ def _load_latest_market_judgement(
     if as_of_date is not None:
         latest_day = min(latest_day, as_of_date)
     start_day = (
-        latest_day - _MARKET.pd.Timedelta(days=max(8, int(feature_lookback_days))).to_pytimedelta()
+        latest_day
+        - _MARKET.pd.to_timedelta(
+            max(8, int(feature_lookback_days)),
+            unit="D",
+        ).to_pytimedelta()
     )
     symbol_frames = []
     for symbol in symbol_universe:

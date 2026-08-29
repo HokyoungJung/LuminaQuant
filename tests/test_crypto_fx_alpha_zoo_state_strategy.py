@@ -305,7 +305,7 @@ def test_market_window_live_path_matches_batch_path_for_hourly_alpha_zoo_decisio
 def test_replay_grid_hides_locked_oos_until_after_train_validation_selection() -> None:
     rows = []
     for ts in range(60):
-        timestamp = pd.Timestamp("2026-01-01") + pd.Timedelta(hours=ts)
+        timestamp = pd.Timestamp("2026-01-01") + pd.to_timedelta(ts, unit="h")
         split = "train" if ts < 30 else "validation" if ts < 45 else "locked_oos"
         for symbol, drift in (("BTC/USDT", 0.001), ("ETH/USDT", 0.004), ("SOL/USDT", -0.002)):
             close = 100.0 * (1.0 + drift * ts)

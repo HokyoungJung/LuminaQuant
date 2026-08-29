@@ -32,10 +32,10 @@ CURRENT_REGISTRY_SHA256 = "cfe3a04620c52cc235d6f1cda1cac617ba30cd7327c753fc2f620
 CURRENT_KEY_SET_SHA256 = "3a4791cf353abcb82f9717ce89ee16b9d73d84f431d5b058135046c2ba8e332b"
 PRIOR_KEY_SET_ACTUAL_LF_SHA256 = "3b078011040f89e8d788b2cef9214c58f687221104381e26a688a7f8cdbddd78"
 INCUMBENT_AUDIT_SHA256 = "5133bc40116399fe7af32e75a1ecc52a4f385dc8a0b5d3a4a9585e2437615ed8"
-RUNTIME_CONTRACT_SHA256 = "b3859443c842cf8b04d04ed32923e6c6a8207af18e26f68a717ba623b4edfef9"
-CONFIG_PAYLOAD_SHA256 = "b062e3805d94087cc18cd22634918815503f94dd73f8fa8ac1979e7aef535f85"
-CONFIG_CANONICAL_SHA256 = "691bf756519be1984ebb331142dce1b8787783d8da1d3e9911fbdd8d7d0d4ac3"
-CONFIG_FILE_SHA256 = "2f267451c4df6b6b7471d972b7756327e41c82522ae2ef4b9198fbf6aa8b5e9c"
+RUNTIME_CONTRACT_SHA256 = "a6c945e43870c3d45e0f5f745e689eb75d68d82e0da07d22918df29e14ada753"
+CONFIG_PAYLOAD_SHA256 = "44cc454556f11d5bf66f8992e41343b0ada0ca8803a771342756057138e3cd44"
+CONFIG_CANONICAL_SHA256 = "3f54ec513402204602fc14233e59f3be0dcbef4f2e89f7cd065133305d023f1c"
+CONFIG_FILE_SHA256 = "01d1c783d8393966d356024ab41349b540339184384eb72ef2952ae11f4dad04"
 
 CANDIDATE_SYMBOLS = [
     "ADAUSDT",
@@ -659,9 +659,9 @@ def test_runtime_contract_is_exhaustive_and_has_no_override_surface() -> None:
     constructor = runtime["backtest_constructor"]
     assert constructor["strategy_timeframe"] == "1s"
     assert constructor["warmup_bars"] == 0
-    assert constructor["record_history"] is True
-    assert constructor["track_metrics"] is True
-    assert constructor["record_trades"] is True
+    assert constructor["record_history"] is False
+    assert constructor["track_metrics"] is False
+    assert constructor["record_trades"] is False
     assert constructor["strict_data_handler_construction"] is True
     assert constructor["data_handler_kwargs"] == {
         "backtest_poll_seconds": 1,

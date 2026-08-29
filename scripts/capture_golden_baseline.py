@@ -118,7 +118,7 @@ def generate_ohlcv(symbol: str) -> pl.DataFrame:
             "close": closes,
             "volume": volumes,
         }
-    ).with_columns(pl.col("datetime").cast(pl.Datetime))
+    ).with_columns(pl.col("datetime").str.to_datetime())
 
 
 def step_generate_fixtures(dry_run: bool) -> dict[str, dict]:

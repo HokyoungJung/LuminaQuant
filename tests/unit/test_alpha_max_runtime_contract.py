@@ -412,7 +412,7 @@ def test_u50_constructor_plan_has_only_explicit_one_second_phase_owned_inputs(
     assert plan.config is config
     assert plan.strategy_timeframe == "1s"
     assert plan.warmup_bars == 0
-    assert plan.record_history is plan.track_metrics is plan.record_trades is True
+    assert plan.record_history is plan.track_metrics is plan.record_trades is False
     assert plan.strict_data_handler_construction is True
     assert dict(plan.data_handler_kwargs) == {
         "backtest_poll_seconds": 1,

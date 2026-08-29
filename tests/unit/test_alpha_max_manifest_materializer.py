@@ -186,17 +186,12 @@ def test_materializer_bytes_path_hash_and_strategy_params_are_exact(tmp_path, re
     )
 
     assert result.path == str(expected_path)
-    assert result.manifest_path == result.path
     assert result.canonical_bytes == expected_bytes == expected_path.read_bytes()
     assert result.sha256 == hashlib.sha256(expected_bytes).hexdigest()
-    assert result.manifest_sha256 == result.sha256
     assert dict(result.strategy_params) == {
         "portfolio_mode": f"manifest:{expected_path}",
         "decision_cadence_seconds": 1,
     }
-    assert result["payload"] == result.payload
-    assert result["manifest_bytes"] == result.canonical_bytes
-
     with pytest.raises(ValueError, match="target_exists"):
         materialize_alpha_max_manifest(
             registry_nodes["component_trend_1x"],

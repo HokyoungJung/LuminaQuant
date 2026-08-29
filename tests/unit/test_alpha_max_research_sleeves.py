@@ -18,6 +18,7 @@ from lumina_quant.strategies.alpha_max_research_sleeves import (
     ResearchOnlyDailyCrossSectionalNearHighAnchoringStrategy,
     ResearchOnlyDailyLowTurnoverTrendPersistenceStrategy,
     ResearchOnlyFourHourFundingHarvestCarryStrategy,
+    _get_completed_bars,
 )
 from lumina_quant.strategies.low_turnover_trend_alpha_sleeves import (
     LowTurnoverTrendPersistenceStrategy,
@@ -58,6 +59,11 @@ class _Agg:
         return bars[-int(count) :]
 
 
+class _FailingAgg:
+    def get_bars(self, symbol: str, timeframe: str, lookback_bars: int = 1, *, n=None):
+        raise RuntimeError(f"aggregator unavailable for {symbol} {timeframe}")
+
+
 def _dt(day: int = 1, hour: int = 0) -> datetime:
     return datetime(2026, 1, day, hour, tzinfo=UTC)
 
@@ -85,6 +91,20 @@ def _event_for(
 
 def _json_state(strategy: Any) -> str:
     return json.dumps(strategy.get_research_indicator_state(), sort_keys=True, default=str)
+
+
+def test_get_completed_bars_propagates_aggregator_failure() -> None:
+    with pytest.raises(RuntimeError, match=r"aggregator unavailable for BTCUSDT 1d"):
+        _get_completed_bars(_FailingAgg(), "BTCUSDT", "1d", include_final=False)
+
+
+def test_get_completed_bars_preserves_completed_bar_selection() -> None:
+    aggregator = _Agg()
+    bars = [_bar(_dt(day), float(day)) for day in range(1, 4)]
+    aggregator.set_bars("BTCUSDT", "1d", bars)
+
+    assert _get_completed_bars(aggregator, "BTCUSDT", "1d", include_final=True) == bars
+    assert _get_completed_bars(aggregator, "BTCUSDT", "1d", include_final=False) == bars[:-1]
 
 
 def test_adapters_have_exact_research_only_rows_and_native_timeframes() -> None:

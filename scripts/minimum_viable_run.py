@@ -34,7 +34,7 @@ def _write_synthetic_ohlcv_csv(path: Path, *, days: int, seed: int) -> None:
             "close": close,
             "volume": volume,
         }
-    ).with_columns(pl.col("datetime").cast(pl.Datetime))
+    ).with_columns(pl.col("datetime").str.to_datetime())
 
     path.parent.mkdir(parents=True, exist_ok=True)
     frame.write_csv(path)

@@ -341,7 +341,7 @@ def dynamic_weights(
 
     weights = np.zeros_like(returns, dtype=np.float32)
     selection_log: list[dict[str, Any]] = []
-    start = index[0].normalize() + pd.Timedelta(days=params.lookback_days)
+    start = index[0].normalize() + pd.to_timedelta(params.lookback_days, unit="D")
     for rebalance_time in pd.date_range(
         start=start, end=index[-1], freq=f"{params.rebalance_days}D"
     ):
@@ -351,14 +351,14 @@ def dynamic_weights(
         loc_next = int(
             np.searchsorted(
                 index.values,
-                np.datetime64(rebalance_time + pd.Timedelta(days=params.rebalance_days)),
+                np.datetime64(rebalance_time + pd.to_timedelta(params.rebalance_days, unit="D")),
                 side="left",
             )
         )
         lookback_start = int(
             np.searchsorted(
                 index.values,
-                np.datetime64(rebalance_time - pd.Timedelta(days=params.lookback_days)),
+                np.datetime64(rebalance_time - pd.to_timedelta(params.lookback_days, unit="D")),
                 side="left",
             )
         )

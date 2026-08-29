@@ -227,7 +227,7 @@ def _load_symbol_close_30m_from_feature_points(
     effective_start = max(start_day, first_observed)
     full_index = pd.date_range(
         start=effective_start,
-        end=(end_day + pd.Timedelta(days=1) - pd.Timedelta(minutes=30)),
+        end=(end_day + pd.to_timedelta(1, unit="D") - pd.to_timedelta(30, unit="min")),
         freq="30min",
         tz="UTC",
     )

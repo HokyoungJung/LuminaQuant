@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "lumina_compute"
-version = "0.1.0"
+version = "0.2.0"
 requires-python = ">=3.11"
 description = "lumina_quant native compute island (pyo3)"
 classifiers = ["Private :: Do Not Upload"]

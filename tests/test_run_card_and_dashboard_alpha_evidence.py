@@ -109,7 +109,7 @@ def test_run_card_blocks_real_mode_and_oos_leakage() -> None:
 def test_run_card_consumes_alpha_evidence_oos_leakage_flag() -> None:
     rows = []
     for idx, split in enumerate(("train", "train", "locked_oos", "locked_oos")):
-        timestamp = pd.Timestamp("2026-01-01") + pd.Timedelta(hours=idx)
+        timestamp = pd.Timestamp("2026-01-01") + pd.to_timedelta(idx, unit="h")
         for rank, symbol in enumerate(("A", "B", "C", "D"), start=1):
             rows.append(
                 {
@@ -225,7 +225,7 @@ def test_alpha_benchmark_loop_stays_within_performance_budget() -> None:
     max_seconds = 2.0
     for idx in range(48):
         split = "train" if idx < 24 else "validation" if idx < 36 else "locked_oos"
-        timestamp = pd.Timestamp("2026-01-01") + pd.Timedelta(hours=idx)
+        timestamp = pd.Timestamp("2026-01-01") + pd.to_timedelta(idx, unit="h")
         for rank in range(96):
             signal = float(rank)
             rows.append(

@@ -7703,7 +7703,17 @@ def _read_csv_ohlcv(path: Path) -> pl.DataFrame:
 
     if "datetime" in cols:
         dt_col = cols["datetime"]
-        dt_expr = pl.col(dt_col).cast(pl.Datetime(time_unit="ms"), strict=False)
+        datetime_dtype = frame.schema[dt_col]
+        if datetime_dtype == pl.String:
+            dt_expr = pl.col(dt_col).str.to_datetime(time_unit="ms", strict=False)
+        elif isinstance(datetime_dtype, pl.Datetime) or datetime_dtype == pl.Date:
+            dt_expr = pl.col(dt_col).cast(pl.Datetime(time_unit="ms"))
+        elif datetime_dtype.is_integer():
+            dt_expr = pl.from_epoch(pl.col(dt_col).cast(pl.Int64), time_unit="ms").cast(
+                pl.Datetime(time_unit="ms")
+            )
+        else:
+            raise TypeError(f"unsupported CSV datetime dtype: {datetime_dtype}")
     elif "timestamp" in cols:
         dt_col = cols["timestamp"]
         dt_expr = pl.from_epoch(pl.col(dt_col).cast(pl.Int64), time_unit="s").cast(

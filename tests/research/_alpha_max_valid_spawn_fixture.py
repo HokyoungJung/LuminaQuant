@@ -237,7 +237,6 @@ def _run_cases(base: Path) -> dict[int, dict[str, object]]:
             "byte_count": 3,
             "sha256": hashlib.sha256(b"[]\n").hexdigest(),
         },
-        _include_v2_bindings=True,
     )
     store = runner._AlphaMaxCellCheckpointStore(
         checkpoint, output_root=output, descriptor=descriptor, config_bytes=preflight.config_bytes

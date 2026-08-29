@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 
 import polars as pl
@@ -32,6 +33,51 @@ def _sample_1s_frame() -> pl.DataFrame:
             "volume": [1.0, 2.0, 3.0, 4.0],
         }
     )
+
+
+def test_ohlcv_datetime_normalization_accepts_string_temporal_and_epoch_ms() -> None:
+    expected = [
+        datetime(2026, 1, 1, 0, 0),
+        datetime(2026, 1, 1, 0, 0, 1),
+    ]
+    base = {
+        "open": [100.0, 101.0],
+        "high": [101.0, 102.0],
+        "low": [99.0, 100.0],
+        "close": [100.5, 101.5],
+        "volume": [1.0, 2.0],
+    }
+    frames = (
+        pl.DataFrame(
+            {
+                "datetime": ["2026-01-01T00:00:00Z", "2026-01-01T00:00:01Z"],
+                **base,
+            }
+        ),
+        pl.DataFrame(
+            {
+                "datetime": [1_767_225_600_000, 1_767_225_601_000],
+                **base,
+            }
+        ),
+        pl.DataFrame(
+            {
+                "datetime": pl.datetime_range(
+                    expected[0],
+                    expected[1],
+                    interval="1s",
+                    time_unit="us",
+                    eager=True,
+                ),
+                **base,
+            }
+        ),
+    )
+
+    normalized = [ParquetMarketDataRepository._ensure_ohlcv_frame(frame) for frame in frames]
+
+    assert all(frame.schema["datetime"] == pl.Datetime("ms") for frame in normalized)
+    assert all(frame["datetime"].to_list() == expected for frame in normalized)
 
 
 def test_upsert_1s_writes_wal(tmp_path: Path):

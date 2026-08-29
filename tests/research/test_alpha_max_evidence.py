@@ -17,9 +17,10 @@ import lumina_quant.research.alpha_max_evidence as evidence
 from lumina_quant.core.engine import TradingEngine
 from lumina_quant.research.alpha_max_evidence import (
     ALPHA_MAX_CANDIDATE_SYMBOLS,
-    AlphaMaxAdmissionCandidateInput,
+    AlphaMaxAdmissionDailyCandidateInput,
     AlphaMaxCapsuleReceipt,
     AlphaMaxCostCellEvidence,
+    AlphaMaxDailyQuoteNotional,
     AlphaMaxEquityEndpoint,
     AlphaMaxGateInput,
     AlphaMaxFundingBoundaryResolver,
@@ -27,7 +28,6 @@ from lumina_quant.research.alpha_max_evidence import (
     AlphaMaxManifestReceipt,
     AlphaMaxTerminalGateEvidence,
     AlphaMaxOrderedFundingLookup,
-    AlphaMaxRawObservation,
     AlphaMaxRootReceipt,
     AlphaMaxRowEvidence,
     AlphaMaxStreamingEquityTracker,
@@ -44,7 +44,7 @@ from lumina_quant.research.alpha_max_evidence import (
     canonical_alpha_max_cost_cell_bytes,
     canonical_alpha_max_row_bytes,
     compute_alpha_max_metric_statistics,
-    compute_alpha_max_train_admission,
+    compute_alpha_max_train_admission_from_daily_summaries,
     rank_alpha_max_historical_report,
     reconcile_alpha_max_cost_attribution,
     seal_alpha_max_contract_manifest,
@@ -1491,7 +1491,7 @@ def test_contract_manifest_seal_accepts_only_exact_canonical_ten_symbol_metadata
         seal_alpha_max_contract_manifest(path)
 
 
-def _candidate_input(
+def _daily_candidate_input(
     symbol: str,
     *,
     passes: bool,
@@ -1500,33 +1500,33 @@ def _candidate_input(
 ):
     start = datetime(2024, 1, 1, tzinfo=UTC)
     volume = 40_000.0 if passes else 20_000.0
-    rows: list[AlphaMaxRawObservation] = []
+    daily_summaries: list[AlphaMaxDailyQuoteNotional] = []
     for day_index in range(first_day_index, 517):
-        for hour in (0, 4, 8, 12, 16, 20):
-            if missing_last_bucket and day_index == 516 and hour == 20:
-                continue
-            rows.append(
-                AlphaMaxRawObservation(
-                    timestamp=start + timedelta(days=day_index, hours=hour),
-                    close=100.0,
-                    volume=volume,
-                )
+        completed_4h_bucket_hours = (0, 4, 8, 12, 16, 20)
+        if missing_last_bucket and day_index == 516:
+            completed_4h_bucket_hours = (0, 4, 8, 12, 16)
+        daily_summaries.append(
+            AlphaMaxDailyQuoteNotional(
+                day=(start + timedelta(days=day_index)).date(),
+                quote_notional_usdt=100.0 * volume * len(completed_4h_bucket_hours),
+                completed_4h_bucket_hours=completed_4h_bucket_hours,
             )
-    return AlphaMaxAdmissionCandidateInput(
+        )
+    return AlphaMaxAdmissionDailyCandidateInput(
         symbol=symbol,
-        train_observations=tuple(rows),
+        daily_quote_notional=tuple(daily_summaries),
         consecutive_completed_daily_bars_before_train=366,
         causal_funding_coverage_complete=True,
         unresolved_daily_cross_section_count=0,
     )
 
 
-def test_actual_517_day_train_admission_computes_float64_fsum_type7_and_vectors() -> None:
+def test_actual_517_day_train_admission_uses_daily_summaries_and_type7_vectors() -> None:
     inputs = {
-        symbol: _candidate_input(symbol, passes=index < 5)
+        symbol: _daily_candidate_input(symbol, passes=index < 5)
         for index, symbol in enumerate(ALPHA_MAX_CANDIDATE_SYMBOLS)
     }
-    result = compute_alpha_max_train_admission(
+    result = compute_alpha_max_train_admission_from_daily_summaries(
         inputs,
         input_root_hashes={"warmup": _HASH_A, "train": _HASH_B},
     )
@@ -1550,7 +1550,7 @@ def test_actual_517_day_train_admission_computes_float64_fsum_type7_and_vectors(
 
 def test_train_admission_missing_bucket_is_not_synthetic_zero_and_fails_membership() -> None:
     inputs = {
-        symbol: _candidate_input(
+        symbol: _daily_candidate_input(
             symbol,
             passes=index < 5,
             missing_last_bucket=index == 0,
@@ -1558,7 +1558,7 @@ def test_train_admission_missing_bucket_is_not_synthetic_zero_and_fails_membersh
         for index, symbol in enumerate(ALPHA_MAX_CANDIDATE_SYMBOLS)
     }
     with pytest.raises(ValueError, match="insufficient_train_universe"):
-        compute_alpha_max_train_admission(
+        compute_alpha_max_train_admission_from_daily_summaries(
             inputs,
             input_root_hashes={"warmup": _HASH_A, "train": _HASH_B},
         )
@@ -1566,7 +1566,7 @@ def test_train_admission_missing_bucket_is_not_synthetic_zero_and_fails_membersh
 
 def test_train_admission_rejects_ton_listing_gap_instead_of_fabricating_coverage() -> None:
     inputs = {
-        symbol: _candidate_input(
+        symbol: _daily_candidate_input(
             symbol,
             passes=index < 5 or symbol == "TONUSDT",
             first_day_index=60 if symbol == "TONUSDT" else 0,
@@ -1574,7 +1574,7 @@ def test_train_admission_rejects_ton_listing_gap_instead_of_fabricating_coverage
         for index, symbol in enumerate(ALPHA_MAX_CANDIDATE_SYMBOLS)
     }
 
-    result = compute_alpha_max_train_admission(
+    result = compute_alpha_max_train_admission_from_daily_summaries(
         inputs,
         input_root_hashes={"warmup": _HASH_A, "train": _HASH_B},
     )
@@ -1606,9 +1606,9 @@ def test_train_admission_rejects_ton_listing_gap_instead_of_fabricating_coverage
 
 
 def _train_liquidity_bucket_fixture():
-    admission = compute_alpha_max_train_admission(
+    admission = compute_alpha_max_train_admission_from_daily_summaries(
         {
-            symbol: _candidate_input(symbol, passes=index < 5)
+            symbol: _daily_candidate_input(symbol, passes=index < 5)
             for index, symbol in enumerate(ALPHA_MAX_CANDIDATE_SYMBOLS)
         },
         input_root_hashes={"warmup": _HASH_A, "train": _HASH_B},
@@ -2362,7 +2362,7 @@ def test_streaming_full_event_tracker_records_zero_and_negative_equity_as_ruin()
 
     snapshot = tracker.finalize()
 
-    assert snapshot.ruin is True
+    assert snapshot.ruin_detected is True
     assert snapshot.ending_equity == -25.0
     assert snapshot.full_event_mdd == 1.0
     assert snapshot.uncapped_full_event_drawdown == pytest.approx(1.0025)

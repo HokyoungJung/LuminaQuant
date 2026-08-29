@@ -1899,9 +1899,9 @@
   },
   "integrity": {
     "canonicalization": "json.dumps(value,sort_keys=True,separators=(\",\",\":\"),ensure_ascii=False,allow_nan=False).encode(\"utf-8\")",
-    "config_payload_sha256": "b062e3805d94087cc18cd22634918815503f94dd73f8fa8ac1979e7aef535f85",
+    "config_payload_sha256": "44cc454556f11d5bf66f8992e41343b0ada0ca8803a771342756057138e3cd44",
     "config_payload_sha256_scope": "entire_document_with_integrity.config_payload_sha256_omitted",
-    "runtime_contract_sha256": "b3859443c842cf8b04d04ed32923e6c6a8207af18e26f68a717ba623b4edfef9"
+    "runtime_contract_sha256": "a6c945e43870c3d45e0f5f745e689eb75d68d82e0da07d22918df29e14ada753"
   },
   "metrics_and_statistics": {
     "gate_mdd": "max(full_event_mdd,reporting_4h_mdd)",
@@ -2117,11 +2117,11 @@
         "fill_application_attribution_sink": "collector.record_application",
         "funding_boundary_resolver": "phase_owned_AlphaMaxFundingBoundaryResolver_by_identity"
       },
-      "record_history": true,
-      "record_trades": true,
+      "record_history": false,
+      "record_trades": false,
       "strategy_timeframe": "1s",
       "strict_data_handler_construction": true,
-      "track_metrics": true,
+      "track_metrics": false,
       "warmup_bars": 0
     },
     "class_name": "AlphaMaxBacktestConfig",

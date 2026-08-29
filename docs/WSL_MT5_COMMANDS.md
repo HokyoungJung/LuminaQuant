@@ -16,7 +16,7 @@ uv run python -c "import MetaTrader5 as mt5; print(mt5.__version__)"
 
 ```bash
 # Base deps for WSL runtime (no uv build)
-uv sync --extra live --extra dev
+uv sync --extra live-binance --extra live-mt5 --extra live-polymarket --extra dev
 
 # Optional: if TA-Lib wheel is not available, install OS deps first
 sudo apt-get update

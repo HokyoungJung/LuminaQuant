@@ -248,18 +248,7 @@ def _event_watermark_ms(event: Any) -> int | None:
 def _get_completed_bars(
     aggregator: Any, symbol: str, timeframe: str, *, include_final: bool
 ) -> list[Any]:
-    getter = getattr(aggregator, "get_bars", None)
-    if not callable(getter):
-        return []
-    try:
-        bars = list(getter(symbol=symbol, timeframe=timeframe, n=100_000) or [])
-    except TypeError:
-        try:
-            bars = list(getter(symbol, timeframe, 100_000) or [])
-        except Exception:
-            return []
-    except Exception:
-        return []
+    bars = list(aggregator.get_bars(symbol=symbol, timeframe=timeframe, n=100_000) or [])
     if include_final:
         return bars
     return bars[:-1] if len(bars) >= 2 else []
@@ -746,15 +735,11 @@ class ResearchOnlyDailyCrossSectionalNearHighAnchoringStrategy(
     def set_state(self, state: dict[str, Any]) -> None:
         """Restore a full chunk snapshot while leaving the new aggregator unbound."""
         if not isinstance(state, dict):
-            super().set_state(state)
-            return
+            raise ValueError("invalid_alpha_max_near_high_chunk_state")
 
         raw_chunk = state.get(self._chunk_state_key)
         if raw_chunk is None:
-            # Indicator capsules and legacy snapshots contain only the inherited
-            # strategy state.  Preserve that contract unchanged.
-            super().set_state(state)
-            return
+            raise ValueError("invalid_alpha_max_near_high_chunk_state")
         required_keys = {
             "version",
             "adapter_class",
@@ -1141,7 +1126,7 @@ class ResearchOnlyDailyCrossSectionalNearHighAnchoringStrategy(
         self._alpha_max_last_completed_native_key_by_symbol = (
             {str(k): str(v) for k, v in raw_last.items()} if isinstance(raw_last, Mapping) else {}
         )
-        self.set_state(
+        super().set_state(
             {
                 "last_eval_time_key": capsule.get("last_eval_time_key", ""),
                 "tick": capsule.get("tick", 0),

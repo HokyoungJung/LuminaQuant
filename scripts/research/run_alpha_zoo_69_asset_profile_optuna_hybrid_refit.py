@@ -1171,7 +1171,7 @@ def _split_windows_for_hybrid(
     raw_oos = plan_payload.get("locked_oos", {})
     if raw_oos.get("start") is None or raw_oos.get("end") is None:
         validation_end = out["validation"][1]
-        out["locked_oos"] = (validation_end + pd.Timedelta(hours=1), validation_end)
+        out["locked_oos"] = (validation_end + pd.to_timedelta(1, unit="h"), validation_end)
     else:
         out["locked_oos"] = (
             pd.Timestamp(raw_oos["start"]).tz_localize(None),

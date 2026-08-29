@@ -43,6 +43,89 @@ fn max_drawdown(series: &[f64]) -> f64 {
     max_dd
 }
 
+fn exact_fsum_finite(values: &[f64]) -> f64 {
+    let mut partials: Vec<f64> = Vec::new();
+    for &value in values {
+        let mut x = value;
+        let mut retained = 0;
+        for index in 0..partials.len() {
+            let mut y = partials[index];
+            if x.abs() < y.abs() {
+                std::mem::swap(&mut x, &mut y);
+            }
+            let high = x + y;
+            let low = y - (high - x);
+            if low != 0.0 {
+                partials[retained] = low;
+                retained += 1;
+            }
+            x = high;
+        }
+        partials.truncate(retained);
+        partials.push(x);
+    }
+
+    let Some(mut high) = partials.pop() else {
+        return 0.0;
+    };
+    let mut low = 0.0;
+    while let Some(y) = partials.pop() {
+        let x = high;
+        high = x + y;
+        low = y - (high - x);
+        if low != 0.0 {
+            break;
+        }
+    }
+    if let Some(&next) = partials.last() {
+        if (low < 0.0 && next < 0.0) || (low > 0.0 && next > 0.0) {
+            let doubled = low * 2.0;
+            let corrected = high + doubled;
+            if doubled == corrected - high {
+                high = corrected;
+            }
+        }
+    }
+    high
+}
+
+#[pyfunction]
+fn grouped_fsum<'py>(
+    py: Python<'py>,
+    bucket_ids: PyReadonlyArray1<'py, i64>,
+    values: PyReadonlyArray1<'py, f64>,
+) -> PyResult<(Bound<'py, PyArray1<i64>>, Bound<'py, PyArray1<f64>>)> {
+    let buckets = bucket_ids.as_slice()?;
+    let values = values.as_slice()?;
+    if buckets.len() != values.len() {
+        return Err(PyValueError::new_err("grouped_fsum_length_mismatch"));
+    }
+    if values.iter().any(|value| !value.is_finite()) {
+        return Err(PyValueError::new_err("grouped_fsum_nonfinite_value"));
+    }
+
+    let mut output_buckets = Vec::new();
+    let mut output_sums = Vec::new();
+    let mut start = 0;
+    while start < buckets.len() {
+        let bucket = buckets[start];
+        let mut end = start + 1;
+        while end < buckets.len() && buckets[end] == bucket {
+            end += 1;
+        }
+        if end < buckets.len() && buckets[end] < bucket {
+            return Err(PyValueError::new_err("grouped_fsum_bucket_order_invalid"));
+        }
+        output_buckets.push(bucket);
+        output_sums.push(exact_fsum_finite(&values[start..end]));
+        start = end;
+    }
+    Ok((
+        Array1::from(output_buckets).into_pyarray(py),
+        Array1::from(output_sums).into_pyarray(py),
+    ))
+}
+
 // ============================================================================
 // Alpha-fold helpers  (logic from native/rust_alpha_fold/src/lib.rs)
 // ============================================================================
@@ -1506,5 +1589,6 @@ fn _compute(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(aggregate_raw_aggtrades_to_1s, m)?)?;
     m.add_function(wrap_pyfunction!(append_ohlcv_1s_wal, m)?)?;
     m.add_function(wrap_pyfunction!(fold_alpha_max_native_bars, m)?)?;
+    m.add_function(wrap_pyfunction!(grouped_fsum, m)?)?;
     Ok(())
 }

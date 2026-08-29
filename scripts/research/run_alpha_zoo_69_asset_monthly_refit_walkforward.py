@@ -1048,7 +1048,7 @@ def build_monthly_folds(
 ) -> list[MonthlyFold]:
     folds: list[MonthlyFold] = []
     oos_start = first_oos_start.normalize()
-    step = pd.Timedelta(minutes=int(bar_minutes))
+    step = pd.to_timedelta(int(bar_minutes), unit="min")
     while oos_start <= latest_data:
         validation_start = _add_month(oos_start, -2)
         validation_end = oos_start - step
