@@ -16,8 +16,8 @@ funding-rate print series (perp funding settles every 8h on Binance USD-M):
 - :func:`funding_implied_basis_bps` -- the latest funding print expressed in
   basis points per funding interval (the standing, lagged-TWAP funding leg).
 - :func:`basis_funding_gap_bps` -- instantaneous ``basis_bps(mark, index)``
-  minus :func:`funding_implied_basis_bps`: the funding-expectation error the
-  ``BasisFundingGapConvergenceStrategy`` sleeve fades.
+  minus :func:`funding_implied_basis_bps`: a descriptive difference between
+  the two contemporaneous measures, expressed in basis points.
 
 External prior (pre-registered):
 - Koijen, Moskowitz, Pedersen, Vrugt (2018, JFE) "Carry" -- carry
@@ -25,11 +25,8 @@ External prior (pre-registered):
 - Schmeling, Schrimpf, Todorov (BIS WP 2023) "Crypto carry" -- perp funding as
   the crypto carry leg, persistent and partly predictable.
 - Ackerer, Hugonnier & Jermann, "Perpetual Futures Pricing" (2023 wp/SSRN):
-  perp premium equals the expectation of future funding flows, making
-  premium-vs-funding disagreement a convergence object; plus the Binance
-  funding specification itself (funding = clamp(premium-index TWAP) +
-  interest), which makes the basis-funding gap a near-mechanical predictor of
-  the next funding print.
+  perpetual premium and funding are related quantities whose observed
+  difference can be measured without assigning a directional interpretation.
 
 EXPECTED NULL (verbatim, pre-registered): "Extraction leg: byte-identical, no
 null. TS-agreement leg: the spread adds no selectivity -- funding momentum
@@ -102,19 +99,26 @@ def funding_momentum(
     only addition is the never-raise ``finite_floats`` coercion, a no-op on
     such input).
     """
-    values = finite_floats(funding)
+    try:
+        diff_width = int(diff_window)
+        slope_width = int(slope_window)
+        span = int(ewma_span)
+        values = finite_floats(funding)
+    except Exception:
+        return None
+    if diff_width < 1 or slope_width < 2 or span < 1:
+        return None
     if len(values) < 2:
         return None
     diffs = [values[i] - values[i - 1] for i in range(1, len(values))]
-    diff_tail = diffs[-max(1, int(diff_window)) :]
+    diff_tail = diffs[-diff_width:]
     # EWMA of the first differences (most-recent weighted highest).
-    span = max(1, int(ewma_span))
     alpha = 2.0 / (span + 1.0)
     ewma = diff_tail[0]
     for value in diff_tail[1:]:
         ewma = alpha * value + (1.0 - alpha) * ewma
     # Rolling OLS slope of the funding LEVEL over the trailing slope window.
-    level_tail = values[-max(2, int(slope_window)) :]
+    level_tail = values[-slope_width:]
     slope = _ols_slope(level_tail)
     return float(ewma) + float(slope)
 
@@ -138,7 +142,10 @@ def funding_term_structure_spread(
         return None
     if short < 1 or long <= short:
         return None
-    values = finite_floats(funding)
+    try:
+        values = finite_floats(funding)
+    except Exception:
+        return None
     if len(values) < long:
         return None
     short_mean = sum(values[-short:]) / float(short)
@@ -161,14 +168,12 @@ def funding_implied_basis_bps(funding_rate: Any) -> float | None:
 
 
 def basis_funding_gap_bps(mark_price: Any, index_price: Any, funding_rate: Any) -> float | None:
-    """Instantaneous basis minus the funding-implied basis, in basis points.
+    """Difference between instantaneous basis and the funding rate, in basis points.
 
-    ``basis_bps(mark, index) - funding_implied_basis_bps(funding_rate)``: a
-    large POSITIVE gap means the instantaneous mark-index premium is richer
-    than the standing funding print, so the NEXT funding print mechanically
-    catches up and the basis itself tends to mean-revert (the convergence
-    object of Ackerer-Hugonnier-Jermann).  ``None`` when either leg is
-    unavailable, never raises.
+    ``basis_bps(mark, index) - funding_implied_basis_bps(funding_rate)``. A
+    positive value means the instantaneous mark-index basis exceeds the
+    funding rate expressed in basis points; a negative value means the
+    converse. ``None`` when either leg is unavailable, never raises.
     """
     basis = basis_bps(safe_float(mark_price), safe_float(index_price))
     implied = funding_implied_basis_bps(funding_rate)

@@ -980,10 +980,26 @@ class MarketDataRepository:
             start_date=start_date,
             end_date=end_date,
         )
-        if not direct.is_empty() or timeframe_token == "1s" or not self._prefer_1s_derived:
+        if not direct.is_empty() or timeframe_token in {"1s", "1m"} or not self._prefer_1s_derived:
             return direct
 
-        return direct
+        minute = _load_direct_ohlcv(
+            self.root_path,
+            exchange=normalized_exchange,
+            symbol=normalized_symbol,
+            timeframe="1m",
+            start_date=start_date,
+            end_date=end_date,
+        )
+        if minute.is_empty():
+            return direct
+        from lumina_quant.timeframe_aggregator import resample_ohlcv_frame_to_timeframe
+
+        return resample_ohlcv_frame_to_timeframe(
+            minute,
+            source_timeframe="1m",
+            timeframe=timeframe_token,
+        )
 
     def load_ohlcv_1s(
         self,

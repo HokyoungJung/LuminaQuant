@@ -99,8 +99,11 @@ from __future__ import annotations
 
 import json
 import math
+import hashlib
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
+from itertools import pairwise
+from types import MappingProxyType
 from typing import Any
 
 import numpy as np
@@ -159,12 +162,70 @@ DEFAULT_SPEC: dict[str, Any] = {
     "qlike_improvement_floor": 0.05,
     "fold_win_rate_floor": 0.60,
     "bh_alpha": 0.05,
+    "session_calendar": {
+        "canonical_family": "utc_seven_day_epoch_days",
+        "expected_day_step": 1,
+        "members": ["BTCUSDT", *_CORE_ALT_FOLLOWERS, "XAUUSDT", *_METAL_FOLLOWERS],
+    },
     "pairs": [["BTCUSDT", follower] for follower in _CORE_ALT_FOLLOWERS]
     + [["XAUUSDT", follower] for follower in _METAL_FOLLOWERS],
 }
+_CANONICAL_SPEC_BYTES = json.dumps(
+    DEFAULT_SPEC,
+    sort_keys=True,
+    separators=(",", ":"),
+    allow_nan=False,
+).encode("utf-8")
 
 _COEF_NAMES_BASE: tuple[str, ...] = ("const", "own_d", "own_w", "own_m")
 _COEF_NAMES_LEADER: tuple[str, ...] = ("leader_d", "leader_w", "leader_m")
+_LINEAGE_VERSION = "vdiag-input-v3"
+_CLI_LOADER_VERSION = "vdiag-cli-v3"
+_ALLOWED_CLI_LOADERS = {
+    "explicit_epoch_day": "_load_rv_csv",
+    "canonical_intraday": "_load_closes_csv",
+    "canonical_intraday_series_dir": "_load_series_dir",
+}
+_AUTHORITY_SEAL = object()
+
+
+class _DiagnosticAuthority:
+    """Unserializable capability issued after the CLI has sealed its input."""
+
+    __slots__ = ("_initialized", "_input_digest", "_lineage", "_seal")
+
+    def __init__(self, seal: object, lineage: dict[str, str], input_digest: str) -> None:
+        if seal is not _AUTHORITY_SEAL:
+            raise TypeError("diagnostic authority is minted by the CLI loader")
+        object.__setattr__(self, "_seal", seal)
+        object.__setattr__(self, "_lineage", MappingProxyType(dict(lineage)))
+        object.__setattr__(self, "_input_digest", input_digest)
+        object.__setattr__(self, "_initialized", True)
+
+    def __setattr__(self, name: str, value: object) -> None:
+        if getattr(self, "_initialized", False):
+            raise AttributeError("diagnostic authority is immutable")
+        object.__setattr__(self, name, value)
+
+
+def _freeze(value: Any) -> Any:
+    """Recursively freeze report evidence so nested mutation cannot alter it."""
+    if isinstance(value, Mapping):
+        return MappingProxyType({str(key): _freeze(item) for key, item in value.items()})
+    if isinstance(value, list):
+        return tuple(_freeze(item) for item in value)
+    if isinstance(value, tuple):
+        return tuple(_freeze(item) for item in value)
+    return value
+
+
+def _thaw(value: Any) -> Any:
+    """Return a JSON-compatible detached copy of frozen evidence."""
+    if isinstance(value, Mapping):
+        return {key: _thaw(item) for key, item in value.items()}
+    if isinstance(value, tuple):
+        return [_thaw(item) for item in value]
+    return value
 
 
 # --------------------------------------------------------------------------- #
@@ -325,6 +386,100 @@ def _sign_stability(coef_by_fold: list[np.ndarray], names: tuple[str, ...]) -> d
     return table
 
 
+def _validated_spec(
+    overrides: Mapping[str, Any] | None,
+    pairs: Sequence[tuple[str, str]] | None = None,
+) -> tuple[dict[str, Any], bool, bool]:
+    """Return a JSON snapshot plus validity and canonical-admission flags."""
+    canonical = json.loads(_CANONICAL_SPEC_BYTES)
+    merged = json.loads(_CANONICAL_SPEC_BYTES)
+    valid = True
+    if overrides is not None:
+        if not isinstance(overrides, Mapping) or not set(overrides) <= set(canonical):
+            valid = False
+        else:
+            try:
+                normalized = json.loads(json.dumps(dict(overrides), allow_nan=False))
+                merged.update(normalized)
+            except TypeError, ValueError:
+                valid = False
+    if pairs is not None:
+        merged["pairs"] = []
+        try:
+            pair_items = list(pairs)
+            if not pair_items:
+                valid = False
+            for item in pair_items:
+                if (
+                    not isinstance(item, (list, tuple))
+                    or len(item) != 2
+                    or type(item[0]) is not str
+                    or not item[0]
+                    or type(item[1]) is not str
+                    or not item[1]
+                ):
+                    valid = False
+                    break
+                merged["pairs"].append([item[0], item[1]])
+            if not valid:
+                merged["pairs"] = []
+        except TypeError, ValueError:
+            valid = False
+    try:
+        integer_fields = (
+            "version",
+            "num_folds",
+            "min_train_rows",
+            "min_test_rows",
+            "bootstrap_rounds",
+            "bootstrap_seed",
+        )
+        if any(
+            type(merged[field]) is not int
+            or merged[field] < (0 if field == "bootstrap_seed" else 1)
+            for field in integer_fields
+        ):
+            valid = False
+        lags = tuple(sorted({int(value) for value in merged["har_lags"]}))
+        if lags != tuple(DEFAULT_HAR_LAGS):
+            valid = False
+        finite_positive = ("log_rv_eps", "forecast_log_clip")
+        if any(
+            not math.isfinite(float(merged[field])) or float(merged[field]) <= 0.0
+            for field in finite_positive
+        ):
+            valid = False
+        lam = float(merged["ewma_reference_lambda"])
+        if not math.isfinite(lam) or not 0.0 < lam < 1.0:
+            valid = False
+        for field in (
+            "qlike_improvement_floor",
+            "fold_win_rate_floor",
+            "bh_alpha",
+        ):
+            value = float(merged[field])
+            if not math.isfinite(value) or not 0.0 <= value <= 1.0:
+                valid = False
+        normalized_pairs = merged["pairs"]
+        if (
+            type(normalized_pairs) is not list
+            or not normalized_pairs
+            or any(
+                type(item) is not list
+                or len(item) != 2
+                or any(type(value) is not str or not value for value in item)
+                for item in normalized_pairs
+            )
+            or len({tuple(item) for item in normalized_pairs}) != len(normalized_pairs)
+        ):
+            valid = False
+    except KeyError, TypeError, ValueError, OverflowError:
+        valid = False
+    authoritative = valid and merged == canonical
+    merged["canonical_admission_eligible"] = authoritative
+    return merged, valid, authoritative
+
+
 # --------------------------------------------------------------------------- #
 # per-pair evaluation
 # --------------------------------------------------------------------------- #
@@ -341,9 +496,9 @@ def evaluate_pair(
     ``insufficient_data``.  Admission fields except the BH adjustment are
     populated (BH is a cross-pair, whole-search step).  Never raises.
     """
-    merged = dict(DEFAULT_SPEC)
-    if spec:
-        merged.update(spec)
+    merged, valid_spec, _authoritative = _validated_spec(spec)
+    if not valid_spec:
+        return None
     # Normalize the lag spec EXACTLY as ``har_design`` does (sorted unique
     # ints) and fail closed BEFORE building any design: the coefficient
     # labels (``_COEF_NAMES_BASE + _COEF_NAMES_LEADER``) and the leader-block
@@ -354,7 +509,7 @@ def evaluate_pair(
         lag_list = sorted({int(k) for k in merged["har_lags"]})
     except Exception:
         return None
-    if len(lag_list) != 3:
+    if tuple(lag_list) != tuple(DEFAULT_HAR_LAGS):
         return None
     lags = tuple(lag_list)
     eps = float(merged["log_rv_eps"])
@@ -493,6 +648,9 @@ class PairDiagnostic:
     rv_excess_kurtosis: float | None = None
     qlike_diff_skewness: float | None = None
     admitted: bool = False
+    shared_day_start: int | None = None
+    shared_day_end: int | None = None
+    fold_day_bounds: tuple[tuple[int, int], ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         """Return a JSON-friendly dict (lists for tuples, plain scalars)."""
@@ -511,10 +669,13 @@ class PairDiagnostic:
             "mean_qlike_ewma_reference": self.mean_qlike_ewma_reference,
             "bootstrap_pvalue": self.bootstrap_pvalue,
             "bh_adjusted_pvalue": self.bh_adjusted_pvalue,
-            "coefficient_sign_stability": dict(self.coefficient_sign_stability),
+            "coefficient_sign_stability": _thaw(self.coefficient_sign_stability),
             "rv_excess_kurtosis": self.rv_excess_kurtosis,
             "qlike_diff_skewness": self.qlike_diff_skewness,
             "admitted": bool(self.admitted),
+            "shared_day_start": self.shared_day_start,
+            "shared_day_end": self.shared_day_end,
+            "fold_day_bounds": [list(bounds) for bounds in self.fold_day_bounds],
         }
 
 
@@ -522,24 +683,26 @@ class PairDiagnostic:
 class VerdictReport:
     """Whole-search V-DIAG verdict artifact (deterministic, timestamp-free)."""
 
-    spec: dict[str, Any]
+    spec: Mapping[str, Any]
     pairs: tuple[PairDiagnostic, ...]
     evaluated_pairs: int
     admitted_pairs: tuple[str, ...]
     insufficient_pairs: tuple[str, ...]
     program_verdict: str  # "admitted" | "dead" | "insufficient_data"
     sizing_overlay_build_gate_open: bool
+    lineage: Mapping[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         """Return the nested JSON-friendly artifact payload."""
         return {
-            "spec": dict(self.spec),
+            "spec": _thaw(self.spec),
             "pairs": [pair.to_dict() for pair in self.pairs],
             "evaluated_pairs": int(self.evaluated_pairs),
             "admitted_pairs": list(self.admitted_pairs),
             "insufficient_pairs": list(self.insufficient_pairs),
             "program_verdict": self.program_verdict,
             "sizing_overlay_build_gate_open": bool(self.sizing_overlay_build_gate_open),
+            "lineage": _thaw(self.lineage),
             "kill_semantics": (
                 "program_verdict=dead KILLS all direct vol-spillover strategies "
                 "and any new multivariate-vol code (design-brief section 5)"
@@ -554,41 +717,152 @@ class VerdictReport:
 # --------------------------------------------------------------------------- #
 # whole-search runner
 # --------------------------------------------------------------------------- #
-def _normalize_symbol_series(payload: Any) -> dict[int, float]:
-    """Coerce one symbol's RV input into ``{day_id: rv}``; never raises.
+def _normalize_symbol_series(payload: Any) -> tuple[dict[int, float], bool, str]:
+    """Validate one symbol's RV input without coercion or silent row loss.
 
-    Accepted shapes: a mapping ``day -> rv``; a 2-tuple ``(days, rvs)``; or a
-    plain sequence of RV values (implicitly aligned, day = index).  Entries
-    with non-finite or negative RV are dropped.
+    Only explicitly day-keyed mappings or ``(days, values)`` pairs are
+    authoritative.  Plain sequences are retained for diagnostic smoke runs,
+    but are labelled nonauthoritative and cannot open the canonical gate.
     """
     out: dict[int, float] = {}
 
-    def _put(day: Any, value: Any) -> None:
-        try:
-            day_id = int(day)
-            rv = float(value)
-        except Exception:
-            return
-        if math.isfinite(rv) and rv >= 0.0:
-            out[day_id] = rv
+    def put(day: Any, value: Any) -> bool:
+        if type(day) is not int or type(value) not in (int, float):
+            return False
+        rv = float(value)
+        if not math.isfinite(rv) or rv < 0.0 or day in out:
+            return False
+        out[day] = rv
+        return True
 
     try:
         if isinstance(payload, Mapping):
             for day, value in payload.items():
-                _put(day, value)
-        elif (
-            isinstance(payload, tuple)
-            and len(payload) == 2
-            and not isinstance(payload[0], (int, float))
-        ):
-            for day, value in zip(list(payload[0]), list(payload[1]), strict=False):
-                _put(day, value)
-        else:
-            for day, value in enumerate(list(payload)):
-                _put(day, value)
-    except TypeError:
-        return {}
-    return out
+                if not put(day, value):
+                    return {}, False, "invalid_day_or_value"
+            return out, True, "explicit_day_mapping"
+        if isinstance(payload, tuple) and len(payload) == 2:
+            days, values = list(payload[0]), list(payload[1])
+            if len(days) != len(values):
+                return {}, False, "day_value_length_mismatch"
+            for day, value in zip(days, values, strict=True):
+                if not put(day, value):
+                    return {}, False, "invalid_day_or_value"
+            return out, True, "explicit_day_sequence"
+        values = list(payload)
+        for day, value in enumerate(values):
+            if (
+                type(value) not in (int, float)
+                or not math.isfinite(float(value))
+                or float(value) < 0
+            ):
+                return {}, False, "invalid_plain_sequence"
+            out[day] = float(value)
+        return out, False, "plain_sequence_nonauthoritative"
+    except TypeError, ValueError:
+        return {}, False, "unreadable_payload"
+
+
+def _normalized_input_digest(normalized: Mapping[str, Mapping[int, float]]) -> str:
+    """Hash exactly the normalized rows consumed by :func:`run_diagnostic`."""
+    return hashlib.sha256(
+        json.dumps(
+            {
+                symbol: [[day, value] for day, value in sorted(values.items())]
+                for symbol, values in sorted(normalized.items())
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        ).encode("utf-8")
+    ).hexdigest()
+
+
+def _normalize_rv_series(
+    rv_series: Mapping[str, Any],
+) -> tuple[dict[str, dict[int, float]], dict[str, bool], dict[str, str]]:
+    normalized: dict[str, dict[int, float]] = {}
+    input_authority: dict[str, bool] = {}
+    input_quality: dict[str, str] = {}
+    if isinstance(rv_series, Mapping):
+        for symbol, payload in rv_series.items():
+            if type(symbol) is not str or not symbol:
+                continue
+            values, is_authoritative, quality = _normalize_symbol_series(payload)
+            normalized[symbol] = values
+            input_authority[symbol] = is_authoritative
+            input_quality[symbol] = quality
+    return normalized, input_authority, input_quality
+
+
+def _mint_cli_authority(
+    rv_series: Mapping[str, Any],
+    *,
+    source_authority: str,
+    loader: str,
+    loader_version: str,
+    source_identity: str,
+    source_content_sha256: str,
+) -> _DiagnosticAuthority:
+    """Mint a capability only after a CLI loader has fully validated its grid."""
+    if (
+        _ALLOWED_CLI_LOADERS.get(source_authority) != loader
+        or loader_version != _CLI_LOADER_VERSION
+        or type(source_identity) is not str
+        or not source_identity
+        or type(source_content_sha256) is not str
+        or len(source_content_sha256) != 64
+        or any(character not in "0123456789abcdef" for character in source_content_sha256)
+    ):
+        raise ValueError("unallowlisted CLI source lineage")
+    normalized, input_authority, _ = _normalize_rv_series(rv_series)
+    members = set(DEFAULT_SPEC["session_calendar"]["members"])
+    if set(normalized) != members or not all(input_authority.get(symbol) for symbol in members):
+        raise ValueError("incomplete explicit-day source grid")
+    day_sets = [set(normalized[symbol]) for symbol in sorted(members)]
+    if not day_sets or not day_sets[0] or any(days != day_sets[0] for days in day_sets[1:]):
+        raise ValueError("inconsistent source day grid")
+    days = sorted(day_sets[0])
+    if not all(current == previous + 1 for previous, current in pairwise(days)):
+        raise ValueError("partial source day grid")
+    lineage = {
+        "authority": source_authority,
+        "loader": loader,
+        "loader_version": loader_version,
+        "source_identity": source_identity,
+        "source_content_sha256": source_content_sha256,
+    }
+    return _DiagnosticAuthority(_AUTHORITY_SEAL, lineage, _normalized_input_digest(normalized))
+
+
+def _validated_authority(
+    authority: object | None, input_digest: str
+) -> tuple[dict[str, str], bool]:
+    """Accept only a capability minted for these exact normalized inputs."""
+    required = {
+        "authority",
+        "loader",
+        "loader_version",
+        "source_identity",
+        "source_content_sha256",
+    }
+    if (
+        not isinstance(authority, _DiagnosticAuthority)
+        or authority._seal is not _AUTHORITY_SEAL
+        or authority._input_digest != input_digest
+        or set(authority._lineage) != required
+        or _ALLOWED_CLI_LOADERS.get(authority._lineage["authority"]) != authority._lineage["loader"]
+        or authority._lineage["loader_version"] != _CLI_LOADER_VERSION
+        or any(
+            type(authority._lineage[field]) is not str or not authority._lineage[field]
+            for field in required
+        )
+    ):
+        return {"authority": "unsealed_library_call"}, False
+    digest = authority._lineage["source_content_sha256"]
+    if len(digest) != 64 or any(character not in "0123456789abcdef" for character in digest):
+        return {"authority": "unsealed_library_call"}, False
+    return dict(authority._lineage), True
 
 
 def run_diagnostic(
@@ -596,6 +870,7 @@ def run_diagnostic(
     *,
     pairs: Sequence[tuple[str, str]] | None = None,
     spec: Mapping[str, Any] | None = None,
+    authority: object | None = None,
 ) -> VerdictReport:
     """Run the whole-search V-DIAG over every pre-registered pair.
 
@@ -603,20 +878,17 @@ def run_diagnostic(
     :func:`_normalize_symbol_series` for accepted shapes).  ``pairs``
     overrides the pre-registered SPEC pair list (each item ``(leader,
     follower)``); the SPEC (with any overrides merged) is echoed verbatim
-    into the artifact.  Missing symbols, non-overlapping day ranges, or
-    short series close each affected pair as ``insufficient_data``.  Never
-    raises.
+    into the artifact.  Canonical admission requires an opaque capability
+    minted by the verified CLI loader for these exact normalized inputs.
+    Missing symbols, non-overlapping day ranges, or short series close each
+    affected pair as ``insufficient_data``.  Never raises.
     """
-    merged_spec = dict(DEFAULT_SPEC)
-    if spec:
-        merged_spec.update(spec)
-    if pairs is not None:
-        merged_spec["pairs"] = [[str(leader), str(follower)] for leader, follower in pairs]
-
-    normalized: dict[str, dict[int, float]] = {}
-    if isinstance(rv_series, Mapping):
-        for symbol, payload in rv_series.items():
-            normalized[str(symbol)] = _normalize_symbol_series(payload)
+    merged_spec, valid_spec, authoritative = _validated_spec(spec, pairs)
+    normalized, input_authority, input_quality = _normalize_rv_series(rv_series)
+    input_digest = _normalized_input_digest(normalized)
+    normalized_source_lineage, sealed_source = _validated_authority(authority, input_digest)
+    authoritative = authoritative and sealed_source
+    merged_spec["canonical_admission_eligible"] = authoritative
 
     pair_items = [
         (str(item[0]), str(item[1]))
@@ -627,12 +899,21 @@ def run_diagnostic(
     for leader, follower in pair_items:
         leader_map = normalized.get(leader, {})
         follower_map = normalized.get(follower, {})
-        shared_days = sorted(set(leader_map) & set(follower_map))
+        shared_days = sorted(set(leader_map).intersection(follower_map))
         artifact: dict[str, Any] | None = None
-        if shared_days:
+        contiguous = all(current == previous + 1 for previous, current in pairwise(shared_days))
+        if valid_spec and shared_days and contiguous:
             follower_rv = [follower_map[day] for day in shared_days]
             leader_rv = [leader_map[day] for day in shared_days]
-            artifact = evaluate_pair(follower_rv, leader_rv, spec=merged_spec)
+            artifact = evaluate_pair(
+                follower_rv,
+                leader_rv,
+                spec={
+                    key: value
+                    for key, value in merged_spec.items()
+                    if key != "canonical_admission_eligible"
+                },
+            )
         if artifact is None:
             results.append(
                 PairDiagnostic(
@@ -650,6 +931,8 @@ def run_diagnostic(
                     mean_qlike_ewma_reference=None,
                     bootstrap_pvalue=None,
                     bh_adjusted_pvalue=None,
+                    shared_day_start=shared_days[0] if shared_days else None,
+                    shared_day_end=shared_days[-1] if shared_days else None,
                 )
             )
         else:
@@ -669,24 +952,44 @@ def run_diagnostic(
                     mean_qlike_ewma_reference=artifact["mean_qlike_ewma_reference"],
                     bootstrap_pvalue=artifact["bootstrap_pvalue"],
                     bh_adjusted_pvalue=None,
-                    coefficient_sign_stability=artifact["coefficient_sign_stability"],
+                    coefficient_sign_stability=_freeze(artifact["coefficient_sign_stability"]),
                     rv_excess_kurtosis=artifact["rv_excess_kurtosis"],
                     qlike_diff_skewness=artifact["qlike_diff_skewness"],
+                    shared_day_start=shared_days[0],
+                    shared_day_end=shared_days[-1],
+                    fold_day_bounds=tuple(
+                        (
+                            shared_days[max(DEFAULT_HAR_LAGS) + fold["test_start"]],
+                            shared_days[max(DEFAULT_HAR_LAGS) + fold["test_end"] - 1],
+                        )
+                        for fold in artifact["folds"]
+                    ),
                 )
             )
 
-    # Whole-search BH-FDR across every EVALUATED pair (pre-registered family).
+    # Whole-search BH-FDR uses the full registered family. Missing hypotheses
+    # receive p=1 rather than shrinking multiplicity to the observed subset.
     evaluated_indices = [idx for idx, pair in enumerate(results) if pair.status == "evaluated"]
-    raw_pvalues = [results[idx].bootstrap_pvalue for idx in evaluated_indices]
-    adjusted = bh_adjusted_pvalues([float(p) for p in raw_pvalues])
+    family_pvalues = [
+        float(pair.bootstrap_pvalue)
+        if pair.status == "evaluated" and pair.bootstrap_pvalue is not None
+        else 1.0
+        for pair in results
+    ]
+    adjusted = bh_adjusted_pvalues(family_pvalues)
+    complete_family = len(evaluated_indices) == len(results)
     improvement_floor = float(merged_spec["qlike_improvement_floor"])
     win_floor = float(merged_spec["fold_win_rate_floor"])
     bh_alpha = float(merged_spec["bh_alpha"])
-    for position, idx in enumerate(evaluated_indices):
+    for idx in evaluated_indices:
         pair = results[idx]
-        bh_p = float(adjusted[position])
+        bh_p = float(adjusted[idx])
         admitted = (
-            pair.median_qlike_improvement is not None
+            authoritative
+            and complete_family
+            and input_authority.get(pair.leader, False)
+            and input_authority.get(pair.follower, False)
+            and pair.median_qlike_improvement is not None
             and pair.median_qlike_improvement >= improvement_floor
             and pair.fold_win_rate is not None
             and pair.fold_win_rate >= win_floor
@@ -707,10 +1010,13 @@ def run_diagnostic(
             mean_qlike_ewma_reference=pair.mean_qlike_ewma_reference,
             bootstrap_pvalue=pair.bootstrap_pvalue,
             bh_adjusted_pvalue=bh_p,
-            coefficient_sign_stability=pair.coefficient_sign_stability,
+            coefficient_sign_stability=_freeze(pair.coefficient_sign_stability),
             rv_excess_kurtosis=pair.rv_excess_kurtosis,
             qlike_diff_skewness=pair.qlike_diff_skewness,
             admitted=bool(admitted),
+            shared_day_start=pair.shared_day_start,
+            shared_day_end=pair.shared_day_end,
+            fold_day_bounds=pair.fold_day_bounds,
         )
 
     admitted_keys = tuple(f"{pair.leader}->{pair.follower}" for pair in results if pair.admitted)
@@ -718,19 +1024,54 @@ def run_diagnostic(
         f"{pair.leader}->{pair.follower}" for pair in results if pair.status != "evaluated"
     )
     evaluated_count = len(evaluated_indices)
-    if evaluated_count == 0:
+    if evaluated_count == 0 or not complete_family or not authoritative:
         verdict = "insufficient_data"
     elif admitted_keys:
         verdict = "admitted"
     else:
         verdict = "dead"
-    gate_open = any(pair.admitted and pair.leader == "BTCUSDT" for pair in results)
+    gate_open = (
+        authoritative
+        and complete_family
+        and any(pair.admitted and pair.leader == "BTCUSDT" for pair in results)
+    )
     return VerdictReport(
-        spec=merged_spec,
+        spec=_freeze(merged_spec),
         pairs=tuple(results),
         evaluated_pairs=evaluated_count,
         admitted_pairs=admitted_keys,
         insufficient_pairs=insufficient_keys,
         program_verdict=verdict,
         sizing_overlay_build_gate_open=bool(gate_open),
+        lineage=_freeze(
+            {
+                "input_digest_sha256": input_digest,
+                "loader_aggregation_version": _LINEAGE_VERSION,
+                "source": normalized_source_lineage,
+                "authority_counts": {
+                    "explicit_day_series": sum(input_authority.values()),
+                    "nonauthoritative_series": sum(
+                        1 for value in input_authority.values() if not value
+                    ),
+                },
+                "quality_counts": {
+                    quality: sum(1 for item in input_quality.values() if item == quality)
+                    for quality in sorted(set(input_quality.values()))
+                },
+                "per_symbol": {
+                    symbol: {
+                        "authority": (
+                            "explicit_epoch_day"
+                            if input_authority.get(symbol)
+                            else "nonauthoritative"
+                        ),
+                        "quality": input_quality.get(symbol, "missing"),
+                        "day_start": min(values) if values else None,
+                        "day_end": max(values) if values else None,
+                        "observations": len(values),
+                    }
+                    for symbol, values in sorted(normalized.items())
+                },
+            }
+        ),
     )

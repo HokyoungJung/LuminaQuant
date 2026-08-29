@@ -2,10 +2,11 @@
 
 Direct class import (registry/tier/candidate-wiring assertions land with the
 orchestrator's integration wave, not here).  The fixture is a hand-built,
-closed-form stream of daily UTC bars (no RNG anywhere): one MARKET event per
-symbol per day at 00:00 UTC starting Monday 2025-01-06, with ``open_interest``
-and ``mark_price`` carried as event attributes (tier-1 of the shared
-None-tolerant feature cascade).
+closed-form stream of synchronized daily UTC panels (no RNG anywhere): one
+atomic MARKET_WINDOW event containing every configured symbol per day at 00:00
+UTC starting Monday 2025-01-06. ``open_interest`` and ``mark_price`` are
+provided through the test bar source's feature lookup, so each symbol retains
+its own feature values within the shared snapshot.
 
 Panel design for the sign-lock: every symbol shares the SAME mildly-oscillating
 price path (identical momentum and identical realized vol -> the momentum
@@ -18,6 +19,7 @@ LONG and FALLER must be SHORT (no flip).
 from __future__ import annotations
 
 import math
+from copy import deepcopy
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from typing import Any
@@ -69,6 +71,21 @@ class _Queue:
         self.items.append(item)
 
 
+class _Bars:
+    def __init__(self, symbols: list[str]) -> None:
+        self.symbol_list = list(symbols)
+        self._features: dict[str, dict[str, float | None]] = {}
+
+    def set_features(self, values: dict[str, tuple[float | None, float | None]]) -> None:
+        self._features = {
+            symbol: {"open_interest": oi, "mark_price": mark}
+            for symbol, (oi, mark) in values.items()
+        }
+
+    def get_latest_feature_value(self, symbol: str, field: str) -> float | None:
+        return self._features.get(symbol, {}).get(field)
+
+
 def _event(
     symbol: str,
     moment: datetime,
@@ -92,6 +109,32 @@ def _event(
     )
 
 
+def _window_event(
+    moment: datetime,
+    values: dict[str, tuple[float, float | None, float | None]],
+) -> SimpleNamespace:
+    time = moment.isoformat().replace("+00:00", "Z")
+    return SimpleNamespace(
+        type="MARKET_WINDOW",
+        time=time,
+        bars_1s={
+            symbol: [
+                {
+                    "time": time,
+                    "open": close,
+                    "high": close * 1.001,
+                    "low": close * 0.999,
+                    "close": close,
+                    "volume": 1_000.0,
+                    "open_interest": oi,
+                    "mark_price": mark,
+                }
+            ]
+            for symbol, (close, oi, mark) in values.items()
+        },
+    )
+
+
 def _feed_panel(
     strategy: Any,
     symbols: list[str],
@@ -104,13 +147,22 @@ def _feed_panel(
 ) -> None:
     for day in range(start_day, n_days):
         moment = _START + timedelta(days=day)
-        for symbol in symbols:
-            close = price_fn(symbol, day) if price_fn is not None else _price(day)
-            oi = oi_fn(symbol, day)
-            mark = close if mark_from_price else 100.0
-            strategy.calculate_signals(
-                _event(symbol, moment, close, open_interest=oi, mark_price=mark)
+        values = {
+            symbol: (
+                price_fn(symbol, day) if price_fn is not None else _price(day),
+                oi_fn(symbol, day),
+                (
+                    price_fn(symbol, day)
+                    if price_fn is not None and mark_from_price
+                    else (_price(day) if mark_from_price else 100.0)
+                ),
             )
+            for symbol in symbols
+        }
+        strategy.bars.set_features(
+            {symbol: (oi, mark) for symbol, (_close, oi, mark) in values.items()}
+        )
+        strategy.calculate_signals(_window_event(moment, values))
 
 
 def _final_sides(items: list[Any]) -> dict[str, str]:
@@ -137,7 +189,7 @@ def _make_candidate(symbols: list[str] | None = None, **overrides: Any) -> Any:
         allow_short=True,
     )
     params.update(overrides)
-    bars = SimpleNamespace(symbol_list=list(symbols if symbols is not None else _ALL_SYMBOLS))
+    bars = _Bars(list(symbols if symbols is not None else _ALL_SYMBOLS))
     return OpenInterestGrowthPressureStrategy(bars, _Queue(), **params)
 
 
@@ -193,6 +245,68 @@ def test_residual_scores_rank_riser_above_faller() -> None:
         assert meta["oi_coverage"] >= 0.80
 
 
+def test_individual_market_events_do_not_mutate_cross_sectional_state() -> None:
+    candidate = _make_candidate()
+    before_state = candidate.get_state()
+    before_events = list(candidate.events.items)
+    for day in range(_N_DAYS):
+        moment = _START + timedelta(days=day)
+        for symbol in _ALL_SYMBOLS:
+            close = _price(day)
+            candidate.calculate_signals(
+                _event(
+                    symbol,
+                    moment,
+                    close,
+                    open_interest=_open_interest(symbol, day),
+                    mark_price=100.0,
+                )
+            )
+    assert candidate.get_state() == before_state
+    assert candidate.events.items == before_events
+
+
+def test_oi_window_duplicate_timestamp_row_abstains_without_partial_commit() -> None:
+    candidate = _make_candidate()
+    moment = _START
+    values = {symbol: (_price(0), _open_interest(symbol, 0), 100.0) for symbol in _ALL_SYMBOLS}
+    candidate.bars.set_features(
+        {symbol: (oi, mark) for symbol, (_close, oi, mark) in values.items()}
+    )
+    candidate.calculate_signals(_window_event(moment, values))
+    before_state = candidate.get_state()
+    before_events = list(candidate.events.items)
+
+    duplicate = _window_event(moment + timedelta(days=1), values)
+    duplicate.bars_1s[RISER].append(dict(duplicate.bars_1s[RISER][0]))
+    candidate.calculate_signals(duplicate)
+
+    assert candidate.get_state() == before_state
+    assert candidate.events.items == before_events
+
+
+def test_oi_uses_exact_raw_row_not_stale_feature_cache() -> None:
+    candidate = _make_candidate()
+    values = {symbol: (_price(0), _open_interest(symbol, 0), 100.0) for symbol in _ALL_SYMBOLS}
+    candidate.bars.set_features(dict.fromkeys(_ALL_SYMBOLS, (999_999.0, 999_999.0)))
+    candidate.calculate_signals(_window_event(_START, values))
+
+    assert candidate._state[RISER].cur_oi_notional == _open_interest(RISER, 0) * 100.0
+
+
+def test_oi_missing_raw_feature_abstains_without_partial_commit() -> None:
+    candidate = _make_candidate()
+    values = {symbol: (_price(0), _open_interest(symbol, 0), 100.0) for symbol in _ALL_SYMBOLS}
+    candidate.calculate_signals(_window_event(_START, values))
+    before = candidate.get_state()
+    missing = _window_event(_START + timedelta(days=1), values)
+    del missing.bars_1s[RISER][0]["mark_price"]
+
+    candidate.calculate_signals(missing)
+
+    assert candidate.get_state() == before
+
+
 # --------------------------------------------------------------------------- #
 # momentum-residualization lock: pure-momentum panel with flat OI emits nothing
 # --------------------------------------------------------------------------- #
@@ -230,22 +344,36 @@ def test_sparse_oi_symbol_is_excluded_from_the_rank() -> None:
     dense, sparse, third = _ALL_SYMBOLS[0], _ALL_SYMBOLS[1], _ALL_SYMBOLS[2]
     for day in range(window_len + 2):
         close = _price(day)
+        day_str = (_START + timedelta(days=day)).date().isoformat()
         candidate._state[dense].days.append(
-            _DayRecord(oi_notional=1_000.0 + 50.0 * day, dollar_volume=100_000.0, close=close)
+            _DayRecord(
+                day=day_str,
+                oi_notional=1_000.0 + 50.0 * day,
+                dollar_volume=100_000.0,
+                close=close,
+            )
         )
         candidate._state[sparse].days.append(
             _DayRecord(
+                day=day_str,
                 oi_notional=(2_000.0 + 40.0 * day) if day % 3 == 0 else None,
                 dollar_volume=100_000.0,
                 close=close,
             )
         )
         candidate._state[third].days.append(
-            _DayRecord(oi_notional=3_000.0 - 20.0 * day, dollar_volume=100_000.0, close=close)
+            _DayRecord(
+                day=day_str,
+                oi_notional=3_000.0 - 20.0 * day,
+                dollar_volume=100_000.0,
+                close=close,
+            )
         )
     for symbol in (dense, sparse, third):
         for day in range(8):
             candidate._state[symbol].closes.append(_price(day))
+        candidate._state[symbol].last_committed_day = day_str
+    candidate._last_committed_day = day_str
     residual, _vols, _metas = candidate._residual_scores()
     assert dense in residual
     assert third in residual
@@ -315,6 +443,36 @@ def test_adversarial_set_state_never_raises() -> None:
         candidate.set_state(junk)  # must never raise
 
 
+def test_checkpoint_rejects_partial_missing_and_unordered_days_atomically() -> None:
+    candidate = _make_candidate()
+    _feed_panel(candidate, _ALL_SYMBOLS)
+    before = candidate.get_state()
+    invalid_states = []
+
+    partial = deepcopy(before)
+    del partial["symbol_state"][RISER]
+    invalid_states.append(partial)
+
+    missing = deepcopy(before)
+    del missing["symbol_state"][RISER]["cur_close"]
+    invalid_states.append(missing)
+
+    unordered = deepcopy(before)
+    unordered["symbol_state"][RISER]["days"][0], unordered["symbol_state"][RISER]["days"][1] = (
+        unordered["symbol_state"][RISER]["days"][1],
+        unordered["symbol_state"][RISER]["days"][0],
+    )
+    invalid_states.append(unordered)
+
+    duplicate = deepcopy(before)
+    duplicate["symbol_state"][RISER]["days"][1][0] = duplicate["symbol_state"][RISER]["days"][0][0]
+    invalid_states.append(duplicate)
+
+    for invalid in invalid_states:
+        candidate.set_state(invalid)
+        assert candidate.get_state() == before
+
+
 # --------------------------------------------------------------------------- #
 # state roundtrip (lossless)
 # --------------------------------------------------------------------------- #
@@ -327,6 +485,47 @@ def test_state_roundtrip_is_lossless_mid_position() -> None:
     revived = _make_candidate()
     revived.set_state(snapshot)
     assert revived.get_state() == snapshot
+
+
+def test_gapped_utc_history_roundtrips_and_bad_volume_is_atomic() -> None:
+    candidate = _make_candidate()
+    values = {symbol: (_price(0), _open_interest(symbol, 0), 100.0) for symbol in _ALL_SYMBOLS}
+    for offset in (0, 2, 4):
+        candidate.calculate_signals(_window_event(_START + timedelta(days=offset), values))
+    snapshot = candidate.get_state()
+    revived = _make_candidate()
+    revived.set_state(snapshot)
+    assert revived.get_state() == snapshot
+    assert all(
+        [record.day for record in state.days][-2:]
+        == [
+            (_START + timedelta(days=0)).date().isoformat(),
+            (_START + timedelta(days=2)).date().isoformat(),
+        ]
+        for state in candidate._state.values()
+    )
+
+    malformed = _window_event(_START + timedelta(days=6), values)
+    malformed.bars_1s[RISER][0]["volume"] = "not-a-number"
+    candidate.calculate_signals(malformed)
+    assert candidate.get_state() == snapshot
+
+    overflow = _window_event(_START + timedelta(days=6), values)
+    overflow.bars_1s[RISER][0]["volume"] = 1e308
+    candidate.calculate_signals(overflow)
+    assert candidate.get_state() == snapshot
+
+
+def test_state_roundtrip_continues_like_the_original_panel() -> None:
+    original = _make_candidate()
+    _feed_panel(original, _ALL_SYMBOLS)
+    revived = _make_candidate()
+    revived.set_state(original.get_state())
+    original_event_count = len(original.events.items)
+    _feed_panel(original, _ALL_SYMBOLS, n_days=_N_DAYS + 7, start_day=_N_DAYS)
+    _feed_panel(revived, _ALL_SYMBOLS, n_days=_N_DAYS + 7, start_day=_N_DAYS)
+    assert revived.get_state() == original.get_state()
+    assert revived.events.items == original.events.items[original_event_count:]
 
 
 # --------------------------------------------------------------------------- #
@@ -478,7 +677,7 @@ def test_universe_wide_oi_outage_week_does_not_flush_mature_book() -> None:
 
 
 # --------------------------------------------------------------------------- #
-# freshness gate: a stale symbol (dead feed) is excluded from the rank
+# freshness and atomic-window gates
 # --------------------------------------------------------------------------- #
 
 
@@ -489,21 +688,23 @@ def test_stale_symbol_is_excluded_from_the_rank() -> None:
     stale = FILLERS[0]
     fresh = [symbol for symbol in _ALL_SYMBOLS if symbol != stale]
     candidate = _make_candidate()
-    for day in range(_N_DAYS):
-        moment = _START + timedelta(days=day)
+    for day in range(10):
+        day_str = (_START + timedelta(days=day)).date().isoformat()
         for symbol in _ALL_SYMBOLS:
-            if symbol == stale and day >= 13:
-                continue  # the stale feed dies after day 12
-            close = _price(day)
-            candidate.calculate_signals(
-                _event(
-                    symbol,
-                    moment,
-                    close,
-                    open_interest=_open_interest(symbol, day),
-                    mark_price=100.0,
+            if symbol == stale and day == 9:
+                continue  # dead feed missed the latest finalized UTC day
+            item = candidate._state[symbol]
+            item.days.append(
+                _DayRecord(
+                    day=day_str,
+                    oi_notional=_open_interest(symbol, day) * 100.0,
+                    dollar_volume=100_000.0,
+                    close=_price(day),
                 )
             )
+            item.closes.append(_price(day))
+            item.last_committed_day = day_str
+    candidate._last_committed_day = day_str
     stale_state = candidate._state[stale]
     # The stale symbol WOULD be panel-eligible on history + coverage alone --
     # only the freshness gate keeps its old window out of the rank.
@@ -523,6 +724,50 @@ def test_stale_symbol_is_excluded_from_the_rank() -> None:
     ]
 
 
+def test_skewed_or_partial_market_window_abstains_without_mutating_the_book() -> None:
+    candidate = _make_candidate()
+    _feed_panel(candidate, _ALL_SYMBOLS)
+    before_state = candidate.get_state()
+    before_events = list(candidate.events.items)
+    moment = _START + timedelta(days=_N_DAYS)
+    partial = {
+        symbol: (_price(_N_DAYS), _open_interest(symbol, _N_DAYS), 100.0)
+        for symbol in _ALL_SYMBOLS
+        if symbol != FALLER
+    }
+    candidate.bars.set_features(
+        {symbol: (oi, mark) for symbol, (_close, oi, mark) in partial.items()}
+    )
+    candidate.calculate_signals(_window_event(moment, partial))
+    assert candidate.get_state() == before_state
+    assert candidate.events.items == before_events
+
+    complete = {
+        symbol: (_price(_N_DAYS), _open_interest(symbol, _N_DAYS), 100.0) for symbol in _ALL_SYMBOLS
+    }
+    candidate.bars.set_features(
+        {symbol: (oi, mark) for symbol, (_close, oi, mark) in complete.items()}
+    )
+    skewed = _window_event(moment, complete)
+    skewed.bars_1s[FALLER][0]["time"] = (
+        (moment + timedelta(seconds=1)).isoformat().replace("+00:00", "Z")
+    )
+    candidate.calculate_signals(skewed)
+    assert candidate.get_state() == before_state
+    assert candidate.events.items == before_events
+
+    older = _window_event(_START + timedelta(days=_N_DAYS - 1), complete)
+    candidate.calculate_signals(older)
+    assert candidate.get_state() == before_state
+    assert candidate.events.items == before_events
+
+    unkeyed = _window_event(moment, complete)
+    unkeyed.bars_1s[FALLER][0].pop("time")
+    candidate.calculate_signals(unkeyed)
+    assert candidate.get_state() == before_state
+    assert candidate.events.items == before_events
+
+
 # --------------------------------------------------------------------------- #
 # WARMUP-GHOST-BOOK: on_warmup_end flattens the ghost book, keeps history
 # --------------------------------------------------------------------------- #
@@ -535,7 +780,7 @@ def test_on_warmup_end_flattens_ghost_book_and_preserves_history() -> None:
     before = {
         symbol: (
             list(item.closes),
-            [[r.oi_notional, r.dollar_volume, r.close] for r in item.days],
+            [[r.day, r.oi_notional, r.dollar_volume, r.close] for r in item.days],
             item.cur_date,
             item.cur_oi_notional,
             item.cur_dollar_volume,
@@ -554,7 +799,7 @@ def test_on_warmup_end_flattens_ghost_book_and_preserves_history() -> None:
         assert item.score is None
         assert (
             list(item.closes),
-            [[r.oi_notional, r.dollar_volume, r.close] for r in item.days],
+            [[r.day, r.oi_notional, r.dollar_volume, r.close] for r in item.days],
             item.cur_date,
             item.cur_oi_notional,
             item.cur_dollar_volume,

@@ -102,18 +102,18 @@ def test_salience_never_raises_on_degenerate() -> None:
     )
     for returns, market in cases:
         assert salience_theory_value(returns, market) is None
-    # Adversarial constants degrade gracefully instead of raising.
-    assert salience_theory_value([0.1, -0.1], [0.0, 0.0], theta=-1.0) is not None
-    assert salience_theory_value([0.1, -0.1], [0.0, 0.0], delta=0.0) is not None
-    assert salience_theory_value([0.1, -0.1], [0.0, 0.0], delta=float("nan")) is not None
-    # VDIAG-02 regression: non-numeric constants (None / 'abc') never raise --
-    # they fall back to the canonical BGS defaults exactly.
+    # Explicitly invalid parameters fail closed rather than being defaulted or
+    # clamped into a different model.
     returns = [0.02, -0.03, 0.01, 0.05, -0.01]
     market = [0.01, -0.01, 0.0, 0.02, 0.0]
-    base = salience_theory_value(returns, market)
-    assert base is not None
-    assert salience_theory_value(returns, market, theta=None, delta=None) == base
-    assert salience_theory_value(returns, market, theta="abc", delta="abc") == base
+    for theta, delta in (
+        (-1.0, 0.7),
+        (0.1, 0.0),
+        (float("nan"), 0.7),
+        (None, None),
+        ("abc", "abc"),
+    ):
+        assert salience_theory_value(returns, market, theta=theta, delta=delta) is None
 
 
 # --------------------------------------------------------------------------- #
@@ -153,23 +153,15 @@ def test_prospect_never_raises_on_degenerate() -> None:
     for bad in (None, [], [0.1], "abc", [float("nan")] * 5, [[1.0], [2.0]], {"a": 1}):
         assert prospect_theory_value(bad) is None
     assert prospect_theory_value([float("inf"), 0.1, -0.1]) is not None  # inf dropped
-    # Adversarial constants degrade gracefully instead of raising.
-    assert prospect_theory_value([0.1, -0.1], alpha=-2.0) is not None
-    assert prospect_theory_value([0.1, -0.1], lam=-5.0) is not None
-    assert prospect_theory_value([0.1, -0.1], gamma_gain=0.0, gamma_loss=100.0) is not None
-    # VDIAG-02 regression: non-numeric constants (None / 'abc') never raise --
-    # they fall back to the canonical TK-1992 defaults exactly.
     returns = [0.02, -0.03, 0.01, 0.05, -0.01]
-    base = prospect_theory_value(returns)
-    assert base is not None
-    assert (
-        prospect_theory_value(returns, alpha=None, lam=None, gamma_gain=None, gamma_loss=None)
-        == base
-    )
-    assert (
-        prospect_theory_value(returns, alpha="abc", lam="abc", gamma_gain="abc", gamma_loss="abc")
-        == base
-    )
+    for params in (
+        {"alpha": -2.0},
+        {"lam": -5.0},
+        {"gamma_gain": 0.0, "gamma_loss": 100.0},
+        {"alpha": None, "lam": None, "gamma_gain": None, "gamma_loss": None},
+        {"alpha": "abc", "lam": "abc", "gamma_gain": "abc", "gamma_loss": "abc"},
+    ):
+        assert prospect_theory_value(returns, **params) is None
 
 
 # --------------------------------------------------------------------------- #

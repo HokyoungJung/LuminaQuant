@@ -106,15 +106,14 @@ from __future__ import annotations
 
 import math
 from collections import deque
+from itertools import pairwise
+from datetime import date
 from dataclasses import dataclass
 from typing import Any
 
 from lumina_quant.core.plugin_registry import register
 from lumina_quant.indicators.alpha_features import realized_volatility
-from lumina_quant.indicators.behavioral_value import (
-    prospect_theory_value,
-    salience_theory_value,
-)
+from lumina_quant.indicators.behavioral_value import prospect_theory_value
 from lumina_quant.indicators.common import safe_float, time_key
 from lumina_quant.indicators.cross_sectional_residualize import (
     cross_sectional_residualize,
@@ -126,13 +125,10 @@ from lumina_quant.strategies.external_alpha_sleeves import (
     _emit,
     _event_datetime_utc,
     _event_symbols,
-    _market_snapshot,
-    _safe_non_negative_int,
     _Snapshot,
     _target_metadata,
     _window_snapshot,
 )
-from lumina_quant.strategies.robust_alpha_sleeves import _restore_deque
 from lumina_quant.strategy import Strategy
 from lumina_quant.tuning import HyperParam, resolve_params_from_schema
 
@@ -163,17 +159,59 @@ class _State:
     score: float | None = None
 
 
-def _mode(raw: Any) -> str:
-    """Coerce a serialized mode token to one of ``{OUT, LONG, SHORT}``."""
-    parsed = str(raw or "OUT").upper()
-    return parsed if parsed in {"OUT", "LONG", "SHORT"} else "OUT"
+def _utc_datetime(raw_time: Any) -> Any | None:
+    """Return a parseable UTC timestamp; never substitute a lexical clock."""
+    if isinstance(raw_time, bool) or (
+        isinstance(raw_time, (int, float)) and not math.isfinite(raw_time)
+    ):
+        return None
+    return _event_datetime_utc(raw_time)
 
 
-def _restore_day_deque(target: deque[str], payload: Any) -> None:
-    """Losslessly restore a committed UTC-day-key deque from serialized state."""
-    target.clear()
-    for value in list(payload or [])[-int(target.maxlen or 0) :]:
-        target.append(str(value))
+def _utc_day(raw_day: Any) -> date | None:
+    """Parse an exact serialized UTC calendar day."""
+    if not isinstance(raw_day, str) or len(raw_day) != 10:
+        return None
+    try:
+        parsed = date.fromisoformat(raw_day)
+    except TypeError, ValueError:
+        return None
+    return parsed if parsed.isoformat() == raw_day else None
+
+
+def _utc_week(raw_week: Any) -> bool:
+    """Validate an exact ISO week clock."""
+    if not isinstance(raw_week, str) or len(raw_week) != 8 or raw_week[4:6] != "-W":
+        return False
+    try:
+        year, week = int(raw_week[:4]), int(raw_week[6:])
+        return (
+            f"{year:04d}-W{week:02d}" == raw_week
+            and date.fromisocalendar(year, week, 1) is not None
+        )
+    except TypeError, ValueError:
+        return False
+
+
+def _consecutive_days(days: list[str], *, ending: str | None = None) -> bool:
+    """Require a complete consecutive UTC-day calendar, optionally anchored."""
+    parsed = [_utc_day(day) for day in days]
+    if any(day is None for day in parsed):
+        return False
+    if ending is not None and (not parsed or parsed[-1] != _utc_day(ending)):
+        return False
+    return all(right == left.fromordinal(left.toordinal() + 1) for left, right in pairwise(parsed))
+
+
+def _strictly_newer_time(raw_time: Any, previous_key: str) -> bool:
+    """Compare only parseable timestamps chronologically."""
+    candidate = _utc_datetime(raw_time)
+    if candidate is None:
+        return False
+    if not previous_key:
+        return True
+    previous = _utc_datetime(previous_key)
+    return previous is not None and candidate > previous
 
 
 def _xs_zscores(values: dict[str, float]) -> dict[str, float]:
@@ -218,6 +256,44 @@ def _max_daily_return(returns: list[float], days: int) -> float | None:
     if len(tail) < max(1, int(days)):
         return None
     result = max(tail)
+    return float(result) if math.isfinite(result) else None
+
+
+def _salience_value(
+    returns: list[float],
+    market_returns: list[float],
+    *,
+    theta: float,
+    delta: float,
+    probability_mass: list[float] | None = None,
+) -> float | None:
+    """BGS distortion with one consistent probability measure for both values."""
+    if len(returns) != len(market_returns) or len(returns) < 2:
+        return None
+    masses = probability_mass or [1.0 / len(returns)] * len(returns)
+    if len(masses) != len(returns) or any(mass < 0.0 or not math.isfinite(mass) for mass in masses):
+        return None
+    total_mass = sum(masses)
+    if total_mass <= _EPS:
+        return None
+    masses = [mass / total_mass for mass in masses]
+    if any(not math.isfinite(value) for value in (*returns, *market_returns)):
+        return None
+    salience = [
+        abs(own - market) / (abs(own) + abs(market) + theta)
+        for own, market in zip(returns, market_returns, strict=True)
+    ]
+    order = sorted(range(len(returns)), key=lambda idx: (-salience[idx], idx))
+    attention = [masses[idx] * delta**rank for rank, idx in enumerate(order)]
+    attention_total = sum(attention)
+    if attention_total <= _EPS:
+        return None
+    distorted = sum(
+        (weight / attention_total) * returns[idx]
+        for weight, idx in zip(attention, order, strict=True)
+    )
+    objective = sum(mass * value for mass, value in zip(masses, returns, strict=True))
+    result = distorted - objective
     return float(result) if math.isfinite(result) else None
 
 
@@ -309,6 +385,7 @@ class _WeeklyBehavioralValueXS(Strategy):
         self._last_day_key = ""
         self._last_committed_day = ""
         self._last_decision_week = ""
+        self._last_window_key = ""
         self._tick = 0
 
     # ------------------------------------------------------------------ #
@@ -327,6 +404,7 @@ class _WeeklyBehavioralValueXS(Strategy):
             "last_day_key": self._last_day_key,
             "last_committed_day": self._last_committed_day,
             "last_decision_week": self._last_decision_week,
+            "last_window_key": self._last_window_key,
             "tick": int(self._tick),
             "symbol_state": {
                 symbol: {
@@ -346,48 +424,160 @@ class _WeeklyBehavioralValueXS(Strategy):
         }
 
     def set_state(self, state: dict[str, Any]) -> None:
-        if not isinstance(state, dict):
+        """Install only a fully coherent checkpoint; leave state untouched otherwise."""
+        top_level_fields = {
+            "last_day_key",
+            "last_committed_day",
+            "last_decision_week",
+            "last_window_key",
+            "tick",
+            "symbol_state",
+        }
+        symbol_fields = {
+            "daily_closes",
+            "daily_days",
+            "pending_day",
+            "pending_close",
+            "last_committed_day",
+            "last_bar_key",
+            "mode",
+            "entry_price",
+            "days_held",
+            "score",
+        }
+        if type(state) is not dict or set(state) != top_level_fields:
             return
-        self._last_day_key = str(state.get("last_day_key", ""))
-        self._last_committed_day = str(state.get("last_committed_day", ""))
-        self._last_decision_week = str(state.get("last_decision_week", ""))
-        self._tick = _safe_non_negative_int(state.get("tick"))
-        raw = state.get("symbol_state")
-        if not isinstance(raw, dict):
+        raw = state["symbol_state"]
+        if type(raw) is not dict or set(raw) != set(self._state):
             return
-        for symbol, payload in raw.items():
-            if symbol not in self._state or not isinstance(payload, dict):
-                continue
-            item = self._state[symbol]
-            try:
-                _restore_deque(item.daily_closes, payload.get("daily_closes"))
-                _restore_day_deque(item.daily_days, payload.get("daily_days"))
-                item.pending_day = str(payload.get("pending_day", ""))
-                item.pending_close = safe_float(payload.get("pending_close"))
-                item.last_committed_day = str(payload.get("last_committed_day", ""))
-                item.last_bar_key = str(payload.get("last_bar_key", ""))
-                item.mode = _mode(payload.get("mode"))
-                item.entry_price = safe_float(payload.get("entry_price"))
-                item.days_held = _safe_non_negative_int(payload.get("days_held"))
-                item.score = safe_float(payload.get("score"))
-            except Exception:
-                continue
+        last_day = state["last_day_key"]
+        last_committed = state["last_committed_day"]
+        last_week = state["last_decision_week"]
+        last_window = state["last_window_key"]
+        tick = state["tick"]
+        if (
+            type(last_day) is not str
+            or type(last_committed) is not str
+            or type(last_week) is not str
+            or type(last_window) is not str
+            or type(tick) is not int
+            or tick < 1
+            or _utc_day(last_day) is None
+            or _utc_day(last_committed) is None
+            or not _utc_week(last_week)
+            or _utc_datetime(last_window) is None
+            or _utc_day(last_committed) >= _utc_day(last_day)
+            or self._day_key(last_window) != last_day
+            or self._week_key(last_window) != last_week
+        ):
+            return
+        restored: dict[str, _State] = {}
+        common_days: list[str] | None = None
+        common_pending: str | None = None
+        for symbol in self.symbol_list:
+            payload = raw[symbol]
+            if type(payload) is not dict or set(payload) != symbol_fields:
+                return
+            closes, days = payload["daily_closes"], payload["daily_days"]
+            if (
+                type(closes) is not list
+                or type(days) is not list
+                or not closes
+                or len(closes) != len(days)
+                or len(closes) > int(self._state[symbol].daily_closes.maxlen or 0)
+                or not all(
+                    type(value) is float and math.isfinite(value) and value > self.min_price
+                    for value in closes
+                )
+                or not all(type(value) is str for value in days)
+                or not _consecutive_days(days, ending=last_committed)
+            ):
+                return
+            pending_day, pending_close = (
+                payload["pending_day"],
+                payload["pending_close"],
+            )
+            item_last_committed, last_bar = (
+                payload["last_committed_day"],
+                payload["last_bar_key"],
+            )
+            mode, entry_price, days_held, score = (
+                payload["mode"],
+                payload["entry_price"],
+                payload["days_held"],
+                payload["score"],
+            )
+            if (
+                type(pending_day) is not str
+                or type(item_last_committed) is not str
+                or type(last_bar) is not str
+                or mode not in {"OUT", "LONG", "SHORT"}
+                or type(days_held) is not int
+                or days_held < 0
+                or (item_last_committed != last_committed)
+                or _utc_day(pending_day) is None
+                or pending_day != last_day
+                or _utc_datetime(last_bar) is None
+                or _utc_datetime(last_bar) != _utc_datetime(last_window)
+                or type(pending_close) is not float
+                or not math.isfinite(pending_close)
+                or pending_close <= self.min_price
+                or (
+                    entry_price is not None
+                    and (
+                        type(entry_price) is not float
+                        or not math.isfinite(entry_price)
+                        or entry_price <= self.min_price
+                    )
+                )
+                or (score is not None and (type(score) is not float or not math.isfinite(score)))
+                or (
+                    mode == "OUT"
+                    and (entry_price is not None or days_held != 0 or score is not None)
+                )
+                or (mode != "OUT" and (entry_price is None or score is None))
+            ):
+                return
+            if common_days is None:
+                common_days = days
+                common_pending = pending_day
+            elif days != common_days or pending_day != common_pending:
+                return
+            restored[symbol] = _State(
+                daily_closes=deque(
+                    closes,
+                    maxlen=self._state[symbol].daily_closes.maxlen,
+                ),
+                daily_days=deque(days, maxlen=self._state[symbol].daily_days.maxlen),
+                pending_day=pending_day,
+                pending_close=pending_close,
+                last_committed_day=item_last_committed,
+                last_bar_key=last_bar,
+                mode=mode,
+                entry_price=entry_price,
+                days_held=days_held,
+                score=score,
+            )
+        self._last_day_key = last_day
+        self._last_committed_day = last_committed
+        self._last_decision_week = last_week
+        self._last_window_key = last_window
+        self._tick = tick
+        self._state = restored
 
     # ------------------------------------------------------------------ #
     # ingestion / UTC-day + ISO-week clocks
     # ------------------------------------------------------------------ #
     def _day_key(self, raw_time: Any) -> str:
         """Bucket a bar timestamp into a UTC ``YYYY-MM-DD`` day key."""
-        dt = _event_datetime_utc(raw_time)
-        if dt is None:
-            return time_key(raw_time)
-        return dt.date().isoformat()
+        dt = _utc_datetime(raw_time)
+        return dt.date().isoformat() if dt is not None else ""
 
     def _week_key(self, raw_time: Any) -> str:
         """Bucket a bar timestamp into an ISO ``YYYY-Wnn`` weekly decision key."""
-        dt = _event_datetime_utc(raw_time)
+        dt = _utc_datetime(raw_time)
         if dt is None:
-            return time_key(raw_time)
+            return ""
         iso = dt.isocalendar()
         return f"{int(iso[0]):04d}-W{int(iso[1]):02d}"
 
@@ -397,23 +587,65 @@ class _WeeklyBehavioralValueXS(Strategy):
             return False
         item = self._state[symbol]
         key = time_key(snapshot.time)
-        if key and key == item.last_bar_key:
+        if not _strictly_newer_time(snapshot.time, item.last_bar_key):
             return False
-        item.last_bar_key = key
         day = self._day_key(snapshot.time)
         if not day:
             return False
+        item.last_bar_key = key
         # The latest close seen within a UTC day wins; the day commits only
         # when a bar from a LATER day proves it complete (completed-close only).
         item.pending_day = day
         item.pending_close = float(close)
         return True
 
+    def _window_updates(self, event: Any) -> list[tuple[str, _Snapshot]] | None:
+        """Validate a complete, common-time window before mutating any state."""
+        event_time = getattr(event, "time", None)
+        event_dt = _utc_datetime(event_time)
+        event_key = time_key(event_time)
+        if (
+            event_dt is None
+            or not event_key
+            or not _strictly_newer_time(event_time, self._last_window_key)
+        ):
+            return None
+        if len(_event_symbols(event, self.symbol_list)) != len(self.symbol_list):
+            return None
+        updates: list[tuple[str, _Snapshot]] = []
+        for symbol in self.symbol_list:
+            raw_rows = list((getattr(event, "bars_1s", {}) or {}).get(symbol) or [])
+            row_times = [
+                row.get("time")
+                if isinstance(row, dict)
+                else row[0]
+                if isinstance(row, (tuple, list)) and row
+                else None
+                for row in raw_rows
+            ]
+            row_datetimes = [_utc_datetime(raw_time) for raw_time in row_times]
+            snapshot = _window_snapshot(event, symbol)
+            if (
+                snapshot is None
+                or not raw_rows
+                or any(raw_time is None for raw_time in row_datetimes)
+                or len(set(row_datetimes)) != len(raw_rows)
+                or _utc_datetime(snapshot.time) != event_dt
+                or safe_float(snapshot.close) is None
+                or safe_float(snapshot.close) <= self.min_price
+                or not _strictly_newer_time(snapshot.time, self._state[symbol].last_bar_key)
+            ):
+                return None
+            updates.append((symbol, snapshot))
+        return updates
+
     def _roll_day(self, new_day: str, event_time: Any) -> None:
         """Commit completed UTC days, age daily counters, sweep max-hold."""
+        if not new_day or (self._last_day_key and new_day <= self._last_day_key):
+            return
         committed = self._last_committed_day
         for item in self._state.values():
-            if item.pending_close is not None and item.pending_day and item.pending_day != new_day:
+            if item.pending_close is not None and item.pending_day and item.pending_day < new_day:
                 item.daily_closes.append(float(item.pending_close))
                 item.daily_days.append(item.pending_day)
                 item.last_committed_day = item.pending_day
@@ -429,7 +661,7 @@ class _WeeklyBehavioralValueXS(Strategy):
 
     def _handle_day(self, event_time: Any) -> None:
         day = self._day_key(event_time)
-        if day and day != self._last_day_key:
+        if day and (not self._last_day_key or day > self._last_day_key):
             if self._last_day_key:
                 self._roll_day(day, event_time)
             self._last_day_key = day
@@ -444,14 +676,14 @@ class _WeeklyBehavioralValueXS(Strategy):
 
     def calculate_signals_window(self, event: Any, aggregator: Any = None) -> None:
         _ = aggregator
+        updates = self._window_updates(event)
+        if updates is None:
+            return
+        self._last_window_key = time_key(getattr(event, "time", None))
         self._handle_day(getattr(event, "time", None))
-        updated = False
-        for symbol in _event_symbols(event, self.symbol_list):
-            snapshot = _window_snapshot(event, symbol)
-            if snapshot is not None and self._update_symbol(symbol, snapshot):
-                updated = True
-        if updated:
-            self._maybe_decide(getattr(event, "time", None))
+        for symbol, snapshot in updates:
+            self._update_symbol(symbol, snapshot)
+        self._maybe_decide(getattr(event, "time", None))
 
     def calculate_signals(self, event: Any) -> None:
         if str(getattr(event, "type", "")).upper() == "MARKET_WINDOW":
@@ -459,14 +691,8 @@ class _WeeklyBehavioralValueXS(Strategy):
             return
         if getattr(event, "type", None) != "MARKET":
             return
-        symbol = getattr(event, "symbol", None)
-        if symbol in self._state:
-            snapshot = _market_snapshot(event)
-            if snapshot is None:
-                return
-            self._handle_day(snapshot.time)
-            if self._update_symbol(str(symbol), snapshot):
-                self._maybe_decide(snapshot.time)
+        # A single-symbol callback cannot prove a common-time panel.
+        return
 
     # ------------------------------------------------------------------ #
     # scoring (characteristic -> momentum+MAX residualization -> fade)
@@ -483,8 +709,10 @@ class _WeeklyBehavioralValueXS(Strategy):
         if not self._last_committed_day:
             return {}
         window = self.formation_days + 1
+        if _utc_day(self._last_committed_day) is None:
+            return {}
         candidates: dict[str, list[float]] = {}
-        trailing_days: dict[str, tuple[str, ...]] = {}
+        expected_days: tuple[str, ...] | None = None
         for symbol, item in self._state.items():
             if item.last_committed_day != self._last_committed_day:
                 continue
@@ -495,19 +723,16 @@ class _WeeklyBehavioralValueXS(Strategy):
             returns = _daily_simple_returns(list(item.daily_closes))
             if len(returns) < self.formation_days:
                 continue
+            days = list(item.daily_days)[-window:]
+            if len(days) != window or not _consecutive_days(days, ending=self._last_committed_day):
+                continue
+            day_tuple = tuple(days)
+            if expected_days is None:
+                expected_days = day_tuple
+            elif day_tuple != expected_days:
+                continue
             candidates[symbol] = returns[-self.formation_days :]
-            trailing_days[symbol] = tuple(item.daily_days)[-window:]
-        if not candidates:
-            return {}
-        counts: dict[tuple[str, ...], int] = {}
-        for days in trailing_days.values():
-            counts[days] = counts.get(days, 0) + 1
-        consensus = max(counts.items(), key=lambda kv: (kv[1], kv[0]))[0]
-        return {
-            symbol: returns
-            for symbol, returns in candidates.items()
-            if trailing_days[symbol] == consensus
-        }
+        return candidates
 
     def _score_symbols(self) -> dict[str, tuple[float, dict[str, Any]]]:
         panel = self._formation_panel()
@@ -546,6 +771,13 @@ class _WeeklyBehavioralValueXS(Strategy):
             ],
         )
         if residual is None:
+            return {}
+        if len(residual) != len(ordered) or any(
+            not isinstance(value, (int, float)) or not math.isfinite(value) for value in residual
+        ):
+            return {}
+        dispersion = sample_std([float(value) for value in residual])
+        if dispersion is None or not math.isfinite(dispersion) or dispersion <= _EPS:
             return {}
         scored: dict[str, tuple[float, dict[str, Any]]] = {}
         for idx, symbol in enumerate(ordered):
@@ -666,7 +898,7 @@ class _WeeklyBehavioralValueXS(Strategy):
             side = desired.get(symbol, "OUT")
             price = self._reference_price(item)
             if side == "OUT":
-                if item.mode != "OUT" and item.days_held >= self.min_hold_daily_decisions:
+                if item.mode != "OUT":
                     _emit(
                         self.events,
                         strategy_id=self.strategy_id,
@@ -769,7 +1001,7 @@ class SalienceTheoryValueStrategy(_WeeklyBehavioralValueXS):
     def _characteristic_value(
         self, returns: list[float], market_returns: list[float]
     ) -> float | None:
-        return salience_theory_value(returns, market_returns, theta=self.theta, delta=self.delta)
+        return _salience_value(returns, market_returns, theta=self.theta, delta=self.delta)
 
 
 @register("strategy", _PT_STRATEGY_NAME, interface="event_driven")

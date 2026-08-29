@@ -1,5 +1,9 @@
 """Deterministic data-free tests for the basis-funding gap convergence sleeve.
 
+Cross-sectional decisions are admitted only from complete, aligned ``MARKET_WINDOW``
+panels at exact UTC 8-hour funding boundaries. Individual ``MARKET`` events may
+extend per-symbol history but never rebalance.
+
 Covers the FADE sign-lock on a synthetic panel (rich basis vs standing funding
 => SHORT; discount => LONG); the 8h funding-boundary cadence floor; the hard
 min-hold before the gap-sign-flip exit; the 72h-style max-hold exit; the
@@ -57,9 +61,13 @@ class _Queue:
 class _Bars:
     def __init__(self, symbols: list[str]):
         self.symbol_list = list(symbols)
+        self.features: dict[str, dict[str, float | None]] = {}
+
+    def set_features(self, features: dict[str, dict[str, float | None]]) -> None:
+        self.features = features
 
     def get_latest_feature_value(self, symbol: str, field: str) -> float | None:
-        return None
+        return self.features.get(symbol, {}).get(field)
 
     def get_latest_bar_value(self, symbol: str, field: str) -> float | None:
         return None
@@ -98,6 +106,43 @@ def _event(
     return SimpleNamespace(**kwargs)
 
 
+def _window(
+    strategy: BasisFundingGapConvergenceStrategy,
+    t: int,
+    mark_fn: Any,
+    *,
+    symbols: list[str] | None = None,
+    missing_features: set[str] | None = None,
+    skewed_symbol: str | None = None,
+) -> SimpleNamespace:
+    """A complete, aligned 8h panel; optional defects exercise fail-closed admission."""
+    roster = symbols if symbols is not None else _SYMBOLS
+    missing = missing_features or set()
+    features: dict[str, dict[str, float | None]] = {}
+    bars_1s: dict[str, list[dict[str, Any]]] = {}
+    for i, symbol in enumerate(roster):
+        close = _close(100.0 + i, t)
+        row_time = _ts(t + 1) if symbol == skewed_symbol else _ts(t)
+        bars_1s[symbol] = [
+            {
+                "time": row_time,
+                "open": close,
+                "high": close,
+                "low": close,
+                "close": close,
+                "volume": 1000.0,
+            }
+        ]
+        features[symbol] = {
+            "funding_rate": None if symbol in missing else 0.0001,
+            "mark_price": None if symbol in missing else mark_fn(symbol, t),
+            "index_price": None if symbol in missing else 100.0,
+        }
+    assert isinstance(strategy.bars, _Bars)
+    strategy.bars.set_features(features)
+    return SimpleNamespace(type="MARKET_WINDOW", time=_ts(t), bars_1s=bars_1s)
+
+
 def _default_mark(symbol: str, t: int) -> float:
     """Flat cross-section: gaps span -1..+6 bps, no |z|>2 outlier anywhere."""
     _ = t
@@ -110,13 +155,11 @@ def _feed(
     mark_fn: Any,
     *,
     symbols: list[str] | None = None,
+    start: int = 0,
 ) -> None:
     roster = symbols if symbols is not None else _SYMBOLS
-    for t in range(n):
-        for i, symbol in enumerate(roster):
-            strategy.calculate_signals(
-                _event(symbol, t, close=_close(100.0 + i, t), mark=mark_fn(symbol, t))
-            )
+    for t in range(start, start + n):
+        strategy.calculate_signals(_window(strategy, t, mark_fn, symbols=roster))
 
 
 def _make(queue: _Queue, **extra: Any) -> BasisFundingGapConvergenceStrategy:
@@ -190,6 +233,36 @@ def test_no_dislocation_no_entries() -> None:
     strat = _make(queue)
     _feed(strat, 10, _default_mark)  # gaps -1..+5bp, no |z|>2 outlier
     assert queue.items == []
+
+
+def test_market_history_never_rebalances_without_an_atomic_window() -> None:
+    queue = _Queue()
+    strat = _make(queue)
+    for t in range(6):
+        for i, symbol in enumerate(_SYMBOLS):
+            strat.calculate_signals(
+                _event(symbol, t, close=_close(100.0 + i, t), mark=_rich_mark(symbol, t))
+            )
+    assert all(strat._state[symbol].gaps for symbol in _SYMBOLS)
+    assert queue.items == []
+
+
+def test_partial_or_skewed_window_never_rebalances() -> None:
+    queue = _Queue()
+    strat = _make(queue)
+    _feed(strat, 6, _default_mark)
+    baseline_tick = strat._tick
+
+    partial = _window(strat, 6, _rich_mark)
+    del partial.bars_1s[_RICH]
+    strat.calculate_signals(partial)
+    strat.calculate_signals(_window(strat, 6, _rich_mark, skewed_symbol=_RICH))
+
+    assert strat._tick == baseline_tick
+    assert queue.items == []
+    strat.calculate_signals(_window(strat, 6, _rich_mark))
+    entries = _entries(queue)
+    assert entries and {entry.symbol for entry in entries} == {_RICH}
 
 
 def test_allow_short_false_suppresses_the_rich_fade() -> None:
@@ -294,11 +367,8 @@ def test_min_symbols_self_skip_small_universe() -> None:
 def test_min_symbols_self_skip_when_features_missing() -> None:
     queue = _Queue()
     strat = _make(queue, min_symbols=6)
-    # Only 3 symbols ever print mark_price => fewer than min_symbols gaps.
     for t in range(10):
-        for i, symbol in enumerate(_SYMBOLS):
-            mark = _rich_mark(symbol, t) if i < 3 else None
-            strat.calculate_signals(_event(symbol, t, close=_close(100.0 + i, t), mark=mark))
+        strat.calculate_signals(_window(strat, t, _rich_mark, missing_features=set(_SYMBOLS[3:])))
     assert queue.items == []
 
 
@@ -383,31 +453,26 @@ def test_set_state_never_raises_on_non_iterable_payloads() -> None:
 # Stale-symbol cross-section (dead feed must leave the panel)
 # --------------------------------------------------------------------------- #
 def test_dead_feed_symbol_leaves_the_panel_and_never_churns() -> None:
-    """STALE-SYMBOL-CROSS-SECTION: frozen gaps are not ranked, traded, or re-entered."""
+    """A dead symbol is excluded from later panels and cannot cause a rebalance."""
     queue = _Queue()
     strat = _make(queue, min_symbols=6, min_hold_intervals=2, max_hold_intervals=3)
-    dead_at = 6
-    total = 16
-    for t in range(total):
+    _feed(strat, 6, _rich_mark)
+    assert len(_entries(queue)) == 1
+
+    # Individual MARKET events may update the surviving histories, but cannot
+    # age, exit, or re-enter the cross-sectional book after the rich feed dies.
+    for t in range(6, 16):
         for i, symbol in enumerate(_SYMBOLS):
-            if symbol == _RICH and t >= dead_at:
-                continue  # the outlier's feed dies here
-            strat.calculate_signals(
-                _event(symbol, t, close=_close(100.0 + i, t), mark=_rich_mark(symbol, t))
-            )
+            if symbol != _RICH:
+                strat.calculate_signals(
+                    _event(symbol, t, close=_close(100.0 + i, t), mark=_rich_mark(symbol, t))
+                )
     entries = _entries(queue)
     exits = _exits(queue)
-    # Exactly ONE entry while the feed was alive; the max-hold flatten fires
-    # once, and the frozen |z|>2 gap must NEVER re-enter (no EXIT->re-ENTRY
-    # churn at frozen prices).
     assert len(entries) == 1 and entries[0].symbol == _RICH
     assert entries[0].signal_type == "SHORT"
-    assert len(exits) == 1 and exits[0].symbol == _RICH
-    assert exits[0].metadata["reason"] == "max_hold"
-    assert _interval_of(exits[0].datetime) > _interval_of(entries[0].datetime)
-    # The cross-sectional panel (mean/sigma inputs) excludes the stale symbol
-    # while every fresh symbol stays in.
-    gaps, vols = strat._collect(_ts(total - 1), strict=False)
+    assert exits == []
+    gaps, vols = strat._collect(_ts(15), strict=False)
     assert _RICH not in gaps and _RICH not in vols
     assert set(gaps) == set(_SYMBOLS) - {_RICH}
 
@@ -457,11 +522,7 @@ def test_on_warmup_end_flattens_ghost_positions_but_keeps_history() -> None:
     # Live continuation: no EXIT may fire for the ghost book; the persisting
     # dislocation is re-entered as a FRESH position instead.
     queue.items.clear()
-    for t in range(10, 14):
-        for i, symbol in enumerate(_SYMBOLS):
-            strat.calculate_signals(
-                _event(symbol, t, close=_close(100.0 + i, t), mark=_rich_mark(symbol, t))
-            )
+    _feed(strat, 4, _rich_mark, start=10)
     assert _exits(queue) == []
     entries = _entries(queue)
     assert entries and entries[0].symbol == _RICH and entries[0].signal_type == "SHORT"

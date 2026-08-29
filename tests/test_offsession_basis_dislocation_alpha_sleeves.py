@@ -117,6 +117,17 @@ class _Queue:
         self.items.append(item)
 
 
+class _Bars:
+    """Feature-store stand-in for complete MARKET_WINDOW observations."""
+
+    def __init__(self, symbols: list[str]) -> None:
+        self.symbol_list = list(symbols)
+        self.features: dict[tuple[str, str], float] = {}
+
+    def get_latest_feature_value(self, symbol: str, field: str) -> float | None:
+        return self.features.get((symbol, field))
+
+
 def _event(symbol: str, moment: datetime, close: float, index: float) -> SimpleNamespace:
     return SimpleNamespace(
         type="MARKET",
@@ -132,13 +143,45 @@ def _event(symbol: str, moment: datetime, close: float, index: float) -> SimpleN
     )
 
 
+def _window(
+    candidate: Any,
+    moment: datetime,
+    symbols: list[str],
+    *,
+    row_times: dict[str, datetime] | None = None,
+) -> SimpleNamespace:
+    """Build one aligned atomic panel and populate its per-symbol features."""
+    bars = candidate.bars
+    assert isinstance(bars, _Bars)
+    rows: dict[str, list[dict[str, Any]]] = {}
+    step = _TIMES.index(moment)
+    for symbol in symbols:
+        row_time = (row_times or {}).get(symbol, moment)
+        close = _CLOSES[symbol][step]
+        index = _INDEXES[symbol][step]
+        bars.features[(symbol, "mark_price")] = close
+        bars.features[(symbol, "index_price")] = index
+        rows[symbol] = [
+            {
+                "time": row_time.isoformat().replace("+00:00", "Z"),
+                "open": close,
+                "high": close * 1.001,
+                "low": close * 0.999,
+                "close": close,
+                "volume": 1000.0,
+            }
+        ]
+    return SimpleNamespace(
+        type="MARKET_WINDOW",
+        time=moment.isoformat().replace("+00:00", "Z"),
+        bars_1s=rows,
+    )
+
+
 def _feed(strategy: Any, symbols: list[str], end_step: int = _N_STEPS) -> None:
     for step in range(min(end_step, _N_STEPS)):
         moment = _TIMES[step]
-        for symbol in symbols:
-            strategy.calculate_signals(
-                _event(symbol, moment, _CLOSES[symbol][step], _INDEXES[symbol][step])
-            )
+        strategy.calculate_signals(_window(strategy, moment, symbols))
 
 
 def _final_sides(items: list[Any]) -> dict[str, str]:
@@ -166,7 +209,7 @@ def _make_candidate(symbols: list[str] | None = None, **overrides: Any) -> Any:
         allow_short=True,
     )
     params.update(overrides)
-    bars = SimpleNamespace(symbol_list=list(symbols if symbols is not None else _ALL_SYMBOLS))
+    bars = _Bars(list(symbols if symbols is not None else _ALL_SYMBOLS))
     return OffSessionBasisDislocationStrategy(bars, _Queue(), **params)
 
 
@@ -215,6 +258,34 @@ def test_stage1_weekend_dislocation_accumulates_in_state() -> None:
     assert pump.off_obs >= 40
 
 
+def test_partial_or_skewed_windows_fail_closed_until_aligned_panel_arrives() -> None:
+    candidate = _make_candidate()
+    _feed(candidate, _ALL_SYMBOLS, end_step=180)  # through Monday 11:00
+    pump = candidate._state[PUMP]
+    closes_before = list(pump.closes)
+    decision_before = candidate._last_decision_date
+
+    # Missing one configured TradFi leg at the decision timestamp is not a
+    # usable cross-section; it cannot age state, score, or emit an order.
+    candidate.calculate_signals(_window(candidate, _TIMES[180], _TRADFI[:-1]))
+    assert candidate.events.items == []
+    assert candidate._last_decision_date == decision_before
+    assert list(pump.closes) == closes_before
+
+    # Every leg must also carry the event's exact timestamp; cached/skewed
+    # rows fail before mutating the panel.
+    candidate.calculate_signals(
+        _window(candidate, _TIMES[180], _TRADFI, row_times={PUMP: _TIMES[179]})
+    )
+    assert candidate.events.items == []
+    assert candidate._last_decision_date == decision_before
+    assert list(pump.closes) == closes_before
+
+    candidate.calculate_signals(_window(candidate, _TIMES[180], _TRADFI))
+    sides = _final_sides(candidate.events.items)
+    assert sides == {PUMP: "SHORT", DUMP: "LONG"}
+
+
 # --------------------------------------------------------------------------- #
 # sign-lock: SHORT the pumped-off-anchor leg, LONG the dumped leg
 # --------------------------------------------------------------------------- #
@@ -260,6 +331,17 @@ def test_no_entry_on_calm_weekdays_calendar_alone_never_trades() -> None:
     assert not [
         s for s in candidate.events.items if str(s.signal_type).upper() in {"LONG", "SHORT"}
     ]
+
+
+def test_individual_market_events_learn_but_never_rebalance() -> None:
+    candidate = _make_candidate()
+    for symbol in _TRADFI:
+        candidate.calculate_signals(
+            _event(symbol, _TIMES[180], _CLOSES[symbol][180], _INDEXES[symbol][180])
+        )
+    assert candidate._state[PUMP].closes
+    assert candidate._last_decision_date is None
+    assert candidate.events.items == []
 
 
 # --------------------------------------------------------------------------- #
@@ -549,14 +631,36 @@ def test_two_runs_are_bit_identical() -> None:
     assert _trace(first)  # the fixture produces a non-empty tape
 
 
+def test_window_row_order_does_not_change_the_signal_tape() -> None:
+    first = _make_candidate()
+    _feed(first, _ALL_SYMBOLS)
+    second = _make_candidate()
+    _feed(second, list(reversed(_ALL_SYMBOLS)))
+
+    def _trace(strategy: Any) -> list[tuple[str, str, float, float]]:
+        return [
+            (
+                s.symbol,
+                str(s.signal_type).upper(),
+                round(float(s.strength), 12),
+                round(float((s.metadata or {}).get("target_allocation", 0.0)), 12),
+            )
+            for s in strategy.events.items
+        ]
+
+    assert _trace(first) == _trace(second)
+    assert _trace(first)
+
+
 # --------------------------------------------------------------------------- #
 # SLEEVE-STATE-02 regressions: panel-wide aging + halted-symbol staleness gate
 # --------------------------------------------------------------------------- #
 
 
-def test_halted_symbol_gets_max_hold_exit_without_printing_bars() -> None:
-    # Fix 1a: a HALTED symbol with an open position gets its 72h max-hold EXIT
-    # from ANOTHER symbol's bar (panel-wide aging), price = last known close.
+def test_max_hold_exit_requires_a_complete_fresh_panel() -> None:
+    # A partial panel cannot age a halted leg out: exits are close-confirmed by
+    # a complete same-timestamp window.  Once the leg has a fresh quote in a
+    # complete panel, max-hold closes it at its prior known price.
     candidate = _make_candidate()
     item = candidate._state[PUMP]
     item.closes.append(123.0)
@@ -564,7 +668,10 @@ def test_halted_symbol_gets_max_hold_exit_without_printing_bars() -> None:
     item.entry_price = 123.0
     item.entry_epoch = _MONDAY_DECISION.timestamp()
     later = _MONDAY_DECISION + timedelta(hours=73)
-    candidate.calculate_signals(_event(DUMP, later, 100.0, 100.0))
+    candidate.calculate_signals(_window(candidate, later, [DUMP]))
+    assert not candidate.events.items
+    assert item.mode == "SHORT"
+    candidate.calculate_signals(_window(candidate, later, _TRADFI))
     exits = [s for s in candidate.events.items if str(s.signal_type).upper() == "EXIT"]
     assert [s.symbol for s in exits] == [PUMP]
     assert dict(exits[0].metadata or {}).get("reason") == "max_hold"
@@ -577,7 +684,7 @@ def test_halted_symbol_gets_max_hold_exit_without_printing_bars() -> None:
     bare = ghost._state[PUMP]
     bare.mode = "LONG"
     bare.entry_epoch = _MONDAY_DECISION.timestamp()
-    ghost.calculate_signals(_event(DUMP, later, 100.0, 100.0))
+    ghost.calculate_signals(_window(ghost, later, _TRADFI))
     exits = [s for s in ghost.events.items if str(s.signal_type).upper() == "EXIT"]
     assert [s.symbol for s in exits] == [PUMP]
     assert exits[0].price is None
@@ -589,30 +696,22 @@ def test_halted_symbol_gets_max_hold_exit_without_printing_bars() -> None:
     held.closes.append(123.0)
     held.mode = "SHORT"
     held.entry_epoch = _MONDAY_DECISION.timestamp()
-    early.calculate_signals(_event(DUMP, _MONDAY_DECISION + timedelta(hours=71), 100.0, 100.0))
+    early.calculate_signals(_window(early, _MONDAY_DECISION + timedelta(hours=71), _TRADFI))
     assert not [s for s in early.events.items if str(s.signal_type).upper() == "EXIT"]
     assert held.mode == "SHORT"
 
 
-def test_frozen_accumulator_is_never_scored_or_entered() -> None:
-    # Fix 1b (integration): PUMP halts at Monday 00:00 with a huge frozen
-    # weekend dislocation in its accumulator; the Monday pre-reopen decision
-    # must exclude it (stale last bar >> 3x the 1h spacing) while still
-    # entering the live dumped leg from the remaining fresh cross-section.
+def test_halted_leg_fails_closed_instead_of_rebalancing_stale_panel() -> None:
+    # PUMP halts at Monday 00:00 with a huge frozen weekend accumulator.  The
+    # incomplete Monday panel cannot drive a decision from the remaining legs.
     candidate = _make_candidate()
     halt_at = 168  # Monday 2025-01-13 00:00 UTC: PUMP prints nothing from here
     for step in range(182):  # through Monday 13:00
         moment = _TIMES[step]
-        for symbol in _ALL_SYMBOLS:
-            if symbol == PUMP and step >= halt_at:
-                continue
-            candidate.calculate_signals(
-                _event(symbol, moment, _CLOSES[symbol][step], _INDEXES[symbol][step])
-            )
+        symbols = _TRADFI if step < halt_at else [symbol for symbol in _TRADFI if symbol != PUMP]
+        candidate.calculate_signals(_window(candidate, moment, symbols))
     assert candidate._state[PUMP].off_accum_bps > 150.0  # frozen photograph
-    sides = _final_sides(candidate.events.items)
-    assert PUMP not in sides  # never scored, never entered
-    assert sides.get(DUMP) == "LONG"
+    assert _final_sides(candidate.events.items) == {}
 
 
 def test_stale_last_bar_excluded_from_scores_fresh_passes() -> None:

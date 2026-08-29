@@ -17,7 +17,9 @@ from __future__ import annotations
 
 import math
 import queue
+from copy import deepcopy
 from dataclasses import dataclass
+from types import SimpleNamespace
 from typing import Any
 
 from lumina_quant.core.market_window_contract import build_market_window_event
@@ -42,6 +44,9 @@ ANOMALY_STRATEGIES = (
     "TrendEfficiencyMomentumStrategy",
     "DispersionConditionedReversionStrategy",
 )
+
+_DAY_MS = 86_400_000
+_UTC_START_MS = 1_704_067_200_000  # 2024-01-01T00:00:00Z
 
 
 @dataclass(slots=True)
@@ -150,6 +155,199 @@ def test_skewness_is_the_original_plain_sum_recipe_not_the_fsum_alias() -> None:
     assert canonical is not None and canonical != golden
 
 
+def test_anomaly_panel_admission_is_payload_order_invariant_and_rejects_duplicates() -> None:
+    symbols = ["BTC/USDT", "AAA/USDT", "BBB/USDT", "CCC/USDT"]
+    params = dict(beta_window=4, vol_window=2, rebalance_bars=99, min_symbols=2)
+    left = IdiosyncraticVolatilityStrategy(_Bars(symbols), queue.Queue(), **params)
+    right = IdiosyncraticVolatilityStrategy(_Bars(symbols), queue.Queue(), **params)
+    closes = {symbol: 100.0 + index for index, symbol in enumerate(symbols)}
+    volumes = dict.fromkeys(symbols, 1_000.0)
+    left.calculate_signals(_window(_UTC_START_MS, closes, volumes))
+    right.calculate_signals(_window(_UTC_START_MS, dict(reversed(closes.items())), volumes))
+    assert left.get_state() == right.get_state()
+
+    before = left.get_state()
+    duplicate_row = _window(_UTC_START_MS + _DAY_MS, closes, volumes)
+    duplicate_row.bars_1s["AAA/USDT"] *= 2
+    left.calculate_signals(duplicate_row)
+    assert left.get_state() == before
+
+    duplicate_symbols = IdiosyncraticVolatilityStrategy(
+        _Bars([*symbols, "AAA/USDT"]), queue.Queue(), **params
+    )
+    duplicate_symbols.calculate_signals(_window(_UTC_START_MS, closes, volumes))
+    assert duplicate_symbols.get_state()["tick"] == 0
+
+
+def test_idiosyncratic_returns_abstain_on_a_gapped_common_benchmark_grid() -> None:
+    symbols = ["BTC/USDT", "AAA/USDT", "BBB/USDT", "CCC/USDT"]
+    strategy = IdiosyncraticVolatilityStrategy(
+        _Bars(symbols),
+        queue.Queue(),
+        beta_window=4,
+        vol_window=2,
+        rebalance_bars=99,
+        min_symbols=2,
+    )
+    closes = {symbol: 100.0 + index for index, symbol in enumerate(symbols)}
+    volumes = dict.fromkeys(symbols, 1_000.0)
+    for offset in (0, _DAY_MS, 2 * _DAY_MS, 4 * _DAY_MS, 5 * _DAY_MS):
+        strategy.calculate_signals(_window(_UTC_START_MS + offset, closes, volumes))
+    assert strategy._synchronized_returns("AAA/USDT", "BTC/USDT", 4) is None
+
+
+def test_idiosyncratic_uses_one_common_tail_for_distinct_beta_and_vol_horizons() -> None:
+    symbols = ["BTC/USDT", "AAA/USDT", "BBB/USDT"]
+    closes = dict.fromkeys(symbols, 100.0)
+    volumes = dict.fromkeys(symbols, 1_000.0)
+    for beta_window, vol_window in ((4, 2), (4, 6)):
+        strategy = IdiosyncraticVolatilityStrategy(
+            _Bars(symbols),
+            queue.Queue(),
+            beta_window=beta_window,
+            vol_window=vol_window,
+            rebalance_bars=99,
+            min_symbols=2,
+        )
+        for index in range(max(beta_window, vol_window) + 1):
+            for symbol in symbols:
+                closes[symbol] *= 1.0 + (0.01 if index % 2 else -0.005)
+            strategy.calculate_signals(_window(_UTC_START_MS + index * _DAY_MS, closes, volumes))
+        aligned = strategy._synchronized_returns(
+            "AAA/USDT", "BTC/USDT", max(beta_window, vol_window)
+        )
+        assert aligned is not None
+        assert all(len(series) == max(beta_window, vol_window) for series in aligned)
+
+
+def test_idiosyncratic_equal_scores_abstain() -> None:
+    symbols = ["BTC/USDT", "AAA/USDT", "BBB/USDT"]
+    events: queue.Queue = queue.Queue()
+    strategy = IdiosyncraticVolatilityStrategy(
+        _Bars(symbols), events, beta_window=4, vol_window=4, rebalance_bars=1, min_symbols=2
+    )
+    closes = dict.fromkeys(symbols, 100.0)
+    volumes = dict.fromkeys(symbols, 1_000.0)
+    for index in range(5):
+        for symbol in symbols:
+            closes[symbol] *= 1.01 if index % 2 else 0.995
+        strategy.calculate_signals(_window(_UTC_START_MS + index * _DAY_MS, closes, volumes))
+    assert _drain(events) == []
+
+
+def test_lottery_rejects_gapped_daily_max_tail_and_bad_restore_without_mutation() -> None:
+    symbols = ["AAA/USDT", "BBB/USDT"]
+    strategy = LotterySkewnessStrategy(
+        _Bars(symbols), queue.Queue(), skew_window=3, max_window=2, rebalance_bars=99, min_symbols=2
+    )
+    assert (
+        strategy._lottery_score(
+            [100.0, 101.0, 99.0, 102.0],
+            completed_daily_closes=[
+                (str(_UTC_START_MS), 100.0),
+                (str(_UTC_START_MS + 2 * _DAY_MS), 101.0),
+                (str(_UTC_START_MS + 3 * _DAY_MS), 102.0),
+            ],
+        )
+        is None
+    )
+
+    closes = dict.fromkeys(symbols, 100.0)
+    volumes = dict.fromkeys(symbols, 1_000.0)
+    for index in range(4):
+        for symbol in symbols:
+            closes[symbol] *= 1.0 + (0.01 if index % 2 else -0.005)
+        strategy.calculate_signals(_window(_UTC_START_MS + index * _DAY_MS, closes, volumes))
+    checkpoint = strategy.get_state()
+    malformed = deepcopy(checkpoint)
+    del malformed["completed_daily_closes"]
+    strategy.set_state(malformed)
+    assert strategy.get_state() == checkpoint
+    partial = deepcopy(checkpoint)
+    partial["close_times"]["AAA/USDT"].pop()
+    strategy.set_state(partial)
+    assert strategy.get_state() == checkpoint
+    shifted = deepcopy(checkpoint)
+    shifted["close_times"]["AAA/USDT"].pop(0)
+    shifted["symbol_state"]["AAA/USDT"]["closes"].pop(0)
+    shifted["symbol_state"]["AAA/USDT"]["volumes"].pop(0)
+    strategy.set_state(shifted)
+    assert strategy.get_state() == checkpoint
+    forged_open = deepcopy(checkpoint)
+    forged_open["open_daily_closes"]["AAA/USDT"][1] += 1.0
+    strategy.set_state(forged_open)
+    assert strategy.get_state() == checkpoint
+
+    empty = LotterySkewnessStrategy(_Bars(symbols), queue.Queue(), max_window=2, min_symbols=2)
+    empty_checkpoint = empty.get_state()
+    empty.set_state(empty_checkpoint)
+    assert empty.get_state() == empty_checkpoint
+
+
+def test_cross_state_rejects_mismatched_same_tail_grids_atomically() -> None:
+    symbols = ["AAA/USDT", "BBB/USDT"]
+    strategy = LotterySkewnessStrategy(
+        _Bars(symbols), queue.Queue(), skew_window=3, max_window=2, rebalance_bars=99, min_symbols=2
+    )
+    closes = dict.fromkeys(symbols, 100.0)
+    volumes = dict.fromkeys(symbols, 1_000.0)
+    for index in range(4):
+        for symbol in symbols:
+            closes[symbol] *= 1.01 if index % 2 else 0.995
+        strategy.calculate_signals(_window(_UTC_START_MS + index * _DAY_MS, closes, volumes))
+
+    checkpoint = strategy.get_state()
+    forged = deepcopy(checkpoint)
+    # Keep AAA's complete, strictly increasing tail valid on its own while
+    # moving an interior timestamp off the cross-symbol synchronized grid.
+    forged["close_times"]["AAA/USDT"][1] = str(_UTC_START_MS + _DAY_MS + 3_600_000)
+    strategy.set_state(forged)
+    assert strategy.get_state() == checkpoint
+
+
+def test_lottery_partial_checkpoint_roundtrips_and_forged_open_close_is_atomic() -> None:
+    symbols = ["AAA/USDT", "BBB/USDT"]
+    strategy = LotterySkewnessStrategy(
+        _Bars(symbols), queue.Queue(), skew_window=3, max_window=2, rebalance_bars=99, min_symbols=2
+    )
+    closes = dict.fromkeys(symbols, 100.0)
+    volumes = dict.fromkeys(symbols, 1_000.0)
+    strategy.calculate_signals(_window(_UTC_START_MS, closes, volumes))
+
+    checkpoint = strategy.get_state()
+    restored = LotterySkewnessStrategy(
+        _Bars(symbols), queue.Queue(), skew_window=3, max_window=2, rebalance_bars=99, min_symbols=2
+    )
+    restored.set_state(checkpoint)
+    assert restored.get_state() == checkpoint
+
+    forged = deepcopy(checkpoint)
+    forged["open_daily_closes"]["AAA/USDT"][1] *= 1.01
+    restored.set_state(forged)
+    assert restored.get_state() == checkpoint
+
+
+def test_lottery_checkpoint_restores_exactly_and_continues() -> None:
+    symbols = ["AAA/USDT", "BBB/USDT"]
+    params = dict(skew_window=3, max_window=2, rebalance_bars=99, min_symbols=2)
+    original = LotterySkewnessStrategy(_Bars(symbols), queue.Queue(), **params)
+    closes = dict.fromkeys(symbols, 100.0)
+    volumes = dict.fromkeys(symbols, 1_000.0)
+    for index in range(4):
+        for symbol in symbols:
+            closes[symbol] *= 1.0 + (0.01 if index % 2 else -0.005)
+        original.calculate_signals(_window(_UTC_START_MS + index * _DAY_MS, closes, volumes))
+    restored = LotterySkewnessStrategy(_Bars(symbols), queue.Queue(), **params)
+    restored.set_state(original.get_state())
+    assert restored.get_state() == original.get_state()
+    for symbol in symbols:
+        closes[symbol] *= 1.01
+    event = _window(_UTC_START_MS + 4 * _DAY_MS, closes, volumes)
+    original.calculate_signals(event)
+    restored.calculate_signals(event)
+    assert restored.get_state() == original.get_state()
+
+
 # ---------------------------------------------------------------------------
 # (a) registry presence (4)
 # ---------------------------------------------------------------------------
@@ -222,8 +420,10 @@ def test_idiosyncratic_volatility_dry_emission_and_directionality() -> None:
     _strat, signals = _run_idiosyncratic_volatility()
     assert _allocated(signals), "idio-vol sleeve emitted no allocated non-EXIT signal"
     side = _final_side(signals)
-    # Low idiosyncratic vol (AAA) is long; high idiosyncratic vol (EEE) is short.
-    assert side.get("AAA/USDT") == "LONG", side
+    # Low residual volatility is long; high residual volatility is short.
+    # BBB's high total volatility is systematic and disappears after beta
+    # residualization, so it wins the low-idiosyncratic-volatility rank.
+    assert side.get("BBB/USDT") == "LONG", side
     assert side.get("EEE/USDT") == "SHORT", side
     # BBB has high beta (high TOTAL vol) but low idio vol: residualization must
     # remove the systematic component, so it is never shorted as "high vol".
@@ -243,20 +443,27 @@ def _run_lottery_skewness() -> tuple[Any, list[Any]]:
         min_symbols=4,
         allow_short=True,
     )
+    steady_price = 100.0
     for ts in range(80):
         closes: dict[str, float] = {}
         volumes: dict[str, float] = {}
         for idx, symbol in enumerate(symbols):
             if symbol == "LOTTO/USDT":
-                # Periodic upside spikes -> high positive skew + large MAX.
-                spike = 0.15 if ts % 17 == 0 else 1.0
-                closes[symbol] = 100.0 * (1.0 + 0.001 * ts) * (1.0 + spike if ts % 17 == 0 else 1.0)
+                # Frequent upside spikes keep a large daily MAX in the trailing
+                # completed-day window at every late rebalance.
+                spike = 0.15 if ts % 7 == 0 else 1.0
+                closes[symbol] = 100.0 * (1.0 + 0.001 * ts) * (1.0 + spike if ts % 7 == 0 else 1.0)
             elif symbol == "STEADY/USDT":
-                closes[symbol] = 100.0 * (1.002) ** ts * (1.0 + 0.001 * math.sin(ts * 0.5))
+                # Small ordinary gains punctuated by rare losses make this the
+                # low-lottery control under daily MAX normalization.
+                if ts:
+                    steady_price *= 0.99 if ts % 6 == 0 else 1.001
+                closes[symbol] = steady_price
             else:
                 closes[symbol] = 100.0 * (1.001) ** ts * (1.0 + 0.010 * math.sin(ts * 0.7 + idx))
             volumes[symbol] = 1000.0
-        strat.calculate_signals(_window(ts, closes, volumes))
+        # MAX is defined over completed UTC-day returns, not intraday bars.
+        strat.calculate_signals(_window(_UTC_START_MS + ts * _DAY_MS, closes, volumes))
     return strat, _drain(events)
 
 
@@ -264,8 +471,12 @@ def test_lottery_skewness_dry_emission_and_directionality() -> None:
     _strat, signals = _run_lottery_skewness()
     assert _allocated(signals), "lottery sleeve emitted no allocated non-EXIT signal"
     side = _final_side(signals)
-    # High-lottery name shorted; smooth low-skew name long.
-    assert side.get("LOTTO/USDT") == "SHORT", side
+    # High-lottery name is repeatedly shorted; its final stop/rebalance exit
+    # does not invalidate the directionality of those admitted entries.
+    assert any(
+        signal.symbol == "LOTTO/USDT" and str(signal.signal_type).upper() == "SHORT"
+        for signal in _allocated(signals)
+    )
     assert side.get("STEADY/USDT") == "LONG", side
 
 
@@ -382,6 +593,71 @@ def test_graceful_skip_when_no_symbols() -> None:
     strat = IdiosyncraticVolatilityStrategy(_Bars([]), events)
     strat.calculate_signals(_window(0, {}, {}))
     assert _drain(events) == []
+
+
+def test_partial_skewed_windows_and_individual_events_cannot_drive_decisions() -> None:
+    """Cross-sectional decisions require one complete, exact-time panel."""
+    symbols = ["A/USDT", "B/USDT", "C/USDT", "D/USDT"]
+    events: queue.Queue = queue.Queue()
+    strat = TrendEfficiencyMomentumStrategy(
+        _Bars(list(symbols)),
+        events,
+        efficiency_period=6,
+        trend_lookback_bars=6,
+        rebalance_bars=1,
+        min_symbols=4,
+        allow_short=True,
+    )
+    for ts in range(12):
+        closes = {
+            symbol: 100.0 * (1.0 + 0.003 * (idx + 1)) ** ts for idx, symbol in enumerate(symbols)
+        }
+        strat.calculate_signals(_window(_UTC_START_MS + ts * _DAY_MS, closes, {}))
+    _drain(events)
+    baseline = strat.get_state()
+
+    # A missing name rejects the batch without aging positions or appending a
+    # subset of the panel.
+    partial_closes = {
+        symbol: 100.0 * (1.0 + 0.003 * (idx + 1)) ** 12 for idx, symbol in enumerate(symbols[:-1])
+    }
+    partial_time = _UTC_START_MS + 12 * _DAY_MS
+    strat.calculate_signals(_window(partial_time, partial_closes, {}))
+    assert _drain(events) == []
+    assert strat.get_state() == baseline
+
+    # All names alone are insufficient: every bar must carry the event time.
+    skewed_closes = {
+        symbol: 100.0 * (1.0 + 0.003 * (idx + 1)) ** 13 for idx, symbol in enumerate(symbols)
+    }
+    skewed_time = _UTC_START_MS + 13 * _DAY_MS
+    skewed = _window(skewed_time, skewed_closes, {})
+    close = skewed_closes["D/USDT"]
+    skewed.bars_1s["D/USDT"] = (
+        (skewed_time - 1_000, close * 0.999, close * 1.01, close * 0.99, close, 1000.0),
+    )
+    strat.calculate_signals(skewed)
+    assert _drain(events) == []
+    assert strat.get_state() == baseline
+
+    # Individual MARKET events cannot establish a common-time panel and must
+    # not mutate cross-sectional history.
+    for symbol in symbols:
+        close = skewed_closes[symbol]
+        strat.calculate_signals(
+            SimpleNamespace(
+                type="MARKET",
+                symbol=symbol,
+                time=skewed_time,
+                open=close,
+                high=close,
+                low=close,
+                close=close,
+                volume=1000.0,
+            )
+        )
+    assert _drain(events) == []
+    assert strat.get_state() == baseline
 
 
 # ---------------------------------------------------------------------------

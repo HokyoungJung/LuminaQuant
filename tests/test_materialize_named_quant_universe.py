@@ -71,12 +71,12 @@ def _suite() -> dict:
             {
                 "candidate_id": "tradfi",
                 "metadata": {"universe_binding": "tradfi_all"},
-                "symbols": ["OLD"],
+                "symbols": ["XAU/USDT"],
             },
             {
                 "candidate_id": "both",
                 "metadata": {"universe_binding": "crypto_top10_plus_tradfi"},
-                "symbols": ["OLD"],
+                "symbols": ["BTC/USDT", "XAU/USDT"],
             },
             {
                 "candidate_id": "fixed-outside",
@@ -137,8 +137,8 @@ def test_materializes_ranked_intersection_tradfi_filters_and_bindings(tmp_path: 
         "TRX/USDT",
     ]
     assert candidates["crypto"]["symbols"] == crypto
-    assert candidates["tradfi"]["symbols"] == ["SPX/USDT", "XAU/USDT"]
-    assert candidates["both"]["symbols"] == [*crypto, "SPX/USDT", "XAU/USDT"]
+    assert candidates["tradfi"]["symbols"] == ["XAU/USDT"]
+    assert candidates["both"]["symbols"] == [*crypto, "XAU/USDT"]
     assert candidates["fixed-outside"]["enabled"] is False
     assert candidates["fixed-outside"]["disabled_reason"].endswith("LINK/USDT")
     assert candidates["fixed-tradfi-outside"]["enabled"] is False
@@ -165,6 +165,45 @@ def test_materializes_ranked_intersection_tradfi_filters_and_bindings(tmp_path: 
         {"filterType": "LOT_SIZE", "minQty": "0.001", "stepSize": "0.001"},
         {"filterType": "MIN_NOTIONAL", "notional": "5"},
     ]
+
+
+def test_tradfi_binding_preserves_configured_group_by_pit_intersection(tmp_path: Path) -> None:
+    market = _market_snapshot(
+        "2026-01-01T00:00:00Z",
+        ["BTC", "ETH", "SOL", "XRP", "DOGE", "ADA", "AVAX", "TON", "BNB", "TRX"],
+    )
+    exchange = _exchange_snapshot("2026-01-01T00:00:00Z", tradfi=("XAU", "SPX", "WTI"))
+    market_path = tmp_path / "caps.json"
+    exchange_path = tmp_path / "exchange.json"
+    market_path.write_text(json.dumps(market))
+    exchange_path.write_text(json.dumps(exchange))
+    suite = {
+        "candidates": [
+            {
+                "candidate_id": "metals",
+                "metadata": {"universe_binding": "tradfi_all"},
+                "symbols": ["XAU/USDT", "MISSING/USDT"],
+            },
+            {
+                "candidate_id": "indices",
+                "metadata": {"universe_binding": "tradfi_all"},
+                "symbols": ["SPX/USDT"],
+            },
+        ]
+    }
+
+    materialized = MODULE.materialize(
+        suite,
+        market,
+        exchange,
+        as_of=datetime(2026, 1, 2, tzinfo=UTC),
+        market_cap_source=market_path,
+        exchange_info_source=exchange_path,
+    )
+
+    candidates = {row["candidate_id"]: row for row in materialized["candidates"]}
+    assert candidates["metals"]["symbols"] == ["XAU/USDT"]
+    assert candidates["indices"]["symbols"] == ["SPX/USDT"]
 
 
 def test_cli_uses_latest_non_future_snapshot_and_jsonl(tmp_path: Path) -> None:
@@ -234,6 +273,14 @@ def test_single_snapshot_object_is_accepted(tmp_path: Path) -> None:
     path.write_text(json.dumps(snapshot))
     assert MODULE._load_snapshots(path, label="exchangeInfo") == [snapshot]
     assert MODULE._positive_float(True) is None
+
+
+def test_atomic_publication_rejects_stale_output(tmp_path: Path) -> None:
+    output = tmp_path / "materialized.json"
+    output.write_text('{"prior": true}\n')
+    with pytest.raises(ValueError, match="already exists"):
+        MODULE._publish_json(output, {"replacement": True})
+    assert json.loads(output.read_text()) == {"prior": True}
 
 
 def test_tradfi_binding_fails_closed_when_exchange_has_none(tmp_path: Path) -> None:

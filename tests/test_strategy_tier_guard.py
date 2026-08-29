@@ -22,6 +22,15 @@ cross-sectional flow-share candidate follows the HONEST admission route
 
 from __future__ import annotations
 
+import queue
+import time
+from types import SimpleNamespace
+
+import pytest
+
+from lumina_quant.core.engine import TradingEngine
+from lumina_quant.core.events import OrderEvent
+from lumina_quant.live.trader import LiveTrader
 from lumina_quant.strategies.registry import (
     _STRATEGY_MAP,
     _STRATEGY_TIER_HINTS,
@@ -103,9 +112,7 @@ _LEGACY_UNHINTED_LIVE_DEFAULT = frozenset(
         "CrossAssetDiversifiedTrendStrategy",
         "CrossSectionalEquityMomentumStrategy",
         "CrossSectionalShortTermReversalStrategy",
-        "CusumChangePointTrendRiderStrategy",
         "DeepLearningForecastGateStrategy",
-        "DispersionConditionedReversionStrategy",
         "DonchianAtrTrendStrategy",
         "DualMomentumDefensiveRotationStrategy",
         "DualMomentumIndexRotationStrategy",
@@ -118,7 +125,6 @@ _LEGACY_UNHINTED_LIVE_DEFAULT = frozenset(
         "GoldSilverRatioMeanReversionStrategy",
         "GoldSilverRatioTrendStrategy",
         "HurstRegimeGatedStrategy",
-        "IdiosyncraticVolatilityStrategy",
         "IntermarketLeadLagContinuationStrategy",
         "IntradayFlowPressureRiderStrategy",
         "IntradaySeasonalMomentumRiderStrategy",
@@ -126,7 +132,6 @@ _LEGACY_UNHINTED_LIVE_DEFAULT = frozenset(
         "LeveragedTrendTimingRiderStrategy",
         "LiquidationCascadeReversionStrategy",
         "LiquidityShockReversionStrategy",
-        "LotterySkewnessStrategy",
         "LowVolatilityMomentumStrategy",
         "MetalEquityDivergenceReversalStrategy",
         "MetalsRelativeValueBasketStrategy",
@@ -150,9 +155,7 @@ _LEGACY_UNHINTED_LIVE_DEFAULT = frozenset(
         "SemisLeadLagRotationStrategy",
         "SpectralCycleRiderStrategy",
         "TakerFlowImbalanceContinuationStrategy",
-        "TrendEfficiencyMomentumStrategy",
         "VWAPCompressionReversionStrategy",
-        "VarianceRatioTrendRiderStrategy",
         "VolManagedMomentumCrashGateStrategy",
         "VolOfVolRegimeTrendGateStrategy",
         "VolatilityBreakoutRiderStrategy",
@@ -172,6 +175,276 @@ _CRYPTO_UNIVERSE = [
 ]
 
 _ALL_TIMEFRAMES = ["1s", "1m", "5m", "15m", "30m", "1h", "4h", "1d"]
+
+
+def _live_order_admission_trader(*, stage="canary", risk_approved=True):
+    executed = []
+    trader = LiveTrader.__new__(LiveTrader)
+    execution_handler = SimpleNamespace(execute_order=executed.append)
+    TradingEngine.__init__(
+        trader,
+        events=None,
+        data_handler=SimpleNamespace(get_latest_bar_value=lambda symbol, field: 100.0),
+        strategy=get_strategy_map()["RsiStrategy"].__new__(get_strategy_map()["RsiStrategy"]),
+        portfolio=SimpleNamespace(
+            current_positions={"BTC/USDT": 1.0},
+            current_position_legs={},
+        ),
+        execution_handler=execution_handler,
+    )
+    trader.config = SimpleNamespace(GO_LIVE_STAGE=stage, POSITION_MODE="ONE_WAY")
+    trader.strategy_name = "RsiStrategy"
+    trader.risk_manager = SimpleNamespace(
+        check_order=lambda event, price, portfolio: (risk_approved, "risk_rejected")
+    )
+    trader.audit_store = SimpleNamespace(log_risk_event=lambda *args, **kwargs: None)
+    trader.run_id = "test"
+    trader.logger = SimpleNamespace(warning=lambda *args, **kwargs: None)
+    trader._live_readiness_verified = True
+    trader._startup_reconciliation_complete = True
+    trader._startup_state = "ready"
+    trader.materialized_staleness_threshold_seconds = 45
+    trader._market_freshness_by_symbol = {"BTC/USDT": (time.time_ns(), 1, 0)}
+    trader._materialized_stale_block_active = False
+    trader._data_silence_block_active = False
+    trader._hard_halt_active = False
+    return trader, executed
+
+
+def _order():
+    return OrderEvent("BTC/USDT", "MKT", 1.0, "BUY")
+
+
+def _current_bar(timestamp_ms):
+    return (timestamp_ms, 100.0, 101.0, 99.0, 100.5, 1.0)
+
+
+def test_live_direct_order_is_denied_before_readiness():
+    trader, executed = _live_order_admission_trader()
+    trader._live_readiness_verified = False
+
+    trader.process_event(_order())
+
+    assert executed == []
+
+
+def test_authenticated_reduce_only_flatten_bypasses_only_entry_gates():
+    trader, executed = _live_order_admission_trader()
+    trader._live_readiness_verified = False
+    trader._startup_reconciliation_complete = False
+    trader._startup_state = "blocked"
+    trader._market_freshness_by_symbol = {}
+    trader._materialized_stale_block_active = True
+    trader._data_silence_block_active = True
+    trader._hard_halt_active = True
+    flatten = OrderEvent(
+        "BTC/USDT",
+        "MKT",
+        1.0,
+        "SELL",
+        reduce_only=True,
+        metadata={
+            "source": "live_trader_reduce_only_flatten",
+            "flatten_quantity": 1.0,
+            "flatten_position_side": "",
+        },
+    )
+
+    trader.process_event(flatten)
+
+    assert executed == [flatten]
+
+
+def test_forged_reduce_only_flatten_cannot_bypass_entry_gates():
+    trader, executed = _live_order_admission_trader()
+    trader._hard_halt_active = True
+    forged = OrderEvent(
+        "BTC/USDT",
+        "MKT",
+        2.0,
+        "SELL",
+        reduce_only=True,
+        metadata={
+            "source": "live_trader_reduce_only_flatten",
+            "flatten_quantity": 2.0,
+            "flatten_position_side": "",
+        },
+    )
+
+    trader.process_event(forged)
+
+    assert executed == []
+
+
+@pytest.mark.parametrize(
+    "attribute,value",
+    [
+        ("_startup_reconciliation_complete", False),
+        ("_market_freshness_by_symbol", {}),
+        ("_materialized_stale_block_active", True),
+    ],
+)
+def test_live_order_is_denied_for_incomplete_or_stale_startup_state(attribute, value):
+    trader, executed = _live_order_admission_trader()
+    setattr(trader, attribute, value)
+
+    trader.process_event(_order())
+
+    assert executed == []
+
+
+@pytest.mark.parametrize("stage", ["research_only", "shadow"])
+def test_non_executing_deployment_stages_are_null_order_sinks(stage):
+    trader, executed = _live_order_admission_trader(stage=stage)
+
+    trader.process_event(_order())
+
+    assert executed == []
+
+
+def test_research_only_strategy_tier_is_a_null_order_sink(monkeypatch):
+    trader, executed = _live_order_admission_trader()
+    research_cls = get_strategy_map()["DisagreementGatedEnsembleStrategy"]
+    trader.strategy = research_cls.__new__(research_cls)
+    trader.strategy_name = research_cls.__name__
+
+    trader.process_event(_order())
+
+    assert executed == []
+
+
+def test_unknown_stage_or_strategy_tier_is_denied(monkeypatch):
+    trader, executed = _live_order_admission_trader(stage="unreviewed")
+    trader.process_event(_order())
+    assert executed == []
+
+    monkeypatch.setattr(
+        "lumina_quant.strategies.registry.get_strategy_tier",
+        lambda strategy_name: "unreviewed",
+    )
+    trader, executed = _live_order_admission_trader()
+    trader.process_event(_order())
+    assert executed == []
+
+
+def test_research_instance_cannot_spoof_a_live_display_name():
+    trader, executed = _live_order_admission_trader()
+    research_cls = get_strategy_map()["DisagreementGatedEnsembleStrategy"]
+    trader.strategy = research_cls.__new__(research_cls)
+    # The user-visible/configured label must not choose this instance's tier.
+    trader.strategy_name = "RsiStrategy"
+
+    trader.process_event(_order())
+
+    assert executed == []
+
+
+def test_missing_or_other_symbol_market_evidence_cannot_admit_order():
+    trader, executed = _live_order_admission_trader()
+    trader._market_freshness_by_symbol = {}
+    trader.process_event(_order())
+    assert executed == []
+
+    trader, executed = _live_order_admission_trader()
+    trader._market_freshness_by_symbol = {"ETH/USDT": (time.time_ns(), 1, 0)}
+    trader.process_event(_order())
+    assert executed == []
+
+
+def test_market_window_without_lag_does_not_create_admission_evidence():
+    trader, _ = _live_order_admission_trader()
+    trader._market_freshness_by_symbol = {}
+
+    trader._record_market_freshness(
+        SimpleNamespace(
+            bars_1s={"BTC/USDT": ()},
+            timestamp_ns=time.time_ns(),
+            sequence=1,
+            lag_ms=None,
+            is_stale=False,
+        )
+    )
+
+    assert trader._market_freshness_by_symbol == {}
+
+
+@pytest.mark.parametrize(
+    "evidence",
+    [(0, 1, 0), (time.time_ns(), 0, 0), (time.time_ns(), 1, 45_001), (1, 1, 0)],
+)
+def test_stale_market_evidence_cannot_admit_order(evidence):
+    trader, _executed = _live_order_admission_trader()
+    trader._market_freshness_by_symbol = {"BTC/USDT": evidence}
+
+    trader.process_event(_order())
+
+    assert trader._market_freshness_by_symbol == {}
+
+
+@pytest.mark.parametrize(
+    "bars_1s",
+    [
+        {},
+        {"BTC/USDT": ()},
+        {"BTC/USDT": ((1_000, 100.0),)},
+        {"BTC/USDT": ((1_000, 100.0, 99.0, 101.0, 100.0, 1.0),)},
+    ],
+)
+def test_empty_or_malformed_current_bar_clears_market_admission_evidence(bars_1s):
+    trader, _ = _live_order_admission_trader()
+    trader._record_market_freshness(
+        SimpleNamespace(
+            bars_1s=bars_1s,
+            time=1_000,
+            event_time_watermark_ms=1_000,
+            timestamp_ns=time.time_ns(),
+            sequence=2,
+            lag_ms=0,
+            is_stale=False,
+        )
+    )
+
+    assert trader._market_freshness_by_symbol == {}
+
+
+def test_same_symbol_causal_bounded_market_evidence_admits_order():
+    trader, executed = _live_order_admission_trader()
+    trader._market_freshness_by_symbol = {}
+    window_time_ms = int(time.time_ns() // 1_000_000)
+    trader._record_market_freshness(
+        SimpleNamespace(
+            bars_1s={"BTC/USDT": (_current_bar(window_time_ms),)},
+            time=window_time_ms,
+            event_time_watermark_ms=window_time_ms,
+            timestamp_ns=time.time_ns(),
+            sequence=1,
+            lag_ms=0,
+            is_stale=False,
+        )
+    )
+
+    trader.process_event(_order())
+
+    assert len(executed) == 1
+
+
+@pytest.mark.parametrize("stage", ["canary", "full"])
+def test_canary_and_full_execute_only_after_all_admission_gates(stage):
+    trader, executed = _live_order_admission_trader(stage=stage)
+    trader.process_event(_order())
+
+    assert len(executed) == 1
+
+    trader.events = queue.Queue()
+    trader.events.put(_order())
+    trader.process_event(trader.events.get_nowait())
+
+    assert len(executed) == 2
+
+    trader, executed = _live_order_admission_trader(stage=stage, risk_approved=False)
+    trader.process_event(_order())
+
+    assert executed == []
 
 
 def _candidates() -> list:

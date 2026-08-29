@@ -4,11 +4,17 @@
 from __future__ import annotations
 
 import argparse
+import ctypes
+import errno
 import hashlib
 import json
 import math
 import os
+import random
 import re
+import shutil
+import subprocess
+import tempfile
 from copy import deepcopy
 from dataclasses import asdict, is_dataclass
 from datetime import UTC, datetime, timedelta
@@ -16,13 +22,22 @@ from itertools import pairwise
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+
 from lumina_quant.backtesting.backtest import Backtest
 from lumina_quant.backtesting.data import HistoricCSVDataHandler
 from lumina_quant.backtesting.execution_sim import SimulatedExecutionHandler
 from lumina_quant.backtesting.portfolio_backtest import Portfolio
 from lumina_quant.configuration import get_default_runtime_config
-from lumina_quant.data.feature_points import FEATURE_COLUMNS, FEATURE_POINT_MAX_STALE_MS
+from lumina_quant.data.feature_points import (
+    BINANCE_FUNDING_SOURCE_JITTER_TOLERANCE_MS,
+    FEATURE_COLUMNS,
+    FEATURE_POINT_MAX_STALE_MS,
+)
 from lumina_quant.market_data import MarketDataRepository, timeframe_to_milliseconds
+from lumina_quant.portfolio.quality_gated_allocation import (
+    _materialized_return_panel_sha256,
+)
 from lumina_quant.strategies.registry import resolve_strategy_class
 
 
@@ -116,6 +131,24 @@ def _json_sha256(value: Any) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
+def _is_sha256(value: Any) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) == 64
+        and all(character in "0123456789abcdef" for character in value)
+    )
+
+
+def _path_matches_sha256(value: Any, expected: Any) -> bool:
+    if not isinstance(value, str) or not _is_sha256(expected):
+        return False
+    try:
+        path = Path(value).expanduser().resolve(strict=True)
+        return path.is_file() and hashlib.sha256(path.read_bytes()).hexdigest() == expected
+    except OSError:
+        return False
+
+
 def _plain(value: Any) -> Any:
     if is_dataclass(value):
         return _plain(asdict(value))
@@ -128,18 +161,143 @@ def _plain(value: Any) -> Any:
     return value
 
 
-def _lineage(manifest: dict[str, Any], manifest_path: Path) -> dict[str, Any]:
+def _data_inventory(data_root: Path) -> dict[str, Any]:
+    if not data_root.is_dir():
+        raise ValueError(f"data root must be an existing directory: {data_root}")
+    files = [
+        {
+            "path": str(path.relative_to(data_root)),
+            "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+            "size_bytes": path.stat().st_size,
+        }
+        for path in sorted(data_root.rglob("*"))
+        if path.is_file()
+    ]
+    return {"root": str(data_root.resolve()), "files": files, "sha256": _json_sha256(files)}
+
+
+def _cost_profile() -> tuple[dict[str, Any], Any, dict[str, Any]]:
+    raw_path = os.getenv("LQ_CONFIG_PATH", "").strip()
+    if not raw_path:
+        raise ValueError("LQ_CONFIG_PATH must explicitly name a realistic-cost profile")
+    path = Path(raw_path).expanduser().resolve()
+    if not path.is_file():
+        raise ValueError(f"realistic-cost profile does not exist: {path}")
+    runtime_config = get_default_runtime_config()
+    runtime = _plain(runtime_config)
+    execution = runtime.get("execution") if isinstance(runtime, dict) else None
+    if not isinstance(execution, dict):
+        raise ValueError("realistic-cost profile has no execution configuration")
+    required_positive = (
+        "maker_fee_rate",
+        "taker_fee_rate",
+        "spread_rate",
+        "slippage_rate",
+        "slippage_impact_coefficient",
+        "maintenance_margin_rate",
+        "liquidation_buffer_rate",
+    )
+    missing = [key for key in required_positive if _positive_float(execution.get(key)) is None]
+    if missing:
+        raise ValueError("realistic-cost profile requires nonzero " + ", ".join(missing))
+    if execution.get("slippage_impact_model") != "sqrt_impact":
+        raise ValueError("realistic-cost profile requires slippage_impact_model=sqrt_impact")
+    if not execution.get("require_funding_coverage") or not execution.get(
+        "funding_on_utc_boundary"
+    ):
+        raise ValueError("realistic-cost profile requires funding coverage and UTC settlement")
+    return (
+        {"path": str(path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()},
+        runtime_config,
+        runtime,
+    )
+
+
+def _source_commit() -> str:
+    completed = subprocess.run(
+        ("git", "rev-parse", "HEAD"),
+        cwd=Path(__file__).parents[2],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    commit = completed.stdout.strip()
+    if not re.fullmatch(r"[0-9a-f]{40}", commit):
+        raise ValueError("cannot determine source commit")
+    return commit
+
+
+def _source_identity() -> dict[str, Any]:
+    root = Path(__file__).parents[2].resolve()
+    paths = [Path(__file__).resolve(), *sorted((root / "src/lumina_quant").rglob("*.py"))]
+    digest = hashlib.sha256()
+    for path in paths:
+        relative = path.relative_to(root).as_posix().encode("utf-8")
+        payload = path.read_bytes()
+        digest.update(len(relative).to_bytes(4, "big"))
+        digest.update(relative)
+        digest.update(len(payload).to_bytes(8, "big"))
+        digest.update(payload)
+    return {
+        "git_commit": _source_commit(),
+        "executed_python_file_count": len(paths),
+        "executed_source_sha256": digest.hexdigest(),
+    }
+
+
+def _rename_noreplace(source: Path, target: Path) -> None:
+    libc = ctypes.CDLL(None, use_errno=True)
+    renameat2 = getattr(libc, "renameat2", None)
+    if renameat2 is None:
+        raise RuntimeError("atomic no-replace publication is unsupported")
+    renameat2.argtypes = (
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_uint,
+    )
+    renameat2.restype = ctypes.c_int
+    result = renameat2(
+        -100,
+        os.fsencode(source),
+        -100,
+        os.fsencode(target),
+        1,
+    )
+    if result == 0:
+        return
+    error_number = ctypes.get_errno()
+    if error_number in {errno.EEXIST, errno.ENOTEMPTY}:
+        raise FileExistsError(target)
+    raise OSError(error_number, os.strerror(error_number), str(target))
+
+
+def _publish_json(path: Path, payload: Any) -> None:
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    try:
+        with temporary.open("x", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+        os.replace(temporary, path)
+    except Exception:
+        temporary.unlink(missing_ok=True)
+        raise
+
+
+def _lineage(
+    manifest: dict[str, Any],
+    manifest_path: Path,
+    *,
+    exchange: str,
+    warmup_bars: int,
+    seed: int,
+    cost_profile: dict[str, Any],
+    runtime_defaults: dict[str, Any],
+    data_inventory: dict[str, Any],
+) -> dict[str, Any]:
     receipt = manifest.get("universe_materialization_receipt")
     if not isinstance(receipt, dict):
         raise ValueError("manifest requires universe_materialization_receipt")
-    config_source = os.getenv("LQ_CONFIG_PATH", "").strip()
-    source = None
-    if config_source:
-        config_path = Path(config_source).expanduser().resolve()
-        source = {
-            "path": str(config_path),
-            "sha256": hashlib.sha256(config_path.read_bytes()).hexdigest(),
-        }
     strict_execution = {
         "slippage_impact_model": "sqrt_impact",
         "slippage_impact_coefficient": 0.10,
@@ -149,12 +307,11 @@ def _lineage(manifest: dict[str, Any], manifest_path: Path) -> dict[str, Any]:
         "apply_liquidity_cap_to_conditional_fills": True,
         "attach_default_protective_stop": False,
     }
-    default_config = get_default_runtime_config()
-    effective_defaults = _plain(default_config)
+    effective_defaults = deepcopy(runtime_defaults)
     effective_defaults.get("trading", {}).pop("timeframe", None)
     effective_defaults.get("live", {}).pop("symbol_limits", None)
     runtime = {
-        "source": source,
+        "source": cost_profile,
         "default_config": effective_defaults,
         "strict_research_execution": strict_execution,
     }
@@ -174,6 +331,17 @@ def _lineage(manifest: dict[str, Any], manifest_path: Path) -> dict[str, Any]:
         for candidate in manifest.get("candidates", [])
         if isinstance(candidate, dict)
     ]
+    behavioral_identity = {
+        "exchange": exchange,
+        "warmup_bars": warmup_bars,
+        "determinism": {
+            "numpy_legacy_seed": seed,
+            "python_random_seed": seed,
+        },
+        "source": _source_identity(),
+        "cost_profile": cost_profile,
+        "runtime_config_sha256": runtime["effective_sha256"],
+    }
     return {
         "suite": {
             "suite_id": manifest.get("suite_id"),
@@ -181,7 +349,9 @@ def _lineage(manifest: dict[str, Any], manifest_path: Path) -> dict[str, Any]:
             "manifest_sha256": hashlib.sha256(manifest_path.read_bytes()).hexdigest(),
         },
         "universe": {"receipt_sha256": _json_sha256(receipt), "receipt": receipt},
+        "data_inventory": data_inventory,
         "runtime_config": runtime,
+        "behavioral_identity": behavioral_identity,
     }
 
 
@@ -206,6 +376,8 @@ def _load_selection_artifact(
         != lineage["runtime_config"]["effective_sha256"]
     ):
         raise ValueError("locked-OOS runtime-config identity differs from selection")
+    if selected_lineage.get("behavioral_identity") != lineage["behavioral_identity"]:
+        raise ValueError("locked-OOS behavior-affecting identity differs from selection")
     period = selection.get("period")
     selection_end = _datetime(str(period.get("end"))) if isinstance(period, dict) else None
     if selection_end is None or selection_end >= locked_start:
@@ -308,6 +480,118 @@ def _symbol_limits_from_manifest(manifest: dict[str, Any]) -> dict[str, dict[str
     return limits
 
 
+def _allowed_disabled_candidate(
+    *,
+    candidate_id: str,
+    reason: str,
+    expected: Any,
+    receipt: dict[str, Any],
+    start: datetime,
+    warmup_bars: int,
+    data_inventory_sha256: str,
+    candidate_symbols: Any,
+    candidate_timeframe: Any,
+) -> bool:
+    if isinstance(expected, list):
+        sources = receipt.get("sources")
+        source_sha256 = receipt.get("source_sha256")
+        selected = receipt.get("selected_symbols")
+        selected_symbols = (
+            {symbol for symbols in selected.values() for symbol in symbols}
+            if isinstance(selected, dict)
+            and all(
+                isinstance(symbols, list)
+                and all(isinstance(symbol, str) and symbol for symbol in symbols)
+                for symbols in selected.values()
+            )
+            else set()
+        )
+        excluded_symbols = (
+            sorted(set(candidate_symbols) - selected_symbols)
+            if isinstance(candidate_symbols, list)
+            and all(isinstance(symbol, str) and symbol for symbol in candidate_symbols)
+            else []
+        )
+        return (
+            bool(expected)
+            and expected == excluded_symbols
+            and all(
+                isinstance(symbol, str) and symbol and symbol not in selected_symbols
+                for symbol in expected
+            )
+            and reason == ("outside point-in-time universe: " + ", ".join(expected))
+            and isinstance(sources, dict)
+            and isinstance(source_sha256, dict)
+            and set(sources) == set(source_sha256)
+            and bool(sources)
+            and all(
+                _path_matches_sha256(identity, source_sha256.get(name))
+                for name, identity in sources.items()
+            )
+        )
+    if not isinstance(expected, dict) or set(expected) != {
+        "kind",
+        "reason",
+        "required_buckets",
+        "shortfalls",
+        "timeframe",
+        "candidate_symbols",
+    }:
+        return False
+    if (
+        expected.get("kind") != "insufficient_point_in_time_history"
+        or expected.get("reason") != reason
+        or type(expected.get("required_buckets")) is not int
+        or expected["required_buckets"] != warmup_bars
+        or expected.get("timeframe") != candidate_timeframe
+        or not isinstance(candidate_timeframe, str)
+        or not candidate_timeframe
+        or expected.get("candidate_symbols") != candidate_symbols
+        or not isinstance(candidate_symbols, list)
+        or not candidate_symbols
+        or not all(isinstance(symbol, str) and symbol for symbol in candidate_symbols)
+        or not isinstance(expected.get("shortfalls"), dict)
+        or not expected["shortfalls"]
+        or any(
+            not isinstance(symbol, str)
+            or not symbol
+            or type(count) is not int
+            or count < 0
+            or count >= warmup_bars
+            for symbol, count in expected["shortfalls"].items()
+        )
+    ):
+        return False
+    eligibility = receipt.get("data_eligibility")
+    if not isinstance(eligibility, dict) or "sha256" not in eligibility:
+        return False
+    scope = {key: value for key, value in eligibility.items() if key != "sha256"}
+    return (
+        set(eligibility)
+        == {
+            "schema",
+            "start",
+            "required_buckets",
+            "input_data_inventory_sha256",
+            "resample_receipt_path",
+            "resample_receipt_sha256",
+            "exclusions",
+            "sha256",
+        }
+        and eligibility.get("schema") == "named_quant_data_eligibility.v1"
+        and eligibility.get("start") == start.replace(tzinfo=UTC).isoformat()
+        and eligibility.get("required_buckets") == warmup_bars
+        and eligibility.get("input_data_inventory_sha256") == data_inventory_sha256
+        and _path_matches_sha256(
+            eligibility.get("resample_receipt_path"),
+            eligibility.get("resample_receipt_sha256"),
+        )
+        and isinstance(eligibility.get("exclusions"), dict)
+        and eligibility["exclusions"].get(candidate_id) == expected
+        and eligibility.get("sha256") == _json_sha256(scope)
+    )
+
+
 def _required_features(strategy_cls: type, params: dict[str, Any]) -> tuple[str, ...]:
     raw = getattr(strategy_cls, "required_features", ())
     if isinstance(raw, property):
@@ -317,21 +601,44 @@ def _required_features(strategy_cls: type, params: dict[str, Any]) -> tuple[str,
     return tuple(str(item).strip().lower() for item in tuple(raw or ()) if str(item).strip())
 
 
+def _funding_feature_covered(timestamps: list[int], *, start_ms: int, end_ms: int) -> bool:
+    """Require exactly one finite source row in each nominal settlement window."""
+    interval_ms = FEATURE_POINT_MAX_STALE_MS
+    first_boundary_ms = ((start_ms // interval_ms) + 1) * interval_ms
+    last_boundary_ms = end_ms - (end_ms % interval_ms)
+    return all(
+        sum(
+            boundary_ms <= timestamp <= boundary_ms + BINANCE_FUNDING_SOURCE_JITTER_TOLERANCE_MS
+            for timestamp in timestamps
+        )
+        == 1
+        for boundary_ms in range(first_boundary_ms, last_boundary_ms + 1, interval_ms)
+    )
+
+
 def _preflight_required_features(
     repository: MarketDataRepository,
     *,
     exchange: str,
     symbols: list[str],
     required_features: tuple[str, ...],
+    require_utc_funding: bool = False,
     start: datetime,
     end: datetime,
 ) -> None:
+    if require_utc_funding:
+        required_features = tuple(dict.fromkeys((*required_features, "funding_fee_quote_per_unit")))
     if not required_features:
         return
     unsupported = sorted(set(required_features) - set(FEATURE_COLUMNS))
     if unsupported:
         raise RuntimeError("unsupported required features: " + ",".join(unsupported))
     stale = timedelta(milliseconds=FEATURE_POINT_MAX_STALE_MS)
+    funding_source_jitter = (
+        timedelta(milliseconds=BINANCE_FUNDING_SOURCE_JITTER_TOLERANCE_MS)
+        if any(feature.startswith("funding_") for feature in required_features)
+        else timedelta()
+    )
     start_ms = int(start.replace(tzinfo=UTC).timestamp() * 1000)
     end_ms = int(end.replace(tzinfo=UTC).timestamp() * 1000)
     failures: list[str] = []
@@ -340,7 +647,7 @@ def _preflight_required_features(
             exchange=exchange,
             symbol=symbol,
             start_date=start - stale,
-            end_date=end,
+            end_date=end + funding_source_jitter,
         )
         for feature in required_features:
             timestamps: list[int] = []
@@ -356,6 +663,11 @@ def _preflight_required_features(
                         continue
                     if timestamp is not None and math.isfinite(parsed):
                         timestamps.append(int(timestamp))
+            timestamps = sorted(timestamps)
+            if feature.startswith("funding_"):
+                if not _funding_feature_covered(timestamps, start_ms=start_ms, end_ms=end_ms):
+                    failures.append(f"{symbol}:{feature}")
+                continue
             timestamps = sorted(set(timestamps))
             anchor = max((value for value in timestamps if value <= start_ms), default=None)
             covered = anchor is not None and start_ms - anchor <= FEATURE_POINT_MAX_STALE_MS
@@ -385,6 +697,8 @@ def _run_candidate(
     end: datetime,
     symbol_limits: dict[str, dict[str, float]],
     warmup_bars: int,
+    runtime_config: Any,
+    seed: int,
 ) -> dict[str, Any]:
     data = {
         symbol: _load_with_warmup(
@@ -411,11 +725,27 @@ def _run_candidate(
         exchange=exchange,
         symbols=spec["symbols"],
         required_features=_required_features(strategy_cls, spec["params"]),
+        require_utc_funding=False,
         start=feature_start,
         end=end,
     )
+    # Funding fees are a portfolio accounting input, not strategy formation
+    # data. Warmup signals cannot create portfolio positions, so exact fee
+    # coverage is required from the first live instant rather than over the
+    # strategy's pre-start formation prefix.
+    _preflight_required_features(
+        repository,
+        exchange=exchange,
+        symbols=spec["symbols"],
+        required_features=(),
+        require_utc_funding=True,
+        start=start,
+        end=end,
+    )
 
-    config = get_default_runtime_config()
+    random.seed(seed)
+    np.random.seed(seed)
+    config = deepcopy(runtime_config)
     config.trading.timeframe = spec["timeframe"]
     config.backtest.persist_output = False
     config.risk.attach_default_protective_stop = False
@@ -426,6 +756,9 @@ def _run_candidate(
     config.execution.enforce_reduce_only = True
     config.execution.apply_liquidity_cap_to_conditional_fills = True
     config.live.symbol_limits = {**config.live.symbol_limits, **symbol_limits}
+    funding_settlement_end = end + timedelta(
+        milliseconds=BINANCE_FUNDING_SOURCE_JITTER_TOLERANCE_MS
+    )
     backtest = Backtest(
         "data",
         spec["symbols"],
@@ -435,7 +768,7 @@ def _run_candidate(
         Portfolio,
         strategy_cls,
         strategy_params=spec["params"],
-        end_date=end,
+        end_date=funding_settlement_end,
         data_dict=data,
         record_history=True,
         track_metrics=True,
@@ -449,6 +782,12 @@ def _run_candidate(
         warmup_bars=warmup_bars,
     )
     backtest.simulate_trading(output=False)
+    backtest.portfolio.settle_terminal_funding(funding_settlement_end)
+    pending_liabilities = getattr(backtest.portfolio, "_pending_funding_liabilities", None)
+    if isinstance(pending_liabilities, dict) and any(
+        bool(rows) for rows in pending_liabilities.values()
+    ):
+        raise RuntimeError("terminal pending funding liability lacks settlement evidence")
     return_timestamps, returns = _daily_returns(backtest.portfolio.all_holdings)
     initial_equity = float(backtest.portfolio.initial_capital)
     traded_notional = sum(
@@ -490,7 +829,7 @@ def _run_candidate(
     }
 
 
-def run_suite(
+def _run_suite_into(
     manifest_path: Path,
     data_root: Path,
     output_dir: Path,
@@ -501,6 +840,8 @@ def run_suite(
     purpose: str = "selection",
     warmup_bars: int = 400,
     selection_artifact: Path | None = None,
+    seed: int = 0,
+    published_output_dir: Path | None = None,
 ) -> dict[str, Any]:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     candidates = manifest.get("candidates") if isinstance(manifest, dict) else None
@@ -512,7 +853,37 @@ def run_suite(
         raise ValueError("purpose must be 'selection' or 'locked_oos'")
     if warmup_bars < 0:
         raise ValueError("warmup_bars must be nonnegative")
-    lineage = _lineage(manifest, manifest_path)
+    if type(seed) is not int or seed < 0 or seed > 2**32 - 1:
+        raise ValueError("seed must be an integer in [0, 2**32 - 1]")
+    if output_dir.exists():
+        raise ValueError(f"output target already exists: {output_dir}")
+    if not all(isinstance(candidate, dict) for candidate in candidates):
+        raise ValueError("manifest candidates must contain only objects")
+    candidate_ids = [str(candidate.get("candidate_id") or "") for candidate in candidates]
+    if not all(candidate_ids):
+        raise ValueError("candidate_id values must be non-empty")
+    if len(candidate_ids) != len(set(candidate_ids)):
+        raise ValueError("duplicate candidate_id")
+    sleeves = manifest.get("sleeves", {})
+    if not isinstance(sleeves, dict):
+        raise ValueError("manifest sleeves must be an object")
+    sleeve_ids = set(sleeves)
+    if not all(isinstance(sleeve_id, str) and sleeve_id for sleeve_id in sleeve_ids):
+        raise ValueError("manifest sleeve IDs must be non-empty strings")
+    unknown_sleeves = sorted(sleeve_ids - set(candidate_ids))
+    if unknown_sleeves:
+        raise ValueError("manifest sleeves lack candidates: " + ", ".join(unknown_sleeves))
+    cost_profile, runtime_config, runtime_defaults = _cost_profile()
+    lineage = _lineage(
+        manifest,
+        manifest_path,
+        exchange=exchange,
+        warmup_bars=warmup_bars,
+        seed=seed,
+        cost_profile=cost_profile,
+        runtime_defaults=runtime_defaults,
+        data_inventory=_data_inventory(data_root),
+    )
     receipt_as_of = _datetime(str(lineage["universe"]["receipt"].get("as_of")))
     if receipt_as_of > start:
         raise ValueError("universe receipt as_of must be at or before runner start")
@@ -523,20 +894,20 @@ def run_suite(
         selection = _load_selection_artifact(
             selection_artifact, lineage=lineage, locked_start=start
         )
-    candidate_ids = [
-        str(candidate.get("candidate_id") or "")
-        for candidate in candidates
-        if isinstance(candidate, dict)
-    ]
-    if len(candidate_ids) != len(set(candidate_ids)):
-        raise ValueError("duplicate candidate_id")
-
-    output_dir.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True)
     repository = MarketDataRepository(str(data_root))
     symbol_limits = _symbol_limits_from_manifest(manifest)
     results: list[dict[str, Any]] = []
     receipt_disabled = lineage["universe"]["receipt"].get("disabled_candidates", {})
-    receipt_disabled = receipt_disabled if isinstance(receipt_disabled, dict) else {}
+    if not isinstance(receipt_disabled, dict):
+        raise ValueError("universe receipt disabled_candidates must be an object")
+    disabled_candidate_ids = {
+        str(candidate["candidate_id"])
+        for candidate in candidates
+        if candidate.get("enabled") is False
+    }
+    if set(receipt_disabled) != disabled_candidate_ids:
+        raise ValueError("universe receipt disabled_candidates must match disabled candidates")
     for index, candidate in enumerate(candidates):
         fallback_id = (
             str(candidate.get("candidate_id") or f"candidate_{index:03d}")
@@ -546,9 +917,20 @@ def run_suite(
         if isinstance(candidate, dict) and candidate.get("enabled") is False:
             reason = str(candidate.get("disabled_reason") or "disabled by manifest")
             expected = receipt_disabled.get(fallback_id)
-            allowed_exclusion = isinstance(
-                expected, list
-            ) and reason == "outside point-in-time universe: " + ", ".join(expected)
+            allowed_exclusion = _allowed_disabled_candidate(
+                candidate_id=fallback_id,
+                reason=reason,
+                expected=expected,
+                receipt=lineage["universe"]["receipt"],
+                start=start,
+                warmup_bars=warmup_bars,
+                data_inventory_sha256=lineage["data_inventory"]["sha256"],
+                candidate_symbols=candidate.get("symbols"),
+                candidate_timeframe=candidate.get("timeframe")
+                or candidate.get("strategy_timeframe"),
+            )
+            if not allowed_exclusion:
+                raise ValueError(f"invalid disabled candidate exclusion: {fallback_id}")
             result = {
                 "candidate_id": fallback_id,
                 "status": "skip",
@@ -560,9 +942,7 @@ def run_suite(
                 **({"returns_are_net": True} if purpose == "locked_oos" else {}),
             }
             artifact = output_dir / _artifact_name(index, fallback_id)
-            artifact.write_text(
-                json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-            )
+            _publish_json(artifact, result)
             results.append({**result, "artifact": artifact.name})
             continue
         try:
@@ -575,6 +955,8 @@ def run_suite(
                 end=end,
                 symbol_limits=symbol_limits,
                 warmup_bars=warmup_bars,
+                runtime_config=runtime_config,
+                seed=seed,
             )
         except Exception as exc:
             result = {
@@ -588,14 +970,21 @@ def run_suite(
                 **({"returns_are_net": True} if purpose == "locked_oos" else {}),
             }
         artifact = output_dir / _artifact_name(index, fallback_id)
-        artifact.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        _publish_json(artifact, result)
         results.append({**result, "artifact": artifact.name})
 
     allocator = manifest.get("allocator")
     allocator = allocator if isinstance(allocator, dict) else {}
     min_sleeves = int(manifest.get("min_sleeves", allocator.get("min_sleeves", 1)))
     min_families = int(manifest.get("min_families", allocator.get("min_families", 1)))
-    passed_families = {str(row.get("family") or "") for row in results if row["status"] == "pass"}
+    results_by_id = {row["candidate_id"]: row for row in results}
+    reconciliation_complete = set(results_by_id) == set(candidate_ids) and len(results) == len(
+        candidate_ids
+    )
+    sleeve_results = [results_by_id[sleeve_id] for sleeve_id in sorted(sleeve_ids)]
+    passed_families = {
+        str(row.get("family") or "") for row in sleeve_results if row["status"] == "pass"
+    }
     disallowed_skips = [
         row["candidate_id"]
         for row in results
@@ -608,12 +997,16 @@ def run_suite(
     }
     exclusion_contract_complete = allowed_exclusion_ids == set(receipt_disabled)
     portfolio_ready = (
-        not any(row["status"] == "fail" for row in results)
-        and not disallowed_skips
+        reconciliation_complete
+        and not any(row["status"] == "fail" for row in sleeve_results)
+        and not (set(disallowed_skips) & sleeve_ids)
         and exclusion_contract_complete
-        and sum(row["status"] == "pass" for row in results) >= min_sleeves
+        and sum(row["status"] == "pass" for row in sleeve_results) >= min_sleeves
         and len(passed_families) >= min_families
     )
+    final_data_inventory = _data_inventory(data_root)
+    if final_data_inventory != lineage["data_inventory"]:
+        raise ValueError("data inventory changed during named suite execution")
     summary = {
         "suite_id": manifest.get("suite_id"),
         "purpose": purpose,
@@ -637,10 +1030,15 @@ def run_suite(
             "allowed_exclusion_count": len(allowed_exclusion_ids),
             "complete": exclusion_contract_complete,
         },
+        "candidate_reconciliation": {
+            "manifest_candidate_count": len(candidate_ids),
+            "result_candidate_count": len(results_by_id),
+            "complete": reconciliation_complete,
+        },
         "readiness": {
             "portfolio_ready": portfolio_ready,
             "min_sleeves": min_sleeves,
-            "passing_sleeves": sum(row["status"] == "pass" for row in results),
+            "passing_sleeves": sum(row["status"] == "pass" for row in sleeve_results),
             "min_families": min_families,
             "passing_families": len(passed_families),
         },
@@ -658,10 +1056,8 @@ def run_suite(
             "manifest_sha256": selection["lineage"]["suite"]["manifest_sha256"],
             "universe_receipt_sha256": selection["lineage"]["universe"]["receipt_sha256"],
         }
-    (output_dir / "suite_results.json").write_text(
-        json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
     summary_path = output_dir / "suite_results.json"
+    _publish_json(summary_path, summary)
     if purpose == "locked_oos":
         return summary
 
@@ -697,20 +1093,33 @@ def run_suite(
                     "returns_are_net": True,
                     "turnover": result["turnover"],
                     "run_status": "pass",
-                    "returns_source": {
+                    "returns_source": {"splits": ["train", "validation"]},
+                    "uses_locked_oos_for_selection": False,
+                    "uses_locked_oos_for_sizing": False,
+                    "returns_lineage": {
                         "artifact": "named_quant_data_pc_walkforward",
                         "candidate_id": result["candidate_id"],
                         "stream": "daily UTC net returns over the caller-supplied selection window",
-                        "selection_inputs": ["train", "validation"],
                         "uses_locked_oos_for_selection": False,
                         "uses_locked_oos_for_sizing": False,
                     },
+                    "fit_start": result["return_timestamps"][0],
+                    "fit_end": result["return_timestamps"][-1],
+                    "as_of": end.isoformat(),
+                    "apply_start": end.isoformat(),
                 }
             )
+    allocation_sleeves = allocation_input.get("sleeves", {})
+    allocation_sleeves = allocation_sleeves if isinstance(allocation_sleeves, dict) else {}
+    return_panel_sha256_by_sleeve = {
+        sleeve_id: _materialized_return_panel_sha256(sleeve_id, sleeve)
+        for sleeve_id, sleeve in allocation_sleeves.items()
+        if sleeve.get("returns")
+    }
     allocation_input["source_artifacts"] = [
         {
             "id": "named_quant_data_pc_walkforward",
-            "path": str(summary_path.resolve()),
+            "path": str(((published_output_dir or output_dir) / "suite_results.json").resolve()),
             "sha256": hashlib.sha256(summary_path.read_bytes()).hexdigest(),
             "max_age_hours": 8760,
             "ready": portfolio_ready,
@@ -720,12 +1129,55 @@ def run_suite(
             "selection_period": summary["period"],
             "lineage": lineage,
             "frozen_at": summary["period"]["end"],
+            "return_panel_sha256_by_sleeve": return_panel_sha256_by_sleeve,
         }
     ]
-    (output_dir / "allocation_input.json").write_text(
-        json.dumps(allocation_input, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
+    _publish_json(output_dir / "allocation_input.json", allocation_input)
     return summary
+
+
+def run_suite(
+    manifest_path: Path,
+    data_root: Path,
+    output_dir: Path,
+    *,
+    exchange: str,
+    start: datetime,
+    end: datetime,
+    purpose: str = "selection",
+    warmup_bars: int = 400,
+    selection_artifact: Path | None = None,
+    seed: int = 0,
+) -> dict[str, Any]:
+    output_dir = output_dir.resolve()
+    if output_dir.exists() or output_dir.is_symlink():
+        raise ValueError(f"output target already exists: {output_dir}")
+    output_dir.parent.mkdir(parents=True, exist_ok=True)
+    staging_parent = Path(
+        tempfile.mkdtemp(
+            prefix=f".{output_dir.name}.staging-",
+            dir=output_dir.parent,
+        )
+    )
+    staging_output = staging_parent / "run"
+    try:
+        summary = _run_suite_into(
+            manifest_path,
+            data_root,
+            staging_output,
+            exchange=exchange,
+            start=start,
+            end=end,
+            purpose=purpose,
+            warmup_bars=warmup_bars,
+            selection_artifact=selection_artifact,
+            seed=seed,
+            published_output_dir=output_dir,
+        )
+        _rename_noreplace(staging_output, output_dir)
+        return summary
+    finally:
+        shutil.rmtree(staging_parent, ignore_errors=True)
 
 
 def main() -> None:
@@ -743,6 +1195,7 @@ def main() -> None:
         help="selection emits allocator input; locked_oos never does",
     )
     parser.add_argument("--selection-artifact", type=Path)
+    parser.add_argument("--seed", type=int, default=0)
     parser.add_argument(
         "--warmup-bars",
         type=int,
@@ -760,6 +1213,7 @@ def main() -> None:
         purpose=args.purpose,
         warmup_bars=args.warmup_bars,
         selection_artifact=args.selection_artifact,
+        seed=args.seed,
     )
     raise SystemExit(0 if summary["readiness"]["portfolio_ready"] else 1)
 

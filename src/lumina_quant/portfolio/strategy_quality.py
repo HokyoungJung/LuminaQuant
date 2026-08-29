@@ -282,8 +282,6 @@ class StrategyQualityOverlay:
         component_old_qty: float | None = None,
         component_new_qty: float | None = None,
     ) -> None:
-        if fill_price <= 0.0:
-            return
         symbol = str(getattr(fill, "symbol", ""))
         if self.min_hold_bars > 0 and symbol:
             if component_id and component_old_qty is not None and component_new_qty is not None:
@@ -295,6 +293,8 @@ class StrategyQualityOverlay:
                 )
             else:
                 self._note_min_hold_fill(symbol, float(old_qty), float(new_qty))
+        if fill_price <= 0.0:
+            return
         if not self.enabled:
             return
         notional = abs(float(getattr(fill, "quantity", 0.0) or 0.0)) * float(fill_price)
@@ -388,6 +388,7 @@ class StrategyQualityOverlay:
             if str(metadata.get("exit_reason") or "").strip().lower() in _PROTECTIVE_EXIT_REASONS:
                 return ""
             record["exit_pending"] = True
+            record["exit_state"] = "PENDING"
             record["pending_strategy_id"] = str(getattr(signal, "strategy_id", "") or "overlay")
             record["pending_metadata"] = {
                 str(k): v
@@ -405,6 +406,27 @@ class StrategyQualityOverlay:
             return "min_hold_reversal_block"
         return ""
 
+    def mark_pending_exit_state(self, key: str, state: str) -> None:
+        """Persist the latest dispatch outcome without clearing a live exit intent."""
+        record = self._min_hold_entries.get(str(key))
+        if record is not None and record.get("exit_pending"):
+            record["exit_state"] = str(state).strip().upper() or "PENDING"
+
+    def reconcile_min_hold_positions(
+        self,
+        positions: dict[str, Any],
+        component_positions: dict[str, Any],
+    ) -> None:
+        """Drop intents only when the authoritative book is flat."""
+        for key in tuple(self._min_hold_entries):
+            component_token, _, symbol = key.partition("|")
+            if component_token == "__net__":
+                qty = _safe_float(positions.get(symbol))
+            else:
+                qty = _safe_float(dict(component_positions.get(component_token) or {}).get(symbol))
+            if qty is None or abs(qty) < 1e-12:
+                self._min_hold_entries.pop(key, None)
+
     def pop_matured_pending_exits(self) -> list[dict[str, Any]]:
         """Release deferred bare EXITs whose min-hold has matured.
 
@@ -412,7 +434,7 @@ class StrategyQualityOverlay:
         ``component_id`` ("" for the net book), ``strategy_id``, and the
         preserved signal ``metadata``.  The caller (Portfolio.update_timeindex)
         synthesizes EXIT SignalEvents from these; the ledger record itself
-        stays until the closing fill removes it via ``note_fill``.
+        stays until the authoritative closing fill removes it via ``note_fill``.
         """
         if self.min_hold_bars <= 0 or not self._min_hold_entries:
             return []
@@ -426,16 +448,19 @@ class StrategyQualityOverlay:
             if self.bar_index - int(entry_bar) < self.min_hold_bars:
                 continue
             component_token, _, symbol = key.partition("|")
-            record["exit_pending"] = False
             metadata = dict(record.get("pending_metadata") or {})
-            record.pop("pending_metadata", None)
-            strategy_id = str(record.pop("pending_strategy_id", "") or "overlay")
+            strategy_id = str(record.get("pending_strategy_id", "") or "overlay")
+            client_order_id = str(
+                record.setdefault("pending_client_order_id", f"min-hold-exit:{key}")
+            )
             released.append(
                 {
+                    "key": key,
                     "symbol": symbol,
                     "component_id": "" if component_token == "__net__" else component_token,
                     "strategy_id": strategy_id,
                     "metadata": metadata,
+                    "client_order_id": client_order_id,
                 }
             )
         return released

@@ -121,6 +121,12 @@ def test_min_hold_defaults_are_byte_identical() -> None:
     assert decision.blocked_reason == ""
 
 
+def test_min_hold_ledger_records_fill_without_price_diagnostics() -> None:
+    overlay = _overlay(min_hold_bars=3)
+    overlay.note_fill(_fill(), old_qty=0.0, new_qty=1.0, fill_price=0.0)
+    assert overlay.get_state()["min_hold_entries"]["__net__|BTC/USDT"]["entry_bar"] == 0
+
+
 def test_min_hold_blocks_bare_exit_then_releases_at_hold() -> None:
     overlay = _overlay(min_hold_bars=3)
     _enter_long(overlay)
@@ -183,8 +189,30 @@ def test_min_hold_defers_blocked_exit_and_releases_at_maturity() -> None:
     assert released[0]["symbol"] == SYMBOL
     assert released[0]["component_id"] == ""
     assert released[0]["metadata"].get("exit_fraction") == 1.0
-    # One-shot: a second pop returns nothing.
-    assert overlay.pop_matured_pending_exits() == []
+    # Unfilled/rejected dispatches retry with the same idempotency key until an
+    # authoritative fill proves the book flat.
+    retry = overlay.pop_matured_pending_exits()
+    assert len(retry) == 1
+    assert retry[0]["client_order_id"] == released[0]["client_order_id"]
+    assert overlay.get_state()["min_hold_entries"]["__net__|BTC/USDT"]["exit_pending"] is True
+
+
+def test_min_hold_pending_lifecycle_survives_restart_until_book_is_flat() -> None:
+    overlay = _overlay(min_hold_bars=1)
+    _enter_long(overlay)
+    assert _apply(overlay, _signal("EXIT")).signal is None
+    overlay.next_bar(datetime(2026, 1, 1, tzinfo=UTC))
+    pending = overlay.pop_matured_pending_exits()[0]
+    overlay.mark_pending_exit_state(pending["key"], "REJECTED")
+
+    restored = _overlay(min_hold_bars=1)
+    restored.set_state(overlay.get_state())
+    retry = restored.pop_matured_pending_exits()[0]
+    assert retry["client_order_id"] == pending["client_order_id"]
+    restored.mark_pending_exit_state(pending["key"], "CANCELLED")
+    assert _apply(restored, _signal("LONG")).blocked_reason == "min_hold_exit_pending"
+    restored.reconcile_min_hold_positions({SYMBOL: 0.0}, {})
+    assert restored.pop_matured_pending_exits() == []
 
 
 def test_min_hold_release_survives_state_roundtrip() -> None:
@@ -345,6 +373,7 @@ def test_no_trade_band_full_exit_exempt_partial_exit_blocked() -> None:
 def _guard_portfolio(now, **config_overrides):
     config = _PortfolioConfig()
     config.FUNDING_ENTRY_GUARD = True
+    config.FUNDING_ON_UTC_BOUNDARY = True
     for key, value in config_overrides.items():
         setattr(config, key, value)
     return Portfolio(
@@ -394,9 +423,9 @@ def test_funding_guard_passes_holds_at_or_above_interval() -> None:
     assert order is not None
 
 
-def test_funding_guard_never_blocks_undeclared_or_exit_signals() -> None:
+def test_funding_guard_fails_closed_for_missing_hold_metadata_but_not_exits() -> None:
     portfolio = _guard_portfolio(datetime(2026, 1, 1, 7, 59, tzinfo=UTC))
-    assert portfolio.generate_order_from_signal(_signal("LONG")) is not None
+    assert portfolio.generate_order_from_signal(_signal("LONG")) is None
 
     portfolio.update_fill(
         FillEvent(
@@ -413,6 +442,22 @@ def test_funding_guard_never_blocks_undeclared_or_exit_signals() -> None:
         _signal("EXIT", metadata={"intended_hold_seconds": 60})
     )
     assert exit_order is not None
+
+
+def test_funding_guard_requires_utc_boundary_mode_and_finite_metadata() -> None:
+    now = datetime(2026, 1, 1, 0, 10, tzinfo=UTC)
+    assert (
+        _guard_portfolio(now, FUNDING_ON_UTC_BOUNDARY=False).generate_order_from_signal(
+            _signal("LONG", metadata={"intended_hold_seconds": 60})
+        )
+        is None
+    )
+    assert (
+        _guard_portfolio(now).generate_order_from_signal(
+            _signal("LONG", metadata={"intended_hold_seconds": float("nan")})
+        )
+        is None
+    )
 
 
 def test_funding_guard_intended_hold_bars_uses_config_timeframe() -> None:

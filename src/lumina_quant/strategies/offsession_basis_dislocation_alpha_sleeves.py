@@ -114,7 +114,6 @@ from lumina_quant.strategies.external_alpha_sleeves import (
     _Snapshot,
     _emit,
     _event_datetime_utc,
-    _event_symbols,
     _extract_feature,
     _market_snapshot,
     _safe_non_negative_int,
@@ -195,6 +194,11 @@ class _State:
     score: float | None = None
     # Epoch (seconds) of the last ACCEPTED bar -- staleness gate input.
     last_bar_epoch: float | None = None
+    # The most recent cash mark, retained until that UTC cash session completes.
+    cash_session_date: str | None = None
+    cash_session_basis_bps: float | None = None
+    # Session date whose closing cash mark is the active off-session baseline.
+    baseline_session_date: str | None = None
 
 
 @register("strategy", "OffSessionBasisDislocationStrategy", interface="event_driven")
@@ -354,6 +358,9 @@ class OffSessionBasisDislocationStrategy(Strategy):
                     "last_time_key": item.last_time_key,
                     "score": item.score,
                     "last_bar_epoch": item.last_bar_epoch,
+                    "cash_session_date": item.cash_session_date,
+                    "cash_session_basis_bps": item.cash_session_basis_bps,
+                    "baseline_session_date": item.baseline_session_date,
                 }
                 for symbol, item in self._state.items()
             },
@@ -393,6 +400,13 @@ class OffSessionBasisDislocationStrategy(Strategy):
                 item.last_time_key = str(payload.get("last_time_key", ""))
                 item.score = safe_float(payload.get("score"))
                 item.last_bar_epoch = safe_float(payload.get("last_bar_epoch"))
+                cash_date = payload.get("cash_session_date")
+                item.cash_session_date = str(cash_date) if cash_date is not None else None
+                item.cash_session_basis_bps = safe_float(payload.get("cash_session_basis_bps"))
+                baseline_date = payload.get("baseline_session_date")
+                item.baseline_session_date = (
+                    str(baseline_date) if baseline_date is not None else None
+                )
             except Exception:
                 continue
 
@@ -472,9 +486,17 @@ class OffSessionBasisDislocationStrategy(Strategy):
         basis = basis_bps(mark, index)
         cls = self._classify_hour(dt)
         if cls == "CASH":
-            # Cash discovery re-anchors the perp: reset the episode accumulator.
-            item.off_accum_bps = 0.0
-            item.off_obs = 0
+            # Cache marks while cash is open.  The baseline is deliberately
+            # committed once, at the following OFF bar, rather than repeatedly
+            # treating every cached cash mark as a new session close.
+            session_date = dt.date().isoformat()
+            if item.cash_session_date != session_date:
+                item.cash_session_date = session_date
+                item.cash_session_basis_bps = None
+                item.off_accum_bps = 0.0
+                item.off_obs = 0
+            if basis is not None:
+                item.cash_session_basis_bps = basis
             item.prev_basis_bps = basis
         elif basis is None:
             # Stale/missing mark or index: invalidate the anchor so the gap
@@ -484,6 +506,21 @@ class OffSessionBasisDislocationStrategy(Strategy):
             # Boundary-hour drop: re-anchor without accruing.
             item.prev_basis_bps = basis
         else:  # OFF
+            # Promote the final cash mark only after its UTC cash session has
+            # completed.  This prevents a pre-open OFF print from assigning a
+            # same-date (still incomplete) cash mark as its anchor.
+            cash_date = item.cash_session_date
+            if (
+                cash_date is not None
+                and item.cash_session_basis_bps is not None
+                and item.baseline_session_date != cash_date
+                and (
+                    dt.date().isoformat() > cash_date
+                    or (dt.date().isoformat() == cash_date and dt.hour >= self.cash_end_hour_utc)
+                )
+            ):
+                item.baseline_session_date = cash_date
+                item.prev_basis_bps = item.cash_session_basis_bps
             if item.prev_basis_bps is not None:
                 item.off_accum_bps += basis - item.prev_basis_bps
                 item.off_obs += 1
@@ -495,14 +532,26 @@ class OffSessionBasisDislocationStrategy(Strategy):
 
     def calculate_signals_window(self, event: Any, aggregator: Any = None) -> None:
         _ = aggregator
-        self._age_book(getattr(event, "time", None))
-        updated = False
-        for symbol in _event_symbols(event, self.symbol_list):
+        event_time = getattr(event, "time", None)
+        event_key = time_key(event_time)
+        event_dt = _event_datetime_utc(event_time)
+        if not event_key or event_dt is None:
+            return
+        # Rebalances require a complete panel from this one event timestamp;
+        # a cached leg is not an observation at the decision time.
+        snapshots: dict[str, _Snapshot] = {}
+        for symbol in self.symbol_list:
             snapshot = _window_snapshot(event, symbol)
-            if snapshot is not None and self._update_symbol(symbol, snapshot, event):
-                updated = True
+            if snapshot is None or _event_datetime_utc(snapshot.time) != event_dt:
+                return
+            snapshots[symbol] = snapshot
+        self._age_book(event_time)
+        updated = False
+        for symbol, snapshot in snapshots.items():
+            updated = self._update_symbol(symbol, snapshot, event) or updated
+            self._state[symbol].last_time_key = event_key
         if updated:
-            self._maybe_evaluate(getattr(event, "time", None))
+            self._maybe_evaluate(event_time)
 
     def calculate_signals(self, event: Any) -> None:
         if str(getattr(event, "type", "")).upper() == "MARKET_WINDOW":
@@ -517,7 +566,9 @@ class OffSessionBasisDislocationStrategy(Strategy):
                 return
             self._age_book(snapshot.time)
             if self._update_symbol(str(symbol), snapshot, event):
-                self._maybe_evaluate(snapshot.time)
+                # Individual MARKET updates can learn state but never form a
+                # cross-sectional rebalance snapshot.
+                return
 
     # ------------------------------------------------------------------ #
     # pre-reopen decision clock

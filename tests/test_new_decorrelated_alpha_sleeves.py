@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import math
+from types import SimpleNamespace
 
 import pytest
 
@@ -20,6 +22,10 @@ from lumina_quant.strategies.registry import (
     get_strategy_param_schema,
 )
 from lumina_quant.strategy_factory import build_binance_futures_candidates
+from lumina_quant.strategies.cross_sectional_anomaly_alpha_sleeves import (
+    IdiosyncraticVolatilityStrategy,
+    LotterySkewnessStrategy,
+)
 
 
 NEW_ALPHA_STRATEGIES = (
@@ -35,6 +41,180 @@ NEW_ALPHA_STRATEGIES = (
     "DualMomentumIndexRotationStrategy",
     "CalendarSeasonalityOverlayStrategy",
 )
+
+
+class _CrossBars:
+    def __init__(self, symbols: list[str]) -> None:
+        self.symbol_list = symbols
+
+
+class _CrossEvents:
+    def put(self, item: object) -> None:
+        _ = item
+
+
+def _cross_window(time: str | None, closes: dict[str, float]) -> SimpleNamespace:
+    return SimpleNamespace(
+        type="MARKET_WINDOW",
+        time=time,
+        bars_1s={
+            symbol: [{"time": time, "close": close, "volume": 1.0}]
+            for symbol, close in closes.items()
+        },
+    )
+
+
+def test_cross_section_windows_reject_skew_and_duplicate_rows_atomically():
+    symbols = ["BTC/USDT", "ETH/USDT"]
+    strategy = IdiosyncraticVolatilityStrategy(
+        _CrossBars(symbols), _CrossEvents(), benchmark_symbol="BTC/USDT", min_symbols=2
+    )
+    skewed = SimpleNamespace(
+        type="MARKET_WINDOW",
+        time="2026-08-20T00:00:00+00:00",
+        bars_1s={
+            "BTC/USDT": [{"time": "2026-08-20T00:00:00+00:00", "close": 100.0}],
+            "ETH/USDT": [{"time": "2026-08-20T00:01:00+00:00", "close": 100.0}],
+        },
+    )
+    strategy.calculate_signals(skewed)
+    assert all(not item.closes for item in strategy._state.values())
+
+    duplicate = SimpleNamespace(
+        type="MARKET_WINDOW",
+        time="2026-08-20T00:00:00+00:00",
+        bars_1s={
+            "BTC/USDT": [
+                {"time": "2026-08-20T00:00:00+00:00", "close": 100.0},
+                {"time": "2026-08-20T00:00:00+00:00", "close": 101.0},
+            ],
+            "ETH/USDT": [{"time": "2026-08-20T00:00:00+00:00", "close": 100.0}],
+        },
+    )
+    strategy.calculate_signals(duplicate)
+    assert all(not item.closes for item in strategy._state.values())
+
+    aligned = SimpleNamespace(
+        type="MARKET_WINDOW",
+        time="2026-08-20T00:00:00+00:00",
+        bars_1s={
+            symbol: [{"time": "2026-08-20T00:00:00+00:00", "close": 100.0}] for symbol in symbols
+        },
+    )
+    strategy.calculate_signals(aligned)
+    strategy.calculate_signals(aligned)
+    assert all(len(item.closes) == 1 for item in strategy._state.values())
+
+
+def test_lottery_max_uses_completed_timestamp_grouped_daily_returns():
+    strategy = LotterySkewnessStrategy(
+        _CrossBars(["A", "B"]), _CrossEvents(), skew_window=3, max_window=2, min_symbols=2
+    )
+    closes = [95.0, 100.0, 110.0, 115.5, 1_000.0]
+    keys = [
+        "2026-08-18T00:00:00+00:00",
+        "2026-08-18T12:00:00+00:00",
+        "2026-08-19T00:00:00+00:00",
+        "2026-08-20T00:00:00+00:00",
+        "2026-08-21T00:00:00+00:00",
+    ]
+    scored = strategy._lottery_score(closes, keys)
+    assert scored is not None
+    assert scored[1]["max_daily_return"] == pytest.approx(0.10)
+
+
+def test_cross_section_history_requires_new_complete_order_independent_windows() -> None:
+    symbols = ["BTC/USDT", "ETH/USDT"]
+    strategy = IdiosyncraticVolatilityStrategy(
+        _CrossBars(symbols), _CrossEvents(), benchmark_symbol="BTC/USDT", min_symbols=2
+    )
+    current = _cross_window("2026-08-20T00:00:00+00:00", {"BTC/USDT": 100.0, "ETH/USDT": 101.0})
+    strategy.calculate_signals(current)
+    baseline = strategy.get_state()
+
+    # Older, unkeyed, and partial windows cannot move the panel or evaluation
+    # clock. A single-symbol callback cannot fill the rejected partial panel.
+    strategy.calculate_signals(
+        _cross_window("2026-08-19T00:00:00+00:00", {"BTC/USDT": 99.0, "ETH/USDT": 100.0})
+    )
+    strategy.calculate_signals(_cross_window(None, {"BTC/USDT": 99.0, "ETH/USDT": 100.0}))
+    strategy.calculate_signals(_cross_window("2026-08-21T00:00:00+00:00", {"BTC/USDT": 102.0}))
+    strategy.calculate_signals(
+        SimpleNamespace(
+            type="MARKET",
+            symbol="ETH/USDT",
+            time="2026-08-21T00:00:00+00:00",
+            close=1_000.0,
+            volume=1.0,
+        )
+    )
+    assert strategy.get_state() == baseline
+
+    # Mapping insertion order is irrelevant once every configured name has one
+    # exact-time row; the whole panel commits at once.
+    strategy.calculate_signals(
+        _cross_window("2026-08-21T00:00:00+00:00", {"ETH/USDT": 102.0, "BTC/USDT": 101.0})
+    )
+    assert strategy._last_eval_time_key > baseline["last_eval_time_key"]
+    assert {len(item.closes) for item in strategy._state.values()} == {2}
+
+
+def test_lottery_daily_state_roundtrip_continues_without_open_day_max() -> None:
+    symbols = ["A", "B"]
+    original = LotterySkewnessStrategy(
+        _CrossBars(symbols), _CrossEvents(), skew_window=3, max_window=2, min_symbols=2
+    )
+    for day, close in enumerate((100.0, 110.0, 115.5, 120.0), start=18):
+        original.calculate_signals(
+            _cross_window(
+                f"2026-08-{day}T12:00:00+00:00",
+                {"A": close, "B": close * 1.01},
+            )
+        )
+    state = original.get_state()
+    assert json.loads(json.dumps(state)) == state
+    restored = LotterySkewnessStrategy(
+        _CrossBars(symbols), _CrossEvents(), skew_window=3, max_window=2, min_symbols=2
+    )
+    restored.set_state(state)
+    assert restored.get_state() == state
+
+    continuation = _cross_window("2026-08-22T12:00:00+00:00", {"A": 1_000.0, "B": 1_010.0})
+    original.calculate_signals(continuation)
+    restored.calculate_signals(continuation)
+    assert restored.get_state() == original.get_state()
+    assert original._lottery_score(
+        list(original._state["A"].closes),
+        list(original._close_times["A"]),
+        list(original._completed_daily_closes["A"]),
+    )[1]["max_daily_return"] == pytest.approx(0.05)
+
+
+def test_idiosyncratic_vol_rejects_sparse_unmatched_benchmark_panel():
+    symbols = ["BTC/USDT", "A", "B"]
+    strategy = IdiosyncraticVolatilityStrategy(
+        _CrossBars(symbols),
+        _CrossEvents(),
+        benchmark_symbol="BTC/USDT",
+        beta_window=4,
+        vol_window=2,
+        rebalance_bars=1,
+        min_symbols=2,
+    )
+    for symbol in symbols:
+        strategy._state[symbol].closes.extend([100.0, 101.0, 99.0, 102.0, 103.0])
+    strategy._close_times["BTC/USDT"].extend(
+        [f"2026-08-{day:02d}T00:00:00+00:00" for day in range(1, 6)]
+    )
+    strategy._close_times["A"].extend(
+        [f"2026-08-{day:02d}T00:00:00+00:00" for day in (1, 2, 4, 5, 6)]
+    )
+    strategy._close_times["B"].extend(
+        [f"2026-08-{day:02d}T00:00:00+00:00" for day in (1, 2, 3, 5, 6)]
+    )
+    strategy._tick = 1
+    strategy._rebalance("2026-08-06T00:00:00+00:00")
+    assert all(item.mode == "OUT" for item in strategy._state.values())
 
 
 def test_new_rolling_stats_primitives_handle_core_math_and_guards():
@@ -85,7 +265,7 @@ def test_new_rolling_stats_primitives_handle_core_math_and_guards():
     assert z_window.zscore(4.0) == pytest.approx((4.0 - 2.0) / math.sqrt(2.0 / 3.0))
 
     restored = RollingZScoreWindow(3)
-    restored.load_state(z_window.to_state()["values"])
+    restored.load_state(z_window.to_state())
     assert restored.to_state() == z_window.to_state()
 
 

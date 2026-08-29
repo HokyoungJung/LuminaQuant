@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import math
+from datetime import UTC, datetime, timedelta
 
 import numpy as np
 import pytest
 
 from lumina_quant.portfolio.quality_gated_allocation import (
+    _materialized_return_panel_sha256,
     allocate_quality_gated,
     build_allocation_manifest,
 )
@@ -44,14 +46,10 @@ def test_target_vol_exposure_matches_hand_math_and_caps_at_max_leverage() -> Non
         _EQUAL, _IDS, matrix, spec={"method": "target_vol", "sigma_target_per_bar": sigma}
     )
     assert at_cap.exposure == pytest.approx(1.0)
-    # max_leverage raises the cap (borrowing allowed only when declared).
-    levered = compute_risk_scaling(
-        _EQUAL,
-        _IDS,
-        matrix,
-        spec={"method": "target_vol", "sigma_target_per_bar": sigma * 2, "max_leverage": 1.5},
-    )
-    assert levered.exposure == pytest.approx(1.5)
+    with pytest.raises(ValueError, match="financing"):
+        resolve_risk_scaling_spec(
+            {"method": "target_vol", "sigma_target_per_bar": sigma * 2, "max_leverage": 1.5}
+        )
     # target_vol consumes NO mu estimate: shifting every mean leaves L unchanged.
     shifted = matrix + 0.05
     assert compute_risk_scaling(_EQUAL, _IDS, shifted, spec=spec).exposure == pytest.approx(
@@ -80,13 +78,12 @@ def test_fractional_kelly_is_gated_and_matches_mu_over_variance() -> None:
         "method": "fractional_kelly",
         "fraction": 0.5,
         "mu_evidence_confirmed": True,
-        "max_leverage": 20.0,
     }
     result = compute_risk_scaling(_EQUAL, _IDS, matrix, spec=spec)
     stream = matrix @ (np.ones(3) / 3)
     mu = float(np.mean(stream))
     var = float(np.std(stream, ddof=1)) ** 2
-    assert result.exposure == pytest.approx(min(20.0, 0.5 * mu / var), abs=1e-9)
+    assert result.exposure == pytest.approx(min(1.0, 0.5 * mu / var), abs=1e-9)
     assert result.diagnostics["full_kelly_exposure"] == pytest.approx(mu / var, abs=1e-9)
     # Negative expected excess return -> zero risky exposure, never short.
     losing = compute_risk_scaling(
@@ -100,7 +97,9 @@ def test_fractional_kelly_is_gated_and_matches_mu_over_variance() -> None:
 
 def test_kelly_mu_sensitivity_is_linear_while_target_vol_is_invariant() -> None:
     matrix = _panel()
-    sens = kelly_mu_sensitivity(_EQUAL, _IDS, matrix, fraction=0.5, max_leverage=50.0)
+    with pytest.raises(ValueError, match="financing"):
+        kelly_mu_sensitivity(_EQUAL, _IDS, matrix, fraction=0.5, max_leverage=50.0)
+    sens = kelly_mu_sensitivity(_EQUAL, _IDS, matrix, fraction=0.01, max_leverage=1.0)
     assert sens["mu_x0.5"] == pytest.approx(0.5 * sens["mu_x1"], rel=1e-6)
     assert sens["mu_x1.5"] == pytest.approx(1.5 * sens["mu_x1"], rel=1e-6)
 
@@ -124,12 +123,60 @@ def test_degenerate_inputs_fail_closed() -> None:
             {"method": "target_vol", "sigma_target_annual": 0.1, "max_leverage": 0.0}
         )
     assert resolve_risk_scaling_spec(None) is None
-    assert resolve_risk_scaling_spec({}) is None
+    for malformed in ({}, [], ""):
+        with pytest.raises(ValueError):
+            resolve_risk_scaling_spec(malformed)
+
+
+def test_scaling_contract_rejects_misaligned_ids_weights_and_targets() -> None:
+    matrix = _panel()
+    spec = {"method": "target_vol", "sigma_target_annual": 0.10}
+    with pytest.raises(ValueError, match="unique"):
+        compute_risk_scaling(_EQUAL, ["a", "a", "c"], matrix, spec=spec)
+    with pytest.raises(ValueError, match="exactly cover"):
+        compute_risk_scaling({"a": 0.5, "b": 0.5, "extra": 0.0}, _IDS, matrix, spec=spec)
+    with pytest.raises(ValueError, match="nonnegative"):
+        compute_risk_scaling({"a": 0.5, "b": -0.1, "c": 0.6}, _IDS, matrix, spec=spec)
+    with pytest.raises(ValueError, match="gross-normalized"):
+        compute_risk_scaling({"a": 0.4, "b": 0.3, "c": 0.2}, _IDS, matrix, spec=spec)
+    with pytest.raises(ValueError, match="byte-exactly"):
+        resolve_risk_scaling_spec(
+            {
+                "method": "target_vol",
+                "sigma_target_per_bar": 0.01,
+                "sigma_target_annual": 0.10,
+            }
+        )
 
 
 def _sleeves() -> dict[str, list[float]]:
     rng = np.random.default_rng(1)
     return {f"s{i}": rng.normal(0.001, 0.01, 300).tolist() for i in range(6)}
+
+
+def _materialized_risk_sleeves(sleeves: dict[str, list[float]]) -> dict[str, dict[str, object]]:
+    start = datetime(2026, 1, 1, tzinfo=UTC)
+    timestamps = [
+        (start + timedelta(days=index)).isoformat().replace("+00:00", "Z") for index in range(300)
+    ]
+    return {
+        sid: {
+            "returns": series,
+            "return_timestamps": timestamps,
+            "returns_are_net": True,
+            "returns_source": "train_validation",
+            "fit_start": timestamps[0],
+            "fit_end": timestamps[-1],
+            "as_of": "2026-11-01T00:00:00Z",
+            "apply_start": "2026-11-01T00:00:00Z",
+            "turnover": 0.1,
+            "family": sid,
+            "strategy_class": "RiskScalingTestStrategy",
+            "symbols": ["BTC/USDT"],
+            "source_artifact_id": "src",
+        }
+        for sid, series in sleeves.items()
+    }
 
 
 def test_allocator_weights_scale_to_l_preserving_relative_structure() -> None:
@@ -162,8 +209,10 @@ def test_manifest_records_provenance_and_cash_weight_reflects_the_residual() -> 
             "portfolio_ready": True,
         }
     ]
-    spec = {
-        sid: {"returns": series, "turnover": 0.1, "family": sid} for sid, series in sleeves.items()
+    spec = _materialized_risk_sleeves(sleeves)
+    source[0]["return_panel_sha256_by_sleeve"] = {
+        sleeve_id: _materialized_return_panel_sha256(sleeve_id, row)
+        for sleeve_id, row in spec.items()
     }
     scaling = {"method": "target_vol", "sigma_target_annual": 0.05, "bars_per_year": 365}
     manifest = build_allocation_manifest(
@@ -249,8 +298,10 @@ def test_confirmed_fractional_kelly_builds_a_manifest_end_to_end() -> None:
             "portfolio_ready": True,
         }
     ]
-    spec = {
-        sid: {"returns": series, "turnover": 0.1, "family": sid} for sid, series in sleeves.items()
+    spec = _materialized_risk_sleeves(sleeves)
+    source[0]["return_panel_sha256_by_sleeve"] = {
+        sleeve_id: _materialized_return_panel_sha256(sleeve_id, row)
+        for sleeve_id, row in spec.items()
     }
     manifest = build_allocation_manifest(
         spec,
@@ -272,8 +323,13 @@ def test_confirmed_fractional_kelly_builds_a_manifest_end_to_end() -> None:
     assert resolve_risk_scaling_spec(once) == once
 
 
-def test_max_leverage_above_gross_cap_fails_closed_at_build_time() -> None:
+def test_max_leverage_above_one_fails_closed_at_build_time() -> None:
     sleeves = _sleeves()
+    timestamps = [
+        (datetime(2024, 1, 1, tzinfo=UTC) + timedelta(days=index)).isoformat()
+        for index in range(len(next(iter(sleeves.values()))))
+    ]
+    apply_start = (datetime.fromisoformat(timestamps[-1]) + timedelta(days=1)).isoformat()
     source = [
         {
             "id": "src",
@@ -285,9 +341,28 @@ def test_max_leverage_above_gross_cap_fails_closed_at_build_time() -> None:
         }
     ]
     spec = {
-        sid: {"returns": series, "turnover": 0.1, "family": sid} for sid, series in sleeves.items()
+        sid: {
+            "returns": series,
+            "return_timestamps": timestamps,
+            "returns_are_net": True,
+            "returns_source": {"splits": ["train", "validation"]},
+            "turnover": 0.1,
+            "family": sid,
+            "strategy_class": "RiskScalingTestStrategy",
+            "symbols": ["BTC/USDT"],
+            "source_artifact_id": "src",
+            "fit_start": timestamps[0],
+            "fit_end": timestamps[-1],
+            "as_of": apply_start,
+            "apply_start": apply_start,
+        }
+        for sid, series in sleeves.items()
     }
-    with pytest.raises(ValueError, match="gross_cap"):
+    source[0]["return_panel_sha256_by_sleeve"] = {
+        sleeve_id: _materialized_return_panel_sha256(sleeve_id, row)
+        for sleeve_id, row in spec.items()
+    }
+    with pytest.raises(ValueError, match="financing"):
         build_allocation_manifest(
             spec,
             source_artifacts=source,

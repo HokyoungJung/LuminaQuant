@@ -133,6 +133,27 @@ def test_no_signal_before_a_box_exists() -> None:
     assert events.signals == []
 
 
+def test_partial_prior_session_cannot_create_a_box() -> None:
+    """A short first session is not a valid substitute for a full UTC day."""
+    strategy, events = _build()
+    _feed(strategy, _day1_bars()[:95])
+    strategy.calculate_signals(_neutral_day2_open())
+    strategy.calculate_signals(_long_setup_bar())
+    assert events.drain() == []
+
+
+def test_missing_prior_volume_reference_blocks_required_volume_entries() -> None:
+    """A complete price box without a complete volume reference stays inactive."""
+    strategy, events = _build()
+    _feed(
+        strategy,
+        [_bar(bar.time, bar.open, bar.high, bar.low, bar.close, None) for bar in _day1_bars()],
+    )
+    strategy.calculate_signals(_neutral_day2_open())
+    strategy.calculate_signals(_long_setup_bar())
+    assert events.drain() == []
+
+
 def test_long_rebound_then_single_signal_then_take_profit() -> None:
     strategy, events = _primed()
 
@@ -309,6 +330,17 @@ def test_close_must_come_back_through_the_quartile() -> None:
     assert [signal.signal_type for signal in allowed_short_events.drain()] == ["SHORT"]
 
 
+def test_entry_is_rejected_after_its_midpoint_target_has_already_been_crossed() -> None:
+    """The next-open order cannot target a midpoint already crossed on the signal close."""
+    long_strategy, long_events = _primed()
+    long_strategy.calculate_signals(_bar(_iso(1, 1), 99.0, 101.0, 93.0, 100.0, 20.0))
+    assert long_events.drain() == []
+
+    short_strategy, short_events = _primed()
+    short_strategy.calculate_signals(_bar(_iso(1, 1), 101.0, 107.0, 99.0, 100.0, 20.0))
+    assert short_events.drain() == []
+
+
 def test_state_round_trip_preserves_behaviour() -> None:
     source, _ = _primed()
     restored, restored_events = _build()
@@ -331,6 +363,18 @@ def test_state_round_trip_preserves_behaviour() -> None:
         ]
 
     assert _fingerprint(restored_events.drain()) == _fingerprint(baseline_events.drain())
+
+
+def test_restart_preserves_complete_session_evidence() -> None:
+    """The prior-session count survives a checkpoint before the day rolls over."""
+    source, _ = _build()
+    _feed(source, _day1_bars())
+    restored, restored_events = _build()
+    restored.set_state(source.get_state())
+
+    restored.calculate_signals(_neutral_day2_open())
+    restored.calculate_signals(_long_setup_bar())
+    assert [signal.signal_type for signal in restored_events.drain()] == ["LONG"]
 
 
 def test_state_round_trip_carries_an_open_position() -> None:

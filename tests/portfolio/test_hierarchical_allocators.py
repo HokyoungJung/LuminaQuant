@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import itertools
+from datetime import date, timedelta
 
 import numpy as np
 import pytest
@@ -11,8 +12,15 @@ from lumina_quant.core.plugin_registry import GLOBAL_REGISTRY
 from lumina_quant.portfolio import hierarchical as hier
 from lumina_quant.portfolio.quality_gated_allocation import (
     _build_allocator,
+    _materialized_return_panel_sha256,
     allocate_quality_gated,
     build_allocation_manifest,
+)
+from lumina_quant.portfolio.optimizers_extra import (
+    ERCPortfolio,
+    HRPPortfolio,
+    MaxDiversificationPortfolio,
+    MeanVariancePortfolio,
 )
 
 
@@ -55,6 +63,42 @@ def test_linkage_and_seriation_group_correlated_pairs() -> None:
     assert {order[0], order[1]} in ({0, 1}, {2, 3})
     assert hier.cut_tree(link, 4, n_clusters=2) == [0, 0, 1, 1]
     assert hier.cut_tree(link, 4, n_clusters=4) == [0, 1, 2, 3]
+
+
+@pytest.mark.parametrize(
+    "optimizer",
+    [ERCPortfolio(), HRPPortfolio(), MaxDiversificationPortfolio(), MeanVariancePortfolio()],
+)
+@pytest.mark.parametrize(
+    "ids,matrix",
+    [
+        (["a", "a"], [[0.01, 0.02], [0.02, 0.03]]),
+        (["a", " "], [[0.01, 0.02], [0.02, 0.03]]),
+        (["a", "b"], [0.01, 0.02]),
+        (["a", "b"], [[0.01, float("nan")], [0.02, 0.03]]),
+        (["a", "b"], [["bad", 0.02], [0.02, 0.03]]),
+    ],
+    ids=["duplicate_ids", "blank_id", "wrong_shape", "nonfinite", "conversion"],
+)
+def test_registered_optimizer_boundaries_reject_corrupt_inputs(
+    optimizer: object, ids: list[str], matrix: object
+) -> None:
+    with pytest.raises(ValueError):
+        optimizer.allocate(ids, matrix)  # type: ignore[attr-defined]
+
+
+@pytest.mark.parametrize(
+    "constructor",
+    [
+        lambda: ERCPortfolio(max_iter=False),
+        lambda: MaxDiversificationPortfolio(step=float("nan")),
+        lambda: MeanVariancePortfolio(risk_aversion=-1),
+        lambda: HRPPortfolio(corr_threshold=float("inf")),
+    ],
+)
+def test_registered_optimizer_boundaries_reject_malformed_parameters(constructor: object) -> None:
+    with pytest.raises(ValueError):
+        constructor()  # type: ignore[operator]
 
 
 def test_hrp_dendrogram_matches_hand_derivation() -> None:
@@ -291,6 +335,22 @@ def test_indefinite_covariance_fails_closed_but_noise_is_clipped() -> None:
     assert np.isclose(w.sum(), 1.0)
 
 
+def test_plugin_covariance_contract_rejects_short_windows_unknown_estimators_and_constants() -> (
+    None
+):
+    ids = ["a", "b"]
+    returns = np.array([[0.01, 0.02], [0.02, 0.01], [0.03, 0.04]])
+    with pytest.raises(ValueError, match="cov_window"):
+        hier.HERCPortfolio(cov_window=1).allocate(ids, returns)
+    with pytest.raises(ValueError, match="cov_estimator"):
+        hier.WassersteinDROPortfolio(cov_estimator="unknown").allocate(ids, returns)
+    assert hier.HERCPortfolio().allocate(ids, np.ones((3, 2))) == {"a": 0.5, "b": 0.5}
+    # A singular but non-constant sample remains a valid covariance input.
+    singular = np.column_stack([returns[:, 0], returns[:, 0]])
+    weights = hier.HERCPortfolio().allocate(ids, singular)
+    assert np.isclose(sum(weights.values()), 1.0)
+
+
 def test_graph_inverse_centrality_is_permutation_equivariant() -> None:
     corr = np.eye(5)
     corr[0, 1:] = corr[1:, 0] = 0.45  # star: asset 0 is the hub (PSD: 1 - 4*0.45^2 > 0)
@@ -371,7 +431,29 @@ def test_quality_gated_dispatch_accepts_new_methods_and_records_params() -> None
         }
     ]
     spec = {
-        sid: {"returns": series, "turnover": 0.1, "family": sid} for sid, series in sleeves.items()
+        sid: {
+            "returns": series,
+            "return_timestamps": [
+                (date(2024, 1, 1) + timedelta(days=index)).isoformat()
+                for index in range(len(series))
+            ],
+            "returns_are_net": True,
+            "returns_source": "train_validation",
+            "fit_start": date(2024, 1, 1).isoformat(),
+            "fit_end": (date(2024, 1, 1) + timedelta(days=len(series) - 1)).isoformat(),
+            "as_of": (date(2024, 1, 1) + timedelta(days=len(series))).isoformat(),
+            "apply_start": (date(2024, 1, 1) + timedelta(days=len(series))).isoformat(),
+            "turnover": 0.1,
+            "family": sid,
+            "strategy_class": "NamedResearchStrategy",
+            "symbols": ["BTC/USDT"],
+            "source_artifact_id": "src",
+        }
+        for sid, series in sleeves.items()
+    }
+    source[0]["return_panel_sha256_by_sleeve"] = {
+        sleeve_id: _materialized_return_panel_sha256(sleeve_id, row)
+        for sleeve_id, row in spec.items()
     }
     manifest = build_allocation_manifest(
         spec,
@@ -387,3 +469,19 @@ def test_quality_gated_dispatch_accepts_new_methods_and_records_params() -> None
         spec, source_artifacts=source, method="erc", min_families=1
     )
     assert "allocator_params" not in legacy_manifest  # default path byte-identical
+
+
+def test_hierarchical_contract_rejects_indefinite_singletons_bad_bounds_and_ids() -> None:
+    with pytest.raises(ValueError, match="positive semi-definite"):
+        hier.hrp_dendrogram_weights([[-1.0]])
+    with pytest.raises(ValueError, match="positive semi-definite"):
+        hier.hrp_dendrogram_weights(np.diag([1e-4, -1e-10]))
+    with pytest.raises(ValueError, match="only"):
+        hier.hrp_dendrogram_weights(np.eye(2), bounds={"unknown": 0.1})
+    with pytest.raises(ValueError, match="finite"):
+        hier.project_box_simplex([np.nan, 0.5], [0.0, 0.0], [1.0, 1.0])
+    returns = np.array([[0.01, 0.02], [0.02, 0.01]])
+    with pytest.raises(ValueError, match="unique"):
+        hier.HERCPortfolio().allocate(["a", "a"], returns)
+    with pytest.raises(ValueError, match="boolean"):
+        hier.NCOPortfolio(use_mean=1)

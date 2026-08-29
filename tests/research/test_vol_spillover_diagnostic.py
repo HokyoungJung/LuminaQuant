@@ -17,6 +17,7 @@ All randomness in the data generators is a seeded inline LCG (never the
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import subprocess
@@ -28,6 +29,7 @@ import pytest
 
 from lumina_quant.research.vol_spillover_diagnostic import (
     DEFAULT_SPEC,
+    _mint_cli_authority,
     bh_adjusted_pvalues,
     evaluate_pair,
     qlike_loss,
@@ -93,7 +95,7 @@ def test_null_generator_yields_zero_admissions_across_seeds() -> None:
         report = run_diagnostic(
             {"BTCUSDT": leader, "ETHUSDT": follower}, pairs=[("BTCUSDT", "ETHUSDT")]
         )
-        assert report.program_verdict == "dead"
+        assert report.program_verdict == "insufficient_data"
         assert report.admitted_pairs == ()
         assert report.sizing_overlay_build_gate_open is False
         pair = report.pairs[0]
@@ -107,11 +109,11 @@ def test_planted_generator_is_admitted() -> None:
     report = run_diagnostic(
         {"BTCUSDT": leader, "ETHUSDT": follower}, pairs=[("BTCUSDT", "ETHUSDT")]
     )
-    assert report.program_verdict == "admitted"
-    assert report.admitted_pairs == ("BTCUSDT->ETHUSDT",)
-    assert report.sizing_overlay_build_gate_open is True
+    assert report.program_verdict == "insufficient_data"
+    assert report.admitted_pairs == ()
+    assert report.sizing_overlay_build_gate_open is False
     pair = report.pairs[0]
-    assert pair.admitted is True
+    assert pair.admitted is False
     assert pair.median_qlike_improvement is not None
     assert pair.median_qlike_improvement >= DEFAULT_SPEC["qlike_improvement_floor"]
     assert pair.fold_win_rate is not None
@@ -123,7 +125,143 @@ def test_planted_generator_is_admitted() -> None:
     assert pair.qlike_diff_skewness is not None
     # SPEC is echoed verbatim (with the pair override) into the artifact.
     assert report.spec["bootstrap_seed"] == DEFAULT_SPEC["bootstrap_seed"]
-    assert report.spec["pairs"] == [["BTCUSDT", "ETHUSDT"]]
+    assert report.spec["pairs"] == (("BTCUSDT", "ETHUSDT"),)
+
+
+def test_complete_canonical_family_direct_call_cannot_open_gate() -> None:
+    """Even complete explicit-day data has no authority outside the CLI."""
+    series: dict[str, dict[int, float]] = {}
+    pairs_by_leader: dict[str, list[str]] = {}
+    for leader, follower in DEFAULT_SPEC["pairs"]:
+        pairs_by_leader.setdefault(leader, []).append(follower)
+    for family_index, (leader, followers) in enumerate(sorted(pairs_by_leader.items())):
+        leader_seed = 42 + family_index
+        for follower_index, follower in enumerate(followers):
+            leader_values, follower_values = _planted_pair(
+                700, leader_seed, 4242 + 100 * family_index + follower_index
+            )
+            series.setdefault(leader, dict(enumerate(leader_values)))
+            series[follower] = dict(enumerate(follower_values))
+    report = run_diagnostic(series)
+    assert report.spec["canonical_admission_eligible"] is False
+    assert report.sizing_overlay_build_gate_open is False
+    assert report.admitted_pairs == ()
+
+
+def test_complete_canonical_null_falsifier_cannot_admit() -> None:
+    series: dict[str, dict[int, float]] = {}
+    for index, symbol in enumerate(
+        sorted({symbol for pair in DEFAULT_SPEC["pairs"] for symbol in pair})
+    ):
+        series[symbol] = dict(
+            enumerate(_null_ar1_log_rv(700, 20_000 + index, mu=-9.0, phi=0.95, sigma=0.35))
+        )
+    report = run_diagnostic(series)
+    assert report.spec["canonical_admission_eligible"] is False
+    assert report.admitted_pairs == ()
+    assert report.sizing_overlay_build_gate_open is False
+
+
+def test_plain_sequences_and_nested_evidence_cannot_be_promoted_or_mutated() -> None:
+    leader, follower = _planted_pair(700, 42, 4242)
+    report = run_diagnostic(
+        {"BTCUSDT": leader, "ETHUSDT": follower}, pairs=[("BTCUSDT", "ETHUSDT")]
+    )
+    before = report.to_json()
+    assert report.sizing_overlay_build_gate_open is False
+    assert report.lineage["per_symbol"]["BTCUSDT"]["authority"] == "nonauthoritative"
+    with pytest.raises(TypeError):
+        report.pairs[0].coefficient_sign_stability["leader_d"] = {}
+    assert report.to_json() == before
+
+
+def test_unsealed_or_malformed_direct_inputs_cannot_recover_canonical_admission() -> None:
+    """No direct call may inherit canonical source or pair authority."""
+    leader, follower = _planted_pair(700, 42, 4242)
+    unsealed = run_diagnostic(
+        {"BTCUSDT": dict(enumerate(leader)), "ETHUSDT": dict(enumerate(follower))},
+        pairs=[("BTCUSDT", "ETHUSDT")],
+    )
+    assert unsealed.spec["canonical_admission_eligible"] is False
+    assert unsealed.sizing_overlay_build_gate_open is False
+    assert unsealed.lineage["source"]["authority"] == "unsealed_library_call"
+
+    malformed = run_diagnostic(
+        {"BTCUSDT": dict(enumerate(leader)), "ETHUSDT": dict(enumerate(follower))},
+        pairs=[("BTCUSDT", "ETHUSDT"), "not-a-pair"],  # type: ignore[list-item]
+        authority={
+            "authority": "explicit_epoch_day",
+            "loader": "_load_rv_csv",
+            "loader_version": "vdiag-cli-v3",
+            "source_identity": "test://vdiag-rv",
+            "source_content_sha256": "0" * 64,
+        },
+    )
+    assert malformed.program_verdict == "insufficient_data"
+    assert malformed.pairs == ()
+    assert malformed.sizing_overlay_build_gate_open is False
+
+
+def test_fabricated_authority_values_and_private_shapes_close_gate() -> None:
+    leader, follower = _planted_pair(700, 42, 4242)
+    inputs = {"BTCUSDT": dict(enumerate(leader)), "ETHUSDT": dict(enumerate(follower))}
+
+    class _PrivateShape:
+        _seal = object()
+        _input_digest = "0" * 64
+        _lineage = {
+            "authority": "explicit_epoch_day",
+            "loader": "_load_rv_csv",
+            "loader_version": "vdiag-cli-v3",
+            "source_identity": "test://forged",
+            "source_content_sha256": "0" * 64,
+        }
+
+    for forged in (
+        "explicit_epoch_day",
+        {"authority": "explicit_epoch_day"},
+        _PrivateShape(),
+    ):
+        report = run_diagnostic(inputs, pairs=[("BTCUSDT", "ETHUSDT")], authority=forged)
+        assert report.spec["canonical_admission_eligible"] is False
+        assert report.sizing_overlay_build_gate_open is False
+
+
+def test_authority_is_bound_to_the_exact_normalized_input_digest() -> None:
+    inputs = {
+        symbol: {0: 0.0001, 1: 0.0002} for symbol in DEFAULT_SPEC["session_calendar"]["members"]
+    }
+    authority = _mint_cli_authority(
+        inputs,
+        source_authority="explicit_epoch_day",
+        loader="_load_rv_csv",
+        loader_version="vdiag-cli-v3",
+        source_identity="test://sealed-grid",
+        source_content_sha256="0" * 64,
+    )
+    inputs["BTCUSDT"][1] = 0.9
+    report = run_diagnostic(inputs, authority=authority)
+    assert report.spec["canonical_admission_eligible"] is False
+    assert report.sizing_overlay_build_gate_open is False
+
+
+@pytest.mark.parametrize(
+    ("loader", "loader_version"),
+    [("_forged_loader", "vdiag-cli-v3"), ("_load_rv_csv", "forged-v1")],
+)
+def test_authority_mint_rejects_wrong_loader_or_version(loader: str, loader_version: str) -> None:
+    inputs = {
+        symbol: {0: 0.0001, 1: 0.0002} for symbol in DEFAULT_SPEC["session_calendar"]["members"]
+    }
+    with pytest.raises(ValueError, match="unallowlisted CLI source lineage"):
+        _mint_cli_authority(
+            inputs,
+            source_authority="explicit_epoch_day",
+            loader=loader,
+            loader_version=loader_version,
+            source_identity="test://sealed-grid",
+            source_content_sha256="0" * 64,
+        )
 
 
 def test_metals_pair_key_and_gate_scoping() -> None:
@@ -220,6 +358,49 @@ def test_non_three_lag_specs_close_as_insufficient_data_never_raise() -> None:
     assert long_report.pairs[0].status == "insufficient_data"
     # Non-coercible lag entries also fail closed instead of raising.
     assert evaluate_pair(follower, leader, spec={"har_lags": [1, "junk", 22]}) is None
+    # Three arbitrary lags cannot inherit daily/weekly/monthly labels.
+    assert evaluate_pair(follower, leader, spec={"har_lags": [2, 3, 4]}) is None
+
+
+def test_calendar_gap_and_incomplete_registered_family_cannot_admit() -> None:
+    leader, follower = _planted_pair(700, 42, 4242)
+    leader_map = {day: value for day, value in enumerate(leader) if day != 350}
+    follower_map = {day: value for day, value in enumerate(follower)}
+    gapped = run_diagnostic(
+        {"BTCUSDT": leader_map, "ETHUSDT": follower_map},
+        pairs=[("BTCUSDT", "ETHUSDT")],
+    )
+    assert gapped.pairs[0].status == "insufficient_data"
+    assert gapped.program_verdict == "insufficient_data"
+    assert gapped.sizing_overlay_build_gate_open is False
+
+    incomplete_family = run_diagnostic({"BTCUSDT": leader, "ETHUSDT": follower})
+    assert incomplete_family.program_verdict == "insufficient_data"
+    assert incomplete_family.admitted_pairs == ()
+    assert incomplete_family.sizing_overlay_build_gate_open is False
+
+
+def test_spec_snapshot_is_stable_against_caller_and_default_mutation() -> None:
+    leader, follower = _planted_pair(700, 42, 4242)
+    override = {"har_lags": [1, 5, 22]}
+    report = run_diagnostic(
+        {"BTCUSDT": leader, "ETHUSDT": follower},
+        pairs=[("BTCUSDT", "ETHUSDT")],
+        spec=override,
+    )
+    frozen = report.to_json()
+    override["har_lags"].append(99)
+    DEFAULT_SPEC["har_lags"].append(99)
+    try:
+        assert report.to_json() == frozen
+        rerun = run_diagnostic(
+            {"BTCUSDT": leader, "ETHUSDT": follower},
+            pairs=[("BTCUSDT", "ETHUSDT")],
+            spec={"har_lags": [1, 5, 22]},
+        )
+        assert rerun.to_json() == frozen
+    finally:
+        DEFAULT_SPEC["har_lags"].pop()
 
 
 def test_default_lag_artifact_unchanged_by_normalization() -> None:
@@ -267,7 +448,7 @@ def test_day_keyed_mapping_input_is_supported() -> None:
         {"BTCUSDT": leader_map, "ETHUSDT": follower_map}, pairs=[("BTCUSDT", "ETHUSDT")]
     )
     assert report.pairs[0].status == "evaluated"
-    assert report.pairs[0].admitted is True
+    assert report.pairs[0].admitted is False
 
 
 # --------------------------------------------------------------------------- #
@@ -354,11 +535,11 @@ def test_mutating_future_folds_leaves_fold0_forecasts_unchanged() -> None:
 
 
 def test_cli_runner_writes_byte_identical_artifact(tmp_path: Path) -> None:
-    leader, follower = _planted_pair(700, 42, 4242)
+    """Only the verified CLI may mint a serializable-lineage authority."""
     csv_path = tmp_path / "rv.csv"
     lines = ["symbol,day,rv"]
-    lines.extend(f"BTCUSDT,{day},{value!r}" for day, value in enumerate(leader))
-    lines.extend(f"ETHUSDT,{day},{value!r}" for day, value in enumerate(follower))
+    for symbol_index, symbol in enumerate(DEFAULT_SPEC["session_calendar"]["members"]):
+        lines.extend(f"{symbol},{day},{0.0001 * (symbol_index + day + 1)!r}" for day in range(2))
     csv_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     out_first = tmp_path / "artifact_a.json"
@@ -376,15 +557,67 @@ def test_cli_runner_writes_byte_identical_artifact(tmp_path: Path) -> None:
     assert first_bytes == out_second.read_bytes()
 
     payload = json.loads(first_bytes)
-    # Default pre-registered pairs: BTC->ETH evaluated, all others (including
-    # every metals pair) close as insufficient_data on this two-symbol input.
-    assert payload["program_verdict"] == "admitted"
-    assert payload["admitted_pairs"] == ["BTCUSDT->ETHUSDT"]
-    assert payload["sizing_overlay_build_gate_open"] is True
+    # The complete but deliberately short grid is CLI-authoritative; every
+    # pair still closes on the pre-registered history requirement.
+    assert payload["program_verdict"] == "insufficient_data"
+    assert payload["admitted_pairs"] == []
+    assert payload["sizing_overlay_build_gate_open"] is False
+    assert payload["spec"]["canonical_admission_eligible"] is True
     assert len(payload["pairs"]) == len(DEFAULT_SPEC["pairs"])
     insufficient = set(payload["insufficient_pairs"])
     assert "XAUUSDT->XAGUSDT" in insufficient
-    assert len(insufficient) == len(DEFAULT_SPEC["pairs"]) - 1
+    assert len(insufficient) == len(DEFAULT_SPEC["pairs"])
     # SPEC echoed verbatim.
     assert payload["spec"]["bootstrap_seed"] == DEFAULT_SPEC["bootstrap_seed"]
     assert payload["spec"]["qlike_improvement_floor"] == 0.05
+    assert payload["lineage"]["source"] == {
+        "authority": "explicit_epoch_day",
+        "loader": "_load_rv_csv",
+        "loader_version": "vdiag-cli-v3",
+        "source_identity": str(csv_path.resolve()),
+        "source_content_sha256": hashlib.sha256(csv_path.read_bytes()).hexdigest(),
+    }
+
+
+def test_cli_rejects_malformed_pair_override_without_canonical_fallback(tmp_path: Path) -> None:
+    csv_path = tmp_path / "rv.csv"
+    csv_path.write_text("symbol,day,rv\nBTCUSDT,0,0.0001\n", encoding="utf-8")
+    out_path = tmp_path / "artifact.json"
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(_SCRIPT),
+            "--rv-csv",
+            str(csv_path),
+            "--pairs",
+            "BTCUSDT:ETHUSDT,broken",
+            "--out",
+            str(out_path),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 2
+    payload = json.loads(out_path.read_text(encoding="utf-8"))
+    assert payload["program_verdict"] == "insufficient_data"
+    assert payload["sizing_overlay_build_gate_open"] is False
+
+
+def test_cli_rejects_partial_intraday_utc_day_grid(tmp_path: Path) -> None:
+    closes = tmp_path / "closes.csv"
+    start = 1_577_836_800
+    lines = ["symbol,epoch_seconds,close"]
+    lines.extend(f"BTCUSDT,{start + hour * 3600},{100 + hour}" for hour in range(23))
+    closes.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    out_path = tmp_path / "artifact.json"
+    result = subprocess.run(
+        [sys.executable, str(_SCRIPT), "--closes-csv", str(closes), "--out", str(out_path)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 2
+    payload = json.loads(out_path.read_text(encoding="utf-8"))
+    assert payload["program_verdict"] == "insufficient_data"
+    assert payload["sizing_overlay_build_gate_open"] is False

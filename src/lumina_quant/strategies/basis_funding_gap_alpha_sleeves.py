@@ -87,7 +87,6 @@ from lumina_quant.strategies.external_alpha_sleeves import (
     _annualize_per_bar_vol,
     _emit,
     _event_datetime_utc,
-    _event_symbols,
     _extract_feature,
     _market_snapshot,
     _safe_non_negative_int,
@@ -116,6 +115,17 @@ def _coerce_float_list(value: Any) -> list[float]:
 # 8h funding cadence floor (seconds).  decision_cadence_seconds must be >= this
 # (the boundary discipline mirrored from CrossSectionalFundingMomentumCarry).
 _FUNDING_CADENCE_SECONDS = 28800
+
+
+def _is_funding_boundary(dt: datetime | None) -> bool:
+    """Whether ``dt`` is an exact UTC 00:00/08:00/16:00 funding boundary."""
+    return (
+        dt is not None
+        and dt.minute == 0
+        and dt.second == 0
+        and dt.microsecond == 0
+        and dt.hour % 8 == 0
+    )
 
 
 @dataclass(slots=True)
@@ -162,6 +172,16 @@ class BasisFundingGapConvergenceStrategy(Strategy):
                 "max_hold_intervals", default=9, low=1, high=1000
             ),
             "min_symbols": HyperParam.integer("min_symbols", default=6, low=4, high=512),
+            "funding_rate_horizon_seconds": HyperParam.integer(
+                "funding_rate_horizon_seconds",
+                default=_FUNDING_CADENCE_SECONDS,
+                low=1,
+                high=31_536_000,
+                tunable=False,
+            ),
+            "funding_rate_unit": HyperParam.categorical(
+                "funding_rate_unit", default="decimal", choices=("decimal", "bps")
+            ),
             "allow_short": HyperParam.boolean("allow_short", default=True, grid=[True, False]),
             "vol_window": HyperParam.integer("vol_window", default=24, low=2, high=400),
             "target_gross_exposure": HyperParam.floating(
@@ -189,6 +209,8 @@ class BasisFundingGapConvergenceStrategy(Strategy):
         self.min_hold_intervals = max(1, int(resolved["min_hold_intervals"]))
         self.max_hold_intervals = max(self.min_hold_intervals, int(resolved["max_hold_intervals"]))
         self.min_symbols = max(2, int(resolved["min_symbols"]))
+        self.funding_rate_horizon_seconds = max(1, int(resolved["funding_rate_horizon_seconds"]))
+        self.funding_rate_unit = str(resolved["funding_rate_unit"]).lower()
         self.allow_short = bool(resolved["allow_short"])
         self.vol_window = max(2, int(resolved["vol_window"]))
         self.target_gross_exposure = max(0.0, float(resolved["target_gross_exposure"]))
@@ -300,7 +322,7 @@ class BasisFundingGapConvergenceStrategy(Strategy):
         funding = self._extract_feature(event, symbol, "funding_rate")
         mark = self._extract_feature(event, symbol, "mark_price")
         index = self._extract_feature(event, symbol, "index_price")
-        gap = basis_funding_gap_bps(mark, index, funding)
+        gap = basis_funding_gap_bps(mark, index, self._normalize_funding_rate(funding))
         if gap is None:
             return False
         item.last_time_key = key
@@ -308,18 +330,42 @@ class BasisFundingGapConvergenceStrategy(Strategy):
         item.gaps.append(float(gap))
         return True
 
+    def _normalize_funding_rate(self, value: Any) -> float | None:
+        """Convert a declared funding print into a decimal rate per 8h interval."""
+        rate = safe_float(value)
+        if rate is None:
+            return None
+        if self.funding_rate_unit == "bps":
+            rate /= 10_000.0
+        elif self.funding_rate_unit != "decimal":
+            return None
+        return rate * (_FUNDING_CADENCE_SECONDS / self.funding_rate_horizon_seconds)
+
     def calculate_signals_window(self, event: Any, aggregator: Any = None) -> None:
         _ = aggregator
-        event_key = time_key(getattr(event, "time", None))
-        updated = False
-        for symbol in _event_symbols(event, self.symbol_list):
+        event_time = getattr(event, "time", None)
+        event_key = time_key(event_time)
+        event_dt = _event_datetime_utc(event_time)
+        if not event_key or not _is_funding_boundary(event_dt):
+            return
+        # A cross-sectional decision is valid only for one complete, common
+        # timestamped panel.  Never blend cached per-symbol bars into a rebalance.
+        snapshots: dict[str, _Snapshot] = {}
+        for symbol in self.symbol_list:
             snapshot = _window_snapshot(event, symbol)
-            if snapshot is not None and self._update_symbol(event, symbol, snapshot):
-                updated = True
-        if updated and event_key and event_key != self._last_eval_time_key:
+            if snapshot is None or _event_datetime_utc(snapshot.time) != event_dt:
+                return
+            snapshots[symbol] = snapshot
+        updated = False
+        for symbol, snapshot in snapshots.items():
+            updated = self._update_symbol(event, symbol, snapshot) or updated
+            # Persist the event's canonical identity after UTC-equivalence
+            # admission, so strict freshness cannot depend on ISO spelling.
+            self._state[symbol].last_time_key = event_key
+        if updated and event_key != self._last_eval_time_key:
             self._last_eval_time_key = event_key
             self._tick += 1
-            self._evaluate(getattr(event, "time", None), strict_freshness=True)
+            self._evaluate(event_time, strict_freshness=True)
 
     def calculate_signals(self, event: Any) -> None:
         if str(getattr(event, "type", "")).upper() == "MARKET_WINDOW":
@@ -330,12 +376,11 @@ class BasisFundingGapConvergenceStrategy(Strategy):
         symbol = getattr(event, "symbol", None)
         if symbol in self._state:
             snapshot = _market_snapshot(event)
-            if snapshot is not None and self._update_symbol(event, str(symbol), snapshot):
-                key = time_key(snapshot.time)
-                if key and key != self._last_eval_time_key:
-                    self._last_eval_time_key = key
-                    self._tick += 1
-                    self._evaluate(snapshot.time, strict_freshness=False)
+            if snapshot is not None:
+                # MARKET events may extend individual histories, but cannot
+                # produce a cross-sectional rebalance: peers are not a common
+                # timestamped snapshot.
+                self._update_symbol(event, str(symbol), snapshot)
 
     # -------------------------------------------------------------- evaluation
     def _symbol_is_fresh(

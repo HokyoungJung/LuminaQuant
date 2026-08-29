@@ -75,11 +75,11 @@ cadence is weekly with min-hold, not an HTF sweep.
 
 Every entry stamps ``intended_hold_seconds`` (~2 weeks) so the engine-side
 funding-entry guard and hold accounting can read the sleeve's ex-ante horizon.
-Feature access is the 3-tier None-tolerant cascade shared with
-``strategies/external_alpha_sleeves.py`` (8h staleness respected by the lookup);
-a missing feature degrades to a missing day sample, never a raise.  The module
-is data-local (no I/O), pure Python/``math`` only, and never raises from
-``calculate_signals``.
+OI and mark-price access is restricted to the validated exact-current raw
+window row; cached or scalar feature values are never used.  A missing raw
+column rejects the entire panel, while an explicit null is recorded as a
+missing OI sample.  The module is data-local (no I/O), pure Python/``math``
+only, and never raises from ``calculate_signals``.
 """
 
 from __future__ import annotations
@@ -87,7 +87,8 @@ from __future__ import annotations
 import math
 from collections import deque
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
+from itertools import pairwise
 from typing import Any
 
 from lumina_quant.core.plugin_registry import register
@@ -96,17 +97,13 @@ from lumina_quant.indicators.annualization import (
     annualize_per_bar_vol,
     bars_per_year_from_spacing,
 )
-from lumina_quant.indicators.common import safe_float, time_key
+from lumina_quant.indicators.common import safe_float
 from lumina_quant.indicators.cross_sectional_residualize import cross_sectional_residualize
 from lumina_quant.strategies.external_alpha_sleeves import (
     _EPS,
     _Snapshot,
     _emit,
     _event_datetime_utc,
-    _event_symbols,
-    _extract_feature,
-    _market_snapshot,
-    _safe_non_negative_int,
     _target_metadata,
     _window_snapshot,
 )
@@ -129,6 +126,7 @@ INTENDED_HOLD_SECONDS = 14 * 86_400
 class _DayRecord:
     """One finalized UTC day: latest OI notional (may be None), $vol, day close."""
 
+    day: str
     oi_notional: float | None
     dollar_volume: float
     close: float
@@ -152,40 +150,6 @@ class _State:
     # ISO date of this symbol's most recently FINALIZED day record (staleness
     # guard for panel eligibility; "" until the first day commits).
     last_committed_day: str = ""
-
-
-def _coerce_float_list(value: Any) -> list[float]:
-    """Best-effort ``list[float]`` coercion that never raises on adversarial input."""
-    if not isinstance(value, (list, tuple)):
-        return []
-    out: list[float] = []
-    for item in value:
-        parsed = safe_float(item)
-        if parsed is not None:
-            out.append(parsed)
-    return out
-
-
-def _coerce_day_records(value: Any) -> list[_DayRecord]:
-    """Coerce a serialized ``[[oi|None, dollar_volume, close], ...]``; never raises."""
-    if not isinstance(value, (list, tuple)):
-        return []
-    out: list[_DayRecord] = []
-    for item in value:
-        if not isinstance(item, (list, tuple)) or len(item) < 3:
-            continue
-        dollar_volume = safe_float(item[1])
-        close = safe_float(item[2])
-        if dollar_volume is None or close is None:
-            continue
-        out.append(
-            _DayRecord(
-                oi_notional=safe_float(item[0]),
-                dollar_volume=max(0.0, float(dollar_volume)),
-                close=float(close),
-            )
-        )
-    return out
 
 
 def _committed_day_lag_days(last_committed_day: str, latest_committed_day: str) -> int | None:
@@ -225,6 +189,19 @@ def _dispersion(values: list[float]) -> float:
     mean_value = sum(values) / float(n)
     variance = sum((value - mean_value) ** 2 for value in values) / float(n - 1)
     return variance**0.5
+
+
+def _exact_current_raw_row(event: Any, symbol: str, event_time: Any) -> dict[str, Any] | None:
+    """Return the one raw row proven current, never a cached feature value."""
+    try:
+        rows = list(dict(getattr(event, "bars_1s", {}) or {}).get(symbol) or [])
+    except Exception:
+        return None
+    if len(rows) != 1 or not isinstance(rows[0], dict):
+        return None
+    row = rows[0]
+    row_dt = _event_datetime_utc(row.get("time"))
+    return row if row_dt == event_time else None
 
 
 @register("strategy", "OpenInterestGrowthPressureStrategy", interface="event_driven")
@@ -343,7 +320,7 @@ class OpenInterestGrowthPressureStrategy(Strategy):
                 symbol: {
                     "closes": list(item.closes),
                     "days": [
-                        [record.oi_notional, record.dollar_volume, record.close]
+                        [record.day, record.oi_notional, record.dollar_volume, record.close]
                         for record in item.days
                     ],
                     "cur_date": item.cur_date,
@@ -362,56 +339,258 @@ class OpenInterestGrowthPressureStrategy(Strategy):
         }
 
     def set_state(self, state: dict[str, Any]) -> None:
-        if not isinstance(state, dict):
-            return
-        self._recent_times.clear()
-        for value in _coerce_float_list(state.get("recent_times"))[
-            -int(self._recent_times.maxlen or 0) :
-        ]:
-            self._recent_times.append(value)
-        self._last_committed_day = str(state.get("last_committed_day", "") or "")
-        week = state.get("last_eval_week")
-        if isinstance(week, (list, tuple)) and len(week) == 2:
-            try:
-                self._last_eval_week = (int(week[0]), int(week[1]))
-            except Exception:
-                self._last_eval_week = None
-        else:
-            self._last_eval_week = None
-        raw = state.get("symbol_state")
-        if not isinstance(raw, dict):
-            return
-        for symbol, payload in raw.items():
-            if symbol not in self._state or not isinstance(payload, dict):
-                continue
-            item = self._state[symbol]
-            try:
-                item.closes.clear()
-                maxlen = int(item.closes.maxlen or 0)
-                closes = _coerce_float_list(payload.get("closes"))
-                for value in closes[-maxlen:] if maxlen else closes:
-                    item.closes.append(value)
-                item.days.clear()
-                dmax = int(item.days.maxlen or 0)
-                records = _coerce_day_records(payload.get("days"))
-                for record in records[-dmax:] if dmax else records:
-                    item.days.append(record)
-                cur_date = payload.get("cur_date")
-                item.cur_date = str(cur_date) if cur_date is not None else None
-                item.cur_oi_notional = safe_float(payload.get("cur_oi_notional"))
-                item.cur_dollar_volume = max(
-                    0.0, safe_float(payload.get("cur_dollar_volume")) or 0.0
+        """Install only a complete, coherent checkpoint, atomically."""
+        fields = {"last_eval_week", "last_committed_day", "recent_times", "symbol_state"}
+        symbol_fields = {
+            "closes",
+            "days",
+            "cur_date",
+            "cur_oi_notional",
+            "cur_dollar_volume",
+            "cur_close",
+            "mode",
+            "entry_price",
+            "decisions_held",
+            "last_time_key",
+            "score",
+            "last_committed_day",
+        }
+        if (
+            not isinstance(state, dict)
+            or set(state) != fields
+            or len(self.symbol_list) != len(set(self.symbol_list))
+            or not isinstance(state["symbol_state"], dict)
+            or set(state["symbol_state"]) != set(self._state)
+            or not isinstance(state["last_committed_day"], str)
+            or (
+                state["last_committed_day"]
+                and _committed_day_lag_days(
+                    state["last_committed_day"], state["last_committed_day"]
                 )
-                item.cur_close = safe_float(payload.get("cur_close"))
-                mode = str(payload.get("mode", "OUT")).upper()
-                item.mode = mode if mode in {"OUT", "LONG", "SHORT"} else "OUT"
-                item.entry_price = safe_float(payload.get("entry_price"))
-                item.decisions_held = _safe_non_negative_int(payload.get("decisions_held"))
-                item.last_time_key = str(payload.get("last_time_key", ""))
-                item.score = safe_float(payload.get("score"))
-                item.last_committed_day = str(payload.get("last_committed_day", "") or "")
-            except Exception:
-                continue
+                is None
+            )
+            or not isinstance(state["recent_times"], list)
+            or len(state["recent_times"]) > int(self._recent_times.maxlen or 0)
+            or not all(
+                isinstance(value, (int, float))
+                and not isinstance(value, bool)
+                and math.isfinite(value)
+                for value in state["recent_times"]
+            )
+            or any(right <= left for left, right in pairwise(state["recent_times"]))
+        ):
+            return
+        week = state["last_eval_week"]
+        if week is not None:
+            if (
+                not isinstance(week, list)
+                or len(week) != 2
+                or any(isinstance(value, bool) or not isinstance(value, int) for value in week)
+            ):
+                return
+            try:
+                date.fromisocalendar(week[0], week[1], 1)
+            except ValueError:
+                return
+        restored: dict[str, _State] = {}
+        common_days: list[str] | None = None
+        common_closes_len: int | None = None
+        common_cur_date: str | None = None
+        common_time: str | None = None
+        for symbol in self.symbol_list:
+            payload = state["symbol_state"][symbol]
+            if not isinstance(payload, dict) or set(payload) != symbol_fields:
+                return
+            closes, records = payload["closes"], payload["days"]
+            if (
+                not isinstance(closes, list)
+                or not isinstance(records, list)
+                or len(closes) > int(self._state[symbol].closes.maxlen or 0)
+                or len(records) > int(self._state[symbol].days.maxlen or 0)
+                or not all(
+                    isinstance(value, (int, float))
+                    and not isinstance(value, bool)
+                    and math.isfinite(value)
+                    and value > self.min_price
+                    for value in closes
+                )
+            ):
+                return
+            parsed_records: list[_DayRecord] = []
+            for record in records:
+                if (
+                    not isinstance(record, list)
+                    or len(record) != 4
+                    or not isinstance(record[0], str)
+                ):
+                    return
+                oi, volume, close = record[1:]
+                if (
+                    (
+                        oi is not None
+                        and (
+                            isinstance(oi, bool)
+                            or not isinstance(oi, (int, float))
+                            or not math.isfinite(oi)
+                            or oi < 0.0
+                        )
+                    )
+                    or isinstance(volume, bool)
+                    or not isinstance(volume, (int, float))
+                    or not math.isfinite(volume)
+                    or volume < 0.0
+                    or isinstance(close, bool)
+                    or not isinstance(close, (int, float))
+                    or not math.isfinite(close)
+                    or close <= self.min_price
+                ):
+                    return
+                parsed_records.append(_DayRecord(record[0], oi, float(volume), float(close)))
+            try:
+                if not math.isfinite(math.fsum(record.dollar_volume for record in parsed_records)):
+                    return
+            except OverflowError:
+                return
+            days = [record.day for record in parsed_records]
+            last_committed = payload["last_committed_day"]
+            cur_date, cur_oi, cur_volume, cur_close, last_time = (
+                payload["cur_date"],
+                payload["cur_oi_notional"],
+                payload["cur_dollar_volume"],
+                payload["cur_close"],
+                payload["last_time_key"],
+            )
+            mode, entry, held, score = (
+                payload["mode"],
+                payload["entry_price"],
+                payload["decisions_held"],
+                payload["score"],
+            )
+            if (
+                not isinstance(last_committed, str)
+                or last_committed != state["last_committed_day"]
+                or bool(days) != bool(last_committed)
+                or (
+                    days
+                    and (
+                        _committed_day_lag_days(days[-1], days[-1]) is None
+                        or days[-1] != last_committed
+                        or any(
+                            ((lag := _committed_day_lag_days(left, right)) is None or lag <= 0)
+                            for left, right in pairwise(days)
+                        )
+                    )
+                )
+                or (not isinstance(cur_date, str) and cur_date is not None)
+                or (cur_date is not None and _committed_day_lag_days(cur_date, cur_date) is None)
+                or isinstance(cur_volume, bool)
+                or not isinstance(cur_volume, (int, float))
+                or not math.isfinite(cur_volume)
+                or cur_volume < 0.0
+                or (
+                    cur_oi is not None
+                    and (
+                        isinstance(cur_oi, bool)
+                        or not isinstance(cur_oi, (int, float))
+                        or not math.isfinite(cur_oi)
+                        or cur_oi < 0.0
+                    )
+                )
+                or (
+                    cur_close is not None
+                    and (
+                        isinstance(cur_close, bool)
+                        or not isinstance(cur_close, (int, float))
+                        or not math.isfinite(cur_close)
+                        or cur_close <= self.min_price
+                    )
+                )
+                or not isinstance(last_time, str)
+                or (last_time and _event_datetime_utc(last_time) is None)
+                or mode not in {"OUT", "LONG", "SHORT"}
+                or isinstance(held, bool)
+                or not isinstance(held, int)
+                or held < 0
+                or (
+                    entry is not None
+                    and (
+                        isinstance(entry, bool)
+                        or not isinstance(entry, (int, float))
+                        or not math.isfinite(entry)
+                        or entry <= self.min_price
+                    )
+                )
+                or (
+                    score is not None
+                    and (
+                        isinstance(score, bool)
+                        or not isinstance(score, (int, float))
+                        or not math.isfinite(score)
+                    )
+                )
+                or (mode == "OUT" and (entry is not None or held != 0 or score is not None))
+                or (mode != "OUT" and (entry is None or score is None))
+            ):
+                return
+            if cur_date is None:
+                if cur_oi is not None or cur_volume != 0.0 or cur_close is not None or last_time:
+                    return
+            elif (
+                cur_close is None
+                or not last_time
+                or _event_datetime_utc(last_time).date().isoformat() != cur_date
+                or (
+                    last_committed
+                    and (
+                        (lag := _committed_day_lag_days(last_committed, cur_date)) is None
+                        or lag <= 0
+                    )
+                )
+                or (not last_committed and days)
+            ):
+                return
+            if common_days is None:
+                common_days, common_closes_len = days, len(closes)
+                common_cur_date, common_time = cur_date, last_time
+            elif (
+                days != common_days
+                or len(closes) != common_closes_len
+                or cur_date != common_cur_date
+                or last_time != common_time
+            ):
+                return
+            restored[symbol] = _State(
+                closes=deque(
+                    (float(value) for value in closes), maxlen=self._state[symbol].closes.maxlen
+                ),
+                days=deque(parsed_records, maxlen=self._state[symbol].days.maxlen),
+                cur_date=cur_date,
+                cur_oi_notional=float(cur_oi) if cur_oi is not None else None,
+                cur_dollar_volume=float(cur_volume),
+                cur_close=float(cur_close) if cur_close is not None else None,
+                mode=mode,
+                entry_price=float(entry) if entry is not None else None,
+                decisions_held=held,
+                last_time_key=last_time,
+                score=float(score) if score is not None else None,
+                last_committed_day=last_committed,
+            )
+        if not common_time:
+            if week is not None or state["recent_times"]:
+                return
+        else:
+            current_dt = _event_datetime_utc(common_time)
+            current_week = current_dt.isocalendar()
+            if (
+                week != [int(current_week[0]), int(current_week[1])]
+                or not state["recent_times"]
+                or state["recent_times"][-1] != current_dt.timestamp()
+            ):
+                return
+        self._last_eval_week = tuple(week) if week is not None else None
+        self._last_committed_day = state["last_committed_day"]
+        self._recent_times = deque(state["recent_times"], maxlen=self._recent_times.maxlen)
+        self._state = restored
 
     def on_warmup_end(self) -> None:
         """Engine warmup-end hook: drop the ghost book entered during warmup.
@@ -432,16 +611,40 @@ class OpenInterestGrowthPressureStrategy(Strategy):
     # ------------------------------------------------------------------ #
     # ingestion
     # ------------------------------------------------------------------ #
-    def _update_symbol(self, symbol: str, snapshot: _Snapshot, event: Any) -> bool:
-        close = safe_float(snapshot.close)
-        if close is None or close <= self.min_price:
+    def _update_symbol(
+        self, symbol: str, snapshot: _Snapshot, oi: float | None, mark: float | None
+    ) -> bool:
+        close = snapshot.close
+        volume = snapshot.volume
+        if (
+            isinstance(close, bool)
+            or not isinstance(close, (int, float))
+            or not math.isfinite(close)
+            or close <= self.min_price
+            or isinstance(volume, bool)
+            or not isinstance(volume, (int, float))
+            or not math.isfinite(volume)
+            or volume < 0.0
+        ):
+            return False
+        dollar_volume = close * volume
+        if not math.isfinite(dollar_volume):
+            return False
+        if (oi is not None and (not math.isfinite(oi) or oi < 0.0)) or (
+            mark is not None and (not math.isfinite(mark) or mark <= 0.0)
+        ):
+            return False
+        if oi is not None and mark is not None and not math.isfinite(oi * mark):
             return False
         item = self._state[symbol]
-        key = time_key(snapshot.time)
-        if key and key == item.last_time_key:
-            return False
         dt = _event_datetime_utc(snapshot.time)
         if dt is None:
+            return False
+        key = dt.isoformat()
+        previous_dt = _event_datetime_utc(item.last_time_key) if item.last_time_key else None
+        if previous_dt is None and item.last_time_key:
+            return False
+        if previous_dt is not None and dt <= previous_dt:
             return False
         item.last_time_key = key
         date_str = dt.date().isoformat()
@@ -452,6 +655,7 @@ class OpenInterestGrowthPressureStrategy(Strategy):
         if item.cur_date is not None and date_str != item.cur_date:
             item.days.append(
                 _DayRecord(
+                    day=item.cur_date,
                     oi_notional=item.cur_oi_notional,
                     dollar_volume=item.cur_dollar_volume,
                     close=item.cur_close if item.cur_close is not None else close,
@@ -467,12 +671,11 @@ class OpenInterestGrowthPressureStrategy(Strategy):
             item.cur_dollar_volume = 0.0
         item.cur_date = date_str
         item.cur_close = close
-        volume = safe_float(snapshot.volume)
-        if volume is not None and volume > 0.0:
-            item.cur_dollar_volume += close * volume
-        # None-tolerant feature cascade: event attr -> feature lookup -> bar value.
-        oi = _extract_feature(self.bars, event, symbol, "open_interest")
-        mark = _extract_feature(self.bars, event, symbol, "mark_price")
+        if not math.isfinite(item.cur_dollar_volume + dollar_volume):
+            return False
+        item.cur_dollar_volume += dollar_volume
+        # Only the exact-current raw row is authoritative.  Do not fall back
+        # to feature caches: they may be stale relative to this window.
         if oi is not None and mark is not None and oi >= 0.0 and mark > 0.0:
             notional = oi * mark
             if math.isfinite(notional):
@@ -482,25 +685,102 @@ class OpenInterestGrowthPressureStrategy(Strategy):
 
     def calculate_signals_window(self, event: Any, aggregator: Any = None) -> None:
         _ = aggregator
-        updated = False
-        for symbol in _event_symbols(event, self.symbol_list):
+        if not self.symbol_list:
+            return
+        event_dt = _event_datetime_utc(getattr(event, "time", None))
+        if event_dt is None:
+            return
+        try:
+            payload_symbols = list(dict(getattr(event, "bars_1s", {}) or {}))
+            configured_symbols = set(self.symbol_list)
+        except TypeError, ValueError:
+            return
+        if (
+            len(configured_symbols) != len(self.symbol_list)
+            or len(payload_symbols) != len(set(payload_symbols))
+            or set(payload_symbols) != configured_symbols
+        ):
+            return
+        panel: list[tuple[str, _Snapshot, float | None, float | None]] = []
+        for symbol in self.symbol_list:
             snapshot = _window_snapshot(event, symbol)
-            if snapshot is not None and self._update_symbol(symbol, snapshot, event):
-                updated = True
-        if updated:
-            self._maybe_evaluate(getattr(event, "time", None))
+            raw_row = _exact_current_raw_row(event, symbol, event_dt)
+            if snapshot is None:
+                return
+            snapshot_dt = _event_datetime_utc(snapshot.time)
+            close = safe_float(snapshot.close)
+            item = self._state[symbol]
+            previous_dt = _event_datetime_utc(item.last_time_key) if item.last_time_key else None
+            if (
+                snapshot_dt is None
+                or snapshot_dt != event_dt
+                or raw_row is None
+                or "open_interest" not in raw_row
+                or "mark_price" not in raw_row
+                or close is None
+                or not math.isfinite(close)
+                or close <= self.min_price
+                or (item.last_time_key and previous_dt is None)
+                or (previous_dt is not None and snapshot_dt <= previous_dt)
+            ):
+                return
+            raw_volume = raw_row.get("volume")
+            raw_oi = raw_row["open_interest"]
+            raw_mark = raw_row["mark_price"]
+            if (
+                isinstance(raw_volume, bool)
+                or not isinstance(raw_volume, (int, float))
+                or not math.isfinite(raw_volume)
+                or raw_volume < 0.0
+            ):
+                return
+            if raw_oi is not None and (
+                isinstance(raw_oi, bool)
+                or not isinstance(raw_oi, (int, float))
+                or not math.isfinite(raw_oi)
+                or raw_oi < 0.0
+            ):
+                return
+            if raw_mark is not None and (
+                isinstance(raw_mark, bool)
+                or not isinstance(raw_mark, (int, float))
+                or not math.isfinite(raw_mark)
+                or raw_mark <= 0.0
+            ):
+                return
+            dollar_volume = close * raw_volume
+            if not math.isfinite(dollar_volume) or (
+                raw_oi is not None and raw_mark is not None and not math.isfinite(raw_oi * raw_mark)
+            ):
+                return
+            pending_volume = (
+                dollar_volume
+                if item.cur_date is None or snapshot_dt.date().isoformat() != item.cur_date
+                else item.cur_dollar_volume + dollar_volume
+            )
+            if not math.isfinite(pending_volume):
+                return
+            panel.append(
+                (
+                    symbol,
+                    snapshot,
+                    float(raw_oi) if raw_oi is not None else None,
+                    float(raw_mark) if raw_mark is not None else None,
+                )
+            )
+        # Every mutable operation follows the complete-panel preflight.  Missing
+        # OI is intentionally committed as a coverage absence by _update_symbol.
+        for symbol, snapshot, oi, mark in panel:
+            self._update_symbol(symbol, snapshot, oi, mark)
+        self._maybe_evaluate(event_dt)
 
     def calculate_signals(self, event: Any) -> None:
         if str(getattr(event, "type", "")).upper() == "MARKET_WINDOW":
             self.calculate_signals_window(event, None)
             return
-        if getattr(event, "type", None) != "MARKET":
-            return
-        symbol = getattr(event, "symbol", None)
-        if symbol in self._state:
-            snapshot = _market_snapshot(event)
-            if snapshot is not None and self._update_symbol(str(symbol), snapshot, event):
-                self._maybe_evaluate(snapshot.time)
+        # Cross-sectional state is only advanced by complete MARKET_WINDOW
+        # panels; individual callbacks cannot create a partial panel.
+        return
 
     # ------------------------------------------------------------------ #
     # weekly ISO-week decision clock
@@ -540,40 +820,57 @@ class OpenInterestGrowthPressureStrategy(Strategy):
                 # a symbol whose last committed day predates the strategy-level
                 # latest committed day is a dead/stale feed and is EXCLUDED
                 # from the rank instead of being ranked on old formation data.
-                # Days commit per symbol on that symbol's NEXT bar, so at the
-                # weekly trigger live peers lag the trigger symbol by at most
-                # one committed day -- the ``> 1`` allowance below is that
-                # commit lag, not a staleness tolerance.
                 lag = _committed_day_lag_days(item.last_committed_day, latest_committed)
-                if lag is None or lag > 1:
+                if lag is None or lag != 0:
                     continue
             if len(item.days) < self.min_history_days:
                 continue
-            window = list(item.days)[-window_len:]
-            if len(window) < window_len:
+            records = {record.day: record for record in item.days}
+            try:
+                end_day = date.fromisoformat(latest_committed)
+            except ValueError:
                 continue
+            window_days = [
+                (end_day - timedelta(days=offset)).isoformat()
+                for offset in range(window_len - 1, -1, -1)
+            ]
+            window = [records.get(day) for day in window_days]
+            # The formation horizon is seven UTC calendar days, not a count
+            # of source events. Missing UTC days are never filled from an
+            # arbitrary-cadence bar stream.
+            if any(record is None for record in window):
+                continue
+            finalized_window = [record for record in window if record is not None]
             samples = [
                 (idx, record.oi_notional)
-                for idx, record in enumerate(window)
-                if record.oi_notional is not None
+                for idx, record in enumerate(finalized_window)
+                if record.oi_notional is not None and math.isfinite(record.oi_notional)
             ]
             # In-window coverage floor -> deterministic exclusion (documented).
             coverage = len(samples) / float(window_len)
             if coverage < self.min_oi_coverage or len(samples) < 2:
                 continue
-            first_idx, first_oi = samples[0]
-            last_idx, last_oi = samples[-1]
-            if last_idx <= first_idx:
+            first_oi = finalized_window[0].oi_notional
+            last_oi = finalized_window[-1].oi_notional
+            # The two notional endpoints define the documented 7d delta.
+            # Interior missing OI observations may satisfy the coverage gate,
+            # but a missing endpoint is not a computable growth rate.
+            if first_oi is None or last_oi is None:
                 continue
             delta_oi = float(last_oi) - float(first_oi)
             # Normalizer: trailing dollar volume over the formation days
             # (the base day excluded -- it anchors the OI level, not the flow).
-            dollar_volume = sum(record.dollar_volume for record in window[1:])
-            if dollar_volume <= _EPS:
+            dollar_volume = sum(record.dollar_volume for record in finalized_window[1:])
+            if not math.isfinite(dollar_volume) or dollar_volume <= _EPS:
                 continue
-            first_close = window[0].close
-            last_close = window[-1].close
-            if first_close <= 0.0 or last_close <= 0.0:
+            first_close = finalized_window[0].close
+            last_close = finalized_window[-1].close
+            if (
+                not math.isfinite(first_close)
+                or not math.isfinite(last_close)
+                or first_close <= 0.0
+                or last_close <= 0.0
+            ):
                 continue
             mom_value = math.log(last_close / first_close)
             if not math.isfinite(mom_value):

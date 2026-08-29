@@ -2206,27 +2206,35 @@
   "research_only": true,
   "risk_scaling": {
     "bars_per_year": 365,
-    "cash_note": "final weights = L * w (allocator weights sum to 1); the residual 1-L is the cash weight recorded as the manifest's cash_weight. The simulator accrues NO interest on idle cash (RiskFreePolicy is the excess-return benchmark for Sharpe/Sortino only); a real risk-free yield on the residual is a live-deployment detail outside the backtest",
-    "estimation": "sigma_hat = std of the common-date aligned train+validation NET portfolio stream under the allocator's relative weights; the ONLY estimate consumed (no mu forecast anywhere in the primary path)",
     "max_leverage": 1.0,
     "method": "target_vol",
     "min_observations": 60,
-    "sigma_target_annual": 0.1,
+    "sigma_target_annual": 0.1
+  },
+  "risk_scaling_research": {
+    "cash_note": "final weights = L * w (allocator weights sum to 1); the residual 1-L is the cash weight recorded as the manifest's cash_weight. The simulator accrues NO interest on idle cash (RiskFreePolicy is the excess-return benchmark for Sharpe/Sortino only); a real risk-free yield on the residual is a live-deployment detail outside the backtest",
+    "estimation": "sigma_hat = std of the common-date aligned train+validation NET portfolio stream under the allocator's relative weights; the ONLY estimate consumed (no mu forecast anywhere in the primary path)",
     "variants": [
       {
-        "method": "target_vol",
-        "sigma_target_annual": 0.1
+        "spec": {
+          "method": "target_vol",
+          "sigma_target_annual": 0.1
+        }
       },
       {
-        "method": "target_vol",
-        "sigma_target_annual": 0.05
+        "spec": {
+          "method": "target_vol",
+          "sigma_target_annual": 0.05
+        }
       },
       {
-        "fraction": 0.5,
-        "method": "fractional_kelly",
-        "mu_evidence_confirmed": false,
         "note": "Kelly re-introduces the mu-hat estimation problem the mu-free allocators avoid (an overestimated mean scales exposure linearly); resolve_risk_scaling_spec fails closed until mu_evidence_confirmed is set true on locked-OOS evidence. Until then it is exercised only through the kelly_mu_sensitivity diagnostic in compare_hierarchical_allocators.py.",
-        "risk_free_annual": 0.0,
+        "spec": {
+          "fraction": 0.5,
+          "method": "fractional_kelly",
+          "mu_evidence_confirmed": false,
+          "risk_free_annual": 0.0
+        },
         "status": "gated_until_locked_oos_mu_evidence"
       }
     ]

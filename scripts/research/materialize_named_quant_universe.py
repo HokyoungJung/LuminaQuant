@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import math
+import os
 from copy import deepcopy
 from datetime import UTC, datetime
 from pathlib import Path
@@ -151,6 +152,31 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _publish_json(path: Path, payload: Any) -> None:
+    """Atomically publish a new artifact without replacing prior evidence."""
+    if path.exists() or path.is_symlink():
+        raise ValueError(f"output target already exists: {path}")
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    try:
+        with temporary.open("x", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        try:
+            os.link(temporary, path)
+        except FileExistsError as exc:
+            raise ValueError(f"output target already exists: {path}") from exc
+        directory_fd = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+    except Exception:
+        raise
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
 def _positive_float(value: Any) -> float | None:
     if isinstance(value, bool):
         return None
@@ -254,7 +280,24 @@ def materialize(
         elif binding not in bindings:
             raise ValueError(f"unknown universe binding: {binding!r}")
         else:
-            candidate["symbols"] = list(bindings[binding])
+            configured_symbols = candidate.get("symbols")
+            if not isinstance(configured_symbols, list) or not all(
+                isinstance(symbol, str) and symbol for symbol in configured_symbols
+            ):
+                raise ValueError(f"{binding} candidate requires configured symbol strings")
+            if binding == "tradfi_all":
+                candidate["symbols"] = [
+                    symbol for symbol in configured_symbols if symbol in bindings["tradfi_all"]
+                ]
+            elif binding == "crypto_top10_plus_tradfi":
+                candidate["symbols"] = [
+                    *bindings["crypto_top10"],
+                    *[symbol for symbol in configured_symbols if symbol in bindings["tradfi_all"]],
+                ]
+            else:
+                candidate["symbols"] = list(bindings[binding])
+            if not candidate["symbols"]:
+                raise ValueError(f"{binding} candidate has no point-in-time symbols")
             patched.append(
                 str(candidate.get("candidate_id") or candidate.get("name") or "<unnamed>")
             )
@@ -342,7 +385,7 @@ def main() -> None:
             crypto_top_n=args.crypto_top_n,
         )
         args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(json.dumps(output, indent=2, sort_keys=True) + "\n")
+        _publish_json(args.output, output)
     except (OSError, json.JSONDecodeError, ValueError) as exc:
         parser.error(str(exc))
 

@@ -50,7 +50,10 @@ from lumina_quant.core.plugin_registry import register
 from lumina_quant.indicators.common import safe_float, time_key
 from lumina_quant.indicators.moving_average import simple_moving_average
 from lumina_quant.indicators.oscillators import rate_of_change
-from lumina_quant.indicators.variance_ratio import variance_ratio as _variance_ratio
+from lumina_quant.indicators.variance_ratio import (
+    variance_ratio as _variance_ratio,
+    variance_ratio_zstat,
+)
 from lumina_quant.strategies.external_alpha_sleeves import _EPS, _Snapshot
 from lumina_quant.strategies.return_rider_alpha_sleeves import (
     _ReturnRiderBase,
@@ -70,14 +73,6 @@ def _rolling_std(values: list[float]) -> float | None:
     if var <= 0.0:
         return None
     return math.sqrt(var)
-
-
-# The Lo-MacKinlay variance ratio now lives at indicator level
-# (``indicators/variance_ratio.py``); the BIASED overlapping estimator that this
-# sleeve always used is that indicator's DEFAULT, so the ``_variance_ratio``
-# import alias above is parity-locked byte-identical to the previous private
-# helper.  Unbiased / heteroskedasticity-robust z-stat variants are opt-in at
-# the indicator and unused here.
 
 
 def _trend_sign(
@@ -177,8 +172,12 @@ class CusumChangePointTrendRiderStrategy(_ReturnRiderBase):
         item = self._state.get(symbol)
         if item is not None:
             key = time_key(snapshot.time)
-            if not (key and key == item.last_time_key):
-                self._update_cusum(symbol, item, snapshot)
+            # CUSUM is a sequential statistic: replaying a completed feature
+            # point (or accepting an unkeyed/older point) would manufacture
+            # drift.  Do not let the base append it either.
+            if not key or (item.last_time_key and key <= item.last_time_key):
+                return
+            self._update_cusum(symbol, item, snapshot)
         super()._process_symbol(symbol, snapshot)
 
     def _update_cusum(self, symbol: str, item: _RiderState, snapshot: _Snapshot) -> None:
@@ -199,7 +198,15 @@ class CusumChangePointTrendRiderStrategy(_ReturnRiderBase):
         std = _rolling_std(list(history)[-self.cusum_vol_window :])
         if std is None or std <= _EPS:
             return
-        z = ret / std
+        # Standardize the return innovation, not its level.  The rolling
+        # 7-day feature's magnitude is therefore measured relative to its own
+        # realized mean and volatility, and the detector only advances once
+        # for each completed bar above.
+        sample = list(history)[-self.cusum_vol_window :]
+        mean = math.fsum(sample) / len(sample)
+        z = (ret - mean) / std
+        if not math.isfinite(z):
+            return
         s_hi = max(0.0, self._s_hi.get(symbol, 0.0) + z - self.cusum_k)
         s_lo = min(0.0, self._s_lo.get(symbol, 0.0) + z + self.cusum_k)
         if s_hi >= self.cusum_h:
@@ -299,7 +306,7 @@ class VarianceRatioTrendRiderStrategy(_ReturnRiderBase):
         return {
             "vr_window": HyperParam.integer("vr_window", default=96, low=8, high=8192),
             "vr_k": HyperParam.integer("vr_k", default=4, low=2, high=512),
-            "vr_threshold": HyperParam.floating("vr_threshold", default=0.10, low=0.0, high=10.0),
+            "vr_threshold": HyperParam.floating("vr_threshold", default=1.96, low=0.1, high=10.0),
             "trend_lookback": HyperParam.integer("trend_lookback", default=48, low=3, high=20000),
             "trend_ma_window": HyperParam.integer("trend_ma_window", default=48, low=2, high=8192),
             "min_trend_roc": HyperParam.floating("min_trend_roc", default=0.0, low=0.0, high=1.0),
@@ -335,7 +342,9 @@ class VarianceRatioTrendRiderStrategy(_ReturnRiderBase):
     def _bind_params(self, resolved: dict[str, Any]) -> None:
         self.vr_window = max(8, int(resolved["vr_window"]))
         self.vr_k = max(2, int(resolved["vr_k"]))
-        self.vr_threshold = max(0.0, float(resolved["vr_threshold"]))
+        # ``vr_threshold`` is a positive, null-standardized Lo-MacKinlay
+        # z-statistic threshold, not an unscaled VR distance from one.
+        self.vr_threshold = max(0.1, float(resolved["vr_threshold"]))
         self.trend_lookback = max(3, int(resolved["trend_lookback"]))
         self.trend_ma_window = max(2, int(resolved["trend_ma_window"]))
         self.min_trend_roc = max(0.0, float(resolved["min_trend_roc"]))
@@ -355,10 +364,15 @@ class VarianceRatioTrendRiderStrategy(_ReturnRiderBase):
         # Append this bar's realized log return BEFORE the base runs ride+entry,
         # mirroring the base time-key dedup.  Causal (current vs previous close).
         item = self._state.get(symbol)
-        if item is not None:
-            key = time_key(snapshot.time)
-            if not (key and key == item.last_time_key):
-                self._append_return(symbol, item, snapshot)
+        if item is None:
+            return
+        key = time_key(snapshot.time)
+        # The feature and the base must advance together.  An unkeyed,
+        # repeated, or older bar is not a new realized return and must not
+        # mutate either history.
+        if not key or (item.last_time_key and key <= item.last_time_key):
+            return
+        self._append_return(symbol, item, snapshot)
         super()._process_symbol(symbol, snapshot)
 
     def _append_return(self, symbol: str, item: _RiderState, snapshot: _Snapshot) -> None:
@@ -379,15 +393,23 @@ class VarianceRatioTrendRiderStrategy(_ReturnRiderBase):
                 return symbol
         return None
 
-    def _vr(self, symbol: str) -> float | None:
+    def _vr(self, symbol: str) -> tuple[float, float] | None:
         history = self._returns.get(symbol)
         if not history or len(history) < self.vr_window:
             return None
-        return _variance_ratio(list(history)[-self.vr_window :], self.vr_k)
+        # The fixed-lag test consumes the complete configured sample.  Do not
+        # truncate it to a disjoint half-sample before estimating overlapping
+        # k-period returns.
+        sample = list(history)[-self.vr_window :]
+        vr = _variance_ratio(sample, self.vr_k, unbiased=True)
+        z_stat = variance_ratio_zstat(sample, self.vr_k)
+        if vr is None or z_stat is None or not math.isfinite(z_stat):
+            return None
+        return vr, z_stat
 
     def _gated_direction(self, symbol: str, item: _RiderState) -> str:
-        vr = self._vr(symbol)
-        if vr is None or vr < 1.0 + self.vr_threshold:
+        statistic = self._vr(symbol)
+        if statistic is None or statistic[1] < self.vr_threshold:
             # Random-walk or mean-reverting regime -> no trend ride.
             return ""
         trend = _trend_sign(
@@ -416,9 +438,10 @@ class VarianceRatioTrendRiderStrategy(_ReturnRiderBase):
 
     def _entry_metadata(self, item: _RiderState) -> dict[str, Any]:
         symbol = self._symbol_for(item)
-        vr = self._vr(symbol) if symbol is not None else None
+        statistic = self._vr(symbol) if symbol is not None else None
         return {
-            "variance_ratio": float(vr) if vr is not None else None,
+            "variance_ratio": float(statistic[0]) if statistic is not None else None,
+            "variance_ratio_z": float(statistic[1]) if statistic is not None else None,
             "vr_k": int(self.vr_k),
         }
 

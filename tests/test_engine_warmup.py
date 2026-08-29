@@ -22,6 +22,7 @@ from lumina_quant.backtesting.data import HistoricCSVDataHandler
 from lumina_quant.backtesting.data_windowed_parquet import HistoricParquetWindowedDataHandler
 from lumina_quant.backtesting.execution_sim import SimulatedExecutionHandler
 from lumina_quant.backtesting.portfolio_backtest import Portfolio
+from lumina_quant.core.engine import TradingEngine
 from lumina_quant.core.events import SignalEvent
 from lumina_quant.optimization.walkers import InsufficientWarmupError
 from lumina_quant.strategy import Strategy
@@ -486,6 +487,51 @@ def test_warmup_end_hook_fires_in_continuation_chunk_via_had_warmup():
 
     assert _ProbeHookStrategy.hook_fired_total == 1
     assert backtest.get_engine_state().get("had_warmup") is True
+
+
+def test_warmup_restores_exact_boundary_suppresses_bad_time_and_retries_failed_hook():
+    class _FlakyHook:
+        def __init__(self):
+            self.calls = 0
+
+        def on_warmup_end(self):
+            self.calls += 1
+            if self.calls == 1:
+                raise RuntimeError("transient hook failure")
+
+    def _engine(live_start_ms=None):
+        engine = object.__new__(TradingEngine)
+        engine._live_start_ms = live_start_ms
+        engine._warmup_active = False
+        engine._warmup_end_hook_fired = False
+        engine._had_warmup = live_start_ms is not None
+        engine._window_decision_last_bucket = None
+        engine.timeframe_aggregator = None
+        engine.strategy = _FlakyHook()
+        return engine
+
+    cutoff = _to_ms(T0 + timedelta(minutes=3))
+    first = _engine(cutoff)
+    first_state = TradingEngine.get_engine_state(first)
+
+    # Chunk two receives no constructor cutoff; restoring must preserve the
+    # exact epoch, and malformed timestamps must remain suppressed.
+    second = _engine()
+    TradingEngine.set_engine_state(second, first_state)
+    assert second._live_start_ms == cutoff
+    assert TradingEngine._update_warmup_state(second, "not-a-time") is True
+    second_state = TradingEngine.get_engine_state(second)
+
+    # Chunk three restores the same boundary. The hook failure is not committed,
+    # so the same first live event retries it; success commits exactly once.
+    third = _engine()
+    TradingEngine.set_engine_state(third, second_state)
+    with pytest.raises(RuntimeError, match="transient hook failure"):
+        TradingEngine._update_warmup_state(third, T0 + timedelta(minutes=3))
+    assert third._warmup_end_hook_fired is False
+    assert TradingEngine._update_warmup_state(third, T0 + timedelta(minutes=3)) is False
+    assert third.strategy.calls == 2
+    assert third._warmup_end_hook_fired is True
 
 
 def test_chunked_runner_fires_warmup_end_hook_once_total():

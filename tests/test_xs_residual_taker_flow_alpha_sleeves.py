@@ -25,6 +25,8 @@ the orchestrator covers registration).  Covered legs:
 
 from __future__ import annotations
 
+import math
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from typing import Any
 
@@ -70,12 +72,17 @@ class _Queue:
 
 
 def _window_event(idx: int, rows: dict[str, dict[str, Any]]) -> SimpleNamespace:
-    time = f"t{idx:04d}"
+    time = _time(idx)
     return SimpleNamespace(
         type="MARKET_WINDOW",
         time=time,
-        bars_1s={sym: [dict(row, time=time)] for sym, row in rows.items()},
+        bars_1s={sym: [{"time": time, **row}] for sym, row in rows.items()},
     )
+
+
+def _time(idx: int) -> str:
+    """Daily completed bars spanning several UTC-week decision boundaries."""
+    return (datetime(2026, 1, 1, tzinfo=UTC) + timedelta(days=idx)).isoformat()
 
 
 def _feed(
@@ -83,10 +90,13 @@ def _feed(
     bars: _Bars,
     series: dict[str, list[dict[str, Any]]],
     flows: dict[str, list[tuple[float, float] | None]],
+    *,
+    start_idx: int = 0,
+    end_idx: int | None = None,
 ) -> None:
     """Feed bar ``idx`` for every symbol, latching that bar's taker features."""
     n = len(next(iter(series.values())))
-    for idx in range(n):
+    for idx in range(start_idx, n if end_idx is None else end_idx):
         bars.features = {}
         for sym in series:
             print_ = flows.get(sym, [None] * n)[idx]
@@ -94,7 +104,14 @@ def _feed(
                 buy, sell = print_
                 bars.features[(sym, "taker_buy_quote_volume")] = float(buy)
                 bars.features[(sym, "taker_sell_quote_volume")] = float(sell)
-        strategy.calculate_signals(_window_event(idx, {sym: series[sym][idx] for sym in series}))
+        rows: dict[str, dict[str, Any]] = {}
+        for sym in series:
+            row = dict(series[sym][idx])
+            print_ = flows.get(sym, [None] * n)[idx]
+            if print_ is not None:
+                row["taker_buy_quote_volume"], row["taker_sell_quote_volume"] = print_
+            rows[sym] = row
+        strategy.calculate_signals(_window_event(idx, rows))
 
 
 def _final_side(items: list[Any]) -> dict[str, str]:
@@ -177,8 +194,6 @@ def _panel() -> tuple[dict[str, list[dict[str, Any]]], dict[str, list[tuple[floa
 
 _COMMON_KWARGS: dict[str, Any] = dict(
     formation_window_bars=12,
-    decision_interval_bars=1,
-    rebalance_decisions=1,
     min_hold_decisions=0,
     rank_hysteresis_z=0.0,
     quantile_pct=0.20,
@@ -340,29 +355,95 @@ def test_missing_taker_features_yields_no_entries_and_never_raises() -> None:
     assert _non_exit(strat.events.items) == []
 
 
-def test_partial_feature_coverage_only_covered_symbols_enter() -> None:
+def test_partial_market_window_abstains_without_using_stale_symbol_history() -> None:
     series, flows = _panel()
-    # Kill the taker prints for one accumulation name entirely: all-or-nothing
-    # capture drops its bars, so it contributes NO entries (never a stale rank).
+    # A MARKET_WINDOW is atomic: dropping one member's taker print must not
+    # rank the remaining names against that member's stale history.
     flows = dict(flows)
     flows["ACC0/USDT"] = [None] * _N
-    strat = _run(series, flows)
-    side = _final_side(strat.events.items)
-    assert "ACC0/USDT" not in side
-    assert side.get("ACC1/USDT") == "LONG"
-    assert side.get("DIST0/USDT") == "SHORT"
+    bars = _Bars(list(series))
+    strat = CrossSectionalResidualTakerFlowStrategy(bars, _Queue(), **_COMMON_KWARGS)
+    before_state = strat.get_state()
+    before_events = list(strat.events.items)
+    _feed(strat, bars, series, flows)
+    assert strat.get_state() == before_state
+    assert strat.events.items == before_events
+    assert _non_exit(strat.events.items) == []
+
+
+def test_individual_market_events_do_not_mutate_cross_sectional_state() -> None:
+    series, flows = _panel()
+    bars = _Bars(list(series))
+    strat = CrossSectionalResidualTakerFlowStrategy(bars, _Queue(), **_COMMON_KWARGS)
+    _feed(strat, bars, series, flows)
+    before_state = strat.get_state()
+    before_events = list(strat.events.items)
+    next_week = _N + 7
+    for sym in series:
+        buy, sell = flows[sym][0]  # type: ignore[misc]
+        bars.features = {
+            (sym, "taker_buy_quote_volume"): float(buy),
+            (sym, "taker_sell_quote_volume"): float(sell),
+        }
+        strat.calculate_signals(
+            SimpleNamespace(
+                type="MARKET",
+                symbol=sym,
+                time=_time(next_week),
+                **series[sym][0],
+            )
+        )
+    assert strat.get_state() == before_state
+    assert strat.events.items == before_events
+
+
+def test_skewed_market_window_abstains_without_committing_a_partial_panel() -> None:
+    series, flows = _panel()
+    bars = _Bars(list(series))
+    strat = CrossSectionalResidualTakerFlowStrategy(bars, _Queue(), **_COMMON_KWARGS)
+    _feed(strat, bars, series, flows)
+    before_state = strat.get_state()
+    before_events = list(strat.events.items)
+    bars.features = {
+        (sym, field): float(value)
+        for sym in series
+        for field, value in zip(
+            ("taker_buy_quote_volume", "taker_sell_quote_volume"),
+            flows[sym][0],  # type: ignore[arg-type]
+        )
+    }
+    rows = {sym: dict(series[sym][0]) for sym in series}
+    rows["ACC0/USDT"]["time"] = _time(_N + 1)
+    strat.calculate_signals(_window_event(_N + 2, rows))
+    assert strat.get_state() == before_state
+    assert strat.events.items == before_events
+
+    older_rows = {sym: dict(series[sym][0]) for sym in series}
+    strat.calculate_signals(_window_event(_N - 1, older_rows))
+    assert strat.get_state() == before_state
+    assert strat.events.items == before_events
+
+    unkeyed = _window_event(_N + 2, older_rows)
+    unkeyed.bars_1s["ACC0/USDT"][0].pop("time")
+    strat.calculate_signals(unkeyed)
+    assert strat.get_state() == before_state
+    assert strat.events.items == before_events
 
 
 def test_degenerate_input_never_raises() -> None:
     bars = _Bars(["Z/USDT"])
     strat = CrossSectionalResidualTakerFlowStrategy(bars, _Queue(), **_COMMON_KWARGS)
-    strat.calculate_signals(SimpleNamespace(type="MARKET", symbol="Z/USDT", time="t0", close=0.0))
-    strat.calculate_signals(SimpleNamespace(type="MARKET", symbol="Z/USDT", time="t1", close=-1.0))
     strat.calculate_signals(
-        SimpleNamespace(type="MARKET", symbol="Z/USDT", time="t2", close=float("nan"))
+        SimpleNamespace(type="MARKET", symbol="Z/USDT", time=_time(0), close=0.0)
     )
-    strat.calculate_signals(SimpleNamespace(type="MARKET_WINDOW", time="t3", bars_1s={}))
-    strat.calculate_signals(SimpleNamespace(type="MARKET_WINDOW", time="t4", bars_1s=None))
+    strat.calculate_signals(
+        SimpleNamespace(type="MARKET", symbol="Z/USDT", time=_time(1), close=-1.0)
+    )
+    strat.calculate_signals(
+        SimpleNamespace(type="MARKET", symbol="Z/USDT", time=_time(2), close=float("nan"))
+    )
+    strat.calculate_signals(SimpleNamespace(type="MARKET_WINDOW", time=_time(3), bars_1s={}))
+    strat.calculate_signals(SimpleNamespace(type="MARKET_WINDOW", time=_time(4), bars_1s=None))
     strat.calculate_signals(SimpleNamespace(type="HEARTBEAT"))
     assert _non_exit(strat.events.items) == []
 
@@ -431,6 +512,179 @@ def test_state_roundtrip_lossless() -> None:
     )
     restored.set_state(snapshot)
     assert restored.get_state() == snapshot
+
+
+def test_state_roundtrip_continues_like_the_original_panel() -> None:
+    series, flows = _panel()
+    series = {symbol: values + values for symbol, values in series.items()}
+    flows = {symbol: values + values for symbol, values in flows.items()}
+    bars = _Bars(list(series))
+    original = CrossSectionalResidualTakerFlowStrategy(bars, _Queue(), **_COMMON_KWARGS)
+    _feed(original, bars, series, flows, end_idx=_N)
+    restored_bars = _Bars(list(series))
+    restored = CrossSectionalResidualTakerFlowStrategy(restored_bars, _Queue(), **_COMMON_KWARGS)
+    restored.set_state(original.get_state())
+    original_event_count = len(original.events.items)
+    _feed(original, bars, series, flows, start_idx=_N)
+    _feed(restored, restored_bars, series, flows, start_idx=_N)
+    assert restored.get_state() == original.get_state()
+    assert restored.events.items == original.events.items[original_event_count:]
+
+
+def test_flow_uses_cumulative_trailing_window_not_last_bar() -> None:
+    symbols = ["A/USDT", "B/USDT", "C/USDT"]
+    series = {
+        "A/USDT": _flat_bars(100.0, 4),
+        "B/USDT": _flat_bars(101.0, 4),
+        "C/USDT": _flat_bars(102.0, 4),
+    }
+    for idx, symbol in enumerate(symbols):
+        for bar_idx, bar in enumerate(series[symbol]):
+            bar["close"] = 100.0 + idx + ((bar_idx % 3) - 1) * (idx + 1.0)
+    flows = {
+        "A/USDT": [(50.0, 50.0), (50.0, 50.0), (100.0, 0.0), (50.5, 49.5)],
+        "B/USDT": [(50.0, 50.0), (50.0, 50.0), (0.0, 100.0), (49.5, 50.5)],
+        "C/USDT": [(50.0, 50.0), (50.0, 50.0), (60.0, 40.0), (47.5, 52.5)],
+    }
+    bars = _Bars(symbols)
+    strat = CrossSectionalResidualTakerFlowStrategy(
+        bars, _Queue(), formation_window_bars=2, vol_window=2, min_symbols=3
+    )
+    _feed(strat, bars, series, flows)
+    a_state = strat._state["A/USDT"]
+    b_state = strat._state["B/USDT"]
+    assert (
+        math.fsum(list(a_state.net_flows)[-2:]) / math.fsum(list(a_state.turnovers)[-2:])
+        == 101.0 / 200.0
+    )
+    assert (
+        math.fsum(list(b_state.net_flows)[-2:]) / math.fsum(list(b_state.turnovers)[-2:])
+        == -101.0 / 200.0
+    )
+
+
+def test_untimestamped_feature_scalar_is_not_restamped() -> None:
+    symbols = ["A/USDT", "B/USDT"]
+    bars = _Bars(symbols)
+    bars.features = {(symbol, "taker_buy_quote_volume"): 100.0 for symbol in symbols} | {
+        (symbol, "taker_sell_quote_volume"): 0.0 for symbol in symbols
+    }
+    strat = CrossSectionalResidualTakerFlowStrategy(bars, _Queue(), min_symbols=2)
+    rows = {symbol: {"close": 100.0} for symbol in symbols}
+    strat.calculate_signals(_window_event(0, rows))
+    assert all(not item.closes for item in strat._state.values())
+
+
+def test_duplicate_current_raw_rows_abstain_atomically() -> None:
+    symbols = ["A/USDT", "B/USDT"]
+    bars = _Bars(symbols)
+    strat = CrossSectionalResidualTakerFlowStrategy(bars, _Queue(), min_symbols=2)
+    event = _window_event(
+        0,
+        {
+            symbol: {
+                "close": 100.0,
+                "taker_buy_quote_volume": 75.0,
+                "taker_sell_quote_volume": 25.0,
+            }
+            for symbol in symbols
+        },
+    )
+    event.bars_1s["A/USDT"].append(dict(event.bars_1s["A/USDT"][0]))
+    strat.calculate_signals(event)
+    assert all(not item.closes for item in strat._state.values())
+
+
+def test_negative_taker_volume_abstains_atomically() -> None:
+    symbols = ["A/USDT", "B/USDT"]
+    strat = CrossSectionalResidualTakerFlowStrategy(_Bars(symbols), _Queue(), min_symbols=2)
+    event = _window_event(
+        0,
+        {
+            "A/USDT": {
+                "close": 100.0,
+                "taker_buy_quote_volume": -1.0,
+                "taker_sell_quote_volume": 25.0,
+            },
+            "B/USDT": {
+                "close": 100.0,
+                "taker_buy_quote_volume": 25.0,
+                "taker_sell_quote_volume": 25.0,
+            },
+        },
+    )
+    strat.calculate_signals(event)
+    assert all(not item.closes for item in strat._state.values())
+
+
+def test_first_panel_checkpoint_binds_exact_common_timestamps_and_rejects_overflow() -> None:
+    symbols = ["A/USDT", "B/USDT"]
+    strat = CrossSectionalResidualTakerFlowStrategy(_Bars(symbols), _Queue(), min_symbols=2)
+    rows = {
+        symbol: {
+            "close": 100.0,
+            "taker_buy_quote_volume": 75.0,
+            "taker_sell_quote_volume": 25.0,
+        }
+        for symbol in symbols
+    }
+    strat.calculate_signals(_window_event(0, rows))
+    checkpoint = strat.get_state()
+    restored = CrossSectionalResidualTakerFlowStrategy(_Bars(symbols), _Queue(), min_symbols=2)
+    restored.set_state(checkpoint)
+    assert restored.get_state() == checkpoint
+
+    forged = strat.get_state()
+    forged["symbol_state"]["B/USDT"]["times"][0] = _time(1)
+    strat.set_state(forged)
+    assert strat.get_state() == checkpoint
+
+    overflow = _window_event(
+        1,
+        {
+            symbol: {
+                "close": 100.0,
+                "taker_buy_quote_volume": 1e308,
+                "taker_sell_quote_volume": 1e308,
+            }
+            for symbol in symbols
+        },
+    )
+    strat.calculate_signals(overflow)
+    assert strat.get_state() == checkpoint
+
+
+def test_partial_or_malformed_checkpoint_leaves_live_state_unchanged() -> None:
+    series, flows = _panel()
+    strat = _run(series, flows)
+    before = strat.get_state()
+    partial = strat.get_state()
+    partial["symbol_state"].pop(next(iter(partial["symbol_state"])))
+    strat.set_state(partial)
+    assert strat.get_state() == before
+    malformed = strat.get_state()
+    symbol = next(iter(malformed["symbol_state"]))
+    malformed["symbol_state"][symbol]["turnovers"] = [1.0]
+    strat.set_state(malformed)
+    assert strat.get_state() == before
+
+
+def test_checkpoint_rejects_missing_fields_and_impossible_position() -> None:
+    series, flows = _panel()
+    strat = _run(series, flows)
+    before = strat.get_state()
+    malformed = strat.get_state()
+    symbol = next(iter(malformed["symbol_state"]))
+    malformed["symbol_state"][symbol].pop("score")
+    strat.set_state(malformed)
+    assert strat.get_state() == before
+
+    impossible = strat.get_state()
+    impossible["symbol_state"][symbol].update(
+        {"mode": "OUT", "entry_price": 100.0, "bars_held": 1, "score": 0.0}
+    )
+    strat.set_state(impossible)
+    assert strat.get_state() == before
 
 
 def test_adversarial_set_state_never_raises() -> None:
@@ -503,21 +757,24 @@ def test_self_skip_on_short_history() -> None:
 
 
 # --------------------------------------------------------------------------- #
-# two-level rebalance clock (decision ticks x rebalance decisions)
+# UTC-week rebalance lifecycle
 # --------------------------------------------------------------------------- #
 
 
-def test_rebalance_clock_gates_entries_to_decision_multiples() -> None:
-    """With ``decision_interval_bars=5`` and ``rebalance_decisions=2`` the ranker
-    only runs every 10th bar (tick % 10 == 0), i.e. the weekly clock is the
-    product of the two pre-registered cadences."""
-    series, flows = _panel()
-    strat = _run(series, flows, decision_interval_bars=5, rebalance_decisions=2)
+def test_rebalance_occurs_once_per_utc_week() -> None:
+    """The calendar week, not a bar-count cadence, controls rebalance timing."""
+    series, flows = _decay_panel()
+    strat = _run(series, flows)
     entries = _non_exit(strat.events.items)
     assert entries
+    rebalance_times: dict[tuple[int, int], set[str]] = {}
     for sig in entries:
-        tick = int(str(sig.datetime)[1:]) + 1  # bar idx -> 1-based tick
-        assert tick % 10 == 0, (sig.symbol, sig.datetime)
+        dt = datetime.fromisoformat(str(sig.datetime))
+        iso = dt.isocalendar()
+        week = (iso.year, iso.week)
+        rebalance_times.setdefault(week, set()).add(str(sig.datetime))
+    assert len(rebalance_times) >= 2
+    assert all(len(times) == 1 for times in rebalance_times.values())
 
 
 # --------------------------------------------------------------------------- #
@@ -562,21 +819,28 @@ def test_vol_target_passthrough_without_bar_spacing() -> None:
 def test_schema_keys_snake_case_and_hyperparam() -> None:
     schema = CrossSectionalResidualTakerFlowStrategy.get_param_schema()
     assert schema
+    assert set(schema) == {
+        "formation_window_bars",
+        "min_hold_decisions",
+        "rank_hysteresis_z",
+        "quantile_pct",
+        "vol_window",
+        "allow_short",
+        "min_symbols",
+        "target_gross_exposure",
+        "target_vol",
+        "stop_loss_pct",
+        "max_hold_bars",
+        "intended_hold_seconds",
+        "base_allocation",
+        "max_symbol_exposure_pct",
+        "max_order_value",
+        "min_price",
+    }
     for key, value in schema.items():
         assert key == key.lower()
         assert " " not in key
         assert isinstance(value, HyperParam)
-    for required in (
-        "formation_window_bars",
-        "decision_interval_bars",
-        "rebalance_decisions",
-        "min_hold_decisions",
-        "rank_hysteresis_z",
-        "quantile_pct",
-        "min_symbols",
-        "intended_hold_seconds",
-    ):
-        assert required in schema
 
 
 def test_required_features_declared() -> None:
@@ -588,8 +852,8 @@ def test_required_features_declared() -> None:
 
 def test_slice_mechanism_constants_pre_registered_and_invariant() -> None:
     """Every variant/timeframe carries the SAME pre-registered mechanism
-    constants (quintile 0.20, 0.5z hysteresis, weekly rebalance = 7 daily
-    decisions, hard min-hold 7, ~7-day intended hold); only bar-denominated
+    constants (quintile 0.20, 0.5z hysteresis, UTC-week rebalance, hard
+    one-week min-hold, ~7-day intended hold); only bar-denominated formation
     windows scale with the timeframe and only risk plumbing differs by variant."""
     slice_ = _XS_RESIDUAL_TAKER_FLOW_SLICE
     assert set(slice_) == {"1h", "4h"}
@@ -598,16 +862,13 @@ def test_slice_mechanism_constants_pre_registered_and_invariant() -> None:
         for cell in cells:
             assert cell["quantile_pct"] == 0.20, timeframe
             assert cell["rank_hysteresis_z"] == 0.5, timeframe
-            assert cell["rebalance_decisions"] == 7, timeframe
-            assert cell["min_hold_decisions"] == 7, timeframe
+            assert cell["min_hold_decisions"] == 1, timeframe
             assert cell["intended_hold_seconds"] == 604800.0, timeframe
-            # daily decision tick x formation ~5 days, in the timeframe's bars
+            # Formation retains its wall-clock span in each timeframe's bars.
             if timeframe == "1h":
                 assert cell["formation_window_bars"] == 120
-                assert cell["decision_interval_bars"] == 24
             else:
                 assert cell["formation_window_bars"] == 30
-                assert cell["decision_interval_bars"] == 6
     assert "cross_sectional" in _SUGGESTED_CANDIDATE_TAGS
 
 
@@ -682,10 +943,10 @@ def test_on_warmup_end_flattens_ghost_book_and_preserves_deques() -> None:
         ], sym
     # Next live rebalance re-enters normally from the preserved history.
     signals_before = len(strat.events.items)
-    live_series = {sym: rows[:3] for sym, rows in series.items()}
-    live_flows = {sym: rows[:3] for sym, rows in flows.items()}
-    # continue the bar-key clock past the warmup feed
-    n_live = 3
+    live_series = {sym: rows[:7] for sym, rows in series.items()}
+    live_flows = {sym: rows[:7] for sym, rows in flows.items()}
+    # Continue through the next Monday UTC-week decision boundary.
+    n_live = 7
     for idx in range(n_live):
         bars.features = {}
         for sym in live_series:
@@ -694,21 +955,26 @@ def test_on_warmup_end_flattens_ghost_book_and_preserves_deques() -> None:
                 buy, sell = print_
                 bars.features[(sym, "taker_buy_quote_volume")] = float(buy)
                 bars.features[(sym, "taker_sell_quote_volume")] = float(sell)
-        strat.calculate_signals(
-            _window_event(_N + idx, {sym: live_series[sym][idx] for sym in live_series})
-        )
+        rows = {}
+        for sym in live_series:
+            row = dict(live_series[sym][idx])
+            buy, sell = live_flows[sym][idx]  # type: ignore[misc]
+            row["taker_buy_quote_volume"] = buy
+            row["taker_sell_quote_volume"] = sell
+            rows[sym] = row
+        strat.calculate_signals(_window_event(_N + idx, rows))
     live_entries = _non_exit(strat.events.items[signals_before:])
     assert live_entries, "post-warmup live rebalance must be able to enter"
     assert _final_side(strat.events.items).get("ACC0/USDT") == "LONG"
 
 
 # --------------------------------------------------------------------------- #
-# STALE-SYMBOL freshness regression: a frozen feed is excluded from the
-# cross-sectional ranks and receives no new entries while others advance.
+# STALE-SYMBOL freshness regression: a frozen member invalidates the atomic
+# cross-sectional window and receives no new entries.
 # --------------------------------------------------------------------------- #
 
 
-def test_frozen_symbol_excluded_from_ranks_and_gets_no_new_entries() -> None:
+def test_frozen_symbol_makes_skewed_market_windows_abstain() -> None:
     phase1, phase2 = 30, 20
     series, flows = _panel()
     bars = _Bars(list(series))
@@ -720,10 +986,17 @@ def test_frozen_symbol_excluded_from_ranks_and_gets_no_new_entries() -> None:
             buy, sell = flows[sym][idx]  # type: ignore[misc]
             bars.features[(sym, "taker_buy_quote_volume")] = float(buy)
             bars.features[(sym, "taker_sell_quote_volume")] = float(sell)
-        strat.calculate_signals(_window_event(idx, {sym: series[sym][idx] for sym in series}))
+        rows = {}
+        for sym in series:
+            row = dict(series[sym][idx])
+            buy, sell = flows[sym][idx]  # type: ignore[misc]
+            row["taker_buy_quote_volume"] = buy
+            row["taker_sell_quote_volume"] = sell
+            rows[sym] = row
+        strat.calculate_signals(_window_event(idx, rows))
     assert _final_side(strat.events.items).get("ACC0/USDT") == "LONG"
-    # Phase 2: ACC0's feed FREEZES (no bars); every other symbol advances and
-    # F0 ramps its buy flow so a FRESH name displaces into the long quintile.
+    # Phase 2: ACC0's feed FREEZES (no bar); the remaining symbols must not
+    # form a new decision panel with ACC0's old observation.
     for idx in range(phase1, phase1 + phase2):
         bars.features = {}
         rows: dict[str, dict[str, Any]] = {}
@@ -738,14 +1011,13 @@ def test_frozen_symbol_excluded_from_ranks_and_gets_no_new_entries() -> None:
             bars.features[(sym, "taker_sell_quote_volume")] = float(sell)
             rows[sym] = series[sym][idx % phase1]
         strat.calculate_signals(_window_event(idx, rows))
-    phase2_signals = [sig for sig in strat.events.items if int(str(sig.datetime)[1:]) >= phase1]
-    # The advancing names still rank and trade (the panel is alive)...
-    assert _non_exit(phase2_signals), "advancing symbols must still receive entries"
-    # ...but the frozen symbol is excluded from ranks: no new entries at all.
-    assert not [sig for sig in _non_exit(phase2_signals) if sig.symbol == "ACC0/USDT"], (
-        "frozen feed must not receive new entries"
-    )
-    assert "ACC0/USDT" not in _final_side(strat.events.items)
+    phase2_signals = [
+        sig
+        for sig in strat.events.items
+        if datetime.fromisoformat(str(sig.datetime)) >= datetime.fromisoformat(_time(phase1))
+    ]
+    assert _non_exit(phase2_signals) == []
+    assert _final_side(strat.events.items).get("ACC0/USDT") == "LONG"
 
 
 # --------------------------------------------------------------------------- #
@@ -778,7 +1050,7 @@ def test_degenerate_panel_decision_does_not_flush_mature_book() -> None:
     # freshness gate): a decision whose ranker returns EMPTY targets must not
     # flush the mature book via rank_lapsed exits.
     strat._score_and_select = lambda: ({}, {})  # type: ignore[method-assign]
-    strat._evaluate("t9999")
+    strat._evaluate(_time(_N + 1))
     assert strat.events.items[signals_before:] == []
     book_final = {sym: item.mode for sym, item in strat._state.items() if item.mode != "OUT"}
     assert book_final == book_before

@@ -49,7 +49,10 @@ class _Queue:
 class _OverlayProbeChild:
     """Deterministic probe child: emits EXIT/LONG on scripted bar indices."""
 
+    required_inputs = ()
     required_features = ()
+    required_timeframes = ()
+    required_lookbacks = ()
     preferred_contract = "market_window"
     uses_timeframe_aggregator = False
     decision_cadence_seconds = 86400
@@ -196,11 +199,16 @@ def test_drawdown_ladder_scale_degenerate_inputs_are_inert() -> None:
     assert drawdown_ladder_scale(0.9, None) == pytest.approx(1.0)
     assert drawdown_ladder_scale(0.9, "garbage,0.1") == pytest.approx(1.0)
     assert drawdown_ladder_scale("not-a-number", DEFAULT_LADDER) == pytest.approx(1.0)
-    assert drawdown_ladder_scale(0.12, ((0.10, 0.4), (0.05, 0.8))) == pytest.approx(0.4)
+    assert drawdown_ladder_scale(0.12, ((0.10, 0.4), (0.05, 0.8))) == pytest.approx(1.0)
 
 
-def test_parse_drawdown_ladder_sorts_and_drops_bad_rungs() -> None:
-    rungs = parse_drawdown_ladder("0.20:0.0,0.05:0.75,bad,0.10:0.5,-0.3:0.1")
+def test_parse_drawdown_ladder_rejects_non_monotone_rungs() -> None:
+    rungs = parse_drawdown_ladder("0.05:0.75,0.20:0.0,bad,0.10:0.5,-0.3:0.1")
+    assert rungs == ()
+
+
+def test_parse_drawdown_ladder_drops_bad_rungs_without_reordering() -> None:
+    rungs = parse_drawdown_ladder("0.05:0.75,bad,0.10:0.5,0.20:0.0,-0.3:0.1")
     assert rungs == ((0.05, 0.75), (0.10, 0.5), (0.20, 0.0))
 
 
@@ -483,7 +491,10 @@ def test_child_exit_queued_before_a_child_exception_is_still_forwarded() -> None
         },
         month_loss_limit=0.0,
     )
-    emitted = _run(strategy, _decline(5))
+    emitted = _run(strategy, _decline(3))
+    with pytest.raises(RuntimeError, match="probe child blew up"):
+        strategy.calculate_signals(_market_event(3, 98.5))
+    emitted.extend((3, signal) for signal in events.items[len(emitted) :])
 
     crash_bar = [sig for idx, sig in emitted if idx == 3]
     assert len(crash_bar) == 1, "only the EXIT survives the crash; the entry is discarded"
@@ -502,17 +513,20 @@ def test_child_exception_salvages_exits_from_every_dispatcher() -> None:
     events_market = _Queue()
     market = _make(events_market, child_params=dict(child_params), month_loss_limit=0.0)
     market.calculate_signals(_market_event(0, 100.0))
-    market.calculate_signals(_market_event(1, 99.0))
+    with pytest.raises(RuntimeError, match="probe child blew up"):
+        market.calculate_signals(_market_event(1, 99.0))
 
     events_window = _Queue()
     window = _make(events_window, child_params=dict(child_params), month_loss_limit=0.0)
     window.calculate_signals_window(_market_event(0, 100.0), None)
-    window.calculate_signals_window(_market_event(1, 99.0), None)
+    with pytest.raises(RuntimeError, match="probe child blew up"):
+        window.calculate_signals_window(_market_event(1, 99.0), None)
 
     events_context = _Queue()
     context = _make(events_context, child_params=dict(child_params), month_loss_limit=0.0)
     context.calculate_signals_context(SimpleNamespace(event=_market_event(0, 100.0)))
-    context.calculate_signals_context(SimpleNamespace(event=_market_event(1, 99.0)))
+    with pytest.raises(RuntimeError, match="probe child blew up"):
+        context.calculate_signals_context(SimpleNamespace(event=_market_event(1, 99.0)))
 
     for queue in (events_market, events_window, events_context):
         assert [sig.signal_type for sig in queue.items] == ["LONG", "EXIT"]
@@ -741,12 +755,48 @@ def test_set_state_ignores_malformed_payloads() -> None:
     assert list(strategy._overlay.equity_curve) == before
 
 
-def test_overlay_never_raises_and_drops_signals_on_child_failure() -> None:
+def test_set_state_rejects_malformed_ledgers_atomically() -> None:
+    strategy = _make(_Queue(), month_loss_limit=0.0)
+    _run(strategy, _decline(5))
+    before = strategy.get_state()
+    malformed = strategy.get_state()
+    malformed["overlay"]["applied_weights"] = {_SYMBOL: "not-a-number"}
+
+    strategy.set_state(malformed)
+
+    assert strategy.get_state() == before
+
+
+def test_set_state_rejects_impossible_completed_kill_atomically() -> None:
+    strategy = _make(_Queue(), month_loss_limit=0.0)
+    _run(strategy, _decline(5))
+    before = strategy.get_state()
+    impossible = strategy.get_state()
+    overlay = impossible["overlay"]
+    overlay["weights"] = {_SYMBOL: 1.0}
+    overlay["applied_weights"] = {_SYMBOL: 1.0}
+    overlay["exposure_scales"] = {_SYMBOL: 1.0}
+    overlay["pending_scale_targets"] = {}
+    overlay["killed"] = True
+    overlay["kill_source"] = "ladder"
+    overlay["kill_exits_sent"] = True
+    overlay["kill_exit_symbols"] = [_SYMBOL]
+    overlay["effective_scale"] = 0.0
+
+    strategy.set_state(impossible)
+
+    assert strategy.get_state() == before
+
+
+def test_overlay_surfaces_child_failures() -> None:
     events = _Queue()
     strategy = _make(events, child_params={"long_at": {0}, "raises": True})
-    strategy.calculate_signals(_market_event(0, 100.0))
-    strategy.calculate_signals_window(_market_event(1, 99.0), None)
-    strategy.calculate_signals_context(SimpleNamespace(event=_market_event(2, 98.0)))
+    with pytest.raises(RuntimeError, match="probe child blew up"):
+        strategy.calculate_signals(_market_event(0, 100.0))
+    with pytest.raises(RuntimeError, match="probe child blew up"):
+        strategy.calculate_signals_window(_market_event(1, 99.0), None)
+    with pytest.raises(RuntimeError, match="probe child blew up"):
+        strategy.calculate_signals_context(SimpleNamespace(event=_market_event(2, 98.0)))
     assert events.items == []
 
 
@@ -760,12 +810,177 @@ def test_no_scaling_before_any_bar_history() -> None:
     assert events.items[0].metadata["target_allocation"] == pytest.approx(0.25)
 
 
+def test_explicit_zero_child_allocation_remains_a_zero_signal() -> None:
+    events = _Queue()
+    strategy = _make(events, child_params={"probe_at": {0}, "target_allocation": 1.0})
+
+    strategy.calculate_signals(_market_event(0, 100.0))
+
+    assert events.items[0].metadata["target_allocation"] == pytest.approx(0.0)
+    assert events.items[0].strength == pytest.approx(0.0)
+
+
+def test_nonfinite_child_sizing_is_rejected_visibly() -> None:
+    events = _Queue()
+    strategy = _make(events)
+    invalid = SignalEvent(
+        strategy_id="probe_child",
+        symbol=_SYMBOL,
+        datetime=_stamp(0),
+        signal_type="LONG",
+        strength=1.0,
+        metadata={"target_allocation": float("nan")},
+    )
+
+    with pytest.raises(ValueError, match="target_allocation"):
+        strategy._forward_child_signal(invalid, 1.0)
+    assert events.items == []
+
+
+def test_missing_close_does_not_discard_open_trade_state() -> None:
+    events = _Queue()
+    strategy = _make(events)
+    strategy._overlay.open_trades[_SYMBOL] = {"close": 100.0, "side": 1.0}
+
+    strategy._close_trade(_SYMBOL, None)
+
+    assert strategy._overlay.open_trades[_SYMBOL] == {"close": 100.0, "side": 1.0}
+
+
+def test_nonzero_rung_emits_partial_exit_for_existing_exposure() -> None:
+    events = _Queue()
+    strategy = _make(events)
+    strategy._overlay.weights[_SYMBOL] = 1.0
+    strategy._overlay.exposure_scales[_SYMBOL] = 1.0
+    strategy._last_event_time = _stamp(1)
+
+    strategy._emit_scale_exits(0.5)
+
+    assert events.items[0].signal_type == "EXIT"
+    assert events.items[0].metadata["exit_fraction"] == pytest.approx(0.5)
+    assert strategy._overlay.exposure_scales[_SYMBOL] == pytest.approx(0.5)
+
+
+def test_nonzero_rung_failure_is_restartable_without_duplicate_exit() -> None:
+    class _FailOnceQueue(_Queue):
+        def __init__(self) -> None:
+            super().__init__()
+            self.fail = True
+
+        def put(self, item: Any) -> None:
+            if self.fail:
+                self.fail = False
+                raise RuntimeError("queue unavailable")
+            super().put(item)
+
+    strategy = _make(_FailOnceQueue())
+    strategy._overlay.weights[_SYMBOL] = 1.0
+    strategy._overlay.applied_weights[_SYMBOL] = 1.0
+    strategy._overlay.exposure_scales[_SYMBOL] = 1.0
+    with pytest.raises(RuntimeError, match="queue unavailable"):
+        strategy._emit_scale_exits(0.5)
+    assert strategy._overlay.exposure_scales[_SYMBOL] == 1.0
+    assert strategy._overlay.pending_scale_targets == {_SYMBOL: 0.5}
+
+    restored_events = _Queue()
+    restored = _make(restored_events)
+    restored.set_state(strategy.get_state())
+    restored._flush_pending_scale_exits()
+    assert len(restored_events.items) == 1
+    assert restored_events.items[0].metadata["exit_fraction"] == pytest.approx(0.5)
+    assert restored._overlay.pending_scale_targets == {}
+    assert restored._overlay.exposure_scales[_SYMBOL] == pytest.approx(0.5)
+
+
+def test_failed_child_signal_commits_once_after_state_restore() -> None:
+    class _AlwaysFailQueue(_Queue):
+        def put(self, _item: Any) -> None:
+            raise RuntimeError("queue unavailable")
+
+    strategy = _make(_AlwaysFailQueue())
+    child_signal = SignalEvent(
+        strategy_id="probe",
+        symbol=_SYMBOL,
+        datetime=_stamp(1),
+        signal_type="LONG",
+        metadata={"target_allocation": 0.2},
+    )
+    strategy._child_queue.put(child_signal)
+    with pytest.raises(RuntimeError, match="queue unavailable"):
+        strategy._drain(0.5)
+    assert strategy._overlay.weights.get(_SYMBOL, 0.0) == 0.0
+    assert len(strategy._pending_forward) == 1
+
+    restored_events = _Queue()
+    restored = _make(restored_events)
+    restored.set_state(strategy.get_state())
+    restored._flush_pending_forward()
+    assert len(restored_events.items) == 1
+    assert restored_events.items[0].metadata["target_allocation"] == pytest.approx(0.1)
+    assert restored._overlay.weights[_SYMBOL] == pytest.approx(0.2)
+    assert restored._pending_forward == []
+
+
+def test_kill_exit_completion_waits_for_an_accepted_exit_and_retries() -> None:
+    class _FailOnceQueue(_Queue):
+        def __init__(self) -> None:
+            super().__init__()
+            self.fail = True
+
+        def put(self, item: Any) -> None:
+            if self.fail:
+                self.fail = False
+                raise RuntimeError("queue unavailable")
+            super().put(item)
+
+    events = _FailOnceQueue()
+    strategy = _make(events)
+    strategy._overlay.killed = True
+    strategy._overlay.weights[_SYMBOL] = 1.0
+    strategy._overlay.applied_weights[_SYMBOL] = 1.0
+
+    with pytest.raises(RuntimeError, match="queue unavailable"):
+        strategy._emit_kill_exits()
+    assert strategy._overlay.kill_exits_sent is False
+    assert strategy._overlay.kill_exit_symbols == set()
+
+    strategy._emit_kill_exits()
+    assert strategy._overlay.kill_exits_sent is True
+    assert strategy._overlay.kill_exit_symbols == {_SYMBOL}
+    assert len(events.items) == 1
+
+
 def test_decision_cadence_and_contract_are_inherited_from_the_child() -> None:
     events = _Queue()
     strategy = _make(events)
     assert strategy.decision_cadence_seconds == 86400
     assert strategy.preferred_contract == "market_window"
     assert strategy.symbol_list == [_SYMBOL]
+
+
+@pytest.mark.parametrize(
+    ("attribute", "value"),
+    [
+        ("required_inputs", staticmethod(lambda: {"book": "latest"})),
+        ("required_features", staticmethod(lambda: ("close", "volume"))),
+        ("required_timeframes", staticmethod(lambda: ("1h", "1d"))),
+        ("required_lookbacks", staticmethod(lambda: {"close": 42})),
+        ("uses_timeframe_aggregator", 1),
+        ("uses_timeframe_aggregator", "yes"),
+        ("decision_cadence_seconds", True),
+        ("decision_cadence_seconds", 1.5),
+        ("decision_cadence_seconds", "86400"),
+        ("preferred_contract", staticmethod(lambda: "market_window")),
+    ],
+)
+def test_child_runtime_declarations_are_propagated_without_coercion(
+    monkeypatch: pytest.MonkeyPatch,
+    attribute: str,
+    value: Any,
+) -> None:
+    monkeypatch.setattr(_OverlayProbeChild, attribute, value)
+    strategy = _make(_Queue())
+    assert getattr(strategy, attribute) is getattr(strategy._child, attribute)
 
 
 def test_child_strategy_alias_param_resolves_the_child() -> None:
@@ -803,6 +1018,9 @@ def test_strategy_is_registered() -> None:
     )
     assert "_OverlayProbeChild" not in GLOBAL_REGISTRY.list_names("strategy")
     assert "ProbeChild" not in GLOBAL_REGISTRY.list_names("strategy")
+    from lumina_quant.strategies.registry import get_strategy_tier
+
+    assert get_strategy_tier("EquityCurveKillSwitchOverlayStrategy") == "research_only"
 
 
 def test_child_protective_levels_are_forwarded_untouched() -> None:
@@ -854,3 +1072,189 @@ def test_child_protective_levels_are_forwarded_untouched() -> None:
     overlay._forward_child_signal(exit_signal, 0.0)
     assert queue.items[-1].signal_type == "EXIT"
     assert queue.items[-1].metadata["exit_fraction"] == 0.6  # partial-exit contract preserved
+    assert overlay._overlay.weights["BTC/USDT"] == pytest.approx(0.08)
+    assert overlay._overlay.exposure_scales["BTC/USDT"] == pytest.approx(0.5)
+
+
+def test_child_default_allocation_is_written_as_scaled_outbound_target() -> None:
+    queue = _Queue()
+    overlay = _make(queue)
+    signal = SignalEvent(
+        strategy_id="probe",
+        symbol=_SYMBOL,
+        datetime=_stamp(1),
+        signal_type="LONG",
+        strength=1.0,
+        metadata={},
+    )
+
+    overlay._forward_child_signal(signal, 0.5)
+
+    assert queue.items[0].metadata["target_allocation"] == pytest.approx(0.5)
+    assert overlay._overlay.applied_weights[_SYMBOL] == pytest.approx(0.5)
+
+
+def test_invalid_partial_exit_is_not_enqueued_and_remains_restartable() -> None:
+    queue = _Queue()
+    overlay = _make(queue)
+    overlay._overlay.weights[_SYMBOL] = 0.2
+    overlay._overlay.applied_weights[_SYMBOL] = 0.1
+    overlay._overlay.exposure_scales[_SYMBOL] = 0.5
+    invalid = SignalEvent(
+        strategy_id="probe",
+        symbol=_SYMBOL,
+        datetime=_stamp(1),
+        signal_type="EXIT",
+        strength=1.0,
+        metadata={"exit_fraction": "invalid"},
+    )
+    overlay._pending_forward.append((invalid, 1.0))
+
+    with pytest.raises(ValueError, match="exit_fraction"):
+        overlay._flush_pending_forward()
+
+    assert queue.items == []
+    assert overlay._overlay.weights[_SYMBOL] == pytest.approx(0.2)
+    assert len(overlay._pending_forward) == 1
+    restored = _make(_Queue())
+    restored.set_state(overlay.get_state())
+    assert len(restored._pending_forward) == 1
+    with pytest.raises(ValueError, match="exit_fraction"):
+        restored._flush_pending_forward()
+    assert restored.events.items == []
+
+
+def test_mixed_scale_pyramiding_tracks_actual_applied_notional() -> None:
+    queue = _Queue()
+    overlay = _make(queue)
+    signal = SignalEvent(
+        strategy_id="probe",
+        symbol=_SYMBOL,
+        datetime=_stamp(1),
+        signal_type="LONG",
+        strength=1.0,
+        metadata={"target_allocation": 0.2},
+    )
+
+    overlay._forward_child_signal(signal, 0.5)
+    overlay._forward_child_signal(signal, 0.75)
+
+    assert overlay._overlay.weights[_SYMBOL] == pytest.approx(0.4)
+    assert overlay._overlay.applied_weights[_SYMBOL] == pytest.approx(0.25)
+    assert overlay._overlay.exposure_scales[_SYMBOL] == pytest.approx(0.625)
+    overlay._emit_scale_exits(0.5)
+    assert queue.items[-1].metadata["exit_fraction"] == pytest.approx(0.2)
+    assert overlay._overlay.applied_weights[_SYMBOL] == pytest.approx(0.2)
+    assert overlay._overlay.exposure_scales[_SYMBOL] == pytest.approx(0.5)
+
+
+def test_mixed_scale_rung_reduction_survives_state_round_trip() -> None:
+    overlay = _make(_Queue())
+    signal = SignalEvent(
+        strategy_id="probe",
+        symbol=_SYMBOL,
+        datetime=_stamp(1),
+        signal_type="LONG",
+        strength=1.0,
+        metadata={"target_allocation": 0.2},
+    )
+    overlay._forward_child_signal(signal, 0.5)
+    overlay._forward_child_signal(signal, 0.75)
+    overlay._emit_scale_exits(0.5)
+
+    restored = _make(_Queue())
+    restored.set_state(overlay.get_state())
+
+    assert restored._overlay.weights[_SYMBOL] == pytest.approx(0.4)
+    assert restored._overlay.applied_weights[_SYMBOL] == pytest.approx(0.2)
+    assert restored._overlay.exposure_scales[_SYMBOL] == pytest.approx(0.5)
+    assert restored._overlay.pending_scale_targets == {}
+
+
+def test_kill_exit_clears_forwarded_exposure_ledgers() -> None:
+    queue = _Queue()
+    overlay = _make(queue)
+    overlay._overlay.killed = True
+    overlay._overlay.weights[_SYMBOL] = 1.0
+    overlay._overlay.applied_weights[_SYMBOL] = 0.5
+    overlay._overlay.exposure_scales[_SYMBOL] = 0.5
+    overlay._overlay.pending_scale_targets[_SYMBOL] = 0.25
+
+    overlay._emit_kill_exits()
+
+    assert len(queue.items) == 1
+    assert queue.items[0].metadata["kill_switch"] is True
+    assert _SYMBOL not in overlay._overlay.applied_weights
+    assert _SYMBOL not in overlay._overlay.exposure_scales
+    assert _SYMBOL not in overlay._overlay.pending_scale_targets
+
+
+def test_opposite_side_net_zero_intent_exits_exact_applied_residual() -> None:
+    queue = _Queue()
+    overlay = _make(queue)
+    long = SignalEvent(
+        strategy_id="probe",
+        symbol=_SYMBOL,
+        datetime=_stamp(1),
+        signal_type="LONG",
+        strength=1.0,
+        metadata={"target_allocation": 0.2},
+    )
+    short = SignalEvent(
+        strategy_id="probe",
+        symbol=_SYMBOL,
+        datetime=_stamp(2),
+        signal_type="SHORT",
+        strength=1.0,
+        metadata={"target_allocation": 0.2},
+    )
+    overlay._forward_child_signal(long, 0.5)
+    overlay._forward_child_signal(short, 0.75)
+
+    assert overlay._overlay.weights[_SYMBOL] == pytest.approx(0.0)
+    residual_exit = queue.items[-1]
+    assert residual_exit.metadata["exit_fraction"] == pytest.approx(1.0)
+    assert residual_exit.metadata["residual_applied_weight"] == pytest.approx(-0.05)
+    assert _SYMBOL not in overlay._overlay.applied_weights
+
+
+def test_allocationless_entry_fails_before_enqueue() -> None:
+    queue = _Queue()
+    overlay = _make(queue)
+    overlay._child_default_alloc = None
+    entry = SignalEvent(
+        strategy_id="probe",
+        symbol=_SYMBOL,
+        datetime=_stamp(1),
+        signal_type="LONG",
+        strength=1.0,
+        metadata={},
+    )
+
+    with pytest.raises(ValueError, match="target_allocation"):
+        overlay._forward_child_signal(entry, 1.0)
+    assert queue.items == []
+    assert overlay._overlay.weights == {}
+    assert overlay._overlay.applied_weights == {}
+
+
+def test_killed_entry_records_intent_without_changing_applied_exposure() -> None:
+    queue = _Queue()
+    overlay = _make(queue)
+    overlay._overlay.killed = True
+    overlay._overlay.weights[_SYMBOL] = 0.2
+    overlay._overlay.applied_weights[_SYMBOL] = 0.1
+    entry = SignalEvent(
+        strategy_id="probe",
+        symbol=_SYMBOL,
+        datetime=_stamp(1),
+        signal_type="SHORT",
+        strength=1.0,
+        metadata={"target_allocation": 0.2},
+    )
+
+    overlay._forward_child_signal(entry, 0.0)
+
+    assert queue.items == []
+    assert overlay._overlay.weights[_SYMBOL] == pytest.approx(0.0)
+    assert overlay._overlay.applied_weights[_SYMBOL] == pytest.approx(0.1)

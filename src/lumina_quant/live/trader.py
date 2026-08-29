@@ -394,6 +394,10 @@ class LiveTrader(TradingEngine):
         self._last_market_window_monotonic = time.monotonic()
         self._data_silence_block_active = False
         self._data_silence_last_alert_monotonic = 0.0
+        # Admission needs source-proven, symbol-specific market evidence.  A
+        # global freshness flag would let activity in one instrument arm orders
+        # for another.
+        self._market_freshness_by_symbol: dict[str, tuple[int, int, int]] = {}
         # State-file identity fingerprint (M1).  Enforced when require_state_fingerprint
         # or real mode; default paper/testnet accepts any state (byte-identical).
         self.require_state_fingerprint = bool(
@@ -467,6 +471,7 @@ class LiveTrader(TradingEngine):
             float(getattr(self.config, "RECONCILIATION_FALLBACK_WINDOW_SECONDS", 120.0) or 120.0),
         )
         self._startup_reconciliation_complete = False
+        self._live_readiness_verified = False
         self._startup_state = "starting"
         self._startup_state_reason = ""
         self._startup_notification_sent = False
@@ -767,7 +772,11 @@ class LiveTrader(TradingEngine):
                 self.audit_store.log_risk_event(
                     self.run_id,
                     reason="STATE_FINGERPRINT_REJECTED",
-                    details={"stored_fingerprint": dict(state.get("fingerprint") or {})},
+                    details={
+                        "stored_fingerprint": dict(state.get("fingerprint") or {})
+                        if isinstance(state, dict)
+                        else {}
+                    },
                 )
             except Exception:
                 pass
@@ -778,46 +787,110 @@ class LiveTrader(TradingEngine):
                 )
             except Exception:
                 pass
-            return
+            raise RuntimeError("state fingerprint rejected; startup aborted")
         self.logger.info("Restoring state from disk...")
+        required = {
+            "portfolio",
+            "strategy",
+            "runtime_cache",
+            "outbox_events",
+            "risk",
+            "hard_halt",
+            "fingerprint",
+        }
+        if (
+            not isinstance(state, dict)
+            or set(state) != required
+            or not isinstance(state["portfolio"], dict)
+            or not isinstance(state["strategy"], dict)
+            or not isinstance(state["runtime_cache"], dict)
+            or not isinstance(state["outbox_events"], list)
+            or not isinstance(state["risk"], dict)
+            or not isinstance(state["hard_halt"], dict)
+            or set(state["hard_halt"]) != {"active", "reason"}
+            or type(state["hard_halt"]["active"]) is not bool
+            or not isinstance(state["hard_halt"]["reason"], str)
+        ):
+            self.logger.error("Refusing incomplete or malformed state restore payload.")
+            raise RuntimeError("incomplete or malformed state restore payload")
+        rollback = None
+        set_risk_state = None
         try:
-            if "portfolio" in state:
-                self.portfolio.set_state(state["portfolio"])
-            if "strategy" in state:
-                self.strategy.set_state(state["strategy"])
-            if isinstance(state.get("runtime_cache"), dict):
-                self.runtime_cache.restore(state["runtime_cache"])
-                if hasattr(self.execution_handler, "rehydrate_orders"):
-                    self.execution_handler.rehydrate_orders(self.runtime_cache.open_orders)
-            if isinstance(state.get("outbox_events"), list):
-                self.outbox_events = list(state["outbox_events"])
-            # M1: restore the RiskManager kill-switch state so a restart cannot re-arm
-            # the consecutive-loss counter / hard-halt to zero — defeating exactly the
-            # crash the halt must survive.  RiskManager.get_state/set_state are provided
-            # by the risk module; guard so older builds / test doubles degrade gracefully.
-            risk_state = state.get("risk")
+            get_risk_state = getattr(self.risk_manager, "get_state", None)
             set_risk_state = getattr(self.risk_manager, "set_state", None)
-            if isinstance(risk_state, dict) and callable(set_risk_state):
-                set_risk_state(risk_state)
-            hard_halt = state.get("hard_halt")
-            if isinstance(hard_halt, dict) and bool(hard_halt.get("active", False)):
-                self._hard_halt_active = True
-                self._hard_halt_reason = str(hard_halt.get("reason", "") or "restored_hard_halt")
+            if not callable(get_risk_state) or not callable(set_risk_state):
+                raise RuntimeError("risk manager does not support transactional state restoration")
+            rollback = {
+                "portfolio": deepcopy(self.portfolio.get_state()),
+                "strategy": deepcopy(self.strategy.get_state()),
+                "runtime_cache": deepcopy(self.runtime_cache.snapshot()),
+                "outbox_events": deepcopy(self.outbox_events),
+                "risk": deepcopy(get_risk_state()),
+                "hard_halt_active": bool(self._hard_halt_active),
+                "hard_halt_reason": str(self._hard_halt_reason),
+                "trading_frozen": bool(self.portfolio.trading_frozen),
+            }
+            for setter, getter, payload, label in (
+                (
+                    self.portfolio.set_state,
+                    self.portfolio.get_state,
+                    state["portfolio"],
+                    "portfolio",
+                ),
+                (self.strategy.set_state, self.strategy.get_state, state["strategy"], "strategy"),
+                (set_risk_state, get_risk_state, state["risk"], "risk"),
+            ):
+                result = setter(deepcopy(payload))
+                if result is False or getter() != payload:
+                    raise RuntimeError(f"{label} state restore was rejected")
+            self.runtime_cache.restore(deepcopy(state["runtime_cache"]))
+            if self.runtime_cache.snapshot() != state["runtime_cache"]:
+                raise RuntimeError("runtime cache state restore was rejected")
+            self.outbox_events = deepcopy(state["outbox_events"])
+            self._hard_halt_active = state["hard_halt"]["active"]
+            self._hard_halt_reason = state["hard_halt"]["reason"]
+            if self._hard_halt_active:
                 self.portfolio.trading_frozen = True
                 self.logger.error(
                     "Restored HARD-HALT from prior session (reason=%s); trading stays halted.",
                     self._hard_halt_reason,
                 )
+            if hasattr(self.execution_handler, "rehydrate_orders"):
+                result = self.execution_handler.rehydrate_orders(self.runtime_cache.open_orders)
+                if result is False:
+                    raise RuntimeError("execution order rehydration was rejected")
             self.logger.info("State restored.")
         except Exception as e:
+            rollback_errors = []
+            if rollback is not None:
+                for setter, payload, label in (
+                    (self.portfolio.set_state, rollback["portfolio"], "portfolio"),
+                    (self.strategy.set_state, rollback["strategy"], "strategy"),
+                    (set_risk_state, rollback["risk"], "risk"),
+                    (self.runtime_cache.restore, rollback["runtime_cache"], "runtime_cache"),
+                ):
+                    try:
+                        setter(payload)
+                    except Exception as rollback_error:
+                        rollback_errors.append(f"{label}:{rollback_error}")
+                self.outbox_events = rollback["outbox_events"]
+                self._hard_halt_active = rollback["hard_halt_active"]
+                self._hard_halt_reason = rollback["hard_halt_reason"]
+                self.portfolio.trading_frozen = rollback["trading_frozen"]
+            if rollback_errors:
+                self.logger.critical("State restore rollback failed: %s", rollback_errors)
             self.logger.error(f"Failed to restore state: {e}")
+            raise RuntimeError("state restore failed; startup aborted") from e
 
     def _save_state(self):
         try:
             risk_state = None
             get_risk_state = getattr(self.risk_manager, "get_state", None)
-            if callable(get_risk_state):
-                risk_state = get_risk_state()
+            if not callable(get_risk_state):
+                raise RuntimeError("risk manager does not support persistent state")
+            risk_state = get_risk_state()
+            if not isinstance(risk_state, dict):
+                raise RuntimeError("risk manager returned malformed persistent state")
             state = {
                 "portfolio": self.portfolio.get_state(),
                 "strategy": self.strategy.get_state(),
@@ -881,24 +954,28 @@ class LiveTrader(TradingEngine):
         return os.path.exists(self.stop_file)
 
     def _close_audit_store(self, status=None):
-        if self._audit_closed:
+        if getattr(self, "_audit_closed", True):
             return
-        final_status = str(status or self._run_exit_status or "").strip().upper() or "FAILED"
+        final_status = (
+            str(status or getattr(self, "_run_exit_status", "") or "").strip().upper() or "FAILED"
+        )
         try:
-            end_run = getattr(self.audit_store, "end_run", None)
-            if self.run_id and callable(end_run):
+            audit_store = getattr(self, "audit_store", None)
+            end_run = getattr(audit_store, "end_run", None)
+            run_id = getattr(self, "run_id", None)
+            if run_id and callable(end_run):
                 end_run(
-                    self.run_id,
+                    run_id,
                     status=final_status,
                     metadata={
-                        "startup_state": str(self._startup_state),
-                        "startup_reason": str(self._startup_state_reason),
+                        "startup_state": str(getattr(self, "_startup_state", "")),
+                        "startup_reason": str(getattr(self, "_startup_state_reason", "")),
                     },
                 )
         except Exception:
             pass
         try:
-            close = getattr(self.audit_store, "close", None)
+            close = getattr(getattr(self, "audit_store", None), "close", None)
             if callable(close):
                 close()
         except Exception:
@@ -1597,6 +1674,14 @@ class LiveTrader(TradingEngine):
                 metadata["reference_price_unavailable"] = True
         if not order_type:
             return False
+        metadata = dict(metadata or {})
+        metadata.update(
+            {
+                "source": "live_trader_reduce_only_flatten",
+                "flatten_quantity": abs(float(quantity)),
+                "flatten_position_side": str(position_side or "").upper(),
+            }
+        )
         event = OrderEvent(
             symbol=symbol,
             order_type=order_type,
@@ -2036,7 +2121,8 @@ class LiveTrader(TradingEngine):
                 float(self.portfolio.current_holdings.get("cash", 0.0) or 0.0) + delta
             )
             self.portfolio.current_holdings["total"] = exchange_equity
-        self.runtime_cache.update_account({"cash": float(exchange_equity)})
+            adjusted_cash = float(self.portfolio.current_holdings["cash"])
+        self.runtime_cache.update_account({"cash": adjusted_cash})
 
         denom = max(1.0, abs(exchange_equity))
         divergence = abs(delta) / denom
@@ -2186,6 +2272,240 @@ class LiveTrader(TradingEngine):
             metadata={"symbol": event.symbol},
         )
 
+    def handle_market_batch_event(self, event):
+        super().handle_market_batch_event(event)
+
+    def handle_market_window_event(self, event):
+        self._record_market_freshness(event)
+        super().handle_market_window_event(event)
+
+    def _record_market_freshness(self, event) -> None:
+        """Record only current, well-formed, bounded-lag window evidence."""
+        bars_1s = getattr(event, "bars_1s", None)
+        if not isinstance(bars_1s, dict) or not bars_1s:
+            # An unidentifiable window must not leave prior symbol evidence
+            # eligible for order admission.
+            self._market_freshness_by_symbol.clear()
+            return
+        if any(not isinstance(symbol, str) or not symbol for symbol in bars_1s):
+            self._market_freshness_by_symbol.clear()
+            return
+        symbols = tuple(sorted(str(symbol) for symbol in bars_1s))
+        try:
+            timestamp_ns = int(getattr(event, "timestamp_ns", None))
+            sequence = int(getattr(event, "sequence", None))
+            lag_ms = int(getattr(event, "lag_ms", None))
+            window_time_ms = int(getattr(event, "time", None))
+            watermark_ms = int(getattr(event, "event_time_watermark_ms", None))
+        except TypeError, ValueError:
+            for symbol in symbols:
+                self._market_freshness_by_symbol.pop(symbol, None)
+            return
+        threshold_ms = int(self.materialized_staleness_threshold_seconds) * 1000
+        watermark_age_ms = int(time.time() * 1000) - watermark_ms
+        if (
+            bool(getattr(event, "is_stale", False))
+            or timestamp_ns <= 0
+            or sequence <= 0
+            or lag_ms < 0
+            or lag_ms > threshold_ms
+            or window_time_ms <= 0
+            or watermark_ms != window_time_ms
+            or watermark_age_ms < 0
+            or watermark_age_ms > threshold_ms
+        ):
+            for symbol in symbols:
+                self._market_freshness_by_symbol.pop(symbol, None)
+            return
+        evidence = (timestamp_ns, sequence, lag_ms)
+        for symbol in symbols:
+            rows = bars_1s.get(symbol)
+            if not isinstance(rows, (tuple, list)) or not rows:
+                self._market_freshness_by_symbol.pop(symbol, None)
+                continue
+            current_bar = rows[-1]
+            if not isinstance(current_bar, (tuple, list)) or len(current_bar) < 6:
+                self._market_freshness_by_symbol.pop(symbol, None)
+                continue
+            try:
+                bar_time_ms = int(current_bar[0])
+                open_, high, low, close, volume = (
+                    float(current_bar[1]),
+                    float(current_bar[2]),
+                    float(current_bar[3]),
+                    float(current_bar[4]),
+                    float(current_bar[5]),
+                )
+            except TypeError, ValueError:
+                self._market_freshness_by_symbol.pop(symbol, None)
+                continue
+            if (
+                bar_time_ms != window_time_ms
+                or not all(
+                    math.isfinite(value) and value > 0.0 for value in (open_, high, low, close)
+                )
+                or not math.isfinite(volume)
+                or volume < 0.0
+                or high < low
+            ):
+                self._market_freshness_by_symbol.pop(symbol, None)
+                continue
+            prior = self._market_freshness_by_symbol.get(symbol)
+            if prior is None or evidence[:2] >= prior[:2]:
+                self._market_freshness_by_symbol[symbol] = evidence
+
+    def _has_fresh_market_evidence(self, symbol) -> bool:
+        evidence = self._market_freshness_by_symbol.get(str(symbol))
+        if evidence is None:
+            return False
+        try:
+            timestamp_ns, sequence, lag_ms = evidence
+            max_age_ns = int(self.materialized_staleness_threshold_seconds) * 1_000_000_000
+            age_ns = time.time_ns() - int(timestamp_ns)
+            valid = (
+                int(timestamp_ns) > 0
+                and int(sequence) > 0
+                and 0 <= int(lag_ms) <= int(self.materialized_staleness_threshold_seconds) * 1000
+                and 0 <= age_ns <= max_age_ns
+            )
+            if not valid:
+                self._market_freshness_by_symbol.pop(str(symbol), None)
+            return valid
+        except TypeError, ValueError:
+            self._market_freshness_by_symbol.pop(str(symbol), None)
+            return False
+
+    def _is_authenticated_flatten_order(self, event) -> bool:
+        """Accept only this trader's exact reduce-only close of a current position."""
+        metadata = getattr(event, "metadata", None)
+        if (
+            getattr(event, "reduce_only", False) is not True
+            or not isinstance(metadata, dict)
+            or metadata.get("source") != "live_trader_reduce_only_flatten"
+        ):
+            return False
+        symbol = getattr(event, "symbol", None)
+        direction = str(getattr(event, "direction", "")).upper()
+        position_side = str(getattr(event, "position_side", "") or "").upper()
+        try:
+            quantity = float(getattr(event, "quantity", None))
+            declared_quantity = float(metadata.get("flatten_quantity"))
+        except TypeError, ValueError:
+            return False
+        if (
+            not isinstance(symbol, str)
+            or not symbol
+            or not math.isfinite(quantity)
+            or quantity <= 0.0
+            or quantity != declared_quantity
+            or metadata.get("flatten_position_side") != position_side
+        ):
+            return False
+        try:
+            with self.portfolio_lock:
+                if str(getattr(self.config, "POSITION_MODE", "")).upper() == "HEDGE":
+                    expected = float(
+                        (self.portfolio.current_position_legs or {})
+                        .get(symbol, {})
+                        .get(position_side, 0.0)
+                    )
+                    expected_direction = "SELL" if position_side == "LONG" else "BUY"
+                    if position_side not in {"LONG", "SHORT"}:
+                        return False
+                else:
+                    signed_quantity = float(
+                        (self.portfolio.current_positions or {}).get(symbol, 0.0)
+                    )
+                    expected = abs(signed_quantity)
+                    expected_direction = "SELL" if signed_quantity > 0.0 else "BUY"
+        except AttributeError, TypeError, ValueError:
+            return False
+        return expected > 0.0 and quantity == expected and direction == expected_direction
+
+    def admit_order_event(self, event) -> bool:
+        """Live's sole order admission boundary before exchange execution."""
+        stage = str(getattr(self.config, "GO_LIVE_STAGE", "") or "").strip().lower()
+        if stage not in {"research_only", "shadow", "testnet", "canary", "full"}:
+            return self._deny_order(event, "unknown_deployment_stage")
+        if stage not in {"canary", "full"}:
+            return self._deny_order(event, f"non_executing_deployment_stage:{stage or 'unset'}")
+
+        tier = self._instantiated_strategy_tier()
+        if tier not in {"research_only", "live_default", "live_opt_in"}:
+            return self._deny_order(event, "unknown_strategy_tier")
+        if tier == "research_only":
+            return self._deny_order(event, "research_only_strategy_tier")
+
+        authenticated_flatten = self._is_authenticated_flatten_order(event)
+        if not authenticated_flatten and not bool(getattr(self, "_live_readiness_verified", False)):
+            return self._deny_order(event, "live_readiness_not_verified")
+        if not authenticated_flatten and not bool(
+            getattr(self, "_startup_reconciliation_complete", False)
+        ):
+            return self._deny_order(event, "startup_reconciliation_incomplete")
+        if (
+            not authenticated_flatten
+            and str(getattr(self, "_startup_state", "")).strip().lower() != "ready"
+        ):
+            return self._deny_order(event, "startup_not_ready")
+        if not authenticated_flatten and not self._has_fresh_market_evidence(event.symbol):
+            return self._deny_order(event, "market_state_not_fresh")
+        if not authenticated_flatten and (
+            bool(getattr(self, "_materialized_stale_block_active", False))
+            or bool(getattr(self, "_data_silence_block_active", False))
+        ):
+            return self._deny_order(event, "market_state_stale")
+        if not authenticated_flatten and bool(getattr(self, "_hard_halt_active", False)):
+            return self._deny_order(event, "hard_halt_active")
+
+        try:
+            current_price = self.data_handler.get_latest_bar_value(event.symbol, "close")
+            approved, reason = self.risk_manager.check_order(
+                event, current_price, portfolio=self.portfolio
+            )
+        except Exception as exc:
+            return self._deny_order(event, f"risk_check_error:{exc.__class__.__name__}")
+        if not approved:
+            return self._deny_order(event, f"risk_rejected:{reason}")
+        return True
+
+    def _instantiated_strategy_tier(self) -> str:
+        """Return the tier only for the configured instance's registry identity."""
+        try:
+            from lumina_quant.strategies.registry import get_strategy_map, get_strategy_tier
+
+            strategy_cls = self.strategy.__class__
+            canonical_name = str(getattr(strategy_cls, "__name__", "") or "")
+            strategy_map = get_strategy_map()
+            if not canonical_name or strategy_map.get(canonical_name) is not strategy_cls:
+                return ""
+            if str(self.strategy_name) != canonical_name:
+                return ""
+            return str(get_strategy_tier(canonical_name) or "").strip().lower()
+        except Exception:
+            return ""
+
+    def _deny_order(self, event, reason: str) -> bool:
+        """Record a denied admission without ever invoking exchange execution."""
+        logger = getattr(self, "logger", None)
+        if logger is not None:
+            logger.warning(
+                "ORDER_ADMISSION_DENIED reason=%s symbol=%s direction=%s",
+                reason,
+                getattr(event, "symbol", None),
+                getattr(event, "direction", None),
+            )
+        self._log_risk_event_safe(
+            reason="ORDER_ADMISSION_DENIED",
+            details={
+                "admission_reason": reason,
+                "symbol": getattr(event, "symbol", None),
+                "direction": getattr(event, "direction", None),
+                "quantity": getattr(event, "quantity", None),
+            },
+        )
+        return False
+
     def handle_fill_event(self, event):
         """Override to save trades on every fill."""
         # Snapshot pre-fill portfolio state for realized-PnL computation.
@@ -2285,13 +2605,20 @@ class LiveTrader(TradingEngine):
         threshold_ms = int(self.materialized_staleness_threshold_seconds) * 1000
         lag_ms = int(getattr(event, "lag_ms", 0) or 0)
         watermark_ms = getattr(event, "event_time_watermark_ms", None)
+        watermark_lag_ms = 0
+        if watermark_ms is not None:
+            try:
+                watermark_lag_ms = max(0, int(time.time() * 1000) - int(watermark_ms))
+            except TypeError, ValueError:
+                watermark_lag_ms = threshold_ms + 1
         if lag_ms <= 0 and watermark_ms is not None:
             try:
-                lag_ms = max(0, int(time.time() * 1000) - int(watermark_ms))
+                lag_ms = watermark_lag_ms
             except Exception:
                 lag_ms = 0
         stale_flag = bool(getattr(event, "is_stale", False))
-        return (stale_flag or lag_ms > threshold_ms), int(lag_ms)
+        effective_lag_ms = max(lag_ms, watermark_lag_ms)
+        return (stale_flag or effective_lag_ms > threshold_ms), int(effective_lag_ms)
 
     def _handle_market_window_staleness(self, event) -> bool:
         is_stale, lag_ms = self._resolve_market_window_staleness(event)
@@ -2453,7 +2780,6 @@ class LiveTrader(TradingEngine):
         self._activate_fallback_polling("startup_reconciliation_timeout")
         if self.startup_reconciliation_hard_fail:
             raise LiveDataFatalError("startup_reconciliation_timeout")
-        self._startup_reconciliation_complete = True
         self.portfolio.trading_frozen = False
         self._set_startup_state("degraded", reason="startup_reconciliation_timeout")
         self.audit_store.log_risk_event(
@@ -2476,6 +2802,7 @@ class LiveTrader(TradingEngine):
         self._measured_shadow_parity_ratio = None if ratio is None else float(ratio)
 
     def _run_live_readiness_gate(self) -> None:
+        self._live_readiness_verified = False
         go_live_stage = (
             str(getattr(self.config, "GO_LIVE_STAGE", "testnet") or "testnet").strip().lower()
         )
@@ -2485,6 +2812,7 @@ class LiveTrader(TradingEngine):
         # composition; the selected stage's gate is mandatory, and real mode is always
         # gated so a real run can never start without the readiness chain).
         if go_live_stage == "testnet" and self.live_mode != "real":
+            self._live_readiness_verified = True
             return
         payload = enforce_live_readiness_from_files(
             mode=self.live_mode,
@@ -2504,6 +2832,7 @@ class LiveTrader(TradingEngine):
                 "status": dict(payload.get("status") or {}),
             },
         )
+        self._live_readiness_verified = True
 
     def run(self):
         """Main Live Trading Loop."""
@@ -2595,7 +2924,18 @@ class LiveTrader(TradingEngine):
                         self._last_market_window_monotonic = time.monotonic()
                         if self._handle_market_window_staleness(event):
                             continue
-                    if self._hard_halt_active and event.type in {"SIGNAL", "ORDER"}:
+                    if self._hard_halt_active and event.type == "SIGNAL":
+                        self.logger.error(
+                            "EVENT_BLOCKED_HARD_HALT type=%s reason=%s",
+                            event.type,
+                            self._hard_halt_reason,
+                        )
+                        continue
+                    if (
+                        self._hard_halt_active
+                        and event.type == "ORDER"
+                        and not self._is_authenticated_flatten_order(event)
+                    ):
                         self.logger.error(
                             "EVENT_BLOCKED_HARD_HALT type=%s reason=%s",
                             event.type,
@@ -2607,59 +2947,7 @@ class LiveTrader(TradingEngine):
                     elif event.type == "SIGNAL":
                         self.logger.info(f"Signal Event: {event.signal_type}")
                     if event.type == "ORDER":
-                        if (
-                            self.order_state_source == "user_stream"
-                            and not self._startup_reconciliation_complete
-                        ):
-                            self.logger.error("ORDER_BLOCKED_STARTUP_RECONCILIATION_PENDING")
-                            continue
-                        stale_block = self._materialized_stale_block_active or bool(
-                            getattr(self, "_data_silence_block_active", False)
-                        )
-                        # D5: a stale/silent feed blocks NEW entries, but reduce_only
-                        # exits must pass through to de-risk — mirroring RiskManager's own
-                        # reduce_only exemption from freeze/halt (blocking exits exactly
-                        # when data lags is the opposite of safe).
-                        if stale_block and not bool(getattr(event, "reduce_only", False)):
-                            self.logger.error(
-                                "ORDER_BLOCKED_STALE_FEED symbol=%s direction=%s",
-                                event.symbol,
-                                event.direction,
-                            )
-                            self.audit_store.log_risk_event(
-                                self.run_id,
-                                reason="ORDER_BLOCKED_STALE_WINDOW",
-                                details={
-                                    "symbol": event.symbol,
-                                    "direction": event.direction,
-                                    "quantity": event.quantity,
-                                },
-                            )
-                            continue
                         self.logger.info(f"Order Event: {event.direction}")
-                        # RISK CHECK
-                        current_price = self.data_handler.get_latest_bar_value(
-                            event.symbol, "close"
-                        )
-                        passed, reason = self.risk_manager.check_order(
-                            event, current_price, portfolio=self.portfolio
-                        )
-                        if not passed:
-                            msg = f"⛔ **Risk Reject**: {reason}"
-                            self.logger.warning(msg)
-                            self.notifier.send_message(msg)
-                            self.audit_store.log_risk_event(
-                                self.run_id,
-                                reason="ORDER_REJECTED",
-                                details={
-                                    "symbol": event.symbol,
-                                    "direction": event.direction,
-                                    "quantity": event.quantity,
-                                    "reason": reason,
-                                },
-                            )
-                            continue  # Skip processing this event
-                        self.audit_store.log_order(self.run_id, event, status="NEW")
 
                     self.process_event(event)
 

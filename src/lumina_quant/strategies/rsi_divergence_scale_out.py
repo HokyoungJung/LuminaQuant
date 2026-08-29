@@ -69,8 +69,12 @@ Everything not in the audited list is this module's own decision:
   using *lagged* moving averages. The 7/100/200/400/800 averages are not
   modelled, only 20/50 direction.
 * Position sizing, stop placement (pivot extreme) and the 12-hour time cap are
-  this module's risk choices; the leverage/"challenge" money management of the
-  public posts is explicitly out of scope.
+  this module's risk choices. A stop is triggered by a long bar's ``low <=
+  stop`` or a short bar's ``high >= stop``. As a bar-close strategy it emits a
+  market EXIT after observing that breach; the execution contract fills at the
+  next available open, including a gap through the stop, rather than claiming
+  an intrabar stop-price fill. The leverage/"challenge" money management of
+  the public posts is explicitly out of scope.
 
 Hypothesis
 ----------
@@ -89,6 +93,8 @@ from __future__ import annotations
 
 from collections import deque
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
+import math
 from typing import Any
 
 from lumina_quant.core.plugin_registry import register
@@ -107,12 +113,6 @@ from lumina_quant.strategy import Strategy
 from lumina_quant.tuning import HyperParam, resolve_params_from_schema
 
 _STRATEGY_ID = "rsi_divergence_scale_out"
-
-# ponytail: the number of confirmed pivots retained per side is a fixed
-# constant rather than a hyper-parameter -- only the newest pivot plus the
-# admissible earlier ones are ever read, and four covers the widest allowed
-# separation in practice.
-_MAX_PIVOTS = 4
 
 
 @dataclass(slots=True)
@@ -159,7 +159,8 @@ class _State:
     pivot_lows: list[_Pivot] = field(default_factory=list)
     pivot_highs: list[_Pivot] = field(default_factory=list)
     bars_seen: int = 0
-    htf_bar_count: int = 0
+    htf_bucket: int | None = None
+    htf_bucket_close: float | None = None
     mode: str = "OUT"
     entry_price: float | None = None
     stop_price: float | None = None
@@ -244,6 +245,10 @@ class RsiDivergenceScaleOutStrategy(Strategy):
         self.htf_ma_window = max(2, int(resolved["htf_ma_window"]))
         self.exit_rsi_first = min(95.0, max(5.0, float(resolved["exit_rsi_first"])))
         self.exit_rsi_second = min(95.0, max(5.0, float(resolved["exit_rsi_second"])))
+        # A reversed ladder can cross the final threshold before a partial
+        # exit is representable. Refuse new entries instead of reordering
+        # frozen parameters or leaving an unsafe open position.
+        self._valid_exit_thresholds = self.exit_rsi_first < self.exit_rsi_second
         # "More than half" in the source; 0.6 is this module's reading of it.
         self.first_exit_fraction = min(1.0, max(0.0, float(resolved["first_exit_fraction"])))
         self.max_hold_bars = max(1, int(resolved["max_hold_bars"]))
@@ -280,7 +285,8 @@ class RsiDivergenceScaleOutStrategy(Strategy):
                     "volumes": list(item.volumes),
                     "rsis": list(item.rsis),
                     "htf_closes": list(item.htf_closes),
-                    "htf_bar_count": int(item.htf_bar_count),
+                    "htf_bucket": item.htf_bucket,
+                    "htf_bucket_close": item.htf_bucket_close,
                     "rsi_calc": item.rsi_calc.to_state(),
                     "pivot_lows": [pivot.as_dict() for pivot in item.pivot_lows],
                     "pivot_highs": [pivot.as_dict() for pivot in item.pivot_highs],
@@ -328,15 +334,19 @@ class RsiDivergenceScaleOutStrategy(Strategy):
                     for raw_pivot in list(payload.get(name) or [])
                     if (pivot := _pivot_from_dict(raw_pivot)) is not None
                 ]
-                setattr(item, name, pivots[-_MAX_PIVOTS:])
+                setattr(item, name, pivots)
             try:
                 item.bars_seen = max(0, int(payload.get("bars_seen", 0)))
             except TypeError, ValueError:
                 item.bars_seen = 0
+            cutoff = item.bars_seen - 2 - self.max_pivot_distance
+            item.pivot_lows[:] = [pivot for pivot in item.pivot_lows if pivot.bar_index >= cutoff]
+            item.pivot_highs[:] = [pivot for pivot in item.pivot_highs if pivot.bar_index >= cutoff]
             try:
-                item.htf_bar_count = int(payload.get("htf_bar_count", 0)) % self.htf_multiple
+                item.htf_bucket = int(payload.get("htf_bucket"))
             except TypeError, ValueError:
-                item.htf_bar_count = 0
+                item.htf_bucket = None
+            item.htf_bucket_close = safe_float(payload.get("htf_bucket_close"))
             mode = str(payload.get("mode", "OUT")).upper()
             item.mode = mode if mode in ("LONG", "SHORT") else "OUT"
             item.entry_price = safe_float(payload.get("entry_price"))
@@ -394,19 +404,14 @@ class RsiDivergenceScaleOutStrategy(Strategy):
         rsi = item.rsi_calc.update(close)
         item.rsis.append(rsi)
         item.bars_seen += 1
-        item.htf_bar_count += 1
-        if item.htf_bar_count >= self.htf_multiple:
-            # Only COMPLETED higher-timeframe groups are published, so the last
-            # element is always a closed HTF bar -- never a partial one.
-            item.htf_bar_count = 0
-            item.htf_closes.append(close)
+        self._record_htf_close(item, snapshot.time, close)
 
         new_low, new_high = self._record_pivots(item)
 
         if item.mode != "OUT":
             self._manage_position(symbol, item, snapshot, close, rsi)
             return
-        if self.target_allocation <= 0.0:
+        if self.target_allocation <= 0.0 or not self._valid_exit_thresholds:
             # ``_target_metadata`` drops the key when the allocation is not
             # positive, so the portfolio would size this entry off its own
             # config default.  Refuse rather than emit an unsized signal.
@@ -431,12 +436,61 @@ class RsiDivergenceScaleOutStrategy(Strategy):
         if item.lows[-2] < item.lows[-3] and item.lows[-2] < item.lows[-1]:
             new_low = _Pivot(pivot_index, item.lows[-2], pivot_rsi, pivot_volume)
             item.pivot_lows.append(new_low)
-            del item.pivot_lows[:-_MAX_PIVOTS]
         if item.highs[-2] > item.highs[-3] and item.highs[-2] > item.highs[-1]:
             new_high = _Pivot(pivot_index, item.highs[-2], pivot_rsi, pivot_volume)
             item.pivot_highs.append(new_high)
-            del item.pivot_highs[:-_MAX_PIVOTS]
+        cutoff = item.bars_seen - 2 - self.max_pivot_distance
+        item.pivot_lows[:] = [pivot for pivot in item.pivot_lows if pivot.bar_index >= cutoff]
+        item.pivot_highs[:] = [pivot for pivot in item.pivot_highs if pivot.bar_index >= cutoff]
         return new_low, new_high
+
+    def _record_htf_close(self, item: _State, raw_time: Any, close: float) -> None:
+        """Publish only completed closes from UTC-aligned HTF buckets.
+
+        Missing base bars leave missing buckets instead of shifting all later
+        groups. A stop or entry decision can therefore use only a completed
+        higher-timeframe close, never a partial bucket.
+        """
+        bucket = self._htf_bucket(raw_time, item.bars_seen - 1)
+        if item.htf_bucket is None:
+            item.htf_bucket = bucket
+        elif bucket > item.htf_bucket:
+            if item.htf_bucket_close is not None:
+                item.htf_closes.append(item.htf_bucket_close)
+            item.htf_bucket = bucket
+        elif bucket < item.htf_bucket:
+            return  # ignore out-of-order bars; state remains causal
+        item.htf_bucket_close = close
+
+    def _htf_bucket(self, raw_time: Any, fallback_index: int) -> int:
+        """Return a UTC bucket; bar ordinals are cadence-spaced logical time."""
+        if isinstance(raw_time, (int, float)) and math.isfinite(float(raw_time)):
+            value = float(raw_time)
+            if abs(value) < 100_000_000:
+                return math.floor(value / self.htf_multiple)
+            if abs(value) > 100_000_000_000:
+                value /= 1000.0
+            return math.floor(value / (self.decision_cadence_seconds * self.htf_multiple))
+        parsed: datetime | None = None
+        if isinstance(raw_time, datetime):
+            parsed = (
+                raw_time.astimezone(UTC)
+                if raw_time.tzinfo is not None
+                else raw_time.replace(tzinfo=UTC)
+            )
+        elif raw_time is not None:
+            try:
+                parsed = datetime.fromisoformat(str(raw_time).replace("Z", "+00:00"))
+                parsed = (
+                    parsed.astimezone(UTC)
+                    if parsed.tzinfo is not None
+                    else parsed.replace(tzinfo=UTC)
+                )
+            except ValueError:
+                pass
+        if parsed is None:
+            return fallback_index // self.htf_multiple
+        return math.floor(parsed.timestamp() / (self.decision_cadence_seconds * self.htf_multiple))
 
     def _volume_ok(self, earlier: _Pivot, newest: _Pivot) -> bool:
         """Public rule: a heavier opposing print can invalidate the divergence."""
@@ -697,14 +751,19 @@ class RsiDivergenceScaleOutStrategy(Strategy):
         """
         first, second = self._exit_levels(item.mode)
         if item.exit_stage == 0:
+            # The repository's EXIT contract treats ``exit_fraction`` as the
+            # fraction of the *current* position. A bar that reaches the final
+            # target therefore closes all of it once, never emits a partial
+            # and waits to discover whether that partial filled.
+            if self._reached(rsi, second, item.mode):
+                self._close(symbol, item, snapshot, close, rsi, reason="stage2_rsi")
+                return True
             if not self._reached(rsi, first, item.mode):
                 return False
-            if self.first_exit_fraction <= 0.0:
-                # Degenerate config: no first leg at all, so hand the whole
-                # position to the second stage without emitting a null order.
-                item.exit_stage = 1
-                return False
-            if self.first_exit_fraction >= 1.0:
+            if not 0.0 < self.first_exit_fraction < 1.0:
+                # Zero is not a valid execution fraction and one is a full
+                # exit. In either case do not advance stage without a
+                # representable partial fill.
                 self._close(symbol, item, snapshot, close, rsi, reason="stage1_rsi")
                 return True
             self._emit_exit(
@@ -726,13 +785,11 @@ class RsiDivergenceScaleOutStrategy(Strategy):
     def _manage_position(
         self, symbol: str, item: _State, snapshot: _Snapshot, close: float, rsi: float | None
     ) -> None:
-        # ponytail: at most one staged decision per bar. If RSI clears BOTH
-        # levels on the same bar, the first leg is emitted here and the
-        # remainder waits for the next qualifying bar rather than firing two
-        # exits at one timestamp.
         item.bars_held += 1
         stopped = item.stop_price is not None and (
-            close < item.stop_price if item.mode == "LONG" else close > item.stop_price
+            safe_float(snapshot.low) <= item.stop_price
+            if item.mode == "LONG"
+            else safe_float(snapshot.high) >= item.stop_price
         )
         if stopped:
             self._close(symbol, item, snapshot, close, rsi, reason="pivot_stop")

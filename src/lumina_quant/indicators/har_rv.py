@@ -39,6 +39,7 @@ empty tuples (series builders).  No scipy/sklearn/statsmodels.
 from __future__ import annotations
 
 import math
+from itertools import pairwise
 from typing import Any
 
 import numpy as np
@@ -99,26 +100,40 @@ def daily_realized_variance(
     try:
         close_list = list(closes)
         epoch_list = list(epoch_seconds)
-    except TypeError:
+    except Exception:
         return (), ()
-    floor_returns = max(1, int(min_intraday_returns)) if min_intraday_returns else 1
+    if len(close_list) != len(epoch_list):
+        return (), ()
+    try:
+        floor_returns = max(1, int(min_intraday_returns))
+    except Exception:
+        return (), ()
+
+    parsed_epochs = [_finite_float(epoch) for epoch in epoch_list]
+    if any(epoch is None for epoch in parsed_epochs):
+        return (), ()
+    if any(current <= previous for previous, current in pairwise(parsed_epochs)):
+        return (), ()
 
     sums: dict[int, float] = {}
     counts: dict[int, int] = {}
     prev_close: float | None = None
     prev_day: int | None = None
-    for raw_close, raw_epoch in zip(close_list, epoch_list, strict=False):
+    for raw_close, epoch in zip(close_list, parsed_epochs, strict=True):
         close = _finite_float(raw_close)
-        epoch = _finite_float(raw_epoch)
-        if close is None or epoch is None or close <= 0.0:
+        if close is None or close <= 0.0:
             prev_close = None
             prev_day = None
             continue
         day = int(epoch // _SECONDS_PER_DAY)
         if prev_close is not None and prev_day == day:
-            log_ret = math.log(close / prev_close)
-            sums[day] = sums.get(day, 0.0) + log_ret * log_ret
-            counts[day] = counts.get(day, 0) + 1
+            try:
+                log_ret = math.log(close / prev_close)
+            except OverflowError, ValueError, ZeroDivisionError:
+                log_ret = math.nan
+            if math.isfinite(log_ret):
+                sums[day] = sums.get(day, 0.0) + log_ret * log_ret
+                counts[day] = counts.get(day, 0) + 1
         prev_close = close
         prev_day = day
 
@@ -143,10 +158,23 @@ def _clean_rv_array(rv_values: Any, *, eps: float) -> np.ndarray | None:
     if not np.all(np.isfinite(arr)) or bool(np.any(arr < 0.0)):
         return None
     try:
-        floor = float(eps) if math.isfinite(float(eps)) and float(eps) > 0.0 else LOG_RV_EPS
-    except TypeError, ValueError:
-        floor = LOG_RV_EPS
+        floor = float(eps)
+    except Exception:
+        return None
+    if not math.isfinite(floor) or floor <= 0.0:
+        return None
     return np.maximum(arr, floor)
+
+
+def _validated_lags(lags: Any) -> list[int] | None:
+    """Return sorted, unique positive integer lag lengths, or ``None``."""
+    try:
+        lag_list = sorted({int(k) for k in lags})
+    except Exception:
+        return None
+    if not lag_list or lag_list[0] < 1:
+        return None
+    return lag_list
 
 
 def log_rv_transform(rv_values: Any, *, eps: float = LOG_RV_EPS) -> np.ndarray | None:
@@ -177,10 +205,10 @@ def har_design(
     """
     try:
         arr = np.asarray(list(log_rv), dtype=float)
-        lag_list = sorted({int(k) for k in lags})
     except Exception:
         return None
-    if arr.ndim != 1 or not lag_list or lag_list[0] < 1:
+    lag_list = _validated_lags(lags)
+    if arr.ndim != 1 or lag_list is None:
         return None
     if not np.all(np.isfinite(arr)):
         return None
@@ -254,16 +282,25 @@ def har_rv_forecast(
     if built is None:
         return None
     design, target = built
-    if design.shape[0] < max(int(min_fit_rows), design.shape[1]):
+    try:
+        required_rows = int(min_fit_rows)
+    except Exception:
+        return None
+    if required_rows < 1 or design.shape[0] < max(required_rows, design.shape[1]):
         return None
     coef = har_fit(design, target)
     if coef is None:
         return None
-    lag_list = sorted({int(k) for k in lags})
+    lag_list = _validated_lags(lags)
+    if lag_list is None:
+        return None
     prediction = float(np.dot(_har_forecast_row(series, lag_list), coef))
     if not math.isfinite(prediction):
         return None
-    forecast = math.exp(prediction) if log_space else max(0.0, prediction)
+    try:
+        forecast = math.exp(prediction) if log_space else max(0.0, prediction)
+    except OverflowError:
+        return None
     if not math.isfinite(forecast) or forecast < 0.0:
         return None
     return float(forecast)

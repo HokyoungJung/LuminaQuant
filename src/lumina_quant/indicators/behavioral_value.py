@@ -73,23 +73,15 @@ from typing import Any
 import numpy as np
 
 _EPS = 1e-12
-# Probability-weighting curvature floor: keeps p**(1/g) style terms numerically
-# sane on adversarial gamma inputs while leaving the TK-1992 canonical values
-# (0.61 / 0.69) untouched.
-_GAMMA_FLOOR = 0.05
 
 
-def _coerce_param(raw: Any, default: float) -> float:
-    """Coerce a scalar constant to a finite float; canonical default otherwise.
-
-    Never raises: non-numeric (``None``, ``'abc'``) and non-finite inputs fall
-    back to the canonical default instead of propagating ``float()`` errors.
-    """
+def _coerce_param(raw: Any) -> float | None:
+    """Coerce an explicitly supplied scalar parameter to a finite float."""
     try:
         value = float(raw)
     except Exception:
-        return default
-    return value if math.isfinite(value) else default
+        return None
+    return value if math.isfinite(value) else None
 
 
 def _coerce_1d(values: Any) -> np.ndarray | None:
@@ -145,8 +137,10 @@ def salience_theory_value(
     n = own.size
     if n < 2:
         return None
-    theta_f = max(_coerce_param(theta, 0.1), _EPS)
-    delta_f = min(max(_coerce_param(delta, 0.7), _EPS), 1.0)
+    theta_f = _coerce_param(theta)
+    delta_f = _coerce_param(delta)
+    if theta_f is None or delta_f is None or theta_f <= 0.0 or not 0.0 < delta_f <= 1.0:
+        return None
     sigma = np.abs(own - market) / (np.abs(own) + np.abs(market) + theta_f)
     # Rank days by salience descending; stable sort makes ties deterministic.
     order = np.argsort(-sigma, kind="stable")
@@ -203,10 +197,21 @@ def prospect_theory_value(
     n = int(arr.size)
     if n < 2:
         return None
-    alpha_f = min(max(_coerce_param(alpha, 0.88), _EPS), 1.0)
-    lam_f = max(_coerce_param(lam, 2.25), 0.0)
-    g_gain = min(max(_coerce_param(gamma_gain, 0.61), _GAMMA_FLOOR), 1.0)
-    g_loss = min(max(_coerce_param(gamma_loss, 0.69), _GAMMA_FLOOR), 1.0)
+    alpha_f = _coerce_param(alpha)
+    lam_f = _coerce_param(lam)
+    g_gain = _coerce_param(gamma_gain)
+    g_loss = _coerce_param(gamma_loss)
+    if (
+        alpha_f is None
+        or lam_f is None
+        or g_gain is None
+        or g_loss is None
+        or not 0.0 < alpha_f <= 1.0
+        or lam_f < 0.0
+        or not 0.0 < g_gain <= 1.0
+        or not 0.0 < g_loss <= 1.0
+    ):
+        return None
 
     ordered = np.sort(arr, kind="stable")
     n_loss = int(np.count_nonzero(ordered < 0.0))

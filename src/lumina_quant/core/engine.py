@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC
-from datetime import UTC, datetime
+from inspect import Signature, signature
 from typing import Any
 
 from lumina_quant.core.events import MarketBatchEvent, MarketEvent
@@ -9,64 +9,35 @@ from lumina_quant.core.strategy_input import StrategyInputContext
 from lumina_quant.data.feature_points import FEATURE_COLUMNS
 from lumina_quant.event_clock import EventSequencer, assign_event_identity
 from lumina_quant.message_bus import MessageBus
+from lumina_quant.utils.timeutil import utc_epoch_ms
 
 
 def _event_time_to_ms(value: Any) -> int | None:
-    """Coerce a bar/event time to epoch milliseconds.
-
-    Naive ``datetime`` values are UTC (the data handlers emit naive UTC bar
-    times -- see ``HistoricCSVDataHandler._bar_time_ms`` and
-    ``_warmup_time_to_ms``).  Interpreting them in the host's local timezone
-    would shift every timeframe-alignment check by the UTC offset: on a KST
-    host a naive 00:00 daily bar landed at 15:00 UTC, so the legacy
-    ``TimeframeGatedStrategy`` ``event_ms % 86_400_000 == 0`` test dropped
-    EVERY 1d/4h bar and those strategies silently never traded.
-    """
-    if value is None:
-        return None
-    if isinstance(value, (int, float)):
-        numeric = int(float(value))
-        if abs(numeric) < 100_000_000_000:
-            return numeric * 1000
-        return numeric
-    if isinstance(value, datetime):
-        dt = value if value.tzinfo is not None else value.replace(tzinfo=UTC)
-        return int(dt.astimezone(UTC).timestamp() * 1000)
-    ts_fn = getattr(value, "timestamp", None)
-    if callable(ts_fn):
-        try:
-            ts_value = ts_fn()
-            if isinstance(ts_value, (int, float)):
-                return int(float(ts_value) * 1000)
-        except Exception:
-            return None
-    return None
+    """Coerce event time with the shared strict UTC conversion contract."""
+    return utc_epoch_ms(value)
 
 
 def _warmup_time_to_ms(value: Any) -> int | None:
-    """Bar-time coercion for warmup-boundary checks.
+    """Coerce warmup time with the shared strict UTC conversion contract."""
+    return utc_epoch_ms(value)
 
-    Mirrors ``HistoricCSVDataHandler._bar_time_ms``: naive datetimes are UTC
-    (``_event_time_to_ms`` now follows the same convention; this helper is kept
-    for the ISO-string path used by window watermarks).
+
+def _accepts_positional_call(function: Any, *args: Any) -> bool:
+    """Whether a callable can receive these positional arguments.
+
+    Signature inspection distinguishes an argument mismatch from a TypeError
+    raised inside strategy code. Uninspectable callables are invoked normally
+    so their contract failures remain visible.
     """
-    if value is None:
-        return None
-    if isinstance(value, (int, float)):
-        numeric = int(float(value))
-        if abs(numeric) < 100_000_000_000:
-            return numeric * 1000
-        return numeric
-    if isinstance(value, datetime):
-        dt = value if value.tzinfo is not None else value.replace(tzinfo=UTC)
-        return int(dt.astimezone(UTC).timestamp() * 1000)
     try:
-        dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=UTC)
-        return int(dt.astimezone(UTC).timestamp() * 1000)
-    except Exception:
-        return None
+        contract: Signature = signature(function)
+    except TypeError, ValueError:
+        return True
+    try:
+        contract.bind(*args)
+    except TypeError:
+        return False
+    return True
 
 
 class TradingEngine(ABC):
@@ -120,7 +91,9 @@ class TradingEngine(ABC):
         if self._live_start_ms is None:
             return False
         event_ms = _warmup_time_to_ms(time_value)
-        return event_ms is not None and event_ms < self._live_start_ms
+        # A bad clock must never turn a warmup event into a live-routing event.
+        # Suppress it until a valid timestamp proves it is at/after the cutoff.
+        return event_ms is None or event_ms < self._live_start_ms
 
     def _update_warmup_state(self, time_value: Any) -> bool:
         """Track whether the current market event sits in the warmup region.
@@ -142,11 +115,13 @@ class TradingEngine(ABC):
             and not self._warmup_active
             and not self._warmup_end_hook_fired
         ):
-            self._warmup_end_hook_fired = True
             hook = getattr(self.strategy, "on_warmup_end", None)
             if callable(hook):
                 # A deliberately-defined hook must not fail silently.
                 hook()
+            # Only a successful hook invocation commits the one-shot state.
+            # A transient hook failure is retried before the next valid live bar.
+            self._warmup_end_hook_fired = True
         return self._warmup_active
 
     def _required_inputs(self) -> tuple[str, ...]:
@@ -210,10 +185,7 @@ class TradingEngine(ABC):
         should_process = True
         strategy_guard = getattr(self.strategy, "should_process_market_event", None)
         if callable(strategy_guard):
-            try:
-                should_process = bool(strategy_guard(event))
-            except Exception:
-                should_process = True
+            should_process = bool(strategy_guard(event))
         if should_process:
             self._assert_strategy_requirements(
                 available_inputs={
@@ -248,10 +220,7 @@ class TradingEngine(ABC):
             self.market_events += 1
             should_process = True
             if callable(strategy_guard):
-                try:
-                    should_process = bool(strategy_guard(market_event))
-                except Exception:
-                    should_process = True
+                should_process = bool(strategy_guard(market_event))
             if should_process:
                 self._assert_strategy_requirements(
                     available_inputs={
@@ -300,43 +269,40 @@ class TradingEngine(ABC):
 
         raw = getattr(self.strategy, "required_timeframes", None)
         if callable(raw):
-            try:
-                raw = raw()
-            except Exception:
-                raw = None
-        if isinstance(raw, (list, tuple, set)):
-            for token in raw:
-                item = str(token or "").strip()
-                if item:
-                    resolved.append(item)
+            raw = raw()
+        if raw is None:
+            return resolved
+        if not isinstance(raw, (list, tuple, set)):
+            raise TypeError("strategy required_timeframes must be a sequence")
+        for token in raw:
+            if type(token) is not str or not token.strip():
+                raise ValueError("strategy required_timeframes contains an invalid token")
+            resolved.append(token.strip())
         return resolved
 
     def _resolve_required_lookbacks(self) -> dict[str, int]:
         raw = getattr(self.strategy, "required_lookbacks", None)
         if callable(raw):
-            try:
-                raw = raw()
-            except Exception:
-                raw = None
-        if not isinstance(raw, dict):
+            raw = raw()
+        if raw is None:
             return {}
+        if not isinstance(raw, dict):
+            raise TypeError("strategy required_lookbacks must be a mapping")
 
         out: dict[str, int] = {}
         for key, value in raw.items():
-            try:
-                out[str(key)] = max(1, int(value))
-            except Exception:
-                continue
+            if type(key) is not str or not key.strip() or type(value) is not int or value <= 0:
+                raise ValueError("strategy required_lookbacks contains an invalid entry")
+            out[key.strip()] = value
         return out
 
     def _strategy_uses_timeframe_aggregator(self) -> bool:
         raw = getattr(self.strategy, "uses_timeframe_aggregator", False)
         if callable(raw):
-            try:
-                raw = raw()
-            except Exception:
-                raw = False
-        if bool(raw):
+            raw = raw()
+        if type(raw) is not bool:
+            raise TypeError("strategy uses_timeframe_aggregator must be boolean")
+        if raw:
             return True
 
         if "aggregator" in self._required_inputs():
@@ -344,26 +310,24 @@ class TradingEngine(ABC):
 
         raw_timeframes = getattr(self.strategy, "required_timeframes", None)
         if callable(raw_timeframes):
-            try:
-                raw_timeframes = raw_timeframes()
-            except Exception:
-                raw_timeframes = None
+            raw_timeframes = raw_timeframes()
+        if raw_timeframes is not None and not isinstance(raw_timeframes, (list, tuple, set)):
+            raise TypeError("strategy required_timeframes must be a sequence")
         if isinstance(raw_timeframes, (list, tuple, set)):
-            return any(str(token or "").strip() for token in raw_timeframes)
+            if any(type(token) is not str or not token.strip() for token in raw_timeframes):
+                raise ValueError("strategy required_timeframes contains an invalid token")
+            return bool(raw_timeframes)
         return False
 
     def _ensure_timeframe_aggregator(self):
         if self.timeframe_aggregator is not None:
             return self.timeframe_aggregator
-        try:
-            from lumina_quant.timeframe_aggregator import TimeframeAggregator
+        from lumina_quant.timeframe_aggregator import TimeframeAggregator
 
-            self.timeframe_aggregator = TimeframeAggregator(
-                timeframes=self._resolve_required_timeframes(),
-                lookbacks=self._resolve_required_lookbacks(),
-            )
-        except Exception:
-            self.timeframe_aggregator = None
+        self.timeframe_aggregator = TimeframeAggregator(
+            timeframes=self._resolve_required_timeframes(),
+            lookbacks=self._resolve_required_lookbacks(),
+        )
         return self.timeframe_aggregator
 
     @staticmethod
@@ -395,21 +359,20 @@ class TradingEngine(ABC):
     def _should_process_market_window_event(self, event: Any) -> bool:
         raw_cadence = getattr(self.strategy, "decision_cadence_seconds", None)
         if callable(raw_cadence):
-            try:
-                raw_cadence = raw_cadence()
-            except Exception:
-                raw_cadence = None
-        try:
-            cadence_seconds = int(raw_cadence) if raw_cadence is not None else 0
-        except Exception:
+            raw_cadence = raw_cadence()
+        if raw_cadence is None:
             cadence_seconds = 0
+        elif type(raw_cadence) is not int:
+            raise TypeError("strategy decision_cadence_seconds must be an integer")
+        else:
+            cadence_seconds = raw_cadence
 
         if cadence_seconds <= 0:
             return True
 
         event_ms = _event_time_to_ms(getattr(event, "time", None))
         if event_ms is None:
-            return True
+            raise ValueError("market window decision timestamp is invalid")
 
         cadence_ms = max(1_000, cadence_seconds * 1000)
         bucket = int(event_ms // cadence_ms)
@@ -475,21 +438,18 @@ class TradingEngine(ABC):
                         "market_data_source": getattr(self, "market_data_source", None),
                     },
                 )
-                try:
+                if _accepts_positional_call(context_fn, context):
                     context_fn(context)
-                except TypeError:
-                    if callable(window_fn):
-                        try:
-                            window_fn(event, aggregator)
-                        except TypeError:
-                            self.strategy.calculate_signals(event)
-                    else:
-                        self.strategy.calculate_signals(event)
-            elif callable(window_fn):
-                try:
+                elif callable(window_fn) and _accepts_positional_call(window_fn, event, aggregator):
                     window_fn(event, aggregator)
-                except TypeError:
+                elif callable(window_fn) and _accepts_positional_call(window_fn, event):
+                    window_fn(event)
+                else:
                     self.strategy.calculate_signals(event)
+            elif callable(window_fn) and _accepts_positional_call(window_fn, event, aggregator):
+                window_fn(event, aggregator)
+            elif callable(window_fn) and _accepts_positional_call(window_fn, event):
+                window_fn(event)
             else:
                 self.strategy.calculate_signals(event)
 
@@ -542,8 +502,19 @@ class TradingEngine(ABC):
         self.signals += 1
         self.portfolio.update_signal(event)
 
+    def admit_order_event(self, event) -> bool:
+        """Return whether an order may reach the configured execution handler.
+
+        Backtests retain their historical behavior.  Live engines override this
+        single hook so queued and direct ``process_event(OrderEvent)`` calls
+        share the same execution boundary.
+        """
+        return True
+
     def handle_order_event(self, event):
         if self._warmup_active:
+            return
+        if not self.admit_order_event(event):
             return
         self.orders += 1
         self.execution_handler.execute_order(event)
@@ -570,6 +541,7 @@ class TradingEngine(ABC):
             "window_decision_last_bucket": self._window_decision_last_bucket,
             "warmup_end_hook_fired": bool(self._warmup_end_hook_fired),
             "had_warmup": bool(self._live_start_ms is not None or self._had_warmup),
+            "live_start_ms": self._live_start_ms,
         }
         if self.timeframe_aggregator is None and not self._strategy_uses_timeframe_aggregator():
             return state
@@ -578,10 +550,7 @@ class TradingEngine(ABC):
         if aggregator is not None:
             get_state_fn = getattr(aggregator, "get_state", None)
             if callable(get_state_fn):
-                try:
-                    state["timeframe_aggregator"] = get_state_fn()
-                except Exception:
-                    pass
+                state["timeframe_aggregator"] = get_state_fn()
         return state
 
     def set_engine_state(self, state: dict[str, Any]) -> None:
@@ -600,6 +569,15 @@ class TradingEngine(ABC):
             self._warmup_end_hook_fired = bool(state.get("warmup_end_hook_fired"))
         if state.get("had_warmup"):
             self._had_warmup = True
+        if "live_start_ms" in state:
+            raw = state.get("live_start_ms")
+            try:
+                restored_live_start_ms = int(raw) if raw is not None else None
+            except TypeError, ValueError:
+                restored_live_start_ms = None
+            if restored_live_start_ms is not None:
+                self._live_start_ms = restored_live_start_ms
+                self._had_warmup = True
 
         aggregator_state = state.get("timeframe_aggregator")
         if isinstance(aggregator_state, dict) and self._strategy_uses_timeframe_aggregator():

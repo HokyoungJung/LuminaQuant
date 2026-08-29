@@ -37,6 +37,8 @@ from __future__ import annotations
 
 import math
 from collections import deque
+from datetime import timedelta
+from itertools import pairwise
 from statistics import mean
 from typing import Any
 
@@ -61,15 +63,11 @@ from lumina_quant.strategies.equity_xs_factor_alpha_sleeves import (
 from lumina_quant.strategies.external_alpha_sleeves import (
     _EPS,
     _Snapshot,
-    _event_symbols,
-    _market_snapshot,
-    _safe_non_negative_int,
+    _event_datetime_utc,
     _window_snapshot,
 )
 from lumina_quant.strategies.robust_alpha_sleeves import (
     _CrossSectionalState,
-    _mode,
-    _restore_deque,
 )
 from lumina_quant.strategy import Strategy
 from lumina_quant.tuning import HyperParam, resolve_params_from_schema
@@ -115,13 +113,104 @@ def _pack_cross(item: _CrossSectionalState) -> dict[str, Any]:
     }
 
 
-def _restore_cross(item: _CrossSectionalState, payload: dict[str, Any]) -> None:
-    _restore_deque(item.closes, payload.get("closes"))
-    _restore_deque(item.volumes, payload.get("volumes"))
-    item.mode = _mode(payload.get("mode"))
-    item.entry_price = safe_float(payload.get("entry_price"))
-    item.bars_held = _safe_non_negative_int(payload.get("bars_held"))
-    item.last_time_key = str(payload.get("last_time_key", ""))
+def _valid_float(value: Any, *, positive: bool = False) -> float | None:
+    """Return a finite numeric checkpoint value without coercing wire data."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    number = float(value)
+    if not math.isfinite(number) or (positive and number <= _EPS):
+        return None
+    return number
+
+
+def _validated_cross_state(
+    state: Any, symbols: list[str], size: int
+) -> tuple[str, int, dict[str, _CrossSectionalState], dict[str, deque[str]]] | None:
+    """Validate the complete base checkpoint before constructing replacement state."""
+    if not isinstance(state, dict) or set(state) != {
+        "last_eval_time_key",
+        "tick",
+        "symbol_state",
+        "close_times",
+    }:
+        return None
+    last_eval_key = state["last_eval_time_key"]
+    tick = state["tick"]
+    raw_items = state["symbol_state"]
+    raw_times = state["close_times"]
+    if (
+        not isinstance(last_eval_key, str)
+        or (last_eval_key and _event_datetime_from_key(last_eval_key) is None)
+        or isinstance(tick, bool)
+        or not isinstance(tick, int)
+        or tick < 0
+        or not isinstance(raw_items, dict)
+        or not isinstance(raw_times, dict)
+        or set(raw_items) != set(symbols)
+        or set(raw_times) != set(symbols)
+    ):
+        return None
+    items: dict[str, _CrossSectionalState] = {}
+    close_times: dict[str, deque[str]] = {}
+    common_times: list[str] | None = None
+    for symbol in symbols:
+        payload = raw_items[symbol]
+        times = raw_times[symbol]
+        if (
+            not isinstance(payload, dict)
+            or set(payload)
+            != {"closes", "volumes", "mode", "entry_price", "bars_held", "last_time_key"}
+            or not isinstance(payload["closes"], list)
+            or not isinstance(payload["volumes"], list)
+            or not isinstance(times, list)
+            or not (len(payload["closes"]) == len(payload["volumes"]) == len(times))
+            or len(times) > size
+            or not isinstance(payload["mode"], str)
+            or payload["mode"] not in {"OUT", "LONG", "SHORT"}
+            or isinstance(payload["bars_held"], bool)
+            or not isinstance(payload["bars_held"], int)
+            or payload["bars_held"] < 0
+        ):
+            return None
+        closes = [_valid_float(value, positive=True) for value in payload["closes"]]
+        volumes = [_valid_float(value) for value in payload["volumes"]]
+        entry_price = payload["entry_price"]
+        if any(value is None for value in closes) or any(value is None for value in volumes):
+            return None
+        if entry_price is not None and _valid_float(entry_price, positive=True) is None:
+            return None
+        if not all(
+            isinstance(key, str) and _event_datetime_from_key(key) is not None for key in times
+        ):
+            return None
+        dts = [_event_datetime_from_key(key) for key in times]
+        if any(current <= previous for previous, current in pairwise(dts)):
+            return None
+        if common_times is None:
+            common_times = list(times)
+        elif times != common_times:
+            return None
+        item_last_key = payload["last_time_key"]
+        if (
+            not isinstance(item_last_key, str)
+            or (times and item_last_key != times[-1])
+            or (not times and item_last_key)
+            or (times and last_eval_key != times[-1])
+            or (not times and last_eval_key)
+        ):
+            return None
+        if (payload["mode"] == "OUT") != (entry_price is None):
+            return None
+        items[symbol] = _CrossSectionalState(
+            deque((float(value) for value in closes), maxlen=size),
+            deque((float(value) for value in volumes), maxlen=size),
+            payload["mode"],
+            _valid_float(entry_price, positive=True) if entry_price is not None else None,
+            payload["bars_held"],
+            item_last_key,
+        )
+        close_times[symbol] = deque(times, maxlen=size)
+    return last_eval_key, tick, items, close_times
 
 
 def _bar_simple_returns(closes: list[float]) -> list[float]:
@@ -135,6 +224,67 @@ def _bar_simple_returns(closes: list[float]) -> list[float]:
     return out
 
 
+def _event_datetime_from_key(key: str) -> Any:
+    """Parse a normalized key, including numeric keys made by ``time_key``."""
+    dt = _event_datetime_utc(key)
+    if dt is not None:
+        return dt
+    try:
+        return _event_datetime_utc(float(key))
+    except TypeError, ValueError:
+        return None
+
+
+def _daily_simple_returns(
+    closes: list[float], keys: list[str], window: int | None = None
+) -> list[float] | None:
+    """Return completed UTC-day returns; never substitute bar returns for MAX."""
+    if len(closes) != len(keys):
+        return None
+    by_day: dict[str, tuple[Any, str, float]] = {}
+    for close, key in zip(closes, keys, strict=True):
+        dt = _event_datetime_from_key(key)
+        if dt is None or close <= _EPS:
+            return None
+        day = dt.date().isoformat()
+        previous = by_day.get(day)
+        if previous is None or dt > previous[0]:
+            by_day[day] = (dt, key, close)
+    completed_days = sorted(by_day)
+    # The newest observed UTC date is still open. Its close must not affect
+    # MAX, regardless of the bar cadence.
+    if len(completed_days) < 3:
+        return None
+    completed_days = completed_days[:-1]
+    if window is not None:
+        entries = [(by_day[day][1], by_day[day][2]) for day in completed_days[-(window + 1) :]]
+        entries = _consecutive_completed_daily_closes(entries, window + 1)
+        if entries is None:
+            return None
+        return _bar_simple_returns([close for _, close in entries])
+    return _bar_simple_returns([by_day[day][2] for day in completed_days])
+
+
+def _consecutive_completed_daily_closes(entries: Any, count: int) -> list[tuple[str, float]] | None:
+    """Validate the exact UTC-day close tail required for Lottery MAX."""
+    if not isinstance(entries, list) or len(entries) != count:
+        return None
+    restored: list[tuple[str, float]] = []
+    dates: list[Any] = []
+    for entry in entries:
+        if not isinstance(entry, (list, tuple)) or len(entry) != 2 or not isinstance(entry[0], str):
+            return None
+        dt = _event_datetime_from_key(entry[0])
+        close = _valid_float(entry[1], positive=True)
+        if dt is None or close is None:
+            return None
+        restored.append((entry[0], close))
+        dates.append(dt.date())
+    if any(current != previous + timedelta(days=1) for previous, current in pairwise(dates)):
+        return None
+    return restored
+
+
 class _CrossUpdateMixin:
     """Shared per-symbol close ingestion / state serialization for XS sleeves."""
 
@@ -144,52 +294,123 @@ class _CrossUpdateMixin:
     _last_eval_time_key: str
     _tick: int
 
-    def _update_symbol(self, symbol: str, snapshot: _Snapshot) -> bool:
-        close = safe_float(snapshot.close)
-        if close is None or close <= self.min_price:
-            return False
+    def _append_symbol(self, symbol: str, snapshot: _Snapshot) -> None:
+        """Append a snapshot already validated as part of a complete panel."""
         item = self._state[symbol]
         key = time_key(snapshot.time)
-        if key and key == item.last_time_key:
-            return False
         item.last_time_key = key
-        item.closes.append(close)
+        item.closes.append(float(snapshot.close))
         item.volumes.append(max(0.0, float(snapshot.volume or 0.0)))
-        return True
+        self._close_times[symbol].append(key)
+
+    def _window_updates(self, event: Any) -> list[tuple[str, _Snapshot]] | None:
+        """Return one exact-time snapshot per configured name, or reject the batch."""
+        event_key = time_key(getattr(event, "time", None))
+        event_dt = _event_datetime_from_key(event_key)
+        last_eval_dt = _event_datetime_from_key(self._last_eval_time_key)
+        if event_dt is None or (last_eval_dt is not None and event_dt <= last_eval_dt):
+            return None
+        try:
+            payload_symbols = list(dict(getattr(event, "bars_1s", {}) or {}))
+        except TypeError, ValueError:
+            return None
+        configured_symbols = set(self.symbol_list)
+        if (
+            len(configured_symbols) != len(self.symbol_list)
+            or len(payload_symbols) != len(set(payload_symbols))
+            or set(payload_symbols) != configured_symbols
+        ):
+            return None
+        updates: list[tuple[str, _Snapshot]] = []
+        for symbol in self.symbol_list:
+            raw_rows = list((getattr(event, "bars_1s", {}) or {}).get(symbol) or [])
+            row_keys = {
+                time_key(
+                    row.get("time")
+                    if isinstance(row, dict)
+                    else row[0]
+                    if isinstance(row, (tuple, list)) and row
+                    else None
+                )
+                for row in raw_rows
+            }
+            snapshot = _window_snapshot(event, symbol)
+            last_symbol_dt = _event_datetime_from_key(self._state[symbol].last_time_key)
+            if (
+                snapshot is None
+                or "" in row_keys
+                or len(row_keys) != len(raw_rows)
+                or time_key(snapshot.time) != event_key
+                or safe_float(snapshot.close) is None
+                or safe_float(snapshot.close) <= self.min_price
+                or (last_symbol_dt is not None and event_dt <= last_symbol_dt)
+            ):
+                return None
+            updates.append((symbol, snapshot))
+        return updates
+
+    def _after_window_commit(self, updates: list[tuple[str, _Snapshot]]) -> None:
+        """Optional strategy-specific processing after an atomic panel append."""
+        _ = updates
+
+    def _synchronized_returns(
+        self, symbol: str, benchmark_symbol: str, window: int
+    ) -> tuple[list[float], list[float]] | None:
+        """Return a complete, regular common-grid return tail, or abstain."""
+        item = self._state[symbol]
+        benchmark = self._state[benchmark_symbol]
+        symbol_times = list(self._close_times[symbol])
+        benchmark_times = list(self._close_times[benchmark_symbol])
+        count = min(
+            len(item.closes), len(benchmark.closes), len(symbol_times), len(benchmark_times)
+        )
+        if count < window + 1:
+            return None
+        symbol_closes = list(item.closes)[-count:]
+        benchmark_closes = list(benchmark.closes)[-count:]
+        if symbol_times[-count:] != benchmark_times[-count:]:
+            return None
+        tail_times = symbol_times[-(window + 1) :]
+        tail_dts = [_event_datetime_from_key(key) for key in tail_times]
+        if len(tail_dts) != window + 1 or any(dt is None for dt in tail_dts):
+            return None
+        gaps = [tail_dts[index + 1] - tail_dts[index] for index in range(len(tail_dts) - 1)]
+        if not gaps or gaps[0].total_seconds() <= 0 or any(gap != gaps[0] for gap in gaps[1:]):
+            return None
+        return (
+            _bar_simple_returns(symbol_closes[-(window + 1) :]),
+            _bar_simple_returns(benchmark_closes[-(window + 1) :]),
+        )
 
     def get_state(self) -> dict[str, Any]:
         return {
             "last_eval_time_key": self._last_eval_time_key,
             "tick": int(self._tick),
             "symbol_state": {symbol: _pack_cross(item) for symbol, item in self._state.items()},
+            "close_times": {symbol: list(times) for symbol, times in self._close_times.items()},
         }
 
     def set_state(self, state: dict[str, Any]) -> None:
-        if not isinstance(state, dict):
+        size = next(iter(self._state.values())).closes.maxlen or 0
+        validated = _validated_cross_state(state, self.symbol_list, size)
+        if validated is None:
             return
-        self._last_eval_time_key = str(state.get("last_eval_time_key", ""))
-        self._tick = _safe_non_negative_int(state.get("tick"))
-        raw = state.get("symbol_state")
-        if isinstance(raw, dict):
-            for symbol, payload in raw.items():
-                if symbol in self._state and isinstance(payload, dict):
-                    _restore_cross(self._state[symbol], payload)
+        self._last_eval_time_key, self._tick, self._state, self._close_times = validated
 
     def _rebalance(self, event_time: Any) -> None:  # pragma: no cover - overridden
         raise NotImplementedError
 
     def calculate_signals_window(self, event: Any, aggregator: Any = None) -> None:
         _ = aggregator
-        event_key = time_key(getattr(event, "time", None))
-        updated = False
-        for symbol in _event_symbols(event, self.symbol_list):
-            snapshot = _window_snapshot(event, symbol)
-            if snapshot is not None and self._update_symbol(symbol, snapshot):
-                updated = True
-        if updated and event_key and event_key != self._last_eval_time_key:
-            self._last_eval_time_key = event_key
-            self._tick += 1
-            self._rebalance(getattr(event, "time", None))
+        updates = self._window_updates(event)
+        if updates is None:
+            return
+        for symbol, snapshot in updates:
+            self._append_symbol(symbol, snapshot)
+        self._after_window_commit(updates)
+        self._last_eval_time_key = time_key(getattr(event, "time", None))
+        self._tick += 1
+        self._rebalance(getattr(event, "time", None))
 
     def calculate_signals(self, event: Any) -> None:
         if str(getattr(event, "type", "")).upper() == "MARKET_WINDOW":
@@ -197,15 +418,8 @@ class _CrossUpdateMixin:
             return
         if getattr(event, "type", None) != "MARKET":
             return
-        symbol = getattr(event, "symbol", None)
-        if symbol in self._state:
-            snapshot = _market_snapshot(event)
-            if snapshot is not None and self._update_symbol(str(symbol), snapshot):
-                key = time_key(snapshot.time)
-                if key and key != self._last_eval_time_key:
-                    self._last_eval_time_key = key
-                    self._tick += 1
-                    self._rebalance(snapshot.time)
+        # A single-symbol callback cannot establish a common-time panel and
+        # therefore must not mutate cross-sectional history.
 
 
 @register("strategy", "IdiosyncraticVolatilityStrategy", interface="event_driven")
@@ -263,6 +477,7 @@ class IdiosyncraticVolatilityStrategy(_CrossUpdateMixin, Strategy):
             symbol: _CrossSectionalState(deque(maxlen=size), deque(maxlen=size))
             for symbol in self.symbol_list
         }
+        self._close_times = {symbol: deque(maxlen=size) for symbol in self.symbol_list}
         self._last_eval_time_key = ""
         self._tick = 0
 
@@ -282,40 +497,51 @@ class IdiosyncraticVolatilityStrategy(_CrossUpdateMixin, Strategy):
         need = max(self.beta_window, self.vol_window) + 1
         if benchmark is None or len(benchmark.closes) < need:
             return
-        bench_returns = _bar_simple_returns(list(benchmark.closes))
-        if len(bench_returns) < max(4, self.vol_window):
-            return
         rows: list[tuple[float, str, dict[str, Any]]] = []
         for symbol, item in self._state.items():
             if symbol == self.benchmark_symbol or len(item.closes) < need:
                 continue
-            sym_returns = _bar_simple_returns(list(item.closes))
-            window = min(len(sym_returns), len(bench_returns), self.beta_window)
-            if window < max(4, self.vol_window):
+            aligned = self._synchronized_returns(
+                symbol, self.benchmark_symbol, max(self.beta_window, self.vol_window)
+            )
+            if aligned is None:
                 continue
-            x_tail = bench_returns[-window:]
-            y_tail = sym_returns[-window:]
+            y_tail, x_tail = aligned
+            if len(y_tail) < max(self.beta_window, self.vol_window):
+                continue
             # rolling_beta(a, b) = cov(a, b) / var(b): pass the SYMBOL series first
             # and the BENCHMARK second so beta is the asset-on-market loading
             # (cov(sym, bench) / var(bench)); the residual below then removes the
             # systematic component, leaving the idiosyncratic return.
-            beta = rolling_beta(y_tail, x_tail)
+            beta = rolling_beta(y_tail[-self.beta_window :], x_tail[-self.beta_window :])
             if beta is None:
-                beta = 0.0
-            residuals = [ry - beta * rx for ry, rx in zip(y_tail, x_tail, strict=False)]
-            idio_vol = sample_std(residuals[-self.vol_window :])
-            if idio_vol is None or idio_vol <= _EPS:
+                continue
+            vol_returns = y_tail[-self.vol_window :]
+            vol_benchmark_returns = x_tail[-self.vol_window :]
+            residuals = [
+                ry - beta * rx for ry, rx in zip(vol_returns, vol_benchmark_returns, strict=True)
+            ]
+            idio_vol = sample_std(residuals)
+            total_vol = sample_std(vol_returns)
+            if idio_vol is None or total_vol is None or idio_vol <= _EPS or total_vol <= _EPS:
                 continue
             # Low idio-vol -> high score (long); high idio-vol -> low score (short).
-            score = -float(idio_vol)
+            standardized_idio_vol = float(idio_vol) / float(total_vol)
+            score = -standardized_idio_vol
             rows.append(
                 (
                     score,
                     symbol,
-                    {"idiosyncratic_vol": float(idio_vol), "beta": float(beta)},
+                    {
+                        "idiosyncratic_vol": float(idio_vol),
+                        "standardized_idiosyncratic_vol": standardized_idio_vol,
+                        "beta": float(beta),
+                    },
                 )
             )
         if len(rows) < self.min_symbols:
+            return
+        if max(score for score, _, _ in rows) - min(score for score, _, _ in rows) <= _EPS:
             return
         max_side = max(1, int(len(rows) * self.quantile_pct))
         targets = _ranked_targets(
@@ -391,25 +617,159 @@ class LotterySkewnessStrategy(_CrossUpdateMixin, Strategy):
             symbol: _CrossSectionalState(deque(maxlen=size), deque(maxlen=size))
             for symbol in self.symbol_list
         }
+        self._close_times = {symbol: deque(maxlen=size) for symbol in self.symbol_list}
+        # MAX needs max_window daily returns, hence max_window + 1 completed
+        # daily closes. Keep this separately from bar history so sub-daily
+        # streams cannot evict the required daily observations.
+        self._completed_daily_closes = {
+            symbol: deque(maxlen=self.max_window + 1) for symbol in self.symbol_list
+        }
+        self._open_daily_closes: dict[str, tuple[str, float] | None] = dict.fromkeys(
+            self.symbol_list
+        )
         self._last_eval_time_key = ""
         self._tick = 0
 
-    def _lottery_score(self, closes: list[float]) -> tuple[float, dict[str, Any]] | None:
+    def _after_window_commit(self, updates: list[tuple[str, _Snapshot]]) -> None:
+        """Advance daily-close state only after every panel symbol committed."""
+        for symbol, snapshot in updates:
+            key = time_key(snapshot.time)
+            dt = _event_datetime_from_key(key)
+            close = safe_float(snapshot.close)
+            if dt is None or close is None:
+                continue
+            open_close = self._open_daily_closes[symbol]
+            open_dt = _event_datetime_from_key(open_close[0]) if open_close is not None else None
+            if open_close is not None and open_dt is not None and open_dt.date() != dt.date():
+                self._completed_daily_closes[symbol].append(open_close)
+            # This timestamp is strictly newer by window validation.
+            self._open_daily_closes[symbol] = (key, float(close))
+
+    def get_state(self) -> dict[str, Any]:
+        state = super().get_state()
+        state["completed_daily_closes"] = {
+            symbol: [[key, close] for key, close in closes]
+            for symbol, closes in self._completed_daily_closes.items()
+        }
+        state["open_daily_closes"] = {
+            symbol: [entry[0], entry[1]] if entry is not None else None
+            for symbol, entry in self._open_daily_closes.items()
+        }
+        return state
+
+    def set_state(self, state: dict[str, Any]) -> None:
+        if not isinstance(state, dict) or set(state) != {
+            "last_eval_time_key",
+            "tick",
+            "symbol_state",
+            "close_times",
+            "completed_daily_closes",
+            "open_daily_closes",
+        }:
+            return
+        size = next(iter(self._state.values())).closes.maxlen or 0
+        base = _validated_cross_state(
+            {
+                key: state[key]
+                for key in ("last_eval_time_key", "tick", "symbol_state", "close_times")
+            },
+            self.symbol_list,
+            size,
+        )
+        completed = state["completed_daily_closes"]
+        open_closes = state["open_daily_closes"]
+        if (
+            base is None
+            or not isinstance(completed, dict)
+            or not isinstance(open_closes, dict)
+            or set(completed) != set(self.symbol_list)
+            or set(open_closes) != set(self.symbol_list)
+        ):
+            return
+        restored_completed: dict[str, deque[tuple[str, float]]] = {}
+        restored_open: dict[str, tuple[str, float] | None] = {}
+        for symbol in self.symbol_list:
+            raw_entries = completed[symbol]
+            entry = open_closes[symbol]
+            if not isinstance(raw_entries, list) or len(raw_entries) > self.max_window + 1:
+                return
+            entries = _consecutive_completed_daily_closes(raw_entries, len(raw_entries))
+            if entries is None:
+                return
+            if entry is None:
+                if entries or base[2][symbol].closes or base[2][symbol].last_time_key:
+                    return
+                restored_completed[symbol] = deque(maxlen=self.max_window + 1)
+                restored_open[symbol] = None
+                continue
+            if not isinstance(entry, (list, tuple)) or len(entry) != 2:
+                return
+            key, close = entry
+            if not isinstance(key, str):
+                return
+            dt = _event_datetime_from_key(key)
+            number = _valid_float(close, positive=True)
+            last_dt = _event_datetime_from_key(entries[-1][0]) if entries else None
+            latest_close = float(base[2][symbol].closes[-1]) if base[2][symbol].closes else None
+            if (
+                dt is None
+                or number is None
+                or (last_dt is not None and dt.date() != last_dt.date() + timedelta(days=1))
+                or key != base[2][symbol].last_time_key
+                or latest_close is None
+                or number != latest_close
+            ):
+                return
+            restored_completed[symbol] = deque(entries, maxlen=self.max_window + 1)
+            restored_open[symbol] = (key, number)
+        (
+            self._last_eval_time_key,
+            self._tick,
+            self._state,
+            self._close_times,
+        ) = base
+        self._completed_daily_closes = restored_completed
+        self._open_daily_closes = restored_open
+
+    def _lottery_score(
+        self,
+        closes: list[float],
+        keys: list[str] | None = None,
+        completed_daily_closes: list[tuple[str, float]] | None = None,
+    ) -> tuple[float, dict[str, Any]] | None:
         returns = _bar_simple_returns(closes)
         if len(returns) < max(3, self.skew_window // 2):
             return None
         skew = _skewness(returns[-self.skew_window :])
-        max_tail = returns[-self.max_window :]
-        max_ret = max(max_tail) if max_tail else None
+        daily_returns = (
+            _bar_simple_returns(
+                [close for _, close in completed_daily_closes]
+                if _consecutive_completed_daily_closes(completed_daily_closes, self.max_window + 1)
+                is not None
+                else []
+            )
+            if completed_daily_closes is not None
+            else _daily_simple_returns(closes, keys, self.max_window)
+            if keys is not None
+            else None
+        )
+        if daily_returns is None or len(daily_returns) < self.max_window:
+            return None
+        max_tail = daily_returns[-self.max_window :]
+        max_ret = max(max_tail)
+        max_scale = sample_std(max_tail)
+        if max_scale is None or max_scale <= _EPS:
+            return None
         if skew is None and max_ret is None:
             return None
         skew_component = float(skew) if skew is not None else 0.0
-        max_component = float(max_ret) if max_ret is not None else 0.0
+        max_component = float(max_ret) / float(max_scale)
         # Higher lottery score -> more lottery-like (short candidate).
         lottery = (1.0 - self.max_weight) * skew_component + self.max_weight * max_component
         return float(lottery), {
             "skewness": skew_component,
-            "max_return": max_component,
+            "max_daily_return": float(max_ret),
+            "standardized_max_daily_return": max_component,
             "lottery_score": float(lottery),
         }
 
@@ -430,13 +790,19 @@ class LotterySkewnessStrategy(_CrossUpdateMixin, Strategy):
         for symbol, item in self._state.items():
             if len(item.closes) < need:
                 continue
-            scored = self._lottery_score(list(item.closes))
+            scored = self._lottery_score(
+                list(item.closes),
+                list(self._close_times[symbol]),
+                list(self._completed_daily_closes[symbol]),
+            )
             if scored is None:
                 continue
             lottery, meta = scored
             # Long low-lottery (negate so low lottery -> high rank score).
             rows.append((-lottery, symbol, meta))
         if len(rows) < self.min_symbols:
+            return
+        if max(score for score, _, _ in rows) - min(score for score, _, _ in rows) <= _EPS:
             return
         max_side = max(1, int(len(rows) * self.quantile_pct))
         targets = _ranked_targets(
@@ -518,6 +884,7 @@ class TrendEfficiencyMomentumStrategy(_CrossUpdateMixin, Strategy):
             symbol: _CrossSectionalState(deque(maxlen=size), deque(maxlen=size))
             for symbol in self.symbol_list
         }
+        self._close_times = {symbol: deque(maxlen=size) for symbol in self.symbol_list}
         self._last_eval_time_key = ""
         self._tick = 0
 
@@ -638,6 +1005,7 @@ class DispersionConditionedReversionStrategy(_CrossUpdateMixin, Strategy):
             symbol: _CrossSectionalState(deque(maxlen=size), deque(maxlen=size))
             for symbol in self.symbol_list
         }
+        self._close_times = {symbol: deque(maxlen=size) for symbol in self.symbol_list}
         self._last_eval_time_key = ""
         self._tick = 0
 

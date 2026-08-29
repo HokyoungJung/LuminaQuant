@@ -83,6 +83,36 @@ def test_materializer_bound_coercion_is_utc_on_any_host(host_tz) -> None:
     assert _coerce_timestamp_ms("not-a-date") is None
 
 
+def test_repository_resamples_direct_minute_partitions_when_target_is_absent(
+    tmp_path,
+) -> None:
+    root = tmp_path / "data"
+    partition = root / "exchange=binance" / "symbol=BTCUSDT" / "timeframe=1m" / "date=2026-03-02"
+    partition.mkdir(parents=True)
+    frame = pl.DataFrame(
+        {
+            "datetime": [datetime(2026, 3, 2, 0, minute) for minute in range(10)],
+            "open": [float(100 + minute) for minute in range(10)],
+            "high": [float(101 + minute) for minute in range(10)],
+            "low": [float(99 + minute) for minute in range(10)],
+            "close": [float(100.5 + minute) for minute in range(10)],
+            "volume": [1.0] * 10,
+        }
+    )
+    frame.write_parquet(partition / "part-0000.parquet")
+
+    sampled = MarketDataRepository(str(root)).load_ohlcv(
+        exchange="binance",
+        symbol="BTC/USDT",
+        timeframe="5m",
+    )
+
+    assert sampled.height == 2
+    assert sampled["open"].to_list() == [100.0, 105.0]
+    assert sampled["close"].to_list() == [104.5, 109.5]
+    assert sampled["volume"].to_list() == [5.0, 5.0]
+
+
 def test_timeutil_helpers_and_remaining_sites_are_utc_on_any_host(host_tz, tmp_path) -> None:
     from lumina_quant.live.readiness_policy import _parse_utc
     from lumina_quant.optimization.frozen_dataset import _as_ns_epoch

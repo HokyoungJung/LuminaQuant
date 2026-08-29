@@ -10,6 +10,9 @@ import numpy as np
 
 from lumina_quant.configuration.loader import load_runtime_config
 from lumina_quant.portfolio.optimizers_extra import HRPPortfolio
+from lumina_quant.portfolio.quality_gated_allocation import (
+    _materialized_return_panel_sha256,
+)
 from lumina_quant.research.external_source_registry import validate_source_registry
 from lumina_quant.research_universe import (
     BINANCE_CORE_CRYPTO_RESEARCH_SYMBOLS,
@@ -160,17 +163,24 @@ def test_materialized_hrp_children_keep_runnable_strategy_definitions() -> None:
             (datetime(2025, 1, 1, tzinfo=UTC) + timedelta(days=day)).isoformat()
             for day in range(len(t))
         ]
+        sleeve["fit_start"] = sleeve["return_timestamps"][0]
+        sleeve["fit_end"] = sleeve["return_timestamps"][-1]
+        sleeve["as_of"] = (datetime(2025, 1, 1, tzinfo=UTC) + timedelta(days=len(t))).isoformat()
+        sleeve["apply_start"] = sleeve["as_of"]
         sleeve["returns_are_net"] = True
         sleeve["turnover"] = 0.01
-        assert sleeve["returns_source"]["stream"] == (
-            "common-date aligned train/validation NET returns only"
-        )
+        sleeve["returns_source"] = {"splits": ["train", "validation"]}
     suite["source_artifacts"][0].update(
         {
             "path": "/data/named_quant_train_validation.json",
             "portfolio_ready": True,
             "ready": True,
             "sha256": "a" * 64,
+            "return_panel_sha256_by_sleeve": {
+                sleeve_id: _materialized_return_panel_sha256(sleeve_id, sleeve)
+                for sleeve_id, sleeve in suite["sleeves"].items()
+                if sleeve["returns"]
+            },
         }
     )
 

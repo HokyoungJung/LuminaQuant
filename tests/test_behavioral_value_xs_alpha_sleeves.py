@@ -26,6 +26,7 @@ fires on the final completed bar.
 
 from __future__ import annotations
 
+from copy import deepcopy
 import math
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
@@ -38,6 +39,7 @@ from lumina_quant.strategies.behavioral_value_xs_alpha_sleeves import (
     _SUGGESTED_CANDIDATE_TAGS,
     ProspectTheoryValueStrategy,
     SalienceTheoryValueStrategy,
+    _salience_value,
 )
 from lumina_quant.tuning import HyperParam
 
@@ -284,6 +286,29 @@ def test_pt_equal_skew_equal_max_different_tk_fixture() -> None:
     assert abs(tk_x - tk_y) > 1e-4  # the full-distribution functional separates
 
 
+def test_salience_uses_the_same_probability_mass_for_distortion_and_value() -> None:
+    returns = [0.20, -0.02]
+    market = [0.00, 0.00]
+    weighted = _salience_value(returns, market, theta=0.1, delta=0.7, probability_mass=[0.9, 0.1])
+    uniform = _salience_value(returns, market, theta=0.1, delta=0.7, probability_mass=[0.5, 0.5])
+    assert weighted is not None and uniform is not None
+    assert weighted != uniform
+
+
+def test_required_exit_is_not_blocked_by_min_hold_deadband() -> None:
+    cand = _st_candidate(_ST_SYMS, min_hold_daily_decisions=5)
+    item = cand._state["SAL_UP"]
+    item.mode = "LONG"
+    item.days_held = 0
+    item.pending_close = 100.0
+    cand._emit_book({"SAL_UP": "OUT"}, {}, {}, _ts(1))
+    assert item.mode == "OUT"
+    assert any(
+        sig.symbol == "SAL_UP" and str(sig.signal_type).upper() == "EXIT"
+        for sig in cand.events.items
+    )
+
+
 # --------------------------------------------------------------------------- #
 # hygiene (both classes)
 # --------------------------------------------------------------------------- #
@@ -344,6 +369,59 @@ def test_state_roundtrip_resumes_identically() -> None:
     tail = [(s.symbol, s.signal_type) for s in resumed.events.items]
     full_all = [(s.symbol, s.signal_type) for s in full.events.items]
     assert full_all[-len(tail) :] == tail if tail else True
+    assert resumed.get_state() == full.get_state()
+
+
+def test_only_strictly_newer_complete_windows_advance_xs_state() -> None:
+    """Stale, partial, and single-name callbacks cannot advance clocks or data."""
+    panel = _st_panel()
+    cand = _st_candidate(_ST_SYMS)
+    cand.calculate_signals(_window_event(panel, 0))
+    cand.calculate_signals(_window_event(panel, 1))
+    after_two_windows = cand.get_state()
+
+    for symbol in reversed(_ST_SYMS):
+        close = panel[symbol][2]
+        cand.calculate_signals(
+            SimpleNamespace(type="MARKET", symbol=symbol, time=_ts(2), close=close)
+        )
+    assert cand.get_state() == after_two_windows
+
+    partial = _window_event(panel, 2)
+    partial.bars_1s.pop(_ST_SYMS[-1])
+    cand.calculate_signals(partial)
+    cand.calculate_signals(_window_event(panel, 0))
+    assert cand.get_state() == after_two_windows
+
+    cand.calculate_signals(_window_event(panel, 2))
+    after_newer_window = cand.get_state()
+    cand.calculate_signals(_window_event(panel, 1))
+    partial_newer = _window_event(panel, 3)
+    partial_newer.bars_1s.pop(_ST_SYMS[0])
+    cand.calculate_signals(partial_newer)
+    assert cand.get_state() == after_newer_window
+
+
+def test_single_name_order_permutations_do_not_affect_window_continuation() -> None:
+    """Only the aligned window, not callback order, determines XS state."""
+    panel = _st_panel()
+    expected = _st_candidate(_ST_SYMS)
+    observed = _st_candidate(_ST_SYMS)
+    for t in range(3):
+        expected.calculate_signals(_window_event(panel, t))
+        for symbol in reversed(_ST_SYMS) if t % 2 else _ST_SYMS:
+            observed.calculate_signals(
+                SimpleNamespace(
+                    type="MARKET",
+                    symbol=symbol,
+                    time=_ts(t),
+                    close=panel[symbol][t],
+                )
+            )
+        event = _window_event(panel, t)
+        event.bars_1s = dict(reversed(list(event.bars_1s.items())))
+        observed.calculate_signals(event)
+    assert observed.get_state() == expected.get_state()
 
 
 def test_adversarial_set_state_never_raises() -> None:
@@ -405,10 +483,12 @@ def test_interior_utc_day_gap_excludes_symbol_from_panel() -> None:
             [0.002 * (1.0 if t % 3 == 0 else -1.0) for t in range(n - 1)]
         )
         cand = build([*syms, gappy])
-        for t in range(n):
-            event_panel = panel if t != gap_day else {s: panel[s] for s in syms}
-            cand.calculate_signals(_window_event(event_panel, t))
+        _feed(cand, panel, n=n)
         item = cand._state[gappy]
+        missing_day = _ts(gap_day)[:10]
+        missing_index = list(item.daily_days).index(missing_day)
+        del item.daily_days[missing_index]
+        del item.daily_closes[missing_index]
         # The gap symbol is fresh and long enough -- ONLY the calendar check
         # can exclude it (the exclusion is not staleness / short history).
         assert item.last_committed_day == cand._last_committed_day
@@ -425,6 +505,128 @@ def test_interior_utc_day_gap_excludes_symbol_from_panel() -> None:
         for sym in syms:
             assert scored_gap[sym][0] == scored_ref[sym][0]
             assert scored_gap[sym][1]["behavioral_value"] == scored_ref[sym][1]["behavioral_value"]
+
+
+def test_gapped_common_calendar_cannot_form_or_trade() -> None:
+    """A missing global UTC day cannot be repaired by a later window."""
+    panel = _st_panel()
+    cand = _st_candidate(_ST_SYMS)
+    for t in range(_N_ST):
+        if t != 25:
+            cand.calculate_signals(_window_event(panel, t))
+    assert cand._formation_panel() == {}
+    assert cand._score_symbols() == {}
+    assert cand.events.items == []
+
+
+def test_malformed_window_clock_is_an_atomic_noop() -> None:
+    cand = _st_candidate(_ST_SYMS)
+    cand.calculate_signals(_window_event(_st_panel(), 0))
+    before = cand.get_state()
+    bad = _window_event(_st_panel(), 1)
+    bad.time = "not-a-clock"
+    bad.bars_1s["SAL_UP"][0]["time"] = "also-not-a-clock"
+    cand.calculate_signals(bad)
+    assert cand.get_state() == before
+
+
+def test_zero_residual_dispersion_cannot_trade_on_symbol_ties() -> None:
+    syms = ["A", "B", "C", "D", "E", "F"]
+    closes = _closes_from_returns([0.002 if t % 2 else -0.001 for t in range(_N_ST - 1)])
+    cand = _st_candidate(syms)
+    _feed(cand, {symbol: list(closes) for symbol in syms}, n=_N_ST)
+    assert cand._score_symbols() == {}
+    assert cand.events.items == []
+
+
+def test_partial_or_malformed_checkpoint_is_an_atomic_noop() -> None:
+    cand = _st_candidate(_ST_SYMS)
+    _feed(cand, _st_panel(), n=31)
+    before = cand.get_state()
+    partial = cand.get_state()
+    partial["symbol_state"].pop("SAL_UP")
+    cand.set_state(partial)
+    assert cand.get_state() == before
+    malformed = cand.get_state()
+    malformed["last_day_key"] = "2024-13-99"
+    cand.set_state(malformed)
+    assert cand.get_state() == before
+    malformed = cand.get_state()
+    malformed["symbol_state"]["SAL_UP"]["pending_day"] = "tomorrow"
+    cand.set_state(malformed)
+    assert cand.get_state() == before
+
+
+def test_checkpoint_requires_exact_schema_and_coherent_clocks() -> None:
+    cand = _st_candidate(_ST_SYMS)
+    panel = _st_panel()
+    _feed(cand, panel, n=31)
+    before = cand.get_state()
+
+    missing_global = deepcopy(before)
+    missing_global.pop("last_window_key")
+    cand.set_state(missing_global)
+    assert cand.get_state() == before
+
+    empty_global = deepcopy(before)
+    empty_global["last_decision_week"] = ""
+    cand.set_state(empty_global)
+    assert cand.get_state() == before
+
+    missing_symbol = deepcopy(before)
+    missing_symbol["symbol_state"]["SAL_UP"].pop("pending_close")
+    cand.set_state(missing_symbol)
+    assert cand.get_state() == before
+
+    extra_global = deepcopy(before)
+    extra_global["forged"] = True
+    cand.set_state(extra_global)
+    assert cand.get_state() == before
+
+    extra_symbol = deepcopy(before)
+    extra_symbol["symbol_state"]["SAL_UP"]["forged"] = True
+    cand.set_state(extra_symbol)
+    assert cand.get_state() == before
+
+    clock_mismatch = deepcopy(before)
+    clock_mismatch["symbol_state"]["SAL_UP"]["last_bar_key"] = _ts(29)
+    cand.set_state(clock_mismatch)
+    assert cand.get_state() == before
+
+    coerced_close = deepcopy(before)
+    coerced_close["symbol_state"]["SAL_UP"]["daily_closes"][0] = 100
+    cand.set_state(coerced_close)
+    assert cand.get_state() == before
+
+
+def test_checkpoint_same_week_replay_and_continuation_are_exact() -> None:
+    panel = _st_panel()
+    original = _st_candidate(_ST_SYMS)
+    _feed(original, panel, n=31)
+    checkpoint = original.get_state()
+
+    resumed = _st_candidate(_ST_SYMS)
+    resumed.set_state(deepcopy(checkpoint))
+    assert resumed.get_state() == checkpoint
+
+    resumed.calculate_signals(_window_event(panel, 30))
+    assert resumed.get_state() == checkpoint
+    assert resumed.events.items == []
+
+    original_event_count = len(original.events.items)
+    original.calculate_signals(_window_event(panel, 31))
+    resumed.calculate_signals(_window_event(panel, 31))
+    assert resumed._tick == checkpoint["tick"]
+    assert resumed.get_state() == original.get_state()
+
+    for t in range(32, _N_ST):
+        original.calculate_signals(_window_event(panel, t))
+        resumed.calculate_signals(_window_event(panel, t))
+    assert resumed.get_state() == original.get_state()
+    assert [(signal.symbol, signal.signal_type) for signal in resumed.events.items] == [
+        (signal.symbol, signal.signal_type)
+        for signal in original.events.items[original_event_count:]
+    ]
 
 
 def test_state_roundtrip_preserves_committed_day_keys() -> None:

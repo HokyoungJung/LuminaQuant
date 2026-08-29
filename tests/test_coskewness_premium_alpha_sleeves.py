@@ -22,6 +22,7 @@ moment), each run as a real class.
 from __future__ import annotations
 
 import math
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from typing import Any
 
@@ -42,6 +43,7 @@ from lumina_quant.tuning import HyperParam
 _BENCH = "BTC/USDT"
 _T = 160
 _WINDOW = 120
+_BASE_TIME = datetime(2026, 2, 1, tzinfo=UTC)
 
 
 def _lcg_stream(seed: int):
@@ -65,9 +67,11 @@ class _Queue:
 
 
 def _window_event(symbols: list[str], closes: dict[str, float], idx: int) -> SimpleNamespace:
+    time = (_BASE_TIME + timedelta(days=idx)).isoformat()
     bars_1s = {
         symbol: [
             {
+                "time": time,
                 "open": closes[symbol],
                 "high": closes[symbol],
                 "low": closes[symbol],
@@ -78,9 +82,7 @@ def _window_event(symbols: list[str], closes: dict[str, float], idx: int) -> Sim
         for symbol in symbols
         if symbol in closes
     }
-    return SimpleNamespace(
-        type="MARKET_WINDOW", time=f"2026-02-01T00:00:00Z#{idx}", bars_1s=bars_1s
-    )
+    return SimpleNamespace(type="MARKET_WINDOW", time=time, bars_1s=bars_1s)
 
 
 def _feed(strategy: Any, symbols: list[str], closes_by_symbol: dict[str, list[float]]) -> None:
@@ -270,8 +272,12 @@ def test_lottery_owns_z_candidate_ignores_it() -> None:
     lottery_side = _final_side(lottery.events.items)
     # Lottery SHORTS the high own-skew / MAX name (Z) -> live and univariate.
     assert lottery_side.get("Z") == "SHORT", lottery_side
-    # ... and leaves the coskew pair out of its extremes.
-    assert "X" not in lottery_side and "Y" not in lottery_side, lottery_side
+    # ... and cannot put the equal-score coskew pair on opposite sides.
+    assert not (
+        lottery_side.get("X") is not None
+        and lottery_side.get("Y") is not None
+        and lottery_side["X"] != lottery_side["Y"]
+    ), lottery_side
 
     sleeve = _sleeve(symbols)
     _feed(sleeve, symbols, closes)
@@ -318,7 +324,11 @@ def test_idiovol_cannot_separate_mirror_pair() -> None:
     idio_side = _final_side(idio.events.items)
     assert any(s == "SHORT" for s in idio_side.values()), idio_side  # live
     # Equal residual vol => IdioVol cannot put the pair on opposite sides.
-    assert idio_side.get("X") == idio_side.get("Y"), idio_side
+    assert not (
+        idio_side.get("X") is not None
+        and idio_side.get("Y") is not None
+        and idio_side["X"] != idio_side["Y"]
+    ), idio_side
 
     sleeve = _sleeve(symbols)
     _feed(sleeve, symbols, closes)

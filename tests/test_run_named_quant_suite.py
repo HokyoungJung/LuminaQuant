@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import hashlib
 import json
 import sys
 from datetime import UTC, datetime
@@ -51,7 +52,18 @@ class _Repository:
         return _Frame(empty=kwargs["symbol"] == "MISSING/USDT")
 
     def load_futures_feature_points(self, **_kwargs):
-        return pl.DataFrame()
+        rows = []
+        current = datetime(2022, 11, 26, 16, tzinfo=UTC)
+        end = datetime(2025, 1, 1, tzinfo=UTC)
+        while current <= end:
+            rows.append(
+                {
+                    "timestamp_ms": int(current.timestamp() * 1000),
+                    "funding_fee_quote_per_unit": 0.0,
+                }
+            )
+            current += MODULE.timedelta(hours=8)
+        return pl.DataFrame(rows)
 
 
 class _Backtest:
@@ -79,6 +91,7 @@ class _Backtest:
             ],
             trades=[{"fill_cost": 10.0}, {"fill_cost": 20.0}],
             trade_count=2,
+            settle_terminal_funding=lambda _as_of: None,
         )
 
     def simulate_trading(self, *, output: bool) -> None:
@@ -90,13 +103,33 @@ def _runtime_config(*, symbol_limits=None):
         trading=SimpleNamespace(timeframe="1m"),
         backtest=SimpleNamespace(persist_output=True),
         risk=SimpleNamespace(attach_default_protective_stop=True),
-        execution=SimpleNamespace(),
+        execution=SimpleNamespace(
+            maker_fee_rate=0.0002,
+            taker_fee_rate=0.0004,
+            spread_rate=0.0002,
+            slippage_rate=0.0005,
+            slippage_impact_model="sqrt_impact",
+            slippage_impact_coefficient=0.10,
+            maintenance_margin_rate=0.005,
+            liquidation_buffer_rate=0.0005,
+            require_funding_coverage=True,
+            funding_on_utc_boundary=True,
+        ),
         live=SimpleNamespace(symbol_limits=symbol_limits or {}),
     )
 
 
 def _receipt() -> dict:
     return {"as_of": "2023-12-31T00:00:00Z", "selected_symbols": {}}
+
+
+@pytest.fixture(autouse=True)
+def _realistic_cost_profile(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv(
+        "LQ_CONFIG_PATH",
+        str(Path(__file__).parents[1] / "configs/profiles/backtest_cost_realistic.yaml"),
+    )
+    (tmp_path / "data").mkdir()
 
 
 def test_runs_each_candidate_and_writes_allocator_inputs_and_failures(
@@ -197,9 +230,11 @@ def test_runs_each_candidate_and_writes_allocator_inputs_and_failures(
     )
     assert allocation_input["sleeves"]["works"]["returns_are_net"] is True
     assert allocation_input["sleeves"]["works"]["returns_source"] == {
+        "splits": ["train", "validation"]
+    }
+    assert allocation_input["sleeves"]["works"]["returns_lineage"] == {
         "artifact": "named_quant_data_pc_walkforward",
         "candidate_id": "works",
-        "selection_inputs": ["train", "validation"],
         "stream": "daily UTC net returns over the caller-supplied selection window",
         "uses_locked_oos_for_selection": False,
         "uses_locked_oos_for_sizing": False,
@@ -344,6 +379,7 @@ def test_required_feature_coverage_is_preflighted_for_candidate(
                     {
                         "timestamp_ms": int(current.timestamp() * 1000),
                         "funding_rate": 0.0001,
+                        "funding_fee_quote_per_unit": 0.0,
                     }
                 )
                 current += MODULE.timedelta(hours=8)
@@ -388,6 +424,59 @@ def test_required_feature_coverage_is_preflighted_for_candidate(
         assert result["results"][0]["error"] == (
             "missing or stale required features: BTC/USDT:funding_rate"
         )
+
+
+@pytest.mark.parametrize(
+    ("offset_ms", "missing_boundary_hour", "covered"),
+    [
+        (0, None, True),
+        (29, None, True),
+        (30, None, False),
+        (0, 16, False),
+    ],
+    ids=("exact-boundary", "valid-source-jitter", "over-tolerance", "missing-gap"),
+)
+def test_funding_preflight_requires_continuous_authentic_source_evidence(
+    offset_ms: int, missing_boundary_hour: int | None, covered: bool
+) -> None:
+    start = datetime(2024, 1, 1, tzinfo=UTC)
+    end = datetime(2024, 1, 2, tzinfo=UTC)
+    rows = [
+        {
+            "timestamp_ms": int((start + MODULE.timedelta(hours=hour)).timestamp() * 1000)
+            + offset_ms,
+            "funding_rate": 0.0001,
+        }
+        for hour in (0, 8, 16, 24)
+        if hour != missing_boundary_hour
+    ]
+
+    class FeatureRepository:
+        def load_futures_feature_points(self, **_kwargs):
+            return pl.DataFrame(rows)
+
+    if covered:
+        MODULE._preflight_required_features(
+            FeatureRepository(),
+            exchange="binance",
+            symbols=["BTC/USDT"],
+            required_features=("funding_rate",),
+            start=start,
+            end=end,
+        )
+    else:
+        with pytest.raises(
+            RuntimeError,
+            match="missing or stale required features: BTC/USDT:funding_rate",
+        ):
+            MODULE._preflight_required_features(
+                FeatureRepository(),
+                exchange="binance",
+                symbols=["BTC/USDT"],
+                required_features=("funding_rate",),
+                start=start,
+                end=end,
+            )
 
 
 def test_duplicate_candidate_ids_fail_closed(tmp_path) -> None:
@@ -480,18 +569,33 @@ def test_locked_oos_run_never_emits_allocator_input(tmp_path, monkeypatch) -> No
     output = tmp_path / "locked"
     selection = tmp_path / "selection.json"
     selection_manifest = json.loads(manifest.read_text())
-    selection_manifest["universe_materialization_receipt"] = {
-        "as_of": "2023-01-01T00:00:00Z",
-        "selected_symbols": {"crypto_top10": ["ETH/USDT"]},
-    }
     selection_manifest_path = tmp_path / "selection_manifest.json"
     selection_manifest_path.write_text(json.dumps(selection_manifest))
+    cost_profile, _runtime_config_value, runtime_defaults = MODULE._cost_profile()
+    selection_lineage = MODULE._lineage(
+        selection_manifest,
+        selection_manifest_path,
+        exchange="binance",
+        warmup_bars=400,
+        seed=0,
+        cost_profile=cost_profile,
+        runtime_defaults=runtime_defaults,
+        data_inventory=MODULE._data_inventory(tmp_path / "data"),
+    )
+    selection_lineage["universe"] = {
+        "receipt_sha256": "a" * 64,
+        "receipt": {"as_of": "2023-12-31T00:00:00Z"},
+    }
+    selection_lineage["data_inventory"] = {
+        "file_count": 1,
+        "content_sha256": "b" * 64,
+    }
     selection.write_text(
         json.dumps(
             {
                 "purpose": "selection",
                 "period": {"start": "2024-01-01T00:00:00", "end": "2025-01-01T00:00:00"},
-                "lineage": MODULE._lineage(selection_manifest, selection_manifest_path),
+                "lineage": selection_lineage,
             }
         )
     )
@@ -509,18 +613,23 @@ def test_locked_oos_run_never_emits_allocator_input(tmp_path, monkeypatch) -> No
 
     assert result["purpose"] == "locked_oos"
     assert result["selection_artifact"]["sha256"]
+    assert result["lineage"]["universe"] != selection_lineage["universe"]
+    assert result["lineage"]["data_inventory"] != selection_lineage["data_inventory"]
     assert not (output / "allocation_input.json").exists()
 
 
 def test_disabled_candidate_is_reported_as_skip_without_loading_data(tmp_path, monkeypatch) -> None:
     manifest = tmp_path / "suite.json"
+    receipt = _receipt()
+    receipt["disabled_candidates"] = {"outside": ["AVAX/USDT"]}
     manifest.write_text(
         json.dumps(
             {
-                "universe_materialization_receipt": _receipt(),
+                "universe_materialization_receipt": receipt,
                 "candidates": [
                     {
                         "candidate_id": "outside",
+                        "symbols": ["AVAX/USDT"],
                         "enabled": False,
                         "disabled_reason": "outside point-in-time universe: AVAX/USDT",
                     }
@@ -531,26 +640,43 @@ def test_disabled_candidate_is_reported_as_skip_without_loading_data(tmp_path, m
     _Repository.calls.clear()
     monkeypatch.setattr(MODULE, "MarketDataRepository", _Repository)
 
-    result = MODULE.run_suite(
-        manifest,
-        tmp_path / "data",
-        tmp_path / "out",
-        exchange="binance",
-        start=datetime(2024, 1, 1),
-        end=datetime(2025, 1, 1),
-    )
-
-    assert (result["pass_count"], result["fail_count"], result["skip_count"]) == (0, 0, 1)
+    with pytest.raises(ValueError, match="invalid disabled candidate exclusion"):
+        MODULE.run_suite(
+            manifest,
+            tmp_path / "data",
+            tmp_path / "out",
+            exchange="binance",
+            start=datetime(2024, 1, 1),
+            end=datetime(2025, 1, 1),
+        )
     assert _Repository.calls == []
-    allocation = json.loads((tmp_path / "out" / "allocation_input.json").read_text())
-    assert allocation["source_artifacts"][0]["portfolio_ready"] is False
-    assert result["disallowed_skip_ids"] == ["outside"]
+    assert not (tmp_path / "out").exists()
 
 
 def test_materializer_authenticated_exclusion_can_still_be_ready(tmp_path, monkeypatch) -> None:
     manifest = tmp_path / "suite.json"
+    market_caps = tmp_path / "market_caps.json"
+    exchange_info = tmp_path / "exchange_info.json"
+    market_caps.write_text("{}")
+    exchange_info.write_text("{}")
     receipt = _receipt()
     receipt["disabled_candidates"] = {"outside": ["AVAX/USDT"]}
+    receipt["selected_symbols"] = {"crypto_top10": ["BTC/USDT"]}
+    receipt["binance_filters"] = {
+        "BTC/USDT": [
+            {"filterType": "PRICE_FILTER", "tickSize": "0.1"},
+            {"filterType": "LOT_SIZE", "minQty": "0.001", "stepSize": "0.001"},
+            {"filterType": "MIN_NOTIONAL", "minNotional": "5"},
+        ]
+    }
+    receipt["sources"] = {
+        "market_caps": str(market_caps),
+        "exchange_info": str(exchange_info),
+    }
+    receipt["source_sha256"] = {
+        "market_caps": hashlib.sha256(market_caps.read_bytes()).hexdigest(),
+        "exchange_info": hashlib.sha256(exchange_info.read_bytes()).hexdigest(),
+    }
     manifest.write_text(
         json.dumps(
             {
@@ -568,6 +694,7 @@ def test_materializer_authenticated_exclusion_can_still_be_ready(tmp_path, monke
                     },
                     {
                         "candidate_id": "outside",
+                        "symbols": ["AVAX/USDT"],
                         "enabled": False,
                         "disabled_reason": "outside point-in-time universe: AVAX/USDT",
                     },
@@ -621,6 +748,60 @@ def test_materializer_authenticated_exclusion_can_still_be_ready(tmp_path, monke
     assert build_manifest_from_input(allocation)["children"]
 
 
+def test_authenticated_history_exclusion_is_exact_and_tamper_evident(tmp_path) -> None:
+    start = datetime(2024, 1, 1)
+    resample_receipt = tmp_path / "resample.json"
+    resample_receipt.write_text("{}")
+    expected = {
+        "kind": "insufficient_point_in_time_history",
+        "reason": "insufficient point-in-time history: BTC/USDT=19/20 1d buckets",
+        "required_buckets": 20,
+        "shortfalls": {"BTC/USDT": 19},
+        "timeframe": "1d",
+        "candidate_symbols": ["BTC/USDT"],
+    }
+    scope = {
+        "schema": "named_quant_data_eligibility.v1",
+        "start": "2024-01-01T00:00:00+00:00",
+        "required_buckets": 20,
+        "input_data_inventory_sha256": "a" * 64,
+        "resample_receipt_path": str(resample_receipt),
+        "resample_receipt_sha256": hashlib.sha256(resample_receipt.read_bytes()).hexdigest(),
+        "exclusions": {"limited": expected},
+    }
+    receipt = {"data_eligibility": {**scope, "sha256": MODULE._json_sha256(scope)}}
+    assert MODULE._allowed_disabled_candidate(
+        candidate_id="limited",
+        reason=expected["reason"],
+        expected=expected,
+        receipt=receipt,
+        start=start,
+        warmup_bars=20,
+        data_inventory_sha256="a" * 64,
+        candidate_symbols=["BTC/USDT"],
+        candidate_timeframe="1d",
+    )
+
+    for tampered in (
+        {**expected, "reason": "different"},
+        {**expected, "required_buckets": 19},
+        {**expected, "shortfalls": {"BTC/USDT": 20}},
+        {**expected, "candidate_symbols": ["ETH/USDT"]},
+        {**expected, "timeframe": "4h"},
+    ):
+        assert not MODULE._allowed_disabled_candidate(
+            candidate_id="limited",
+            reason=expected["reason"],
+            expected=tampered,
+            receipt=receipt,
+            start=start,
+            warmup_bars=20,
+            data_inventory_sha256="a" * 64,
+            candidate_symbols=["BTC/USDT"],
+            candidate_timeframe="1d",
+        )
+
+
 def test_warmup_counts_actual_weekday_daily_buckets() -> None:
     class Weekdays:
         calls = 0
@@ -668,6 +849,50 @@ def test_future_universe_receipt_fails_before_execution(tmp_path) -> None:
             start=datetime(2024, 1, 1),
             end=datetime(2024, 1, 2),
         )
+
+
+def test_runner_rejects_stale_output_directory_before_execution(tmp_path) -> None:
+    manifest = tmp_path / "suite.json"
+    manifest.write_text(
+        json.dumps({"universe_materialization_receipt": _receipt(), "candidates": []})
+    )
+    output = tmp_path / "out"
+    output.mkdir()
+    with pytest.raises(ValueError, match="output target already exists"):
+        MODULE.run_suite(
+            manifest,
+            tmp_path / "data",
+            output,
+            exchange="binance",
+            start=datetime(2024, 1, 1),
+            end=datetime(2025, 1, 1),
+        )
+
+
+def test_runner_failure_never_publishes_partial_output(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    output = tmp_path / "out"
+
+    def fail_after_partial_write(*args, **kwargs):
+        staging_output = args[2]
+        staging_output.mkdir(parents=True)
+        (staging_output / "partial.json").write_text("{}\n")
+        raise RuntimeError("injected staged failure")
+
+    monkeypatch.setattr(MODULE, "_run_suite_into", fail_after_partial_write)
+    with pytest.raises(RuntimeError, match="injected staged failure"):
+        MODULE.run_suite(
+            tmp_path / "suite.json",
+            tmp_path / "data",
+            output,
+            exchange="binance",
+            start=datetime(2024, 1, 1),
+            end=datetime(2025, 1, 1),
+        )
+
+    assert not output.exists()
+    assert not list(tmp_path.glob(".out.staging-*"))
 
 
 def test_cli_exits_nonzero_when_readiness_is_false(monkeypatch, tmp_path) -> None:

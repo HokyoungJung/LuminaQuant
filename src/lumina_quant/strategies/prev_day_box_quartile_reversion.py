@@ -89,6 +89,7 @@ class _State:
     session_high: float | None = None
     session_low: float | None = None
     session_volumes: list[float] = field(default_factory=list)
+    session_bar_count: int = 0
     box_high: float | None = None
     box_low: float | None = None
     prev_median_volume: float | None = None
@@ -151,6 +152,7 @@ class PrevDayBoxQuartileReversionStrategy(Strategy):
                     "session_high": item.session_high,
                     "session_low": item.session_low,
                     "session_volumes": list(item.session_volumes),
+                    "session_bar_count": int(item.session_bar_count),
                     "box_high": item.box_high,
                     "box_low": item.box_low,
                     "prev_median_volume": item.prev_median_volume,
@@ -183,6 +185,10 @@ class PrevDayBoxQuartileReversionStrategy(Strategy):
                 if (parsed := safe_float(value)) is not None
             ]
             item.session_volumes = volumes
+            try:
+                item.session_bar_count = max(0, int(payload.get("session_bar_count", 0)))
+            except TypeError, ValueError:
+                item.session_bar_count = 0
             item.box_high = safe_float(payload.get("box_high"))
             item.box_low = safe_float(payload.get("box_low"))
             item.prev_median_volume = safe_float(payload.get("prev_median_volume"))
@@ -248,6 +254,7 @@ class PrevDayBoxQuartileReversionStrategy(Strategy):
 
         item.session_high = high if item.session_high is None else max(item.session_high, high)
         item.session_low = low if item.session_low is None else min(item.session_low, low)
+        item.session_bar_count += 1
         if volume is not None and volume >= 0.0:
             item.session_volumes.append(volume)
 
@@ -272,17 +279,28 @@ class PrevDayBoxQuartileReversionStrategy(Strategy):
             )
             self._flatten(item)
         prev_high, prev_low = item.session_high, item.session_low
-        if prev_high is not None and prev_low is not None and prev_high > prev_low:
+        complete_session = item.session_bar_count == self._expected_session_bars()
+        if (
+            complete_session
+            and item.session_bar_count >= self.min_session_bars
+            and prev_high is not None
+            and prev_low is not None
+            and prev_high > prev_low
+        ):
             item.box_high, item.box_low = prev_high, prev_low
         else:
             item.box_high = item.box_low = None
-        if len(item.session_volumes) >= self.min_session_bars:
+        if complete_session and len(item.session_volumes) == item.session_bar_count:
             item.prev_median_volume = float(median(item.session_volumes))
         else:
             item.prev_median_volume = None
         item.session = session
         item.session_high = item.session_low = None
         item.session_volumes = []
+        item.session_bar_count = 0
+
+    def _expected_session_bars(self) -> int:
+        return 86400 // self.decision_cadence_seconds
 
     def _flatten(self, item: _State) -> None:
         item.mode = "OUT"
@@ -364,6 +382,11 @@ class PrevDayBoxQuartileReversionStrategy(Strategy):
             side = "SHORT"
         if not side:
             return
+        # Signals are decided on this close but fill at the next bar open.  If
+        # the close has reached or passed the midpoint, that target is already
+        # consumed before an executable order can exist.
+        if (side == "LONG" and close >= mid) or (side == "SHORT" and close <= mid):
+            return
 
         stop = box_low if side == "LONG" else box_high
         metadata = _target_metadata(
@@ -408,4 +431,4 @@ class PrevDayBoxQuartileReversionStrategy(Strategy):
             # confidence check cannot be evaluated, so the setup is skipped.
             return False
         reference = item.prev_median_volume
-        return reference is None or volume > reference
+        return reference is not None and volume > reference

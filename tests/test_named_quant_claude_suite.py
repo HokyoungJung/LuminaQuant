@@ -114,20 +114,23 @@ def test_risk_scaling_layer_is_target_vol_primary_with_gated_kelly() -> None:
     assert scaling["sigma_target_annual"] == 0.10
     assert scaling["max_leverage"] == 1.0
     # The primary block itself must validate through the fail-closed resolver.
-    resolved = resolve_risk_scaling_spec({k: v for k, v in scaling.items() if k != "variants"})
+    resolved = resolve_risk_scaling_spec(scaling)
     assert resolved is not None and resolved["method"] == "target_vol"
-    kelly = [v for v in scaling["variants"] if v["method"] == "fractional_kelly"]
+    research = suite["risk_scaling_research"]
+    kelly = [v for v in research["variants"] if v["spec"]["method"] == "fractional_kelly"]
     assert len(kelly) == 1
-    assert kelly[0]["mu_evidence_confirmed"] is False
+    assert kelly[0]["spec"]["mu_evidence_confirmed"] is False
     assert kelly[0]["status"] == "gated_until_locked_oos_mu_evidence"
     # And the gate actually holds: the pre-registered kelly variant is rejected as-is.
     import pytest
 
     with pytest.raises(ValueError, match="gated"):
-        resolve_risk_scaling_spec(kelly[0])
+        resolve_risk_scaling_spec(kelly[0]["spec"])
     assert scaling["bars_per_year"] == 365 and scaling["min_observations"] == 60
     assert {
-        v["sigma_target_annual"] for v in scaling["variants"] if v["method"] == "target_vol"
+        v["spec"]["sigma_target_annual"]
+        for v in research["variants"]
+        if v["spec"]["method"] == "target_vol"
     } == {0.10, 0.05}
     layering = suite["allocation_layering"]
     assert set(layering) >= {"layer_1_relative", "layer_2_exposure", "layer_3_growth"}

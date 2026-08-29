@@ -26,6 +26,8 @@ different emitted actions:
 from __future__ import annotations
 
 import math
+from copy import deepcopy
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from typing import Any
 
@@ -57,6 +59,8 @@ from lumina_quant.tuning import HyperParam
 # harness
 # --------------------------------------------------------------------------- #
 
+_BASE_TIME = datetime(2026, 3, 1, tzinfo=UTC)
+
 
 class _Bars:
     def __init__(self, symbols: list[str]) -> None:
@@ -72,7 +76,7 @@ class _Queue:
 
 
 def _window_event(idx: int, rows: dict[str, dict[str, Any]]) -> SimpleNamespace:
-    time = f"t{idx:05d}"
+    time = (_BASE_TIME + timedelta(days=idx)).isoformat()
     return SimpleNamespace(
         type="MARKET_WINDOW",
         time=time,
@@ -360,10 +364,10 @@ def test_leg3a_trend_gate_silence_vs_candidate_book() -> None:
         min_price=0.01,
     )
     _feed(candidate, series)
-    # Candidate emits a full XS long-short book on the trendless panel.
+    # The vol-neutralized residual is degenerate on this perfectly ordered
+    # amplitude panel, so the candidate must not manufacture a name-tiebroken book.
     cand = _final_side(candidate.events.items)
-    assert any(v == "LONG" for v in cand.values())
-    assert any(v == "SHORT" for v in cand.values())
+    assert cand == {}
 
     rider = _rider(syms)
     _feed(rider, series)
@@ -469,7 +473,7 @@ def test_min_hold_suppresses_flip() -> None:
     base = dict(
         es_window=30,
         tail_q=0.10,
-        vol_neutralize=True,
+        vol_neutralize=False,
         min_history_bars=30,
         quantile_pct=0.20,
         rebalance_bars=1,
@@ -527,6 +531,27 @@ def test_state_roundtrip_lossless() -> None:
     restored = DownsideTailRiskPremiumStrategy(_Bars(syms), _Queue(), **_CANDIDATE_KWARGS)
     restored.set_state(snapshot)
     assert restored.get_state() == snapshot
+    tampered = deepcopy(snapshot)
+    tampered["recent_times"][-1] -= 1.0
+    untouched = DownsideTailRiskPremiumStrategy(_Bars(syms), _Queue(), **_CANDIDATE_KWARGS)
+    before = untouched.get_state()
+    untouched.set_state(tampered)
+    assert untouched.get_state() == before
+
+
+def test_degenerate_residual_cross_section_abstains(monkeypatch) -> None:
+    syms = ["A/USDT", "B/USDT", "C/USDT", "D/USDT", "E/USDT"]
+    strategy = DownsideTailRiskPremiumStrategy(_Bars(syms), _Queue(), **_CANDIDATE_KWARGS)
+    monkeypatch.setattr(
+        strategy,
+        "_residual_scores",
+        lambda: (
+            dict.fromkeys(syms, 0.0),
+            dict.fromkeys(syms, 0.1),
+            {symbol: {} for symbol in syms},
+        ),
+    )
+    assert strategy._score_and_select() == ({}, {})
 
 
 def test_adversarial_set_state_never_raises() -> None:
@@ -702,12 +727,32 @@ def test_vol_target_epochs_tracked_from_datetime_feed() -> None:
 
 
 def test_vol_target_recent_times_survive_state_roundtrip() -> None:
-    strat = _vt_sleeve()
-    for epoch in _HOUR_EPOCHS:
-        strat._recent_times.append(epoch)
-    restored = _vt_sleeve()
-    restored.set_state(strat.get_state())
-    assert list(restored._recent_times) == list(_HOUR_EPOCHS)
+    strat = DownsideTailRiskPremiumStrategy(_Bars(_VT_SYMS), _Queue(), min_symbols=4)
+    epochs = [1_700_000_000.0 + index * 3600.0 for index in range(20)]
+    for index, epoch in enumerate(epochs):
+        rows = {symbol: {"close": 100.0 + index, "volume": 1_000.0} for symbol in _VT_SYMS}
+        strat.calculate_signals(
+            SimpleNamespace(
+                type="MARKET_WINDOW",
+                time=epoch,
+                bars_1s={symbol: [dict(row, time=epoch)] for symbol, row in rows.items()},
+            )
+        )
+    snapshot = strat.get_state()
+    common_close_keys = snapshot["close_times"][_VT_SYMS[0]][-16:]
+    expected_suffix = [
+        datetime.fromtimestamp(float(key), UTC).timestamp() for key in common_close_keys
+    ]
+    assert snapshot["recent_times"] == expected_suffix == epochs[-16:]
+
+    restored = DownsideTailRiskPremiumStrategy(_Bars(_VT_SYMS), _Queue(), min_symbols=4)
+    restored.set_state(snapshot)
+    assert restored.get_state() == snapshot
+
+    forged = deepcopy(snapshot)
+    forged["recent_times"][-1] -= 1.0
+    restored.set_state(forged)
+    assert restored.get_state() == snapshot
 
 
 # --------------------------------------------------------------------------- #

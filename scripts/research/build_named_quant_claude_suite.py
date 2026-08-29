@@ -1021,6 +1021,8 @@ def build_suite() -> dict[str, Any]:
             "bars_per_year": 365,
             "max_leverage": 1.0,
             "min_observations": 60,
+        },
+        "risk_scaling_research": {
             "estimation": (
                 "sigma_hat = std of the common-date aligned train+validation NET portfolio "
                 "stream under the allocator's relative weights; the ONLY estimate consumed "
@@ -1034,13 +1036,15 @@ def build_suite() -> dict[str, Any]:
                 "live-deployment detail outside the backtest"
             ),
             "variants": [
-                {"method": "target_vol", "sigma_target_annual": 0.10},
-                {"method": "target_vol", "sigma_target_annual": 0.05},
+                {"spec": {"method": "target_vol", "sigma_target_annual": 0.10}},
+                {"spec": {"method": "target_vol", "sigma_target_annual": 0.05}},
                 {
-                    "method": "fractional_kelly",
-                    "fraction": 0.5,
-                    "risk_free_annual": 0.0,
-                    "mu_evidence_confirmed": False,
+                    "spec": {
+                        "method": "fractional_kelly",
+                        "fraction": 0.5,
+                        "risk_free_annual": 0.0,
+                        "mu_evidence_confirmed": False,
+                    },
                     "status": "gated_until_locked_oos_mu_evidence",
                     "note": (
                         "Kelly re-introduces the mu-hat estimation problem the mu-free "

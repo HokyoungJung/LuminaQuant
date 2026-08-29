@@ -65,6 +65,7 @@ from __future__ import annotations
 import math
 from collections import deque
 from dataclasses import dataclass
+from itertools import pairwise
 from typing import Any
 
 from lumina_quant.core.plugin_registry import register
@@ -77,11 +78,7 @@ from lumina_quant.strategies.external_alpha_sleeves import (
     _Snapshot,
     _emit,
     _event_datetime_utc,
-    _event_symbols,
-    _market_snapshot,
-    _safe_non_negative_int,
     _target_metadata,
-    _window_snapshot,
 )
 from lumina_quant.strategy import Strategy
 from lumina_quant.tuning import HyperParam, resolve_params_from_schema
@@ -144,6 +141,7 @@ class _State:
     """Per-symbol close history + weekly position / min-hold / cooldown state."""
 
     closes: deque[float]
+    times: deque[str]
     mode: str = "OUT"  # OUT / LONG / SHORT
     entry_price: float | None = None
     bars_held: int = 0  # weekly DECISIONS in the current position
@@ -162,12 +160,6 @@ def _coerce_float_list(value: Any) -> list[float]:
         if parsed is not None:
             out.append(parsed)
     return out
-
-
-def _mode(raw: Any) -> str:
-    """Coerce a serialized mode token to one of ``{OUT, LONG, SHORT}``."""
-    parsed = str(raw or "OUT").upper()
-    return parsed if parsed in {"OUT", "LONG", "SHORT"} else "OUT"
 
 
 @register("strategy", "IdiosyncraticSkewInnovationStrategy", interface="event_driven")
@@ -244,20 +236,24 @@ class IdiosyncraticSkewInnovationStrategy(Strategy):
         self.cooldown_decisions = max(0, int(resolved["cooldown_decisions"]))
         self.min_symbols = max(2, int(resolved["min_symbols"]))
         self.vol_window = max(2, int(resolved["vol_window"]))
-        self.min_history_bars = max(2 * self.skew_window + 1, int(resolved["min_history_bars"]))
+        self.min_history_bars = max(
+            max(self.beta_window, 2 * self.skew_window) + 1,
+            self.vol_window + 1,
+            int(resolved["min_history_bars"]),
+        )
         self.max_hold_decisions = max(1, int(resolved["max_hold_decisions"]))
         self.allow_short = bool(resolved["allow_short"])
         self.target_gross_exposure = max(0.0, float(resolved["target_gross_exposure"]))
         self.max_order_value = max(0.0, float(resolved["max_order_value"]))
         self.min_price = max(0.0, float(resolved["min_price"]))
         size = _state_size(
-            self.beta_window + 1,
-            2 * self.skew_window + 1,
+            max(self.beta_window, 2 * self.skew_window) + 1,
             self.vol_window + 1,
             self.min_history_bars,
         )
         self._state: dict[str, _State] = {
-            symbol: _State(closes=deque(maxlen=size)) for symbol in self.symbol_list
+            symbol: _State(closes=deque(maxlen=size), times=deque(maxlen=size))
+            for symbol in self.symbol_list
         }
         self._last_decision_week = ""
         self._tick = 0
@@ -272,6 +268,7 @@ class IdiosyncraticSkewInnovationStrategy(Strategy):
             "symbol_state": {
                 symbol: {
                     "closes": list(item.closes),
+                    "times": list(item.times),
                     "mode": item.mode,
                     "entry_price": item.entry_price,
                     "bars_held": int(item.bars_held),
@@ -284,36 +281,130 @@ class IdiosyncraticSkewInnovationStrategy(Strategy):
         }
 
     def set_state(self, state: dict[str, Any]) -> None:
+        """Install only an exact, coherent common-clock checkpoint atomically."""
         if not isinstance(state, dict):
             return
-        self._last_decision_week = str(state.get("last_decision_week", ""))
-        self._tick = _safe_non_negative_int(state.get("tick"))
-        raw = state.get("symbol_state")
-        if not isinstance(raw, dict):
+        if set(state) != {"last_decision_week", "tick", "symbol_state"}:
             return
-        for symbol, payload in raw.items():
-            if symbol not in self._state or not isinstance(payload, dict):
-                continue
+        raw = state.get("symbol_state")
+        if not isinstance(raw, dict) or set(raw) != set(self._state):
+            return
+
+        last_decision_week = state["last_decision_week"]
+        tick = state["tick"]
+        if (
+            not isinstance(last_decision_week, str)
+            or isinstance(tick, bool)
+            or not isinstance(tick, int)
+            or tick < 0
+        ):
+            return
+
+        candidate: dict[str, _State] = {}
+        common_times: list[str] | None = None
+        for symbol in self.symbol_list:
+            payload = raw[symbol]
+            if not isinstance(payload, dict) or set(payload) != {
+                "closes",
+                "times",
+                "mode",
+                "entry_price",
+                "bars_held",
+                "bars_since_exit",
+                "last_bar_key",
+                "score",
+            }:
+                return
             item = self._state[symbol]
-            try:
-                item.closes.clear()
-                maxlen = int(item.closes.maxlen or 0)
-                values = _coerce_float_list(payload.get("closes"))
-                for value in values[-maxlen:] if maxlen else values:
-                    item.closes.append(value)
-                item.mode = _mode(payload.get("mode"))
-                item.entry_price = safe_float(payload.get("entry_price"))
-                item.bars_held = _safe_non_negative_int(payload.get("bars_held"))
-                raw_cooldown = payload.get("bars_since_exit")
-                item.bars_since_exit = (
-                    _safe_non_negative_int(raw_cooldown)
-                    if raw_cooldown is not None
-                    else _COOLDOWN_SATISFIED
-                )
-                item.last_bar_key = str(payload.get("last_bar_key", ""))
-                item.score = safe_float(payload.get("score"))
-            except Exception:
-                continue
+            closes_raw = payload["closes"]
+            times_raw = payload["times"]
+            if (
+                not isinstance(closes_raw, (list, tuple))
+                or not isinstance(times_raw, (list, tuple))
+                or len(closes_raw) != len(times_raw)
+                or len(closes_raw) > int(item.closes.maxlen or 0)
+            ):
+                return
+            if any(
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(value)
+                or value <= self.min_price
+                for value in closes_raw
+            ) or any(not isinstance(value, str) for value in times_raw):
+                return
+            closes = [float(value) for value in closes_raw]
+            times: list[str] = []
+            for raw_time in times_raw:
+                point = _event_datetime_utc(raw_time)
+                if point is None or point.isoformat() != raw_time:
+                    return
+                times.append(raw_time)
+            if any(right <= left for left, right in pairwise(times)):
+                return
+            if common_times is None:
+                common_times = times
+            elif times != common_times:
+                return
+
+            mode = payload["mode"]
+            entry_price = payload["entry_price"]
+            score = payload["score"]
+            bars_held = payload["bars_held"]
+            bars_since_exit = payload["bars_since_exit"]
+            last_bar_key = payload["last_bar_key"]
+            if (
+                not isinstance(mode, str)
+                or mode not in {"OUT", "LONG", "SHORT"}
+                or isinstance(bars_held, bool)
+                or not isinstance(bars_held, int)
+                or bars_held < 0
+                or isinstance(bars_since_exit, bool)
+                or not isinstance(bars_since_exit, int)
+                or bars_since_exit < 0
+                or not isinstance(last_bar_key, str)
+                or (times and last_bar_key != times[-1])
+                or (not times and last_bar_key)
+            ):
+                return
+            if entry_price is not None and (
+                not isinstance(entry_price, (int, float))
+                or isinstance(entry_price, bool)
+                or not math.isfinite(float(entry_price))
+            ):
+                return
+            if score is not None and (
+                not isinstance(score, (int, float))
+                or isinstance(score, bool)
+                or not math.isfinite(float(score))
+            ):
+                return
+            if mode == "OUT":
+                if entry_price is not None or bars_held != 0 or score is not None:
+                    return
+            elif entry_price is None or float(entry_price) <= self.min_price or score is None:
+                return
+            candidate[symbol] = _State(
+                closes=deque(closes, maxlen=item.closes.maxlen),
+                times=deque(times, maxlen=item.times.maxlen),
+                mode=mode,
+                entry_price=float(entry_price) if entry_price is not None else None,
+                bars_held=bars_held,
+                bars_since_exit=bars_since_exit,
+                last_bar_key=last_bar_key,
+                score=float(score) if score is not None else None,
+            )
+
+        common_times = common_times if common_times is not None else []
+        if common_times:
+            tail_week = self._week_key(common_times[-1])
+            if last_decision_week != tail_week or tick < 1:
+                return
+        elif last_decision_week or tick:
+            return
+        self._state = candidate
+        self._last_decision_week = last_decision_week
+        self._tick = tick
 
     # ------------------------------------------------------------------ #
     # ingestion / weekly cadence
@@ -326,39 +417,88 @@ class IdiosyncraticSkewInnovationStrategy(Strategy):
         iso = dt.isocalendar()
         return f"{int(iso[0]):04d}-W{int(iso[1]):02d}"
 
-    def _update_symbol(self, symbol: str, snapshot: _Snapshot) -> bool:
-        close = safe_float(snapshot.close)
-        if close is None or close <= self.min_price:
+    @staticmethod
+    def _has_uniform_utc_cadence(times: list[str]) -> bool:
+        points = [_event_datetime_utc(value) for value in times]
+        if len(points) < 2 or any(point is None for point in points):
             return False
-        item = self._state[symbol]
-        key = time_key(snapshot.time)
-        if key and key == item.last_bar_key:
-            return False
-        item.last_bar_key = key
-        item.closes.append(close)
-        return True
+        valid_points = [point for point in points if point is not None]
+        cadence = (valid_points[1] - valid_points[0]).total_seconds()
+        return cadence > 0.0 and all(
+            (current - prior).total_seconds() == cadence
+            for prior, current in pairwise(valid_points)
+        )
+
+    def _complete_window(self, event: Any) -> dict[str, _Snapshot] | None:
+        """Return a strictly-new, exact-time panel without mutating state."""
+        event_dt = _event_datetime_utc(getattr(event, "time", None))
+        if event_dt is None or not self.symbol_list:
+            return None
+        event_key = event_dt.isoformat()
+        bars_1s = getattr(event, "bars_1s", None)
+        if not isinstance(bars_1s, dict):
+            return None
+        panel: dict[str, _Snapshot] = {}
+        for symbol in self.symbol_list:
+            raw_rows = bars_1s.get(symbol)
+            if not isinstance(raw_rows, (list, tuple)) or len(raw_rows) != 1:
+                return None
+            raw = raw_rows[0]
+            if isinstance(raw, dict):
+                row = raw
+            elif isinstance(raw, (list, tuple)):
+                keys = ("time", "open", "high", "low", "close", "volume")
+                row = {key: raw[index] for index, key in enumerate(keys) if index < len(raw)}
+            else:
+                return None
+            snapshot_dt = _event_datetime_utc(row.get("time"))
+            close = safe_float(row.get("close"))
+            item = self._state[symbol]
+            # A partial callback must not leave the cross-section at mixed
+            # timestamps, so validate every configured constituent first.
+            if (
+                snapshot_dt is None
+                or snapshot_dt != event_dt
+                or close is None
+                or close <= self.min_price
+                or (
+                    item.last_bar_key
+                    and (
+                        (prior_dt := _event_datetime_utc(item.last_bar_key)) is None
+                        or event_dt <= prior_dt
+                    )
+                )
+            ):
+                return None
+            panel[symbol] = _Snapshot(
+                time=event_key,
+                open=safe_float(row.get("open")),
+                high=safe_float(row.get("high")),
+                low=safe_float(row.get("low")),
+                close=close,
+                volume=safe_float(row.get("volume")),
+            )
+        return panel
 
     def calculate_signals_window(self, event: Any, aggregator: Any = None) -> None:
         _ = aggregator
-        updated = False
-        for symbol in _event_symbols(event, self.symbol_list):
-            snapshot = _window_snapshot(event, symbol)
-            if snapshot is not None and self._update_symbol(symbol, snapshot):
-                updated = True
-        if updated:
-            self._maybe_decide(getattr(event, "time", None))
+        panel = self._complete_window(event)
+        if panel is None:
+            return
+        # Commit only after the whole panel has passed preflight.
+        for symbol, snapshot in panel.items():
+            item = self._state[symbol]
+            item.last_bar_key = str(snapshot.time)
+            item.closes.append(float(snapshot.close))
+            item.times.append(item.last_bar_key)
+        self._maybe_decide(getattr(event, "time", None))
 
     def calculate_signals(self, event: Any) -> None:
         if str(getattr(event, "type", "")).upper() == "MARKET_WINDOW":
             self.calculate_signals_window(event, None)
             return
-        if getattr(event, "type", None) != "MARKET":
-            return
-        symbol = getattr(event, "symbol", None)
-        if symbol in self._state:
-            snapshot = _market_snapshot(event)
-            if snapshot is not None and self._update_symbol(str(symbol), snapshot):
-                self._maybe_decide(snapshot.time)
+        # A single-symbol callback cannot establish a common cross-section.
+        return
 
     def _maybe_decide(self, event_time: Any) -> None:
         week = self._week_key(event_time)
@@ -372,31 +512,86 @@ class IdiosyncraticSkewInnovationStrategy(Strategy):
     # scoring
     # ------------------------------------------------------------------ #
     def _beta_hedged_residuals(
-        self, sym_closes: list[float], bench_rets: list[float]
+        self,
+        sym_closes: list[float],
+        sym_times: list[str],
+        bench_closes: list[float],
+        bench_times: list[str],
     ) -> list[float] | None:
         """Return the trailing ``2W`` beta-hedged residual returns, or ``None``."""
-        sym_rets = _bar_simple_returns(sym_closes)
-        need = 2 * self.skew_window
-        aligned = min(len(sym_rets), len(bench_rets))
-        if aligned < need:
+        if (
+            len(sym_closes) != len(sym_times)
+            or len(bench_closes) != len(bench_times)
+            or len(set(sym_times)) != len(sym_times)
+            or len(set(bench_times)) != len(bench_times)
+        ):
             return None
-        beta_depth = min(aligned, self.beta_window)
-        beta = rolling_beta(sym_rets[-beta_depth:], bench_rets[-beta_depth:])
-        if beta is None:
-            beta = 0.0
+        # Never intersect sparse histories: an interior missing bar would turn
+        # the next return into a multi-period return.  Peers need identical
+        # horizons on the benchmark's one timestamp grid.
+        if (
+            sym_times != bench_times
+            or len(sym_times) < max(self.beta_window, 2 * self.skew_window) + 1
+            or not self._has_uniform_utc_cadence(sym_times)
+        ):
+            return None
+        sym_prices = dict(zip(sym_times, sym_closes, strict=True))
+        bench_prices = dict(zip(bench_times, bench_closes, strict=True))
+        sym_rets: list[float] = []
+        bench_rets: list[float] = []
+        for prior, current in pairwise(bench_times):
+            sym_prior, sym_current = sym_prices[prior], sym_prices[current]
+            bench_prior, bench_current = bench_prices[prior], bench_prices[current]
+            if (
+                abs(sym_prior) <= _EPS
+                or abs(bench_prior) <= _EPS
+                or not all(
+                    math.isfinite(value)
+                    for value in (sym_prior, sym_current, bench_prior, bench_current)
+                )
+            ):
+                return None
+            sym_rets.append(sym_current / sym_prior - 1.0)
+            bench_rets.append(bench_current / bench_prior - 1.0)
+        need = 2 * self.skew_window
+        if len(sym_rets) < max(self.beta_window, need):
+            return None
+        beta = rolling_beta(
+            sym_rets[-self.beta_window :],
+            bench_rets[-self.beta_window :],
+        )
+        if beta is None or not math.isfinite(beta):
+            return None
         sym_tail = sym_rets[-need:]
         bench_tail = bench_rets[-need:]
-        residuals = [s - beta * b for s, b in zip(sym_tail, bench_tail, strict=False)]
-        return residuals
+        residuals = [s - beta * b for s, b in zip(sym_tail, bench_tail, strict=True)]
+        return residuals if all(math.isfinite(value) for value in residuals) else None
 
-    def delta_skew_for(self, sym_closes: list[float], bench_closes: list[float]) -> float | None:
+    def delta_skew_for(
+        self,
+        sym_closes: list[float],
+        bench_closes: list[float],
+        sym_times: list[str] | None = None,
+        bench_times: list[str] | None = None,
+    ) -> float | None:
         """Public helper: the beta-hedged residual skew innovation for one symbol."""
         if len(sym_closes) < self.min_history_bars:
             return None
-        bench_rets = _bar_simple_returns(bench_closes)
-        if len(bench_rets) < 2 * self.skew_window:
+        if len(bench_closes) < self.min_history_bars:
             return None
-        residuals = self._beta_hedged_residuals(sym_closes, bench_rets)
+        if sym_times is None:
+            sym_times = [
+                f"1970-01-01T00:{index // 60:02d}:{index % 60:02d}+00:00"
+                for index in range(len(sym_closes))
+            ]
+        if bench_times is None:
+            bench_times = [
+                f"1970-01-01T00:{index // 60:02d}:{index % 60:02d}+00:00"
+                for index in range(len(bench_closes))
+            ]
+        if len(sym_times) != len(sym_closes) or len(bench_times) != len(bench_closes):
+            return None
+        residuals = self._beta_hedged_residuals(sym_closes, sym_times, bench_closes, bench_times)
         if residuals is None:
             return None
         return _skew_innovation(residuals, self.skew_window)
@@ -406,27 +601,37 @@ class IdiosyncraticSkewInnovationStrategy(Strategy):
         if bench is None:
             return {}
         bench_closes = list(bench.closes)
-        bench_rets = _bar_simple_returns(bench_closes)
-        if len(bench_rets) < 2 * self.skew_window:
+        bench_times = list(bench.times)
+        if (
+            len(bench_closes) < self.min_history_bars
+            or not bench_times
+            or not self._has_uniform_utc_cadence(bench_times)
+        ):
             return {}
-        scored: dict[str, tuple[float, dict[str, Any]]] = {}
+        deltas: dict[str, float] = {}
         for symbol, item in self._state.items():
             if symbol == self.benchmark_symbol:
                 continue
             sym_closes = list(item.closes)
-            if len(sym_closes) < self.min_history_bars:
+            sym_times = list(item.times)
+            if len(sym_closes) < self.min_history_bars or not sym_times or sym_times != bench_times:
                 continue
-            residuals = self._beta_hedged_residuals(sym_closes, bench_rets)
+            residuals = self._beta_hedged_residuals(
+                sym_closes, sym_times, bench_closes, bench_times
+            )
             if residuals is None:
                 continue
             delta = _skew_innovation(residuals, self.skew_window)
             if delta is None:
                 continue
-            # LONG the collapsing tail (low delta), SHORT the building tail (high
-            # delta): score is the NEGATED innovation so the top-of-book is LONG.
-            score = -float(delta)
-            scored[symbol] = (score, {"delta_skew": float(delta)})
-        return scored
+            deltas[symbol] = float(delta)
+        # No relative innovation exists in a tied cross-section.  Do not let
+        # deterministic symbol ordering manufacture a long/short ranking.
+        if len(deltas) < 2 or max(deltas.values()) - min(deltas.values()) <= _EPS:
+            return {}
+        # LONG the collapsing tail (low delta), SHORT the building tail (high
+        # delta): score is the NEGATED innovation so the top-of-book is LONG.
+        return {symbol: (-delta, {"delta_skew": delta}) for symbol, delta in deltas.items()}
 
     # ------------------------------------------------------------------ #
     # selection (rank-band hysteresis + hard min-hold + cooldown)

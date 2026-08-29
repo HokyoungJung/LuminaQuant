@@ -111,16 +111,15 @@ def _ensure_psd(cov: Any) -> np.ndarray:
     convex programmes below meaningless) raises ``ValueError``.
     """
     matrix = _clean_cov(cov)
-    n = int(matrix.shape[0])
-    if n <= 1:
+    if matrix.shape[0] == 0:
         return matrix
     try:
         evals, evecs = np.linalg.eigh(matrix)
-    except np.linalg.LinAlgError:
-        return matrix
-    scale = max(1.0, float(np.abs(evals).max()))
+    except np.linalg.LinAlgError as exc:
+        raise ValueError("covariance eigendecomposition failed; refusing to allocate") from exc
+    scale = float(np.abs(evals).max())
     lowest = float(evals.min())
-    if lowest < -_PSD_REL_TOL * scale:
+    if lowest < -_PSD_REL_TOL * max(scale, np.finfo(float).tiny):
         raise ValueError(
             f"covariance is not positive semi-definite (min eigenvalue {lowest:.3e}); "
             "refusing to allocate on an indefinite matrix"
@@ -347,6 +346,8 @@ def project_box_simplex(vector: Any, lower: Any, upper: Any) -> np.ndarray:
     hi = np.broadcast_to(np.asarray(upper, dtype=float), (n,)).astype(float)
     if n == 0:
         return np.zeros(0, dtype=float)
+    if not (np.all(np.isfinite(v)) and np.all(np.isfinite(lo)) and np.all(np.isfinite(hi))):
+        raise ValueError("box-simplex projection inputs must be finite")
     if np.any(hi < lo - _TOL) or float(lo.sum()) > 1.0 + 1e-9 or float(hi.sum()) < 1.0 - 1e-9:
         raise ValueError(
             "infeasible box for a probability vector: "
@@ -618,8 +619,12 @@ def _resolve_bounds(
     if bounds is None:
         return None
     if isinstance(bounds, Mapping):
+        if set(bounds) - {"lower", "upper"}:
+            raise ValueError("constrained HRP bounds support only 'lower' and 'upper'")
         lower, upper = bounds.get("lower", 0.0), bounds.get("upper", 1.0)
     else:
+        if not isinstance(bounds, tuple) or len(bounds) != 2:
+            raise ValueError("constrained HRP bounds must be a (lower, upper) tuple")
         lower, upper = bounds
     lo = np.broadcast_to(np.asarray(lower, dtype=float), (n,)).astype(float)
     hi = np.broadcast_to(np.asarray(upper, dtype=float), (n,)).astype(float)
@@ -1028,12 +1033,14 @@ def graph_inverse_centrality_weights(cov: Any, *, floor: float = 1e-6) -> np.nda
     np.fill_diagonal(adjacency, 0.0)
     try:
         evals, evecs = np.linalg.eigh(adjacency)
-    except np.linalg.LinAlgError:
-        return _equal_weights(n)
+    except np.linalg.LinAlgError as exc:
+        raise ValueError(
+            "graph centrality eigendecomposition failed; refusing to allocate"
+        ) from exc
     perron = np.abs(evecs[:, int(np.argmax(evals))])
     total = float(perron.sum())
     if not np.isfinite(total) or total <= 0.0:
-        return _equal_weights(n)
+        raise ValueError("graph centrality eigendecomposition returned invalid eigenvector")
     z = np.maximum(perron / total, 1e-12)
     weights = 1.0 / z
     return weights / float(weights.sum())
@@ -1044,20 +1051,65 @@ def graph_inverse_centrality_weights(cov: Any, *, floor: float = 1e-6) -> np.nda
 # ---------------------------------------------------------------------------
 
 
+def _validate_wrapper_controls(
+    *,
+    linkage_method: Any | None = None,
+    n_clusters: Any = None,
+    max_clusters: Any = None,
+    cov_window: Any = None,
+) -> None:
+    if linkage_method is not None and (
+        not isinstance(linkage_method, str) or linkage_method not in _LINKAGES
+    ):
+        raise ValueError(f"linkage_method must be one of {_LINKAGES}")
+    for name, value, minimum in (
+        ("n_clusters", n_clusters, 2),
+        ("max_clusters", max_clusters, 2),
+        ("cov_window", cov_window, 2),
+    ):
+        if value is not None and (
+            isinstance(value, bool) or not isinstance(value, (int, np.integer)) or value < minimum
+        ):
+            raise ValueError(f"{name} must be an integer of at least {minimum}")
+
+
+def _validate_bound_control(value: Any, *, name: str) -> None:
+    if value is None:
+        return
+    raw = np.asarray(value)
+    if raw.dtype == np.bool_ or not np.issubdtype(raw.dtype, np.number):
+        raise ValueError(f"{name} must be numeric")
+    if not np.all(np.isfinite(raw)):
+        raise ValueError(f"{name} must be finite")
+
+
 def _prep(ids: list[str], returns_matrix: Any, cov_window: int | None, *, estimator: str = "lw"):
     ids = list(ids)
+    if any(not isinstance(sleeve_id, str) or not sleeve_id for sleeve_id in ids):
+        raise ValueError("allocator ids must be nonempty strings")
+    if len(set(ids)) != len(ids):
+        raise ValueError("allocator ids must be unique")
     matrix = _clean_matrix(returns_matrix)
     if not ids or matrix.shape[1] != len(ids):
         return None, None
+    if cov_window is not None:
+        if (
+            isinstance(cov_window, bool)
+            or not isinstance(cov_window, (int, np.integer))
+            or cov_window < 2
+        ):
+            raise ValueError("cov_window must be an integer of at least 2")
+        matrix = matrix[-cov_window:]
+    if matrix.shape[0] < 2:
+        return None, None
     if estimator == "sample":
-        rows = matrix if cov_window is None else matrix[-int(cov_window) :]
-        if rows.shape[0] < 2:
-            return None, None
-        centered = rows - rows.mean(axis=0)
-        cov = (centered.T @ centered) / float(rows.shape[0])  # MLE / n divisor
+        centered = matrix - matrix.mean(axis=0)
+        cov = (centered.T @ centered) / float(matrix.shape[0])  # MLE / n divisor
+    elif estimator == "lw":
+        cov, _ = ledoit_wolf_shrunk_covariance(matrix)
     else:
-        cov, _ = ledoit_wolf_shrunk_covariance(matrix, window=cov_window)
-    if cov.shape != (len(ids), len(ids)):
+        raise ValueError("covariance estimator must be 'sample' or 'lw'")
+    if cov.shape != (len(ids), len(ids)) or not np.all(np.isfinite(cov)):
         return None, None
     return matrix, cov
 
@@ -1074,7 +1126,10 @@ class HRPDendrogramPortfolio:
         upper_bound: float | Sequence[float] | None = None,
         cov_window: int | None = None,
     ) -> None:
-        self.linkage_method = str(linkage_method)
+        _validate_wrapper_controls(linkage_method=linkage_method, cov_window=cov_window)
+        _validate_bound_control(lower, name="lower")
+        _validate_bound_control(upper_bound, name="upper_bound")
+        self.linkage_method = linkage_method
         self.lower = lower
         self.upper_bound = upper_bound
         self.cov_window = cov_window
@@ -1115,9 +1170,15 @@ class HERCPortfolio:
         max_clusters: int = 10,
         cov_window: int | None = None,
     ) -> None:
-        self.linkage_method = str(linkage_method)
+        _validate_wrapper_controls(
+            linkage_method=linkage_method,
+            n_clusters=n_clusters,
+            max_clusters=max_clusters,
+            cov_window=cov_window,
+        )
+        self.linkage_method = linkage_method
         self.n_clusters = n_clusters
-        self.max_clusters = int(max_clusters)
+        self.max_clusters = max_clusters
         self.cov_window = cov_window
 
     def allocate(
@@ -1148,10 +1209,18 @@ class NCOPortfolio:
         max_clusters: int = 10,
         cov_window: int | None = None,
     ) -> None:
-        self.use_mean = bool(use_mean)
-        self.linkage_method = str(linkage_method)
+        if not isinstance(use_mean, bool):
+            raise ValueError("use_mean must be a boolean")
+        _validate_wrapper_controls(
+            linkage_method=linkage_method,
+            n_clusters=n_clusters,
+            max_clusters=max_clusters,
+            cov_window=cov_window,
+        )
+        self.use_mean = use_mean
+        self.linkage_method = linkage_method
         self.n_clusters = n_clusters
-        self.max_clusters = int(max_clusters)
+        self.max_clusters = max_clusters
         self.cov_window = cov_window
 
     def allocate(
@@ -1191,10 +1260,36 @@ class WassersteinDROPortfolio:
         max_iter: int = 20_000,
         cov_window: int | None = None,
     ) -> None:
+        if (
+            isinstance(radius, bool)
+            or not isinstance(radius, (int, float, np.integer, np.floating))
+            or not np.isfinite(radius)
+            or radius < 0.0
+        ):
+            raise ValueError("radius must be finite and non-negative")
+        if target_return is not None and (
+            isinstance(target_return, bool)
+            or not isinstance(target_return, (int, float, np.integer, np.floating))
+            or not np.isfinite(target_return)
+        ):
+            raise ValueError("target_return must be finite")
+        if not isinstance(cov_estimator, str) or cov_estimator not in {
+            "sample",
+            "lw",
+            "ledoit_wolf",
+        }:
+            raise ValueError("cov_estimator must be one of 'sample', 'lw', or 'ledoit_wolf'")
+        if (
+            isinstance(max_iter, bool)
+            or not isinstance(max_iter, (int, np.integer))
+            or max_iter <= 0
+        ):
+            raise ValueError("max_iter must be a positive integer")
+        _validate_wrapper_controls(cov_window=cov_window)
         self.radius = float(radius)
         self.target_return = None if target_return is None else float(target_return)
-        self.cov_estimator = str(cov_estimator)
-        self.max_iter = int(max_iter)
+        self.cov_estimator = cov_estimator
+        self.max_iter = max_iter
         self.cov_window = cov_window
 
     def allocate(
@@ -1203,7 +1298,13 @@ class WassersteinDROPortfolio:
         raw = np.asarray(returns_matrix, dtype=float)
         if raw.ndim not in (1, 2) or not np.all(np.isfinite(raw)):
             raise ValueError("Wasserstein returns must contain only finite values")
-        estimator = "sample" if self.cov_estimator == "sample" else "lw"
+        estimator_tokens = {"sample": "sample", "lw": "lw", "ledoit_wolf": "lw"}
+        try:
+            estimator = estimator_tokens[self.cov_estimator]
+        except KeyError as exc:
+            raise ValueError(
+                "cov_estimator must be one of 'sample', 'lw', or 'ledoit_wolf'"
+            ) from exc
         matrix, cov = _prep(ids, returns_matrix, self.cov_window, estimator=estimator)
         if cov is None:
             return {}
@@ -1231,6 +1332,14 @@ class GraphInverseCentralityPortfolio:
     """Full-graph inverse-centrality graph-risk heuristic -- see :func:`graph_inverse_centrality_weights`."""
 
     def __init__(self, *, floor: float = 1e-6, cov_window: int | None = None) -> None:
+        if (
+            isinstance(floor, bool)
+            or not isinstance(floor, (int, float, np.integer, np.floating))
+            or not np.isfinite(floor)
+            or floor <= 0.0
+        ):
+            raise ValueError("floor must be finite and positive")
+        _validate_wrapper_controls(cov_window=cov_window)
         self.floor = float(floor)
         self.cov_window = cov_window
 
