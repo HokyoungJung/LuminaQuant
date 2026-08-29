@@ -6,7 +6,7 @@
 
 ```bash
 uv python pin 3.13
-uv sync --extra optimize --extra dev --extra live-binance --extra live-mt5 --extra live-polymarket
+uv sync --group dev --extra optimize --extra live-binance --extra live-mt5 --extra live-polymarket
 ```
 
 선택 사항 (Linux x86_64 + CUDA 12):

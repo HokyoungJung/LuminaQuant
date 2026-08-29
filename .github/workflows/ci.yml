@@ -92,7 +92,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
 
       - name: Sync dependencies
-        run: uv sync --extra optimize --extra research-ml --extra dev --extra live-binance --extra live-mt5 --extra live-polymarket --extra dashboard
+        run: uv sync --group dev --extra optimize --extra research-ml --extra live-binance --extra live-mt5 --extra live-polymarket --extra dashboard
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -264,7 +264,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
 
       - name: Sync GPU dependencies
-        run: uv sync --extra dev --extra gpu
+        run: uv sync --group dev --extra gpu
 
       - name: GPU contract tests
         run: |
@@ -300,7 +300,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
 
       - name: Sync GPU dependencies
-        run: uv sync --extra dev --extra gpu
+        run: uv sync --group dev --extra gpu
 
       - name: NVIDIA inventory
         run: nvidia-smi

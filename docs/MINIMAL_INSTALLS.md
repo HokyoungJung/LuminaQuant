@@ -6,44 +6,44 @@ LuminaQuant now supports persona-oriented extras so users can install only what 
 
 ### Backtest-only
 ```bash
-uv sync --extra backtest --extra dev
+uv sync --group dev --extra backtest
 ```
 Use when you only need historical backtests with canonical CSV/parquet OHLCV data.
 
 ### Optimize
 ```bash
-uv sync --extra backtest --extra optimize --extra dev
+uv sync --group dev --extra backtest --extra optimize
 ```
 Use when you need walk-forward/Optuna optimization on top of backtest support.
 
 ### Live Binance
 ```bash
-uv sync --extra live-binance --extra dev
+uv sync --group dev --extra live-binance
 ```
 Includes `websockets` for Binance Futures live streams; REST execution/data sync use the native stdlib client.
 
 ### Live MT5
 ```bash
-uv sync --extra live-mt5 --extra dev
+uv sync --group dev --extra live-mt5
 ```
 Use on Windows or with MT5 bridge mode on WSL/Linux.
 
 ### Live Polymarket (Phase 1)
 ```bash
-uv sync --extra live-polymarket --extra dev
+uv sync --group dev --extra live-polymarket
 ```
 This lane supports market data, paper/shadow workflows, and experimental real execution paths when Polymarket credentials/private key are configured and `allow_real_execution` is explicitly enabled.
 
 ### Dashboard
 ```bash
-uv sync --extra dashboard --extra dev
+uv sync --group dev --extra dashboard
 cd apps/dashboard_web && npm install
 ```
 Use when you need the Python dashboard helpers plus the primary Next.js dashboard runtime (Node 20+).
 
 ### Full local maintainer setup
 ```bash
-uv sync --extra backtest --extra optimize --extra live-binance --extra live-mt5 --extra live-polymarket --extra dashboard --extra dev
+uv sync --group dev --extra backtest --extra optimize --extra live-binance --extra live-mt5 --extra live-polymarket --extra dashboard
 cd apps/dashboard_web && npm install
 ```
 

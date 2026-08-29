@@ -65,7 +65,7 @@ This report summarizes the recent verification and hardening work across backtes
 Executed from project root:
 
 ```bash
-uv sync --extra optimize --extra dev --extra live-binance --extra live-mt5 --extra live-polymarket
+uv sync --group dev --extra optimize --extra live-binance --extra live-mt5 --extra live-polymarket
 uv run ruff check .
 uv run pytest -q
 uv run lq backtest

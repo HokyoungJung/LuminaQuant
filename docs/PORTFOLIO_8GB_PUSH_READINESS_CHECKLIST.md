@@ -43,9 +43,9 @@ ls -ld "$leader_root/.omx/team/execute-the-approved-plan-in-o/worktrees"
 ## Targeted verification commands
 
 ```bash
-uv run --extra dev ruff check tests/test_portfolio_split_contract.py
+uv run --group dev ruff check tests/test_portfolio_split_contract.py
 
-uv run --extra dev pytest -q \
+uv run --group dev pytest -q \
   tests/test_portfolio_split_contract.py \
   tests/test_exact_window_runtime.py \
   tests/test_portfolio_followup_memory_guard.py \

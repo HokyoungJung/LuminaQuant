@@ -12,7 +12,7 @@
 
 ```bash
 cd /path/to/<REPO_DIR>
-uv sync --extra optimize --extra dev --extra live-binance --extra live-mt5 --extra live-polymarket
+uv sync --group dev --extra optimize --extra live-binance --extra live-mt5 --extra live-polymarket
 # Linux x86_64 + CUDA 12 환경이면 권장
 # uv sync --extra gpu
 uv run python scripts/init_postgres_schema.py --dsn "$LQ_POSTGRES_DSN"

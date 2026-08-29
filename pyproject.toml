@@ -16,6 +16,7 @@ dependencies = [
     "python-dotenv>=1.2.2",
     "PyYAML>=6.0.3",
     "ta-lib>=0.6.8",
+    "cryptography>=49.0.0",
 ]
 
 [project.scripts]
@@ -66,11 +67,6 @@ mt5 = [
     "MetaTrader5>=5.0.0; platform_system == 'Windows'",
 ]
 terminal-authority = [
-    "cryptography==49.0.0",
-]
-dev = [
-    "pytest>=8.0.0",
-    "ruff>=0.15.1",
     "cryptography==49.0.0",
 ]
 research-ml = [
@@ -164,9 +160,13 @@ indent-style = "space"
 [dependency-groups]
 dev = [
     "maturin>=1.13.3",
+    "pytest>=8.0.0",
+    "ruff>=0.15.1",
     # Optimizer deps in the default dev sync so optuna/numba test paths never
     # skip in local runs (also published to users via the "optimize" extra).
     "optuna>=4.0",
     "numba>=0.62",
-    "cryptography==49.0.0",
+    "websockets>=17.1",
+    "lightgbm>=4.7.0",
+    "scikit-learn>=1.9.0",
 ]

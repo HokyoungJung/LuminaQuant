@@ -39,7 +39,7 @@ This document tracks high-performance engine patterns adopted in LuminaQuant, wi
 ## Runtime activation
 
 ```bash
-uv sync --extra optimize --extra dev --extra live-binance --extra live-mt5 --extra live-polymarket
+uv sync --group dev --extra optimize --extra live-binance --extra live-mt5 --extra live-polymarket
 winget install --id Rustlang.Rustup -e --accept-source-agreements --accept-package-agreements --disable-interactivity
 export PATH="$PATH:/c/Users/<user>/.cargo/bin"
 ```
