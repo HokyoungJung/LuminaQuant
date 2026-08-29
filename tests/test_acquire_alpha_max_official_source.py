@@ -22,6 +22,11 @@ sys.modules[_SPEC.name] = subject
 _SPEC.loader.exec_module(subject)
 
 
+@pytest.fixture(autouse=True)
+def _host_reserve_path(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(subject, "HOST_RESERVE_PATH", tmp_path)
+
+
 def archive(
     tmp_path: Path,
     rows: list[list[str]],
@@ -3523,7 +3528,7 @@ def test_compact_plan_binds_host_storage_contract() -> None:
     plan = subject.full_plan()
     assert plan["schema"] == "alpha_max_official_acquisition_plan.v4"
     assert plan["storage_contract"] == {
-        "host_reserve_path": "/mnt/c",
+        "host_reserve_path": str(subject.HOST_RESERVE_PATH),
         "host_reserve_bytes": 21_474_836_480,
         "max_live_archives": 1,
         "archive_retention": "retired_after_double_derivation",

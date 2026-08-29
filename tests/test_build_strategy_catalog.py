@@ -350,7 +350,7 @@ def test_repository_evidence_semantically_classifies_every_in_scope_strategy() -
     )
     diagnostic = dacapogo["dedicated_diagnostic"]
     assert diagnostic["artifact"] == {
-        "path": "var/reports/common_period_reval_20260812/dacapogo_common_metrics.json",
+        "path": "docs/research_note/evidence/dacapogo_common_metrics.json",
         "bytes": 20410,
         "sha256": "412a3dc92ed98cb1ba06704d76efd411c76a0e8e8f1eb7967e098a94851c70bf",
     }

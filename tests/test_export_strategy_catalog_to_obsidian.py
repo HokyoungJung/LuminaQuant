@@ -427,7 +427,7 @@ def test_polars_batch_research_note_warns_and_rejects_live_claim(tmp_path: Path)
 def test_repository_dacapogo_diagnostic_is_hash_bound_and_rendered() -> None:
     root = Path(__file__).resolve().parents[1]
     catalog = MODULE._load_catalog(
-        root / "var" / "reports" / "strategy_research_20260812" / "strategy_catalog.json"
+        root / "docs" / "research_note" / "evidence" / "strategy_catalog_20260812.json"
     )
     strategy = next(
         row for row in catalog["strategies"] if row["strategy"] == "DacapogoDailySourceStrategy"

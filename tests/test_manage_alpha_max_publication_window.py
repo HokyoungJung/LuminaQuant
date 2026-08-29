@@ -19,9 +19,10 @@ spec.loader.exec_module(window)
 
 
 @pytest.fixture(autouse=True)
-def _stable_test_clock(monkeypatch: pytest.MonkeyPatch) -> None:
+def _stable_test_clock(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     now_ns = time.time_ns()
     monkeypatch.setattr(window.time, "time_ns", lambda: now_ns)
+    monkeypatch.setattr(window, "CAPACITY_PATH", str(tmp_path))
 
 
 def put(root: Path, name: str) -> None:
