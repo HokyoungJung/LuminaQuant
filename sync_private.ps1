@@ -4,7 +4,7 @@ if ($scriptPath -like "*\Quants-agent\LuminaQuant\*") {
     $tempPath = Join-Path $env:TEMP "sync_private.ps1"
     Write-Host "Copying script to temp: $tempPath" -ForegroundColor DarkGray
     Copy-Item $scriptPath $tempPath -Force
-    
+
     # Run the temp copy and exit
     & $tempPath
     exit

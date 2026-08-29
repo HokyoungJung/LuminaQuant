@@ -305,3 +305,9 @@ native/lumina_compute/.omc/
 .omc/handoffs/
 .omc/notepad.md
 .omc/project-memory.json
+
+# GJC runtime/session state is machine-local; durable plans and skills remain tracked.
+.gjc/_session-*/
+.gjc/state/audit.jsonl
+.gjc/state/sessions/
+var/tmp/
