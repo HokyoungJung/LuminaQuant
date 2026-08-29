@@ -35,7 +35,7 @@ from contextlib import contextmanager
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from itertools import pairwise
 from pathlib import Path
 from types import MappingProxyType
@@ -3468,6 +3468,8 @@ def _alpha_max_indicator_checkpoint_encode(value: object) -> object:
         return {"t": "float", "v": value.hex()}
     if type(value) is str:
         return {"t": "str", "v": value}
+    if type(value) is date:
+        return {"t": "date", "v": value.isoformat()}
     if type(value) is datetime:
         return {"t": "datetime", "v": value.isoformat(), "fold": value.fold}
     if type(value) is list:
@@ -3494,7 +3496,10 @@ def _alpha_max_indicator_checkpoint_encode(value: object) -> object:
         if any(encoded[index] == encoded[index - 1] for index in range(1, len(encoded))):
             raise AlphaMaxRuntimeContractError("alpha_max_indicator_checkpoint_duplicate_item")
         return {"t": "frozenset" if type(value) is frozenset else "set", "v": encoded}
-    raise AlphaMaxRuntimeContractError("alpha_max_indicator_checkpoint_type_invalid")
+    type_token = re.sub(r"[^a-z0-9_]+", "_", type(value).__name__.lower()).strip("_")
+    raise AlphaMaxRuntimeContractError(
+        f"alpha_max_indicator_checkpoint_type_invalid:{type_token or 'unknown'}"
+    )
 
 
 def _alpha_max_indicator_checkpoint_decode(value: object, *, depth: int = 0) -> object:
@@ -3507,6 +3512,7 @@ def _alpha_max_indicator_checkpoint_decode(value: object, *, depth: int = 0) -> 
         "int": {"t", "v"},
         "float": {"t", "v"},
         "str": {"t", "v"},
+        "date": {"t", "v"},
         "datetime": {"t", "v", "fold"},
         "list": {"t", "v"},
         "tuple": {"t", "v"},
@@ -3542,6 +3548,16 @@ def _alpha_max_indicator_checkpoint_decode(value: object, *, depth: int = 0) -> 
         return result
     if tag == "str" and type(value["v"]) is str:
         return value["v"]
+    if tag == "date" and type(value["v"]) is str:
+        try:
+            result = date.fromisoformat(value["v"])
+        except ValueError as exc:
+            raise AlphaMaxRuntimeContractError(
+                "alpha_max_indicator_checkpoint_date_invalid"
+            ) from exc
+        if result.isoformat() != value["v"]:
+            raise AlphaMaxRuntimeContractError("alpha_max_indicator_checkpoint_date_invalid")
+        return result
     if tag == "datetime" and type(value["v"]) is str and type(value["fold"]) is int:
         try:
             result = datetime.fromisoformat(value["v"]).replace(fold=value["fold"])

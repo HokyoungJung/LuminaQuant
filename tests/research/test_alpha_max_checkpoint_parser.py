@@ -122,6 +122,7 @@ def test_indicator_day_checkpoint_typed_codec_rejects_tamper_and_aliases() -> No
         "bool": True,
         "int": 1,
         "float": -0.0,
+        "day": __import__("datetime").date(2024, 1, 1),
         "when": __import__("datetime").datetime(2024, 1, 1),
         "items": [("x",), {"a", 2}, frozenset({"z"})],
     }
@@ -133,6 +134,38 @@ def test_indicator_day_checkpoint_typed_codec_rejects_tamper_and_aliases() -> No
         runner._parse_alpha_max_indicator_checkpoint_bytes(
             b'{"t":"set","v":[{"t":"bool","v":true},{"t":"int","v":"1"}]}\n'
         )
+
+
+def test_indicator_day_checkpoint_date_codec_is_exact_and_canonical() -> None:
+    datetime_module = __import__("datetime")
+    day = datetime_module.date(2024, 1, 1)
+    moment = datetime_module.datetime(2024, 1, 1)
+    assert runner._alpha_max_indicator_checkpoint_encode(day) == {
+        "t": "date",
+        "v": "2024-01-01",
+    }
+    assert runner._alpha_max_indicator_checkpoint_encode(moment)["t"] == "datetime"
+    decoded = runner._parse_alpha_max_indicator_checkpoint_bytes(b'{"t":"date","v":"2024-01-01"}\n')
+    assert type(decoded) is datetime_module.date
+    assert decoded == day
+
+    class DateSubclass(datetime_module.date):
+        pass
+
+    with pytest.raises(
+        runner.AlphaMaxRuntimeContractError,
+        match="alpha_max_indicator_checkpoint_type_invalid:datesubclass",
+    ):
+        runner._alpha_max_indicator_checkpoint_encode(DateSubclass(2024, 1, 1))
+    for payload in (
+        b'{"t":"date","v":"20240101"}\n',
+        b'{"t":"date","v":"2024-W01-1"}\n',
+        b'{"extra":0,"t":"date","v":"2024-01-01"}\n',
+        b'{"t":"date"}\n',
+        b'{"t":"date","v":20240101}\n',
+    ):
+        with pytest.raises(runner.AlphaMaxRuntimeContractError):
+            runner._parse_alpha_max_indicator_checkpoint_bytes(payload)
 
 
 @pytest.mark.parametrize(
