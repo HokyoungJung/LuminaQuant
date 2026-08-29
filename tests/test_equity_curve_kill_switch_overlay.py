@@ -196,11 +196,16 @@ def test_drawdown_ladder_scale_degenerate_inputs_are_inert() -> None:
     assert drawdown_ladder_scale(0.9, None) == pytest.approx(1.0)
     assert drawdown_ladder_scale(0.9, "garbage,0.1") == pytest.approx(1.0)
     assert drawdown_ladder_scale("not-a-number", DEFAULT_LADDER) == pytest.approx(1.0)
-    assert drawdown_ladder_scale(0.12, ((0.10, 0.4), (0.05, 0.8))) == pytest.approx(0.4)
+    assert drawdown_ladder_scale(0.12, ((0.10, 0.4), (0.05, 0.8))) == pytest.approx(1.0)
 
 
-def test_parse_drawdown_ladder_sorts_and_drops_bad_rungs() -> None:
-    rungs = parse_drawdown_ladder("0.20:0.0,0.05:0.75,bad,0.10:0.5,-0.3:0.1")
+def test_parse_drawdown_ladder_rejects_non_monotone_rungs() -> None:
+    rungs = parse_drawdown_ladder("0.05:0.75,0.20:0.0,bad,0.10:0.5,-0.3:0.1")
+    assert rungs == ()
+
+
+def test_parse_drawdown_ladder_drops_bad_rungs_without_reordering() -> None:
+    rungs = parse_drawdown_ladder("0.05:0.75,bad,0.10:0.5,0.20:0.0,-0.3:0.1")
     assert rungs == ((0.05, 0.75), (0.10, 0.5), (0.20, 0.0))
 
 
@@ -483,7 +488,10 @@ def test_child_exit_queued_before_a_child_exception_is_still_forwarded() -> None
         },
         month_loss_limit=0.0,
     )
-    emitted = _run(strategy, _decline(5))
+    emitted = _run(strategy, _decline(3))
+    with pytest.raises(RuntimeError, match="probe child blew up"):
+        strategy.calculate_signals(_market_event(3, 98.5))
+    emitted.extend((3, signal) for signal in events.items[len(emitted) :])
 
     crash_bar = [sig for idx, sig in emitted if idx == 3]
     assert len(crash_bar) == 1, "only the EXIT survives the crash; the entry is discarded"
@@ -502,17 +510,20 @@ def test_child_exception_salvages_exits_from_every_dispatcher() -> None:
     events_market = _Queue()
     market = _make(events_market, child_params=dict(child_params), month_loss_limit=0.0)
     market.calculate_signals(_market_event(0, 100.0))
-    market.calculate_signals(_market_event(1, 99.0))
+    with pytest.raises(RuntimeError, match="probe child blew up"):
+        market.calculate_signals(_market_event(1, 99.0))
 
     events_window = _Queue()
     window = _make(events_window, child_params=dict(child_params), month_loss_limit=0.0)
     window.calculate_signals_window(_market_event(0, 100.0), None)
-    window.calculate_signals_window(_market_event(1, 99.0), None)
+    with pytest.raises(RuntimeError, match="probe child blew up"):
+        window.calculate_signals_window(_market_event(1, 99.0), None)
 
     events_context = _Queue()
     context = _make(events_context, child_params=dict(child_params), month_loss_limit=0.0)
     context.calculate_signals_context(SimpleNamespace(event=_market_event(0, 100.0)))
-    context.calculate_signals_context(SimpleNamespace(event=_market_event(1, 99.0)))
+    with pytest.raises(RuntimeError, match="probe child blew up"):
+        context.calculate_signals_context(SimpleNamespace(event=_market_event(1, 99.0)))
 
     for queue in (events_market, events_window, events_context):
         assert [sig.signal_type for sig in queue.items] == ["LONG", "EXIT"]
@@ -741,12 +752,15 @@ def test_set_state_ignores_malformed_payloads() -> None:
     assert list(strategy._overlay.equity_curve) == before
 
 
-def test_overlay_never_raises_and_drops_signals_on_child_failure() -> None:
+def test_overlay_surfaces_child_failures() -> None:
     events = _Queue()
     strategy = _make(events, child_params={"long_at": {0}, "raises": True})
-    strategy.calculate_signals(_market_event(0, 100.0))
-    strategy.calculate_signals_window(_market_event(1, 99.0), None)
-    strategy.calculate_signals_context(SimpleNamespace(event=_market_event(2, 98.0)))
+    with pytest.raises(RuntimeError, match="probe child blew up"):
+        strategy.calculate_signals(_market_event(0, 100.0))
+    with pytest.raises(RuntimeError, match="probe child blew up"):
+        strategy.calculate_signals_window(_market_event(1, 99.0), None)
+    with pytest.raises(RuntimeError, match="probe child blew up"):
+        strategy.calculate_signals_context(SimpleNamespace(event=_market_event(2, 98.0)))
     assert events.items == []
 
 
@@ -758,6 +772,85 @@ def test_no_scaling_before_any_bar_history() -> None:
     assert list(strategy._overlay.equity_curve) == []
     assert len(events.items) == 1
     assert events.items[0].metadata["target_allocation"] == pytest.approx(0.25)
+
+
+def test_explicit_zero_child_allocation_remains_a_zero_signal() -> None:
+    events = _Queue()
+    strategy = _make(events, child_params={"probe_at": {0}, "target_allocation": 1.0})
+
+    strategy.calculate_signals(_market_event(0, 100.0))
+
+    assert events.items[0].metadata["target_allocation"] == pytest.approx(0.0)
+    assert events.items[0].strength == pytest.approx(0.0)
+
+
+def test_nonfinite_child_sizing_is_rejected_visibly() -> None:
+    events = _Queue()
+    strategy = _make(events)
+    invalid = SignalEvent(
+        strategy_id="probe_child",
+        symbol=_SYMBOL,
+        datetime=_stamp(0),
+        signal_type="LONG",
+        strength=1.0,
+        metadata={"target_allocation": float("nan")},
+    )
+
+    with pytest.raises(ValueError, match="target_allocation"):
+        strategy._forward_child_signal(invalid, 1.0)
+    assert events.items == []
+
+
+def test_missing_close_does_not_discard_open_trade_state() -> None:
+    events = _Queue()
+    strategy = _make(events)
+    strategy._overlay.open_trades[_SYMBOL] = {"close": 100.0, "side": 1.0}
+
+    strategy._close_trade(_SYMBOL, None)
+
+    assert strategy._overlay.open_trades[_SYMBOL] == {"close": 100.0, "side": 1.0}
+
+
+def test_nonzero_rung_emits_partial_exit_for_existing_exposure() -> None:
+    events = _Queue()
+    strategy = _make(events)
+    strategy._overlay.weights[_SYMBOL] = 1.0
+    strategy._overlay.exposure_scales[_SYMBOL] = 1.0
+    strategy._last_event_time = _stamp(1)
+
+    strategy._emit_scale_exits(0.5)
+
+    assert events.items[0].signal_type == "EXIT"
+    assert events.items[0].metadata["exit_fraction"] == pytest.approx(0.5)
+    assert strategy._overlay.exposure_scales[_SYMBOL] == pytest.approx(0.5)
+
+
+def test_kill_exit_completion_waits_for_an_accepted_exit_and_retries() -> None:
+    class _FailOnceQueue(_Queue):
+        def __init__(self) -> None:
+            super().__init__()
+            self.fail = True
+
+        def put(self, item: Any) -> None:
+            if self.fail:
+                self.fail = False
+                raise RuntimeError("queue unavailable")
+            super().put(item)
+
+    events = _FailOnceQueue()
+    strategy = _make(events)
+    strategy._overlay.killed = True
+    strategy._overlay.weights[_SYMBOL] = 1.0
+
+    with pytest.raises(RuntimeError, match="queue unavailable"):
+        strategy._emit_kill_exits()
+    assert strategy._overlay.kill_exits_sent is False
+    assert strategy._overlay.kill_exit_symbols == set()
+
+    strategy._emit_kill_exits()
+    assert strategy._overlay.kill_exits_sent is True
+    assert strategy._overlay.kill_exit_symbols == {_SYMBOL}
+    assert len(events.items) == 1
 
 
 def test_decision_cadence_and_contract_are_inherited_from_the_child() -> None:

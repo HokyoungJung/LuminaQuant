@@ -177,7 +177,7 @@ class MaScoreVolTargetRotationStrategy(Strategy):
         self._state = {symbol: _State(closes=deque(maxlen=size)) for symbol in self.symbol_list}
         self._last_eval_time_key = ""
         self._pending_time_key = ""
-        self._pending_time: Any = None
+        self._pending_closes: dict[str, float] = {}
         self._pending_count = 0
         self._tick = 0
 
@@ -187,6 +187,7 @@ class MaScoreVolTargetRotationStrategy(Strategy):
         return {
             "last_eval_time_key": self._last_eval_time_key,
             "pending_time_key": self._pending_time_key,
+            "pending_closes": dict(self._pending_closes),
             "pending_count": int(self._pending_count),
             "tick": int(self._tick),
             "symbol_state": {
@@ -204,12 +205,17 @@ class MaScoreVolTargetRotationStrategy(Strategy):
             return
         self._last_eval_time_key = str(state.get("last_eval_time_key", ""))
         self._pending_time_key = str(state.get("pending_time_key", ""))
-        self._pending_count = _safe_non_negative_int(state.get("pending_count"))
+        raw_pending = state.get("pending_closes")
+        self._pending_closes = {}
+        if isinstance(raw_pending, dict) and self._pending_time_key:
+            for symbol, value in raw_pending.items():
+                if symbol not in self._state:
+                    continue
+                close = safe_float(value)
+                if close is not None and close > 0.0:
+                    self._pending_closes[symbol] = close
+        self._pending_count = len(self._pending_closes)
         self._tick = _safe_non_negative_int(state.get("tick"))
-        # ``_pending_time`` is a raw event timestamp and is deliberately NOT
-        # persisted (it is not reliably JSON-able); a restored session simply
-        # re-learns it from the next print.
-        self._pending_time = None
         raw = state.get("symbol_state")
         if not isinstance(raw, dict):
             return
@@ -228,51 +234,37 @@ class MaScoreVolTargetRotationStrategy(Strategy):
 
     # ------------------------------------------------------------- ingestion
 
-    def _update_symbol(self, symbol: str, snapshot: _Snapshot, key: str) -> bool:
-        """Append one close under the DECISION key (same key the quorum counts).
-
-        Per-symbol dedupe and the bar-completion quorum must agree on what "one
-        bar" is: a window event stamps every symbol with the window's own time,
-        not the last 1s row's time, so they can never drift apart.
-        """
+    def _stage_symbol(self, symbol: str, snapshot: _Snapshot, key: str) -> bool:
+        """Stage a close until the complete timestamped cross-section arrives."""
         close = safe_float(snapshot.close)
-        if close is None or close <= 0.0:
+        if not key or close is None or close <= 0.0:
             return False
-        item = self._state[symbol]
-        if key and key == item.last_time_key:
+        if key == self._last_eval_time_key:
             return False
-        item.last_time_key = key
-        item.closes.append(close)
-        return True
-
-    def _quorum(self) -> int:
-        """Symbols that have ever printed -- the bar is complete once all report.
-
-        Warming symbols with no history do not block the first evaluations, and
-        the count grows as the book fills in.
-        """
-        return max(1, sum(1 for item in self._state.values() if item.closes))
-
-    def _note_update(self, key: str, event_time: Any) -> None:
-        """Advance the per-bar quorum and evaluate once the bar is complete."""
-        if key and key != self._pending_time_key:
-            # A strictly newer bar arrived while the previous one never reached
-            # quorum (a symbol stalled or was delisted).  Evaluate the stale bar
-            # now so one missing print cannot freeze the book forever.
-            if self._pending_time_key and self._pending_time_key != self._last_eval_time_key:
-                self._last_eval_time_key = self._pending_time_key
-                self._tick += 1
-                self._evaluate(self._pending_time)
+        if key != self._pending_time_key:
+            # Never append a partial bar.  A missing symbol makes that
+            # timestamp unusable; discarding it avoids feature endpoints that
+            # differ by symbol and lets the following common bar proceed.
             self._pending_time_key = key
-            self._pending_count = 0
-        self._pending_time = event_time
-        self._pending_count += 1
-        if not key or key == self._last_eval_time_key:
-            return
-        if self._pending_count >= self._quorum():
-            self._last_eval_time_key = key
-            self._tick += 1
-            self._evaluate(event_time)
+            self._pending_closes = {}
+        self._pending_closes[symbol] = close
+        self._pending_count = len(self._pending_closes)
+        if self._pending_count != len(self._state):
+            return True
+
+        # Commit in configured order so both the stored history and emitted
+        # signal order are independent of the incoming symbol order.
+        for current_symbol in self.symbol_list:
+            item = self._state[current_symbol]
+            item.last_time_key = key
+            item.closes.append(self._pending_closes[current_symbol])
+        self._last_eval_time_key = key
+        self._pending_time_key = ""
+        self._pending_closes = {}
+        self._pending_count = 0
+        self._tick += 1
+        self._evaluate(key)
+        return True
 
     def calculate_signals_window(self, event: Any, aggregator: Any = None) -> None:
         _ = aggregator
@@ -282,8 +274,7 @@ class MaScoreVolTargetRotationStrategy(Strategy):
             if snapshot is None:
                 continue
             key = time_key(event_time) or time_key(snapshot.time)
-            if self._update_symbol(symbol, snapshot, key):
-                self._note_update(key, event_time)
+            self._stage_symbol(symbol, snapshot, key)
 
     def calculate_signals(self, event: Any) -> None:
         event_type = str(getattr(event, "type", "")).upper()
@@ -299,8 +290,7 @@ class MaScoreVolTargetRotationStrategy(Strategy):
         if snapshot is None:
             return
         key = time_key(snapshot.time)
-        if self._update_symbol(symbol, snapshot, key):
-            self._note_update(key, snapshot.time)
+        self._stage_symbol(symbol, snapshot, key)
 
     # ------------------------------------------------------------- rebalance
 

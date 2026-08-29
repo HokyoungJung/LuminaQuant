@@ -53,7 +53,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from lumina_quant.core.plugin_registry import register
-from lumina_quant.indicators.common import safe_float, time_key
+from lumina_quant.indicators.common import safe_float
 from lumina_quant.indicators.stat_arb import pca_residual_sscores
 from lumina_quant.strategies.external_alpha_sleeves import (
     _EPS,
@@ -67,6 +67,7 @@ from lumina_quant.strategies.external_alpha_sleeves import (
 )
 from lumina_quant.strategy import Strategy
 from lumina_quant.tuning import HyperParam, resolve_params_from_schema
+from lumina_quant.utils.timeutil import utc_epoch_ms
 
 _STRATEGY_ID = "pca_residual_stat_arb"
 _STRATEGY_NAME = "PcaResidualStatArbStrategy"
@@ -78,11 +79,13 @@ class _State:
     """Per-symbol rolling closes plus the open-position bookkeeping."""
 
     closes: deque[float]
-    last_time_key: str = ""
+    close_times_ms: deque[int]
+    last_time_ms: int | None = None
     side: str = "OUT"
     bars_held: int = 0
     entry_s: float | None = None
     none_streak: int = 0
+    cooldown_until_eval: int = -1
 
     def flatten(self) -> None:
         self.side = "OUT"
@@ -183,19 +186,45 @@ class PcaResidualStatArbStrategy(Strategy):
         self.max_position_allocation = max(0.0, float(resolved["max_position_allocation"]))
         self.max_order_value = max(0.0, float(resolved["max_order_value"]))
         size = self.lookback_bars + 2
-        self._state = {symbol: _State(closes=deque(maxlen=size)) for symbol in self.symbol_list}
+        self._state = {
+            symbol: _State(
+                closes=deque(maxlen=size),
+                close_times_ms=deque(maxlen=size),
+            )
+            for symbol in self.symbol_list
+        }
         self._eval_count = 0
-        self._last_eval_time_key = ""
+        self._last_eval_time_ms: int | None = None
+        self._pending_time_ms: int | None = None
+        self._pending_symbols: set[str] = set()
+        self._diagnostics = {
+            "incomplete_panel": 0,
+            "model_empty": 0,
+            "model_width_mismatch": 0,
+            "out_of_order_or_duplicate": 0,
+            "window_timestamp_mismatch": 0,
+        }
 
     # ------------------------------------------------------------------ state
 
     def get_state(self) -> dict[str, Any]:
         return {
             "eval_count": int(self._eval_count),
-            "last_eval_time_key": self._last_eval_time_key,
+            "last_eval_time_ms": self._last_eval_time_ms,
             "closes": {symbol: list(item.closes) for symbol, item in self._state.items()},
-            "last_time_keys": {symbol: item.last_time_key for symbol, item in self._state.items()},
+            "close_times_ms": {
+                symbol: list(item.close_times_ms) for symbol, item in self._state.items()
+            },
+            "last_times_ms": {symbol: item.last_time_ms for symbol, item in self._state.items()},
             "none_streaks": {symbol: int(item.none_streak) for symbol, item in self._state.items()},
+            "cooldown_until_eval": {
+                symbol: int(item.cooldown_until_eval)
+                for symbol, item in self._state.items()
+                if item.cooldown_until_eval >= 0
+            },
+            "pending_time_ms": self._pending_time_ms,
+            "pending_symbols": sorted(self._pending_symbols),
+            "diagnostics": dict(self._diagnostics),
             "positions": {
                 symbol: {
                     "side": item.side,
@@ -211,29 +240,54 @@ class PcaResidualStatArbStrategy(Strategy):
         if not isinstance(state, dict):
             return
         self._eval_count = _safe_non_negative_int(state.get("eval_count"))
-        self._last_eval_time_key = str(state.get("last_eval_time_key", ""))
+        try:
+            last_eval = state.get("last_eval_time_ms")
+            self._last_eval_time_ms = None if last_eval is None else max(0, int(last_eval))
+        except TypeError, ValueError:
+            self._last_eval_time_ms = None
         closes = state.get("closes")
+        close_times = state.get("close_times_ms")
         if isinstance(closes, dict):
             for symbol, values in closes.items():
                 item = self._state.get(symbol)
                 if item is None:
                     continue
                 item.closes.clear()
-                for value in list(values or [])[-int(item.closes.maxlen or 0) :]:
+                item.close_times_ms.clear()
+                raw_values = list(values or [])[-int(item.closes.maxlen or 0) :]
+                raw_times = (
+                    list(close_times.get(symbol) or [])[-int(item.close_times_ms.maxlen or 0) :]
+                    if isinstance(close_times, dict)
+                    else []
+                )
+                if len(raw_values) != len(raw_times):
+                    continue
+                for raw_time, value in zip(raw_times, raw_values, strict=True):
                     parsed = safe_float(value)
-                    if parsed is not None and parsed > 0.0:
-                        item.closes.append(parsed)
-        keys = state.get("last_time_keys")
-        if isinstance(keys, dict):
-            for symbol, value in keys.items():
-                item = self._state.get(symbol)
-                if item is not None:
-                    item.last_time_key = str(value)
+                    try:
+                        parsed_time = int(raw_time)
+                    except TypeError, ValueError:
+                        item.closes.clear()
+                        item.close_times_ms.clear()
+                        break
+                    if (
+                        parsed is None
+                        or parsed <= 0.0
+                        or parsed_time < 0
+                        or (item.close_times_ms and parsed_time <= item.close_times_ms[-1])
+                    ):
+                        item.closes.clear()
+                        item.close_times_ms.clear()
+                        break
+                    item.closes.append(parsed)
+                    item.close_times_ms.append(parsed_time)
+                item.last_time_ms = item.close_times_ms[-1] if item.close_times_ms else None
         for item in self._state.values():
             item.side = "OUT"
             item.bars_held = 0
             item.entry_s = None
             item.none_streak = 0
+            item.cooldown_until_eval = -1
         positions = state.get("positions")
         if isinstance(positions, dict):
             for symbol, payload in positions.items():
@@ -252,39 +306,77 @@ class PcaResidualStatArbStrategy(Strategy):
                 item = self._state.get(symbol)
                 if item is not None:
                     item.none_streak = _safe_non_negative_int(value)
+        cooldowns = state.get("cooldown_until_eval")
+        if isinstance(cooldowns, dict):
+            for symbol, value in cooldowns.items():
+                item = self._state.get(symbol)
+                if item is not None:
+                    try:
+                        item.cooldown_until_eval = max(-1, int(value))
+                    except TypeError, ValueError:
+                        item.cooldown_until_eval = -1
+        try:
+            pending = state.get("pending_time_ms")
+            self._pending_time_ms = None if pending is None else max(0, int(pending))
+        except TypeError, ValueError:
+            self._pending_time_ms = None
+        raw_pending_symbols = state.get("pending_symbols")
+        self._pending_symbols = (
+            {str(symbol) for symbol in raw_pending_symbols if str(symbol) in self._state}
+            if isinstance(raw_pending_symbols, list)
+            else set()
+        )
+        if self._pending_time_ms is None:
+            self._pending_symbols.clear()
+        diagnostics = state.get("diagnostics")
+        if isinstance(diagnostics, dict):
+            for key in self._diagnostics:
+                self._diagnostics[key] = _safe_non_negative_int(diagnostics.get(key))
 
     # ------------------------------------------------------------- ingestion
 
-    def _update_symbol(self, symbol: str, snapshot: _Snapshot) -> bool:
+    def _update_symbol(self, symbol: str, snapshot: _Snapshot) -> int | None:
         item = self._state.get(symbol)
         if item is None:
-            return False
+            return None
         close = safe_float(snapshot.close)
         if close is None or close <= 0.0:
-            return False
-        key = time_key(snapshot.time)
-        if key and key == item.last_time_key:
-            return False
-        item.last_time_key = key
+            return None
+        try:
+            timestamp_ms = utc_epoch_ms(snapshot.time)
+        except TypeError, ValueError:
+            return None
+        if type(timestamp_ms) is not int or timestamp_ms < 0:
+            return None
+        if item.last_time_ms is not None and timestamp_ms <= item.last_time_ms:
+            self._diagnostics["out_of_order_or_duplicate"] += 1
+            return None
+        item.last_time_ms = timestamp_ms
+        item.close_times_ms.append(timestamp_ms)
         item.closes.append(float(close))
-        return True
+        return timestamp_ms
 
     def calculate_signals_window(self, event: Any, aggregator: Any = None) -> None:
         _ = aggregator
-        updated = False
-        last_key = ""
+        updated_times: list[int] = []
         for symbol in _event_symbols(event, self.symbol_list):
             snapshot = _window_snapshot(event, symbol)
-            if snapshot is not None and self._update_symbol(symbol, snapshot):
-                updated = True
-                last_key = time_key(snapshot.time) or last_key
-        if not updated:
+            if snapshot is not None:
+                timestamp_ms = self._update_symbol(symbol, snapshot)
+                if timestamp_ms is not None:
+                    updated_times.append(timestamp_ms)
+        if not updated_times:
             return
-        event_key = time_key(getattr(event, "time", None)) or last_key
-        if event_key and event_key == self._last_eval_time_key:
+        if len(set(updated_times)) != 1:
+            self._diagnostics["window_timestamp_mismatch"] += 1
             return
-        self._last_eval_time_key = event_key
-        self._evaluate(getattr(event, "time", None))
+        event_time_ms = updated_times[0]
+        if event_time_ms == self._last_eval_time_ms:
+            return
+        self._last_eval_time_ms = event_time_ms
+        self._pending_time_ms = None
+        self._pending_symbols.clear()
+        self._evaluate(getattr(event, "time", None), event_time_ms)
 
     def calculate_signals(self, event: Any) -> None:
         event_type = str(getattr(event, "type", "")).upper()
@@ -297,61 +389,105 @@ class PcaResidualStatArbStrategy(Strategy):
         if symbol not in self._state:
             return
         snapshot = _market_snapshot(event)
-        if snapshot is None or not self._update_symbol(symbol, snapshot):
+        if snapshot is None:
             return
-        key = time_key(snapshot.time)
-        if key and key == self._last_eval_time_key:
+        timestamp_ms = self._update_symbol(symbol, snapshot)
+        if timestamp_ms is None:
             return
-        self._last_eval_time_key = key
-        self._evaluate(snapshot.time)
+        if self._pending_time_ms != timestamp_ms:
+            self._pending_time_ms = timestamp_ms
+            self._pending_symbols.clear()
+        self._pending_symbols.add(symbol)
+        if self._pending_symbols != set(self.symbol_list):
+            return
+        if timestamp_ms == self._last_eval_time_ms:
+            return
+        self._last_eval_time_ms = timestamp_ms
+        self._pending_time_ms = None
+        self._pending_symbols.clear()
+        self._evaluate(snapshot.time, timestamp_ms)
 
     # ---------------------------------------------------------------- model
 
-    def _panel(self) -> tuple[list[str], list[list[float]]]:
+    def _panel(self, expected_time_ms: int) -> tuple[list[str], list[list[float]]]:
         """Aligned ``lookback_bars x N`` log-return panel over eligible names.
 
         A name is eligible once it carries ``lookback_bars + 1`` closes; the row
         ends at the latest COMPLETED bar close, which is exactly the close this
         rebalance trades against.
 
-        ponytail: eligibility is by history length, not by a shared bar key. Under
-        the declared ``market_window`` contract every symbol in the event is
-        ingested before the evaluation runs, so the columns are bar-aligned. On
-        the legacy per-symbol MARKET path a name that has not yet printed the
-        current bar contributes a one-bar-STALE column (staleness, never
-        lookahead); we accept that rather than carry a per-bar key ledger.
+        Every selected column contains the same exact timestamp keys and ends at
+        ``expected_time_ms``. Sparse names are deterministically removed until a
+        complete panel exists; no stale column is admitted.
         """
         needed = self.lookback_bars + 1
-        symbols: list[str] = []
-        columns: list[list[float]] = []
+        minimum = max(self.min_symbols, self.n_factors + 2)
+        observations: dict[str, dict[int, float]] = {}
         for symbol in self.symbol_list:
             item = self._state.get(symbol)
-            if item is None or len(item.closes) < needed:
+            if (
+                item is None
+                or len(item.closes) < needed
+                or len(item.close_times_ms) != len(item.closes)
+                or item.last_time_ms != expected_time_ms
+            ):
                 continue
-            returns = _log_returns(list(item.closes)[-needed:])
-            if returns is None or len(returns) != self.lookback_bars:
-                continue
-            symbols.append(symbol)
-            columns.append(returns)
-        if len(symbols) < max(self.min_symbols, self.n_factors + 2):
-            return [], []
-        rows = [[column[t] for column in columns] for t in range(self.lookback_bars)]
-        return symbols, rows
+            observations[symbol] = dict(zip(item.close_times_ms, item.closes, strict=True))
+        active = sorted(observations)
+        # ponytail: this deterministic O(n²) sparse-panel reducer is adequate for
+        # the bounded research universe; replace with a timestamp incidence index
+        # if the universe grows into the thousands.
+        while len(active) >= minimum:
+            common = set(observations[active[0]])
+            for symbol in active[1:]:
+                common.intersection_update(observations[symbol])
+            ordered = [
+                timestamp
+                for timestamp in self._state[active[0]].close_times_ms
+                if timestamp in common
+            ]
+            if len(ordered) >= needed and ordered[-1] == expected_time_ms:
+                selected_times = ordered[-needed:]
+                columns = [
+                    [observations[symbol][timestamp] for timestamp in selected_times]
+                    for symbol in active
+                ]
+                return active, [
+                    [math.log(column[index] / column[index - 1]) for column in columns]
+                    for index in range(1, needed)
+                ]
+            if len(active) == minimum:
+                break
+            removal = max(
+                active,
+                key=lambda candidate: (
+                    len(
+                        set.intersection(
+                            *(set(observations[symbol]) for symbol in active if symbol != candidate)
+                        )
+                    ),
+                    candidate,
+                ),
+            )
+            active.remove(removal)
+        self._diagnostics["incomplete_panel"] += 1
+        return [], []
 
-    def _scores(self) -> tuple[dict[str, float | None], int]:
-        symbols, rows = self._panel()
+    def _scores(self, expected_time_ms: int) -> tuple[dict[str, float | None], int]:
+        symbols, rows = self._panel(expected_time_ms)
         if not symbols:
             return {}, 0
-        try:
-            values = pca_residual_sscores(
-                rows,
-                n_factors=self.n_factors,
-                max_half_life_bars=self.max_half_life_bars or None,
-                min_rows=self.min_rows,
-            )
-        except Exception:
+        values = pca_residual_sscores(
+            rows,
+            n_factors=self.n_factors,
+            max_half_life_bars=self.max_half_life_bars or None,
+            min_rows=self.min_rows,
+        )
+        if not values:
+            self._diagnostics["model_empty"] += 1
             return {}, 0
         if len(values) != len(symbols):
+            self._diagnostics["model_width_mismatch"] += 1
             return {}, 0
         return dict(zip(symbols, values, strict=True)), len(symbols)
 
@@ -384,42 +520,63 @@ class PcaResidualStatArbStrategy(Strategy):
             return "max_hold"
         return ""
 
-    def _evaluate(self, event_time: Any) -> None:
-        try:
-            self._eval_count += 1
-            # Age every open name once per BAR (not once per model run) so
-            # ``max_hold_bars`` keeps its plain meaning under a coarse
-            # ``rebalance_bars``.  ponytail: with rebalance_bars > 1 the age-out
-            # can only be ACTED on at the next model run, so a position may
-            # overstay by up to rebalance_bars - 1 bars.
-            for item in self._state.values():
-                if item.side in _SIDES:
-                    item.bars_held += 1
-            if self._eval_count % self.rebalance_bars != 0:
-                return
-            scores, panel_size = self._scores()
-            # Run the exit ladder even when the panel could not be built at all
-            # (universe shrank, history gaps): every held name then scores as
-            # unestimable, so ``none_tolerance_evals`` and ``max_hold_bars`` can
-            # still flatten the book instead of stranding it.
-            self._close_positions(scores, panel_size, event_time)
-            if not scores:
-                return
-            self._open_positions(scores, panel_size, event_time)
-        except Exception:
+    def _evaluate(self, event_time: Any, event_time_ms: int) -> None:
+        self._eval_count += 1
+        # Age every open name once per BAR (not once per model run) so
+        # ``max_hold_bars`` keeps its plain meaning under a coarse
+        # ``rebalance_bars``.  ponytail: with rebalance_bars > 1 the age-out
+        # can only be ACTED on at the next model run, so a position may
+        # overstay by up to rebalance_bars - 1 bars.
+        for item in self._state.values():
+            if item.side in _SIDES:
+                item.bars_held += 1
+        if self._eval_count % self.rebalance_bars != 0:
             return
+        scores, panel_size = self._scores(event_time_ms)
+        # Run the exit ladder even when the panel could not be built at all
+        # (universe shrank, history gaps): every held name then scores as
+        # unestimable, so ``none_tolerance_evals`` and ``max_hold_bars`` can
+        # still flatten the book instead of stranding it.
+        closed = self._close_positions(scores, panel_size, event_time)
+        if not scores:
+            return
+        self._open_positions(scores, panel_size, event_time, excluded=closed)
 
     def _close_positions(
         self, scores: dict[str, float | None], panel_size: int, event_time: Any
-    ) -> None:
+    ) -> set[str]:
+        planned: dict[str, str] = {}
         for symbol, item in self._state.items():
             if item.side not in _SIDES:
                 continue
             score = scores.get(symbol)
             item.none_streak = item.none_streak + 1 if score is None else 0
             reason = self._exit_reason(item, score)
-            if not reason:
+            if reason:
+                planned[symbol] = reason
+        if self.require_balanced:
+            remaining_longs = sorted(
+                symbol
+                for symbol, item in self._state.items()
+                if item.side == "LONG" and symbol not in planned
+            )
+            remaining_shorts = sorted(
+                symbol
+                for symbol, item in self._state.items()
+                if item.side == "SHORT" and symbol not in planned
+            )
+            if len(remaining_longs) > len(remaining_shorts):
+                for symbol in remaining_longs[len(remaining_shorts) :]:
+                    planned[symbol] = "balance_reduction"
+            elif len(remaining_shorts) > len(remaining_longs):
+                for symbol in remaining_shorts[len(remaining_longs) :]:
+                    planned[symbol] = "balance_reduction"
+        for symbol in self.symbol_list:
+            reason = planned.get(symbol)
+            if reason is None:
                 continue
+            item = self._state[symbol]
+            score = scores.get(symbol)
             # ponytail: EXIT is whole-position by portfolio contract (there are no
             # partial exits), so the ladder scales OUT in one step.
             _emit(
@@ -440,9 +597,17 @@ class PcaResidualStatArbStrategy(Strategy):
                 },
             )
             item.flatten()
+            if reason in {"s_stop", "max_hold"}:
+                item.cooldown_until_eval = self._eval_count + 1
+        return set(planned)
 
     def _open_positions(
-        self, scores: dict[str, float | None], panel_size: int, event_time: Any
+        self,
+        scores: dict[str, float | None],
+        panel_size: int,
+        event_time: Any,
+        *,
+        excluded: set[str],
     ) -> None:
         held_long = sum(1 for item in self._state.values() if item.side == "LONG")
         held_short = sum(1 for item in self._state.values() if item.side == "SHORT")
@@ -451,7 +616,10 @@ class PcaResidualStatArbStrategy(Strategy):
         candidates = [
             (symbol, float(score))
             for symbol, score in scores.items()
-            if score is not None and self._state[symbol].side == "OUT"
+            if score is not None
+            and symbol not in excluded
+            and self._state[symbol].side == "OUT"
+            and self._state[symbol].cooldown_until_eval < self._eval_count
         ]
         # Most negative first for longs, most positive first for shorts; the
         # symbol is the deterministic tiebreak.

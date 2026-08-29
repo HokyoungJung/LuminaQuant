@@ -55,16 +55,14 @@ HYSTERESIS: de-risking applies on the bar it is detected; re-risking (a scale
 INCREASE) waits ``rerisk_min_bars`` bars after the last de-risk so the book does
 not flip-flop around a rung boundary.
 
-SIZING-MODE CAVEAT (shared with the incumbent overlays): the scale multiplies
-the child's ``target_allocation`` / ``max_order_value`` / ``strength`` only.  The
-child's protective ``stop_loss`` / ``take_profit`` are forwarded UNTOUCHED (a
-de-risk wrapper must never strip protection).  Under the default
-``target_allocation_mode=legacy_notional_cap`` the portfolio sizes
-``qty = equity * risk_per_trade / |price - stop|`` and uses the (scaled)
-allocation only as a notional CAP, so with a wide child stop an intermediate
-rung may leave the entry size unchanged (dollar risk-at-stop is governed by
-``risk_per_trade``); ``notional_fraction`` / ``isolated_margin_fraction`` modes
-scale fully.  Kill (scale 0) always drops entries regardless of mode.
+SIZING: the scale multiplies the child's ``target_allocation`` /
+``max_order_value`` / ``strength`` for new signals.  When a nonzero rung
+tightens, the overlay also emits an ``EXIT`` with ``exit_fraction`` for every
+previously forwarded active symbol, reducing its existing target by the same
+ratio; the per-symbol applied scales are durable overlay state.  The child's
+protective ``stop_loss`` / ``take_profit`` are forwarded UNTOUCHED (a de-risk
+wrapper must never strip protection).  Kill (scale 0) always drops entries and
+emits full exits regardless of portfolio sizing mode.
 
 KILL STATE (``overlay_scale == 0``): the overlay emits one EXIT per symbol that
 carries a nonzero child target (once per kill episode) and then SUPPRESSES the
@@ -141,8 +139,9 @@ def parse_drawdown_ladder(ladder: Any) -> tuple[tuple[float, float], ...]:
 
     Accepts either the ``"0.05:0.75,0.10:0.50"`` string form or an already
     parsed sequence of ``(depth, scale)`` pairs.  Malformed entries, negative
-    depths and non-finite values are dropped rather than raised on; an empty or
-    unparseable spec yields no rungs (the ladder is then inert).
+    depths and non-finite values are dropped rather than raised on.  Remaining
+    rungs must be strictly ascending in depth and non-increasing in scale; an
+    empty or invalid spec yields no rungs (the ladder is then inert).
     """
     rungs: list[tuple[float, float]] = []
     if ladder is None:
@@ -171,7 +170,9 @@ def parse_drawdown_ladder(ladder: Any) -> tuple[tuple[float, float], ...]:
         if depth is None or scale is None or depth < 0.0:
             continue
         rungs.append((float(depth), float(max(0.0, min(1.0, scale)))))
-    rungs.sort(key=lambda rung: rung[0])
+    for previous, current in zip(rungs, rungs[1:], strict=False):
+        if current[0] <= previous[0] or current[1] > previous[1]:
+            return ()
     return tuple(rungs)
 
 
@@ -411,6 +412,8 @@ class _OverlayState:
     killed: bool = False
     kill_source: str = ""
     kill_exits_sent: bool = False
+    kill_exit_symbols: set[str] = field(default_factory=set)
+    exposure_scales: dict[str, float] = field(default_factory=dict)
     effective_scale: float = 1.0
     bars_since_derisk: int = 0
     last_time_key: str = ""
@@ -510,6 +513,8 @@ class EquityCurveKillSwitchOverlayStrategy(Strategy):
             self.preferred_contract = child_contract
         # Fallback allocation when a child signal carries no explicit target.
         self._child_default_alloc = safe_float(getattr(self._child, "target_allocation", None))
+        if self._child_default_alloc is not None and self._child_default_alloc < 0.0:
+            raise ValueError("child target_allocation must be a finite nonnegative number")
 
         self._overlay = _OverlayState(
             equity_curve=deque(maxlen=max(self.equity_ma_window, _MIN_EQUITY_HISTORY)),
@@ -545,6 +550,8 @@ class EquityCurveKillSwitchOverlayStrategy(Strategy):
                 "killed": bool(overlay.killed),
                 "kill_source": str(overlay.kill_source),
                 "kill_exits_sent": bool(overlay.kill_exits_sent),
+                "kill_exit_symbols": sorted(overlay.kill_exit_symbols),
+                "exposure_scales": {k: float(v) for k, v in overlay.exposure_scales.items()},
                 "effective_scale": float(overlay.effective_scale),
                 "bars_since_derisk": int(overlay.bars_since_derisk),
                 "last_time_key": str(overlay.last_time_key),
@@ -584,6 +591,16 @@ class EquityCurveKillSwitchOverlayStrategy(Strategy):
         overlay.killed = bool(raw.get("killed"))
         overlay.kill_source = str(raw.get("kill_source") or "")
         overlay.kill_exits_sent = bool(raw.get("kill_exits_sent"))
+        raw_kill_exits = raw.get("kill_exit_symbols")
+        overlay.kill_exit_symbols = (
+            {str(symbol) for symbol in raw_kill_exits}
+            if isinstance(raw_kill_exits, (list, tuple, set))
+            else set()
+        )
+        overlay.exposure_scales = {
+            symbol: min(1.0, max(0.0, scale))
+            for symbol, scale in _restore_float_map(raw.get("exposure_scales")).items()
+        }
         restored_scale = safe_float(raw.get("effective_scale"))
         overlay.effective_scale = 1.0 if restored_scale is None else float(restored_scale)
         overlay.bars_since_derisk = max(0, int(safe_float(raw.get("bars_since_derisk")) or 0))
@@ -630,6 +647,8 @@ class EquityCurveKillSwitchOverlayStrategy(Strategy):
                 if weight != 0.0:
                     proxy_return += weight * (close / prev - 1.0)
             overlay.last_close[symbol] = float(close)
+            if abs(overlay.weights.get(symbol, 0.0)) <= _EPS:
+                self._close_trade(symbol, float(close))
         if not saw_bar:
             return
 
@@ -655,6 +674,7 @@ class EquityCurveKillSwitchOverlayStrategy(Strategy):
             overlay.killed = False
             overlay.kill_source = ""
             overlay.kill_exits_sent = False
+            overlay.kill_exit_symbols.clear()
 
     def _advance_scale(self) -> None:
         """Recompute the raw scale, apply the kill latch, then the hysteresis."""
@@ -685,6 +705,7 @@ class EquityCurveKillSwitchOverlayStrategy(Strategy):
                 "month" if month_scale is not None and month_scale <= _EPS else "ladder"
             )
             overlay.kill_exits_sent = False
+            overlay.kill_exit_symbols.clear()
         elif overlay.killed and overlay.kill_source == "ladder":
             # A month roll clears a month kill (see ``_advance_month``); a ladder
             # kill clears only once the proxy drawdown has actually healed.
@@ -692,6 +713,7 @@ class EquityCurveKillSwitchOverlayStrategy(Strategy):
                 overlay.killed = False
                 overlay.kill_source = ""
                 overlay.kill_exits_sent = False
+                overlay.kill_exit_symbols.clear()
         if overlay.killed:
             raw_scale = 0.0
             reasons = [r for r in (diagnostics.get("reasons") or []) if r != "none"]
@@ -700,13 +722,18 @@ class EquityCurveKillSwitchOverlayStrategy(Strategy):
             diagnostics["reason"] = ",".join(reasons)
 
         # Hysteresis: de-risk immediately, re-risk only after a quiet period.
-        if raw_scale < overlay.effective_scale - _EPS:
+        if _EPS < raw_scale < overlay.effective_scale - _EPS:
+            self._emit_scale_exits(float(raw_scale))
+            overlay.effective_scale = float(raw_scale)
+            overlay.bars_since_derisk = 0
+        elif raw_scale < overlay.effective_scale - _EPS:
             overlay.effective_scale = float(raw_scale)
             overlay.bars_since_derisk = 0
         elif raw_scale > overlay.effective_scale + _EPS:
             if overlay.bars_since_derisk >= self.rerisk_min_bars:
                 overlay.effective_scale = float(raw_scale)
         diagnostics["effective_scale"] = float(overlay.effective_scale)
+        diagnostics["existing_exposure_scales"] = dict(overlay.exposure_scales)
 
     # ------------------------------------------------------------- kill exits
 
@@ -715,9 +742,10 @@ class EquityCurveKillSwitchOverlayStrategy(Strategy):
         overlay = self._overlay
         if not overlay.killed or overlay.kill_exits_sent:
             return
-        overlay.kill_exits_sent = True
         for symbol in sorted(overlay.weights):
             if abs(overlay.weights.get(symbol, 0.0)) <= _EPS:
+                continue
+            if symbol in overlay.kill_exit_symbols:
                 continue
             self.events.put(
                 SignalEvent(
@@ -736,6 +764,40 @@ class EquityCurveKillSwitchOverlayStrategy(Strategy):
                     },
                 )
             )
+            overlay.kill_exit_symbols.add(symbol)
+        overlay.kill_exits_sent = all(
+            abs(weight) <= _EPS or symbol in overlay.kill_exit_symbols
+            for symbol, weight in overlay.weights.items()
+        )
+
+    def _emit_scale_exits(self, target_scale: float) -> None:
+        """Reduce already-forwarded exposure when a nonzero rung tightens."""
+        overlay = self._overlay
+        for symbol, weight in sorted(overlay.weights.items()):
+            if abs(weight) <= _EPS:
+                continue
+            current_scale = overlay.exposure_scales.get(symbol, overlay.effective_scale)
+            reduced_scale = min(current_scale, target_scale)
+            if reduced_scale >= current_scale - _EPS:
+                continue
+            self.events.put(
+                SignalEvent(
+                    strategy_id=f"{_STRATEGY_ID}::{self.child_strategy_class}",
+                    symbol=str(symbol),
+                    datetime=self._last_event_time,
+                    signal_type="EXIT",
+                    strength=1.0,
+                    metadata={
+                        "strategy": _STRATEGY_ID,
+                        "exit_fraction": float(1.0 - reduced_scale / current_scale),
+                        "overlay_scale": float(reduced_scale),
+                        "overlay_reason": str(self._last_diagnostics.get("reason") or "de_risk"),
+                        "proxy_drawdown": self._diagnostic_drawdown(),
+                        "child_strategy_class": self.child_strategy_class,
+                    },
+                )
+            )
+            overlay.exposure_scales[symbol] = float(reduced_scale)
 
     # ------------------------------------------------------------- forwarding
 
@@ -744,8 +806,10 @@ class EquityCurveKillSwitchOverlayStrategy(Strategy):
         return float(parsed) if parsed is not None else 0.0
 
     def _child_alloc(self, metadata: dict[str, Any]) -> float | None:
-        alloc = safe_float(metadata.get("target_allocation"))
-        if alloc is not None:
+        if "target_allocation" in metadata:
+            alloc = safe_float(metadata["target_allocation"])
+            if alloc is None or alloc < 0.0:
+                raise ValueError("child target_allocation must be a finite nonnegative number")
             return float(alloc)
         return self._child_default_alloc
 
@@ -780,9 +844,10 @@ class EquityCurveKillSwitchOverlayStrategy(Strategy):
 
     def _close_trade(self, symbol: str, close: float | None) -> None:
         """Settle a shadow trade and advance/reset the consecutive-loss streak."""
-        trade = self._overlay.open_trades.pop(symbol, None)
+        trade = self._overlay.open_trades.get(symbol)
         if trade is None or close is None or close <= 0.0:
             return
+        self._overlay.open_trades.pop(symbol, None)
         entry = float(trade.get("close", 0.0))
         side = float(trade.get("side", 0.0))
         if entry <= 0.0 or side == 0.0:
@@ -799,11 +864,21 @@ class EquityCurveKillSwitchOverlayStrategy(Strategy):
         signal_type = str(getattr(signal, "signal_type", "")).upper()
         metadata = dict(signal.metadata or {})
         alloc = self._child_alloc(metadata)
+        if signal_type != "EXIT":
+            for field_name in ("max_order_value",):
+                if field_name in metadata:
+                    value = safe_float(metadata[field_name])
+                    if value is None or value < 0.0:
+                        raise ValueError(f"child {field_name} must be a finite nonnegative number")
+            strength = safe_float(getattr(signal, "strength", 1.0))
+            if strength is None or strength < 0.0:
+                raise ValueError("child strength must be a finite nonnegative number")
         self._record_intent(signal, signal_type, alloc)
 
         if signal_type == "EXIT":
             # De-risking must never be blocked, rescaled or suppressed.
             self.events.put(self._rebuild_signal(signal, metadata, strength_scale=1.0))
+            self._overlay.exposure_scales.pop(str(signal.symbol), None)
             return
         if overlay_scale <= _EPS:
             # Kill state: the child's entries are dropped, not merely shrunk.
@@ -819,18 +894,26 @@ class EquityCurveKillSwitchOverlayStrategy(Strategy):
         metadata["overlay_reason"] = str(self._last_diagnostics.get("reason") or "none")
         metadata["proxy_drawdown"] = self._diagnostic_drawdown()
         metadata["child_strategy_class"] = self.child_strategy_class
-        self.events.put(self._rebuild_signal(signal, metadata, strength_scale=overlay_scale))
+        strength_scale = 0.0 if alloc == 0.0 else overlay_scale
+        self.events.put(self._rebuild_signal(signal, metadata, strength_scale=strength_scale))
+        if alloc is not None and alloc > 0.0:
+            symbol = str(signal.symbol)
+            self._overlay.exposure_scales[symbol] = max(
+                self._overlay.exposure_scales.get(symbol, 0.0), float(overlay_scale)
+            )
 
     def _rebuild_signal(
         self, signal: SignalEvent, metadata: dict[str, Any], *, strength_scale: float
     ) -> SignalEvent:
-        base_strength = float(getattr(signal, "strength", 1.0) or 1.0)
+        base_strength = safe_float(getattr(signal, "strength", 1.0))
+        if base_strength is None:
+            raise ValueError("child strength must be finite")
         return SignalEvent(
             strategy_id=f"{_STRATEGY_ID}::{self.child_strategy_class}",
             symbol=str(signal.symbol),
             datetime=signal.datetime,
             signal_type=str(signal.signal_type),
-            strength=base_strength * float(strength_scale),
+            strength=float(base_strength) * float(strength_scale),
             price=getattr(signal, "price", None),
             # The child's protective levels are part of its de-risking; the
             # overlay must forward them untouched (dropping them would REMOVE
@@ -856,17 +939,15 @@ class EquityCurveKillSwitchOverlayStrategy(Strategy):
         can include de-risking EXITs.  Dropping the whole queue would be the
         wrong failure direction for a de-risk-only overlay: a child crash must
         never be able to STRAND an open position.  Entries are still discarded
-        -- a half-computed child is not trusted to open risk.  Never raises.
+        -- a half-computed child is not trusted to open risk.  Forwarding
+        failures remain visible to the research runner.
         """
         for item in self._child_queue.drain():
             if not isinstance(item, SignalEvent):
                 continue
             if str(getattr(item, "signal_type", "")).upper() != "EXIT":
                 continue
-            try:
-                self._forward_child_signal(item, 0.0)
-            except Exception:
-                continue
+            self._forward_child_signal(item, 0.0)
 
     # ------------------------------------------------------------ dispatchers
 
@@ -880,10 +961,10 @@ class EquityCurveKillSwitchOverlayStrategy(Strategy):
         try:
             overlay_scale = self._pre(event)
             self._child.calculate_signals(event)
-            self._drain(overlay_scale)
         except Exception:
-            # The overlay must never raise from calculate_signals.
             self._drain_exits_only()
+            raise
+        self._drain(overlay_scale)
 
     def calculate_signals_window(self, event: Any, aggregator: Any = None) -> None:
         try:
@@ -893,9 +974,10 @@ class EquityCurveKillSwitchOverlayStrategy(Strategy):
                 handler(event, aggregator)
             else:
                 self._child.calculate_signals(event)
-            self._drain(overlay_scale)
         except Exception:
             self._drain_exits_only()
+            raise
+        self._drain(overlay_scale)
 
     def calculate_signals_context(self, context: Any) -> None:
         try:
@@ -910,9 +992,10 @@ class EquityCurveKillSwitchOverlayStrategy(Strategy):
                     window(event, getattr(context, "aggregator", None))
                 else:
                     self._child.calculate_signals(event)
-            self._drain(overlay_scale)
         except Exception:
             self._drain_exits_only()
+            raise
+        self._drain(overlay_scale)
 
 
 def _restore_float_map(raw: Any) -> dict[str, float]:

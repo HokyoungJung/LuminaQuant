@@ -19,6 +19,15 @@ def _lineage(*, manifest: str, universe: str, as_of: str) -> dict:
         },
         "universe": {"receipt_sha256": universe, "receipt": {"as_of": as_of}},
         "runtime_config": {"effective_sha256": "f" * 64},
+        "behavioral_identity": {
+            "exchange": "binance",
+            "warmup_bars": 400,
+            "determinism": {"random_number_generation": "none"},
+            "source_commit": "a" * 40,
+            "cost_profile": {"path": "/cost-profile.yaml", "sha256": "b" * 64},
+            "runtime_config_sha256": "f" * 64,
+            "data_inventory": {"root": "/data", "files": [], "sha256": "d" * 64},
+        },
     }
 
 

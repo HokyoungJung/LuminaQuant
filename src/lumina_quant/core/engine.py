@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC
-from datetime import UTC, datetime
+from inspect import Signature, signature
 from typing import Any
 
 from lumina_quant.core.events import MarketBatchEvent, MarketEvent
@@ -9,64 +9,35 @@ from lumina_quant.core.strategy_input import StrategyInputContext
 from lumina_quant.data.feature_points import FEATURE_COLUMNS
 from lumina_quant.event_clock import EventSequencer, assign_event_identity
 from lumina_quant.message_bus import MessageBus
+from lumina_quant.utils.timeutil import utc_epoch_ms
 
 
 def _event_time_to_ms(value: Any) -> int | None:
-    """Coerce a bar/event time to epoch milliseconds.
-
-    Naive ``datetime`` values are UTC (the data handlers emit naive UTC bar
-    times -- see ``HistoricCSVDataHandler._bar_time_ms`` and
-    ``_warmup_time_to_ms``).  Interpreting them in the host's local timezone
-    would shift every timeframe-alignment check by the UTC offset: on a KST
-    host a naive 00:00 daily bar landed at 15:00 UTC, so the legacy
-    ``TimeframeGatedStrategy`` ``event_ms % 86_400_000 == 0`` test dropped
-    EVERY 1d/4h bar and those strategies silently never traded.
-    """
-    if value is None:
-        return None
-    if isinstance(value, (int, float)):
-        numeric = int(float(value))
-        if abs(numeric) < 100_000_000_000:
-            return numeric * 1000
-        return numeric
-    if isinstance(value, datetime):
-        dt = value if value.tzinfo is not None else value.replace(tzinfo=UTC)
-        return int(dt.astimezone(UTC).timestamp() * 1000)
-    ts_fn = getattr(value, "timestamp", None)
-    if callable(ts_fn):
-        try:
-            ts_value = ts_fn()
-            if isinstance(ts_value, (int, float)):
-                return int(float(ts_value) * 1000)
-        except Exception:
-            return None
-    return None
+    """Coerce event time with the shared strict UTC conversion contract."""
+    return utc_epoch_ms(value)
 
 
 def _warmup_time_to_ms(value: Any) -> int | None:
-    """Bar-time coercion for warmup-boundary checks.
+    """Coerce warmup time with the shared strict UTC conversion contract."""
+    return utc_epoch_ms(value)
 
-    Mirrors ``HistoricCSVDataHandler._bar_time_ms``: naive datetimes are UTC
-    (``_event_time_to_ms`` now follows the same convention; this helper is kept
-    for the ISO-string path used by window watermarks).
+
+def _accepts_positional_call(function: Any, *args: Any) -> bool:
+    """Whether a callable can receive these positional arguments.
+
+    Signature inspection distinguishes an argument mismatch from a TypeError
+    raised inside strategy code. Uninspectable callables are invoked normally
+    so their contract failures remain visible.
     """
-    if value is None:
-        return None
-    if isinstance(value, (int, float)):
-        numeric = int(float(value))
-        if abs(numeric) < 100_000_000_000:
-            return numeric * 1000
-        return numeric
-    if isinstance(value, datetime):
-        dt = value if value.tzinfo is not None else value.replace(tzinfo=UTC)
-        return int(dt.astimezone(UTC).timestamp() * 1000)
     try:
-        dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=UTC)
-        return int(dt.astimezone(UTC).timestamp() * 1000)
-    except Exception:
-        return None
+        contract: Signature = signature(function)
+    except TypeError, ValueError:
+        return True
+    try:
+        contract.bind(*args)
+    except TypeError:
+        return False
+    return True
 
 
 class TradingEngine(ABC):
@@ -183,10 +154,7 @@ class TradingEngine(ABC):
         should_process = True
         strategy_guard = getattr(self.strategy, "should_process_market_event", None)
         if callable(strategy_guard):
-            try:
-                should_process = bool(strategy_guard(event))
-            except Exception:
-                should_process = True
+            should_process = bool(strategy_guard(event))
         if should_process:
             self._assert_strategy_requirements(
                 available_inputs={
@@ -221,10 +189,7 @@ class TradingEngine(ABC):
             self.market_events += 1
             should_process = True
             if callable(strategy_guard):
-                try:
-                    should_process = bool(strategy_guard(market_event))
-                except Exception:
-                    should_process = True
+                should_process = bool(strategy_guard(market_event))
             if should_process:
                 self._assert_strategy_requirements(
                     available_inputs={
@@ -328,15 +293,12 @@ class TradingEngine(ABC):
     def _ensure_timeframe_aggregator(self):
         if self.timeframe_aggregator is not None:
             return self.timeframe_aggregator
-        try:
-            from lumina_quant.timeframe_aggregator import TimeframeAggregator
+        from lumina_quant.timeframe_aggregator import TimeframeAggregator
 
-            self.timeframe_aggregator = TimeframeAggregator(
-                timeframes=self._resolve_required_timeframes(),
-                lookbacks=self._resolve_required_lookbacks(),
-            )
-        except Exception:
-            self.timeframe_aggregator = None
+        self.timeframe_aggregator = TimeframeAggregator(
+            timeframes=self._resolve_required_timeframes(),
+            lookbacks=self._resolve_required_lookbacks(),
+        )
         return self.timeframe_aggregator
 
     @staticmethod
@@ -448,21 +410,18 @@ class TradingEngine(ABC):
                         "market_data_source": getattr(self, "market_data_source", None),
                     },
                 )
-                try:
+                if _accepts_positional_call(context_fn, context):
                     context_fn(context)
-                except TypeError:
-                    if callable(window_fn):
-                        try:
-                            window_fn(event, aggregator)
-                        except TypeError:
-                            self.strategy.calculate_signals(event)
-                    else:
-                        self.strategy.calculate_signals(event)
-            elif callable(window_fn):
-                try:
+                elif callable(window_fn) and _accepts_positional_call(window_fn, event, aggregator):
                     window_fn(event, aggregator)
-                except TypeError:
+                elif callable(window_fn) and _accepts_positional_call(window_fn, event):
+                    window_fn(event)
+                else:
                     self.strategy.calculate_signals(event)
+            elif callable(window_fn) and _accepts_positional_call(window_fn, event, aggregator):
+                window_fn(event, aggregator)
+            elif callable(window_fn) and _accepts_positional_call(window_fn, event):
+                window_fn(event)
             else:
                 self.strategy.calculate_signals(event)
 

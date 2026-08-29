@@ -186,7 +186,9 @@ class TrendGatedIbsReversionStrategy(Strategy):
             return
 
         if (
-            ibs is None
+            self.target_allocation <= 0.0
+            or self.max_order_value <= 0.0
+            or ibs is None
             or ibs > self.entry_ibs
             or lagged_sma is None
             or close <= lagged_sma
@@ -209,7 +211,7 @@ class TrendGatedIbsReversionStrategy(Strategy):
             symbol=symbol,
             event_time=snapshot.time,
             signal_type="LONG",
-            strength=self.target_allocation or 1.0,
+            strength=self.target_allocation,
             price=close,
             stop_loss=stop_loss,
             metadata=metadata,

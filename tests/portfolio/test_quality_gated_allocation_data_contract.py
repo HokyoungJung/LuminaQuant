@@ -365,3 +365,57 @@ def test_materialized_children_require_unique_ready_source_artifacts(
         sleeve["source_artifact_id"] = "source"
     with pytest.raises(ValueError, match=r"source artifact|source_artifacts"):
         qga.build_allocation_manifest(sleeves, source_artifacts=sources)
+
+
+@pytest.mark.parametrize(
+    "artifact",
+    [
+        {"sha256": "a" * 63},
+        {"sha256": "g" * 64},
+        {"max_age_hours": 0},
+        {"max_age_hours": float("nan")},
+    ],
+)
+def test_materialized_sources_require_sealed_artifacts(artifact: dict[str, Any]) -> None:
+    sleeves = _sleeves()
+    for sleeve in sleeves.values():
+        sleeve["source_artifact_id"] = "source"
+    with pytest.raises(ValueError, match="sha256|max_age"):
+        qga.build_allocation_manifest(sleeves, source_artifacts=[{**_sources()[0], **artifact}])
+
+
+def test_manifest_rejects_invalid_economics_and_requires_resolved_children() -> None:
+    sleeves = _sleeves()
+    for sleeve in sleeves.values():
+        sleeve["source_artifact_id"] = "source"
+    with pytest.raises(ValueError, match="turnover"):
+        qga.build_allocation_manifest(
+            {**sleeves, "a": {**sleeves["a"], "turnover": float("nan")}},
+            source_artifacts=_sources(),
+        )
+    with pytest.raises(ValueError, match="gross_cap"):
+        qga.build_allocation_manifest(sleeves, source_artifacts=_sources(), gross_cap=0.0)
+    with pytest.raises(ValueError, match="strategy_class"):
+        qga.build_allocation_manifest(
+            {**sleeves, "a": {**sleeves["a"], "strategy_class": ""}},
+            source_artifacts=_sources(),
+        )
+    manifest = qga.build_allocation_manifest(sleeves, source_artifacts=_sources(), gross_cap=0.6)
+    assert all(child["weight"] <= 0.6 for child in manifest["children"])
+
+
+def test_allocator_empty_result_preserves_cash(monkeypatch: pytest.MonkeyPatch) -> None:
+    class _FailingAllocator:
+        def allocate(self, *args: Any, **kwargs: Any) -> dict[str, float]:
+            return {}
+
+    monkeypatch.setattr(qga, "_build_allocator", lambda *args, **kwargs: _FailingAllocator())
+    sleeves = _sleeves()
+    assert (
+        qga.allocate_quality_gated(
+            {sid: spec["returns"] for sid, spec in sleeves.items()},
+            {sid: spec["turnover"] for sid, spec in sleeves.items()},
+            returns_are_net={sid: True for sid in sleeves},
+        )
+        == {}
+    )

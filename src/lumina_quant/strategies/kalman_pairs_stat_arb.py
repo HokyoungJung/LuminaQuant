@@ -11,16 +11,17 @@ endorsement or performance claim.  Public-source lineage:
   and the z-score of the Engle-Granger residual that today's posterior implies
   over the trailing window.  The residual z is the default here; the innovation
   z stays available as ``signal_mode="innovation"``.
-* The cointegration / mean-reversion-half-life discipline of the classic pairs
+* The residual-ADF / mean-reversion-half-life discipline of the classic pairs
   and statistical-arbitrage curriculum published by the Korean quant educator
   "amateur quant" (Cho Sung-hyun), within the scope of that public research
-  writing: only trade a pair while an ADF test still rejects a unit root in the
-  spread, and bound the holding period by the estimated OU/AR(1) half-life.
+  writing: only trade a pair while a preregistered residual-ADF heuristic
+  rejects a unit root in the spread, and bound the holding period by the
+  estimated OU/AR(1) half-life.
 
 Hypothesis: for a genuinely cointegrated pair the Kalman posterior is a
 self-updating hedge that needs no fixed beta lookback, so fading large
-deviations of the residual it implies -- while an ADF gate on that same
-residual confirms the spread is still stationary -- and closing on reversion or
+deviations of the residual it implies -- while an uncalibrated residual-ADF
+heuristic on that same residual rejects a unit root -- and closing on reversion or
 on a half-life clock harvests the spread's mean reversion with fewer stale-beta
 artefacts than a rolling-window hedge.
 
@@ -41,8 +42,8 @@ and ``pair_spread_zscore`` estimate the hedge with rolling OLS or a scalar RLS
 and z-score the *spread level*.  This sleeve carries the full 2-state Kalman
 posterior from ``lumina_quant.indicators.stat_arb`` (slope AND intercept, with
 explicit process noise ``delta`` and observation noise ``obs_noise``), z-scores
-the Engle-Granger residual that posterior implies (with the filter-normalised
-innovation z kept as an option), gates new entries on an ADF cointegration test
+and z-scores the Engle-Granger residual that posterior implies (with the filter-normalised
+innovation z kept as an option), gates new entries on an uncalibrated residual-ADF heuristic
 of that residual, and caps the hold with its OU half-life.
 
 Public source vs. author's choices:
@@ -53,7 +54,8 @@ Public source vs. author's choices:
 * AUTHOR's choices (arbitrary, unvalidated, never fitted to data here): every
   numeric default -- ``kalman_delta=1e-4``, ``kalman_obs_noise=1e-5``,
   ``entry_z=2.0``, ``exit_z=0.5``, ``stop_z=4.0``, ``min_updates=60``,
-  ``adf_window=90`` at the 5% critical value, ``half_life_multiple=2.0``,
+  ``adf_window=90`` with the preregistered generic ADF threshold,
+  ``half_life_multiple=2.0``,
   ``max_hold_bars=120``, the ``leg_allocation`` / ``max_leg_allocation`` sizing
   and the 1-hour decision cadence.
 
@@ -137,7 +139,14 @@ class KalmanPairsStatArbStrategy(Strategy):
             "z_window": HyperParam.integer("z_window", default=60, low=5, high=5000),
             "min_updates": HyperParam.integer("min_updates", default=60, low=2, high=100000),
             "min_beta": HyperParam.floating("min_beta", default=0.0, low=0.0, high=10.0),
-            "require_cointegration": HyperParam.boolean("require_cointegration", default=True),
+            "require_cointegration": HyperParam.boolean(
+                "require_cointegration",
+                default=True,
+                description=(
+                    "Apply the preregistered, uncalibrated residual-ADF heuristic. "
+                    "This is not a calibrated 5% Engle-Granger test."
+                ),
+            ),
             "adf_window": HyperParam.integer("adf_window", default=90, low=12, high=5000),
             "entry_z": HyperParam.floating("entry_z", default=2.0, low=0.1, high=20.0),
             "exit_z": HyperParam.floating("exit_z", default=0.5, low=0.0, high=10.0),
@@ -200,68 +209,102 @@ class KalmanPairsStatArbStrategy(Strategy):
         history = max(self.z_window, self.adf_window) + 2
         self._log_ys: deque[float] = deque(maxlen=history)
         self._log_xs: deque[float] = deque(maxlen=history)
+        self._paired_history: deque[tuple[str, float, float]] = deque(maxlen=history)
         self._mode = _FLAT
         self._bars_held = 0
         self._last_pair_key = ""
         self._pending_y: tuple[str, float] | None = None
         self._pending_x: tuple[str, float] | None = None
+        self._unmatched_leg_drops = 0
+        self._emission_failures = 0
 
     # ------------------------------------------------------------------ state
 
     def get_state(self) -> dict[str, Any]:
         return {
             "kalman": self._kalman.to_dict() if self._kalman is not None else None,
-            "log_ys": [float(value) for value in self._log_ys],
-            "log_xs": [float(value) for value in self._log_xs],
+            "paired_history": [
+                [stamp, float(log_y), float(log_x)] for stamp, log_y, log_x in self._paired_history
+            ],
             "mode": self._mode,
             "bars_held": int(self._bars_held),
             "last_pair_key": str(self._last_pair_key),
             "pending_y": list(self._pending_y) if self._pending_y is not None else None,
             "pending_x": list(self._pending_x) if self._pending_x is not None else None,
+            "unmatched_leg_drops": int(self._unmatched_leg_drops),
+            "emission_failures": int(self._emission_failures),
         }
 
     def set_state(self, state: dict[str, Any]) -> None:
         if not isinstance(state, dict):
             return
-        if "kalman" in state:
-            self._kalman = KalmanHedgeState.from_dict(state.get("kalman"))
-        raw_ys, raw_xs = state.get("log_ys"), state.get("log_xs")
-        if isinstance(raw_ys, list) and isinstance(raw_xs, list):
-            parsed_ys = [value for value in map(safe_float, raw_ys) if value is not None]
-            parsed_xs = [value for value in map(safe_float, raw_xs) if value is not None]
-            # The two legs only mean anything ALIGNED, so a truncated or partly
-            # unparseable payload restores the common tail instead of a skewed zip.
-            keep = min(len(parsed_ys), len(parsed_xs), int(self._log_ys.maxlen or 0))
-            self._log_ys.clear()
-            self._log_xs.clear()
-            if keep > 0:
-                self._log_ys.extend(parsed_ys[-keep:])
-                self._log_xs.extend(parsed_xs[-keep:])
-        mode = str(state.get("mode", _FLAT)).upper()
-        self._mode = mode if mode in _MODES else _FLAT
+        required = {
+            "kalman",
+            "paired_history",
+            "mode",
+            "bars_held",
+            "last_pair_key",
+            "pending_y",
+            "pending_x",
+            "unmatched_leg_drops",
+            "emission_failures",
+        }
+        if not required.issubset(state):
+            return
+        kalman_payload = state["kalman"]
+        kalman = None if kalman_payload is None else KalmanHedgeState.from_dict(kalman_payload)
+        if kalman_payload is not None and kalman is None:
+            return
+        if kalman is not None and not all(
+            math.isfinite(value)
+            for value in (kalman.beta, kalman.alpha, kalman.p00, kalman.p01, kalman.p11)
+        ):
+            return
+        paired_history = _parse_paired_history(state["paired_history"], self._paired_history.maxlen)
+        if paired_history is None:
+            return
+        mode = str(state["mode"]).upper()
+        if mode not in _MODES:
+            return
         try:
-            self._bars_held = max(0, int(state.get("bars_held", 0)))
+            bars_held = max(0, int(state["bars_held"]))
+            unmatched_leg_drops = max(0, int(state["unmatched_leg_drops"]))
+            emission_failures = max(0, int(state["emission_failures"]))
         except TypeError, ValueError:
-            self._bars_held = 0
-        self._last_pair_key = str(state.get("last_pair_key", ""))
-        self._pending_y = _parse_pending(state.get("pending_y"))
-        self._pending_x = _parse_pending(state.get("pending_x"))
+            return
+        pending_y = _parse_pending(state["pending_y"])
+        pending_x = _parse_pending(state["pending_x"])
+        if state["pending_y"] is not None and pending_y is None:
+            return
+        if state["pending_x"] is not None and pending_x is None:
+            return
+        if not isinstance(state["last_pair_key"], str):
+            return
+        last_pair_key = state["last_pair_key"]
+        if paired_history and last_pair_key != paired_history[-1][0]:
+            return
+
+        self._kalman = kalman
+        self._paired_history = deque(paired_history, maxlen=self._paired_history.maxlen)
+        self._log_ys = deque((item[1] for item in paired_history), maxlen=self._log_ys.maxlen)
+        self._log_xs = deque((item[2] for item in paired_history), maxlen=self._log_xs.maxlen)
+        self._mode = mode
+        self._bars_held = bars_held
+        self._last_pair_key = last_pair_key
+        self._pending_y = pending_y
+        self._pending_x = pending_x
+        self._unmatched_leg_drops = unmatched_leg_drops
+        self._emission_failures = emission_failures
 
     # ----------------------------------------------------------------- events
 
     def calculate_signals_window(self, event: Any, aggregator: Any = None) -> None:
         _ = aggregator
-        event_time = getattr(event, "time", None)
         for symbol in _event_symbols(event, self.symbol_list):
             snapshot = _window_snapshot(event, symbol)
             if snapshot is None:
                 continue
-            # The WINDOW's own timestamp is the pairing key: ``snapshot.time`` is the
-            # last 1s row per symbol, so a gap in one tape gives the two legs
-            # different keys and the pair would never step.
-            key = time_key(event_time) or time_key(snapshot.time)
-            stamp = snapshot.time if event_time is None else event_time
-            self._process(symbol, snapshot, key, stamp)
+            self._process(symbol, snapshot, time_key(snapshot.time), snapshot.time)
 
     def calculate_signals(self, event: Any) -> None:
         event_type = str(getattr(event, "type", "")).upper()
@@ -292,12 +335,19 @@ class KalmanPairsStatArbStrategy(Strategy):
         pending_y, pending_x = self._pending_y, self._pending_x
         if pending_y is None or pending_x is None:
             return
-        if pending_y[0] != pending_x[0] or pending_y[0] == self._last_pair_key:
+        if pending_y[0] != pending_x[0]:
+            self._unmatched_leg_drops += 1
+            if symbol == self.symbol_y:
+                self._pending_x = None
+            else:
+                self._pending_y = None
+            return
+        if pending_y[0] == self._last_pair_key:
             return
         self._last_pair_key = pending_y[0]
-        self._step(event_time, pending_y[1], pending_x[1])
+        self._step(event_time, pending_y[1], pending_x[1], pending_y[0])
 
-    def _step(self, event_time: Any, close_y: float, close_x: float) -> None:
+    def _step(self, event_time: Any, close_y: float, close_x: float, pair_key: str) -> None:
         log_y, log_x = math.log(close_y), math.log(close_x)
         state = kalman_hedge_ratio_step(
             self._kalman,
@@ -312,10 +362,10 @@ class KalmanPairsStatArbStrategy(Strategy):
         self._kalman = state
         self._log_ys.append(log_y)
         self._log_xs.append(log_x)
+        self._paired_history.append((pair_key, log_y, log_x))
         z = self._signal_z(state)
         if self._mode != _FLAT:
-            self._bars_held += 1
-            self._manage_open(event_time, close_y, close_x, state, z)
+            self._manage_open(event_time, close_y, close_x, state, z, self._bars_held + 1)
             return
         if z is not None:
             self._maybe_enter(event_time, close_y, close_x, state, z)
@@ -343,7 +393,7 @@ class KalmanPairsStatArbStrategy(Strategy):
         return state.innovation_z
 
     def _adf_pass(self) -> bool | None:
-        """``True``/``False`` when the ADF gate can be evaluated, else ``None``."""
+        """Evaluate the preregistered, uncalibrated residual-ADF heuristic."""
         if len(self._log_ys) < self.adf_window:
             return None
         statistic = adf_t_statistic(self._residuals(self.adf_window), lags=1)
@@ -382,11 +432,12 @@ class KalmanPairsStatArbStrategy(Strategy):
             mode, y_side, x_side = _SHORT_SPREAD, "SHORT", "LONG"
         else:
             mode, y_side, x_side = _LONG_SPREAD, "LONG", "SHORT"
-        for leg, symbol, side, price, allocation in (
+        emissions = (
             ("y", self.symbol_y, y_side, close_y, self.leg_allocation),
             ("x", self.symbol_x, x_side, close_x, x_allocation),
-        ):
-            _emit(
+        )
+        for leg, symbol, side, price, allocation in emissions:
+            emitted = self._emit_leg(
                 self.events,
                 strategy_id=_STRATEGY_ID,
                 symbol=symbol,
@@ -403,10 +454,13 @@ class KalmanPairsStatArbStrategy(Strategy):
                     z=float(z),
                     mode=mode,
                     signal_mode=self.signal_mode,
+                    cointegration_gate="uncalibrated_residual_adf_heuristic",
                     leg=leg,
                     pair=self.pair_id,
                 ),
             )
+            if not emitted:
+                return
         self._mode = mode
         self._bars_held = 0
 
@@ -417,6 +471,7 @@ class KalmanPairsStatArbStrategy(Strategy):
         close_x: float,
         state: KalmanHedgeState,
         z: float | None,
+        bars_held: int,
     ) -> None:
         reason = ""
         if z is not None:
@@ -431,11 +486,12 @@ class KalmanPairsStatArbStrategy(Strategy):
             reason = "coint_break"
         if not reason:
             cap = self._half_life_cap()
-            if cap is not None and self._bars_held >= cap:
+            if cap is not None and bars_held >= cap:
                 reason = "half_life_cap"
-            elif self._bars_held >= self.max_hold_bars:
+            elif bars_held >= self.max_hold_bars:
                 reason = "max_hold"
         if not reason:
+            self._bars_held = bars_held
             return
         # ponytail: EXIT closes the whole leg -- the portfolio has no partial exits,
         # so a scale-out at the half-life cap is collapsed into one full close.
@@ -443,7 +499,7 @@ class KalmanPairsStatArbStrategy(Strategy):
             ("y", self.symbol_y, close_y),
             ("x", self.symbol_x, close_x),
         ):
-            _emit(
+            emitted = self._emit_leg(
                 self.events,
                 strategy_id=_STRATEGY_ID,
                 symbol=symbol,
@@ -458,20 +514,55 @@ class KalmanPairsStatArbStrategy(Strategy):
                     "z": None if z is None else float(z),
                     "mode": self._mode,
                     "signal_mode": self.signal_mode,
+                    "cointegration_gate": "uncalibrated_residual_adf_heuristic",
                     "leg": leg,
                     "pair": self.pair_id,
-                    "bars_held": int(self._bars_held),
+                    "bars_held": int(bars_held),
                 },
             )
+            if not emitted:
+                return
         self._mode = _FLAT
         self._bars_held = 0
+
+    def _emit_leg(self, *args: Any, **kwargs: Any) -> bool:
+        """Queue one leg and record failures without committing pair state."""
+        try:
+            _emit(*args, **kwargs)
+        except Exception:
+            self._emission_failures += 1
+            return False
+        return True
 
 
 def _parse_pending(payload: Any) -> tuple[str, float] | None:
     if not isinstance(payload, (list, tuple)) or len(payload) != 2:
         return None
     close = safe_float(payload[1])
-    return None if close is None else (str(payload[0]), close)
+    key = payload[0]
+    return (
+        None
+        if close is None or close <= 0.0 or not isinstance(key, str) or not key
+        else (key, close)
+    )
+
+
+def _parse_paired_history(
+    payload: Any, maxlen: int | None
+) -> list[tuple[str, float, float]] | None:
+    if not isinstance(payload, list):
+        return None
+    parsed: list[tuple[str, float, float]] = []
+    for item in payload:
+        if not isinstance(item, (list, tuple)) or len(item) != 3:
+            return None
+        stamp = item[0]
+        log_y, log_x = safe_float(item[1]), safe_float(item[2])
+        if not isinstance(stamp, str) or not stamp or log_y is None or log_x is None:
+            return None
+        parsed.append((stamp, log_y, log_x))
+    keep = int(maxlen or 0)
+    return parsed[-keep:] if keep > 0 else []
 
 
 __all__ = ["KalmanPairsStatArbStrategy"]

@@ -11,6 +11,7 @@ these helpers instead.
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from math import isfinite
 from typing import Any
 
 
@@ -28,7 +29,9 @@ def utc_epoch_seconds(value: datetime) -> float:
 def utc_epoch_ms(value: Any) -> int | None:
     """Epoch milliseconds for a datetime / ISO string / epoch number (naive == UTC).
 
-    Numbers below ``1e11`` are treated as epoch seconds, otherwise milliseconds.
+    Numeric magnitudes below ``100_000_000_000`` are epoch seconds; larger
+    magnitudes are epoch milliseconds. Fractional epoch seconds retain their
+    millisecond component. Boolean and non-finite numeric inputs are rejected.
     Returns ``None`` for ``None`` or unparseable input.
     """
     if value is None:
@@ -36,8 +39,12 @@ def utc_epoch_ms(value: Any) -> int | None:
     if isinstance(value, bool):
         return None
     if isinstance(value, (int, float)):
-        numeric = int(float(value))
-        return numeric * 1000 if abs(numeric) < 100_000_000_000 else numeric
+        numeric = float(value)
+        if not isfinite(numeric):
+            return None
+        if abs(numeric) < 100_000_000_000:
+            return int(numeric * 1000)
+        return int(numeric)
     if isinstance(value, datetime):
         return int(utc_epoch_seconds(value) * 1000)
     text = str(value).strip()

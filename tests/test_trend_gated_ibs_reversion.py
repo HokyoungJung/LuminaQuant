@@ -66,3 +66,18 @@ def test_no_lookahead_entry_exit_state_and_registry() -> None:
         TrendGatedIbsReversionStrategy
     )
     assert get_strategy_tier("TrendGatedIbsReversionStrategy") == "research_only"
+
+
+@pytest.mark.parametrize("target_allocation", [0.0, -0.1])
+def test_nonpositive_target_allocation_never_enters(target_allocation: float) -> None:
+    events: SimpleQueue = SimpleQueue()
+    strategy = TrendGatedIbsReversionStrategy(
+        _Bars(), events, sma_window=2, target_allocation=target_allocation
+    )
+
+    strategy.calculate_signals(_bar(0, 100.0, 101.0, 99.0, 100.0))
+    strategy.calculate_signals(_bar(1, 103.0, 103.0, 101.0, 102.0))
+    strategy.calculate_signals(_bar(2, 103.0, 106.0, 102.0, 103.0))
+
+    assert events.empty()
+    assert strategy._state["BTC/USDT"].mode == "OUT"

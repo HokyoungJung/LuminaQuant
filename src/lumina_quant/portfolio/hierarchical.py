@@ -116,8 +116,8 @@ def _ensure_psd(cov: Any) -> np.ndarray:
         return matrix
     try:
         evals, evecs = np.linalg.eigh(matrix)
-    except np.linalg.LinAlgError:
-        return matrix
+    except np.linalg.LinAlgError as exc:
+        raise ValueError("covariance eigendecomposition failed; refusing to allocate") from exc
     scale = max(1.0, float(np.abs(evals).max()))
     lowest = float(evals.min())
     if lowest < -_PSD_REL_TOL * scale:
@@ -1028,12 +1028,14 @@ def graph_inverse_centrality_weights(cov: Any, *, floor: float = 1e-6) -> np.nda
     np.fill_diagonal(adjacency, 0.0)
     try:
         evals, evecs = np.linalg.eigh(adjacency)
-    except np.linalg.LinAlgError:
-        return _equal_weights(n)
+    except np.linalg.LinAlgError as exc:
+        raise ValueError(
+            "graph centrality eigendecomposition failed; refusing to allocate"
+        ) from exc
     perron = np.abs(evecs[:, int(np.argmax(evals))])
     total = float(perron.sum())
     if not np.isfinite(total) or total <= 0.0:
-        return _equal_weights(n)
+        raise ValueError("graph centrality eigendecomposition returned invalid eigenvector")
     z = np.maximum(perron / total, 1e-12)
     weights = 1.0 / z
     return weights / float(weights.sum())
@@ -1049,15 +1051,24 @@ def _prep(ids: list[str], returns_matrix: Any, cov_window: int | None, *, estima
     matrix = _clean_matrix(returns_matrix)
     if not ids or matrix.shape[1] != len(ids):
         return None, None
+    if cov_window is not None:
+        if (
+            isinstance(cov_window, bool)
+            or not isinstance(cov_window, (int, np.integer))
+            or cov_window < 2
+        ):
+            raise ValueError("cov_window must be an integer of at least 2")
+        matrix = matrix[-cov_window:]
+    if matrix.shape[0] < 2:
+        return None, None
     if estimator == "sample":
-        rows = matrix if cov_window is None else matrix[-int(cov_window) :]
-        if rows.shape[0] < 2:
-            return None, None
-        centered = rows - rows.mean(axis=0)
-        cov = (centered.T @ centered) / float(rows.shape[0])  # MLE / n divisor
+        centered = matrix - matrix.mean(axis=0)
+        cov = (centered.T @ centered) / float(matrix.shape[0])  # MLE / n divisor
+    elif estimator == "lw":
+        cov, _ = ledoit_wolf_shrunk_covariance(matrix)
     else:
-        cov, _ = ledoit_wolf_shrunk_covariance(matrix, window=cov_window)
-    if cov.shape != (len(ids), len(ids)):
+        raise ValueError("covariance estimator must be 'sample' or 'lw'")
+    if cov.shape != (len(ids), len(ids)) or not np.all(np.isfinite(cov)):
         return None, None
     return matrix, cov
 
@@ -1203,7 +1214,13 @@ class WassersteinDROPortfolio:
         raw = np.asarray(returns_matrix, dtype=float)
         if raw.ndim not in (1, 2) or not np.all(np.isfinite(raw)):
             raise ValueError("Wasserstein returns must contain only finite values")
-        estimator = "sample" if self.cov_estimator == "sample" else "lw"
+        estimator_tokens = {"sample": "sample", "lw": "lw", "ledoit_wolf": "lw"}
+        try:
+            estimator = estimator_tokens[self.cov_estimator]
+        except KeyError as exc:
+            raise ValueError(
+                "cov_estimator must be one of 'sample', 'lw', or 'ledoit_wolf'"
+            ) from exc
         matrix, cov = _prep(ids, returns_matrix, self.cov_window, estimator=estimator)
         if cov is None:
             return {}

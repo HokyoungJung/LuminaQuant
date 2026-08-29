@@ -16,7 +16,8 @@ from types import SimpleNamespace
 import pytest
 
 from lumina_quant.backtesting.backtest import TimeframeGatedStrategy
-from lumina_quant.core.engine import _event_time_to_ms, _warmup_time_to_ms
+from lumina_quant.core.engine import TradingEngine, _event_time_to_ms, _warmup_time_to_ms
+from lumina_quant.core.events import MarketWindowEvent
 from lumina_quant.event_clock import normalize_timestamp_ns
 
 
@@ -83,3 +84,47 @@ def test_event_identity_timestamp_is_host_timezone_independent(host_tz) -> None:
     assert normalize_timestamp_ns(naive) == 1_772_323_200_000_000_000
     assert normalize_timestamp_ns("2026-03-01T00:00:00") == normalize_timestamp_ns(aware)
     assert normalize_timestamp_ns("2026-03-01T00:00:00Z") == normalize_timestamp_ns(aware)
+
+
+def test_event_and_warmup_time_coercion_share_strict_utc_contract(host_tz) -> None:
+    expected = 1_772_323_200_123
+    values = (
+        datetime(2026, 3, 1, 0, 0, 0, 123_000),
+        "2026-03-01T00:00:00.123Z",
+        "2026-03-01T09:00:00.123+09:00",
+        1_772_323_200.123,
+        expected,
+    )
+    for value in values:
+        assert _event_time_to_ms(value) == expected
+        assert _warmup_time_to_ms(value) == expected
+
+    for value in (True, False, float("inf"), float("-inf"), float("nan")):
+        assert _event_time_to_ms(value) is None
+        assert _warmup_time_to_ms(value) is None
+
+
+def test_iso_cadence_is_timezone_independent_and_once_per_bucket(host_tz) -> None:
+    calls: list[object] = []
+    strategy = SimpleNamespace(
+        decision_cadence_seconds=60,
+        calculate_signals=calls.append,
+    )
+    engine = TradingEngine(
+        events=None,
+        data_handler=SimpleNamespace(_feature_lookup=None),
+        strategy=strategy,
+        portfolio=SimpleNamespace(update_timeindex=lambda event: None),
+        execution_handler=SimpleNamespace(),
+    )
+
+    for value in (
+        "2026-03-01T00:00:00Z",
+        "2026-03-01T09:00:30+09:00",
+        "2026-03-01T00:01:00Z",
+    ):
+        engine.handle_market_window_event(
+            MarketWindowEvent(time=value, window_seconds=60, bars_1s={})
+        )
+
+    assert len(calls) == 2

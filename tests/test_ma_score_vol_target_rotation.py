@@ -427,6 +427,126 @@ def test_window_and_market_paths_agree() -> None:
     assert _fingerprint(window_queue.items) == _fingerprint(market_queue.items)
 
 
+def test_market_symbol_order_does_not_change_the_cross_section() -> None:
+    """A complete timestamp commits in configured order, not arrival order."""
+    prices = _three_symbol_prices(30)
+    forward, forward_queue = _build(_SYMBOLS)
+    reverse, reverse_queue = _build(_SYMBOLS)
+
+    for index in range(30):
+        for strategy, symbols in ((forward, _SYMBOLS), (reverse, list(reversed(_SYMBOLS)))):
+            for symbol in symbols:
+                close = prices[symbol][index]
+                strategy.calculate_signals(
+                    MarketEvent(
+                        time=_stamp(index),
+                        symbol=symbol,
+                        open=close,
+                        high=close,
+                        low=close,
+                        close=close,
+                        volume=1000.0,
+                    )
+                )
+
+    assert _fingerprint(reverse_queue.items) == _fingerprint(forward_queue.items)
+    assert reverse.get_state() == forward.get_state()
+
+
+def test_missing_symbol_discards_the_incomplete_cross_section() -> None:
+    """A stalled symbol cannot leave the book with mismatched feature endpoints."""
+    strategy, queue = _build(["AAA", "CCC"], rebalance_bars=1, ma_score_windows="2", vol_window=2)
+    prices = {
+        "AAA": [100.0, 101.0, 102.0],
+        "CCC": [100.0, 102.0, 104.0],
+    }
+    for symbol in ("AAA", "CCC"):
+        close = prices[symbol][0]
+        strategy.calculate_signals(
+            MarketEvent(
+                time=_stamp(0),
+                symbol=symbol,
+                open=close,
+                high=close,
+                low=close,
+                close=close,
+                volume=1.0,
+            )
+        )
+    close = prices["AAA"][1]
+    strategy.calculate_signals(
+        MarketEvent(
+            time=_stamp(1),
+            symbol="AAA",
+            open=close,
+            high=close,
+            low=close,
+            close=close,
+            volume=1.0,
+        )
+    )
+    for symbol in ("CCC", "AAA"):
+        close = prices[symbol][2]
+        strategy.calculate_signals(
+            MarketEvent(
+                time=_stamp(2),
+                symbol=symbol,
+                open=close,
+                high=close,
+                low=close,
+                close=close,
+                volume=1.0,
+            )
+        )
+
+    assert strategy._tick == 2
+    assert list(strategy._state["AAA"].closes) == [100.0, 102.0]
+    assert list(strategy._state["CCC"].closes) == [100.0, 104.0]
+    assert queue.items == []
+
+
+def test_mid_quorum_restore_preserves_the_pending_cross_section() -> None:
+    """A checkpoint between symbol prints completes the same timestamp after restart."""
+    prices = {
+        "AAA": _path(100.0, [(_UP_FAST, 22)]),
+        "CCC": _path(100.0, [(_UP_LOUD, 22)]),
+    }
+    source, source_queue = _build(["AAA", "CCC"], rebalance_bars=1)
+    _feed_market(source, prices, stop=22)
+    source_queue.items.clear()
+
+    close = prices["AAA"][22]
+    source.calculate_signals(
+        MarketEvent(
+            time=_stamp(22),
+            symbol="AAA",
+            open=close,
+            high=close,
+            low=close,
+            close=close,
+            volume=1.0,
+        )
+    )
+    restored, restored_queue = _build(["AAA", "CCC"], rebalance_bars=1)
+    restored.set_state(json.loads(json.dumps(source.get_state())))
+
+    close = prices["CCC"][22]
+    event = MarketEvent(
+        time=_stamp(22),
+        symbol="CCC",
+        open=close,
+        high=close,
+        low=close,
+        close=close,
+        volume=1.0,
+    )
+    source.calculate_signals(event)
+    restored.calculate_signals(event)
+
+    assert _fingerprint(restored_queue.items) == _fingerprint(source_queue.items)
+    assert restored.get_state() == source.get_state()
+
+
 def test_state_round_trip_preserves_behaviour() -> None:
     prices = {
         "AAA": _path(100.0, [(_UP_FAST, 29), (_DOWN_HARD, 30)]),

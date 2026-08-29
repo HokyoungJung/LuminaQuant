@@ -468,3 +468,109 @@ def test_set_state_ignores_garbage() -> None:
     series = _closes()
     _feed(strategy, series, 0, FIRST_EVAL_BAR)
     assert "ZZZ" in _signals(queue, "LONG")
+
+
+def test_sparse_window_uses_only_one_exact_common_timestamp_panel() -> None:
+    series = _closes()
+    strategy, _queue = _build()
+    _feed(strategy, series, 0, FIRST_EVAL_BAR - 1)
+    partial = SYMBOLS[:-1]
+    strategy.calculate_signals(
+        _window(
+            FIRST_EVAL_BAR,
+            {symbol: series[symbol][FIRST_EVAL_BAR] for symbol in partial},
+        )
+    )
+    symbols, rows = strategy._panel(FIRST_EVAL_BAR * 1000)
+    assert symbols == sorted(partial)
+    assert "ZZZ" not in symbols
+    assert len(rows) == LOOKBACK
+    assert all(len(row) == len(partial) for row in rows)
+
+
+def test_panel_and_signals_are_symbol_order_invariant() -> None:
+    series = _closes()
+    forward, forward_queue = _build(SYMBOLS)
+    reverse_symbols = list(reversed(SYMBOLS))
+    reverse, reverse_queue = _build(reverse_symbols)
+    reverse_series = {symbol: series[symbol] for symbol in reverse_symbols}
+    _feed(forward, series, 0, FIRST_EVAL_BAR)
+    _feed(reverse, reverse_series, 0, FIRST_EVAL_BAR)
+
+    def fingerprint(queue: _Queue) -> list[tuple[str, str, float]]:
+        return sorted(
+            (signal.symbol, signal.signal_type, signal.metadata["s_score"])
+            for signal in queue.items
+        )
+
+    assert fingerprint(reverse_queue) == fingerprint(forward_queue)
+
+
+def test_unexpected_model_failure_is_visible(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    series = _closes()
+    strategy, _queue = _build()
+
+    def broken_model(*_args: Any, **_kwargs: Any):
+        raise RuntimeError("model defect")
+
+    monkeypatch.setattr(
+        "lumina_quant.strategies.pca_residual_stat_arb.pca_residual_sscores",
+        broken_model,
+    )
+    with pytest.raises(RuntimeError, match="model defect"):
+        _feed(strategy, series, 0, FIRST_EVAL_BAR)
+
+
+def test_risk_exit_cannot_reopen_same_bar_and_cooldown_survives_restore() -> None:
+    strategy, queue = _build(s_stop=1.0)
+    _with_installed_position(strategy, "AAA", "LONG")
+    strategy._state["AAA"].closes.append(100.0)
+    strategy._state["AAA"].close_times_ms.append(1)
+    strategy._scores = lambda _time: ({"AAA": 2.0}, len(SYMBOLS))  # type: ignore[method-assign]
+    strategy._evaluate(1, 1)
+    assert [(item.signal_type, item.symbol) for item in queue.items] == [("EXIT", "AAA")]
+    assert strategy._state["AAA"].side == "OUT"
+
+    snapshot = strategy.get_state()
+    restored, restored_queue = _build(s_stop=1.0)
+    restored.set_state(snapshot)
+    restored._scores = lambda _time: ({"AAA": 2.0}, len(SYMBOLS))  # type: ignore[method-assign]
+    restored._evaluate(2, 2)
+    assert restored_queue.items == []
+    restored._evaluate(3, 3)
+    assert [(item.signal_type, item.symbol) for item in restored_queue.items] == [("SHORT", "AAA")]
+
+
+def test_required_balance_reduces_total_held_book_after_one_sided_exit() -> None:
+    strategy, queue = _build(require_balanced=True, s_stop=1.0)
+    for symbol, side in (("AAA", "LONG"), ("BBB", "LONG"), ("CCC", "SHORT"), ("DDD", "SHORT")):
+        strategy._state[symbol].side = side
+        strategy._state[symbol].closes.append(100.0)
+        strategy._state[symbol].close_times_ms.append(1)
+    strategy._scores = lambda _time: (  # type: ignore[method-assign]
+        {"AAA": -2.0, "BBB": -0.8, "CCC": 0.8, "DDD": 0.8},
+        len(SYMBOLS),
+    )
+    strategy._evaluate(1, 1)
+    exits = _signals(queue, "EXIT")
+    assert exits["AAA"].metadata["reason"] == "s_stop"
+    assert any(item.metadata["reason"] == "balance_reduction" for item in exits.values())
+    assert sum(item.side == "LONG" for item in strategy._state.values()) == 1
+    assert sum(item.side == "SHORT" for item in strategy._state.values()) == 1
+
+
+def test_queue_failure_propagates_without_advancing_position_state() -> None:
+    class FailingQueue:
+        def put(self, _item: Any) -> None:
+            raise RuntimeError("queue unavailable")
+
+    strategy = PcaResidualStatArbStrategy(_Bars(SYMBOLS), FailingQueue(), s_stop=1.0)
+    strategy._state["AAA"].side = "LONG"
+    strategy._state["AAA"].closes.append(100.0)
+    strategy._state["AAA"].close_times_ms.append(1)
+    strategy._scores = lambda _time: ({"AAA": 2.0}, len(SYMBOLS))  # type: ignore[method-assign]
+    with pytest.raises(RuntimeError, match="queue unavailable"):
+        strategy._evaluate(1, 1)
+    assert strategy._state["AAA"].side == "LONG"

@@ -51,6 +51,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from itertools import pairwise
+import re
 from typing import Any
 
 import numpy as np
@@ -88,10 +89,58 @@ _SELECTION_INPUTS = ("train", "validation")
 # path; mirrors ``optimizers_extra.HRPPortfolio``'s default so the shrunk-linkage
 # variant differs from the OFF path ONLY by the Ledoit-Wolf correlation shrinkage.
 _HRP_CORR_THRESHOLD = 0.60
+_SHA256_RE = re.compile(r"[0-9a-fA-F]{64}\Z")
 
 
 def _round(value: Any, ndigits: int = 10) -> float:
     return round(float(value), ndigits)
+
+
+def _finite_nonnegative(value: Any, *, name: str) -> float:
+    if isinstance(value, bool):
+        raise ValueError(f"{name} must be finite and nonnegative")
+    try:
+        result = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{name} must be finite and nonnegative") from exc
+    if not np.isfinite(result) or result < 0.0:
+        raise ValueError(f"{name} must be finite and nonnegative")
+    return result
+
+
+def _validate_economic_inputs(
+    *, regime: Any, participation: Any, periods_per_year: Any, turnover_penalty_lambda: Any
+) -> tuple[float, int, float]:
+    if not isinstance(regime, CostRegime):
+        raise ValueError("regime must be a CostRegime")
+    for field in (
+        "taker_fee_rate",
+        "spread_rate",
+        "slippage_rate",
+        "slippage_impact_coefficient",
+    ):
+        _finite_nonnegative(getattr(regime, field), name=f"regime.{field}")
+    funding = getattr(regime, "funding_rate_per_8h")
+    try:
+        funding_value = float(funding)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("regime.funding_rate_per_8h must be finite") from exc
+    if not np.isfinite(funding_value):
+        raise ValueError("regime.funding_rate_per_8h must be finite")
+    participation_value = _finite_nonnegative(participation, name="participation")
+    if participation_value <= 0.0:
+        raise ValueError("participation must be finite and positive")
+    if (
+        isinstance(periods_per_year, bool)
+        or not isinstance(periods_per_year, (int, np.integer))
+        or periods_per_year <= 0
+    ):
+        raise ValueError("periods_per_year must be a positive integer")
+    return (
+        participation_value,
+        int(periods_per_year),
+        _finite_nonnegative(turnover_penalty_lambda, name="turnover_penalty_lambda"),
+    )
 
 
 def _normalize_locked_oos_evaluation(value: Mapping[str, Any]) -> dict[str, int | float]:
@@ -174,8 +223,16 @@ def compute_sleeve_quality(
     key is added and no arithmetic touches the existing numbers -- so the emitted
     manifest is unchanged.
     """
+    participation, periods_per_year, turnover_penalty_lambda = _validate_economic_inputs(
+        regime=regime,
+        participation=participation,
+        periods_per_year=periods_per_year,
+        turnover_penalty_lambda=turnover_penalty_lambda,
+    )
     gross = np.asarray(returns if returns is not None else [], dtype=np.float64).reshape(-1)
-    turnover_value = float(turnover) if turnover is not None else 0.0
+    if not np.all(np.isfinite(gross)):
+        raise ValueError("returns must contain only finite values")
+    turnover_value = _finite_nonnegative(0.0 if turnover is None else turnover, name="turnover")
     net = (
         gross
         if returns_are_net
@@ -617,8 +674,16 @@ def _resolve_upper(
     if upper is None:
         return None
     if isinstance(upper, Mapping):
-        return {sleeve_id: float(upper.get(sleeve_id, 1.0)) for sleeve_id in ids}
-    cap = float(upper)
+        resolved = {
+            sleeve_id: _finite_nonnegative(upper.get(sleeve_id, 1.0), name="upper")
+            for sleeve_id in ids
+        }
+        if any(cap > 1.0 for cap in resolved.values()):
+            raise ValueError("upper caps must not exceed 1")
+        return resolved
+    cap = _finite_nonnegative(upper, name="upper")
+    if cap > 1.0:
+        raise ValueError("upper caps must not exceed 1")
     return dict.fromkeys(ids, cap)
 
 
@@ -656,6 +721,38 @@ def _assert_train_validation_source(sleeve_id: str, spec: Mapping[str, Any]) -> 
 
     if _contains_oos(spec.get("returns_source")):
         raise ValueError(f"locked_oos input is forbidden for sleeve {sleeve_id!r}")
+    source = spec.get("returns_source")
+    tokens: list[str] = []
+
+    def _collect_tokens(value: Any) -> None:
+        if isinstance(value, str):
+            tokens.extend(re.split(r"[^a-z0-9]+", value.lower()))
+        elif isinstance(value, Mapping):
+            for item in value.values():
+                _collect_tokens(item)
+        elif isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
+            for item in value:
+                _collect_tokens(item)
+
+    if source is not None:
+        _collect_tokens(source)
+        if "train" not in tokens or "validation" not in tokens:
+            raise ValueError(
+                f"returns_source for sleeve {sleeve_id!r} must include train and validation"
+            )
+
+
+def _validate_source_artifact(source_id: str, source: Mapping[str, Any]) -> None:
+    if not isinstance(source.get("path"), str) or not source["path"].strip():
+        raise ValueError(f"source artifact {source_id!r} must have a nonempty path")
+    sha256 = source.get("sha256")
+    if not isinstance(sha256, str) or _SHA256_RE.fullmatch(sha256) is None:
+        raise ValueError(f"source artifact {source_id!r} must have an exact 64-hex sha256")
+    max_age = _finite_nonnegative(source.get("max_age_hours"), name="max_age_hours")
+    if max_age <= 0.0:
+        raise ValueError(f"source artifact {source_id!r} max_age_hours must be finite and positive")
+    if source.get("ready") is not True or source.get("portfolio_ready") is not True:
+        raise ValueError(f"source artifact {source_id!r} is not portfolio-ready")
 
 
 def _validate_materialized_data_contract(sleeves: Mapping[str, Mapping[str, Any]]) -> None:
@@ -804,11 +901,8 @@ def allocate_quality_gated(
     # in the covariance-less fallback so the tilt is a no-op there.
     matrix: np.ndarray | None = None
     if min_len < 2:
-        # Not enough overlapping observations to estimate a covariance
-        # structure; fall back to equal weight across survivors rather than
-        # fail. Still deterministic (equal split, sorted id order).
-        equal = 1.0 / float(len(survivors))
-        raw_weights = dict.fromkeys(survivors, equal)
+        # No covariance estimate means no allocation; callers retain cash.
+        return {}
     else:
         # Timestamped inputs were already intersected exactly above. Legacy
         # untimestamped callers retain the historical trailing-window behavior.
@@ -830,8 +924,7 @@ def allocate_quality_gated(
             allocator = _build_allocator(method, allocator_params)
             raw_weights = allocator.allocate(survivors, matrix, upper=upper_map)
         if not raw_weights:
-            equal = 1.0 / float(len(survivors))
-            raw_weights = dict.fromkeys(survivors, equal)
+            return {}
 
     if turnover_penalty_lambda > 0.0:
         raw_weights = _turnover_tilted_weights(
@@ -923,6 +1016,9 @@ def build_allocation_manifest(
     (unmapped sleeves stay neutral under the tilt).
     """
     sleeves = sleeves or {}
+    gross_cap = _finite_nonnegative(gross_cap, name="gross_cap")
+    if gross_cap <= 0.0 or gross_cap > 1.0:
+        raise ValueError("gross_cap must be finite, positive, and no greater than 1")
     source_rows = [dict(artifact) for artifact in (source_artifacts or [])]
     source_by_id: dict[str, dict[str, Any]] = {}
     for source in source_rows:
@@ -962,8 +1058,7 @@ def build_allocation_manifest(
     )
     if opt_in_data_contract:
         for source_id, source in source_by_id.items():
-            if source.get("ready") is not True or source.get("portfolio_ready") is not True:
-                raise ValueError(f"source artifact {source_id!r} is not portfolio-ready")
+            _validate_source_artifact(source_id, source)
         default_source_id = str(source_rows[0].get("id") or "") if len(source_rows) == 1 else ""
         referenced_source_ids = {
             str((spec or {}).get("source_artifact_id") or default_source_id or "")
@@ -973,8 +1068,7 @@ def build_allocation_manifest(
             source = source_by_id.get(source_id)
             if source is None:
                 raise ValueError(f"referenced source artifact {source_id!r} is missing")
-            if source.get("ready") is not True or source.get("portfolio_ready") is not True:
-                raise ValueError(f"source artifact {source_id!r} is not portfolio-ready")
+            _validate_source_artifact(source_id, source)
     prepared_returns, alignment, common_observations = _prepare_return_series(
         sleeve_returns, return_timestamps or None
     )
@@ -986,13 +1080,19 @@ def build_allocation_manifest(
         }
         families = derived or None
 
+    resolved_upper = _resolve_upper(upper, sorted(active_ids))
+    effective_upper = {
+        sleeve_id: min(gross_cap, 1.0 if resolved_upper is None else resolved_upper[sleeve_id])
+        for sleeve_id in sorted(active_ids)
+    }
+
     weights = allocate_quality_gated(
         sleeve_returns,
         turnovers,
         regime=regime,
         participation=participation,
         method=method,
-        upper=upper,
+        upper=effective_upper,
         min_sleeves=min_sleeves,
         turnover_penalty_lambda=turnover_penalty_lambda,
         correlation_shrinkage=correlation_shrinkage,
@@ -1037,14 +1137,17 @@ def build_allocation_manifest(
             raise ValueError(
                 f"sleeve {sleeve_id!r} references missing source artifact {source_artifact_id!r}"
             )
-        if source.get("ready") is not True or source.get("portfolio_ready") is not True:
-            raise ValueError(f"source artifact {source_artifact_id!r} is not portfolio-ready")
+        _validate_source_artifact(source_artifact_id, source)
+        strategy_class = str(spec.get("strategy_class") or "").strip()
+        symbols = [str(symbol).strip() for symbol in list(spec.get("symbols") or [])]
+        if not strategy_class or not symbols or any(not symbol for symbol in symbols):
+            raise ValueError(f"sleeve {sleeve_id!r} requires a nonempty strategy_class and symbols")
         children.append(
             {
                 "candidate_id": str(sleeve_id),
                 "name": str(spec.get("name") or sleeve_id),
-                "strategy_class": str(spec.get("strategy_class") or ""),
-                "symbols": [str(symbol) for symbol in list(spec.get("symbols") or [])],
+                "strategy_class": strategy_class,
+                "symbols": symbols,
                 "params": dict(spec.get("params") or {}),
                 "weight": weight,
                 "leaf_gross": weight,

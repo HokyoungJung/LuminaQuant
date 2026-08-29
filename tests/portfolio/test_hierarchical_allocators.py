@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import itertools
+from datetime import date, timedelta
 
 import numpy as np
 import pytest
@@ -291,6 +292,22 @@ def test_indefinite_covariance_fails_closed_but_noise_is_clipped() -> None:
     assert np.isclose(w.sum(), 1.0)
 
 
+def test_plugin_covariance_contract_rejects_short_windows_unknown_estimators_and_constants() -> (
+    None
+):
+    ids = ["a", "b"]
+    returns = np.array([[0.01, 0.02], [0.02, 0.01], [0.03, 0.04]])
+    with pytest.raises(ValueError, match="cov_window"):
+        hier.HERCPortfolio(cov_window=1).allocate(ids, returns)
+    with pytest.raises(ValueError, match="cov_estimator"):
+        hier.WassersteinDROPortfolio(cov_estimator="unknown").allocate(ids, returns)
+    assert hier.HERCPortfolio().allocate(ids, np.ones((3, 2))) == {"a": 0.5, "b": 0.5}
+    # A singular but non-constant sample remains a valid covariance input.
+    singular = np.column_stack([returns[:, 0], returns[:, 0]])
+    weights = hier.HERCPortfolio().allocate(ids, singular)
+    assert np.isclose(sum(weights.values()), 1.0)
+
+
 def test_graph_inverse_centrality_is_permutation_equivariant() -> None:
     corr = np.eye(5)
     corr[0, 1:] = corr[1:, 0] = 0.45  # star: asset 0 is the hub (PSD: 1 - 4*0.45^2 > 0)
@@ -371,7 +388,20 @@ def test_quality_gated_dispatch_accepts_new_methods_and_records_params() -> None
         }
     ]
     spec = {
-        sid: {"returns": series, "turnover": 0.1, "family": sid} for sid, series in sleeves.items()
+        sid: {
+            "returns": series,
+            "return_timestamps": [
+                (date(2024, 1, 1) + timedelta(days=index)).isoformat()
+                for index in range(len(series))
+            ],
+            "returns_are_net": True,
+            "returns_source": "train_validation",
+            "turnover": 0.1,
+            "family": sid,
+            "strategy_class": "NamedResearchStrategy",
+            "symbols": ["BTC/USDT"],
+        }
+        for sid, series in sleeves.items()
     }
     manifest = build_allocation_manifest(
         spec,

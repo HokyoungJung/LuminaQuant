@@ -9,6 +9,7 @@ import json
 import math
 import os
 import re
+import subprocess
 from copy import deepcopy
 from dataclasses import asdict, is_dataclass
 from datetime import UTC, datetime, timedelta
@@ -128,18 +129,91 @@ def _plain(value: Any) -> Any:
     return value
 
 
-def _lineage(manifest: dict[str, Any], manifest_path: Path) -> dict[str, Any]:
+def _data_inventory(data_root: Path) -> dict[str, Any]:
+    if not data_root.is_dir():
+        raise ValueError(f"data root must be an existing directory: {data_root}")
+    files = [
+        {
+            "path": str(path.relative_to(data_root)),
+            "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+            "size_bytes": path.stat().st_size,
+        }
+        for path in sorted(data_root.rglob("*"))
+        if path.is_file()
+    ]
+    return {"root": str(data_root.resolve()), "files": files, "sha256": _json_sha256(files)}
+
+
+def _cost_profile() -> tuple[dict[str, Any], dict[str, Any]]:
+    raw_path = os.getenv("LQ_CONFIG_PATH", "").strip()
+    if not raw_path:
+        raise ValueError("LQ_CONFIG_PATH must explicitly name a realistic-cost profile")
+    path = Path(raw_path).expanduser().resolve()
+    if not path.is_file():
+        raise ValueError(f"realistic-cost profile does not exist: {path}")
+    runtime = _plain(get_default_runtime_config())
+    execution = runtime.get("execution") if isinstance(runtime, dict) else None
+    if not isinstance(execution, dict):
+        raise ValueError("realistic-cost profile has no execution configuration")
+    required_positive = (
+        "maker_fee_rate",
+        "taker_fee_rate",
+        "spread_rate",
+        "slippage_rate",
+        "slippage_impact_coefficient",
+        "maintenance_margin_rate",
+        "liquidation_buffer_rate",
+    )
+    missing = [key for key in required_positive if _positive_float(execution.get(key)) is None]
+    if missing:
+        raise ValueError("realistic-cost profile requires nonzero " + ", ".join(missing))
+    if execution.get("slippage_impact_model") != "sqrt_impact":
+        raise ValueError("realistic-cost profile requires slippage_impact_model=sqrt_impact")
+    if not execution.get("require_funding_coverage") or not execution.get(
+        "funding_on_utc_boundary"
+    ):
+        raise ValueError("realistic-cost profile requires funding coverage and UTC settlement")
+    return {"path": str(path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}, runtime
+
+
+def _source_commit() -> str:
+    completed = subprocess.run(
+        ("git", "rev-parse", "HEAD"),
+        cwd=Path(__file__).parents[2],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    commit = completed.stdout.strip()
+    if not re.fullmatch(r"[0-9a-f]{40}", commit):
+        raise ValueError("cannot determine source commit")
+    return commit
+
+
+def _publish_json(path: Path, payload: Any) -> None:
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    try:
+        with temporary.open("x", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+        os.replace(temporary, path)
+    except Exception:
+        temporary.unlink(missing_ok=True)
+        raise
+
+
+def _lineage(
+    manifest: dict[str, Any],
+    manifest_path: Path,
+    *,
+    exchange: str,
+    warmup_bars: int,
+    cost_profile: dict[str, Any],
+    runtime_defaults: dict[str, Any],
+    data_inventory: dict[str, Any],
+) -> dict[str, Any]:
     receipt = manifest.get("universe_materialization_receipt")
     if not isinstance(receipt, dict):
         raise ValueError("manifest requires universe_materialization_receipt")
-    config_source = os.getenv("LQ_CONFIG_PATH", "").strip()
-    source = None
-    if config_source:
-        config_path = Path(config_source).expanduser().resolve()
-        source = {
-            "path": str(config_path),
-            "sha256": hashlib.sha256(config_path.read_bytes()).hexdigest(),
-        }
     strict_execution = {
         "slippage_impact_model": "sqrt_impact",
         "slippage_impact_coefficient": 0.10,
@@ -149,12 +223,11 @@ def _lineage(manifest: dict[str, Any], manifest_path: Path) -> dict[str, Any]:
         "apply_liquidity_cap_to_conditional_fills": True,
         "attach_default_protective_stop": False,
     }
-    default_config = get_default_runtime_config()
-    effective_defaults = _plain(default_config)
+    effective_defaults = deepcopy(runtime_defaults)
     effective_defaults.get("trading", {}).pop("timeframe", None)
     effective_defaults.get("live", {}).pop("symbol_limits", None)
     runtime = {
-        "source": source,
+        "source": cost_profile,
         "default_config": effective_defaults,
         "strict_research_execution": strict_execution,
     }
@@ -174,6 +247,16 @@ def _lineage(manifest: dict[str, Any], manifest_path: Path) -> dict[str, Any]:
         for candidate in manifest.get("candidates", [])
         if isinstance(candidate, dict)
     ]
+    behavioral_identity = {
+        "exchange": exchange,
+        "warmup_bars": warmup_bars,
+        "determinism": {"random_number_generation": "none"},
+        "source_commit": _source_commit(),
+        "manifest_sha256": hashlib.sha256(manifest_path.read_bytes()).hexdigest(),
+        "cost_profile": cost_profile,
+        "runtime_config_sha256": runtime["effective_sha256"],
+        "data_inventory": data_inventory,
+    }
     return {
         "suite": {
             "suite_id": manifest.get("suite_id"),
@@ -182,6 +265,7 @@ def _lineage(manifest: dict[str, Any], manifest_path: Path) -> dict[str, Any]:
         },
         "universe": {"receipt_sha256": _json_sha256(receipt), "receipt": receipt},
         "runtime_config": runtime,
+        "behavioral_identity": behavioral_identity,
     }
 
 
@@ -206,6 +290,13 @@ def _load_selection_artifact(
         != lineage["runtime_config"]["effective_sha256"]
     ):
         raise ValueError("locked-OOS runtime-config identity differs from selection")
+    if (
+        selected_lineage.get("universe", {}).get("receipt_sha256")
+        != lineage["universe"]["receipt_sha256"]
+    ):
+        raise ValueError("locked-OOS universe identity differs from selection")
+    if selected_lineage.get("behavioral_identity") != lineage["behavioral_identity"]:
+        raise ValueError("locked-OOS behavior-affecting identity differs from selection")
     period = selection.get("period")
     selection_end = _datetime(str(period.get("end"))) if isinstance(period, dict) else None
     if selection_end is None or selection_end >= locked_start:
@@ -512,7 +603,34 @@ def run_suite(
         raise ValueError("purpose must be 'selection' or 'locked_oos'")
     if warmup_bars < 0:
         raise ValueError("warmup_bars must be nonnegative")
-    lineage = _lineage(manifest, manifest_path)
+    if output_dir.exists():
+        raise ValueError(f"output target already exists: {output_dir}")
+    if not all(isinstance(candidate, dict) for candidate in candidates):
+        raise ValueError("manifest candidates must contain only objects")
+    candidate_ids = [str(candidate.get("candidate_id") or "") for candidate in candidates]
+    if not all(candidate_ids):
+        raise ValueError("candidate_id values must be non-empty")
+    if len(candidate_ids) != len(set(candidate_ids)):
+        raise ValueError("duplicate candidate_id")
+    sleeves = manifest.get("sleeves", {})
+    if not isinstance(sleeves, dict):
+        raise ValueError("manifest sleeves must be an object")
+    sleeve_ids = set(sleeves)
+    if not all(isinstance(sleeve_id, str) and sleeve_id for sleeve_id in sleeve_ids):
+        raise ValueError("manifest sleeve IDs must be non-empty strings")
+    unknown_sleeves = sorted(sleeve_ids - set(candidate_ids))
+    if unknown_sleeves:
+        raise ValueError("manifest sleeves lack candidates: " + ", ".join(unknown_sleeves))
+    cost_profile, runtime_defaults = _cost_profile()
+    lineage = _lineage(
+        manifest,
+        manifest_path,
+        exchange=exchange,
+        warmup_bars=warmup_bars,
+        cost_profile=cost_profile,
+        runtime_defaults=runtime_defaults,
+        data_inventory=_data_inventory(data_root),
+    )
     receipt_as_of = _datetime(str(lineage["universe"]["receipt"].get("as_of")))
     if receipt_as_of > start:
         raise ValueError("universe receipt as_of must be at or before runner start")
@@ -523,15 +641,7 @@ def run_suite(
         selection = _load_selection_artifact(
             selection_artifact, lineage=lineage, locked_start=start
         )
-    candidate_ids = [
-        str(candidate.get("candidate_id") or "")
-        for candidate in candidates
-        if isinstance(candidate, dict)
-    ]
-    if len(candidate_ids) != len(set(candidate_ids)):
-        raise ValueError("duplicate candidate_id")
-
-    output_dir.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True)
     repository = MarketDataRepository(str(data_root))
     symbol_limits = _symbol_limits_from_manifest(manifest)
     results: list[dict[str, Any]] = []
@@ -560,9 +670,7 @@ def run_suite(
                 **({"returns_are_net": True} if purpose == "locked_oos" else {}),
             }
             artifact = output_dir / _artifact_name(index, fallback_id)
-            artifact.write_text(
-                json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-            )
+            _publish_json(artifact, result)
             results.append({**result, "artifact": artifact.name})
             continue
         try:
@@ -588,14 +696,21 @@ def run_suite(
                 **({"returns_are_net": True} if purpose == "locked_oos" else {}),
             }
         artifact = output_dir / _artifact_name(index, fallback_id)
-        artifact.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        _publish_json(artifact, result)
         results.append({**result, "artifact": artifact.name})
 
     allocator = manifest.get("allocator")
     allocator = allocator if isinstance(allocator, dict) else {}
     min_sleeves = int(manifest.get("min_sleeves", allocator.get("min_sleeves", 1)))
     min_families = int(manifest.get("min_families", allocator.get("min_families", 1)))
-    passed_families = {str(row.get("family") or "") for row in results if row["status"] == "pass"}
+    results_by_id = {row["candidate_id"]: row for row in results}
+    reconciliation_complete = set(results_by_id) == set(candidate_ids) and len(results) == len(
+        candidate_ids
+    )
+    sleeve_results = [results_by_id[sleeve_id] for sleeve_id in sorted(sleeve_ids)]
+    passed_families = {
+        str(row.get("family") or "") for row in sleeve_results if row["status"] == "pass"
+    }
     disallowed_skips = [
         row["candidate_id"]
         for row in results
@@ -608,10 +723,11 @@ def run_suite(
     }
     exclusion_contract_complete = allowed_exclusion_ids == set(receipt_disabled)
     portfolio_ready = (
-        not any(row["status"] == "fail" for row in results)
-        and not disallowed_skips
+        reconciliation_complete
+        and not any(row["status"] == "fail" for row in sleeve_results)
+        and not (set(disallowed_skips) & sleeve_ids)
         and exclusion_contract_complete
-        and sum(row["status"] == "pass" for row in results) >= min_sleeves
+        and sum(row["status"] == "pass" for row in sleeve_results) >= min_sleeves
         and len(passed_families) >= min_families
     )
     summary = {
@@ -637,10 +753,15 @@ def run_suite(
             "allowed_exclusion_count": len(allowed_exclusion_ids),
             "complete": exclusion_contract_complete,
         },
+        "candidate_reconciliation": {
+            "manifest_candidate_count": len(candidate_ids),
+            "result_candidate_count": len(results_by_id),
+            "complete": reconciliation_complete,
+        },
         "readiness": {
             "portfolio_ready": portfolio_ready,
             "min_sleeves": min_sleeves,
-            "passing_sleeves": sum(row["status"] == "pass" for row in results),
+            "passing_sleeves": sum(row["status"] == "pass" for row in sleeve_results),
             "min_families": min_families,
             "passing_families": len(passed_families),
         },
@@ -658,10 +779,8 @@ def run_suite(
             "manifest_sha256": selection["lineage"]["suite"]["manifest_sha256"],
             "universe_receipt_sha256": selection["lineage"]["universe"]["receipt_sha256"],
         }
-    (output_dir / "suite_results.json").write_text(
-        json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
     summary_path = output_dir / "suite_results.json"
+    _publish_json(summary_path, summary)
     if purpose == "locked_oos":
         return summary
 
@@ -722,9 +841,7 @@ def run_suite(
             "frozen_at": summary["period"]["end"],
         }
     ]
-    (output_dir / "allocation_input.json").write_text(
-        json.dumps(allocation_input, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
+    _publish_json(output_dir / "allocation_input.json", allocation_input)
     return summary
 
 

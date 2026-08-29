@@ -32,6 +32,7 @@ import pytest
 
 from lumina_quant.core.events import MarketEvent, MarketWindowEvent
 from lumina_quant.core.plugin_registry import GLOBAL_REGISTRY
+from lumina_quant.indicators import KalmanHedgeState
 from lumina_quant.strategies.kalman_pairs_stat_arb import KalmanPairsStatArbStrategy
 
 _SYMBOL_Y = "YY/USDT"
@@ -55,6 +56,13 @@ class _Events:
 
     def put(self, event: Any) -> None:
         self.signals.append(event)
+
+
+class _SecondLegFailsEvents(_Events):
+    def put(self, event: Any) -> None:
+        if len(self.signals) == 1:
+            raise RuntimeError("second leg queue failure")
+        super().put(event)
 
 
 # --------------------------------------------------------------------- series
@@ -290,8 +298,8 @@ def test_adverse_blowout_triggers_stop_exit() -> None:
     assert exit_batch[0].metadata["z"] >= 4.0
 
 
-def test_cointegration_gate_blocks_two_independent_random_walks() -> None:
-    """The ADF gate must read the Engle-Granger residual, not the filter residual.
+def test_uncalibrated_residual_adf_heuristic_blocks_two_independent_random_walks() -> None:
+    """The heuristic reads the Engle-Granger residual, not the filter residual.
 
     The filter's own a-posteriori residual is white noise by construction, so an
     ADF test on it rejects a unit root even for these two independent walks.
@@ -309,6 +317,10 @@ def test_cointegration_gate_blocks_two_independent_random_walks() -> None:
     entries = _entries(_feed(ungated, ungated_events, walks))
     assert entries, "the ungated control must trade, or the gate proves nothing"
     assert entries[0][1][0].metadata["beta"] > 0.0  # min_beta is not what blocked the gated run
+    assert entries[0][1][0].metadata["cointegration_gate"] == "uncalibrated_residual_adf_heuristic"
+    assert "not a calibrated 5% Engle-Granger test" in (
+        KalmanPairsStatArbStrategy.get_param_schema()["require_cointegration"].description
+    )
 
     # ... and the genuinely cointegrated pair does pass that same gate.
     passing, passing_events = _build()
@@ -431,25 +443,16 @@ def test_market_window_path_matches_market_event_path() -> None:
     assert _fingerprint(window_events) == _fingerprint(market_events)
 
 
-def test_market_window_pairs_legs_on_the_window_timestamp() -> None:
-    """A gap in one symbol's tape must not stop the pair from stepping.
-
-    ``snapshot.time`` is the LAST 1s row per symbol, so two tapes that end on
-    different sub-seconds produce different keys; the window's own timestamp is
-    the decision key that keeps the two legs aligned.
-    """
+def test_market_window_rejects_stale_native_leg_timestamps() -> None:
+    """A window timestamp cannot overwrite a native completed-bar timestamp."""
     pairs = _cointegrated_pairs(250)
-
-    market, market_events = _build()
-    _feed(market, market_events, pairs)
 
     gappy, gappy_events = _build()
     _feed_windows(gappy, pairs, sub_times={_SYMBOL_Y: ":59", _SYMBOL_X: ":07"})
 
-    assert gappy._kalman is not None
-    assert gappy._kalman.updates == len(pairs)
-    assert market_events.signals
-    assert _fingerprint(gappy_events) == _fingerprint(market_events)
+    assert gappy._kalman is None
+    assert gappy_events.signals == []
+    assert gappy.get_state()["unmatched_leg_drops"] == len(pairs) * 2 - 1
 
     # A window with no timestamp of its own falls back to the row stamps.
     timeless, _ = _build()
@@ -463,6 +466,45 @@ def test_market_window_pairs_legs_on_the_window_timestamp() -> None:
     assert timeless._kalman.updates == 120
 
 
+def test_stale_leg_is_dropped_before_a_matching_completed_bar_steps() -> None:
+    strategy, _ = _build(min_updates=2)
+    pair_0, pair_1 = _cointegrated_pairs(2)
+    strategy.calculate_signals(
+        MarketEvent("T00000", _SYMBOL_Y, pair_0[0], pair_0[0], pair_0[0], pair_0[0], 1.0)
+    )
+    strategy.calculate_signals(
+        MarketEvent("T00001", _SYMBOL_X, pair_1[1], pair_1[1], pair_1[1], pair_1[1], 1.0)
+    )
+    assert strategy._kalman is None
+    assert strategy.get_state()["unmatched_leg_drops"] == 1
+
+    strategy.calculate_signals(
+        MarketEvent("T00001", _SYMBOL_Y, pair_1[0], pair_1[0], pair_1[0], pair_1[0], 1.0)
+    )
+    assert strategy._kalman is not None
+    assert strategy._kalman.updates == 1
+
+
+def test_second_leg_queue_failure_does_not_commit_entry_state() -> None:
+    events = _SecondLegFailsEvents()
+    strategy = KalmanPairsStatArbStrategy(
+        _Bars(),
+        events,
+        symbol_y=_SYMBOL_Y,
+        symbol_x=_SYMBOL_X,
+        min_updates=2,
+        require_cointegration=False,
+    )
+    state = KalmanHedgeState(beta=1.0, alpha=0.0, p00=1.0, p01=0.0, p11=1.0, updates=2)
+
+    strategy._maybe_enter("T00000", 100.0, 100.0, state, 2.0)
+
+    assert len(events.signals) == 1
+    assert strategy.get_state()["mode"] == "FLAT"
+    assert strategy.get_state()["bars_held"] == 0
+    assert strategy.get_state()["emission_failures"] == 1
+
+
 def test_state_roundtrip_preserves_behaviour() -> None:
     reference, reference_events = _build()
     _feed(reference, reference_events, _cointegrated_pairs(400))
@@ -472,7 +514,7 @@ def test_state_roundtrip_preserves_behaviour() -> None:
     snapshot = warm.get_state()
     assert snapshot["kalman"] is not None
     assert snapshot["mode"] in {"FLAT", "LONG_SPREAD", "SHORT_SPREAD"}
-    assert len(snapshot["log_ys"]) == len(snapshot["log_xs"]) == 92
+    assert len(snapshot["paired_history"]) == 92
     assert snapshot["pending_y"] == [_time_key(199), _cointegrated_pairs(1, start=199)[0][0]]
 
     resumed, resumed_events = _build()
@@ -488,12 +530,14 @@ def test_state_roundtrip_preserves_behaviour() -> None:
     resumed.set_state("not-a-dict")
     assert resumed.get_state()["kalman"] is not None
 
-    # A truncated leg restores the ALIGNED common tail, never a skewed zip.
-    skewed = dict(snapshot)
-    skewed["log_xs"] = snapshot["log_xs"][:40]
-    skewed["log_ys"] = [*snapshot["log_ys"][:60], "not-a-number"]
-    resumed.set_state(skewed)
-    restored = resumed.get_state()
-    assert len(restored["log_ys"]) == len(restored["log_xs"]) == 40
-    assert restored["log_ys"] == snapshot["log_ys"][20:60]
-    assert restored["log_xs"] == snapshot["log_xs"][:40]
+    # Corrupt paired history is rejected atomically; it cannot skew the legs.
+    before = resumed.get_state()
+    corrupt = dict(snapshot)
+    corrupt["paired_history"] = [*snapshot["paired_history"][:-1], ["T00199", "bad", 0.0]]
+    resumed.set_state(corrupt)
+    assert resumed.get_state() == before
+
+    corrupt_pending = dict(snapshot)
+    corrupt_pending["pending_y"] = ["T00199", 0.0]
+    resumed.set_state(corrupt_pending)
+    assert resumed.get_state() == before

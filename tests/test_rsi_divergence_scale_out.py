@@ -1,5 +1,6 @@
 """Deterministic tests for RsiDivergenceScaleOutStrategy (research_only sleeve)."""
 
+from datetime import UTC, datetime, timedelta
 from queue import SimpleQueue
 
 import pytest
@@ -7,7 +8,10 @@ import pytest
 from lumina_quant.core.events import MarketEvent, MarketWindowEvent
 from lumina_quant.core.plugin_registry import GLOBAL_REGISTRY
 from lumina_quant.indicators.rsi import IncrementalRsi
-from lumina_quant.strategies.rsi_divergence_scale_out import RsiDivergenceScaleOutStrategy
+from lumina_quant.strategies.rsi_divergence_scale_out import (
+    RsiDivergenceScaleOutStrategy,
+    _Pivot,
+)
 
 SYMBOL = "BTC/USDT"
 _HALF_RANGE = 0.5
@@ -397,6 +401,98 @@ def test_first_exit_fraction_of_one_collapses_to_a_single_full_exit():
     assert "exit_fraction" not in single[1].metadata
 
 
+def test_zero_partial_fraction_uses_a_fill_safe_full_exit():
+    signals, _ = _run(_bullish_divergence_closes(), first_exit_fraction=0.0)
+    assert [signal.signal_type for signal in signals] == ["LONG", "EXIT"]
+    assert signals[1].metadata["reason"] == "stage1_rsi"
+    assert "exit_fraction" not in signals[1].metadata
+
+
+def test_final_rsi_jump_emits_one_full_exit_not_a_delayed_partial():
+    closes = _bullish_divergence_closes(rally_bars=0)
+    closes.append(closes[-1] + 1.0)  # confirm the second pivot and enter
+    events = SimpleQueue()
+    strategy = RsiDivergenceScaleOutStrategy(_Bars(), events)
+    _feed(strategy, closes)
+    assert [signal.signal_type for signal in _drain(events)] == ["LONG"]
+
+    spike = closes[-1] + 100.0
+    strategy.calculate_signals(
+        MarketEvent(
+            len(closes),
+            SYMBOL,
+            closes[-1],
+            spike + _HALF_RANGE,
+            spike - _HALF_RANGE,
+            spike,
+            100.0,
+        )
+    )
+    exits = _drain(events)
+    assert [signal.signal_type for signal in exits] == ["EXIT"]
+    assert exits[0].metadata["reason"] == "stage2_rsi"
+    assert "exit_fraction" not in exits[0].metadata
+
+
+@pytest.mark.parametrize(
+    ("side", "high", "low", "close"),
+    [
+        ("LONG", 102.0, 99.0, 101.0),
+        ("SHORT", 101.0, 98.0, 99.0),
+    ],
+)
+def test_pivot_stop_uses_intrabar_low_or_high_not_close(side, high, low, close):
+    events = SimpleQueue()
+    strategy = RsiDivergenceScaleOutStrategy(_Bars(), events)
+    item = strategy._state[SYMBOL]
+    item.mode = side
+    item.entry_price = 100.0
+    item.stop_price = 100.0
+    strategy.calculate_signals(MarketEvent(0, SYMBOL, close, high, low, close, 100.0))
+    exits = _drain(events)
+    assert [signal.signal_type for signal in exits] == ["EXIT"]
+    assert exits[0].metadata["reason"] == "pivot_stop"
+    assert exits[0].price == close  # execution consumes this market exit next open, gap included
+
+
+def test_pivots_are_retained_through_the_full_maximum_distance():
+    strategy = RsiDivergenceScaleOutStrategy(
+        _Bars(), SimpleQueue(), min_pivot_distance=3, max_pivot_distance=40
+    )
+    item = strategy._state[SYMBOL]
+    item.bars_seen = 101
+    earlier = _Pivot(60, 10.0, 10.0, 100.0)
+    newest = _Pivot(100, 9.0, 15.0, 100.0)
+    item.pivot_lows = [
+        earlier,
+        _Pivot(70, 8.0, 16.0, 100.0),
+        _Pivot(80, 8.0, 16.0, 100.0),
+        _Pivot(90, 8.0, 16.0, 100.0),
+        newest,
+    ]
+    assert strategy._bullish_setup(item, newest) == ("regular", earlier)
+
+
+def test_htf_closes_use_timestamp_aligned_buckets_across_gaps():
+    strategy = RsiDivergenceScaleOutStrategy(_Bars(), SimpleQueue(), htf_multiple=3)
+    item = strategy._state[SYMBOL]
+    start = datetime(2026, 1, 1, tzinfo=UTC)
+    strategy._record_htf_close(item, start, 10.0)
+    strategy._record_htf_close(item, start + timedelta(minutes=10), 11.0)
+    strategy._record_htf_close(item, start + timedelta(minutes=40), 20.0)
+    strategy._record_htf_close(item, start + timedelta(minutes=60), 30.0)
+    assert list(item.htf_closes) == [11.0, 20.0]
+
+
+def test_reversed_exit_thresholds_fail_closed():
+    signals, _ = _run(
+        _bullish_divergence_closes(),
+        exit_rsi_first=60.0,
+        exit_rsi_second=45.0,
+    )
+    assert signals == []
+
+
 def test_state_round_trip_in_stage_one_does_not_repeat_the_partial():
     closes = _bullish_divergence_closes()
     rsi = _rsi_series(closes)
@@ -632,7 +728,8 @@ def test_state_round_trip_preserves_htf_state():
     assert _drain(warm_events) == []
     state = warm.get_state()
     snapshot = state["symbol_state"][SYMBOL]
-    assert snapshot["htf_bar_count"] == split % 3  # an unfinished HTF bar
+    assert snapshot["htf_bucket"] is not None
+    assert snapshot["htf_bucket_close"] == closes[split - 1]
     assert len(snapshot["htf_closes"]) == 10  # capped at htf_ma_window
 
     resumed_events = SimpleQueue()
@@ -640,7 +737,8 @@ def test_state_round_trip_preserves_htf_state():
     resumed.set_state(state)
     restored = resumed.get_state()["symbol_state"][SYMBOL]
     assert restored["htf_closes"] == snapshot["htf_closes"]
-    assert restored["htf_bar_count"] == snapshot["htf_bar_count"]
+    assert restored["htf_bucket"] == snapshot["htf_bucket"]
+    assert restored["htf_bucket_close"] == snapshot["htf_bucket_close"]
     _feed(resumed, closes[split:], start_index=split)
     replayed = _drain(resumed_events)
     assert [(signal.datetime, signal.signal_type) for signal in replayed] == [

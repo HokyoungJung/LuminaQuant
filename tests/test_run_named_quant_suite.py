@@ -90,13 +90,33 @@ def _runtime_config(*, symbol_limits=None):
         trading=SimpleNamespace(timeframe="1m"),
         backtest=SimpleNamespace(persist_output=True),
         risk=SimpleNamespace(attach_default_protective_stop=True),
-        execution=SimpleNamespace(),
+        execution=SimpleNamespace(
+            maker_fee_rate=0.0002,
+            taker_fee_rate=0.0004,
+            spread_rate=0.0002,
+            slippage_rate=0.0005,
+            slippage_impact_model="sqrt_impact",
+            slippage_impact_coefficient=0.10,
+            maintenance_margin_rate=0.005,
+            liquidation_buffer_rate=0.0005,
+            require_funding_coverage=True,
+            funding_on_utc_boundary=True,
+        ),
         live=SimpleNamespace(symbol_limits=symbol_limits or {}),
     )
 
 
 def _receipt() -> dict:
     return {"as_of": "2023-12-31T00:00:00Z", "selected_symbols": {}}
+
+
+@pytest.fixture(autouse=True)
+def _realistic_cost_profile(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv(
+        "LQ_CONFIG_PATH",
+        str(Path(__file__).parents[1] / "configs/profiles/backtest_cost_realistic.yaml"),
+    )
+    (tmp_path / "data").mkdir()
 
 
 def test_runs_each_candidate_and_writes_allocator_inputs_and_failures(
@@ -480,18 +500,23 @@ def test_locked_oos_run_never_emits_allocator_input(tmp_path, monkeypatch) -> No
     output = tmp_path / "locked"
     selection = tmp_path / "selection.json"
     selection_manifest = json.loads(manifest.read_text())
-    selection_manifest["universe_materialization_receipt"] = {
-        "as_of": "2023-01-01T00:00:00Z",
-        "selected_symbols": {"crypto_top10": ["ETH/USDT"]},
-    }
     selection_manifest_path = tmp_path / "selection_manifest.json"
     selection_manifest_path.write_text(json.dumps(selection_manifest))
+    cost_profile, runtime_defaults = MODULE._cost_profile()
     selection.write_text(
         json.dumps(
             {
                 "purpose": "selection",
                 "period": {"start": "2024-01-01T00:00:00", "end": "2025-01-01T00:00:00"},
-                "lineage": MODULE._lineage(selection_manifest, selection_manifest_path),
+                "lineage": MODULE._lineage(
+                    selection_manifest,
+                    selection_manifest_path,
+                    exchange="binance",
+                    warmup_bars=400,
+                    cost_profile=cost_profile,
+                    runtime_defaults=runtime_defaults,
+                    data_inventory=MODULE._data_inventory(tmp_path / "data"),
+                ),
             }
         )
     )
@@ -667,6 +692,24 @@ def test_future_universe_receipt_fails_before_execution(tmp_path) -> None:
             exchange="binance",
             start=datetime(2024, 1, 1),
             end=datetime(2024, 1, 2),
+        )
+
+
+def test_runner_rejects_stale_output_directory_before_execution(tmp_path) -> None:
+    manifest = tmp_path / "suite.json"
+    manifest.write_text(
+        json.dumps({"universe_materialization_receipt": _receipt(), "candidates": []})
+    )
+    output = tmp_path / "out"
+    output.mkdir()
+    with pytest.raises(ValueError, match="output target already exists"):
+        MODULE.run_suite(
+            manifest,
+            tmp_path / "data",
+            output,
+            exchange="binance",
+            start=datetime(2024, 1, 1),
+            end=datetime(2025, 1, 1),
         )
 
 
