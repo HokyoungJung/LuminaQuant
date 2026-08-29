@@ -34,6 +34,7 @@ import hashlib
 import importlib.util
 import json
 import sys
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -43,6 +44,7 @@ import pytest
 
 from lumina_quant.portfolio.quality_gated_allocation import (
     _family_meta_momentum_tilted_weights,
+    _materialized_return_panel_sha256,
     _turnover_tilted_weights,
     allocate_quality_gated,
     build_allocation_manifest,
@@ -75,6 +77,13 @@ _HI, _LO = 0.004, -0.002
 _WHI, _WLO = 0.001, -0.001
 _T = 240
 _BLOCK = 120
+
+
+def _return_timestamps(n: int) -> list[str]:
+    start = datetime(2024, 1, 1, tzinfo=UTC)
+    return [
+        (start + timedelta(days=index)).isoformat().replace("+00:00", "Z") for index in range(n)
+    ]
 
 
 def _block(strong: bool) -> list[float]:
@@ -133,10 +142,19 @@ _TILT_KWARGS: dict[str, Any] = dict(
 
 
 def _sha_free_manifest_sleeves(panel: dict[str, list[float]]) -> dict[str, dict[str, Any]]:
+    timestamps = _return_timestamps(_T)
+    apply_timestamp = _return_timestamps(_T + 1)[-1]
     return {
         sid: {
             "returns": series,
             "turnover": 0.05,
+            "returns_are_net": False,
+            "return_timestamps": timestamps,
+            "returns_source": "train_validation",
+            "fit_start": timestamps[0],
+            "fit_end": timestamps[-1],
+            "as_of": apply_timestamp,
+            "apply_start": apply_timestamp,
             "family": _FAMILIES[sid],
             "strategy_class": "MovingAverageCrossStrategy",
             "symbols": ["BTC/USDT"],
@@ -147,7 +165,7 @@ def _sha_free_manifest_sleeves(panel: dict[str, list[float]]) -> dict[str, dict[
     }
 
 
-def _source_artifacts(tmp_path: Path) -> list[dict[str, Any]]:
+def _source_artifacts(tmp_path: Path, sleeves: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
     source_path = tmp_path / "source.json"
     source_path.write_text(json.dumps({"ready": True}), encoding="utf-8")
     return [
@@ -158,6 +176,10 @@ def _source_artifacts(tmp_path: Path) -> list[dict[str, Any]]:
             "max_age_hours": 876_000,
             "ready": True,
             "portfolio_ready": True,
+            "return_panel_sha256_by_sleeve": {
+                sleeve_id: _materialized_return_panel_sha256(sleeve_id, spec)
+                for sleeve_id, spec in sleeves.items()
+            },
         }
     ]
 
@@ -297,7 +319,7 @@ def test_leg4_allocate_is_byte_identical_when_flag_default(method: str) -> None:
 
 def test_leg4_manifest_is_byte_identical_when_flag_default(tmp_path: Path) -> None:
     sleeves = _sha_free_manifest_sleeves(_panel_p())
-    source_artifacts = _source_artifacts(tmp_path)
+    source_artifacts = _source_artifacts(tmp_path, sleeves)
     default = build_allocation_manifest(
         sleeves, source_artifacts=source_artifacts, method="hrp", gross_cap=1.0
     )
@@ -331,7 +353,7 @@ def test_leg4_manifest_round_trips_through_real_consumer(
     sleeves = _sha_free_manifest_sleeves(_panel_p())
     manifest = build_allocation_manifest(
         sleeves,
-        source_artifacts=_source_artifacts(tmp_path),
+        source_artifacts=_source_artifacts(tmp_path, sleeves),
         method="hrp",
         gross_cap=1.0,
         **kwargs,
@@ -351,7 +373,7 @@ def test_leg4_tilt_on_manifest_constructs_the_real_strategy_off_cash(tmp_path: P
     sleeves = _sha_free_manifest_sleeves(_panel_p())
     manifest = build_allocation_manifest(
         sleeves,
-        source_artifacts=_source_artifacts(tmp_path),
+        source_artifacts=_source_artifacts(tmp_path, sleeves),
         method="hrp",
         gross_cap=1.0,
         family_momentum_window=60,
@@ -504,7 +526,7 @@ def test_family_tilt_is_deterministic_run_twice(tmp_path: Path) -> None:
     assert first == second
 
     sleeves = _sha_free_manifest_sleeves(panel)
-    source_artifacts = _source_artifacts(tmp_path)
+    source_artifacts = _source_artifacts(tmp_path, sleeves)
     manifest_a = build_allocation_manifest(
         sleeves, source_artifacts=source_artifacts, method="hrp", family_momentum_window=60
     )

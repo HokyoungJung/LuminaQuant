@@ -19,6 +19,7 @@ import hashlib
 import importlib.util
 import json
 import sys
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -27,6 +28,7 @@ from collections.abc import Callable
 import pytest
 
 from lumina_quant.portfolio.quality_gated_allocation import (
+    _materialized_return_panel_sha256,
     allocate_quality_gated,
     build_allocation_manifest,
     compute_sleeve_quality,
@@ -62,6 +64,26 @@ def _synthetic_returns(seed: int, n: int, *, drift: float, scale: float) -> list
     return [(value - 0.5) * scale + drift for value in _lcg_stream(seed, n)]
 
 
+def _return_timestamps(n: int) -> list[str]:
+    start = datetime(2024, 1, 1, tzinfo=UTC)
+    return [
+        (start + timedelta(days=index)).isoformat().replace("+00:00", "Z") for index in range(n)
+    ]
+
+
+def _materialized_timing(n: int) -> dict[str, str]:
+    timestamps = _return_timestamps(n)
+    apply_start = (
+        (datetime(2024, 1, 1, tzinfo=UTC) + timedelta(days=n)).isoformat().replace("+00:00", "Z")
+    )
+    return {
+        "fit_start": timestamps[0],
+        "fit_end": timestamps[-1],
+        "as_of": apply_start,
+        "apply_start": apply_start,
+    }
+
+
 def _sha256_of(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -74,6 +96,10 @@ def _single_sleeve_manifest(tmp_path: Path) -> dict[str, Any]:
         "sleeve_a": {
             "returns": _synthetic_returns(42, 64, drift=0.004, scale=0.01),
             "turnover": 0.0,
+            "returns_are_net": False,
+            "return_timestamps": _return_timestamps(64),
+            **_materialized_timing(64),
+            "returns_source": "train_validation",
             "strategy_class": "MovingAverageCrossStrategy",
             "symbols": ["BTC/USDT"],
             "params": {"short_window": 4, "long_window": 12},
@@ -88,6 +114,9 @@ def _single_sleeve_manifest(tmp_path: Path) -> dict[str, Any]:
             "max_age_hours": 876_000,
             "ready": True,
             "portfolio_ready": True,
+            "return_panel_sha256_by_sleeve": {
+                "sleeve_a": _materialized_return_panel_sha256("sleeve_a", sleeves["sleeve_a"]),
+            },
         }
     ]
     return build_allocation_manifest(sleeves, source_artifacts=source_artifacts, gross_cap=1.0)
@@ -316,7 +345,7 @@ def test_allocate_quality_gated_handles_none_and_empty_gracefully(
 # (d) Byte-golden manifest serialization.
 # ---------------------------------------------------------------------------
 
-_GOLDEN_MANIFEST_SHA256 = "b50db777149a7c4a5c3bba53f698ac330a8ce1998ab20674f04f69a59d2739b9"
+_GOLDEN_MANIFEST_SHA256 = "40542b6d0589983ab93332bad5cbe61012b4a62996dd4bef9ce3162ee49b951a"
 
 
 def test_manifest_serialization_matches_pinned_byte_golden() -> None:
@@ -324,6 +353,10 @@ def test_manifest_serialization_matches_pinned_byte_golden() -> None:
         "alpha": {
             "returns": _synthetic_returns(12345, 64, drift=0.0025, scale=0.01),
             "turnover": 0.01,
+            "returns_are_net": False,
+            "return_timestamps": _return_timestamps(64),
+            **_materialized_timing(64),
+            "returns_source": "train_validation",
             "strategy_class": "MovingAverageCrossStrategy",
             "symbols": ["BTC/USDT"],
             "params": {"short_window": 4, "long_window": 12},
@@ -332,6 +365,10 @@ def test_manifest_serialization_matches_pinned_byte_golden() -> None:
         "beta": {
             "returns": _synthetic_returns(67890, 64, drift=0.0018, scale=0.02),
             "turnover": 0.02,
+            "returns_are_net": False,
+            "return_timestamps": _return_timestamps(64),
+            **_materialized_timing(64),
+            "returns_source": "train_validation",
             "strategy_class": "MovingAverageCrossStrategy",
             "symbols": ["ETH/USDT"],
             "params": {"short_window": 6, "long_window": 20},
@@ -346,6 +383,10 @@ def test_manifest_serialization_matches_pinned_byte_golden() -> None:
             "max_age_hours": 100_000,
             "ready": True,
             "portfolio_ready": True,
+            "return_panel_sha256_by_sleeve": {
+                sleeve_id: _materialized_return_panel_sha256(sleeve_id, spec)
+                for sleeve_id, spec in sleeves.items()
+            },
         }
     ]
 

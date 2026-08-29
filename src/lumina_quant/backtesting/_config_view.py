@@ -227,3 +227,7 @@ class BacktestConfigView:
             sq.profit_moonshot_conflict_cooldown_bars
         )
         self.STRATEGY_QUALITY_PAIR_MIN_CORRELATION = float(sq.pair_min_correlation)
+        self.STRATEGY_QUALITY_MIN_HOLD_BARS = int(getattr(sq, "min_hold_bars", 0) or 0)
+        self.STRATEGY_QUALITY_NO_TRADE_BAND_BPS = float(
+            getattr(sq, "no_trade_band_bps", 0.0) or 0.0
+        )

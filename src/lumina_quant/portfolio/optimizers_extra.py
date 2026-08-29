@@ -78,6 +78,60 @@ def _clean_cov(cov: Any) -> np.ndarray:
     return 0.5 * (matrix + matrix.T)
 
 
+def _finite_parameter(value: Any, *, name: str, minimum: float = 0.0) -> float:
+    if isinstance(value, (bool, np.bool_)) or not isinstance(
+        value, (int, float, np.integer, np.floating)
+    ):
+        raise ValueError(f"{name} must be a finite number")
+    result = float(value)
+    if not np.isfinite(result) or result < minimum:
+        raise ValueError(f"{name} must be a finite number no less than {minimum}")
+    return result
+
+
+def _optional_positive_integer(value: Any, *, name: str) -> int | None:
+    if value is None:
+        return None
+    if (
+        isinstance(value, (bool, np.bool_))
+        or not isinstance(value, (int, np.integer))
+        or value <= 0
+    ):
+        raise ValueError(f"{name} must be a positive integer or None")
+    return int(value)
+
+
+def _registered_allocation_inputs(
+    ids: Any, returns_matrix: Any, upper: Any
+) -> tuple[list[str], np.ndarray, dict[str, float] | None]:
+    if isinstance(ids, (str, bytes)):
+        raise ValueError("ids must be a sequence of unique stripped nonempty strings")
+    try:
+        resolved_ids = list(ids)
+    except TypeError as exc:
+        raise ValueError("ids must be a sequence of unique stripped nonempty strings") from exc
+    if any(
+        not isinstance(cid, str) or not cid.strip() or cid != cid.strip() for cid in resolved_ids
+    ):
+        raise ValueError("ids must be unique stripped nonempty strings")
+    if len(set(resolved_ids)) != len(resolved_ids):
+        raise ValueError("ids must be unique stripped nonempty strings")
+    try:
+        matrix = np.asarray(returns_matrix, dtype=float)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("returns_matrix must be a finite two-dimensional numeric array") from exc
+    if matrix.ndim != 2 or matrix.shape[1] != len(resolved_ids) or not np.all(np.isfinite(matrix)):
+        raise ValueError("returns_matrix must be finite with shape (observations, len(ids))")
+    if upper is None:
+        return resolved_ids, matrix, None
+    if not isinstance(upper, dict) or set(upper) != set(resolved_ids):
+        raise ValueError("upper must map exactly the allocation ids to finite caps")
+    bounds = {cid: _finite_parameter(cap, name="upper", minimum=0.0) for cid, cap in upper.items()}
+    if any(cap > 1.0 for cap in bounds.values()) or sum(bounds.values()) < 1.0:
+        raise ValueError("upper caps must be in [0, 1] and feasible")
+    return resolved_ids, matrix, bounds
+
+
 def project_to_simplex(vector: Any, *, total: float = 1.0) -> np.ndarray:
     """Euclidean projection of ``vector`` onto ``{w >= 0, sum(w) == total}``.
 
@@ -398,9 +452,9 @@ class ERCPortfolio:
         tol: float = 1e-10,
         cov_window: int | None = None,
     ) -> None:
-        self.max_iter = int(max_iter)
-        self.tol = float(tol)
-        self.cov_window = cov_window
+        self.max_iter = _optional_positive_integer(max_iter, name="max_iter")
+        self.tol = _finite_parameter(tol, name="tol")
+        self.cov_window = _optional_positive_integer(cov_window, name="cov_window")
 
     def allocate(
         self,
@@ -409,9 +463,8 @@ class ERCPortfolio:
         *,
         upper: dict[str, float] | None = None,
     ) -> dict[str, float]:
-        ids = list(ids)
-        matrix = _clean_matrix(returns_matrix)
-        if not ids or matrix.shape[1] != len(ids):
+        ids, matrix, upper = _registered_allocation_inputs(ids, returns_matrix, upper)
+        if not ids:
             return {}
         cov, _ = ledoit_wolf_shrunk_covariance(matrix, window=self.cov_window)
         weights = erc_weights(cov, max_iter=self.max_iter, tol=self.tol)
@@ -430,10 +483,10 @@ class MaxDiversificationPortfolio:
         tol: float = 1e-12,
         cov_window: int | None = None,
     ) -> None:
-        self.max_iter = int(max_iter)
-        self.step = float(step)
-        self.tol = float(tol)
-        self.cov_window = cov_window
+        self.max_iter = _optional_positive_integer(max_iter, name="max_iter")
+        self.step = _finite_parameter(step, name="step")
+        self.tol = _finite_parameter(tol, name="tol")
+        self.cov_window = _optional_positive_integer(cov_window, name="cov_window")
 
     def allocate(
         self,
@@ -442,9 +495,8 @@ class MaxDiversificationPortfolio:
         *,
         upper: dict[str, float] | None = None,
     ) -> dict[str, float]:
-        ids = list(ids)
-        matrix = _clean_matrix(returns_matrix)
-        if not ids or matrix.shape[1] != len(ids):
+        ids, matrix, upper = _registered_allocation_inputs(ids, returns_matrix, upper)
+        if not ids:
             return {}
         cov, _ = ledoit_wolf_shrunk_covariance(matrix, window=self.cov_window)
         weights = max_diversification_weights(
@@ -466,11 +518,11 @@ class MeanVariancePortfolio:
         tol: float = 1e-12,
         cov_window: int | None = None,
     ) -> None:
-        self.risk_aversion = float(risk_aversion)
-        self.max_iter = int(max_iter)
-        self.step = float(step)
-        self.tol = float(tol)
-        self.cov_window = cov_window
+        self.risk_aversion = _finite_parameter(risk_aversion, name="risk_aversion")
+        self.max_iter = _optional_positive_integer(max_iter, name="max_iter")
+        self.step = _finite_parameter(step, name="step")
+        self.tol = _finite_parameter(tol, name="tol")
+        self.cov_window = _optional_positive_integer(cov_window, name="cov_window")
 
     def allocate(
         self,
@@ -479,9 +531,8 @@ class MeanVariancePortfolio:
         *,
         upper: dict[str, float] | None = None,
     ) -> dict[str, float]:
-        ids = list(ids)
-        matrix = _clean_matrix(returns_matrix)
-        if not ids or matrix.shape[1] != len(ids):
+        ids, matrix, upper = _registered_allocation_inputs(ids, returns_matrix, upper)
+        if not ids:
             return {}
         cov, _ = ledoit_wolf_shrunk_covariance(matrix, window=self.cov_window)
         mean = matrix.mean(axis=0) if matrix.shape[0] > 0 else np.zeros(len(ids))
@@ -506,8 +557,10 @@ class HRPPortfolio:
         corr_threshold: float = 0.60,
         cov_window: int | None = None,
     ) -> None:
-        self.corr_threshold = float(corr_threshold)
-        self.cov_window = cov_window
+        self.corr_threshold = _finite_parameter(corr_threshold, name="corr_threshold")
+        if self.corr_threshold > 1.0:
+            raise ValueError("corr_threshold must be no greater than 1")
+        self.cov_window = _optional_positive_integer(cov_window, name="cov_window")
 
     def allocate(
         self,
@@ -516,9 +569,8 @@ class HRPPortfolio:
         *,
         upper: dict[str, float] | None = None,
     ) -> dict[str, float]:
-        ids = list(ids)
-        matrix = _clean_matrix(returns_matrix)
-        if not ids or matrix.shape[1] != len(ids):
+        ids, matrix, upper = _registered_allocation_inputs(ids, returns_matrix, upper)
+        if not ids:
             return {}
         weights = hrp_weights_from_returns(
             ids,

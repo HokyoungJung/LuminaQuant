@@ -17,7 +17,7 @@ from lumina_quant.backtesting.execution_model import (
     _config_from_attrs,
     execution_pricing_trace_sha256,
 )
-from lumina_quant.core.events import FillEvent, OrderEvent
+from lumina_quant.core.events import FillEvent, OrderEvent, SignalEvent
 from lumina_quant.core.order_policy import (
     canonical_order_type,
     limit_price_for_direction,
@@ -26,6 +26,7 @@ from lumina_quant.core.order_policy import (
     policy_order_type,
     price_tick_size_from_sources,
 )
+from lumina_quant.data.feature_points import BINANCE_FUNDING_SOURCE_JITTER_TOLERANCE_MS
 from lumina_quant.market_data import normalize_timeframe_token, timeframe_to_milliseconds
 from lumina_quant.risk_manager import RiskManager
 from lumina_quant.portfolio.strategy_quality import StrategyQualityOverlay
@@ -358,6 +359,12 @@ class Portfolio:
         self.funding_on_utc_boundary = self._audit_flag(
             config, "FUNDING_ON_UTC_BOUNDARY", "execution", "funding_on_utc_boundary"
         )
+        # L-D funding-entry guard (pre-registered fixed rule, default OFF):
+        # skip a new entry whose declared intended hold is shorter than one
+        # funding interval AND would straddle the next settlement boundary.
+        self.funding_entry_guard = self._audit_flag(
+            config, "FUNDING_ENTRY_GUARD", "execution", "funding_entry_guard"
+        )
         # Lazily-constructed RiskManager backstop for the order-time gate (only when
         # enforce_order_risk_gate is True). Mirrors the live/trader.py:1713 usage.
         self._risk_manager = None
@@ -372,6 +379,13 @@ class Portfolio:
         )
         self._current_day = None
         self._last_funding_ts = dict.fromkeys(self.symbol_list)
+        # Settlement evidence and position exposure advance independently. The
+        # latter is sampled before every position-changing fill so delayed
+        # evidence cannot reinterpret a past boundary at a later size.
+        self._funding_exposure_cursor = dict.fromkeys(self.symbol_list)
+        # UTC funding evidence can publish shortly after its nominal boundary.
+        # Preserve the boundary exposure before same-bar fills mutate it.
+        self._pending_funding_liabilities = {symbol: {} for symbol in self.symbol_list}
         self.total_funding_paid = 0.0
         self.entry_prices = dict.fromkeys(self.symbol_list)
         self.liquidation_events = []
@@ -393,10 +407,19 @@ class Portfolio:
         self._liq_price_cache = {}
         self._metric_totals = [float(self.initial_capital)] if self.track_metrics else []
         self._metric_benchmarks = [0.0] if self.track_metrics else []
+        self._last_metric_timestamp_ms = (
+            self._to_timestamp_ms(self.start_date) if self.track_metrics else None
+        )
         self._equity_points = deque(maxlen=20_000)
         self.trading_frozen = False
         self.component_positions = {}
 
+        # L-C no-trade band (bps of equity). 0.0 = OFF (byte-identical default):
+        # entry / partial-exit orders below the band are dropped as sub-cost
+        # churn; full exits are always exempt (position hygiene).
+        self.no_trade_band_bps = float(
+            getattr(config, "STRATEGY_QUALITY_NO_TRADE_BAND_BPS", 0.0) or 0.0
+        )
         self.strategy_quality = StrategyQualityOverlay(config)
         # Initialize first record
         self.update_initial_record()
@@ -453,7 +476,7 @@ class Portfolio:
             "circuit_breaker_tripped": self.circuit_breaker_tripped,
             "entry_prices": self.entry_prices,
             "total_funding_paid": self.total_funding_paid,
-            "last_funding_ts": self._last_funding_ts,
+            "funding": self._funding_state(),
             "pending_liquidation": list(self._pending_liquidation),
             "liquidation_events": list(self.liquidation_events),
             "trade_count": self.trade_count,
@@ -461,60 +484,224 @@ class Portfolio:
             "equity_points": list(self._equity_points),
             "component_positions": self.component_positions,
             "last_sample_timestamp_ms": self._last_sample_timestamp_ms,
+            "last_metric_timestamp_ms": self._last_metric_timestamp_ms,
             "strategy_quality": self.strategy_quality.get_state(),
             "current_day": self._current_day,
             "day_start_equity": self.day_start_equity,
         }
 
     def set_state(self, state):
+        if not isinstance(state, dict):
+            raise ValueError("portfolio state must be an object")
+        if set(state) != set(self.get_state()):
+            raise ValueError("portfolio state must contain the exact checkpoint schema")
+        symbols = set(self.symbol_list)
+
+        def finite(value, name):
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                raise ValueError(f"invalid {name}")
+            value = float(value)
+            if not math.isfinite(value):
+                raise ValueError(f"invalid {name}")
+            return value
+
+        staged = {}
         if "positions" in state:
-            self.current_positions = state["positions"]
-        if "holdings" in state:
-            self.current_holdings = state["holdings"]
-        if "initial_capital" in state:
-            self.initial_capital = state["initial_capital"]
-        if "circuit_breaker_tripped" in state:
-            self.circuit_breaker_tripped = state["circuit_breaker_tripped"]
-        if "entry_prices" in state and isinstance(state["entry_prices"], dict):
-            self.entry_prices = state["entry_prices"]
-        if "total_funding_paid" in state:
-            self.total_funding_paid = float(state["total_funding_paid"])
-        if "last_funding_ts" in state and isinstance(state["last_funding_ts"], dict):
-            self._last_funding_ts = state["last_funding_ts"]
-        if "pending_liquidation" in state:
-            self._pending_liquidation = set(state["pending_liquidation"])
-        if "liquidation_events" in state and isinstance(state["liquidation_events"], list):
-            self.liquidation_events = list(state["liquidation_events"])
-        if "trade_count" in state:
-            self.trade_count = int(state["trade_count"])
-        if "trading_frozen" in state:
-            self.trading_frozen = bool(state["trading_frozen"])
-        if "equity_points" in state and isinstance(state["equity_points"], list):
-            self._equity_points = deque(state["equity_points"], maxlen=20_000)
-        if "component_positions" in state and isinstance(state["component_positions"], dict):
-            self.component_positions = {
-                str(component): {
-                    str(symbol): float(quantity) for symbol, quantity in dict(symbols or {}).items()
-                }
-                for component, symbols in dict(state["component_positions"]).items()
+            raw = state["positions"]
+            if not isinstance(raw, dict) or set(raw) != symbols:
+                raise ValueError("positions must cover exactly known symbols")
+            staged["current_positions"] = {
+                symbol: finite(quantity, f"position {symbol}") for symbol, quantity in raw.items()
             }
-        if "last_sample_timestamp_ms" in state:
-            raw_last_sample = state.get("last_sample_timestamp_ms")
-            try:
-                self._last_sample_timestamp_ms = (
-                    int(raw_last_sample) if raw_last_sample is not None else None
-                )
-            except Exception:
-                self._last_sample_timestamp_ms = None
-        if "strategy_quality" in state and isinstance(state["strategy_quality"], dict):
-            self.strategy_quality.set_state(state["strategy_quality"])
+        if "holdings" in state:
+            raw = state["holdings"]
+            required = {"cash", "commission", "funding", "total", *symbols}
+            if not isinstance(raw, dict) or set(raw) != required:
+                raise ValueError("holdings must cover exactly known fields")
+            staged["current_holdings"] = {
+                key: finite(value, f"holding {key}") for key, value in raw.items()
+            }
+        if "entry_prices" in state:
+            raw = state["entry_prices"]
+            if not isinstance(raw, dict) or set(raw) != symbols:
+                raise ValueError("entry_prices must cover exactly known symbols")
+            staged["entry_prices"] = {
+                symbol: None if value is None else finite(value, f"entry price {symbol}")
+                for symbol, value in raw.items()
+            }
+        if "funding" in state:
+            funding = self._validated_funding_state(state["funding"])
+            staged.update(
+                _last_funding_ts=funding["settlement_cursors"],
+                _funding_exposure_cursor=funding["exposure_cursors"],
+                _pending_funding_liabilities=funding["liabilities"],
+            )
+        if "pending_liquidation" in state:
+            raw = state["pending_liquidation"]
+            if not isinstance(raw, list) or not all(
+                isinstance(item, str) and item in symbols for item in raw
+            ):
+                raise ValueError("invalid pending_liquidation")
+            staged["_pending_liquidation"] = set(raw)
+        if "liquidation_events" in state:
+            raw = state["liquidation_events"]
+            if not isinstance(raw, list) or not all(isinstance(item, dict) for item in raw):
+                raise ValueError("invalid liquidation_events")
+            staged["liquidation_events"] = list(raw)
+        for key in ("initial_capital", "total_funding_paid", "day_start_equity"):
+            if key in state:
+                staged[key] = finite(state[key], key)
+        if "trade_count" in state:
+            if (
+                isinstance(state["trade_count"], bool)
+                or not isinstance(state["trade_count"], int)
+                or state["trade_count"] < 0
+            ):
+                raise ValueError("invalid trade_count")
+            staged["trade_count"] = state["trade_count"]
+        if "circuit_breaker_tripped" in state:
+            if not isinstance(state["circuit_breaker_tripped"], bool):
+                raise ValueError("invalid circuit_breaker_tripped")
+            staged["circuit_breaker_tripped"] = state["circuit_breaker_tripped"]
+        if "trading_frozen" in state:
+            if not isinstance(state["trading_frozen"], bool):
+                raise ValueError("invalid trading_frozen")
+            staged["trading_frozen"] = state["trading_frozen"]
+        for key in ("last_sample_timestamp_ms", "last_metric_timestamp_ms"):
+            if key in state:
+                value = state[key]
+                if value is not None and (isinstance(value, bool) or not isinstance(value, int)):
+                    raise ValueError(f"invalid {key}")
+                staged[f"_{key}"] = value
+        if "equity_points" in state:
+            raw = state["equity_points"]
+            if not isinstance(raw, list):
+                raise ValueError("invalid equity_points")
+            staged["_equity_points"] = deque(raw, maxlen=20_000)
+        if "component_positions" in state:
+            raw = state["component_positions"]
+            if not isinstance(raw, dict):
+                raise ValueError("invalid component_positions")
+            staged["component_positions"] = {
+                str(component): {
+                    str(symbol): finite(quantity, f"component position {symbol}")
+                    for symbol, quantity in dict(values).items()
+                }
+                for component, values in raw.items()
+                if isinstance(component, str) and component and isinstance(values, dict)
+            }
+            if len(staged["component_positions"]) != len(raw):
+                raise ValueError("invalid component_positions")
         if "current_day" in state:
-            self._current_day = state.get("current_day")
-        if "day_start_equity" in state:
-            try:
-                self.day_start_equity = float(state.get("day_start_equity"))
-            except Exception:
-                pass
+            staged["_current_day"] = state["current_day"]
+        if "strategy_quality" in state and not isinstance(state["strategy_quality"], dict):
+            raise ValueError("invalid strategy_quality")
+
+        previous_strategy_quality = self.strategy_quality.get_state()
+        try:
+            if "strategy_quality" in state:
+                self.strategy_quality.set_state(state["strategy_quality"])
+            for key, value in staged.items():
+                setattr(self, key, value)
+        except Exception:
+            self.strategy_quality.set_state(previous_strategy_quality)
+            raise
+
+    def _funding_state(self):
+        rows = [
+            {
+                "symbol": symbol,
+                "boundary_ms": boundary_ms,
+                "quantity": quantity,
+            }
+            for symbol in sorted(self.symbol_list)
+            for boundary_ms, quantity in sorted(
+                self._pending_funding_liabilities.get(symbol, {}).items()
+            )
+        ]
+        return {
+            "schema": "portfolio_funding.v1",
+            "settlement_cursors": dict(self._last_funding_ts),
+            "exposure_cursors": dict(self._funding_exposure_cursor),
+            "liabilities": rows,
+        }
+
+    def _validated_funding_state(self, value):
+        if not isinstance(value, dict) or set(value) != {
+            "schema",
+            "settlement_cursors",
+            "exposure_cursors",
+            "liabilities",
+        }:
+            raise ValueError("invalid atomic funding state")
+        if value["schema"] != "portfolio_funding.v1":
+            raise ValueError("unsupported funding state schema")
+        symbols = set(self.symbol_list)
+
+        def cursors(name):
+            raw = value[name]
+            if not isinstance(raw, dict) or set(raw) != symbols:
+                raise ValueError(f"funding {name} must cover exactly known symbols")
+            parsed = {}
+            for symbol, cursor in raw.items():
+                if cursor is None:
+                    parsed[symbol] = None
+                elif (
+                    isinstance(cursor, bool)
+                    or not isinstance(cursor, (int, float))
+                    or not math.isfinite(float(cursor))
+                ):
+                    raise ValueError(f"invalid funding {name} cursor")
+                else:
+                    parsed[symbol] = float(cursor)
+            return parsed
+
+        settlement_cursors = cursors("settlement_cursors")
+        exposure_cursors = cursors("exposure_cursors")
+        interval_ms = int(self.execution_model.cfg.funding_interval_hours * 3_600_000)
+        rows = value["liabilities"]
+        if not isinstance(rows, list) or interval_ms <= 0:
+            raise ValueError("invalid funding liabilities")
+        liabilities = {symbol: {} for symbol in self.symbol_list}
+        previous = None
+        for row in rows:
+            if not isinstance(row, dict) or set(row) != {"symbol", "boundary_ms", "quantity"}:
+                raise ValueError("invalid funding liability row")
+            symbol = row["symbol"]
+            boundary_ms = row["boundary_ms"]
+            quantity = row["quantity"]
+            if (
+                symbol not in symbols
+                or isinstance(boundary_ms, bool)
+                or not isinstance(boundary_ms, int)
+                or boundary_ms < 0
+                or boundary_ms % interval_ms
+                or isinstance(quantity, bool)
+                or not isinstance(quantity, (int, float))
+                or not math.isfinite(float(quantity))
+                or abs(float(quantity)) < 1e-12
+            ):
+                raise ValueError("invalid funding liability row")
+            key = (symbol, boundary_ms)
+            if previous is not None and key <= previous:
+                raise ValueError("funding liability rows must be canonical and unique")
+            previous = key
+            liabilities[symbol][boundary_ms] = float(quantity)
+        for symbol in self.symbol_list:
+            settlement = settlement_cursors[symbol]
+            exposure = exposure_cursors[symbol]
+            if settlement is not None and exposure is not None and settlement > exposure:
+                raise ValueError("funding settlement cursor exceeds exposure cursor")
+            for boundary_ms in liabilities[symbol]:
+                if settlement is not None and boundary_ms <= round(settlement * 1000):
+                    raise ValueError("pending funding liability is already settled")
+                if exposure is None or boundary_ms > round(exposure * 1000):
+                    raise ValueError("pending funding liability exceeds exposure cursor")
+        return {
+            "settlement_cursors": settlement_cursors,
+            "exposure_cursors": exposure_cursors,
+            "liabilities": liabilities,
+        }
 
     @staticmethod
     def _audit_flag(config, upper_attr: str, section: str, field: str) -> bool:
@@ -946,6 +1133,33 @@ class Portfolio:
         primary_symbol = self.symbol_list[0]
         latest_datetime = self.bars.get_latest_bar_datetime(primary_symbol)
         self.strategy_quality.next_bar(latest_datetime)
+        self.strategy_quality.reconcile_min_hold_positions(
+            self.current_positions,
+            self.component_positions,
+        )
+        # L-C min-hold: release deferred bare EXITs whose hold just matured as
+        # synthetic EXIT signals (the emitting strategy is one-shot and will
+        # never re-emit). The overlay_reason marker lets them pass the gate.
+        for pending in self.strategy_quality.pop_matured_pending_exits():
+            metadata = dict(pending.get("metadata") or {})
+            metadata["overlay_reason"] = "min_hold_released"
+            metadata["min_hold_exit_key"] = str(pending.get("key") or "")
+            if pending.get("component_id"):
+                metadata.setdefault("component_id", pending["component_id"])
+            self.events.put(
+                SignalEvent(
+                    strategy_id=str(pending.get("strategy_id") or "overlay"),
+                    symbol=str(pending.get("symbol") or ""),
+                    datetime=latest_datetime,
+                    signal_type="EXIT",
+                    strength=1.0,
+                    client_order_id=str(pending.get("client_order_id") or "") or None,
+                    metadata=metadata,
+                )
+            )
+            self.strategy_quality.mark_pending_exit_state(
+                str(pending.get("key") or ""), "DISPATCHED"
+            )
         should_sample = self._should_sample(latest_datetime)
         self._update_day_boundary(latest_datetime)
         self._apply_funding(latest_datetime)
@@ -969,6 +1183,7 @@ class Portfolio:
             if self.track_metrics and should_sample:
                 self._metric_totals.append(float(total))
                 self._metric_benchmarks.append(float(close_price))
+                self._last_metric_timestamp_ms = self._to_timestamp_ms(latest_datetime)
 
             if collect_history:
                 self.all_positions.append((latest_datetime, qty))
@@ -1003,6 +1218,7 @@ class Portfolio:
         if self.track_metrics and should_sample:
             self._metric_totals.append(float(total))
             self._metric_benchmarks.append(float(bench_price))
+            self._last_metric_timestamp_ms = self._to_timestamp_ms(latest_datetime)
         if not collect_history:
             return
 
@@ -1099,6 +1315,55 @@ class Portfolio:
             self.current_holdings[symbol] = market_value
         self.current_holdings["total"] = float(totals[-1])
 
+    def reconcile_final_snapshot(self):
+        """Refresh the last bar snapshot after its queued fills have drained."""
+        latest_datetime = self.bars.get_latest_bar_datetime(self.symbol_list[0])
+        if latest_datetime is None:
+            return
+        market_values = []
+        for symbol in self.symbol_list:
+            value = float(self.current_positions[symbol]) * float(
+                self.bars.get_latest_bar_value(symbol, "close")
+            )
+            self.current_holdings[symbol] = value
+            market_values.append(value)
+        total = float(self.current_holdings["cash"]) + sum(market_values)
+        self.current_holdings["total"] = total
+        benchmark = float(self.bars.get_latest_bar_value(self.symbol_list[0], "close"))
+
+        if self._equity_points and self._equity_points[-1][0] == self._to_unix_seconds(
+            latest_datetime
+        ):
+            self._equity_points[-1] = (self._equity_points[-1][0], total)
+        metric_timestamp_ms = self._to_timestamp_ms(latest_datetime)
+        if self.track_metrics:
+            if self._metric_totals and self._last_metric_timestamp_ms == metric_timestamp_ms:
+                self._metric_totals[-1] = total
+                self._metric_benchmarks[-1] = benchmark
+            else:
+                self._metric_totals.append(total)
+                self._metric_benchmarks.append(benchmark)
+                self._last_metric_timestamp_ms = metric_timestamp_ms
+        if not self.record_history:
+            return
+
+        positions = (latest_datetime, *(self.current_positions[s] for s in self.symbol_list))
+        holdings = (
+            latest_datetime,
+            self.current_holdings["cash"],
+            self.current_holdings["commission"],
+            self.current_holdings.get("funding", 0.0),
+            total,
+            *market_values,
+            benchmark,
+        )
+        if self.all_positions and self.all_positions[-1][0] == latest_datetime:
+            self.all_positions[-1] = positions
+            self.all_holdings[-1] = holdings
+        else:
+            self.all_positions.append(positions)
+            self.all_holdings.append(holdings)
+
     def _to_timestamp_ms(self, value):
         if value is None:
             return None
@@ -1167,6 +1432,11 @@ class Portfolio:
         old_qty = float(self.current_positions.get(fill.symbol, 0.0))
         fill_qty = float(fill.quantity) * fill_dir
         new_qty = old_qty + fill_qty
+        if self.funding_on_utc_boundary:
+            fill_ts = self._to_unix_seconds(getattr(fill, "timeindex", None))
+            if fill_ts is None:
+                raise ValueError("UTC funding exposure scan requires a fill timestamp")
+            self._scan_funding_exposure(fill.symbol, now_ts=fill_ts, quantity=old_qty)
         self.current_positions[fill.symbol] = new_qty
 
         component_id = self._component_id_from_metadata(getattr(fill, "metadata", None))
@@ -1201,6 +1471,7 @@ class Portfolio:
             # funding income). Re-anchoring happens lazily in _apply_funding when
             # last_ts is None on the next bar the position is held.
             self._last_funding_ts[fill.symbol] = None
+            self._funding_exposure_cursor[fill.symbol] = None
             return
 
         # Position flip or fresh position: entry resets to current fill price.
@@ -1209,6 +1480,9 @@ class Portfolio:
             self._pending_liquidation.discard(fill.symbol)
             if alpha_funding_anchor is not None:
                 self._last_funding_ts[fill.symbol] = alpha_funding_anchor
+            self._funding_exposure_cursor[fill.symbol] = self._to_unix_seconds(
+                getattr(fill, "timeindex", None)
+            )
             return
 
         # Adding to existing direction updates VWAP entry.
@@ -1353,7 +1627,27 @@ class Portfolio:
                 if event.fill_cost is not None and float(event.quantity) > 0.0
                 else float(self.bars.get_latest_bar_value(event.symbol, "close") or 0.0)
             )
-            self.strategy_quality.note_fill(event, old_qty, new_qty, fill_price)
+            # Component book qtys (pre-update: update_positions_from_fill runs
+            # below) so the min-hold ledger tracks the book the fill moved.
+            fill_component_id = self._component_id_from_metadata(getattr(event, "metadata", None))
+            component_old_qty = None
+            component_new_qty = None
+            if fill_component_id:
+                component_old_qty = float(
+                    dict(self.component_positions.get(fill_component_id) or {}).get(
+                        event.symbol, 0.0
+                    )
+                )
+                component_new_qty = component_old_qty + fill_dir * float(event.quantity)
+            self.strategy_quality.note_fill(
+                event,
+                old_qty,
+                new_qty,
+                fill_price,
+                component_id=fill_component_id,
+                component_old_qty=component_old_qty,
+                component_new_qty=component_new_qty,
+            )
             self.update_positions_from_fill(event)
             self.update_holdings_from_fill(event)
             self.trade_count += 1
@@ -1456,6 +1750,15 @@ class Portfolio:
             return
 
         for symbol in self.symbol_list:
+            if self.funding_on_utc_boundary:
+                self._apply_utc_boundary_funding(
+                    symbol,
+                    now_ts=now_ts,
+                    interval_seconds=interval_seconds,
+                    default_rate_per_8h=default_rate_per_8h,
+                )
+                continue
+
             qty = float(self.current_positions.get(symbol, 0.0))
             if abs(qty) < 1e-12:
                 continue
@@ -1467,16 +1770,7 @@ class Portfolio:
             if now_ts <= last_ts:
                 continue
 
-            if self.funding_on_utc_boundary:
-                # Count crossed wall-clock funding boundaries. The Unix epoch is
-                # aligned to the exchange 00/08/16 UTC funding epoch because
-                # 86400 % 28800 == 0, so floor(ts / interval) is the boundary
-                # index directly. This charges funding independent of holding
-                # duration (a sub-8h hold straddling a boundary pays one event),
-                # versus the entry-anchored elapsed-duration clock below.
-                periods = int(now_ts // interval_seconds) - int(last_ts // interval_seconds)
-            else:
-                periods = int((now_ts - last_ts) // interval_seconds)
+            periods = int((now_ts - last_ts) // interval_seconds)
             if periods <= 0:
                 continue
 
@@ -1503,13 +1797,94 @@ class Portfolio:
             self.current_holdings["total"] -= funding_payment
             self.current_holdings["funding"] += funding_payment
             self.total_funding_paid += funding_payment
-            if self.funding_on_utc_boundary:
-                # Advance the baseline to the current snapshot: floor(now_ts /
-                # interval) is the last charged boundary index, so the next call
-                # counts only boundaries crossed after this bar.
-                self._last_funding_ts[symbol] = now_ts
+            self._last_funding_ts[symbol] = last_ts + periods * interval_seconds
+
+    def settle_terminal_funding(self, as_of):
+        """Settle boundary liabilities using evidence observable by ``as_of``."""
+        self._apply_funding(as_of)
+        if any(bool(rows) for rows in self._pending_funding_liabilities.values()):
+            raise ValueError("terminal pending funding liability lacks settlement evidence")
+        self.reconcile_final_snapshot()
+
+    def _scan_funding_exposure(self, symbol, *, now_ts, quantity):
+        """Freeze every boundary exposure in ``(cursor, now]`` before advancing."""
+        if not math.isfinite(float(now_ts)):
+            raise ValueError("invalid UTC funding exposure timestamp")
+        interval_seconds = float(self.execution_model.cfg.funding_interval_hours) * 3600.0
+        if not math.isfinite(interval_seconds) or interval_seconds <= 0.0:
+            raise ValueError("invalid UTC funding interval")
+        cursor = self._funding_exposure_cursor.get(symbol)
+        if cursor is None:
+            if abs(float(quantity)) >= 1e-12:
+                self._funding_exposure_cursor[symbol] = float(now_ts)
+            return
+        if now_ts < cursor:
+            raise ValueError("UTC funding exposure timestamp moved backwards")
+        if now_ts == cursor:
+            return
+        if abs(float(quantity)) >= 1e-12:
+            first_boundary = (int(cursor // interval_seconds) + 1) * int(interval_seconds)
+            last_boundary = int(now_ts // interval_seconds) * int(interval_seconds)
+            liabilities = self._pending_funding_liabilities.setdefault(symbol, {})
+            for boundary_ts in range(first_boundary, last_boundary + 1, int(interval_seconds)):
+                liabilities.setdefault(int(boundary_ts * 1000), float(quantity))
+        self._funding_exposure_cursor[symbol] = float(now_ts)
+
+    def _apply_utc_boundary_funding(
+        self,
+        symbol,
+        *,
+        now_ts,
+        interval_seconds,
+        default_rate_per_8h,
+    ):
+        """Settle UTC funding from immutable boundary exposures in exact order."""
+        interval_ms = int(interval_seconds * 1000)
+        liabilities = self._pending_funding_liabilities.setdefault(symbol, {})
+        qty = float(self.current_positions.get(symbol, 0.0))
+        self._scan_funding_exposure(symbol, now_ts=now_ts, quantity=qty)
+
+        lookup = getattr(self.bars, "_feature_lookup", None)
+        sum_fn = getattr(lookup, "funding_fee_sum_between", None)
+        for boundary_ms in sorted(liabilities):
+            boundary_qty = float(liabilities[boundary_ms])
+            coverage = None
+            if callable(sum_fn):
+                coverage = sum_fn(
+                    symbol,
+                    start_timestamp_ms=boundary_ms - interval_ms,
+                    end_timestamp_ms=min(
+                        int(now_ts * 1000),
+                        boundary_ms + BINANCE_FUNDING_SOURCE_JITTER_TOLERANCE_MS,
+                    ),
+                    interval_ms=interval_ms,
+                )
+            fee_sum, complete = coverage if coverage is not None else (None, False)
+            if complete and fee_sum is not None:
+                funding_payment = boundary_qty * float(fee_sum)
             else:
-                self._last_funding_ts[symbol] = last_ts + periods * interval_seconds
+                deferred_boundary_ms = getattr(coverage, "deferred_boundary_ms", None)
+                if deferred_boundary_ms is not None:
+                    break
+                if self.require_funding_coverage:
+                    raise ValueError(
+                        "require_funding_coverage: missing exact funding settlement data "
+                        f"for symbol {symbol!r} at boundary {boundary_ms}"
+                    )
+                rate_per_8h = self._resolve_funding_rate(symbol, default=default_rate_per_8h)
+                price = self.bars.get_latest_bar_value(symbol, "close")
+                funding_payment = self.execution_model.compute_funding_payment(
+                    signed_qty=boundary_qty,
+                    price=price,
+                    periods=1,
+                    rate=rate_per_8h,
+                )
+            self.current_holdings["cash"] -= funding_payment
+            self.current_holdings["total"] -= funding_payment
+            self.current_holdings["funding"] += funding_payment
+            self.total_funding_paid += funding_payment
+            del liabilities[boundary_ms]
+            self._last_funding_ts[symbol] = boundary_ms / 1000.0
 
     def _bar_funding_rate(self, symbol) -> float | None:
         """Return the bar-column funding rate, or ``None`` when genuinely absent.
@@ -1532,8 +1907,15 @@ class Portfolio:
         else:
             # Handlers without a col_idx contract (test doubles, adapters) keep
             # the legacy behavior: a non-None value is trusted as-is.
+            declared = getattr(self.bars, "funding_rate", ...)
+            if declared is None:
+                return None
             try:
-                value = self.bars.get_latest_bar_value(symbol, "funding_rate")
+                value = (
+                    declared
+                    if declared is not ...
+                    else self.bars.get_latest_bar_value(symbol, "funding_rate")
+                )
             except Exception:
                 return None
         if value is None:
@@ -2056,6 +2438,90 @@ class Portfolio:
             return float(entry_price) * (1.0 - pct)
         return float(entry_price) * (1.0 + pct)
 
+    def _funding_entry_guard_blocks(self, signal, symbol) -> bool:
+        """L-D pre-registered rule: block a sub-funding-interval entry that
+        would straddle the next 00/08/16 UTC settlement boundary.
+
+        Only fires when the flag is ON and the signal DECLARES an intended
+        hold via ``intended_hold_seconds`` (or ``intended_hold_bars`` at the
+        config timeframe); undeclared signals are never blocked.
+        """
+        if not self.funding_entry_guard:
+            return False
+        # The guard is defined against exchange settlement boundaries. Enabling
+        # it without boundary-mode funding would make admission and accounting
+        # disagree, so reject rather than silently applying an elapsed-time rule.
+        if not self.funding_on_utc_boundary:
+            return True
+        metadata = dict(getattr(signal, "metadata", {}) or {})
+        hold_s = None
+        raw_seconds = metadata.get("intended_hold_seconds")
+        if raw_seconds is not None:
+            try:
+                hold_s = float(raw_seconds)
+            except TypeError, ValueError:
+                return True
+        if hold_s is None:
+            raw_bars = metadata.get("intended_hold_bars")
+            if raw_bars is None:
+                return True
+            try:
+                bars = float(raw_bars)
+            except TypeError, ValueError:
+                return True
+            if not math.isfinite(bars) or bars <= 0.0:
+                return True
+            timeframe = str(getattr(self.config, "TIMEFRAME", "") or "")
+            if not timeframe:
+                return True
+            try:
+                tf_ms = timeframe_to_milliseconds(normalize_timeframe_token(timeframe))
+            except TypeError, ValueError:
+                return True
+            if not math.isfinite(float(tf_ms)) or float(tf_ms) <= 0.0:
+                return True
+            hold_s = bars * float(tf_ms) / 1000.0
+        if hold_s is None or not math.isfinite(hold_s) or hold_s <= 0.0:
+            return True
+        interval_s = float(self.execution_model.cfg.funding_interval_hours) * 3600.0
+        if not math.isfinite(interval_s) or interval_s <= 0.0:
+            return True
+        if hold_s >= interval_s:
+            return False
+        now_ts = self._to_unix_seconds(self.bars.get_latest_bar_datetime(symbol))
+        if now_ts is None or not math.isfinite(float(now_ts)):
+            return True
+        # Both MKT and LMT orders first become eligible on the next bar. A limit
+        # may fill later, but using the earliest executable timestamp is the
+        # conservative, deterministic admission rule. Holds are [start, end):
+        # a settlement exactly at end is not crossed.
+        timeframe = str(getattr(self.config, "TIMEFRAME", "") or "")
+        if not timeframe:
+            return True
+        try:
+            tf_s = float(timeframe_to_milliseconds(normalize_timeframe_token(timeframe))) / 1000.0
+        except TypeError, ValueError:
+            return True
+        if not math.isfinite(tf_s) or tf_s <= 0.0:
+            return True
+        fill_ts = float(now_ts) + max(0.0, tf_s)
+        next_boundary = (int(fill_ts // interval_s) + 1) * interval_s
+        return (next_boundary - fill_ts) < hold_s
+
+    def _below_no_trade_band(self, quantity, price) -> bool:
+        """True when an order's notional is below the L-C no-trade band."""
+        band = float(self.no_trade_band_bps)
+        if band <= 0.0:
+            return False
+        try:
+            notional = abs(float(quantity)) * float(price)
+        except TypeError, ValueError:
+            return False
+        equity = float(self.current_holdings.get("total", self.initial_capital) or 0.0)
+        if equity <= 0.0:
+            return False
+        return notional < equity * band / 10_000.0
+
     def generate_order_from_signal(self, signal) -> OrderEvent | None:
         """Generates an OrderEvent from a SignalEvent.
         Uses risk-based sizing with exchange constraints.
@@ -2086,10 +2552,15 @@ class Portfolio:
         elif direction == "SHORT":
             position_side = position_side or "SHORT"
 
+        if direction in ("LONG", "SHORT") and self._funding_entry_guard_blocks(signal, symbol):
+            return None
+
         if direction == "LONG":
             qty = self._risk_based_quantity(signal, current_price)
             qty = self._validate_and_round_quantity(symbol, qty, current_price)
             if qty <= 0:
+                return None
+            if self._below_no_trade_band(qty, current_price):
                 return None
             order_type = self._signal_order_type(signal)
             price, limits = self._order_price(
@@ -2126,6 +2597,8 @@ class Portfolio:
             qty = self._validate_and_round_quantity(symbol, qty, current_price)
             if qty <= 0:
                 return None
+            if self._below_no_trade_band(qty, current_price):
+                return None
             order_type = self._signal_order_type(signal)
             price, limits = self._order_price(
                 signal,
@@ -2157,7 +2630,8 @@ class Portfolio:
                 ),
             )
         elif direction == "EXIT":
-            component_id = self._component_id_from_metadata(signal.metadata)
+            metadata = dict(getattr(signal, "metadata", {}) or {})
+            component_id = self._component_id_from_metadata(metadata)
             if component_id:
                 cur_qty = float(
                     dict(self.component_positions.get(component_id) or {}).get(symbol, 0.0)
@@ -2165,6 +2639,21 @@ class Portfolio:
             else:
                 cur_qty = self.current_positions[symbol]
             if cur_qty != 0:
+                try:
+                    exit_fraction = float(metadata.get("exit_fraction", 1.0))
+                except TypeError, ValueError:
+                    exit_fraction = 1.0
+                if not math.isfinite(exit_fraction):
+                    exit_fraction = 1.0
+                exit_fraction = min(1.0, max(0.0, exit_fraction))
+                if exit_fraction <= 0.0:
+                    return None
+                if exit_fraction < 1.0 and self._below_no_trade_band(
+                    abs(cur_qty) * exit_fraction, current_price
+                ):
+                    # Full exits stay exempt from the no-trade band (hygiene);
+                    # only sub-band partial trims are dropped as churn.
+                    return None
                 exit_direction = "SELL" if cur_qty > 0 else "BUY"
                 order_type = self._signal_order_type(signal)
                 price, limits = self._order_price(
@@ -2177,7 +2666,7 @@ class Portfolio:
                 order = OrderEvent(
                     symbol=symbol,
                     order_type=order_type,
-                    quantity=abs(cur_qty),
+                    quantity=abs(cur_qty) * exit_fraction,
                     direction=exit_direction,
                     price=price,
                     position_side="LONG" if cur_qty > 0 else "SHORT",
@@ -2203,8 +2692,20 @@ class Portfolio:
             order_event = self.generate_order_from_signal(event)
             if order_event is not None:
                 if self.enforce_order_risk_gate and not self._passes_order_risk_gate(order_event):
+                    self.strategy_quality.mark_pending_exit_state(
+                        str(
+                            dict(getattr(event, "metadata", {}) or {}).get("min_hold_exit_key")
+                            or ""
+                        ),
+                        "REJECTED",
+                    )
                     return  # Audit-hardening gate rejected the order; skip it.
                 self.events.put(order_event)
+            else:
+                self.strategy_quality.mark_pending_exit_state(
+                    str(dict(getattr(event, "metadata", {}) or {}).get("min_hold_exit_key") or ""),
+                    "REJECTED",
+                )
 
     def _passes_order_risk_gate(self, order_event) -> bool:
         """Run the live RiskManager.check_order backstop on a backtest order.

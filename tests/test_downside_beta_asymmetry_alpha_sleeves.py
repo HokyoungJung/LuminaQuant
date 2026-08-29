@@ -17,6 +17,7 @@ moment axes.
 from __future__ import annotations
 
 import math
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from typing import Any
 
@@ -36,6 +37,7 @@ from lumina_quant.strategies.kalman_semivar_alpha_sleeves import _signed_semivar
 from lumina_quant.tuning import HyperParam
 
 _BENCH = "BTC/USDT"
+_BASE_TIME = datetime(2026, 1, 1, tzinfo=UTC)
 
 
 def _lcg_stream(seed: int):
@@ -64,9 +66,11 @@ class _Queue:
 
 
 def _window_event(symbols: list[str], closes: dict[str, float], idx: int) -> SimpleNamespace:
+    time = (_BASE_TIME + timedelta(days=idx)).isoformat()
     bars_1s = {
         symbol: [
             {
+                "time": time,
                 "open": closes[symbol],
                 "high": closes[symbol],
                 "low": closes[symbol],
@@ -77,9 +81,7 @@ def _window_event(symbols: list[str], closes: dict[str, float], idx: int) -> Sim
         for symbol in symbols
         if symbol in closes
     }
-    return SimpleNamespace(
-        type="MARKET_WINDOW", time=f"2026-01-01T00:00:00Z#{idx}", bars_1s=bars_1s
-    )
+    return SimpleNamespace(type="MARKET_WINDOW", time=time, bars_1s=bars_1s)
 
 
 def _feed(strategy: Any, symbols: list[str], closes_by_symbol: dict[str, list[float]]) -> None:

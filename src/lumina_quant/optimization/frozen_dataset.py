@@ -15,6 +15,7 @@ from lumina_quant.optimization.constants import (
     TIMESTAMP_SMALL_SCALE_TO_NS,
     TIMESTAMP_SMALL_THRESHOLD,
 )
+from lumina_quant.utils.timeutil import utc_epoch_seconds
 
 
 @dataclass(slots=True)
@@ -30,7 +31,8 @@ class FrozenDataset:
 
 def _as_ns_epoch(value) -> int:
     if isinstance(value, datetime):
-        return int(value.timestamp() * 1_000_000_000)
+        # Naive split bounds are UTC (repo convention); compared against a UTC epoch column.
+        return int(utc_epoch_seconds(value) * 1_000_000_000)
     if isinstance(value, (int, float)):
         raw = int(value)
         if abs(raw) < TIMESTAMP_SMALL_THRESHOLD:
@@ -40,7 +42,7 @@ def _as_ns_epoch(value) -> int:
         return raw
     try:
         parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
-        return int(parsed.timestamp() * 1_000_000_000)
+        return int(utc_epoch_seconds(parsed) * 1_000_000_000)
     except Exception:
         return 0
 

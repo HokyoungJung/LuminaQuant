@@ -320,17 +320,20 @@ def test_repository_evidence_semantically_classifies_every_in_scope_strategy() -
         evidence_source={"status": "loaded"},
     )
 
-    assert catalog["counts"]["registry"] == 147
-    assert catalog["counts"]["in_scope"] == 146
-    assert catalog["counts"]["verified_in_scope"] == 122
-    assert catalog["counts"]["scope_unverified"] == 24
-    assert catalog["counts"]["excluded"] == 1
+    assert catalog["counts"]["registry"] == 163
+    assert catalog["counts"]["in_scope"] == 161
+    assert catalog["counts"]["verified_in_scope"] == 136
+    assert catalog["counts"]["scope_unverified"] == 25
+    assert catalog["counts"]["excluded"] == 2
     assert catalog["counts"]["unresolved_family"] == 0
     raw_scorecard = catalog["scorecard_summary"]["raw_registry_diagnostic"]
-    assert raw_scorecard["strategy_count"] == 147
+    assert raw_scorecard["strategy_count"] == 163
     assert raw_scorecard["evaluated_strategy_count"] == 0
-    assert raw_scorecard["not_evaluated_strategy_count"] == 147
-    assert [row["strategy"] for row in catalog["exclusions"]] == ["MicroRangeExpansion1sStrategy"]
+    assert raw_scorecard["not_evaluated_strategy_count"] == 163
+    assert [row["strategy"] for row in catalog["exclusions"]] == [
+        "MicroRangeExpansion1sStrategy",
+        "SessionHighBreakoutScalpStrategy",
+    ]
     dacapogo = next(
         row for row in catalog["strategies"] if row["strategy"] == "DacapogoDailySourceStrategy"
     )

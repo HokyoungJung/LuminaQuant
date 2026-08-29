@@ -496,6 +496,12 @@ _EXPECTED_DYNAMIC_SITES = Counter(
             "self._audit_flag",
             ("FUNDING_ON_UTC_BOUNDARY", "execution", "funding_on_utc_boundary"),
         ): 1,
+        (
+            "portfolio_backtest.py",
+            "Portfolio.__init__",
+            "self._audit_flag",
+            ("FUNDING_ENTRY_GUARD", "execution", "funding_entry_guard"),
+        ): 1,
     }
 )
 
@@ -513,6 +519,7 @@ _EXPECTED_RUNTIME_SOURCE_ATTRIBUTES = frozenset(
         "END_DATE",
         "ENFORCE_ORDER_RISK_GATE_IN_BACKTEST",
         "ENFORCE_REDUCE_ONLY",
+        "FUNDING_ENTRY_GUARD",
         "FUNDING_INTERVAL_HOURS",
         "FUNDING_ON_UTC_BOUNDARY",
         "FUNDING_RATE_PER_8H",
@@ -546,6 +553,8 @@ _EXPECTED_RUNTIME_SOURCE_ATTRIBUTES = frozenset(
         "SPREAD_RATE",
         "START_DATE",
         "STRATEGY_QUALITY_ENABLED",
+        "STRATEGY_QUALITY_MIN_HOLD_BARS",
+        "STRATEGY_QUALITY_NO_TRADE_BAND_BPS",
         "SYMBOL_LIMITS",
         "TAKER_FEE_RATE",
         "TARGET_ALLOCATION",

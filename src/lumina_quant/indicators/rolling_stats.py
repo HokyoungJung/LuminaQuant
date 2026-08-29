@@ -9,28 +9,41 @@ from statistics import mean
 
 def sample_std(values) -> float | None:
     """Return sample standard deviation (ddof=1) or ``None`` if invalid."""
-    count = len(values)
+    try:
+        series = [float(value) for value in values]
+    except Exception:
+        return None
+    if not all(math.isfinite(value) for value in series):
+        return None
+    count = len(series)
     if count < 2:
         return None
-    avg = mean(values)
-    variance = sum((value - avg) ** 2 for value in values) / float(count - 1)
-    if variance <= 0.0:
+    avg = math.fsum(series) / float(count)
+    variance = math.fsum((value - avg) ** 2 for value in series) / float(count - 1)
+    if not math.isfinite(variance) or variance < 0.0:
         return None
     return math.sqrt(variance)
 
 
 def rolling_beta(x_values, y_values) -> float | None:
     """Return beta of x relative to y over aligned rolling samples."""
-    count = min(len(x_values), len(y_values))
+    try:
+        x_series = [float(value) for value in x_values]
+        y_series = [float(value) for value in y_values]
+    except Exception:
+        return None
+    count = min(len(x_series), len(y_series))
     if count < 2:
         return None
-    x_tail = list(x_values)[-count:]
-    y_tail = list(y_values)[-count:]
+    x_tail = x_series[-count:]
+    y_tail = y_series[-count:]
+    if not all(math.isfinite(value) for value in x_tail + y_tail):
+        return None
 
     mean_x = mean(x_tail)
     mean_y = mean(y_tail)
     var_y = sum((value - mean_y) ** 2 for value in y_tail) / float(count - 1)
-    if var_y <= 1e-12:
+    if not math.isfinite(var_y) or var_y <= 0.0:
         return None
 
     cov_xy = sum((xv - mean_x) * (yv - mean_y) for xv, yv in zip(x_tail, y_tail, strict=False))
@@ -38,7 +51,7 @@ def rolling_beta(x_values, y_values) -> float | None:
     beta = cov_xy / var_y
     if not math.isfinite(beta):
         return None
-    return max(-10.0, min(10.0, beta))
+    return beta
 
 
 def _aligned_xy(x_values, y_values) -> tuple[list[float], list[float], float, float, float] | None:
@@ -125,36 +138,43 @@ def hurst_exponent(values, *, min_lag: int = 2, max_lag: int = 20) -> float | No
     Returns ``None`` on empty/degenerate/non-finite input or when the lag range
     is too narrow to fit a slope.
     """
-    series = [float(value) for value in values]
+    try:
+        series = [float(value) for value in values]
+        low_lag = int(min_lag)
+        high_lag = int(max_lag)
+    except Exception:
+        return None
     if not series or not all(math.isfinite(value) for value in series):
         return None
     count = len(series)
 
-    low_lag = max(2, int(min_lag))
-    high_lag = int(max_lag)
-    # The R/S statistic needs at least two points per lag window.
-    high_lag = min(high_lag, count - 1)
+    low_lag = max(2, low_lag)
+    high_lag = min(high_lag, count)
     if high_lag <= low_lag:
         return None
 
     log_lags: list[float] = []
     log_rs: list[float] = []
     for lag in range(low_lag, high_lag + 1):
-        diffs = [series[i] - series[i - lag] for i in range(lag, count)]
-        if len(diffs) < 2:
+        blocks = [series[start : start + lag] for start in range(0, count - lag + 1, lag)]
+        if not blocks:
             continue
-        mean_diff = mean(diffs)
-        deviations = []
-        running = 0.0
-        for value in diffs:
-            running += value - mean_diff
-            deviations.append(running)
-        rng = max(deviations) - min(deviations)
-        variance = sum((value - mean_diff) ** 2 for value in diffs) / float(len(diffs) - 1)
-        if variance <= 1e-12:
+        rs_values: list[float] = []
+        for block in blocks:
+            block_mean = math.fsum(block) / float(lag)
+            running = 0.0
+            deviations = []
+            for value in block:
+                running += value - block_mean
+                deviations.append(running)
+            rng = max(deviations) - min(deviations)
+            variance = math.fsum((value - block_mean) ** 2 for value in block) / float(lag)
+            if variance <= 1e-12:
+                continue
+            rs_values.append(rng / math.sqrt(variance))
+        if not rs_values:
             continue
-        std_diff = math.sqrt(variance)
-        rescaled = rng / std_diff
+        rescaled = math.fsum(rs_values) / float(len(rs_values))
         if rescaled <= 1e-12 or lag <= 0:
             continue
         log_lags.append(math.log(float(lag)))
@@ -295,47 +315,182 @@ def recursive_least_squares_beta_update(
     return float(updated_beta), float(updated_cov)
 
 
+def _finite_tail(values, *, window: int | None) -> list[float] | None:
+    """Return the trailing-``window`` slice of ``values`` as finite floats.
+
+    The window slice is taken BEFORE cleaning (mirroring the historical
+    strategy-side call pattern ``_skewness(series[-window:])``), then entries
+    are float-coerced and non-finite samples dropped.  Returns ``None`` when
+    ``values`` is not iterable or ``window`` is unusable; never raises.
+    """
+    try:
+        tail = list(values)
+    except TypeError:
+        return None
+    if window is not None:
+        try:
+            width = int(window)
+        except TypeError, ValueError:
+            return None
+        if width < 1:
+            return None
+        tail = tail[-width:]
+    cleaned: list[float] = []
+    for value in tail:
+        try:
+            parsed = float(value)
+        except Exception:
+            continue
+        if math.isfinite(parsed):
+            cleaned.append(parsed)
+    return cleaned
+
+
+def rolling_skewness(values, *, window: int | None = None) -> float | None:
+    """Fisher-Pearson (ddof-free) sample skewness over the trailing window.
+
+    Canonical extraction (2026-08-20) of the formerly duplicated
+    strategy-private ``_skewness`` helpers in
+    ``strategies/skew_innovation_alpha_sleeves.py`` and
+    ``strategies/cross_sectional_anomaly_alpha_sleeves.py`` -- the exact
+    ``math.fsum`` recipe of the skew-innovation copy, parity-locked by pinned
+    fixtures in ``tests/indicators/test_rolling_skew_kurt.py``.
+
+    Prior: Amaya, Christoffersen, Jacobs & Vasquez (2015, JFE) establish
+    realized skewness as a standard rolling characteristic.
+
+    ``window=None`` uses the full sample.  Returns ``None`` on fewer than three
+    finite samples, degenerate (``<= 1e-12``) variance, non-finite output, or
+    non-iterable input.  Latest-scalar ``float | None``; never raises.
+    """
+    cleaned = _finite_tail(values, window=window)
+    if cleaned is None:
+        return None
+    count = len(cleaned)
+    if count < 3:
+        return None
+    try:
+        avg = math.fsum(cleaned) / float(count)
+        variance = math.fsum((value - avg) ** 2 for value in cleaned) / float(count)
+        if variance <= 1e-12:
+            return None
+        std = variance**0.5
+        third = math.fsum((value - avg) ** 3 for value in cleaned) / float(count)
+        skew = third / (std**3)
+    except OverflowError, ZeroDivisionError:
+        return None
+    return float(skew) if math.isfinite(skew) else None
+
+
+def rolling_excess_kurtosis(values, *, window: int | None = None) -> float | None:
+    """Excess (Fisher) sample kurtosis over the trailing window.
+
+    Standardized fourth central moment minus 3 (ddof-free, same moment
+    conventions as :func:`rolling_skewness`): ``0.0`` for a normal sample,
+    negative for platykurtic input (uniform ~ ``-1.2``), positive for fat
+    tails.  Named non-trading consumer: the V-DIAG vol-spillover diagnostic
+    reports the RV-series excess kurtosis to flag admissions driven by a
+    handful of fat-tail days (Patton-Sheppard loss-differential caveat).
+
+    ``window=None`` uses the full sample.  Returns ``None`` on fewer than four
+    finite samples, degenerate (``<= 1e-12``) variance, non-finite output, or
+    non-iterable input.  Latest-scalar ``float | None``; never raises.
+    """
+    cleaned = _finite_tail(values, window=window)
+    if cleaned is None:
+        return None
+    count = len(cleaned)
+    if count < 4:
+        return None
+    try:
+        avg = math.fsum(cleaned) / float(count)
+        variance = math.fsum((value - avg) ** 2 for value in cleaned) / float(count)
+        if variance <= 1e-12:
+            return None
+        fourth = math.fsum((value - avg) ** 4 for value in cleaned) / float(count)
+        kurtosis = fourth / (variance * variance) - 3.0
+    except OverflowError, ZeroDivisionError:
+        return None
+    return float(kurtosis) if math.isfinite(kurtosis) else None
+
+
 class RollingZScoreWindow:
-    """Rolling z-score helper preserving O(1) aggregate updates."""
+    """Rolling z-score helper with stable removable variance updates."""
+
+    _STATE_VERSION = 1
 
     def __init__(self, window: int):
-        self.window = max(2, int(window))
-        self.values = deque(maxlen=self.window)
-        self.sum_value = 0.0
-        self.sum_squares = 0.0
+        try:
+            self.window = max(2, int(window))
+        except Exception:
+            self.window = 2
+        self.values: deque[float] = deque()
+        self.mean_value = 0.0
+        self.m2 = 0.0
 
-    def append(self, value: float) -> None:
-        parsed = float(value)
+    def append(self, value: float) -> bool:
+        """Append one finite value, returning ``False`` for invalid input."""
+        try:
+            parsed = float(value)
+        except Exception:
+            return False
+        if not math.isfinite(parsed):
+            return False
         if len(self.values) == self.window:
-            dropped = float(self.values[0])
-            self.sum_value -= dropped
-            self.sum_squares -= dropped * dropped
+            dropped = self.values.popleft()
+            count = len(self.values) + 1
+            new_count = count - 1
+            new_mean = ((count * self.mean_value) - dropped) / float(new_count)
+            self.m2 -= (dropped - self.mean_value) * (dropped - new_mean)
+            self.mean_value = new_mean
+            self.m2 = max(0.0, self.m2)
+        count = len(self.values)
+        new_count = count + 1
+        delta = parsed - self.mean_value
+        self.mean_value += delta / float(new_count)
+        self.m2 += delta * (parsed - self.mean_value)
         self.values.append(parsed)
-        self.sum_value += parsed
-        self.sum_squares += parsed * parsed
+        return True
 
     def zscore(self, value: float) -> float | None:
         count = len(self.values)
         if count < self.window:
             return None
-        count_f = float(count)
-        mean_value = self.sum_value / count_f
-        variance = (self.sum_squares / count_f) - (mean_value * mean_value)
+        try:
+            parsed = float(value)
+        except Exception:
+            return None
+        if not math.isfinite(parsed):
+            return None
+        variance = self.m2 / float(count)
         if variance <= 1e-12:
             return None
         std_value = math.sqrt(variance)
-        return (float(value) - mean_value) / std_value
+        result = (parsed - self.mean_value) / std_value
+        return result if math.isfinite(result) else None
 
     def to_state(self) -> dict:
         return {
+            "version": self._STATE_VERSION,
+            "window": self.window,
             "values": list(self.values),
-            "sum_value": float(self.sum_value),
-            "sum_squares": float(self.sum_squares),
         }
 
-    def load_state(self, values) -> None:
-        self.values = deque(maxlen=self.window)
-        self.sum_value = 0.0
-        self.sum_squares = 0.0
-        for value in values:
-            self.append(float(value))
+    def load_state(self, state: dict) -> None:
+        self.values = deque()
+        self.mean_value = 0.0
+        self.m2 = 0.0
+        if (
+            not isinstance(state, dict)
+            or state.get("version") != self._STATE_VERSION
+            or state.get("window") != self.window
+            or not isinstance(state.get("values"), list)
+            or len(state["values"]) > self.window
+        ):
+            return
+        for value in state["values"]:
+            if not self.append(value):
+                self.values = deque()
+                self.mean_value = 0.0
+                self.m2 = 0.0
+                return

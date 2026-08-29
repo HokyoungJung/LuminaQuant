@@ -1,0 +1,394 @@
+#!/usr/bin/env python3
+"""Materialize point-in-time named-quant universes from local snapshots."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import math
+import os
+from copy import deepcopy
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
+
+_TIMESTAMP_KEYS = ("timestamp", "snapshot_timestamp", "as_of", "time", "serverTime")
+_FILTER_TYPES = {
+    "PRICE_FILTER",
+    "LOT_SIZE",
+    "MARKET_LOT_SIZE",
+    "MIN_NOTIONAL",
+    "PERCENT_PRICE",
+    "PERCENT_PRICE_BY_SIDE",
+}
+_STABLE_BASES = {
+    "BUSD",
+    "DAI",
+    "FDUSD",
+    "PYUSD",
+    "TUSD",
+    "USDC",
+    "USDD",
+    "USDE",
+    "USDP",
+    "USDT",
+}
+
+
+def _parse_timestamp(value: Any, *, label: str) -> datetime:
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        seconds = float(value) / 1000 if abs(float(value)) >= 10_000_000_000 else float(value)
+        parsed = datetime.fromtimestamp(seconds, tz=UTC)
+    elif isinstance(value, str):
+        raw = value.strip().replace("Z", "+00:00")
+        try:
+            parsed = datetime.fromisoformat(raw)
+        except ValueError as exc:
+            raise ValueError(f"invalid {label} timestamp: {value!r}") from exc
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=UTC)
+        parsed = parsed.astimezone(UTC)
+    else:
+        raise ValueError(f"missing or invalid {label} timestamp")
+    return parsed
+
+
+def _timestamp(snapshot: dict[str, Any], *, label: str) -> datetime:
+    for key in _TIMESTAMP_KEYS:
+        if key in snapshot:
+            return _parse_timestamp(snapshot[key], label=label)
+    raise ValueError(f"missing {label} snapshot timestamp")
+
+
+def _load_snapshots(path: Path, *, label: str) -> list[dict[str, Any]]:
+    try:
+        if path.suffix.lower() == ".jsonl":
+            payload: Any = [
+                json.loads(line) for line in path.read_text().splitlines() if line.strip()
+            ]
+        else:
+            payload = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"invalid {label} snapshot file: {path}") from exc
+    if isinstance(payload, dict) and "snapshots" in payload:
+        payload = payload["snapshots"]
+    elif isinstance(payload, dict):
+        payload = [payload]
+    if (
+        not isinstance(payload, list)
+        or not payload
+        or not all(isinstance(row, dict) for row in payload)
+    ):
+        raise ValueError(f"{label} snapshots must be a non-empty list")
+    timestamps = [_timestamp(row, label=label) for row in payload]
+    if len(timestamps) != len(set(timestamps)):
+        raise ValueError(f"duplicate {label} snapshot timestamp")
+    return payload
+
+
+def _latest(snapshots: list[dict[str, Any]], as_of: datetime, *, label: str) -> dict[str, Any]:
+    valid = [row for row in snapshots if _timestamp(row, label=label) <= as_of]
+    if not valid:
+        raise ValueError(f"no {label} snapshot at or before --as-of")
+    return max(valid, key=lambda row: _timestamp(row, label=label))
+
+
+def _rows(snapshot: dict[str, Any], keys: tuple[str, ...], *, label: str) -> list[dict[str, Any]]:
+    for key in keys:
+        value = snapshot.get(key)
+        if isinstance(value, list) and all(isinstance(row, dict) for row in value):
+            return value
+    raise ValueError(f"missing or invalid {label} rows")
+
+
+def _market_cap_ranking(snapshot: dict[str, Any]) -> list[str]:
+    rows = _rows(snapshot, ("assets", "coins", "data", "rankings"), label="market-cap")
+    ranked: list[tuple[int, str]] = []
+    for row in rows:
+        symbol = str(row.get("symbol") or "").upper().strip()
+        rank = row.get("rank", row.get("market_cap_rank"))
+        if not symbol or isinstance(rank, bool):
+            raise ValueError("invalid market-cap row")
+        try:
+            rank_int = int(rank)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("invalid market-cap rank") from exc
+        if rank_int <= 0:
+            raise ValueError("invalid market-cap rank")
+        ranked.append((rank_int, symbol))
+    if len({rank for rank, _ in ranked}) != len(ranked) or len(
+        {symbol for _, symbol in ranked}
+    ) != len(ranked):
+        raise ValueError("duplicate market-cap rank or symbol")
+    return [symbol for _, symbol in sorted(ranked)]
+
+
+def _exchange_symbols(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
+    rows = _rows(snapshot, ("symbols", "data"), label="exchangeInfo")
+    seen: set[str] = set()
+    for row in rows:
+        symbol = str(row.get("symbol") or "").upper().strip()
+        if not symbol or symbol in seen:
+            raise ValueError("missing or duplicate exchangeInfo symbol")
+        seen.add(symbol)
+    return rows
+
+
+def _eligible(row: dict[str, Any], contract_type: str) -> bool:
+    return (
+        str(row.get("contractType") or "").upper() == contract_type
+        and str(row.get("status") or "").upper() == "TRADING"
+        and str(row.get("quoteAsset") or "").upper() == "USDT"
+        and bool(str(row.get("baseAsset") or "").strip())
+    )
+
+
+def _slash_symbol(row: dict[str, Any]) -> str:
+    return f"{str(row['baseAsset']).upper()}/{str(row['quoteAsset']).upper()}"
+
+
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _publish_json(path: Path, payload: Any) -> None:
+    """Atomically publish a new artifact without replacing prior evidence."""
+    if path.exists() or path.is_symlink():
+        raise ValueError(f"output target already exists: {path}")
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    try:
+        with temporary.open("x", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        try:
+            os.link(temporary, path)
+        except FileExistsError as exc:
+            raise ValueError(f"output target already exists: {path}") from exc
+        directory_fd = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+    except Exception:
+        raise
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def _positive_float(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        parsed = float(value)
+    except TypeError, ValueError:
+        return None
+    return parsed if math.isfinite(parsed) and parsed > 0 else None
+
+
+def _validated_filters(row: dict[str, Any]) -> list[dict[str, Any]]:
+    symbol = _slash_symbol(row)
+    filters = [
+        deepcopy(item)
+        for item in row.get("filters", [])
+        if isinstance(item, dict) and item.get("filterType") in _FILTER_TYPES
+    ]
+    by_type = {str(item.get("filterType") or "").upper(): item for item in filters}
+    price = by_type.get("PRICE_FILTER", {})
+    lots = [by_type[key] for key in ("MARKET_LOT_SIZE", "LOT_SIZE") if key in by_type]
+    notional = by_type.get("MIN_NOTIONAL", {})
+    if _positive_float(price.get("tickSize")) is None:
+        raise ValueError(f"selected symbol {symbol} lacks a valid PRICE_FILTER.tickSize")
+    if not any(
+        _positive_float(item.get("minQty")) is not None
+        and _positive_float(item.get("stepSize")) is not None
+        for item in lots
+    ):
+        raise ValueError(f"selected symbol {symbol} lacks a valid lot minQty and stepSize")
+    if (
+        _positive_float(notional.get("notional")) is None
+        and _positive_float(notional.get("minNotional")) is None
+    ):
+        raise ValueError(f"selected symbol {symbol} lacks a valid MIN_NOTIONAL")
+    return filters
+
+
+def materialize(
+    suite: dict[str, Any],
+    market_cap_snapshot: dict[str, Any],
+    exchange_snapshot: dict[str, Any],
+    *,
+    as_of: datetime,
+    market_cap_source: Path,
+    exchange_info_source: Path,
+    crypto_top_n: int = 10,
+) -> dict[str, Any]:
+    """Return a suite with explicitly bound universes replaced point-in-time."""
+    if crypto_top_n <= 0:
+        raise ValueError("--crypto-top-n must be positive")
+    ranking = _market_cap_ranking(market_cap_snapshot)
+    exchange_rows = _exchange_symbols(exchange_snapshot)
+    perpetual_rows = [
+        row
+        for row in exchange_rows
+        if _eligible(row, "PERPETUAL") and str(row["baseAsset"]).upper() not in _STABLE_BASES
+    ]
+    perpetual = {str(row["baseAsset"]).upper(): row for row in perpetual_rows}
+    if len(perpetual) != len(perpetual_rows):
+        raise ValueError("duplicate eligible crypto base asset")
+    ranked_eligible = [base for base in ranking if base in perpetual and base not in _STABLE_BASES]
+    if len(ranked_eligible) < crypto_top_n:
+        raise ValueError(
+            f"only {len(ranked_eligible)} eligible ranked crypto names; need {crypto_top_n}"
+        )
+    crypto_rows = [perpetual[base] for base in ranked_eligible[:crypto_top_n]]
+    tradfi_rows = sorted(
+        (row for row in exchange_rows if _eligible(row, "TRADIFI_PERPETUAL")),
+        key=lambda row: str(row["symbol"]),
+    )
+    crypto = [_slash_symbol(row) for row in crypto_rows]
+    tradfi = [_slash_symbol(row) for row in tradfi_rows]
+
+    result = deepcopy(suite)
+    bindings = {
+        "crypto_top10": crypto,
+        "tradfi_all": tradfi,
+        "crypto_top10_plus_tradfi": crypto + tradfi,
+    }
+    patched: list[str] = []
+    disabled: dict[str, list[str]] = {}
+    candidates = result.get("candidates")
+    if not isinstance(candidates, list):
+        raise ValueError("suite candidates must be a list")
+    uses_tradfi = any(
+        isinstance(candidate, dict)
+        and isinstance(candidate.get("metadata"), dict)
+        and candidate["metadata"].get("universe_binding")
+        in {"tradfi_all", "crypto_top10_plus_tradfi"}
+        for candidate in candidates
+    )
+    if uses_tradfi and not tradfi:
+        raise ValueError("suite requires tradfi_all but no eligible TradFi contracts were selected")
+    for candidate in candidates:
+        if not isinstance(candidate, dict):
+            raise ValueError("invalid suite candidate")
+        metadata = candidate.get("metadata")
+        binding = metadata.get("universe_binding") if isinstance(metadata, dict) else None
+        if binding is None:
+            pass
+        elif binding not in bindings:
+            raise ValueError(f"unknown universe binding: {binding!r}")
+        else:
+            configured_symbols = candidate.get("symbols")
+            if not isinstance(configured_symbols, list) or not all(
+                isinstance(symbol, str) and symbol for symbol in configured_symbols
+            ):
+                raise ValueError(f"{binding} candidate requires configured symbol strings")
+            if binding == "tradfi_all":
+                candidate["symbols"] = [
+                    symbol for symbol in configured_symbols if symbol in bindings["tradfi_all"]
+                ]
+            elif binding == "crypto_top10_plus_tradfi":
+                candidate["symbols"] = [
+                    *bindings["crypto_top10"],
+                    *[symbol for symbol in configured_symbols if symbol in bindings["tradfi_all"]],
+                ]
+            else:
+                candidate["symbols"] = list(bindings[binding])
+            if not candidate["symbols"]:
+                raise ValueError(f"{binding} candidate has no point-in-time symbols")
+            patched.append(
+                str(candidate.get("candidate_id") or candidate.get("name") or "<unnamed>")
+            )
+        constraint = metadata.get("universe_constraint") if isinstance(metadata, dict) else None
+        if constraint is None:
+            constraint = binding
+        if constraint is None:
+            continue
+        if constraint not in bindings:
+            raise ValueError(f"unknown universe constraint: {constraint!r}")
+        candidate_id = str(candidate.get("candidate_id") or candidate.get("name") or "<unnamed>")
+        outside = sorted(set(candidate.get("symbols") or []) - set(bindings[constraint]))
+        if outside:
+            candidate["enabled"] = False
+            candidate["disabled_reason"] = "outside point-in-time universe: " + ", ".join(outside)
+            disabled[candidate_id] = outside
+        else:
+            candidate.pop("enabled", None)
+            candidate.pop("disabled_reason", None)
+
+    selected_rows = crypto_rows + tradfi_rows
+    result["universe_materialization_receipt"] = {
+        "as_of": as_of.astimezone(UTC).isoformat().replace("+00:00", "Z"),
+        "sources": {
+            "market_caps": str(market_cap_source.resolve()),
+            "exchange_info": str(exchange_info_source.resolve()),
+        },
+        "source_sha256": {
+            "market_caps": _sha256(market_cap_source),
+            "exchange_info": _sha256(exchange_info_source),
+        },
+        "snapshot_timestamps": {
+            "market_caps": _timestamp(market_cap_snapshot, label="market-cap")
+            .isoformat()
+            .replace("+00:00", "Z"),
+            "exchange_info": _timestamp(exchange_snapshot, label="exchangeInfo")
+            .isoformat()
+            .replace("+00:00", "Z"),
+        },
+        "counts": {
+            "market_cap_ranked": len(ranking),
+            "eligible_crypto_contracts": len(perpetual),
+            "eligible_ranked_crypto": len(ranked_eligible),
+            "eligible_tradfi_contracts": len(tradfi_rows),
+            "selected_crypto": len(crypto),
+            "selected_tradfi": len(tradfi),
+            "patched_candidates": len(patched),
+            "disabled_candidates": len(disabled),
+        },
+        "selected_symbols": {"crypto_top10": crypto, "tradfi_all": tradfi},
+        "patched_candidates": patched,
+        "disabled_candidates": disabled,
+        "binance_filters": {_slash_symbol(row): _validated_filters(row) for row in selected_rows},
+    }
+    return result
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--suite", type=Path, required=True)
+    parser.add_argument("--market-caps", type=Path, required=True)
+    parser.add_argument("--exchange-info", type=Path, required=True)
+    parser.add_argument("--as-of", required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--crypto-top-n", type=int, default=10)
+    args = parser.parse_args()
+    try:
+        suite = json.loads(args.suite.read_text())
+        if not isinstance(suite, dict):
+            raise ValueError("suite must be a JSON object")
+        as_of = _parse_timestamp(args.as_of, label="--as-of")
+        market_caps = _load_snapshots(args.market_caps, label="market-cap")
+        exchange_info = _load_snapshots(args.exchange_info, label="exchangeInfo")
+        for snapshot in market_caps:
+            _market_cap_ranking(snapshot)
+        for snapshot in exchange_info:
+            _exchange_symbols(snapshot)
+        output = materialize(
+            suite,
+            _latest(market_caps, as_of, label="market-cap"),
+            _latest(exchange_info, as_of, label="exchangeInfo"),
+            as_of=as_of,
+            market_cap_source=args.market_caps,
+            exchange_info_source=args.exchange_info,
+            crypto_top_n=args.crypto_top_n,
+        )
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        _publish_json(args.output, output)
+    except (OSError, json.JSONDecodeError, ValueError) as exc:
+        parser.error(str(exc))
+
+
+if __name__ == "__main__":
+    main()

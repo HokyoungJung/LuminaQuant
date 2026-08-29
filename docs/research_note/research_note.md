@@ -1,4 +1,38 @@
 # Research Note
+## 2026-08-20 KST — 적대 리뷰 라운드: 25건 발견 → 23건 확정 → 전건 수정·회귀봉인
+
+배치 전체 diff에 대해 5-차원 헌터 → 발견별 회의론자 반증 검증(런타임 재현 의무) 라운드를 돌렸다. 25건 발견, **23건 CONFIRMED / 2건 REFUTED**, 확정 전건을 당일 수정하고 회귀 테스트로 봉인했다(전체 스위트 **4946 passed**, 골든·manifest 스냅샷 바이트 불변, ruff/format/architecture/docs 그린). 핵심 수정:
+
+- **L-C 민홀드 드랍→지연(deferral) 재설계(크리티컬 F1)**: 원샷-전이 전략의 bare EXIT를 차단만 하면 전략-북 영구 탈동기+포지션 누수+재진입 스태킹이 발생함을 런타임 재현으로 확정. 오버레이가 컴포넌트 스코프 원장(`component|symbol`)으로 차단 EXIT를 보존했다가 만기 시 합성 EXIT(`overlay_reason=min_hold_released`)로 방출하고, exit-pending 중 동방향 재진입도 차단. `exit_reason` 우회는 truthy가 아닌 **보호성 화이트리스트**로 교체(F4: 'rebalance' 라벨이 게이트를 무력화하던 결함), 컴포넌트 북 분리(F6), 라이브 네임스페이스 패리티(F5)까지 봉인.
+- **L-D 앵커 결함(F2/W1)**: 결정봉 타임스탬프 기준이라 실제 스트래들을 놓치고(12.5%) 깨끗한 진입을 오차단(12.5%) — MKT는 다음 봉 시가 체결이므로 **체결시각(+1 timeframe) 앵커**로 수정.
+- **warmup 훅 청크 연속성(F3)**: `had_warmup` 출처를 엔진 상태로 지속해 첫 라이브 이벤트가 warmup_bars=0 연속 청크에 떨어져도 정확히 1회 발화. **신규 슬리브 5종 전부 `on_warmup_end()` 구현**(유령 북 리셋, 데이터 deque 보존).
+- **슬리브 공통 결함**: 죽은 피드 심볼의 동결값이 크로스섹션을 영구 오염(entry↔exit 무한 churn 포함) → 전 XS 슬리브에 신선도 게이트; offsession 72h 만기를 패널-와이드로(정지 심볼도 만기 청산); 유니버스 전면 결측 1회가 성숙 북을 rank_lapsed로 플러시하던 경로 차단; taker-flow가 자기 계약을 어기고 엔진 인트라바 브래킷을 달던 결함 제거(종가확정 스톱만); basis-gap set_state 적대 입력 내성; salience/prospect 형성 패널 캘린더 정렬(내부 갭 심볼 제외, 위치 정렬은 시장수익률 왜곡 ~25% 재현); OI 민홀드 단위 재고정(주간 5→2, 등록 지평 1-4주 내로); V-DIAG har_lags 비정형 스펙 fail-closed; 행동가치 지표 파라미터 never-raise; VR z-stat 손계산 골든; **배치 배선 테스트 신설**(광역 유니버스 23행 전부 레지스트리 경유 생성+스키마 포함성 — 미지 파라미터 무성 드랍 차단).
+- W3 판정에 따라 cross_sectional_anomaly는 **원본 plain-sum skewness 사본을 의도적으로 유지**(fsum 정준화는 ~10% 윈도우에서 1-ULP 표류 — 등록 전략 기본 수치의 무게이트 변경 금지 원칙).
+
+REFUTED 2건: W4(basis-gap family="carry"는 빌더 헤더가 명시한 의도적 예외 — funding-정산 캐리는 진짜 캐리), W5(기본 매니페스트 행수 21이 정답 — guarded_ls 셀은 min_symbols=12라 기본 10심볼 유니버스에서 비물질화. 광역 유니버스 기준 23행). 판정 불변: **do_not_promote / research_only_no_execution / 실배분 0%**.
+
+## 2026-08-20 KST — 신규 알파 슬리브 7클래스 + V-DIAG + 지표 5모듈 저작 완료 (3종 재고정 포함)
+
+같은 날 오전의 레버 커밋에 이어, 적대 심판 3인을 통과한 신규 저작물을 원자 통합했다. 전부 `research_only`이고 기본 후보 매니페스트에 21개 row로 편입되며(전부 cross_sectional 바스켓, `allow_multi_asset` 핸드오프 경로 전용), 2-symbol 스냅샷 픽스처에는 하나도 물질화되지 않아 **manifest sha는 불변**이다. tier-guard(BATCH 7종 추가)·hardcoded-baseline 재고정 완료, 전체 스위트 **4914 passed / 21 skipped / 3 xfailed**(베이스라인 4712 대비 +202 전원 신규 테스트), ruff/format/compileall/check_architecture/verify_docs/골든 핀 전부 그린.
+
+- **신규 슬리브(각 모듈 독스트링에 EXPECTED NULL + 단일 반증 측정 + 최근접 그레이브야드/인컴번트 사전등록)**: ① `CrossSectionalResidualTakerFlow`(~5일 taker 순공격흐름/턴오버를 수익률 z에 잔차화, 주간 L/S 퀸타일+1주 민홀드 — aggTrades 백필로 그레이브야드 #7 커버리지 사인 해제) ② `BasisFundingGapConvergence`(mark-index basis − funding-내재 basis 스프레드를 8h 정산 경계에서만 |z|>2 페이드, 민홀드 2인터벌 — 인컴번트가 계산하지 않는 funding-기대 오차) ③ `OffSessionBasisDislocation`(TradFi 퍼프의 오프세션 스테일-앵커 괴리를 현물 재개장 직전 페이드, 36h/72h) ④/⑤ `SalienceTheoryValue`/`ProspectTheoryValue`(BGS 2012/TK 1992 정준 상수 동결, 주간 ISO, 모멘텀+MAX 잔차화; ST-PT 중복 토너먼트 사전등록) ⑥ `OpenInterestGrowthPressure`(Hong-Yogo ΔOI/달러볼륨 연속, 모멘텀 잔차화, 부호 양(+) 사전등록·플립 금지).
+- **V-DIAG 구현**(마스터플랜 §6.3 최초 코드화): `research/vol_spillover_diagnostic.py` + 러너 — HAR-RV 기준 vs 리더 lagged-RV 블록, QLIKE(Patton)+블록 부트스트랩+BH-FDR, 승인선 사전등록(중앙 QLIKE 개선 ≥5%·폴드 ≥60%·p≤0.05). 실패 시 vol-스필오버 전략·신규 다변량-vol 코드 전면 KILL. 연기된 leader-RV 사이징 오버레이 설계는 모듈 독스트링에 동결 수록(빌드 게이트=BTC→alt 1쌍 이상 승인).
+- **지표**: `har_rv`·`variance_ratio`(cusum_varratio에서 패리티-락 추출, 편향 추정기 기본 유지)·`funding_structure`(funding_momentum 추출+텀구조 스프레드+basis-funding 갭; 심판 지시로 단일 모듈 병합)·`behavioral_value`·`rolling_stats`의 skew/kurt(전략 사본 2개 dedup, fsum 정준화·패리티 골든). funding-carry 슬리브에 config-gated `require_term_structure_agreement`(기본 False, 진입-스킵 전용).
+- **커버리지 감사 도구**: `scripts/research/audit_liquidation_feature_coverage.py`(OI ≥90%/청산 ≥80% 게이트, 무데이터 시 insufficient_data 폐쇄).
+- 실행서: [`alpha_sleeves_levers_20260820_handoff.md`](alpha_sleeves_levers_20260820_handoff.md) — 백필/감사 선행 → 표준 walkforward(21 row, evaluation_mode 감사) → V-DIAG → L-C/L-D A/B(사전등록 고정값: min_hold 1일 상당, band 8bps, guard ON) → 넷팅 발생률 측정 순.
+
+판정 불변: **do_not_promote / research_only_no_execution / 실배분 0%**. 이 배치는 falsification 프로토콜이며 대부분의 리프의 EXPECTED NULL은 reject다 — 죽음을 보고하는 것이 산출물이다.
+
+## 2026-08-20 KST — 사전등록 엔진 레버 4종 구현 (L-C/L-D/warmup-hook/H1), 전부 기본 OFF
+
+`performance_lever_measurement.md`에 사전등록만 되어 있던 엔진 레버를 실제 엔진 seam에 구현했다. 설계는 8-lens 매핑 + 4-lens 제안 패널 + 3-adversarial-judge 라운드로 검증했고(그레이브야드/비용·데이터/신규성 심판 만장일치 PASS), 전부 config-gated OFF·기본 경로 바이트 동일이다. 골든 핀(`tests/integration/test_engine_golden.py`, `test_walk_forward_golden.py`) 그린, 신규·기존 타깃 스위트 85 passed.
+
+- **L-C no-trade band + hard min-hold (실엔진 seam)**: `StrategyQualityConfig.min_hold_bars`(기본 0)·`no_trade_band_bps`(기본 0.0). min-hold는 `StrategyQualityOverlay`에서 overlay `enabled`와 독립으로 동작 — 보유기간 내 **사유 없는(bare) 전략 EXIT와 역방향 재진입만** 차단하고, `risk_exit`/`exit_reason`/`overlay_reason` 마커가 있는 보호성 EXIT와 엔진 레벨 스톱/청산 체결(check_open_orders 경로)은 절대 지연시키지 않는다. 밴드는 `Portfolio.generate_order_from_signal`에서 진입·부분청산 주문 노셔널이 자본 대비 band bps 미만이면 드랍(전량 청산은 위생상 면제). 이전에 죽어 있던 `cost_aware_constructor.py` 밴드의 엔진(b) 재타게팅이며, `strategy_signal_dispatch` 삽입안은 문서대로 배제했다. 측정은 data-PC A/B(flag OFF vs ON, 사전등록 파라미터, 10/15/20/30bps 그리드)로만 한다.
+- **L-D funding-entry guard**: `ExecutionConfig.funding_entry_guard`(기본 False). 신호 metadata가 `intended_hold_seconds`(또는 `intended_hold_bars`×config TIMEFRAME)를 선언한 경우에 한해, 의도 보유가 펀딩 인터벌(8h)보다 짧으면서 다음 00/08/16 UTC 정산 경계를 걸치면 진입을 스킵한다. 선언 없는 신호·EXIT는 절대 차단하지 않으며 부호 무관(튜너블 없음) 고정 규칙이다.
+- **Warmup-end 훅**: 엔진이 warmup→live 전이 시 전략의 선택적 `on_warmup_end()`를 정확히 1회 호출(첫 라이브 바 처리 전). 유령 포지션(warmup 중 신호 억제로 전략 내부 상태만 진입) 탈동기화를 전략이 스스로 리셋할 수 있는 계약. `get_engine_state`/`set_engine_state`에 `warmup_end_hook_fired` 보존으로 청크 경계에서 중복/누락 없음. 훅 미정의 전략은 바이트 동일(현재 레포에 정의 클래스 0개, grep 검증).
+- **H1 tier fail-safe**: `registry.get_strategy_metadata`의 미지 이름 폴백을 `live_default`→`research_only`로 전환. 68개 pre-contract 레거시 클래스는 레지스트리에 동결 스냅샷(`_LEGACY_UNHINTED_LIVE_DEFAULT`)으로 명시해 기존 tier 해석 전부 불변(신규 테스트가 68개 전원 live_default 유지 + 레지스트리/가드 스냅샷 일치 + 미지 이름 research_only를 고정). 심판 라운드에서 "폴백 한 줄만 뒤집으면 레거시 68개가 라이브 맵에서 탈락한다"는 결함이 독립적으로 검출됐고, 구현은 이를 선반영했다.
+
+판정 관례 유지: **do_not_promote / research_only_no_execution / 실배분 0%**. 레버의 성과 주장 없음 — 효과는 data-PC A/B가 결정한다. 신규 알파 슬리브 6종(taker-flow 잔차 XS·basis-funding 갭 컨버전스·off-session basis 괴리·salience/prospect 행동가치 XS·OI 증가압력 XS)과 V-DIAG(HAR-RV QLIKE 스필오버 승인 진단) + 지표 4모듈은 병렬 저작 진행 중이며 다음 엔트리에서 3종 재고정(manifest+baseline+tier)과 함께 기록한다. 심판 판정으로 **연기**된 항목: leader-RV 사이징 오버레이(V-DIAG가 BTC→alt 페어를 승인해야 저작), 청산 XS 슬리브(liquidation 컬럼은 백필 경로가 없어 커버리지 감사 선행), 동일봉 MKT 넷팅(발생률 측정 우선 — 엔진 개입 없이 주문 로그 분석으로 측정).
 ## 2026-08-23 — G003 integrated alpha-research decision and restartable native replay
 
 Current canonical navigation moved to `README.md`, `strategy_taxonomy.md`,

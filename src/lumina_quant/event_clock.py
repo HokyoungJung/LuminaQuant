@@ -2,14 +2,24 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
+
+
+def _epoch_seconds(value: datetime) -> float:
+    """Naive datetimes are UTC (same convention as ``core.engine._event_time_to_ms``
+    and the data handlers); host-local interpretation would make event identity
+    differ between hosts and break cross-host replay parity.
+    """
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=UTC)
+    return value.astimezone(UTC).timestamp()
 
 
 def normalize_timestamp_ns(value) -> int:
     if value is None:
         return 0
     if isinstance(value, datetime):
-        return int(value.timestamp() * 1_000_000_000)
+        return int(_epoch_seconds(value) * 1_000_000_000)
     if isinstance(value, (int, float)):
         raw = int(value)
         if abs(raw) < 100_000_000_000:
@@ -19,7 +29,7 @@ def normalize_timestamp_ns(value) -> int:
         return raw
     try:
         parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
-        return int(parsed.timestamp() * 1_000_000_000)
+        return int(_epoch_seconds(parsed) * 1_000_000_000)
     except Exception:
         return 0
 

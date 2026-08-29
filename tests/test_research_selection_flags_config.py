@@ -165,6 +165,8 @@ def test_honest_research_profiles_turn_all_flags_on(profile_path):
     assert rt.research.hac_inference is True
     assert rt.research.cscv_pbo is True
     assert rt.research.exposure_normalized_promotion is True
+    assert rt.research.emit_candidate_overfit_stats is True
+    assert rt.research.route_unmapped_registered_strategies is True
     assert rt.execution.funding_on_utc_boundary is True
 
 

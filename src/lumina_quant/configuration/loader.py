@@ -980,6 +980,8 @@ def _normalize_strategy_quality_runtime_section(runtime: RuntimeConfig) -> None:
         _as_int(cfg.profit_moonshot_conflict_cooldown_bars, 3),
     )
     cfg.pair_min_correlation = max(0.0, min(1.0, _as_float(cfg.pair_min_correlation, 0.35)))
+    cfg.min_hold_bars = max(0, _as_int(getattr(cfg, "min_hold_bars", 0), 0))
+    cfg.no_trade_band_bps = max(0.0, _as_float(getattr(cfg, "no_trade_band_bps", 0.0), 0.0))
 
 
 _VALID_ALLOCATION_METHODS: frozenset[str] = frozenset(

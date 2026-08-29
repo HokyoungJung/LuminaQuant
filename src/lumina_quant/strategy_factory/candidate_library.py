@@ -2795,6 +2795,16 @@ class _CandidateBuildContext:
         _build_realized_vol_term_structure_candidates(self)
         _build_breadth_regime_trend_timer_candidates(self)
         _build_bull_bear_regime_rotation_candidates(self)
+        # Alpha-sleeve batch 2026-08-20 (design-panel survivors): residual
+        # taker-flow, basis-vs-funding gap, off-session basis dislocation,
+        # behavioral (salience/prospect) value, OI growth pressure. All
+        # cross-sectional baskets on the allow_multi_asset handoff route;
+        # SLICE constants + pre-registered nulls live in the lane modules.
+        _build_xs_residual_taker_flow_candidates(self)
+        _build_basis_funding_gap_candidates(self)
+        _build_offsession_basis_dislocation_candidates(self)
+        _build_behavioral_value_xs_candidates(self)
+        _build_oi_growth_pressure_candidates(self)
         return self.candidates
 
 
@@ -12374,3 +12384,229 @@ def build_article_pipeline_manifest(
     manifest["max_per_family"] = int(max_per_family)
     manifest["max_total"] = int(max_total)
     return manifest
+
+
+# --------------------------------------------------------------------------- #
+# Alpha-sleeve batch 2026-08-20 (adversarial design-panel survivors; thin
+# builders only — SLICE constants + EXPECTED NULL / falsifier pre-registration
+# live in the lane modules). All are cross-sectional baskets evaluated via the
+# allow_multi_asset handoff route; none is tagged carry except the funding-gap
+# sleeve whose carry tag is genuine (funding-settlement carry).
+# --------------------------------------------------------------------------- #
+def _build_xs_residual_taker_flow_candidates(ctx: _CandidateBuildContext) -> None:
+    """Residual taker-flow accumulation long-short basket (weekly, 1h/4h)."""
+    from lumina_quant.strategies.xs_residual_taker_flow_alpha_sleeves import (
+        _SUGGESTED_CANDIDATE_TAGS,
+        _XS_RESIDUAL_TAKER_FLOW_SLICE,
+    )
+
+    crypto_symbols = tuple(ctx.crypto_only_symbols)
+    for timeframe in ctx._present("1h", "4h"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _XS_RESIDUAL_TAKER_FLOW_SLICE.get(timeframe, ()):
+            if len(crypto_symbols) < int(spec.get("min_symbols", 10)):
+                continue
+            params = {key: value for key, value in spec.items() if key != "variant"}
+            _add_candidate(
+                ctx.candidates,
+                name=f"xs_residual_taker_flow_{tf_tag}_{spec['variant']}",
+                family="cross_sectional",
+                strategy_class="CrossSectionalResidualTakerFlowStrategy",
+                timeframe=timeframe,
+                symbols=crypto_symbols,
+                params=params,
+                notes=(
+                    "Cross-sectional residual aggressor-flow accumulation: ~5-day "
+                    "signed taker imbalance normalized by turnover, residualized "
+                    "against same-window return z (flow price has not paid for), "
+                    "weekly long-short quintiles with rank hysteresis and a hard "
+                    "1-week min-hold. Taker columns are aggTrades-backfillable, "
+                    "lifting the graveyard-7 coverage death for this family "
+                    f"({timeframe}, {spec['variant']})."
+                ),
+                tags=_SUGGESTED_CANDIDATE_TAGS,
+                metadata={
+                    "timeframe": timeframe,
+                    "retune_profile": str(spec["variant"]),
+                    "symbol_scope": "crypto_basket",
+                    "allow_short": bool(spec.get("allow_short", True)),
+                    "admission_route": "allow_multi_asset_handoff",
+                    "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
+                },
+            )
+
+
+def _build_basis_funding_gap_candidates(ctx: _CandidateBuildContext) -> None:
+    """Basis-vs-funding expectation-gap convergence fade (8h boundary clock)."""
+    from lumina_quant.strategies.basis_funding_gap_alpha_sleeves import (
+        _BASIS_FUNDING_GAP_SLICE,
+        _SUGGESTED_CANDIDATE_TAGS,
+    )
+
+    crypto_symbols = tuple(ctx.crypto_only_symbols)
+    for timeframe in ctx._present("1h", "4h"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _BASIS_FUNDING_GAP_SLICE.get(timeframe, ()):
+            if len(crypto_symbols) < int(spec.get("min_symbols", 6)):
+                continue
+            params = {key: value for key, value in spec.items() if key != "variant"}
+            _add_candidate(
+                ctx.candidates,
+                name=f"basis_funding_gap_{tf_tag}_{spec['variant']}",
+                family="carry",
+                strategy_class="BasisFundingGapConvergenceStrategy",
+                timeframe=timeframe,
+                symbols=crypto_symbols,
+                params=params,
+                notes=(
+                    "Basis-minus-funding expectation gap fade: XS z of "
+                    "basis_bps(mark,index) minus funding-implied basis at 8h "
+                    "funding boundaries only, |z|>2 entries, hard 2-interval "
+                    "min-hold, gap-sign-flip / 72h max exit. Trades the funding-"
+                    "expectation error no incumbent computes (level blends only) "
+                    f"({timeframe}, {spec['variant']})."
+                ),
+                tags=_SUGGESTED_CANDIDATE_TAGS,
+                metadata={
+                    "timeframe": timeframe,
+                    "retune_profile": str(spec["variant"]),
+                    "symbol_scope": "crypto_basket",
+                    "allow_short": bool(spec.get("allow_short", True)),
+                    "admission_route": "allow_multi_asset_handoff",
+                    "decision_cadence_seconds": 28800,
+                },
+            )
+
+
+def _build_offsession_basis_dislocation_candidates(ctx: _CandidateBuildContext) -> None:
+    """TradFi-perp off-session basis dislocation fade at cash reopen (1h)."""
+    from lumina_quant.strategies.offsession_basis_dislocation_alpha_sleeves import (
+        _DEFAULT_TRADFI_UNIVERSE,
+        _OFFSESSION_BASIS_DISLOCATION_SLICE,
+        _SUGGESTED_CANDIDATE_TAGS,
+    )
+
+    tradfi_symbols = _intersect_universe(_DEFAULT_TRADFI_UNIVERSE, ctx.normalized_symbols)
+    for timeframe in ctx._present("1h"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _OFFSESSION_BASIS_DISLOCATION_SLICE.get(timeframe, ()):
+            if len(tradfi_symbols) < int(spec.get("min_symbols", 6)):
+                continue
+            params = {key: value for key, value in spec.items() if key != "variant"}
+            _add_candidate(
+                ctx.candidates,
+                name=f"offsession_basis_dislocation_{tf_tag}_{spec['variant']}",
+                family="cross_sectional",
+                strategy_class="OffSessionBasisDislocationStrategy",
+                timeframe=timeframe,
+                symbols=tradfi_symbols,
+                params=params,
+                notes=(
+                    "Off-session mark-index basis dislocation fade on Binance "
+                    "TradFi perps: 24/7 perp flow drifts off the stale cash-index "
+                    "anchor outside UTC 14-20 Mon-Fri; at the last decision bar "
+                    "before reopen, fade |z|>2 accumulated dislocations with a "
+                    "36h min-hold / 72h max exit. Event-conditional and flat-"
+                    f"heavy ({timeframe}, {spec['variant']})."
+                ),
+                tags=_SUGGESTED_CANDIDATE_TAGS,
+                metadata={
+                    "timeframe": timeframe,
+                    "retune_profile": str(spec["variant"]),
+                    "symbol_scope": "tradfi_basket",
+                    "allow_short": bool(spec.get("allow_short", True)),
+                    "admission_route": "allow_multi_asset_handoff",
+                    "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
+                },
+            )
+
+
+def _build_behavioral_value_xs_candidates(ctx: _CandidateBuildContext) -> None:
+    """Salience-theory + prospect-theory value fades (weekly ISO clock)."""
+    from lumina_quant.strategies.behavioral_value_xs_alpha_sleeves import (
+        _PROSPECT_VALUE_SLICE,
+        _SALIENCE_VALUE_SLICE,
+        _SUGGESTED_CANDIDATE_TAGS,
+    )
+
+    crypto_symbols = tuple(ctx.crypto_only_symbols)
+    lanes = (
+        ("salience_value_xs", "SalienceTheoryValueStrategy", _SALIENCE_VALUE_SLICE),
+        ("prospect_value_xs", "ProspectTheoryValueStrategy", _PROSPECT_VALUE_SLICE),
+    )
+    for prefix, strategy_class, slice_map in lanes:
+        for timeframe in ctx._present("1h", "4h", "1d"):
+            tf_tag = timeframe.replace("/", "-")
+            for spec in slice_map.get(timeframe, ()):
+                if len(crypto_symbols) < int(spec.get("min_symbols", 5)):
+                    continue
+                params = {key: value for key, value in spec.items() if key != "variant"}
+                _add_candidate(
+                    ctx.candidates,
+                    name=f"{prefix}_{tf_tag}_{spec['variant']}",
+                    family="cross_sectional",
+                    strategy_class=strategy_class,
+                    timeframe=timeframe,
+                    symbols=crypto_symbols,
+                    params=params,
+                    notes=(
+                        "Behavioral distribution-value fade (BGS salience / "
+                        "TK-1992 prospect value on trailing daily returns), "
+                        "residualized against momentum + MAX, weekly ISO "
+                        "rebalance with q20/q35 hysteresis and daily-decision "
+                        "min-hold. Redundancy tournament vs the sibling lane is "
+                        "pre-registered in the module docstring "
+                        f"({timeframe}, {spec['variant']})."
+                    ),
+                    tags=_SUGGESTED_CANDIDATE_TAGS,
+                    metadata={
+                        "timeframe": timeframe,
+                        "retune_profile": str(spec["variant"]),
+                        "symbol_scope": "crypto_basket",
+                        "allow_short": bool(spec.get("allow_short", True)),
+                        "admission_route": "allow_multi_asset_handoff",
+                        "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
+                    },
+                )
+
+
+def _build_oi_growth_pressure_candidates(ctx: _CandidateBuildContext) -> None:
+    """Open-interest growth pressure continuation basket (weekly, 1h)."""
+    from lumina_quant.strategies.oi_growth_pressure_alpha_sleeves import (
+        _OI_GROWTH_PRESSURE_SLICE,
+        _SUGGESTED_CANDIDATE_TAGS,
+    )
+
+    crypto_symbols = tuple(ctx.crypto_only_symbols)
+    for timeframe in ctx._present("1h"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _OI_GROWTH_PRESSURE_SLICE.get(timeframe, ()):
+            if len(crypto_symbols) < int(spec.get("min_symbols", 5)):
+                continue
+            params = {key: value for key, value in spec.items() if key != "variant"}
+            _add_candidate(
+                ctx.candidates,
+                name=f"oi_growth_pressure_{tf_tag}_{spec['variant']}",
+                family="cross_sectional",
+                strategy_class="OpenInterestGrowthPressureStrategy",
+                timeframe=timeframe,
+                symbols=crypto_symbols,
+                params=params,
+                notes=(
+                    "Hong-Yogo positioning-flow continuation: 7d OI-notional "
+                    "growth normalized by dollar volume, momentum-residualized, "
+                    "weekly long-short quintiles with min-hold. Sign pre-"
+                    "registered POSITIVE (continuation); step-0 OI coverage "
+                    "audit is the pre-backtest kill gate "
+                    f"({timeframe}, {spec['variant']})."
+                ),
+                tags=_SUGGESTED_CANDIDATE_TAGS,
+                metadata={
+                    "timeframe": timeframe,
+                    "retune_profile": str(spec["variant"]),
+                    "symbol_scope": "crypto_basket",
+                    "allow_short": bool(spec.get("allow_short", True)),
+                    "admission_route": "allow_multi_asset_handoff",
+                    "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
+                },
+            )

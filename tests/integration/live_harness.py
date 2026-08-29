@@ -26,8 +26,10 @@ import from it.
 from __future__ import annotations
 
 import logging
+import time
 from collections import deque
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from typing import Any
 
 import lumina_quant.live.trader as trader_mod
@@ -35,6 +37,7 @@ from lumina_quant.configuration import get_default_runtime_config
 from lumina_quant.live.execution_live import LiveExecutionHandler
 from lumina_quant.live.portfolio import get_live_portfolio_cls
 from lumina_quant.live.trader import LiveTrader, _build_live_config_namespace
+from lumina_quant.strategies.rsi_strategy import RsiStrategy
 
 DEFAULT_MARK_PRICE = 100.0
 
@@ -307,7 +310,7 @@ def build_live_trader(
     *,
     exchange: ScriptedFakeExchange,
     symbols: list[str] | None = None,
-    mode: str = "paper",
+    mode: str = "real",
     order_state_source: str = "polling",
     state_store: dict | None = None,
     config_overrides: dict[str, Any] | None = None,
@@ -322,8 +325,14 @@ def build_live_trader(
     """
     symbols = list(symbols or ["BTC/USDT"])
     rt = get_default_runtime_config()
+    # This harness intentionally submits orders through a fake exchange. Model
+    # that deployment as canary so the real admission boundary exercises its
+    # executable-stage path; get_exchange remains patched below, so no real
+    # endpoint can be contacted.
+    rt.live.go_live_stage = "canary"
+    rt.live.mode = str(mode)
+    rt.live.testnet = False
     cfg = _build_live_config_namespace(rt, symbols=symbols)
-    cfg.MODE = str(mode)
     cfg.ORDER_STATE_SOURCE = str(order_state_source)
     cfg.ALLOW_MARKET_ORDERS = True
     cfg.DEFAULT_ORDER_TYPE = "MKT"
@@ -367,13 +376,43 @@ def build_live_trader(
             data_handler_cls=_FakeDataHandler,
             execution_handler_cls=LiveExecutionHandler,
             portfolio_cls=get_live_portfolio_cls(),
-            strategy_cls=strategy_cls or _FakeStrategy,
+            strategy_cls=strategy_cls or RsiStrategy,
             strategy_name=strategy_name,
         )
     finally:
         for name, value in saved.items():
             setattr(trader_mod, name, value)
 
+    trader._live_readiness_verified = True
+    trader._startup_reconciliation_complete = True
+    trader._startup_state = "ready"
+    trader._materialized_stale_block_active = False
+    trader._data_silence_block_active = False
+    now_ns = time.time_ns()
+    now_ms = now_ns // 1_000_000
+    trader._record_market_freshness(
+        SimpleNamespace(
+            bars_1s={
+                symbol: [
+                    (
+                        now_ms,
+                        DEFAULT_MARK_PRICE,
+                        DEFAULT_MARK_PRICE,
+                        DEFAULT_MARK_PRICE,
+                        DEFAULT_MARK_PRICE,
+                        1.0,
+                    )
+                ]
+                for symbol in symbols
+            },
+            timestamp_ns=now_ns,
+            sequence=1,
+            lag_ms=0,
+            time=now_ms,
+            event_time_watermark_ms=now_ms,
+            is_stale=False,
+        )
+    )
     return trader, exchange, audit_holder["obj"], notifier_holder["obj"]
 
 

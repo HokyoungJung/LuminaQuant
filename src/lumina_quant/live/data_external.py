@@ -14,6 +14,7 @@ import polars as pl
 
 from lumina_quant.core.market_window_contract import build_market_window_event
 from lumina_quant.market_data import external_symbol_candidate_paths
+from lumina_quant.utils.timeutil import utc_epoch_ms
 
 
 class ExternalWindowDataHandler:
@@ -197,7 +198,7 @@ class ExternalWindowDataHandler:
                 )
                 rows = tuple(
                     (
-                        int(row[0].timestamp() * 1000),
+                        utc_epoch_ms(row[0]),
                         float(row[1]),
                         float(row[2]),
                         float(row[3]),

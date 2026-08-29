@@ -50,6 +50,33 @@ FEATURE_COLUMNS: Final[tuple[str, ...]] = (
     "book_depth_imbalance_1pct",
 )
 FEATURE_POINT_MAX_STALE_MS: Final[int] = 8 * 60 * 60 * 1000
+# Binance's observed official publication lag is at most 29 ms.  Keep this
+# deliberately narrow and below the one-second ceiling for settlement evidence.
+BINANCE_FUNDING_SOURCE_JITTER_TOLERANCE_MS: Final[int] = 29
+BINANCE_FUNDING_SOURCE_JITTER_CEILING_MS: Final[int] = 1000
+FUNDING_EVIDENCE_COLUMNS: Final[tuple[str, ...]] = (
+    "funding_rate",
+    "funding_mark_price",
+    "funding_fee_rate",
+    "funding_fee_quote_per_unit",
+)
+
+
+@dataclass(frozen=True, slots=True)
+class FundingFeeCoverage:
+    """Source-causal funding-settlement coverage for a nominal boundary range."""
+
+    fee_sum: float | None
+    complete: bool
+    last_consecutive_boundary_ms: int | None
+    deferred_boundary_ms: int | None
+    missing_boundary_ms: int | None
+    invalid_boundary_ms: int | None
+
+    def __iter__(self):
+        """Retain the historical ``fee_sum, complete`` unpacking contract."""
+        yield self.fee_sum
+        yield self.complete
 
 
 @dataclass(frozen=True, slots=True)
@@ -252,6 +279,77 @@ class FeaturePointLookup:
             return None
         return float(sum(values))
 
+    def funding_fee_sum_between(
+        self,
+        symbol: str,
+        *,
+        start_timestamp_ms: int,
+        end_timestamp_ms: int,
+        interval_ms: int,
+    ) -> FundingFeeCoverage:
+        """Return source-causal coverage for nominal settlements in ``(start, end]``."""
+        if not self.db_path or interval_ms <= 0 or end_timestamp_ms <= start_timestamp_ms:
+            return FundingFeeCoverage(None, False, None, None, None, None)
+        first = ((int(start_timestamp_ms) // interval_ms) + 1) * interval_ms
+        settlements = range(first, int(end_timestamp_ms) + 1, interval_ms)
+        if len(settlements) == 0:
+            return FundingFeeCoverage(None, True, None, None, None, None)
+
+        cache = self._get_or_load(symbol)
+        values = cache.raw_columns.get("funding_fee_quote_per_unit", [])
+        found: list[float] = []
+        last_consecutive: int | None = None
+        end_ms = int(end_timestamp_ms)
+        for boundary_ms in settlements:
+            observable_until_ms = min(
+                boundary_ms + BINANCE_FUNDING_SOURCE_JITTER_TOLERANCE_MS,
+                end_ms,
+            )
+            left = bisect_right(cache.timestamps_ms, boundary_ms - 1)
+            right = bisect_right(cache.timestamps_ms, observable_until_ms)
+            window_values = values[left:right]
+            candidates = [
+                float(value)
+                for value in window_values
+                if value is not None and math.isfinite(float(value))
+            ]
+            has_invalid_value = any(
+                value is not None and not math.isfinite(float(value)) for value in window_values
+            )
+            if len(candidates) == 1 and not has_invalid_value:
+                found.append(candidates[0])
+                last_consecutive = boundary_ms
+                continue
+            if (
+                not candidates
+                and not has_invalid_value
+                and end_ms < boundary_ms + BINANCE_FUNDING_SOURCE_JITTER_TOLERANCE_MS
+            ):
+                return FundingFeeCoverage(
+                    float(sum(found)) if found else None,
+                    False,
+                    last_consecutive,
+                    boundary_ms,
+                    None,
+                    None,
+                )
+            return FundingFeeCoverage(
+                float(sum(found)) if found else None,
+                False,
+                last_consecutive,
+                None,
+                boundary_ms if not candidates and not has_invalid_value else None,
+                boundary_ms if candidates or has_invalid_value else None,
+            )
+        return FundingFeeCoverage(
+            float(sum(found)) if found else None,
+            True,
+            last_consecutive,
+            None,
+            None,
+            None,
+        )
+
     def _get_or_load(self, symbol: str) -> _FeatureCache:
         normalized = normalize_symbol(symbol)
         cached = self._cache.get(normalized)
@@ -314,6 +412,15 @@ class FeaturePointLookup:
         else:
             cleaned = cleaned.with_columns(
                 pl.col("source_timestamp_ms").cast(pl.Int64, strict=False)
+            )
+
+        funding_evidence = cleaned.filter(
+            pl.any_horizontal([pl.col(field).is_not_null() for field in FUNDING_EVIDENCE_COLUMNS])
+        )
+        if funding_evidence.get_column("timestamp_ms").is_duplicated().any():
+            raise ValueError(
+                f"duplicate funding evidence timestamps for symbol {symbol!r}; "
+                "funding settlement evidence must be unambiguous"
             )
 
         cleaned = (
@@ -635,9 +742,13 @@ def _read_sealed_feature_frame(root_fd: int, entry: SealedFeatureFile) -> pl.Dat
 
 
 __all__ = [
+    "BINANCE_FUNDING_SOURCE_JITTER_CEILING_MS",
+    "BINANCE_FUNDING_SOURCE_JITTER_TOLERANCE_MS",
     "FEATURE_COLUMNS",
     "FEATURE_POINT_MAX_STALE_MS",
+    "FUNDING_EVIDENCE_COLUMNS",
     "FeaturePoint",
     "FeaturePointLookup",
+    "FundingFeeCoverage",
     "SealedFeatureFile",
 ]

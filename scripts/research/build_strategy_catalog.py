@@ -43,6 +43,17 @@ _ARTIFACT_NAMES = (
     "family_scorecards.csv",
     "family_scorecards.md",
 )
+_POST_SNAPSHOT_FAMILY_OVERRIDES = {
+    "EquityCurveKillSwitchOverlayStrategy": "volatility_risk_overlay",
+    "KalmanPairsStatArbStrategy": "mean_reversion_relative_value",
+    "MaScoreVolTargetRotationStrategy": "trend_momentum",
+    "NoiseFilteredVolatilityBreakoutStrategy": "breakout",
+    "PcaResidualStatArbStrategy": "mean_reversion_relative_value",
+    "PrevDayBoxQuartileReversionStrategy": "mean_reversion_relative_value",
+    "RsiDivergenceScaleOutStrategy": "mean_reversion_relative_value",
+    "TrendGatedIbsReversionStrategy": "mean_reversion_relative_value",
+    "TurtleUnitPyramidingStrategy": "breakout",
+}
 
 
 def get_catalog_strategy_map() -> dict[str, type[Any]]:
@@ -234,6 +245,9 @@ def resolve_family(
     explicit = str(override.get("family") or "").strip()
     if explicit:
         return explicit, "evidence_override"
+    post_snapshot = _POST_SNAPSHOT_FAMILY_OVERRIDES.get(strategy_name)
+    if post_snapshot is not None:
+        return post_snapshot, "post_snapshot_semantic_override"
 
     mapped = sorted(
         {

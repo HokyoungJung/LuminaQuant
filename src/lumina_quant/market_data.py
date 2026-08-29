@@ -19,6 +19,7 @@ from typing import Any
 
 import polars as pl
 from lumina_quant.backtesting.cli_contract import normalize_data_mode
+from lumina_quant.data.raw_first_lineage import resample_1s_frame
 from lumina_quant.symbols import canonical_symbol
 
 MARKET_OHLCV_TABLE = "market_ohlcv"
@@ -1404,7 +1405,10 @@ class MarketDataRepository:
         max_dt = frame["datetime"].max()
         if max_dt is None:
             return None
-        return int(max_dt.timestamp() * 1000)
+        # Stored bar times are tz-naive UTC wall times; a bare ``.timestamp()``
+        # would read them in the host timezone and shift the incremental-sync
+        # cursor by the UTC offset (overlap east of UTC, a silent GAP west of it).
+        return _datetime_to_epoch_ms(max_dt)
 
     def get_last_timestamp_ms(self, *, exchange: str, symbol: str, timeframe: str) -> int | None:
         frame = self.load_ohlcv(exchange=exchange, symbol=symbol, timeframe=timeframe)
@@ -1413,7 +1417,7 @@ class MarketDataRepository:
         max_dt = frame["datetime"].max()
         if max_dt is None:
             return None
-        return int(max_dt.timestamp() * 1000)
+        return _datetime_to_epoch_ms(max_dt)
 
     def market_data_exists(self, *, exchange: str, symbol: str, timeframe: str) -> bool:
         frame = self.load_ohlcv(exchange=exchange, symbol=symbol, timeframe=timeframe)
@@ -1447,6 +1451,29 @@ class MarketDataRepository:
                 start_date=start_date,
                 end_date=end_date,
             )
+            if (
+                direct.is_empty()
+                and resampled.is_empty()
+                and timeframe_token not in {"1s", "1m"}
+                and self._prefer_1s_derived
+            ):
+                minute = _load_direct_ohlcv(
+                    physical_root,
+                    exchange=normalized_exchange,
+                    symbol=normalized_symbol,
+                    timeframe="1m",
+                    start_date=start_date,
+                    end_date=end_date,
+                )
+                if not minute.is_empty():
+                    latest_minute = minute.get_column("datetime").max()
+                    if latest_minute is None:
+                        raise ValueError("direct minute source has no latest timestamp")
+                    direct = resample_1s_frame(
+                        minute,
+                        timeframe=timeframe_token,
+                        complete_through_ms=_datetime_to_epoch_ms(latest_minute) + 59_999,
+                    )
             return _ensure_ohlcv_frame(direct), _ensure_ohlcv_frame(resampled)
 
     def load_ohlcv(

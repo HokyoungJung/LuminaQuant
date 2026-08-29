@@ -8,6 +8,7 @@ import polars as pl
 
 from lumina_quant.strategy_factory import research_runner
 from lumina_quant.strategy_factory import research_run_support
+from lumina_quant.core.events import SignalEvent
 
 
 def _minute_datetimes(length: int) -> np.ndarray:
@@ -28,6 +29,52 @@ def _bundle(symbol: str, *, length: int = 420) -> research_runner.SeriesBundle:
         close=close,
         volume=np.linspace(1_000.0, 1_400.0, length, dtype=float),
     )
+
+
+class _PartialExitStrategy:
+    def __init__(self, bars, events) -> None:
+        self.events = events
+        self.calls = 0
+
+    def calculate_signals(self, event) -> None:
+        signal_type, metadata = (
+            ("LONG", None)
+            if self.calls == 0
+            else ("EXIT", {"exit_fraction": 0.5})
+            if self.calls == 1
+            else ("EXIT", None)
+        )
+        self.events.put(
+            SignalEvent(
+                strategy_id="partial-exit-test",
+                symbol=event.symbol,
+                datetime=event.time,
+                signal_type=signal_type,
+                metadata=metadata,
+            )
+        )
+        self.calls += 1
+
+
+def test_event_driven_exposure_preserves_remainder_after_partial_exit() -> None:
+    bundle = _bundle("BTC/USDT", length=3)
+    aligned = {
+        "datetime": bundle.datetime,
+        "BTC/USDT:open": bundle.open,
+        "BTC/USDT:high": bundle.high,
+        "BTC/USDT:low": bundle.low,
+        "BTC/USDT:close": bundle.close,
+        "BTC/USDT:volume": bundle.volume,
+    }
+
+    exposures = research_runner._simulate_event_driven_strategy_exposures(
+        _PartialExitStrategy,
+        params={},
+        aligned=aligned,
+        symbols=["BTC/USDT"],
+    )
+
+    np.testing.assert_allclose(exposures[0], [1.0, 0.5, 0.0])
 
 
 def test_align_bundles_augments_feature_series_from_feature_cache():

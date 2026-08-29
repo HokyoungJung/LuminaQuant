@@ -17,10 +17,11 @@ actions (anti-strawman rule):
   exactly ``1.5x`` a squeeze-carrying benchmark has a large RAW skew innovation
   but a ~0 RESIDUAL one, so the sleeve abstains on it.
 
-A flat benchmark in FIXTURE A makes ``beta == 0`` (``rolling_beta`` returns
-``None`` on a zero-variance benchmark), so the residual equals the raw return and
-the level-tie / divergence is exact; the load-bearing residualization is proven
-separately in FIXTURE B with a non-flat benchmark.
+FIXTURE A uses a non-flat period-two benchmark and adds the same benchmark
+return to every synthetic residual path.  The paired jump blocks are 30 bars
+apart, so they see identical benchmark returns and retain the exact level tie.
+This keeps beta defined under the production fail-closed contract; FIXTURE B
+separately proves that residualization removes a pure levered benchmark echo.
 
 Any pseudo-randomness (hygiene fillers only) is drawn from a small seeded LCG (no
 ``random`` module) so every run is bit-for-bit reproducible.
@@ -157,16 +158,31 @@ def _closes_from_m(m: list[float], warm_seed: float) -> list[float]:
     return closes
 
 
+def _closes_from_returns(returns: list[float]) -> list[float]:
+    closes = [100.0]
+    for value in returns:
+        closes.append(closes[-1] * (1.0 + value))
+    return closes
+
+
 def _fixture_a() -> tuple[dict[str, list[float]], list[str]]:
-    panel = {
-        _BENCH: [100.0] * _N,  # flat -> beta 0, residual == raw
-        "RISER": _closes_from_m(_RISER_M, 0.001),
-        "FADER": _closes_from_m(_FADER_M, 0.001),
-        "LOTHI": _closes_from_m(_LOTHI_M, 0.001),
-        "LOTLO": _closes_from_m(_LOTLO_M, 0.001),
-        "MID1": _closes_from_m(_MID1_M, 0.001),
-        "MID2": _closes_from_m(_MID2_M, 0.001),
-    }
+    benchmark_returns = [0.003 if index % 2 == 0 else -0.003 for index in range(_N - 1)]
+    panel = {_BENCH: _closes_from_returns(benchmark_returns)}
+    for symbol, path in {
+        "RISER": _RISER_M,
+        "FADER": _FADER_M,
+        "LOTHI": _LOTHI_M,
+        "LOTLO": _LOTLO_M,
+        "MID1": _MID1_M,
+        "MID2": _MID2_M,
+    }.items():
+        residual_returns = _bar_simple_returns(_closes_from_m(path, 0.001))
+        panel[symbol] = _closes_from_returns(
+            [
+                benchmark + residual
+                for benchmark, residual in zip(benchmark_returns, residual_returns, strict=True)
+            ]
+        )
     return panel, list(panel)
 
 
@@ -251,7 +267,7 @@ def test_stage1_level_tie_premises() -> None:
     assert abs(incumbent_skewness(riser[-60:]) - incumbent_skewness(fader[-60:])) < 1e-9
     # (ii) MAX over the last 20 exactly equal
     assert max(riser[-20:]) == max(fader[-20:])
-    # (iii) residual-std (idio-vol) LEVEL equal (flat bench -> residual == raw)
+    # (iii) idiosyncratic-volatility LEVEL remains tied.
     assert abs(sample_std(riser[-60:]) - sample_std(fader[-60:])) < 1e-4
     # (iv) the INNOVATION separates them; the LEVEL fillers stay ~flat
     assert _skew_innovation(riser, 30) > 1.0
@@ -269,8 +285,8 @@ def test_leg1_lottery_skewness_ties_pair_and_is_live() -> None:
     panel, syms = _fixture_a()
     lottery = LotterySkewnessStrategy(_Bars(syms), _Queue(), **_LOTTERY_KWARGS)
     # tied LEVEL score: the incumbent structurally cannot separate the pair
-    ls_riser = lottery._lottery_score(panel["RISER"])
-    ls_fader = lottery._lottery_score(panel["FADER"])
+    ls_riser = lottery._lottery_score(panel["RISER"], _TS)
+    ls_fader = lottery._lottery_score(panel["FADER"], _TS)
     assert ls_riser is not None and ls_fader is not None
     assert abs(ls_riser[0] - ls_fader[0]) < 1e-9
     _feed(lottery, panel, syms)
@@ -420,6 +436,28 @@ def test_state_roundtrip_mid_position() -> None:
     b = _candidate(syms)
     b.set_state(snap)
     assert b.get_state() == snap
+
+
+def test_restore_accepts_gapped_grid_but_rejects_forged_time_and_close() -> None:
+    panel, syms = _fixture_a()
+    candidate = _candidate(syms)
+    candidate.calculate_signals(_window_event(panel, 0, syms))
+    candidate.calculate_signals(_window_event(panel, 2, syms))
+    snapshot = candidate.get_state()
+    revived = _candidate(syms)
+    revived.set_state(snapshot)
+    assert revived.get_state() == snapshot
+    assert all(list(item.times) == [_TS[0], _TS[2]] for item in candidate._state.values())
+
+    forged_time = candidate.get_state()
+    forged_time["symbol_state"]["RISER"]["times"][1] = _TS[1]
+    candidate.set_state(forged_time)
+    assert candidate.get_state() == snapshot
+
+    malformed_close = candidate.get_state()
+    malformed_close["symbol_state"]["RISER"]["closes"][0] = "100.0"
+    candidate.set_state(malformed_close)
+    assert candidate.get_state() == snapshot
 
 
 def test_adversarial_set_state_never_raises() -> None:

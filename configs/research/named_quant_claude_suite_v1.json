@@ -1,0 +1,2967 @@
+{
+  "allocation_input_policy": {
+    "alignment": "common-date intersection of NET returns before any allocator call",
+    "locked_oos_role": "report-only out-of-sample evaluation of the pre-registered weights",
+    "locked_oos_used_for_weights": false,
+    "weights_and_quality_gate_inputs": [
+      "train",
+      "validation"
+    ]
+  },
+  "allocation_layering": {
+    "layer_1_relative": "allocator (hrp_dendrogram primary + variants): HOW to split among risky sleeves; weights sum to 1; mu-free",
+    "layer_2_exposure": "risk_scaling target_vol: HOW MUCH total risky exposure L = min(max_leverage, sigma_target/sigma_hat); residual 1-L is risk-free cash; only sigma_hat is estimated",
+    "layer_3_growth": "fractional Kelly: growth-optimal L = f*mu_hat/sigma_hat^2 -- gated because it re-imports mu-hat error; pre-registered as a variant, never the primary until locked-OOS mu evidence exists",
+    "rationale": "Deliberate separation so the Markowitz's-curse mitigation of the mu-free allocator is not undone by a mu-dependent sizing layer on top."
+  },
+  "allocator": {
+    "gross_cap": 1.0,
+    "method": "hrp_dendrogram",
+    "min_families": 5,
+    "min_sleeves": 6,
+    "notes": "Full Lopez de Prado dendrogram HRP (single linkage) is the pre-registered primary; the variants below are run on the SAME materialized input for comparison, never cherry-picked.",
+    "upper": 0.25
+  },
+  "allocator_evidence_refs": {
+    "constrained_hrp": [
+      "lopez_de_prado_hrp_2016",
+      "constrained_hrp_wp14_2019"
+    ],
+    "graph_inverse_centrality": [
+      "network_risk_parity_2024"
+    ],
+    "herc": [
+      "herc_raffinot_2018"
+    ],
+    "hrp_dendrogram": [
+      "lopez_de_prado_hrp_2016"
+    ],
+    "nco": [
+      "nco_lopez_de_prado"
+    ],
+    "wasserstein_dro": [
+      "blanchet_chen_zhou_2022_wasserstein_mv"
+    ]
+  },
+  "allocator_params": {
+    "linkage_method": "single"
+  },
+  "allocator_variants": [
+    {
+      "allocator_params": {
+        "linkage_method": "single"
+      },
+      "method": "hrp_dendrogram"
+    },
+    {
+      "allocator_params": {
+        "linkage_method": "ward"
+      },
+      "method": "hrp_dendrogram"
+    },
+    {
+      "allocator_params": {
+        "linkage_method": "single",
+        "lower": 0.0,
+        "upper_bound": 0.2
+      },
+      "method": "constrained_hrp"
+    },
+    {
+      "allocator_params": {
+        "linkage_method": "ward"
+      },
+      "method": "herc",
+      "notes": "Deterministic silhouette-selected HERC variant; not the original gap-statistic selection."
+    },
+    {
+      "allocator_params": {
+        "use_mean": false
+      },
+      "method": "nco"
+    },
+    {
+      "allocator_params": {
+        "radius": 1e-05
+      },
+      "method": "wasserstein_dro",
+      "notes": "Sensitivity radius in squared-return units; no confidence or calibration interpretation."
+    },
+    {
+      "allocator_params": {
+        "radius": 0.0001,
+        "target_return": 0.0002
+      },
+      "method": "wasserstein_dro",
+      "notes": "Sensitivity radius in squared-return units; no confidence or calibration interpretation."
+    },
+    {
+      "allocator_params": {
+        "floor": 1e-06
+      },
+      "method": "graph_inverse_centrality",
+      "notes": "Independent graph-risk heuristic; no published-rule reproduction claim."
+    },
+    {
+      "allocator_params": {},
+      "method": "hrp"
+    },
+    {
+      "allocator_params": {},
+      "method": "erc"
+    }
+  ],
+  "allocator_variants_execution": "build_quality_gated_allocation.py emits ONE manifest per run (top-level method + allocator_params). The variants below are executed by scripts/research/compare_hierarchical_allocators.py --variants on the same materialized input; every row is reported, none is cherry-picked.",
+  "allow_real_money": false,
+  "artifact_kind": "preregistered_research_suite",
+  "asset_level_allocation_study": {
+    "compare_script": "scripts/research/compare_hierarchical_allocators.py",
+    "input": "daily NET log returns per asset, common-date aligned, fold-locked",
+    "methods": [
+      "hrp_dendrogram",
+      "constrained_hrp",
+      "herc",
+      "nco",
+      "wasserstein_dro",
+      "graph_inverse_centrality"
+    ],
+    "notes": "Same CLI as sleeves (sleeves = assets). Report effN, diversification ratio, turnover and fold stability per method; no single winner is pre-declared.",
+    "rebalance": [
+      "weekly",
+      "monthly"
+    ],
+    "universe": "crypto10 + tradfi groups (precious_metals, energy_industrial, etf_index, equity)"
+  },
+  "attribution_policy": "Independent research hypotheses. Named sources are cited only for their stated scope: systrader79 design philosophy, 물탄찬밥's disclosed Turtle backbone, FlightF's direct posts, AmateurQuant scope, and Albatross/AOA risk context. Box and session-scalp rules are unattributed proxies; not reproductions, endorsements or performance claims.",
+  "candidate_research": {
+    "research": {
+      "cost_rate_multiplier": 2.2,
+      "dsr_gate_floor": 0.9,
+      "emit_candidate_overfit_stats": true,
+      "hac_inference": true,
+      "route_unmapped_registered_strategies": true,
+      "spa_gate_ceiling": 0.05,
+      "strict_selection_gate": true
+    },
+    "shortlist_selection": {
+      "allow_multi_asset": true,
+      "drop_single_without_metrics": true,
+      "include_weights": false,
+      "max_per_family": 2,
+      "max_per_timeframe": 10,
+      "single_min_return": 0.0,
+      "single_min_sharpe": 0.35,
+      "single_min_trades": 5
+    }
+  },
+  "candidates": [
+    {
+      "candidate_id": "crypto_vb_noise_session_1h_v1",
+      "family": "session_volatility_breakout",
+      "metadata": {
+        "hypothesis_refs": [
+          "systrader79_public_post",
+          "brock_technical_rules_1992"
+        ],
+        "lane": "claude",
+        "promotion_eligible": false,
+        "universe_binding": "crypto_top10",
+        "universe_constraint": "crypto_top10",
+        "universe_membership": "frozen smoke snapshot; data-PC must replace with point-in-time membership receipts"
+      },
+      "name": "Crypto Session Volatility Breakout (noise K, MA score, vol target)",
+      "notes": "UTC-day session open + independently selected noise-adaptive K x prev range; MA-score and range vol-target scale size; time-cut exit at next session. systrader79 supports design philosophy, not these exact parameters.",
+      "params": {
+        "allow_short": false,
+        "k": 0.5,
+        "k_max": 0.7,
+        "k_min": 0.3,
+        "k_mode": "noise",
+        "ma_score_windows": "3,5,10,20",
+        "max_order_value": 500.0,
+        "max_position_allocation": 0.3,
+        "max_symbols_by_noise": 5,
+        "max_vol_weight": 1.0,
+        "min_ma_score": 0.25,
+        "noise_period": 20,
+        "session_start_minute_utc": 0,
+        "stop_loss_pct": 0.0,
+        "target_allocation": 0.1,
+        "target_session_vol": 0.02,
+        "use_ma_score": true,
+        "use_vol_target": true
+      },
+      "strategy": "NoiseFilteredVolatilityBreakoutStrategy",
+      "strategy_class": "NoiseFilteredVolatilityBreakoutStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT",
+        "XRP/USDT",
+        "DOGE/USDT",
+        "ADA/USDT",
+        "AVAX/USDT",
+        "TON/USDT"
+      ],
+      "tags": [
+        "research_only",
+        "preregistered",
+        "cost_realistic_required",
+        "claude_lane",
+        "cross_sectional"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "crypto_ma_score_vol_target_1d_v1",
+      "family": "ma_score_dynamic_allocation",
+      "metadata": {
+        "admission_route": "allow_multi_asset_handoff",
+        "hypothesis_refs": [
+          "systrader79_public_post",
+          "moreira_muir_2017"
+        ],
+        "lane": "claude",
+        "promotion_eligible": false,
+        "universe_binding": "crypto_top10",
+        "universe_constraint": "crypto_top10",
+        "universe_membership": "frozen smoke snapshot; data-PC must replace with point-in-time membership receipts"
+      },
+      "name": "Crypto MA-Score x Inverse-Vol x Vol-Target Rotation",
+      "notes": "Long-only independent adaptation: fraction of 3/5/10/20d SMAs below price x inverse-vol risk parity x per-bar vol-target clamp; systrader79 supports design philosophy, not these exact parameters.",
+      "params": {
+        "gross_cap": 1.0,
+        "ma_score_windows": "3,5,10,20",
+        "max_order_value": 500.0,
+        "max_weight": 0.35,
+        "min_score": 0.25,
+        "min_symbols": 2,
+        "min_weight_change": 0.02,
+        "rebalance_bars": 5,
+        "target_vol_per_bar": 0.02,
+        "vol_window": 20
+      },
+      "strategy": "MaScoreVolTargetRotationStrategy",
+      "strategy_class": "MaScoreVolTargetRotationStrategy",
+      "strategy_timeframe": "1d",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT",
+        "XRP/USDT",
+        "DOGE/USDT",
+        "ADA/USDT",
+        "AVAX/USDT",
+        "TON/USDT"
+      ],
+      "tags": [
+        "research_only",
+        "preregistered",
+        "cost_realistic_required",
+        "claude_lane",
+        "cross_sectional"
+      ],
+      "timeframe": "1d"
+    },
+    {
+      "candidate_id": "crypto_multanchanbap_20_10_public_rule_1d_v1",
+      "family": "turtle_unit_pyramiding",
+      "metadata": {
+        "hypothesis_refs": [
+          "multanchanbap_coin_preview"
+        ],
+        "lane": "claude",
+        "promotion_eligible": false,
+        "universe_binding": "crypto_top10",
+        "universe_constraint": "crypto_top10",
+        "universe_membership": "frozen smoke snapshot; data-PC must replace with point-in-time membership receipts"
+      },
+      "name": "Crypto 20/10 + 120d Gate (independent close/-3.5% parameterization)",
+      "notes": "Public evidence supports the 120-day gate, 20-day high/10-day low and ATR short-stop/Turtle backbone. Close-channel, fixed -3.5% stop, long-only, one-unit sizing and no-pyramiding/no-N-stop settings are independent hypothesis parameters.",
+      "params": {
+        "add_step_atr": 0.5,
+        "allow_short": false,
+        "atr_window": 20,
+        "channel_source": "close",
+        "entry_lookback": 20,
+        "exit_lookback": 10,
+        "max_hold_bars": 0,
+        "max_order_value": 500.0,
+        "max_unit_allocation": 0.25,
+        "max_units": 1,
+        "require_prior_loser_skip": false,
+        "stop_atr_multiple": 2.0,
+        "stop_loss_pct": 0.035,
+        "trend_ma_window": 120,
+        "unit_risk_pct": 0.02,
+        "use_n_stop": false
+      },
+      "strategy": "TurtleUnitPyramidingStrategy",
+      "strategy_class": "TurtleUnitPyramidingStrategy",
+      "strategy_timeframe": "1d",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT",
+        "XRP/USDT",
+        "DOGE/USDT",
+        "ADA/USDT",
+        "AVAX/USDT",
+        "TON/USDT"
+      ],
+      "tags": [
+        "research_only",
+        "preregistered",
+        "cost_realistic_required",
+        "claude_lane",
+        "cross_sectional"
+      ],
+      "timeframe": "1d"
+    },
+    {
+      "candidate_id": "crypto_turtle_unit_pyramid_1d_v1",
+      "family": "turtle_unit_pyramiding",
+      "metadata": {
+        "hypothesis_refs": [
+          "faith_way_of_turtle_2007",
+          "multanchanbap_coin_preview"
+        ],
+        "lane": "claude",
+        "promotion_eligible": false,
+        "universe_binding": "crypto_top10",
+        "universe_constraint": "crypto_top10",
+        "universe_membership": "frozen smoke snapshot; data-PC must replace with point-in-time membership receipts"
+      },
+      "name": "Crypto Turtle 55/20 Unit Pyramiding",
+      "notes": "Published Turtle rule shape (Faith 2007): risk%/N unit sizing, +0.5N adds, whole-position 2N stop from the last fill, 55/20 channels; the numeric values (1% risk, 4 units, caps) and the 물탄찬밥 pyramiding framing are this lane's independent choices, not quoted from either source.",
+      "params": {
+        "add_step_atr": 0.5,
+        "allow_short": true,
+        "atr_window": 20,
+        "channel_source": "hl",
+        "entry_lookback": 55,
+        "exit_lookback": 20,
+        "max_hold_bars": 0,
+        "max_order_value": 500.0,
+        "max_unit_allocation": 0.25,
+        "max_units": 4,
+        "require_prior_loser_skip": false,
+        "stop_atr_multiple": 2.0,
+        "stop_loss_pct": 0.0,
+        "trend_ma_window": 0,
+        "unit_risk_pct": 0.01,
+        "use_n_stop": true
+      },
+      "strategy": "TurtleUnitPyramidingStrategy",
+      "strategy_class": "TurtleUnitPyramidingStrategy",
+      "strategy_timeframe": "1d",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT",
+        "XRP/USDT",
+        "DOGE/USDT",
+        "ADA/USDT",
+        "AVAX/USDT",
+        "TON/USDT"
+      ],
+      "tags": [
+        "research_only",
+        "preregistered",
+        "cost_realistic_required",
+        "claude_lane",
+        "cross_sectional"
+      ],
+      "timeframe": "1d"
+    },
+    {
+      "candidate_id": "crypto_kalman_pair_eth_btc_1h_v1",
+      "family": "kalman_pairs_stat_arb",
+      "metadata": {
+        "admission_route": "allow_multi_asset_handoff",
+        "hypothesis_refs": [
+          "chan_algorithmic_trading_2013",
+          "triantafyllopoulos_montana_2011"
+        ],
+        "lane": "claude",
+        "promotion_eligible": false,
+        "provenance_refs": [
+          "amateurquant_profile"
+        ],
+        "universe_constraint": "crypto_top10",
+        "universe_membership": "frozen smoke snapshot; data-PC must replace with point-in-time membership receipts"
+      },
+      "name": "Kalman Pair ETH/BTC (1h)",
+      "notes": "2-state Kalman hedge on log prices, standardized innovation z entry/exit, ADF gate, half-life hold cap.",
+      "params": {
+        "adf_window": 90,
+        "entry_z": 2.0,
+        "exit_on_cointegration_break": false,
+        "exit_z": 0.5,
+        "half_life_multiple": 2.0,
+        "kalman_delta": 0.0001,
+        "kalman_obs_noise": 1e-05,
+        "leg_allocation": 0.1,
+        "max_hold_bars": 120,
+        "max_leg_allocation": 0.3,
+        "max_order_value": 500.0,
+        "min_beta": 0.0,
+        "min_updates": 60,
+        "require_cointegration": true,
+        "signal_mode": "spread_z",
+        "stop_z": 4.0,
+        "symbol_x": "BTC/USDT",
+        "symbol_y": "ETH/USDT",
+        "z_window": 60
+      },
+      "strategy": "KalmanPairsStatArbStrategy",
+      "strategy_class": "KalmanPairsStatArbStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "ETH/USDT",
+        "BTC/USDT"
+      ],
+      "tags": [
+        "research_only",
+        "preregistered",
+        "cost_realistic_required",
+        "claude_lane",
+        "cross_sectional"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "crypto_kalman_pair_sol_avax_4h_v1",
+      "family": "kalman_pairs_stat_arb",
+      "metadata": {
+        "admission_route": "allow_multi_asset_handoff",
+        "hypothesis_refs": [
+          "chan_algorithmic_trading_2013",
+          "triantafyllopoulos_montana_2011"
+        ],
+        "lane": "claude",
+        "promotion_eligible": false,
+        "provenance_refs": [
+          "amateurquant_profile"
+        ],
+        "universe_constraint": "crypto_top10",
+        "universe_membership": "frozen smoke snapshot; data-PC must replace with point-in-time membership receipts"
+      },
+      "name": "Kalman Pair SOL/AVAX (4h)",
+      "notes": "Same engine on an L1 pair at 4h.",
+      "params": {
+        "adf_window": 90,
+        "entry_z": 2.0,
+        "exit_on_cointegration_break": false,
+        "exit_z": 0.5,
+        "half_life_multiple": 2.0,
+        "kalman_delta": 0.0001,
+        "kalman_obs_noise": 1e-05,
+        "leg_allocation": 0.1,
+        "max_hold_bars": 60,
+        "max_leg_allocation": 0.3,
+        "max_order_value": 500.0,
+        "min_beta": 0.0,
+        "min_updates": 60,
+        "require_cointegration": true,
+        "signal_mode": "spread_z",
+        "stop_z": 4.0,
+        "symbol_x": "AVAX/USDT",
+        "symbol_y": "SOL/USDT",
+        "z_window": 60
+      },
+      "strategy": "KalmanPairsStatArbStrategy",
+      "strategy_class": "KalmanPairsStatArbStrategy",
+      "strategy_timeframe": "4h",
+      "symbols": [
+        "SOL/USDT",
+        "AVAX/USDT"
+      ],
+      "tags": [
+        "research_only",
+        "preregistered",
+        "cost_realistic_required",
+        "claude_lane",
+        "cross_sectional"
+      ],
+      "timeframe": "4h"
+    },
+    {
+      "candidate_id": "crypto_pca_residual_statarb_1d_v1",
+      "family": "pca_residual_stat_arb",
+      "metadata": {
+        "admission_route": "allow_multi_asset_handoff",
+        "hypothesis_refs": [
+          "avellaneda_lee_2010"
+        ],
+        "lane": "claude",
+        "promotion_eligible": false,
+        "provenance_refs": [
+          "amateurquant_profile"
+        ],
+        "universe_binding": "crypto_top10",
+        "universe_constraint": "crypto_top10",
+        "universe_membership": "frozen smoke snapshot; data-PC must replace with point-in-time membership receipts"
+      },
+      "name": "Crypto PCA Residual s-score Stat-Arb (k=1)",
+      "notes": "Eigenportfolio residual OU s-scores; open |s|>1.25, close 0.5/0.75; dollar-neutral caps.",
+      "params": {
+        "allow_short": true,
+        "gross_cap": 0.6,
+        "lookback_bars": 60,
+        "max_half_life_bars": 0.0,
+        "max_hold_bars": 40,
+        "max_longs": 3,
+        "max_order_value": 500.0,
+        "max_position_allocation": 0.2,
+        "max_shorts": 3,
+        "min_rows": 30,
+        "min_symbols": 6,
+        "n_factors": 1,
+        "none_tolerance_evals": 3,
+        "rebalance_bars": 1,
+        "require_balanced": false,
+        "s_close_long": 0.5,
+        "s_close_short": 0.75,
+        "s_open": 1.25,
+        "s_stop": 0.0
+      },
+      "strategy": "PcaResidualStatArbStrategy",
+      "strategy_class": "PcaResidualStatArbStrategy",
+      "strategy_timeframe": "1d",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT",
+        "XRP/USDT",
+        "DOGE/USDT",
+        "ADA/USDT",
+        "AVAX/USDT",
+        "TON/USDT"
+      ],
+      "tags": [
+        "research_only",
+        "preregistered",
+        "cost_realistic_required",
+        "claude_lane",
+        "cross_sectional"
+      ],
+      "timeframe": "1d"
+    },
+    {
+      "candidate_id": "crypto_rsi_divergence_btc_eth_10m_v1",
+      "family": "rsi_divergence_flight",
+      "metadata": {
+        "diagnostic_context": "dacapogo's tested comparison-proxy family produced negative results; retain as nonreplication caution, not rule evidence.",
+        "hypothesis_refs": [
+          "flightf_rsi_divergence_20210124",
+          "flightf_trading_principles_20200908"
+        ],
+        "lane": "claude",
+        "promotion_eligible": false,
+        "provenance_refs": [
+          "dacapogo_public_repo_633ba5d"
+        ],
+        "universe_constraint": "crypto_top10",
+        "universe_membership": "frozen smoke snapshot; data-PC must replace with point-in-time membership receipts"
+      },
+      "name": "RSI(11) Divergence (FlightF proxy) BTC/ETH 10m",
+      "notes": "Audited public rule: 10m BTC futures, RSI<20 divergence; staged exit = 60% of the position (EXIT with metadata.exit_fraction=0.6, 'more than half' in the source) at RSI 45, the remaining 40% as a full EXIT at RSI 60; opposing-volume invalidation; 1h (6x10m) trend confirmation as the higher-timeframe proxy. Signals fire on bar close and fill at the next bar open (engine contract).",
+      "params": {
+        "allow_short": true,
+        "exit_rsi_first": 45.0,
+        "exit_rsi_second": 60.0,
+        "first_exit_fraction": 0.6,
+        "htf_ma_window": 20,
+        "htf_multiple": 6,
+        "ma_fast": 20,
+        "ma_slow": 50,
+        "max_hold_bars": 72,
+        "max_order_value": 500.0,
+        "max_pivot_distance": 40,
+        "min_pivot_distance": 3,
+        "opposing_volume_multiple": 1.5,
+        "overbought": 80.0,
+        "oversold": 20.0,
+        "require_htf_confirmation": true,
+        "require_volume_confirmation": true,
+        "rsi_period": 11,
+        "target_allocation": 0.1,
+        "use_hidden": true
+      },
+      "strategy": "RsiDivergenceScaleOutStrategy",
+      "strategy_class": "RsiDivergenceScaleOutStrategy",
+      "strategy_timeframe": "10m",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT"
+      ],
+      "tags": [
+        "research_only",
+        "preregistered",
+        "cost_realistic_required",
+        "claude_lane",
+        "cross_sectional"
+      ],
+      "timeframe": "10m"
+    },
+    {
+      "candidate_id": "crypto_prev_day_box_15m_v1",
+      "family": "prev_day_box_quartile",
+      "metadata": {
+        "hypothesis_refs": [],
+        "lane": "claude",
+        "promotion_eligible": false,
+        "provenance_refs": [
+          "dacapogo_public_repo_633ba5d"
+        ],
+        "universe_constraint": "crypto_top10",
+        "universe_membership": "frozen smoke snapshot; data-PC must replace with point-in-time membership receipts"
+      },
+      "name": "Prev-Day Box Quartile Reversion (independent proxy) BTC/ETH 15m",
+      "notes": "INDEPENDENT comparison-proxy rule set (previous UTC-day box, 25/50/75 levels, wick>=body rebound, volume>prev-day median, TP mid / SL box end / flat at day end) as documented in the dacapogo repo; the AOA interview states no box/quartile rule, so it is deliberately NOT cited as evidence.",
+      "params": {
+        "allow_short": true,
+        "max_hold_bars": 0,
+        "max_order_value": 500.0,
+        "min_session_bars": 8,
+        "one_signal_per_session": true,
+        "require_volume": true,
+        "session_start_minute_utc": 0,
+        "target_allocation": 0.25
+      },
+      "strategy": "PrevDayBoxQuartileReversionStrategy",
+      "strategy_class": "PrevDayBoxQuartileReversionStrategy",
+      "strategy_timeframe": "15m",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT"
+      ],
+      "tags": [
+        "research_only",
+        "preregistered",
+        "cost_realistic_required",
+        "claude_lane",
+        "cross_sectional"
+      ],
+      "timeframe": "15m"
+    },
+    {
+      "candidate_id": "crypto_session_high_scalp_1m_v1",
+      "family": "session_high_breakout_scalp",
+      "metadata": {
+        "hypothesis_refs": [],
+        "lane": "claude",
+        "promotion_eligible": false,
+        "provenance_refs": [
+          "dolpago_dogdrip_20210802",
+          "dacapogo_public_repo_633ba5d"
+        ],
+        "universe_binding": "crypto_top10",
+        "universe_constraint": "crypto_top10",
+        "universe_membership": "frozen smoke snapshot; data-PC must replace with point-in-time membership receipts"
+      },
+      "name": "Session-High Breakout Scalp (Dolpago-observed proxy) 1m",
+      "notes": "Independent OHLCV proxy: prior-session-high break + volume surge in the first 4h of the UTC session, TP 1.5% / SL 0.7% / 5-bar time stop. Dolpago's formula is private/unavailable; fill/queue realism is required before any inference.",
+      "params": {
+        "allow_short": false,
+        "breakout_buffer_pct": 0.0005,
+        "entry_end_minute": 240,
+        "entry_start_minute": 0,
+        "max_entries_per_session": 3,
+        "max_hold_bars": 5,
+        "max_order_value": 500.0,
+        "max_symbols_by_turnover": 5,
+        "min_session_bars": 30,
+        "require_new_high_after_exit": true,
+        "session_start_minute_utc": 0,
+        "stop_loss_pct": 0.007,
+        "surge_bars": 5,
+        "surge_multiple": 2.0,
+        "take_profit_pct": 0.015,
+        "target_allocation": 0.1
+      },
+      "strategy": "SessionHighBreakoutScalpStrategy",
+      "strategy_class": "SessionHighBreakoutScalpStrategy",
+      "strategy_timeframe": "1m",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT",
+        "XRP/USDT",
+        "DOGE/USDT",
+        "ADA/USDT",
+        "AVAX/USDT",
+        "TON/USDT"
+      ],
+      "tags": [
+        "research_only",
+        "preregistered",
+        "cost_realistic_required",
+        "claude_lane",
+        "cross_sectional"
+      ],
+      "timeframe": "1m"
+    },
+    {
+      "candidate_id": "crypto_kill_switch_overlay_turtle_1d_v1",
+      "family": "equity_curve_kill_switch_overlay",
+      "metadata": {
+        "hypothesis_refs": [
+          "albatross_risk_governance",
+          "aoa_bitmex_interview_20250611"
+        ],
+        "lane": "claude",
+        "promotion_eligible": false,
+        "universe_binding": "crypto_top10",
+        "universe_constraint": "crypto_top10",
+        "universe_membership": "frozen smoke snapshot; data-PC must replace with point-in-time membership receipts"
+      },
+      "name": "Equity-Curve Kill-Switch Overlay over Crypto Turtle",
+      "notes": "Proxy-equity drawdown ladder (5/10/15/20% -> 0.75/0.5/0.25/0), consecutive-loss halving from the 3rd loss, 10% monthly loss kill, re-risk hysteresis.",
+      "params": {
+        "below_ma_scale": 0.5,
+        "child_params": {
+          "add_step_atr": 0.5,
+          "allow_short": true,
+          "atr_window": 20,
+          "channel_source": "hl",
+          "entry_lookback": 55,
+          "exit_lookback": 20,
+          "max_hold_bars": 0,
+          "max_order_value": 500.0,
+          "max_unit_allocation": 0.25,
+          "max_units": 4,
+          "require_prior_loser_skip": false,
+          "stop_atr_multiple": 2.0,
+          "stop_loss_pct": 0.0,
+          "trend_ma_window": 0,
+          "unit_risk_pct": 0.01,
+          "use_n_stop": true
+        },
+        "child_strategy_class": "TurtleUnitPyramidingStrategy",
+        "consecutive_loss_halving_from": 3,
+        "equity_ma_window": 0,
+        "ladder": "0.05:0.75,0.10:0.50,0.15:0.25,0.20:0.0",
+        "min_scale": 0.1,
+        "month_loss_limit": 0.1,
+        "recover_drawdown": 0.1,
+        "rerisk_min_bars": 5
+      },
+      "strategy": "EquityCurveKillSwitchOverlayStrategy",
+      "strategy_class": "EquityCurveKillSwitchOverlayStrategy",
+      "strategy_timeframe": "1d",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT",
+        "XRP/USDT",
+        "DOGE/USDT",
+        "ADA/USDT",
+        "AVAX/USDT",
+        "TON/USDT"
+      ],
+      "tags": [
+        "research_only",
+        "preregistered",
+        "cost_realistic_required",
+        "claude_lane",
+        "cross_sectional"
+      ],
+      "timeframe": "1d"
+    },
+    {
+      "candidate_id": "tradfi_vb_noise_session_1h_v1",
+      "family": "session_volatility_breakout",
+      "metadata": {
+        "hypothesis_refs": [
+          "systrader79_public_post",
+          "brock_technical_rules_1992"
+        ],
+        "lane": "claude",
+        "promotion_eligible": false,
+        "universe_binding": "tradfi_all",
+        "universe_constraint": "tradfi_all",
+        "universe_membership": "frozen smoke snapshot; data-PC must replace with point-in-time membership receipts"
+      },
+      "name": "TradFi Session Volatility Breakout (ETF/metals/energy)",
+      "notes": "Same engine on 20 liquid TradFi perps; UTC session is a proxy for the underlying's cash session.",
+      "params": {
+        "allow_short": false,
+        "k": 0.5,
+        "k_max": 0.7,
+        "k_min": 0.3,
+        "k_mode": "noise",
+        "ma_score_windows": "3,5,10,20",
+        "max_order_value": 500.0,
+        "max_position_allocation": 0.3,
+        "max_symbols_by_noise": 8,
+        "max_vol_weight": 1.0,
+        "min_ma_score": 0.25,
+        "noise_period": 20,
+        "session_start_minute_utc": 0,
+        "stop_loss_pct": 0.0,
+        "target_allocation": 0.1,
+        "target_session_vol": 0.02,
+        "use_ma_score": true,
+        "use_vol_target": true
+      },
+      "strategy": "NoiseFilteredVolatilityBreakoutStrategy",
+      "strategy_class": "NoiseFilteredVolatilityBreakoutStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "QQQ/USDT",
+        "SPY/USDT",
+        "EWY/USDT",
+        "EWJ/USDT",
+        "SOXL/USDT",
+        "EWT/USDT",
+        "IWM/USDT",
+        "EWZ/USDT",
+        "XLE/USDT",
+        "URNM/USDT",
+        "UVXY/USDT",
+        "STXX/USDT",
+        "XAU/USDT",
+        "XAG/USDT",
+        "XPT/USDT",
+        "XPD/USDT",
+        "COPPER/USDT",
+        "CL/USDT",
+        "BZ/USDT",
+        "NATGAS/USDT"
+      ],
+      "tags": [
+        "research_only",
+        "preregistered",
+        "cost_realistic_required",
+        "claude_lane",
+        "cross_sectional"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "tradfi_ma_score_vol_target_1d_v1",
+      "family": "ma_score_dynamic_allocation",
+      "metadata": {
+        "admission_route": "allow_multi_asset_handoff",
+        "hypothesis_refs": [
+          "systrader79_public_post",
+          "moreira_muir_2017"
+        ],
+        "lane": "claude",
+        "promotion_eligible": false,
+        "universe_binding": "tradfi_all",
+        "universe_constraint": "tradfi_all",
+        "universe_membership": "frozen smoke snapshot; data-PC must replace with point-in-time membership receipts"
+      },
+      "name": "TradFi MA-Score Rotation (ETF/metals/energy)",
+      "notes": "Long-only tactical allocation across index ETFs, precious metals and energy.",
+      "params": {
+        "gross_cap": 1.0,
+        "ma_score_windows": "3,5,10,20",
+        "max_order_value": 500.0,
+        "max_weight": 0.25,
+        "min_score": 0.25,
+        "min_symbols": 2,
+        "min_weight_change": 0.02,
+        "rebalance_bars": 5,
+        "target_vol_per_bar": 0.02,
+        "vol_window": 20
+      },
+      "strategy": "MaScoreVolTargetRotationStrategy",
+      "strategy_class": "MaScoreVolTargetRotationStrategy",
+      "strategy_timeframe": "1d",
+      "symbols": [
+        "QQQ/USDT",
+        "SPY/USDT",
+        "EWY/USDT",
+        "EWJ/USDT",
+        "SOXL/USDT",
+        "EWT/USDT",
+        "IWM/USDT",
+        "EWZ/USDT",
+        "XLE/USDT",
+        "URNM/USDT",
+        "UVXY/USDT",
+        "STXX/USDT",
+        "XAU/USDT",
+        "XAG/USDT",
+        "XPT/USDT",
+        "XPD/USDT",
+        "COPPER/USDT",
+        "CL/USDT",
+        "BZ/USDT",
+        "NATGAS/USDT"
+      ],
+      "tags": [
+        "research_only",
+        "preregistered",
+        "cost_realistic_required",
+        "claude_lane",
+        "cross_sectional"
+      ],
+      "timeframe": "1d"
+    },
+    {
+      "candidate_id": "tradfi_multanchanbap_20_10_public_rule_1d_v1",
+      "family": "turtle_unit_pyramiding",
+      "metadata": {
+        "hypothesis_refs": [
+          "multanchanbap_coin_preview"
+        ],
+        "lane": "claude",
+        "promotion_eligible": false,
+        "universe_binding": "tradfi_all",
+        "universe_constraint": "tradfi_all",
+        "universe_membership": "frozen smoke snapshot; data-PC must replace with point-in-time membership receipts"
+      },
+      "name": "TradFi 20/10 + 120d Gate (independent close/-3.5% parameterization)",
+      "notes": "TradFi transfer of the public 120-day gate, 20-day high/10-day low and ATR short-stop/Turtle backbone; close-channel, fixed -3.5% stop and sizing controls are independent parameters.",
+      "params": {
+        "add_step_atr": 0.5,
+        "allow_short": false,
+        "atr_window": 20,
+        "channel_source": "close",
+        "entry_lookback": 20,
+        "exit_lookback": 10,
+        "max_hold_bars": 0,
+        "max_order_value": 500.0,
+        "max_unit_allocation": 0.25,
+        "max_units": 1,
+        "require_prior_loser_skip": false,
+        "stop_atr_multiple": 2.0,
+        "stop_loss_pct": 0.035,
+        "trend_ma_window": 120,
+        "unit_risk_pct": 0.02,
+        "use_n_stop": false
+      },
+      "strategy": "TurtleUnitPyramidingStrategy",
+      "strategy_class": "TurtleUnitPyramidingStrategy",
+      "strategy_timeframe": "1d",
+      "symbols": [
+        "QQQ/USDT",
+        "SPY/USDT",
+        "EWY/USDT",
+        "EWJ/USDT",
+        "SOXL/USDT",
+        "EWT/USDT",
+        "IWM/USDT",
+        "EWZ/USDT",
+        "XLE/USDT",
+        "URNM/USDT",
+        "UVXY/USDT",
+        "STXX/USDT",
+        "XAU/USDT",
+        "XAG/USDT",
+        "XPT/USDT",
+        "XPD/USDT",
+        "COPPER/USDT",
+        "CL/USDT",
+        "BZ/USDT",
+        "NATGAS/USDT"
+      ],
+      "tags": [
+        "research_only",
+        "preregistered",
+        "cost_realistic_required",
+        "claude_lane",
+        "cross_sectional"
+      ],
+      "timeframe": "1d"
+    },
+    {
+      "candidate_id": "tradfi_turtle_unit_pyramid_1d_v1",
+      "family": "turtle_unit_pyramiding",
+      "metadata": {
+        "hypothesis_refs": [
+          "faith_way_of_turtle_2007",
+          "multanchanbap_coin_preview"
+        ],
+        "lane": "claude",
+        "promotion_eligible": false,
+        "universe_binding": "tradfi_all",
+        "universe_constraint": "tradfi_all",
+        "universe_membership": "frozen smoke snapshot; data-PC must replace with point-in-time membership receipts"
+      },
+      "name": "TradFi Turtle 55/20 Unit Pyramiding",
+      "notes": "Classic Turtle universe analogue (metals, energy, index ETFs); same rule shape as the crypto sleeve, values are independent choices.",
+      "params": {
+        "add_step_atr": 0.5,
+        "allow_short": true,
+        "atr_window": 20,
+        "channel_source": "hl",
+        "entry_lookback": 55,
+        "exit_lookback": 20,
+        "max_hold_bars": 0,
+        "max_order_value": 500.0,
+        "max_unit_allocation": 0.25,
+        "max_units": 4,
+        "require_prior_loser_skip": false,
+        "stop_atr_multiple": 2.0,
+        "stop_loss_pct": 0.0,
+        "trend_ma_window": 0,
+        "unit_risk_pct": 0.01,
+        "use_n_stop": true
+      },
+      "strategy": "TurtleUnitPyramidingStrategy",
+      "strategy_class": "TurtleUnitPyramidingStrategy",
+      "strategy_timeframe": "1d",
+      "symbols": [
+        "QQQ/USDT",
+        "SPY/USDT",
+        "EWY/USDT",
+        "EWJ/USDT",
+        "SOXL/USDT",
+        "EWT/USDT",
+        "IWM/USDT",
+        "EWZ/USDT",
+        "XLE/USDT",
+        "URNM/USDT",
+        "UVXY/USDT",
+        "STXX/USDT",
+        "XAU/USDT",
+        "XAG/USDT",
+        "XPT/USDT",
+        "XPD/USDT",
+        "COPPER/USDT",
+        "CL/USDT",
+        "BZ/USDT",
+        "NATGAS/USDT"
+      ],
+      "tags": [
+        "research_only",
+        "preregistered",
+        "cost_realistic_required",
+        "claude_lane",
+        "cross_sectional"
+      ],
+      "timeframe": "1d"
+    },
+    {
+      "candidate_id": "tradfi_kalman_pair_qqq_spy_1h_v1",
+      "family": "kalman_pairs_stat_arb",
+      "metadata": {
+        "admission_route": "allow_multi_asset_handoff",
+        "hypothesis_refs": [
+          "chan_algorithmic_trading_2013",
+          "triantafyllopoulos_montana_2011"
+        ],
+        "lane": "claude",
+        "promotion_eligible": false,
+        "provenance_refs": [
+          "amateurquant_profile"
+        ],
+        "universe_constraint": "tradfi_all",
+        "universe_membership": "frozen smoke snapshot; data-PC must replace with point-in-time membership receipts"
+      },
+      "name": "Kalman Pair QQQ/SPY (1h)",
+      "notes": "Index-ETF pair with drifting beta.",
+      "params": {
+        "adf_window": 90,
+        "entry_z": 2.0,
+        "exit_on_cointegration_break": false,
+        "exit_z": 0.5,
+        "half_life_multiple": 2.0,
+        "kalman_delta": 0.0001,
+        "kalman_obs_noise": 1e-05,
+        "leg_allocation": 0.1,
+        "max_hold_bars": 120,
+        "max_leg_allocation": 0.3,
+        "max_order_value": 500.0,
+        "min_beta": 0.0,
+        "min_updates": 60,
+        "require_cointegration": true,
+        "signal_mode": "spread_z",
+        "stop_z": 4.0,
+        "symbol_x": "SPY/USDT",
+        "symbol_y": "QQQ/USDT",
+        "z_window": 60
+      },
+      "strategy": "KalmanPairsStatArbStrategy",
+      "strategy_class": "KalmanPairsStatArbStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "QQQ/USDT",
+        "SPY/USDT"
+      ],
+      "tags": [
+        "research_only",
+        "preregistered",
+        "cost_realistic_required",
+        "claude_lane",
+        "cross_sectional"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "tradfi_kalman_pair_ewy_ewt_4h_v1",
+      "family": "kalman_pairs_stat_arb",
+      "metadata": {
+        "admission_route": "allow_multi_asset_handoff",
+        "hypothesis_refs": [
+          "chan_algorithmic_trading_2013",
+          "triantafyllopoulos_montana_2011"
+        ],
+        "lane": "claude",
+        "promotion_eligible": false,
+        "provenance_refs": [
+          "amateurquant_profile"
+        ],
+        "universe_constraint": "tradfi_all",
+        "universe_membership": "frozen smoke snapshot; data-PC must replace with point-in-time membership receipts"
+      },
+      "name": "Kalman Pair EWY/EWT (4h)",
+      "notes": "Korea vs Taiwan country-ETF pair (semiconductor-heavy both).",
+      "params": {
+        "adf_window": 90,
+        "entry_z": 2.0,
+        "exit_on_cointegration_break": false,
+        "exit_z": 0.5,
+        "half_life_multiple": 2.0,
+        "kalman_delta": 0.0001,
+        "kalman_obs_noise": 1e-05,
+        "leg_allocation": 0.1,
+        "max_hold_bars": 60,
+        "max_leg_allocation": 0.3,
+        "max_order_value": 500.0,
+        "min_beta": 0.0,
+        "min_updates": 60,
+        "require_cointegration": true,
+        "signal_mode": "spread_z",
+        "stop_z": 4.0,
+        "symbol_x": "EWT/USDT",
+        "symbol_y": "EWY/USDT",
+        "z_window": 60
+      },
+      "strategy": "KalmanPairsStatArbStrategy",
+      "strategy_class": "KalmanPairsStatArbStrategy",
+      "strategy_timeframe": "4h",
+      "symbols": [
+        "EWY/USDT",
+        "EWT/USDT"
+      ],
+      "tags": [
+        "research_only",
+        "preregistered",
+        "cost_realistic_required",
+        "claude_lane",
+        "cross_sectional"
+      ],
+      "timeframe": "4h"
+    },
+    {
+      "candidate_id": "tradfi_kalman_pair_nvda_amd_1h_v1",
+      "family": "kalman_pairs_stat_arb",
+      "metadata": {
+        "admission_route": "allow_multi_asset_handoff",
+        "hypothesis_refs": [
+          "chan_algorithmic_trading_2013",
+          "triantafyllopoulos_montana_2011"
+        ],
+        "lane": "claude",
+        "promotion_eligible": false,
+        "provenance_refs": [
+          "amateurquant_profile"
+        ],
+        "universe_constraint": "tradfi_all",
+        "universe_membership": "frozen smoke snapshot; data-PC must replace with point-in-time membership receipts"
+      },
+      "name": "Kalman Pair NVDA/AMD (1h)",
+      "notes": "Single-stock sector pair.",
+      "params": {
+        "adf_window": 90,
+        "entry_z": 2.0,
+        "exit_on_cointegration_break": false,
+        "exit_z": 0.5,
+        "half_life_multiple": 2.0,
+        "kalman_delta": 0.0001,
+        "kalman_obs_noise": 1e-05,
+        "leg_allocation": 0.1,
+        "max_hold_bars": 120,
+        "max_leg_allocation": 0.3,
+        "max_order_value": 500.0,
+        "min_beta": 0.0,
+        "min_updates": 60,
+        "require_cointegration": true,
+        "signal_mode": "spread_z",
+        "stop_z": 4.0,
+        "symbol_x": "AMD/USDT",
+        "symbol_y": "NVDA/USDT",
+        "z_window": 60
+      },
+      "strategy": "KalmanPairsStatArbStrategy",
+      "strategy_class": "KalmanPairsStatArbStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "NVDA/USDT",
+        "AMD/USDT"
+      ],
+      "tags": [
+        "research_only",
+        "preregistered",
+        "cost_realistic_required",
+        "claude_lane",
+        "cross_sectional"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "tradfi_pca_residual_statarb_equity_1d_v1",
+      "family": "pca_residual_stat_arb",
+      "metadata": {
+        "admission_route": "allow_multi_asset_handoff",
+        "hypothesis_refs": [
+          "avellaneda_lee_2010"
+        ],
+        "lane": "claude",
+        "promotion_eligible": false,
+        "provenance_refs": [
+          "amateurquant_profile"
+        ],
+        "universe_binding": "tradfi_all",
+        "universe_constraint": "tradfi_all",
+        "universe_membership": "frozen smoke snapshot; data-PC must replace with point-in-time membership receipts"
+      },
+      "name": "TradFi Equity PCA Residual Stat-Arb (k=3)",
+      "notes": "Avellaneda-Lee on the single-stock perp book; 3 eigenportfolios.",
+      "params": {
+        "allow_short": true,
+        "gross_cap": 0.8,
+        "lookback_bars": 60,
+        "max_half_life_bars": 0.0,
+        "max_hold_bars": 40,
+        "max_longs": 8,
+        "max_order_value": 500.0,
+        "max_position_allocation": 0.1,
+        "max_shorts": 8,
+        "min_rows": 30,
+        "min_symbols": 20,
+        "n_factors": 3,
+        "none_tolerance_evals": 3,
+        "rebalance_bars": 1,
+        "require_balanced": false,
+        "s_close_long": 0.5,
+        "s_close_short": 0.75,
+        "s_open": 1.25,
+        "s_stop": 0.0
+      },
+      "strategy": "PcaResidualStatArbStrategy",
+      "strategy_class": "PcaResidualStatArbStrategy",
+      "strategy_timeframe": "1d",
+      "symbols": [
+        "TSLA/USDT",
+        "INTC/USDT",
+        "HOOD/USDT",
+        "MSTR/USDT",
+        "AMZN/USDT",
+        "CRCL/USDT",
+        "COIN/USDT",
+        "PLTR/USDT",
+        "PAYP/USDT",
+        "META/USDT",
+        "NVDA/USDT",
+        "GOOGL/USDT",
+        "AAPL/USDT",
+        "TSM/USDT",
+        "MU/USDT",
+        "SNDK/USDT",
+        "MSFT/USDT",
+        "AVGO/USDT",
+        "BABA/USDT",
+        "AMD/USDT",
+        "QCOM/USDT",
+        "USAR/USDT",
+        "LITE/USDT",
+        "ORCL/USDT",
+        "DIS/USDT",
+        "UBER/USDT",
+        "CSCO/USDT",
+        "HD/USDT",
+        "MRVL/USDT",
+        "CRWV/USDT",
+        "WMT/USDT",
+        "JPM/USDT",
+        "V/USDT",
+        "BRKB/USDT",
+        "FLNC/USDT",
+        "DRAM/USDT",
+        "RKLB/USDT",
+        "CBRS/USDT",
+        "NBIS/USDT",
+        "WDC/USDT",
+        "ARM/USDT",
+        "BE/USDT",
+        "COHR/USDT",
+        "ASTS/USDT",
+        "BBX/USDT",
+        "CRM/USDT",
+        "DELL/USDT",
+        "HYUNDAI/USDT",
+        "IBM/USDT",
+        "IREN/USDT",
+        "LLY/USDT",
+        "NOK/USDT",
+        "NOW/USDT",
+        "NVO/USDT",
+        "ONDS/USDT",
+        "SAMSUNG/USDT",
+        "SKHYNIX/USDT",
+        "BX/USDT",
+        "HPE/USDT",
+        "AMAT/USDT",
+        "CRWD/USDT",
+        "CRDO/USDT",
+        "AAOI/USDT",
+        "AXTI/USDT",
+        "NFLX/USDT",
+        "COST/USDT",
+        "HIMS/USDT",
+        "EBAY/USDT",
+        "ZM/USDT",
+        "DKNG/USDT",
+        "RIVN/USDT",
+        "GME/USDT",
+        "BMNR/USDT",
+        "ADBE/USDT",
+        "GLW/USDT",
+        "ASML/USDT"
+      ],
+      "tags": [
+        "research_only",
+        "preregistered",
+        "cost_realistic_required",
+        "claude_lane",
+        "cross_sectional"
+      ],
+      "timeframe": "1d"
+    },
+    {
+      "candidate_id": "tradfi_pca_residual_statarb_etf_cmdty_1d_v1",
+      "family": "pca_residual_stat_arb",
+      "metadata": {
+        "admission_route": "allow_multi_asset_handoff",
+        "hypothesis_refs": [
+          "avellaneda_lee_2010"
+        ],
+        "lane": "claude",
+        "promotion_eligible": false,
+        "provenance_refs": [
+          "amateurquant_profile"
+        ],
+        "universe_binding": "tradfi_all",
+        "universe_constraint": "tradfi_all",
+        "universe_membership": "frozen smoke snapshot; data-PC must replace with point-in-time membership receipts"
+      },
+      "name": "TradFi ETF+Commodity PCA Residual Stat-Arb (k=2)",
+      "notes": "Cross-asset residual reversion among index ETFs, metals and energy.",
+      "params": {
+        "allow_short": true,
+        "gross_cap": 0.6,
+        "lookback_bars": 60,
+        "max_half_life_bars": 0.0,
+        "max_hold_bars": 40,
+        "max_longs": 4,
+        "max_order_value": 500.0,
+        "max_position_allocation": 0.2,
+        "max_shorts": 4,
+        "min_rows": 30,
+        "min_symbols": 10,
+        "n_factors": 2,
+        "none_tolerance_evals": 3,
+        "rebalance_bars": 1,
+        "require_balanced": false,
+        "s_close_long": 0.5,
+        "s_close_short": 0.75,
+        "s_open": 1.25,
+        "s_stop": 0.0
+      },
+      "strategy": "PcaResidualStatArbStrategy",
+      "strategy_class": "PcaResidualStatArbStrategy",
+      "strategy_timeframe": "1d",
+      "symbols": [
+        "QQQ/USDT",
+        "SPY/USDT",
+        "EWY/USDT",
+        "EWJ/USDT",
+        "SOXL/USDT",
+        "EWT/USDT",
+        "IWM/USDT",
+        "EWZ/USDT",
+        "XLE/USDT",
+        "URNM/USDT",
+        "UVXY/USDT",
+        "STXX/USDT",
+        "XAU/USDT",
+        "XAG/USDT",
+        "XPT/USDT",
+        "XPD/USDT",
+        "COPPER/USDT",
+        "CL/USDT",
+        "BZ/USDT",
+        "NATGAS/USDT"
+      ],
+      "tags": [
+        "research_only",
+        "preregistered",
+        "cost_realistic_required",
+        "claude_lane",
+        "cross_sectional"
+      ],
+      "timeframe": "1d"
+    },
+    {
+      "candidate_id": "tradfi_rsi_divergence_xau_cl_10m_v1",
+      "family": "rsi_divergence_flight",
+      "metadata": {
+        "diagnostic_context": "dacapogo's tested comparison-proxy family produced negative results; retain as nonreplication caution, not rule evidence.",
+        "hypothesis_refs": [
+          "flightf_rsi_divergence_20210124",
+          "flightf_trading_principles_20200908"
+        ],
+        "lane": "claude",
+        "promotion_eligible": false,
+        "provenance_refs": [
+          "dacapogo_public_repo_633ba5d"
+        ],
+        "universe_constraint": "tradfi_all",
+        "universe_membership": "frozen smoke snapshot; data-PC must replace with point-in-time membership receipts"
+      },
+      "name": "RSI(11) Divergence (FlightF proxy) XAU/CL 10m",
+      "notes": "Hypothesis transfer of the BTC-futures RSI method to gold and crude perps at the same 10m cadence (60% exit at RSI 45, remainder at 60).",
+      "params": {
+        "allow_short": true,
+        "exit_rsi_first": 45.0,
+        "exit_rsi_second": 60.0,
+        "first_exit_fraction": 0.6,
+        "htf_ma_window": 20,
+        "htf_multiple": 6,
+        "ma_fast": 20,
+        "ma_slow": 50,
+        "max_hold_bars": 72,
+        "max_order_value": 500.0,
+        "max_pivot_distance": 40,
+        "min_pivot_distance": 3,
+        "opposing_volume_multiple": 1.5,
+        "overbought": 80.0,
+        "oversold": 20.0,
+        "require_htf_confirmation": true,
+        "require_volume_confirmation": true,
+        "rsi_period": 11,
+        "target_allocation": 0.1,
+        "use_hidden": true
+      },
+      "strategy": "RsiDivergenceScaleOutStrategy",
+      "strategy_class": "RsiDivergenceScaleOutStrategy",
+      "strategy_timeframe": "10m",
+      "symbols": [
+        "XAU/USDT",
+        "CL/USDT"
+      ],
+      "tags": [
+        "research_only",
+        "preregistered",
+        "cost_realistic_required",
+        "claude_lane",
+        "cross_sectional"
+      ],
+      "timeframe": "10m"
+    },
+    {
+      "candidate_id": "tradfi_prev_day_box_15m_v1",
+      "family": "prev_day_box_quartile",
+      "metadata": {
+        "hypothesis_refs": [],
+        "lane": "claude",
+        "promotion_eligible": false,
+        "provenance_refs": [
+          "dacapogo_public_repo_633ba5d"
+        ],
+        "universe_constraint": "tradfi_all",
+        "universe_membership": "frozen smoke snapshot; data-PC must replace with point-in-time membership receipts"
+      },
+      "name": "Prev-Day Box Quartile Reversion (independent proxy) XAU/SPY/QQQ 15m",
+      "notes": "Same independent comparison-proxy rule set on macro perps; UTC-day box; no attribution to any trader's stated rule.",
+      "params": {
+        "allow_short": true,
+        "max_hold_bars": 0,
+        "max_order_value": 500.0,
+        "min_session_bars": 8,
+        "one_signal_per_session": true,
+        "require_volume": true,
+        "session_start_minute_utc": 0,
+        "target_allocation": 0.25
+      },
+      "strategy": "PrevDayBoxQuartileReversionStrategy",
+      "strategy_class": "PrevDayBoxQuartileReversionStrategy",
+      "strategy_timeframe": "15m",
+      "symbols": [
+        "XAU/USDT",
+        "SPY/USDT",
+        "QQQ/USDT"
+      ],
+      "tags": [
+        "research_only",
+        "preregistered",
+        "cost_realistic_required",
+        "claude_lane",
+        "cross_sectional"
+      ],
+      "timeframe": "15m"
+    },
+    {
+      "candidate_id": "tradfi_session_high_scalp_1m_v1",
+      "family": "session_high_breakout_scalp",
+      "metadata": {
+        "hypothesis_refs": [],
+        "lane": "claude",
+        "promotion_eligible": false,
+        "provenance_refs": [
+          "dolpago_dogdrip_20210802",
+          "dacapogo_public_repo_633ba5d"
+        ],
+        "universe_constraint": "tradfi_all",
+        "universe_membership": "frozen smoke snapshot; data-PC must replace with point-in-time membership receipts"
+      },
+      "name": "Session-High Breakout Scalp (Dolpago-observed proxy) equities 1m",
+      "notes": "Independent OHLCV proxy using a 13:30-16:30 UTC entry window and previous-session top-10 turnover names. Dolpago's formula is private/unavailable.",
+      "params": {
+        "allow_short": false,
+        "breakout_buffer_pct": 0.0005,
+        "entry_end_minute": 990,
+        "entry_start_minute": 810,
+        "max_entries_per_session": 3,
+        "max_hold_bars": 5,
+        "max_order_value": 500.0,
+        "max_symbols_by_turnover": 10,
+        "min_session_bars": 30,
+        "require_new_high_after_exit": true,
+        "session_start_minute_utc": 0,
+        "stop_loss_pct": 0.007,
+        "surge_bars": 5,
+        "surge_multiple": 2.0,
+        "take_profit_pct": 0.015,
+        "target_allocation": 0.1
+      },
+      "strategy": "SessionHighBreakoutScalpStrategy",
+      "strategy_class": "SessionHighBreakoutScalpStrategy",
+      "strategy_timeframe": "1m",
+      "symbols": [
+        "TSLA/USDT",
+        "INTC/USDT",
+        "HOOD/USDT",
+        "MSTR/USDT",
+        "AMZN/USDT",
+        "CRCL/USDT",
+        "COIN/USDT",
+        "PLTR/USDT",
+        "PAYP/USDT",
+        "META/USDT",
+        "NVDA/USDT",
+        "GOOGL/USDT",
+        "AAPL/USDT",
+        "TSM/USDT",
+        "MU/USDT",
+        "SNDK/USDT",
+        "MSFT/USDT",
+        "AVGO/USDT",
+        "BABA/USDT",
+        "AMD/USDT",
+        "QCOM/USDT",
+        "USAR/USDT",
+        "LITE/USDT",
+        "ORCL/USDT",
+        "DIS/USDT",
+        "UBER/USDT",
+        "CSCO/USDT",
+        "HD/USDT",
+        "MRVL/USDT",
+        "CRWV/USDT",
+        "WMT/USDT",
+        "JPM/USDT",
+        "V/USDT",
+        "BRKB/USDT",
+        "FLNC/USDT",
+        "DRAM/USDT",
+        "RKLB/USDT",
+        "CBRS/USDT",
+        "NBIS/USDT",
+        "WDC/USDT",
+        "ARM/USDT",
+        "BE/USDT",
+        "COHR/USDT",
+        "ASTS/USDT",
+        "BBX/USDT",
+        "CRM/USDT",
+        "DELL/USDT",
+        "HYUNDAI/USDT",
+        "IBM/USDT",
+        "IREN/USDT",
+        "LLY/USDT",
+        "NOK/USDT",
+        "NOW/USDT",
+        "NVO/USDT",
+        "ONDS/USDT",
+        "SAMSUNG/USDT",
+        "SKHYNIX/USDT",
+        "BX/USDT",
+        "HPE/USDT",
+        "AMAT/USDT",
+        "CRWD/USDT",
+        "CRDO/USDT",
+        "AAOI/USDT",
+        "AXTI/USDT",
+        "NFLX/USDT",
+        "COST/USDT",
+        "HIMS/USDT",
+        "EBAY/USDT",
+        "ZM/USDT",
+        "DKNG/USDT",
+        "RIVN/USDT",
+        "GME/USDT",
+        "BMNR/USDT",
+        "ADBE/USDT",
+        "GLW/USDT",
+        "ASML/USDT"
+      ],
+      "tags": [
+        "research_only",
+        "preregistered",
+        "cost_realistic_required",
+        "claude_lane",
+        "cross_sectional"
+      ],
+      "timeframe": "1m"
+    },
+    {
+      "candidate_id": "tradfi_kill_switch_overlay_ma_rotation_1d_v1",
+      "family": "equity_curve_kill_switch_overlay",
+      "metadata": {
+        "admission_route": "allow_multi_asset_handoff",
+        "hypothesis_refs": [
+          "albatross_risk_governance"
+        ],
+        "lane": "claude",
+        "promotion_eligible": false,
+        "universe_binding": "tradfi_all",
+        "universe_constraint": "tradfi_all",
+        "universe_membership": "frozen smoke snapshot; data-PC must replace with point-in-time membership receipts"
+      },
+      "name": "Equity-Curve Kill-Switch Overlay over TradFi MA-Score Rotation",
+      "notes": "Adds the 60-bar equity-curve MA filter on top of the drawdown ladder.",
+      "params": {
+        "below_ma_scale": 0.5,
+        "child_params": {
+          "gross_cap": 1.0,
+          "ma_score_windows": "3,5,10,20",
+          "max_order_value": 500.0,
+          "max_weight": 0.25,
+          "min_score": 0.25,
+          "min_symbols": 2,
+          "min_weight_change": 0.02,
+          "rebalance_bars": 5,
+          "target_vol_per_bar": 0.02,
+          "vol_window": 20
+        },
+        "child_strategy_class": "MaScoreVolTargetRotationStrategy",
+        "consecutive_loss_halving_from": 3,
+        "equity_ma_window": 60,
+        "ladder": "0.05:0.75,0.10:0.50,0.15:0.25,0.20:0.0",
+        "min_scale": 0.1,
+        "month_loss_limit": 0.1,
+        "recover_drawdown": 0.1,
+        "rerisk_min_bars": 5
+      },
+      "strategy": "EquityCurveKillSwitchOverlayStrategy",
+      "strategy_class": "EquityCurveKillSwitchOverlayStrategy",
+      "strategy_timeframe": "1d",
+      "symbols": [
+        "QQQ/USDT",
+        "SPY/USDT",
+        "EWY/USDT",
+        "EWJ/USDT",
+        "SOXL/USDT",
+        "EWT/USDT",
+        "IWM/USDT",
+        "EWZ/USDT",
+        "XLE/USDT",
+        "URNM/USDT",
+        "UVXY/USDT",
+        "STXX/USDT",
+        "XAU/USDT",
+        "XAG/USDT",
+        "XPT/USDT",
+        "XPD/USDT",
+        "COPPER/USDT",
+        "CL/USDT",
+        "BZ/USDT",
+        "NATGAS/USDT"
+      ],
+      "tags": [
+        "research_only",
+        "preregistered",
+        "cost_realistic_required",
+        "claude_lane",
+        "cross_sectional"
+      ],
+      "timeframe": "1d"
+    },
+    {
+      "candidate_id": "xasset_ma_score_vol_target_1d_v1",
+      "family": "ma_score_dynamic_allocation",
+      "metadata": {
+        "admission_route": "allow_multi_asset_handoff",
+        "hypothesis_refs": [
+          "systrader79_public_post",
+          "moreira_muir_2017"
+        ],
+        "lane": "claude",
+        "promotion_eligible": false,
+        "universe_binding": "crypto_top10_plus_tradfi",
+        "universe_constraint": "crypto_top10_plus_tradfi",
+        "universe_membership": "frozen smoke snapshot; data-PC must replace with point-in-time membership receipts"
+      },
+      "name": "Cross-Asset MA-Score Rotation (crypto10 + metals/energy + index ETFs)",
+      "notes": "30-asset tactical book; the timing overlay for the asset-level hierarchical allocation study.",
+      "params": {
+        "gross_cap": 1.0,
+        "ma_score_windows": "3,5,10,20",
+        "max_order_value": 500.0,
+        "max_weight": 0.15,
+        "min_score": 0.25,
+        "min_symbols": 5,
+        "min_weight_change": 0.02,
+        "rebalance_bars": 5,
+        "target_vol_per_bar": 0.02,
+        "vol_window": 20
+      },
+      "strategy": "MaScoreVolTargetRotationStrategy",
+      "strategy_class": "MaScoreVolTargetRotationStrategy",
+      "strategy_timeframe": "1d",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT",
+        "XRP/USDT",
+        "DOGE/USDT",
+        "ADA/USDT",
+        "AVAX/USDT",
+        "TON/USDT",
+        "XAU/USDT",
+        "XAG/USDT",
+        "XPT/USDT",
+        "XPD/USDT",
+        "COPPER/USDT",
+        "CL/USDT",
+        "BZ/USDT",
+        "NATGAS/USDT",
+        "QQQ/USDT",
+        "SPY/USDT",
+        "EWY/USDT",
+        "EWJ/USDT",
+        "SOXL/USDT",
+        "EWT/USDT",
+        "IWM/USDT",
+        "EWZ/USDT",
+        "XLE/USDT",
+        "URNM/USDT",
+        "UVXY/USDT",
+        "STXX/USDT"
+      ],
+      "tags": [
+        "research_only",
+        "preregistered",
+        "cost_realistic_required",
+        "claude_lane",
+        "cross_sectional"
+      ],
+      "timeframe": "1d"
+    }
+  ],
+  "cell_id": "named_quant_claude_hier_cell_v1",
+  "created_utc": "2026-08-19T00:00:00Z",
+  "evidence_sources": [
+    {
+      "access": "free_unauthenticated",
+      "allowed_usage_label": "strategy_class_evidence",
+      "cache_path": "var/cache/external_sources/systrader79_public_post.html",
+      "credential_requirement": "none",
+      "fallback_behavior": "fail_closed",
+      "license_note": "Public reference/link only; do not redistribute source content.",
+      "notes": [
+        "Adjacent verified public author source; not assumed identical to requested systrader32."
+      ],
+      "release_lag_policy": "evidence only; no market-time feature is consumed",
+      "source_id": "systrader79_public_post",
+      "update_cadence": "static literature or public educational reference",
+      "url": "https://stock79.tistory.com/entry/systrader79-%ED%8A%B8%EB%A0%88%EC%9D%B4%EB%94%A9-%EB%A7%88%EC%8A%A4%ED%84%B0%ED%81%B4%EB%9E%98%EC%8A%A4-%ED%8C%A8%ED%82%A4%EC%A7%80-%EC%98%A4%ED%94%88"
+    },
+    {
+      "access": "free_unauthenticated",
+      "allowed_usage_label": "strategy_class_evidence",
+      "cache_path": "var/cache/external_sources/brock_technical_rules_1992.html",
+      "credential_requirement": "none",
+      "fallback_behavior": "fail_closed",
+      "license_note": "Public reference/link only; do not redistribute source content.",
+      "notes": [
+        "Primary moving-average and breakout-rule evidence."
+      ],
+      "release_lag_policy": "evidence only; no market-time feature is consumed",
+      "source_id": "brock_technical_rules_1992",
+      "update_cadence": "static literature or public educational reference",
+      "url": "https://doi.org/10.1111/j.1540-6261.1992.tb04385.x"
+    },
+    {
+      "access": "free_unauthenticated",
+      "allowed_usage_label": "strategy_class_evidence",
+      "cache_path": "var/cache/external_sources/moreira_muir_2017.html",
+      "credential_requirement": "none",
+      "fallback_behavior": "fail_closed",
+      "license_note": "Public reference/link only; do not redistribute source content.",
+      "notes": [
+        "Primary volatility-managed portfolio reference."
+      ],
+      "release_lag_policy": "evidence only; no market-time feature is consumed",
+      "source_id": "moreira_muir_2017",
+      "update_cadence": "static literature or public educational reference",
+      "url": "https://doi.org/10.1111/jofi.12513"
+    },
+    {
+      "access": "free_unauthenticated",
+      "allowed_usage_label": "strategy_class_evidence",
+      "cache_path": "var/cache/external_sources/multanchanbap_coin_preview.html",
+      "credential_requirement": "none",
+      "fallback_behavior": "fail_closed",
+      "license_note": "Public reference/link only; do not redistribute source content.",
+      "notes": [
+        "Public preview documents 120-day filter, 20/10 Turtle rule and ATR stop."
+      ],
+      "release_lag_policy": "evidence only; no market-time feature is consumed",
+      "source_id": "multanchanbap_coin_preview",
+      "update_cadence": "static literature or public educational reference",
+      "url": "https://resource.newsystock.com/Admin/Academy/%28Preview%29_MultanChanbab_coin_strategy.pdf"
+    },
+    {
+      "access": "free_unauthenticated",
+      "allowed_usage_label": "strategy_class_evidence",
+      "cache_path": "var/cache/external_sources/multanchanbap_basic_preview.html",
+      "credential_requirement": "none",
+      "fallback_behavior": "fail_closed",
+      "license_note": "Public reference/link only; do not redistribute source content.",
+      "notes": [
+        "Public preview documents IBS below 0.3, medium trend and bearish prior bar."
+      ],
+      "release_lag_policy": "evidence only; no market-time feature is consumed",
+      "source_id": "multanchanbap_basic_preview",
+      "update_cadence": "static literature or public educational reference",
+      "url": "https://resource.newsystock.com/Admin/Academy/%28Preview%29%20Developing%20the%20basic%20strategy%20of%20Multanchanbap%2816%29.pdf"
+    },
+    {
+      "access": "free_unauthenticated",
+      "allowed_usage_label": "evidence_only",
+      "cache_path": "var/cache/external_sources/amateurquant_profile.html",
+      "credential_requirement": "none",
+      "fallback_behavior": "fail_closed",
+      "license_note": "Public reference/link only; do not redistribute source content.",
+      "notes": [
+        "Public profile supplies scope/provenance only, not strategy-rule evidence."
+      ],
+      "release_lag_policy": "evidence only; no market-time feature is consumed",
+      "source_id": "amateurquant_profile",
+      "update_cadence": "static literature or public educational reference",
+      "url": "https://insightcampus.co.kr/teachers/%EC%A1%B0%EC%84%B1%ED%98%84-%EA%B0%95%EC%82%AC%EB%8B%98/"
+    },
+    {
+      "access": "free_unauthenticated",
+      "allowed_usage_label": "strategy_class_evidence",
+      "cache_path": "var/cache/external_sources/flightf_rsi_divergence_20210124.html",
+      "credential_requirement": "none",
+      "fallback_behavior": "fail_closed",
+      "license_note": "Public reference/link only; do not redistribute source content.",
+      "notes": [
+        "First-person educational example supports 10-minute RSI divergence and staged RSI exits; pivot and sizing rules remain undisclosed."
+      ],
+      "release_lag_policy": "evidence only; no market-time feature is consumed",
+      "source_id": "flightf_rsi_divergence_20210124",
+      "update_cadence": "static literature or public educational reference",
+      "url": "https://gall.dcinside.com/mgallery/board/view/?id=electronicmoney&no=548338"
+    },
+    {
+      "access": "free_unauthenticated",
+      "allowed_usage_label": "strategy_class_evidence",
+      "cache_path": "var/cache/external_sources/flightf_trading_principles_20200908.html",
+      "credential_requirement": "none",
+      "fallback_behavior": "fail_closed",
+      "license_note": "Public reference/link only; do not redistribute source content.",
+      "notes": [
+        "First-person post separates range and one-way regimes and emphasizes stops, volume and multiple timeframes."
+      ],
+      "release_lag_policy": "evidence only; no market-time feature is consumed",
+      "source_id": "flightf_trading_principles_20200908",
+      "update_cadence": "static literature or public educational reference",
+      "url": "https://gall.dcinside.com/mgallery/board/view/?id=electronicmoney&no=187860"
+    },
+    {
+      "access": "free_unauthenticated",
+      "allowed_usage_label": "diagnostic_only",
+      "cache_path": "var/cache/external_sources/dacapogo_public_repo_633ba5d.html",
+      "credential_requirement": "none",
+      "fallback_behavior": "fail_closed",
+      "license_note": "Public reference/link only; do not redistribute source content.",
+      "notes": [
+        "Secondary reproducible research notebook at commit 633ba5d; its trader rules are explicitly proxies.",
+        "Pinned commit; diagnostic/proxy provenance only (comparison-proxy documents and ledger analysis), NOT rule evidence."
+      ],
+      "release_lag_policy": "evidence only; no market-time feature is consumed",
+      "source_id": "dacapogo_public_repo_633ba5d",
+      "update_cadence": "static literature or public educational reference",
+      "url": "https://github.com/HokyoungJung/dacapogo/tree/633ba5d6bc0c84a20696af6b2bf807cf55d21248"
+    },
+    {
+      "access": "free_unauthenticated",
+      "allowed_usage_label": "strategy_class_evidence",
+      "cache_path": "var/cache/external_sources/aoa_bitmex_interview_20250611.html",
+      "credential_requirement": "none",
+      "fallback_behavior": "fail_closed",
+      "license_note": "Public reference/link only; do not redistribute source content.",
+      "notes": [
+        "Official first-person interview supports liquid-major preference and portfolio risk limits, not an entry formula."
+      ],
+      "release_lag_policy": "evidence only; no market-time feature is consumed",
+      "source_id": "aoa_bitmex_interview_20250611",
+      "update_cadence": "static literature or public educational reference",
+      "url": "https://www.bitmex.com/blog/whale-trader-talks-aoa"
+    },
+    {
+      "access": "free_unauthenticated",
+      "allowed_usage_label": "diagnostic_only",
+      "cache_path": "var/cache/external_sources/dolpago_dogdrip_20210802.html",
+      "credential_requirement": "none",
+      "fallback_behavior": "fail_closed",
+      "license_note": "Public reference/link only; do not redistribute source content.",
+      "notes": [
+        "First-person competition certification; no complete trading formula is disclosed."
+      ],
+      "release_lag_policy": "evidence only; no market-time feature is consumed",
+      "source_id": "dolpago_dogdrip_20210802",
+      "update_cadence": "static literature or public educational reference",
+      "url": "https://www.dogdrip.net/341084283"
+    },
+    {
+      "access": "free_unauthenticated",
+      "allowed_usage_label": "strategy_class_evidence",
+      "cache_path": "var/cache/external_sources/albatross_risk_governance.html",
+      "credential_requirement": "none",
+      "fallback_behavior": "fail_closed",
+      "license_note": "Public reference/link only; do not redistribute source content.",
+      "notes": [
+        "Publisher page supports rules and capital-management inspiration, not a concrete alpha rule."
+      ],
+      "release_lag_policy": "evidence only; no market-time feature is consumed",
+      "source_id": "albatross_risk_governance",
+      "update_cadence": "static literature or public educational reference",
+      "url": "https://www.yes24.com/Product/Goods/141814145"
+    },
+    {
+      "access": "free_unauthenticated",
+      "allowed_usage_label": "strategy_class_evidence",
+      "cache_path": "var/cache/external_sources/lopez_de_prado_hrp_2016.html",
+      "credential_requirement": "none",
+      "fallback_behavior": "fail_closed",
+      "license_note": "Public reference/link only; do not redistribute source content.",
+      "notes": [
+        "HRP reference; allocator diversifies risk and does not forecast alpha."
+      ],
+      "release_lag_policy": "evidence only; no market-time feature is consumed",
+      "source_id": "lopez_de_prado_hrp_2016",
+      "update_cadence": "static literature or public educational reference",
+      "url": "https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2708678"
+    },
+    {
+      "access": "free_unauthenticated",
+      "allowed_usage_label": "strategy_class_evidence",
+      "cache_path": "var/cache/external_sources/herc_raffinot_2018.html",
+      "credential_requirement": "none",
+      "fallback_behavior": "fail_closed",
+      "license_note": "Public reference/link only; do not redistribute source content.",
+      "notes": [
+        "Primary HERC paper; no full dendrogram HERC optimizer is implemented in this repository."
+      ],
+      "release_lag_policy": "evidence only; no market-time feature is consumed",
+      "source_id": "herc_raffinot_2018",
+      "update_cadence": "static literature or public educational reference",
+      "url": "https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3237540"
+    },
+    {
+      "access": "free_unauthenticated",
+      "allowed_usage_label": "strategy_class_evidence",
+      "cache_path": "var/cache/external_sources/nco_lopez_de_prado.html",
+      "credential_requirement": "none",
+      "fallback_behavior": "fail_closed",
+      "license_note": "Public reference/link only; do not redistribute source content.",
+      "notes": [
+        "Primary NCO paper; no NCO optimizer is implemented in this repository."
+      ],
+      "release_lag_policy": "evidence only; no market-time feature is consumed",
+      "source_id": "nco_lopez_de_prado",
+      "update_cadence": "static literature or public educational reference",
+      "url": "https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3469961"
+    },
+    {
+      "access": "free_unauthenticated",
+      "allowed_usage_label": "strategy_class_evidence",
+      "cache_path": "var/cache/external_sources/constrained_hrp_wp14_2019.html",
+      "credential_requirement": "none",
+      "fallback_behavior": "fail_closed",
+      "license_note": "Public reference/link only; do not redistribute source content.",
+      "notes": [
+        "Constrained HRP working paper; current code only reuses per-sleeve caps and quality gates."
+      ],
+      "release_lag_policy": "evidence only; no market-time feature is consumed",
+      "source_id": "constrained_hrp_wp14_2019",
+      "update_cadence": "static literature or public educational reference",
+      "url": "https://www.ekon.sun.ac.za/wpapers/2019/wp142019/wp142019.pdf"
+    },
+    {
+      "access": "free_unauthenticated",
+      "allowed_usage_label": "strategy_class_evidence",
+      "cache_path": "var/cache/external_sources/network_risk_parity_2024.html",
+      "credential_requirement": "none",
+      "fallback_behavior": "fail_closed",
+      "license_note": "Public reference/link only; do not redistribute source content.",
+      "notes": [
+        "Primary network-risk-parity reference; graph allocation remains diagnostic-only here."
+      ],
+      "release_lag_policy": "evidence only; no market-time feature is consumed",
+      "source_id": "network_risk_parity_2024",
+      "update_cadence": "static literature or public educational reference",
+      "url": "https://doi.org/10.1057/s41260-023-00347-8"
+    },
+    {
+      "access": "free_unauthenticated",
+      "allowed_usage_label": "strategy_class_evidence",
+      "cache_path": "var/cache/external_sources/faith_way_of_turtle_2007.html",
+      "credential_requirement": "none",
+      "fallback_behavior": "fail_closed",
+      "license_note": "Public reference/link only; do not redistribute source content.",
+      "notes": [
+        "Curtis Faith, Way of the Turtle (McGraw-Hill 2007): published Turtle unit sizing (risk% / N), 1/2N pyramiding and 2N stop; parameter values used here are this lane's independent choices."
+      ],
+      "release_lag_policy": "evidence only; no market-time feature is consumed",
+      "source_id": "faith_way_of_turtle_2007",
+      "update_cadence": "static literature or public educational reference",
+      "url": "https://www.mheducation.com/highered/mhp/product/way-turtle-secret-methods-turned-ordinary-people-into-legendary-traders.html"
+    },
+    {
+      "access": "free_unauthenticated",
+      "allowed_usage_label": "strategy_class_evidence",
+      "cache_path": "var/cache/external_sources/avellaneda_lee_2010.html",
+      "credential_requirement": "none",
+      "fallback_behavior": "fail_closed",
+      "license_note": "Public reference/link only; do not redistribute source content.",
+      "notes": [
+        "Avellaneda & Lee (2010) Quantitative Finance: PCA eigenportfolio residual s-score stat-arb; scope evidence only, thresholds are the paper's published defaults reused as hypothesis values."
+      ],
+      "release_lag_policy": "evidence only; no market-time feature is consumed",
+      "source_id": "avellaneda_lee_2010",
+      "update_cadence": "static literature or public educational reference",
+      "url": "https://doi.org/10.1080/14697680903124632"
+    },
+    {
+      "access": "free_unauthenticated",
+      "allowed_usage_label": "strategy_class_evidence",
+      "cache_path": "var/cache/external_sources/chan_algorithmic_trading_2013.html",
+      "credential_requirement": "none",
+      "fallback_behavior": "fail_closed",
+      "license_note": "Public reference/link only; do not redistribute source content.",
+      "notes": [
+        "E. Chan, Algorithmic Trading (Wiley 2013): Kalman-filter dynamic hedge ratio for pairs; independent 2-state implementation."
+      ],
+      "release_lag_policy": "evidence only; no market-time feature is consumed",
+      "source_id": "chan_algorithmic_trading_2013",
+      "update_cadence": "static literature or public educational reference",
+      "url": "https://doi.org/10.1002/9781118676998"
+    },
+    {
+      "access": "free_unauthenticated",
+      "allowed_usage_label": "strategy_class_evidence",
+      "cache_path": "var/cache/external_sources/triantafyllopoulos_montana_2011.html",
+      "credential_requirement": "none",
+      "fallback_behavior": "fail_closed",
+      "license_note": "Public reference/link only; do not redistribute source content.",
+      "notes": [
+        "Triantafyllopoulos & Montana (2011) Computational Management Science: dynamic-hedging pairs trading with time-varying regression (Kalman) -- supporting evidence for the state-space hedge ratio."
+      ],
+      "release_lag_policy": "evidence only; no market-time feature is consumed",
+      "source_id": "triantafyllopoulos_montana_2011",
+      "update_cadence": "static literature or public educational reference",
+      "url": "https://doi.org/10.1007/s10287-009-0105-8"
+    },
+    {
+      "access": "free_unauthenticated",
+      "allowed_usage_label": "strategy_class_evidence",
+      "cache_path": "var/cache/external_sources/blanchet_chen_zhou_2022_wasserstein_mv.html",
+      "credential_requirement": "none",
+      "fallback_behavior": "fail_closed",
+      "license_note": "Public reference/link only; do not redistribute source content.",
+      "notes": [
+        "Blanchet, Chen & Zhou (2022) Management Science: exact type-2 Wasserstein DRO mean-variance (p=q=2) -- the formulation implemented by wasserstein_dro_weights."
+      ],
+      "release_lag_policy": "evidence only; no market-time feature is consumed",
+      "source_id": "blanchet_chen_zhou_2022_wasserstein_mv",
+      "update_cadence": "static literature or public educational reference",
+      "url": "https://doi.org/10.1287/mnsc.2021.4155"
+    }
+  ],
+  "families": [
+    "equity_curve_kill_switch_overlay",
+    "kalman_pairs_stat_arb",
+    "ma_score_dynamic_allocation",
+    "pca_residual_stat_arb",
+    "prev_day_box_quartile",
+    "rsi_divergence_flight",
+    "session_high_breakout_scalp",
+    "session_volatility_breakout",
+    "turtle_unit_pyramiding"
+  ],
+  "gross_cap": 1.0,
+  "kind": "preregistered_allocation_cell",
+  "lane": "claude",
+  "locked_oos_evaluation": {
+    "allocation_cost_bps": 10.0,
+    "periods_per_year": 252,
+    "rebalance_every_observations": 5
+  },
+  "membership_is_preregistered_weights_are_measured": true,
+  "method": "hrp_dendrogram",
+  "min_sleeves": 6,
+  "portfolio_recipes": [
+    {
+      "method": "equal_weight",
+      "name": "equal_weight_baseline"
+    },
+    {
+      "method": "inverse_vol",
+      "name": "inverse_vol_baseline"
+    },
+    {
+      "method": "erc",
+      "name": "erc"
+    },
+    {
+      "method": "hrp",
+      "name": "hrp_threshold_legacy"
+    },
+    {
+      "method": "hrp_dendrogram",
+      "name": "hrp_dendrogram_single"
+    },
+    {
+      "method": "constrained_hrp",
+      "name": "constrained_hrp_cap20"
+    },
+    {
+      "method": "herc",
+      "name": "herc_ward_silhouette"
+    },
+    {
+      "method": "nco",
+      "name": "nco_min_variance"
+    },
+    {
+      "method": "wasserstein_dro",
+      "name": "wasserstein_dro_bcz"
+    },
+    {
+      "method": "graph_inverse_centrality",
+      "name": "graph_inverse_centrality_heuristic"
+    }
+  ],
+  "promotion_eligible": false,
+  "required_data_contracts": [
+    "timestamped OHLCV and next-open execution",
+    "mark/index price retained as diagnostics; funding rate and actual settlement timestamp per symbol",
+    "maker/taker fee, spread, slippage, sqrt-impact and trade-price OHLC isolated liquidation approximation",
+    "1s/1m bars with per-bar volume for the scalp candidates; queue-position model before any inference",
+    "point-in-time market-cap and listing/delisting membership receipts",
+    "common-date aligned net sleeve return streams before allocation"
+  ],
+  "research_only": true,
+  "risk_scaling": {
+    "bars_per_year": 365,
+    "max_leverage": 1.0,
+    "method": "target_vol",
+    "min_observations": 60,
+    "sigma_target_annual": 0.1
+  },
+  "risk_scaling_research": {
+    "cash_note": "final weights = L * w (allocator weights sum to 1); the residual 1-L is the cash weight recorded as the manifest's cash_weight. The simulator accrues NO interest on idle cash (RiskFreePolicy is the excess-return benchmark for Sharpe/Sortino only); a real risk-free yield on the residual is a live-deployment detail outside the backtest",
+    "estimation": "sigma_hat = std of the common-date aligned train+validation NET portfolio stream under the allocator's relative weights; the ONLY estimate consumed (no mu forecast anywhere in the primary path)",
+    "variants": [
+      {
+        "spec": {
+          "method": "target_vol",
+          "sigma_target_annual": 0.1
+        }
+      },
+      {
+        "spec": {
+          "method": "target_vol",
+          "sigma_target_annual": 0.05
+        }
+      },
+      {
+        "note": "Kelly re-introduces the mu-hat estimation problem the mu-free allocators avoid (an overestimated mean scales exposure linearly); resolve_risk_scaling_spec fails closed until mu_evidence_confirmed is set true on locked-OOS evidence. Until then it is exercised only through the kelly_mu_sensitivity diagnostic in compare_hierarchical_allocators.py.",
+        "spec": {
+          "fraction": 0.5,
+          "method": "fractional_kelly",
+          "mu_evidence_confirmed": false,
+          "risk_free_annual": 0.0
+        },
+        "status": "gated_until_locked_oos_mu_evidence"
+      }
+    ]
+  },
+  "schema_version": 1,
+  "sibling_lane": "configs/research/named_quant_crypto_tradfi_suite_v1.json",
+  "sleeves": {
+    "crypto_kalman_pair_eth_btc_1h_v1": {
+      "family": "kalman_pairs_stat_arb",
+      "returns": null,
+      "returns_source": {
+        "artifact": "named_quant_claude_data_pc_walkforward",
+        "candidate_id": "crypto_kalman_pair_eth_btc_1h_v1",
+        "locked_oos_used_for_weights": false,
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "stream": "common-date aligned train+validation NET returns only",
+        "turnover_source": "same candidate, train+validation folds, after fees, funding, slippage and impact"
+      },
+      "source_artifact_id": "named_quant_claude_data_pc_walkforward",
+      "turnover": null
+    },
+    "crypto_kalman_pair_sol_avax_4h_v1": {
+      "family": "kalman_pairs_stat_arb",
+      "returns": null,
+      "returns_source": {
+        "artifact": "named_quant_claude_data_pc_walkforward",
+        "candidate_id": "crypto_kalman_pair_sol_avax_4h_v1",
+        "locked_oos_used_for_weights": false,
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "stream": "common-date aligned train+validation NET returns only",
+        "turnover_source": "same candidate, train+validation folds, after fees, funding, slippage and impact"
+      },
+      "source_artifact_id": "named_quant_claude_data_pc_walkforward",
+      "turnover": null
+    },
+    "crypto_kill_switch_overlay_turtle_1d_v1": {
+      "family": "equity_curve_kill_switch_overlay",
+      "returns": null,
+      "returns_source": {
+        "artifact": "named_quant_claude_data_pc_walkforward",
+        "candidate_id": "crypto_kill_switch_overlay_turtle_1d_v1",
+        "locked_oos_used_for_weights": false,
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "stream": "common-date aligned train+validation NET returns only",
+        "turnover_source": "same candidate, train+validation folds, after fees, funding, slippage and impact"
+      },
+      "source_artifact_id": "named_quant_claude_data_pc_walkforward",
+      "turnover": null
+    },
+    "crypto_ma_score_vol_target_1d_v1": {
+      "family": "ma_score_dynamic_allocation",
+      "returns": null,
+      "returns_source": {
+        "artifact": "named_quant_claude_data_pc_walkforward",
+        "candidate_id": "crypto_ma_score_vol_target_1d_v1",
+        "locked_oos_used_for_weights": false,
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "stream": "common-date aligned train+validation NET returns only",
+        "turnover_source": "same candidate, train+validation folds, after fees, funding, slippage and impact"
+      },
+      "source_artifact_id": "named_quant_claude_data_pc_walkforward",
+      "turnover": null
+    },
+    "crypto_multanchanbap_20_10_public_rule_1d_v1": {
+      "family": "turtle_unit_pyramiding",
+      "returns": null,
+      "returns_source": {
+        "artifact": "named_quant_claude_data_pc_walkforward",
+        "candidate_id": "crypto_multanchanbap_20_10_public_rule_1d_v1",
+        "locked_oos_used_for_weights": false,
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "stream": "common-date aligned train+validation NET returns only",
+        "turnover_source": "same candidate, train+validation folds, after fees, funding, slippage and impact"
+      },
+      "source_artifact_id": "named_quant_claude_data_pc_walkforward",
+      "turnover": null
+    },
+    "crypto_pca_residual_statarb_1d_v1": {
+      "family": "pca_residual_stat_arb",
+      "returns": null,
+      "returns_source": {
+        "artifact": "named_quant_claude_data_pc_walkforward",
+        "candidate_id": "crypto_pca_residual_statarb_1d_v1",
+        "locked_oos_used_for_weights": false,
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "stream": "common-date aligned train+validation NET returns only",
+        "turnover_source": "same candidate, train+validation folds, after fees, funding, slippage and impact"
+      },
+      "source_artifact_id": "named_quant_claude_data_pc_walkforward",
+      "turnover": null
+    },
+    "crypto_prev_day_box_15m_v1": {
+      "family": "prev_day_box_quartile",
+      "returns": null,
+      "returns_source": {
+        "artifact": "named_quant_claude_data_pc_walkforward",
+        "candidate_id": "crypto_prev_day_box_15m_v1",
+        "locked_oos_used_for_weights": false,
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "stream": "common-date aligned train+validation NET returns only",
+        "turnover_source": "same candidate, train+validation folds, after fees, funding, slippage and impact"
+      },
+      "source_artifact_id": "named_quant_claude_data_pc_walkforward",
+      "turnover": null
+    },
+    "crypto_rsi_divergence_btc_eth_10m_v1": {
+      "family": "rsi_divergence_flight",
+      "returns": null,
+      "returns_source": {
+        "artifact": "named_quant_claude_data_pc_walkforward",
+        "candidate_id": "crypto_rsi_divergence_btc_eth_10m_v1",
+        "locked_oos_used_for_weights": false,
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "stream": "common-date aligned train+validation NET returns only",
+        "turnover_source": "same candidate, train+validation folds, after fees, funding, slippage and impact"
+      },
+      "source_artifact_id": "named_quant_claude_data_pc_walkforward",
+      "turnover": null
+    },
+    "crypto_session_high_scalp_1m_v1": {
+      "family": "session_high_breakout_scalp",
+      "returns": null,
+      "returns_source": {
+        "artifact": "named_quant_claude_data_pc_walkforward",
+        "candidate_id": "crypto_session_high_scalp_1m_v1",
+        "locked_oos_used_for_weights": false,
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "stream": "common-date aligned train+validation NET returns only",
+        "turnover_source": "same candidate, train+validation folds, after fees, funding, slippage and impact"
+      },
+      "source_artifact_id": "named_quant_claude_data_pc_walkforward",
+      "turnover": null
+    },
+    "crypto_turtle_unit_pyramid_1d_v1": {
+      "family": "turtle_unit_pyramiding",
+      "returns": null,
+      "returns_source": {
+        "artifact": "named_quant_claude_data_pc_walkforward",
+        "candidate_id": "crypto_turtle_unit_pyramid_1d_v1",
+        "locked_oos_used_for_weights": false,
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "stream": "common-date aligned train+validation NET returns only",
+        "turnover_source": "same candidate, train+validation folds, after fees, funding, slippage and impact"
+      },
+      "source_artifact_id": "named_quant_claude_data_pc_walkforward",
+      "turnover": null
+    },
+    "crypto_vb_noise_session_1h_v1": {
+      "family": "session_volatility_breakout",
+      "returns": null,
+      "returns_source": {
+        "artifact": "named_quant_claude_data_pc_walkforward",
+        "candidate_id": "crypto_vb_noise_session_1h_v1",
+        "locked_oos_used_for_weights": false,
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "stream": "common-date aligned train+validation NET returns only",
+        "turnover_source": "same candidate, train+validation folds, after fees, funding, slippage and impact"
+      },
+      "source_artifact_id": "named_quant_claude_data_pc_walkforward",
+      "turnover": null
+    },
+    "tradfi_kalman_pair_ewy_ewt_4h_v1": {
+      "family": "kalman_pairs_stat_arb",
+      "returns": null,
+      "returns_source": {
+        "artifact": "named_quant_claude_data_pc_walkforward",
+        "candidate_id": "tradfi_kalman_pair_ewy_ewt_4h_v1",
+        "locked_oos_used_for_weights": false,
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "stream": "common-date aligned train+validation NET returns only",
+        "turnover_source": "same candidate, train+validation folds, after fees, funding, slippage and impact"
+      },
+      "source_artifact_id": "named_quant_claude_data_pc_walkforward",
+      "turnover": null
+    },
+    "tradfi_kalman_pair_nvda_amd_1h_v1": {
+      "family": "kalman_pairs_stat_arb",
+      "returns": null,
+      "returns_source": {
+        "artifact": "named_quant_claude_data_pc_walkforward",
+        "candidate_id": "tradfi_kalman_pair_nvda_amd_1h_v1",
+        "locked_oos_used_for_weights": false,
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "stream": "common-date aligned train+validation NET returns only",
+        "turnover_source": "same candidate, train+validation folds, after fees, funding, slippage and impact"
+      },
+      "source_artifact_id": "named_quant_claude_data_pc_walkforward",
+      "turnover": null
+    },
+    "tradfi_kalman_pair_qqq_spy_1h_v1": {
+      "family": "kalman_pairs_stat_arb",
+      "returns": null,
+      "returns_source": {
+        "artifact": "named_quant_claude_data_pc_walkforward",
+        "candidate_id": "tradfi_kalman_pair_qqq_spy_1h_v1",
+        "locked_oos_used_for_weights": false,
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "stream": "common-date aligned train+validation NET returns only",
+        "turnover_source": "same candidate, train+validation folds, after fees, funding, slippage and impact"
+      },
+      "source_artifact_id": "named_quant_claude_data_pc_walkforward",
+      "turnover": null
+    },
+    "tradfi_kill_switch_overlay_ma_rotation_1d_v1": {
+      "family": "equity_curve_kill_switch_overlay",
+      "returns": null,
+      "returns_source": {
+        "artifact": "named_quant_claude_data_pc_walkforward",
+        "candidate_id": "tradfi_kill_switch_overlay_ma_rotation_1d_v1",
+        "locked_oos_used_for_weights": false,
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "stream": "common-date aligned train+validation NET returns only",
+        "turnover_source": "same candidate, train+validation folds, after fees, funding, slippage and impact"
+      },
+      "source_artifact_id": "named_quant_claude_data_pc_walkforward",
+      "turnover": null
+    },
+    "tradfi_ma_score_vol_target_1d_v1": {
+      "family": "ma_score_dynamic_allocation",
+      "returns": null,
+      "returns_source": {
+        "artifact": "named_quant_claude_data_pc_walkforward",
+        "candidate_id": "tradfi_ma_score_vol_target_1d_v1",
+        "locked_oos_used_for_weights": false,
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "stream": "common-date aligned train+validation NET returns only",
+        "turnover_source": "same candidate, train+validation folds, after fees, funding, slippage and impact"
+      },
+      "source_artifact_id": "named_quant_claude_data_pc_walkforward",
+      "turnover": null
+    },
+    "tradfi_multanchanbap_20_10_public_rule_1d_v1": {
+      "family": "turtle_unit_pyramiding",
+      "returns": null,
+      "returns_source": {
+        "artifact": "named_quant_claude_data_pc_walkforward",
+        "candidate_id": "tradfi_multanchanbap_20_10_public_rule_1d_v1",
+        "locked_oos_used_for_weights": false,
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "stream": "common-date aligned train+validation NET returns only",
+        "turnover_source": "same candidate, train+validation folds, after fees, funding, slippage and impact"
+      },
+      "source_artifact_id": "named_quant_claude_data_pc_walkforward",
+      "turnover": null
+    },
+    "tradfi_pca_residual_statarb_equity_1d_v1": {
+      "family": "pca_residual_stat_arb",
+      "returns": null,
+      "returns_source": {
+        "artifact": "named_quant_claude_data_pc_walkforward",
+        "candidate_id": "tradfi_pca_residual_statarb_equity_1d_v1",
+        "locked_oos_used_for_weights": false,
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "stream": "common-date aligned train+validation NET returns only",
+        "turnover_source": "same candidate, train+validation folds, after fees, funding, slippage and impact"
+      },
+      "source_artifact_id": "named_quant_claude_data_pc_walkforward",
+      "turnover": null
+    },
+    "tradfi_pca_residual_statarb_etf_cmdty_1d_v1": {
+      "family": "pca_residual_stat_arb",
+      "returns": null,
+      "returns_source": {
+        "artifact": "named_quant_claude_data_pc_walkforward",
+        "candidate_id": "tradfi_pca_residual_statarb_etf_cmdty_1d_v1",
+        "locked_oos_used_for_weights": false,
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "stream": "common-date aligned train+validation NET returns only",
+        "turnover_source": "same candidate, train+validation folds, after fees, funding, slippage and impact"
+      },
+      "source_artifact_id": "named_quant_claude_data_pc_walkforward",
+      "turnover": null
+    },
+    "tradfi_prev_day_box_15m_v1": {
+      "family": "prev_day_box_quartile",
+      "returns": null,
+      "returns_source": {
+        "artifact": "named_quant_claude_data_pc_walkforward",
+        "candidate_id": "tradfi_prev_day_box_15m_v1",
+        "locked_oos_used_for_weights": false,
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "stream": "common-date aligned train+validation NET returns only",
+        "turnover_source": "same candidate, train+validation folds, after fees, funding, slippage and impact"
+      },
+      "source_artifact_id": "named_quant_claude_data_pc_walkforward",
+      "turnover": null
+    },
+    "tradfi_rsi_divergence_xau_cl_10m_v1": {
+      "family": "rsi_divergence_flight",
+      "returns": null,
+      "returns_source": {
+        "artifact": "named_quant_claude_data_pc_walkforward",
+        "candidate_id": "tradfi_rsi_divergence_xau_cl_10m_v1",
+        "locked_oos_used_for_weights": false,
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "stream": "common-date aligned train+validation NET returns only",
+        "turnover_source": "same candidate, train+validation folds, after fees, funding, slippage and impact"
+      },
+      "source_artifact_id": "named_quant_claude_data_pc_walkforward",
+      "turnover": null
+    },
+    "tradfi_session_high_scalp_1m_v1": {
+      "family": "session_high_breakout_scalp",
+      "returns": null,
+      "returns_source": {
+        "artifact": "named_quant_claude_data_pc_walkforward",
+        "candidate_id": "tradfi_session_high_scalp_1m_v1",
+        "locked_oos_used_for_weights": false,
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "stream": "common-date aligned train+validation NET returns only",
+        "turnover_source": "same candidate, train+validation folds, after fees, funding, slippage and impact"
+      },
+      "source_artifact_id": "named_quant_claude_data_pc_walkforward",
+      "turnover": null
+    },
+    "tradfi_turtle_unit_pyramid_1d_v1": {
+      "family": "turtle_unit_pyramiding",
+      "returns": null,
+      "returns_source": {
+        "artifact": "named_quant_claude_data_pc_walkforward",
+        "candidate_id": "tradfi_turtle_unit_pyramid_1d_v1",
+        "locked_oos_used_for_weights": false,
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "stream": "common-date aligned train+validation NET returns only",
+        "turnover_source": "same candidate, train+validation folds, after fees, funding, slippage and impact"
+      },
+      "source_artifact_id": "named_quant_claude_data_pc_walkforward",
+      "turnover": null
+    },
+    "tradfi_vb_noise_session_1h_v1": {
+      "family": "session_volatility_breakout",
+      "returns": null,
+      "returns_source": {
+        "artifact": "named_quant_claude_data_pc_walkforward",
+        "candidate_id": "tradfi_vb_noise_session_1h_v1",
+        "locked_oos_used_for_weights": false,
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "stream": "common-date aligned train+validation NET returns only",
+        "turnover_source": "same candidate, train+validation folds, after fees, funding, slippage and impact"
+      },
+      "source_artifact_id": "named_quant_claude_data_pc_walkforward",
+      "turnover": null
+    },
+    "xasset_ma_score_vol_target_1d_v1": {
+      "family": "ma_score_dynamic_allocation",
+      "returns": null,
+      "returns_source": {
+        "artifact": "named_quant_claude_data_pc_walkforward",
+        "candidate_id": "xasset_ma_score_vol_target_1d_v1",
+        "locked_oos_used_for_weights": false,
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "stream": "common-date aligned train+validation NET returns only",
+        "turnover_source": "same candidate, train+validation folds, after fees, funding, slippage and impact"
+      },
+      "source_artifact_id": "named_quant_claude_data_pc_walkforward",
+      "turnover": null
+    }
+  },
+  "source_artifacts": [
+    {
+      "id": "named_quant_claude_data_pc_walkforward",
+      "max_age_hours": 8760,
+      "note": "Set ready only after point-in-time universe, exact common-date alignment and locked-OOS net-return checks pass.",
+      "path": "data-PC materializes and records path here",
+      "portfolio_ready": false,
+      "ready": false,
+      "sha256": null
+    }
+  ],
+  "source_resolution": [
+    {
+      "action": "no attribution; not mapped to any other handle (systrader79 material below is cited on its own, adjacent public source only)",
+      "requested_label": "systrader32",
+      "status": "unverified"
+    },
+    {
+      "action": "design-philosophy context only; exact noise-K, MA windows and other parameters are independent adaptations",
+      "requested_label": "systrader79",
+      "status": "public_blog_and_books"
+    },
+    {
+      "action": "source supports a 120d gate, 20d high/10d low and ATR short-stop/Turtle backbone; close-channel, fixed -3.5%, sizing and pyramiding settings are independent parameters",
+      "requested_label": "물탄찬밥",
+      "status": "verified_public_preview"
+    },
+    {
+      "action": "pairs / stat-arb research scope only; provenance, not a rule source",
+      "requested_label": "아마추어퀀트",
+      "status": "public_profile"
+    },
+    {
+      "action": "risk-governance context only; overlay thresholds are independent parameters",
+      "requested_label": "알바트로스",
+      "status": "verified_as_성필규"
+    },
+    {
+      "action": "no attribution of any strategy or principle; no public reproducible rules found",
+      "requested_label": "부동심",
+      "status": "unverified"
+    },
+    {
+      "action": "two direct Flight posts support the hypothesis; dacapogo is diagnostic provenance only and its tested proxy family had negative/nonreplicating results",
+      "requested_label": "FlightF",
+      "status": "direct_primary_posts"
+    },
+    {
+      "action": "liquid-major preference and risk context only; no previous-day-box attribution",
+      "requested_label": "워뇨띠/AOA",
+      "status": "direct_bitmex_interview"
+    },
+    {
+      "action": "formula is private/unavailable; session scalp is an independent OHLCV proxy",
+      "requested_label": "돌파고",
+      "status": "identity_and_ledger_provenance_only"
+    }
+  ],
+  "status": "hypotheses_pending_data_pc_backtest",
+  "suite_id": "named_quant_claude_v1",
+  "universe": {
+    "crypto_top10": {
+      "selection_rule": "point_in_time_market_cap_top10_intersect_binance_usdm_TRADING_perpetuals",
+      "snapshot_is_market_cap_proof": false,
+      "static_smoke_symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT",
+        "XRP/USDT",
+        "DOGE/USDT",
+        "ADA/USDT",
+        "AVAX/USDT",
+        "TON/USDT"
+      ]
+    },
+    "tradfi": {
+      "groups": {
+        "energy_industrial": [
+          "COPPER/USDT",
+          "CL/USDT",
+          "BZ/USDT",
+          "NATGAS/USDT"
+        ],
+        "equity": [
+          "TSLA/USDT",
+          "INTC/USDT",
+          "HOOD/USDT",
+          "MSTR/USDT",
+          "AMZN/USDT",
+          "CRCL/USDT",
+          "COIN/USDT",
+          "PLTR/USDT",
+          "PAYP/USDT",
+          "META/USDT",
+          "NVDA/USDT",
+          "GOOGL/USDT",
+          "AAPL/USDT",
+          "TSM/USDT",
+          "MU/USDT",
+          "SNDK/USDT",
+          "MSFT/USDT",
+          "AVGO/USDT",
+          "BABA/USDT",
+          "AMD/USDT",
+          "QCOM/USDT",
+          "USAR/USDT",
+          "LITE/USDT",
+          "ORCL/USDT",
+          "DIS/USDT",
+          "UBER/USDT",
+          "CSCO/USDT",
+          "HD/USDT",
+          "MRVL/USDT",
+          "CRWV/USDT",
+          "WMT/USDT",
+          "JPM/USDT",
+          "V/USDT",
+          "BRKB/USDT",
+          "FLNC/USDT",
+          "DRAM/USDT",
+          "RKLB/USDT",
+          "CBRS/USDT",
+          "NBIS/USDT",
+          "WDC/USDT",
+          "ARM/USDT",
+          "BE/USDT",
+          "COHR/USDT",
+          "ASTS/USDT",
+          "BBX/USDT",
+          "CRM/USDT",
+          "DELL/USDT",
+          "HYUNDAI/USDT",
+          "IBM/USDT",
+          "IREN/USDT",
+          "LLY/USDT",
+          "NOK/USDT",
+          "NOW/USDT",
+          "NVO/USDT",
+          "ONDS/USDT",
+          "SAMSUNG/USDT",
+          "SKHYNIX/USDT",
+          "BX/USDT",
+          "HPE/USDT",
+          "AMAT/USDT",
+          "CRWD/USDT",
+          "CRDO/USDT",
+          "AAOI/USDT",
+          "AXTI/USDT",
+          "NFLX/USDT",
+          "COST/USDT",
+          "HIMS/USDT",
+          "EBAY/USDT",
+          "ZM/USDT",
+          "DKNG/USDT",
+          "RIVN/USDT",
+          "GME/USDT",
+          "BMNR/USDT",
+          "ADBE/USDT",
+          "GLW/USDT",
+          "ASML/USDT"
+        ],
+        "etf_index": [
+          "QQQ/USDT",
+          "SPY/USDT",
+          "EWY/USDT",
+          "EWJ/USDT",
+          "SOXL/USDT",
+          "EWT/USDT",
+          "IWM/USDT",
+          "EWZ/USDT",
+          "XLE/USDT",
+          "URNM/USDT",
+          "UVXY/USDT",
+          "STXX/USDT"
+        ],
+        "precious_metals": [
+          "XAU/USDT",
+          "XAG/USDT",
+          "XPT/USDT",
+          "XPD/USDT"
+        ],
+        "premarket": [
+          "SPCX/USDT",
+          "OPENAI/USDT",
+          "QNTX/USDT",
+          "ANTHROPIC/USDT"
+        ]
+      },
+      "selection_rule": "all Binance USD-M TRADIFI_PERPETUAL contracts with status TRADING at each decision date",
+      "static_smoke_symbols": [
+        "QQQ/USDT",
+        "SPY/USDT",
+        "EWY/USDT",
+        "EWJ/USDT",
+        "SOXL/USDT",
+        "EWT/USDT",
+        "IWM/USDT",
+        "EWZ/USDT",
+        "XLE/USDT",
+        "URNM/USDT",
+        "UVXY/USDT",
+        "STXX/USDT",
+        "XAU/USDT",
+        "XAG/USDT",
+        "XPT/USDT",
+        "XPD/USDT",
+        "COPPER/USDT",
+        "CL/USDT",
+        "BZ/USDT",
+        "NATGAS/USDT",
+        "TSLA/USDT",
+        "INTC/USDT",
+        "HOOD/USDT",
+        "MSTR/USDT",
+        "AMZN/USDT",
+        "CRCL/USDT",
+        "COIN/USDT",
+        "PLTR/USDT",
+        "PAYP/USDT",
+        "META/USDT",
+        "NVDA/USDT",
+        "GOOGL/USDT",
+        "AAPL/USDT",
+        "TSM/USDT",
+        "MU/USDT",
+        "SNDK/USDT",
+        "MSFT/USDT",
+        "AVGO/USDT",
+        "BABA/USDT",
+        "AMD/USDT",
+        "QCOM/USDT",
+        "USAR/USDT",
+        "LITE/USDT",
+        "ORCL/USDT",
+        "DIS/USDT",
+        "UBER/USDT",
+        "CSCO/USDT",
+        "HD/USDT",
+        "MRVL/USDT",
+        "CRWV/USDT",
+        "WMT/USDT",
+        "JPM/USDT",
+        "V/USDT",
+        "BRKB/USDT",
+        "FLNC/USDT",
+        "DRAM/USDT",
+        "RKLB/USDT",
+        "CBRS/USDT",
+        "NBIS/USDT",
+        "WDC/USDT",
+        "ARM/USDT",
+        "BE/USDT",
+        "COHR/USDT",
+        "ASTS/USDT",
+        "BBX/USDT",
+        "CRM/USDT",
+        "DELL/USDT",
+        "HYUNDAI/USDT",
+        "IBM/USDT",
+        "IREN/USDT",
+        "LLY/USDT",
+        "NOK/USDT",
+        "NOW/USDT",
+        "NVO/USDT",
+        "ONDS/USDT",
+        "SAMSUNG/USDT",
+        "SKHYNIX/USDT",
+        "BX/USDT",
+        "HPE/USDT",
+        "AMAT/USDT",
+        "CRWD/USDT",
+        "CRDO/USDT",
+        "AAOI/USDT",
+        "AXTI/USDT",
+        "NFLX/USDT",
+        "COST/USDT",
+        "HIMS/USDT",
+        "EBAY/USDT",
+        "ZM/USDT",
+        "DKNG/USDT",
+        "RIVN/USDT",
+        "GME/USDT",
+        "BMNR/USDT",
+        "ADBE/USDT",
+        "GLW/USDT",
+        "ASML/USDT",
+        "SPCX/USDT",
+        "OPENAI/USDT",
+        "QNTX/USDT",
+        "ANTHROPIC/USDT"
+      ]
+    }
+  },
+  "upper": 0.25
+}

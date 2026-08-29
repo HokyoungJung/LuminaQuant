@@ -13,7 +13,10 @@ manifest, because nothing here reads the wall clock or the filesystem.
 Input JSON shape::
 
     {
-      "method": "erc",                 # optional, default "erc" ("erc"|"hrp")
+      "method": "erc",                 # optional, default "erc" ("erc"|"hrp"|
+                                       #   "hrp_dendrogram"|"herc"|"nco"|"wasserstein_dro"|
+                                       #   "graph_inverse_centrality")
+      "allocator_params": {...},        # optional kwargs for the opt-in allocators
       "upper": 0.6,                    # optional per-sleeve cap (float or {id: cap})
       "min_sleeves": 1,                # optional
       "gross_cap": 1.0,                # optional
@@ -56,15 +59,50 @@ def _load_input(input_path: Path) -> dict[str, Any]:
 
 
 def build_manifest_from_input(payload: dict[str, Any]) -> dict[str, Any]:
+    allocator = payload.get("allocator")
+    allocator = allocator if isinstance(allocator, dict) else {}
+
+    def setting(name: str, default: Any) -> Any:
+        return payload[name] if name in payload else allocator.get(name, default)
+
+    min_families = (
+        setting("min_families", None)
+        if "min_families" in payload or "min_families" in allocator
+        else None
+    )
+    locked_oos_evaluation = payload.get("locked_oos_evaluation")
+    if "locked_oos_evaluation" in payload and not isinstance(locked_oos_evaluation, dict):
+        raise ValueError("locked_oos_evaluation must be an object")
     return build_allocation_manifest(
         dict(payload.get("sleeves") or {}),
         source_artifacts=list(payload.get("source_artifacts") or []),
         regime=REFERENCE_COST_REGIME_20BPS,
         participation=float(payload.get("participation", DEFAULT_PARTICIPATION)),
-        method=str(payload.get("method", "erc")),
-        upper=payload.get("upper"),
-        min_sleeves=int(payload.get("min_sleeves", 1)),
-        gross_cap=float(payload.get("gross_cap", 1.0)),
+        method=str(setting("method", "erc")),
+        upper=setting("upper", None),
+        min_sleeves=int(setting("min_sleeves", 1)),
+        gross_cap=float(setting("gross_cap", 1.0)),
+        turnover_penalty_lambda=float(setting("turnover_penalty_lambda", 0.0)),
+        correlation_shrinkage=setting("correlation_shrinkage", None),
+        family_momentum_window=int(setting("family_momentum_window", 0)),
+        family_momentum_tilt_strength=float(setting("family_momentum_tilt_strength", 0.5)),
+        family_momentum_tilt_cap=float(setting("family_momentum_tilt_cap", 0.30)),
+        min_families=None if min_families is None else int(min_families),
+        # Optional kwargs for the opt-in hierarchical/robust allocators
+        # (hrp_dendrogram / herc / nco / wasserstein_dro / graph_inverse_centrality).
+        allocator_params=(
+            dict(setting("allocator_params", {}))
+            if isinstance(setting("allocator_params", None), dict)
+            else None
+        ),
+        locked_oos_evaluation=(
+            dict(locked_oos_evaluation) if isinstance(locked_oos_evaluation, dict) else None
+        ),
+        # Optional exposure layer above the allocator: {"method": "target_vol",
+        # "sigma_target_annual": 0.10, ...} or the gated fractional_kelly.
+        # Passed through RAW: resolve_risk_scaling_spec fails closed on a
+        # malformed (non-mapping) block instead of silently dropping it.
+        risk_scaling=setting("risk_scaling", None),
     )
 
 

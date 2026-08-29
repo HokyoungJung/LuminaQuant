@@ -135,14 +135,13 @@ def test_foreign_state_is_refused_in_real_mode():
 
     # A DIFFERENT strategy on the same account/mode must NOT inherit the positions
     # (M1 state-fingerprint identity check, enforced in real mode).
-    trader_b, _ex_b, audit_b, _notif_b = build_live_trader(
-        exchange=ScriptedFakeExchange(),
-        mode="real",
-        state_store=store,
-        strategy_name="AlphaTwo",
-    )
-    assert trader_b.portfolio.current_positions.get("BTC/USDT") == pytest.approx(0.0)
-    assert "STATE_FINGERPRINT_REJECTED" in audit_b.reasons()
+    with pytest.raises(RuntimeError, match="fingerprint rejected"):
+        build_live_trader(
+            exchange=ScriptedFakeExchange(),
+            mode="real",
+            state_store=store,
+            strategy_name="AlphaTwo",
+        )
 
 
 # --------------------------------------------------------------------------- #

@@ -49,12 +49,20 @@ code path with the overlay.
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from datetime import UTC, datetime
+import hashlib
+from itertools import pairwise
+import json
+import math
+from numbers import Real
+import re
 from typing import Any
 
 import numpy as np
 
 from lumina_quant.portfolio.optimizer_core import metrics, project_simplex_with_upper_bounds
 from lumina_quant.portfolio.optimizers_extra import ERCPortfolio, HRPPortfolio
+from lumina_quant.portfolio.risk_scaling import compute_risk_scaling, resolve_risk_scaling_spec
 from lumina_quant.research.cost_realism import DEFAULT_PARTICIPATION, CostRegime, apply_cost_drag
 
 __all__ = [
@@ -86,10 +94,106 @@ _SELECTION_INPUTS = ("train", "validation")
 # path; mirrors ``optimizers_extra.HRPPortfolio``'s default so the shrunk-linkage
 # variant differs from the OFF path ONLY by the Ledoit-Wolf correlation shrinkage.
 _HRP_CORR_THRESHOLD = 0.60
+_SHA256_RE = re.compile(r"[0-9a-fA-F]{64}\Z")
 
 
 def _round(value: Any, ndigits: int = 10) -> float:
     return round(float(value), ndigits)
+
+
+def _finite_nonnegative(value: Any, *, name: str) -> float:
+    if isinstance(value, (bool, np.bool_)) or not isinstance(value, Real):
+        raise ValueError(f"{name} must be finite and nonnegative")
+    result = float(value)
+    if not np.isfinite(result) or result < 0.0:
+        raise ValueError(f"{name} must be finite and nonnegative")
+    return result
+
+
+def _canonical_identity(value: Any, *, name: str) -> str:
+    if not isinstance(value, str) or not value.strip() or value != value.strip():
+        raise ValueError(f"{name} must be a stripped nonempty string")
+    return value
+
+
+def _return_panel(values: Any, *, sleeve_id: str) -> np.ndarray:
+    """Accept only a flat finite-real return panel; never coerce or flatten evidence."""
+    if values is None:
+        return np.zeros(0, dtype=np.float64)
+    if isinstance(values, (str, bytes)) or not isinstance(values, (Sequence, np.ndarray)):
+        raise ValueError(f"returns for sleeve {sleeve_id!r} must be a one-dimensional sequence")
+    if isinstance(values, np.ndarray) and values.ndim != 1:
+        raise ValueError(f"returns for sleeve {sleeve_id!r} must be one-dimensional")
+    raw = list(values)
+    if any(
+        isinstance(value, (bool, np.bool_)) or not isinstance(value, Real) or not np.isfinite(value)
+        for value in raw
+    ):
+        raise ValueError(f"returns for sleeve {sleeve_id!r} must contain finite non-boolean reals")
+    return np.asarray(raw, dtype=np.float64)
+
+
+def _validate_economic_inputs(
+    *, regime: Any, participation: Any, periods_per_year: Any, turnover_penalty_lambda: Any
+) -> tuple[float, int, float]:
+    if not isinstance(regime, CostRegime):
+        raise ValueError("regime must be a CostRegime")
+    for field in (
+        "taker_fee_rate",
+        "spread_rate",
+        "slippage_rate",
+        "slippage_impact_coefficient",
+    ):
+        _finite_nonnegative(getattr(regime, field), name=f"regime.{field}")
+    funding = regime.funding_rate_per_8h
+    try:
+        funding_value = float(funding)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("regime.funding_rate_per_8h must be finite") from exc
+    if not np.isfinite(funding_value):
+        raise ValueError("regime.funding_rate_per_8h must be finite")
+    participation_value = _finite_nonnegative(participation, name="participation")
+    if participation_value <= 0.0:
+        raise ValueError("participation must be finite and positive")
+    if (
+        isinstance(periods_per_year, bool)
+        or not isinstance(periods_per_year, (int, np.integer))
+        or periods_per_year <= 0
+    ):
+        raise ValueError("periods_per_year must be a positive integer")
+    return (
+        participation_value,
+        int(periods_per_year),
+        _finite_nonnegative(turnover_penalty_lambda, name="turnover_penalty_lambda"),
+    )
+
+
+def _normalize_locked_oos_evaluation(value: Mapping[str, Any]) -> dict[str, int | float]:
+    """Validate and canonicalize the pre-registered locked-OOS evaluation contract."""
+    keys = (
+        "rebalance_every_observations",
+        "allocation_cost_bps",
+        "periods_per_year",
+    )
+    if not isinstance(value, Mapping) or set(value) != set(keys):
+        raise ValueError(f"locked_oos_evaluation must contain exactly {list(keys)}")
+    cadence = value["rebalance_every_observations"]
+    periods = value["periods_per_year"]
+    cost = value["allocation_cost_bps"]
+    if isinstance(cadence, bool) or not isinstance(cadence, (int, np.integer)) or cadence <= 0:
+        raise ValueError("rebalance_every_observations must be a positive integer")
+    if isinstance(periods, bool) or not isinstance(periods, (int, np.integer)) or periods <= 0:
+        raise ValueError("periods_per_year must be a positive integer")
+    if isinstance(cost, bool) or not isinstance(cost, (int, float, np.integer, np.floating)):
+        raise ValueError("allocation_cost_bps must be finite and nonnegative")
+    cost_value = float(cost)
+    if not np.isfinite(cost_value) or cost_value < 0.0:
+        raise ValueError("allocation_cost_bps must be finite and nonnegative")
+    return {
+        "rebalance_every_observations": int(cadence),
+        "allocation_cost_bps": cost_value,
+        "periods_per_year": int(periods),
+    }
 
 
 def _default_optimizer_provenance() -> dict[str, Any]:
@@ -123,11 +227,13 @@ def compute_sleeve_quality(
     participation: float = DEFAULT_PARTICIPATION,
     periods_per_year: int = 365,
     turnover_penalty_lambda: float = 0.0,
+    returns_are_net: bool = False,
 ) -> dict[str, float]:
-    """Cost-realistic quality score for one sleeve's gross return stream.
+    """Cost-realistic quality score for one sleeve return stream.
 
-    Net returns are ``cost_realism.apply_cost_drag(gross_returns, turnover=...,
-    regime=regime)``; ``sharpe``/``calmar`` are read from
+    Gross inputs are converted with ``cost_realism.apply_cost_drag``; callers
+    that already supply fee/funding/slippage-adjusted returns set
+    ``returns_are_net=True`` so costs are not charged twice. ``sharpe``/``calmar`` are read from
     ``optimizer_core.metrics(net)`` (which does not compute a hit rate), so
     ``hit_rate`` is self-computed as ``mean(net > 0)``. Deterministic; gracefully
     handles ``None`` / empty ``returns`` (treated as a zero-length series, which
@@ -142,10 +248,22 @@ def compute_sleeve_quality(
     key is added and no arithmetic touches the existing numbers -- so the emitted
     manifest is unchanged.
     """
-    gross = np.asarray(returns if returns is not None else [], dtype=np.float64).reshape(-1)
-    turnover_value = float(turnover) if turnover is not None else 0.0
-    net = apply_cost_drag(
-        gross, turnover=turnover_value, regime=regime, participation=participation
+    participation, periods_per_year, turnover_penalty_lambda = _validate_economic_inputs(
+        regime=regime,
+        participation=participation,
+        periods_per_year=periods_per_year,
+        turnover_penalty_lambda=turnover_penalty_lambda,
+    )
+    if type(returns_are_net) is not bool:
+        raise ValueError("returns_are_net must be an exact boolean")
+    gross = _return_panel(returns, sleeve_id="quality")
+    turnover_value = _finite_nonnegative(0.0 if turnover is None else turnover, name="turnover")
+    net = (
+        gross
+        if returns_are_net
+        else apply_cost_drag(
+            gross, turnover=turnover_value, regime=regime, participation=participation
+        )
     )
     stats = metrics(net, periods_per_year=periods_per_year)
     hit_rate = float(np.mean(net > 0.0)) if net.size > 0 else 0.0
@@ -161,6 +279,60 @@ def compute_sleeve_quality(
             quality["net_sharpe"] - float(turnover_penalty_lambda) * turnover_value
         )
     return quality
+
+
+def _timestamp(value: Any, *, sleeve_id: str) -> datetime:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"invalid return timestamp for sleeve {sleeve_id!r}")
+    try:
+        parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise ValueError(f"invalid return timestamp for sleeve {sleeve_id!r}: {value!r}") from exc
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
+
+
+def _prepare_return_series(
+    sleeve_returns: Mapping[str, Sequence[float] | np.ndarray | None],
+    return_timestamps: Mapping[str, Sequence[str]] | None,
+) -> tuple[dict[str, np.ndarray], str, int]:
+    """Validate streams and, when timestamped, align their exact UTC intersection."""
+    series = {
+        sleeve_id: _return_panel(values, sleeve_id=sleeve_id)
+        for sleeve_id, values in sleeve_returns.items()
+    }
+    active = sorted(sleeve_id for sleeve_id, values in series.items() if values.size > 0)
+    if not active:
+        return series, "trailing_min_length", 0
+
+    timestamps = return_timestamps or {}
+    timestamped = [sleeve_id for sleeve_id in active if sleeve_id in timestamps]
+    if not timestamped:
+        return series, "trailing_min_length", min(series[sleeve_id].size for sleeve_id in active)
+    if len(timestamped) != len(active):
+        raise ValueError("timestamped and untimestamped return streams cannot be mixed")
+
+    parsed_by_id: dict[str, list[datetime]] = {}
+    for sleeve_id in active:
+        timestamp_values = timestamps[sleeve_id]
+        if not isinstance(timestamp_values, Sequence) or isinstance(timestamp_values, str):
+            raise ValueError(f"invalid return timestamps for sleeve {sleeve_id!r}")
+        raw = list(timestamp_values)
+        if len(raw) != series[sleeve_id].size:
+            raise ValueError(f"return timestamp length mismatch for sleeve {sleeve_id!r}")
+        parsed = [_timestamp(value, sleeve_id=sleeve_id) for value in raw]
+        if any(current <= previous for previous, current in pairwise(parsed)):
+            raise ValueError(f"return timestamps must be unique and increasing for {sleeve_id!r}")
+        parsed_by_id[sleeve_id] = parsed
+
+    common = sorted(set.intersection(*(set(parsed_by_id[sleeve_id]) for sleeve_id in active)))
+    if len(common) < 2:
+        raise ValueError("fewer than two common return timestamps")
+    for sleeve_id in active:
+        index = dict(zip(parsed_by_id[sleeve_id], series[sleeve_id]))
+        series[sleeve_id] = np.asarray([index[value] for value in common], dtype=np.float64)
+    return series, "exact_timestamp_intersection", len(common)
 
 
 def _penalized_net_sharpe(score: Mapping[str, Any], turnover_penalty_lambda: float) -> float:
@@ -477,13 +649,77 @@ def _family_meta_momentum_tilted_weights(
     return normalized
 
 
-def _build_allocator(method: str) -> ERCPortfolio | HRPPortfolio:
-    token = str(method or "erc").strip().lower()
+# Opt-in hierarchical / robust allocators (2026-08-19). Every token below is
+# additive: ``"erc"`` / ``"hrp"`` keep their exact legacy classes and kwargs-free
+# construction, so the default path stays byte-identical.
+_EXTENDED_ALLOCATORS: dict[str, str] = {
+    "hrp_dendrogram": "HRPDendrogramPortfolio",
+    "hrp_full": "HRPDendrogramPortfolio",
+    "constrained_hrp": "HRPDendrogramPortfolio",
+    "herc": "HERCPortfolio",
+    "nco": "NCOPortfolio",
+    "wasserstein_dro": "WassersteinDROPortfolio",
+    "dro": "WassersteinDROPortfolio",
+    "graph_inverse_centrality": "GraphInverseCentralityPortfolio",
+    "graph": "GraphInverseCentralityPortfolio",
+}
+_ALLOCATOR_METHODS: tuple[str, ...] = ("erc", "hrp", *sorted(_EXTENDED_ALLOCATORS))
+
+
+_ALLOCATOR_PARAM_KEYS: dict[str, set[str]] = {
+    "erc": set(),
+    "hrp": set(),
+    "hrp_dendrogram": {"linkage_method", "lower", "upper_bound", "cov_window"},
+    "hrp_full": {"linkage_method", "lower", "upper_bound", "cov_window"},
+    "constrained_hrp": {"linkage_method", "lower", "upper_bound", "cov_window"},
+    "herc": {"linkage_method", "n_clusters", "max_clusters", "cov_window"},
+    "nco": {"use_mean", "linkage_method", "n_clusters", "max_clusters", "cov_window"},
+    "wasserstein_dro": {"radius", "target_return", "cov_estimator", "max_iter", "cov_window"},
+    "dro": {"radius", "target_return", "cov_estimator", "max_iter", "cov_window"},
+    "graph_inverse_centrality": {"floor", "cov_window"},
+    "graph": {"floor", "cov_window"},
+}
+
+
+def _allocator_token_and_params(method: Any, allocator_params: Any) -> tuple[str, dict[str, Any]]:
+    if not isinstance(method, str) or not method:
+        raise ValueError("allocation method must be a nonempty string")
+    token = method.strip().lower()
+    if token not in _ALLOCATOR_METHODS:
+        raise ValueError(
+            f"unsupported allocation method: {method!r} (expected one of {_ALLOCATOR_METHODS})"
+        )
+    if allocator_params is None:
+        return token, {}
+    if not isinstance(allocator_params, Mapping):
+        raise ValueError("allocator_params must be a mapping")
+    if any(not isinstance(key, str) for key in allocator_params):
+        raise ValueError("allocator_params keys must be strings")
+    params = dict(allocator_params)
+    unknown = set(params) - _ALLOCATOR_PARAM_KEYS[token]
+    if unknown:
+        raise ValueError(f"unsupported allocator_params for {token}: {sorted(unknown)}")
+    return token, params
+
+
+def _build_allocator(method: str, allocator_params: Mapping[str, Any] | None = None):
+    token, params = _allocator_token_and_params(method, allocator_params)
     if token == "erc":
         return ERCPortfolio()
     if token == "hrp":
         return HRPPortfolio()
-    raise ValueError(f"unsupported allocation method: {method!r} (expected 'erc' or 'hrp')")
+    class_name = _EXTENDED_ALLOCATORS[token]
+    from lumina_quant.portfolio import hierarchical as _hier  # local: opt-in module
+
+    cls = getattr(_hier, class_name)
+    if token == "constrained_hrp" and (
+        "lower" not in params
+        or "upper_bound" not in params
+        or params["lower"] is None
+        or params["upper_bound"] is None
+    ):
+        raise ValueError("constrained_hrp requires explicit lower and upper_bound")
+    return cls(**params)
 
 
 def _resolve_upper(
@@ -492,9 +728,380 @@ def _resolve_upper(
     if upper is None:
         return None
     if isinstance(upper, Mapping):
-        return {sleeve_id: float(upper.get(sleeve_id, 1.0)) for sleeve_id in ids}
-    cap = float(upper)
+        if set(upper) != set(ids):
+            missing = sorted(set(ids) - set(upper))
+            extra = sorted(str(key) for key in set(upper) - set(ids))
+            raise ValueError(
+                f"upper caps must exactly cover sleeve ids (missing={missing}, extra={extra})"
+            )
+        resolved = {
+            sleeve_id: _finite_nonnegative(upper[sleeve_id], name="upper") for sleeve_id in ids
+        }
+        if any(cap > 1.0 for cap in resolved.values()):
+            raise ValueError("upper caps must not exceed 1")
+        return resolved
+    cap = _finite_nonnegative(upper, name="upper")
+    if cap > 1.0:
+        raise ValueError("upper caps must not exceed 1")
     return dict.fromkeys(ids, cap)
+
+
+def _positive_integer(value: Any, *, name: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, (int, np.integer)) or value <= 0:
+        raise ValueError(f"{name} must be a positive integer")
+    return int(value)
+
+
+def _validate_allocation_controls(
+    *,
+    method: Any,
+    allocator_params: Any,
+    min_sleeves: Any,
+    correlation_shrinkage: Any,
+    families: Any,
+    family_momentum_window: Any,
+    family_momentum_tilt_strength: Any,
+    family_momentum_tilt_cap: Any,
+    min_families: Any,
+    returns_are_net: Any,
+) -> tuple[str, dict[str, Any]]:
+    token, params = _allocator_token_and_params(method, allocator_params)
+    _positive_integer(min_sleeves, name="min_sleeves")
+    _positive_integer(min_families, name="min_families")
+    if (
+        isinstance(family_momentum_window, bool)
+        or not isinstance(family_momentum_window, (int, np.integer))
+        or family_momentum_window < 0
+    ):
+        raise ValueError("family_momentum_window must be a nonnegative integer")
+    for name, value, limit in (
+        ("family_momentum_tilt_strength", family_momentum_tilt_strength, None),
+        ("family_momentum_tilt_cap", family_momentum_tilt_cap, 1.0),
+    ):
+        if isinstance(value, bool) or not isinstance(value, (int, float, np.integer, np.floating)):
+            raise ValueError(f"{name} must be finite and nonnegative")
+        if not np.isfinite(value) or value < 0.0 or (limit is not None and value > limit):
+            raise ValueError(
+                f"{name} must be finite and nonnegative" + (" and at most 1" if limit else "")
+            )
+    if correlation_shrinkage is not None:
+        if isinstance(correlation_shrinkage, bool):
+            if correlation_shrinkage is not False and token != "hrp":
+                raise ValueError("correlation_shrinkage is supported only for method='hrp'")
+        elif (
+            not isinstance(correlation_shrinkage, (int, float, np.integer, np.floating))
+            or not np.isfinite(correlation_shrinkage)
+            or not 0.0 <= correlation_shrinkage <= 1.0
+        ):
+            raise ValueError("correlation_shrinkage must be a boolean or a finite value in [0, 1]")
+        elif token != "hrp":
+            raise ValueError("correlation_shrinkage is supported only for method='hrp'")
+    if families is not None:
+        if not isinstance(families, Mapping):
+            raise ValueError("families must be a mapping")
+        if any(
+            not isinstance(key, str)
+            or not key.strip()
+            or key != key.strip()
+            or not isinstance(value, str)
+            or not value.strip()
+            or value != value.strip()
+            for key, value in families.items()
+        ):
+            raise ValueError("family ids and labels must be stripped nonempty strings")
+    if returns_are_net is not None:
+        if not isinstance(returns_are_net, Mapping):
+            raise ValueError("returns_are_net must be a mapping")
+        if any(
+            not isinstance(key, str) or not key or type(value) is not bool
+            for key, value in returns_are_net.items()
+        ):
+            raise ValueError(
+                "returns_are_net keys must be nonempty strings and values exact booleans"
+            )
+    return token, params
+
+
+def _validate_allocation_output(
+    weights: Any, survivors: Sequence[str], upper: Mapping[str, float] | None
+) -> dict[str, float]:
+    if not isinstance(weights, Mapping) or set(weights) != set(survivors):
+        raise ValueError("allocator must return exactly the surviving sleeve ids")
+    resolved = {
+        sleeve_id: _finite_nonnegative(weights[sleeve_id], name="allocator weight")
+        for sleeve_id in survivors
+    }
+    total = float(sum(resolved.values()))
+    if total <= 0.0 or not np.isclose(total, 1.0, rtol=0.0, atol=1e-8):
+        raise ValueError("allocator weights must be normalized to one with positive total weight")
+    if upper is not None and any(
+        resolved[sleeve_id] > upper[sleeve_id] + 1e-10 for sleeve_id in survivors
+    ):
+        raise ValueError("allocator weights exceed upper caps")
+    return resolved
+
+
+def _assert_train_validation_source(sleeve_id: str, spec: Mapping[str, Any]) -> None:
+    for key, value in spec.items():
+        token = str(key).strip().lower()
+        if (token.startswith("uses_locked_oos") or token == "uses_current_fold_oos") and bool(
+            value
+        ):
+            raise ValueError(f"locked_oos input is forbidden for sleeve {sleeve_id!r}")
+
+    def _oos_token(value: Any) -> bool:
+        if not isinstance(value, str):
+            return False
+        normalized = value.strip().lower().replace("-", "_").replace(" ", "_")
+        return "locked_oos" in normalized or any(part == "oos" for part in normalized.split("_"))
+
+    def _contains_oos(value: Any) -> bool:
+        if isinstance(value, Mapping):
+            for key, item in value.items():
+                token = str(key).strip().lower().replace("-", "_").replace(" ", "_")
+                if token.startswith("uses_locked_oos") or token in {
+                    "locked_oos_used_for_weights",
+                    "uses_current_fold_oos",
+                }:
+                    if bool(item):
+                        return True
+                    continue
+                if _contains_oos(item):
+                    return True
+            return False
+        if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
+            return any(_contains_oos(item) for item in value)
+        return _oos_token(value)
+
+    if _contains_oos(spec.get("returns_source")):
+        raise ValueError(f"locked_oos input is forbidden for sleeve {sleeve_id!r}")
+    source = spec.get("returns_source")
+    if source is None:
+        return
+    canonical = isinstance(source, str) and source == "train_validation"
+    split_values = (
+        source.get("splits") if isinstance(source, Mapping) and set(source) == {"splits"} else None
+    )
+    structured = (
+        isinstance(source, Mapping)
+        and set(source) == {"splits"}
+        and isinstance(split_values, (Sequence, set, frozenset))
+        and not isinstance(split_values, (str, bytes))
+        and len(split_values) == len(_SELECTION_INPUTS)
+        and all(isinstance(split, str) for split in split_values)
+        and set(split_values) == set(_SELECTION_INPUTS)
+    )
+    if not (canonical or structured):
+        raise ValueError(
+            f"returns_source for sleeve {sleeve_id!r} must be exactly train_validation "
+            "or the structured split set {train, validation}"
+        )
+
+
+def _validate_source_artifact(source_id: str, source: Mapping[str, Any]) -> None:
+    _canonical_identity(source_id, name="source artifact id")
+    if not isinstance(source, Mapping):
+        raise ValueError(f"source artifact {source_id!r} must be a mapping")
+    if not isinstance(source.get("path"), str) or not source["path"].strip():
+        raise ValueError(f"source artifact {source_id!r} must have a nonempty path")
+    sha256 = source.get("sha256")
+    if not isinstance(sha256, str) or _SHA256_RE.fullmatch(sha256) is None:
+        raise ValueError(f"source artifact {source_id!r} must have an exact 64-hex sha256")
+    max_age = _finite_nonnegative(source.get("max_age_hours"), name="max_age_hours")
+    if max_age <= 0.0:
+        raise ValueError(f"source artifact {source_id!r} max_age_hours must be finite and positive")
+    if source.get("ready") is not True or source.get("portfolio_ready") is not True:
+        raise ValueError(f"source artifact {source_id!r} is not portfolio-ready")
+
+
+def _validate_materialized_data_contract(sleeves: Mapping[str, Mapping[str, Any]]) -> None:
+    active = {
+        sleeve_id
+        for sleeve_id, spec in sleeves.items()
+        if _return_panel((spec or {}).get("returns"), sleeve_id=sleeve_id).size > 0
+    }
+    missing_turnover = sorted(
+        sleeve_id for sleeve_id in active if "turnover" not in sleeves[sleeve_id]
+    )
+    if missing_turnover:
+        raise ValueError(f"turnover is required for materialized sleeves: {missing_turnover}")
+    for sleeve_id in active:
+        _finite_nonnegative(sleeves[sleeve_id]["turnover"], name="turnover")
+    missing_net = sorted(
+        sleeve_id for sleeve_id in active if "returns_are_net" not in sleeves[sleeve_id]
+    )
+    if missing_net:
+        raise ValueError(f"returns_are_net is required for materialized sleeves: {missing_net}")
+    invalid_net = sorted(
+        sleeve_id
+        for sleeve_id in active
+        if type((sleeves[sleeve_id] or {})["returns_are_net"]) is not bool
+    )
+    if invalid_net:
+        raise ValueError(f"returns_are_net must be boolean for materialized sleeves: {invalid_net}")
+    for key in ("return_timestamps", "returns_source"):
+        missing = sorted(sleeve_id for sleeve_id in active if key not in (sleeves[sleeve_id] or {}))
+        if missing:
+            raise ValueError(f"{key} is required for materialized sleeves: {missing}")
+    for sleeve_id in active:
+        _assert_train_validation_source(sleeve_id, sleeves[sleeve_id])
+        spec = sleeves[sleeve_id]
+        required_timing = {"fit_start", "fit_end", "as_of", "apply_start"}
+        if not required_timing.issubset(spec):
+            raise ValueError(
+                f"materialized sleeve {sleeve_id!r} requires exact fit/apply timestamps"
+            )
+        timestamps = spec["return_timestamps"]
+        returns = _return_panel(spec["returns"], sleeve_id=sleeve_id)
+        if not isinstance(timestamps, Sequence) or isinstance(timestamps, (str, bytes)):
+            raise ValueError(f"return_timestamps must be a sequence for {sleeve_id!r}")
+        parsed = [_timestamp(value, sleeve_id=sleeve_id) for value in timestamps]
+        if len(parsed) != returns.size or not parsed:
+            raise ValueError(f"return timestamp length mismatch for sleeve {sleeve_id!r}")
+        if any(current <= previous for previous, current in pairwise(parsed)):
+            raise ValueError(f"return timestamps must be unique and increasing for {sleeve_id!r}")
+        fit_start = _timestamp(spec["fit_start"], sleeve_id=sleeve_id)
+        fit_end = _timestamp(spec["fit_end"], sleeve_id=sleeve_id)
+        as_of = _timestamp(spec["as_of"], sleeve_id=sleeve_id)
+        apply_start = _timestamp(spec["apply_start"], sleeve_id=sleeve_id)
+        if fit_start != parsed[0] or fit_end != parsed[-1]:
+            raise ValueError(
+                f"materialized sleeve {sleeve_id!r} fit window must equal its return coverage"
+            )
+        if fit_end > apply_start or as_of != apply_start:
+            raise ValueError(
+                f"materialized sleeve {sleeve_id!r} requires fit_end <= apply_start == as_of"
+            )
+
+
+def _materialized_return_panel_sha256(sleeve_id: str, spec: Mapping[str, Any]) -> str:
+    returns = _return_panel(spec.get("returns"), sleeve_id=sleeve_id)
+    raw_timestamps = spec.get("return_timestamps")
+    if not isinstance(raw_timestamps, Sequence) or isinstance(raw_timestamps, (str, bytes)):
+        raise ValueError(f"return_timestamps must be a sequence for {sleeve_id!r}")
+    timestamps = [_timestamp(value, sleeve_id=sleeve_id) for value in raw_timestamps]
+    if len(timestamps) != returns.size:
+        raise ValueError(f"return timestamp length mismatch for sleeve {sleeve_id!r}")
+    payload = {
+        "id": sleeve_id,
+        "returns": [float(value).hex() for value in returns],
+        "timestamps": [timestamp.isoformat().replace("+00:00", "Z") for timestamp in timestamps],
+    }
+    return hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+    ).hexdigest()
+
+
+def _materialized_risk_provenance(
+    sleeves: Mapping[str, Mapping[str, Any]],
+    active_ids: set[str],
+    source_by_id: Mapping[str, Mapping[str, Any]],
+) -> dict[str, str]:
+    """Validate and seal the exact timestamp panel and source-artifact lineage."""
+    required = ("fit_start", "fit_end", "as_of", "apply_start")
+    rows: list[tuple[str, Mapping[str, Any]]] = []
+    for sleeve_id in sorted(active_ids):
+        spec = sleeves[sleeve_id] or {}
+        missing = [key for key in required if key not in spec]
+        if missing:
+            raise ValueError(
+                f"materialized risk scaling requires {missing} for sleeve {sleeve_id!r}"
+            )
+        rows.append((sleeve_id, spec))
+    values: dict[str, str] = {}
+    for key in required:
+        parsed = {_timestamp(spec[key], sleeve_id=sleeve_id) for sleeve_id, spec in rows}
+        if len(parsed) != 1:
+            raise ValueError(f"materialized risk scaling requires one shared {key}")
+        values[key] = next(iter(parsed)).isoformat().replace("+00:00", "Z")
+    if values["as_of"] != values["apply_start"]:
+        raise ValueError("materialized risk scaling as_of must equal apply_start")
+    if _timestamp(values["fit_start"], sleeve_id="risk_scaling") > _timestamp(
+        values["fit_end"], sleeve_id="risk_scaling"
+    ):
+        raise ValueError("materialized risk scaling fit_start must not follow fit_end")
+    if _timestamp(values["fit_end"], sleeve_id="risk_scaling") > _timestamp(
+        values["apply_start"], sleeve_id="risk_scaling"
+    ):
+        raise ValueError("materialized risk scaling requires fit_end <= apply_start")
+
+    fit_start = _timestamp(values["fit_start"], sleeve_id="risk_scaling")
+    fit_end = _timestamp(values["fit_end"], sleeve_id="risk_scaling")
+    parsed_rows: dict[str, list[tuple[datetime, float]]] = {}
+    for sleeve_id, spec in rows:
+        returns = _return_panel(spec.get("returns"), sleeve_id=sleeve_id)
+        timestamp_values = spec.get("return_timestamps")
+        if not isinstance(timestamp_values, Sequence) or isinstance(timestamp_values, str):
+            raise ValueError(
+                f"materialized risk scaling requires return_timestamps for sleeve {sleeve_id!r}"
+            )
+        raw_timestamps = list(timestamp_values)
+        if len(raw_timestamps) != returns.size:
+            raise ValueError(f"return timestamp length mismatch for sleeve {sleeve_id!r}")
+        timestamps = [_timestamp(value, sleeve_id=sleeve_id) for value in raw_timestamps]
+        if any(current <= previous for previous, current in pairwise(timestamps)):
+            raise ValueError(f"return timestamps must be unique and increasing for {sleeve_id!r}")
+        if any(timestamp < fit_start for timestamp in timestamps):
+            raise ValueError(
+                f"risk scaling return timestamp precedes fit_start for sleeve {sleeve_id!r}"
+            )
+        if any(timestamp > fit_end for timestamp in timestamps):
+            raise ValueError(
+                f"risk scaling return timestamp follows fit_end for sleeve {sleeve_id!r}"
+            )
+        if not timestamps or timestamps[0] != fit_start or timestamps[-1] != fit_end:
+            raise ValueError(
+                "risk scaling return timestamp coverage must exactly span "
+                f"fit_start through fit_end for sleeve {sleeve_id!r}"
+            )
+        parsed_rows[sleeve_id] = list(zip(timestamps, returns.tolist()))
+
+    common = sorted(
+        set.intersection(
+            *(
+                {timestamp for timestamp, _value in parsed_rows[sleeve_id]}
+                for sleeve_id in sorted(active_ids)
+            )
+        )
+    )
+    if len(common) < 2:
+        raise ValueError("fewer than two common return timestamps")
+    if common[0] != fit_start or common[-1] != fit_end:
+        raise ValueError(
+            "risk scaling common return timestamp coverage must exactly span fit_start through fit_end"
+        )
+    canonical_rows = [
+        {
+            "id": sleeve_id,
+            "returns": [float(by_timestamp[timestamp]).hex() for timestamp in common],
+            "timestamps": [timestamp.isoformat().replace("+00:00", "Z") for timestamp in common],
+            "source_artifact_id": _canonical_identity(
+                spec.get("source_artifact_id"), name="source_artifact_id"
+            ),
+            "source_artifact_sha256": str(
+                source_by_id[
+                    _canonical_identity(spec.get("source_artifact_id"), name="source_artifact_id")
+                ]["sha256"]
+            ),
+        }
+        for sleeve_id, spec in rows
+        for by_timestamp in [dict(parsed_rows[sleeve_id])]
+    ]
+
+    def encoded(value: Any) -> bytes:
+        return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+
+    values["input_hash"] = hashlib.sha256(encoded(canonical_rows)).hexdigest()
+    values["window_hash"] = hashlib.sha256(
+        encoded(
+            {
+                "fit_start": values["fit_start"],
+                "fit_end": values["fit_end"],
+                "ids": sorted(active_ids),
+            }
+        )
+    ).hexdigest()
+    return values
 
 
 def allocate_quality_gated(
@@ -513,6 +1120,12 @@ def allocate_quality_gated(
     family_momentum_tilt_strength: float = 0.5,
     family_momentum_tilt_cap: float = 0.30,
     min_families: int = 3,
+    allocator_params: Mapping[str, Any] | None = None,
+    returns_are_net: Mapping[str, bool] | None = None,
+    return_timestamps: Mapping[str, Sequence[str]] | None = None,
+    risk_scaling: Mapping[str, Any] | None = None,
+    risk_scaling_out: dict[str, Any] | None = None,
+    risk_scaling_provenance: Mapping[str, str] | None = None,
 ) -> dict[str, float]:
     """Quality-gate then risk-allocate across sleeves; returns ``id -> weight``.
 
@@ -528,6 +1141,10 @@ def allocate_quality_gated(
     ``min_sleeves`` survivors, mirroring the conservative default of the
     downstream manifest consumer. Gracefully handles ``None``/empty
     ``sleeve_returns``/``turnovers`` and per-sleeve ``None``/empty series.
+    When ``return_timestamps`` is supplied, every non-empty stream must carry a
+    unique increasing timestamp vector and all quality/covariance inputs are
+    restricted to the exact common UTC intersection. ``returns_are_net`` avoids
+    applying the reference cost model a second time to backtester-net streams.
 
     Two config-gated extensions (both default OFF -> the result is byte-identical
     to the pre-extension allocator):
@@ -553,34 +1170,92 @@ def allocate_quality_gated(
       stay neutral); the tilt no-ops below ``min_families`` distinct families or
       zero cross-family dispersion. ``family_momentum_window == 0`` leaves every
       output byte-identical.
+    * ``risk_scaling`` (default ``None`` = OFF, byte-identical): the LAYER ABOVE
+      the allocator. The allocator's relative weights (sum 1) are multiplied by
+      the exposure ``L`` from :mod:`lumina_quant.portfolio.risk_scaling` --
+      ``target_vol`` (mu-free ``L = min(max_leverage, sigma_target/sigma_hat)``,
+      the primary method) or the gated ``fractional_kelly``. The residual
+      ``1 - L`` is the risk-free/cash weight (the manifest's ``cash_weight``
+      picks it up automatically). Fails closed when the covariance-less
+      equal-weight fallback is active (no volatility estimate). Applied LAST,
+      after every tilt/projection, so relative structure is preserved; when
+      ``risk_scaling_out`` is supplied it is filled with the computed
+      diagnostics payload. Allocator bounds (e.g. ``constrained_hrp`` lower /
+      upper) are contracts on the PRE-scaling sum-1 relative weights -- divide
+      the returned weights by the exposure before auditing bound compliance.
     """
+    method_token, _params = _validate_allocation_controls(
+        method=method,
+        allocator_params=allocator_params,
+        min_sleeves=min_sleeves,
+        correlation_shrinkage=correlation_shrinkage,
+        families=families,
+        family_momentum_window=family_momentum_window,
+        family_momentum_tilt_strength=family_momentum_tilt_strength,
+        family_momentum_tilt_cap=family_momentum_tilt_cap,
+        min_families=min_families,
+        returns_are_net=returns_are_net,
+    )
+    _build_allocator(method, allocator_params)
+    resolved_risk_scaling = resolve_risk_scaling_spec(risk_scaling)
+    diagnostic_permissive = bool(
+        isinstance(risk_scaling, Mapping)
+        and risk_scaling.get("research_diagnostic_permissive") is True
+    )
     if not sleeve_returns:
+        if resolved_risk_scaling is not None and not diagnostic_permissive:
+            raise ValueError("enabled risk_scaling requires nonempty candidate return evidence")
         return {}
+    candidate_upper = _resolve_upper(
+        upper,
+        sorted(
+            sleeve_id
+            for sleeve_id, values in sleeve_returns.items()
+            if _return_panel(values, sleeve_id=sleeve_id).size > 0
+        ),
+    )
     turnovers = turnovers or {}
+    returns_are_net = returns_are_net or {}
+    prepared, _alignment, _common_observations = _prepare_return_series(
+        sleeve_returns, return_timestamps
+    )
 
     quality = {
         sleeve_id: compute_sleeve_quality(
-            series, turnovers.get(sleeve_id), regime=regime, participation=participation
+            series,
+            turnovers.get(sleeve_id),
+            regime=regime,
+            participation=participation,
+            returns_are_net=returns_are_net.get(sleeve_id, False),
+            turnover_penalty_lambda=turnover_penalty_lambda,
         )
-        for sleeve_id, series in sleeve_returns.items()
+        for sleeve_id, series in prepared.items()
     }
     survivors = sorted(
         sleeve_id
         for sleeve_id, score in quality.items()
         if _penalized_net_sharpe(score, turnover_penalty_lambda) > 0.0
     )
-    if len(survivors) < max(1, int(min_sleeves)):
+    if len(survivors) < min_sleeves:
+        if resolved_risk_scaling is not None and not diagnostic_permissive:
+            raise ValueError(
+                "enabled risk_scaling has insufficient quality-gated candidate evidence"
+            )
         return {}
+    survivor_upper = (
+        {sleeve_id: candidate_upper[sleeve_id] for sleeve_id in survivors}
+        if candidate_upper is not None
+        else None
+    )
 
     net_series: list[np.ndarray] = []
     for sleeve_id in survivors:
-        gross = np.asarray(
-            sleeve_returns[sleeve_id] if sleeve_returns[sleeve_id] is not None else [],
-            dtype=np.float64,
-        ).reshape(-1)
+        values = prepared[sleeve_id]
         net_series.append(
-            apply_cost_drag(
-                gross,
+            values
+            if returns_are_net.get(sleeve_id, False)
+            else apply_cost_drag(
+                values,
                 turnover=float(turnovers.get(sleeve_id) or 0.0),
                 regime=regime,
                 participation=participation,
@@ -592,22 +1267,16 @@ def allocate_quality_gated(
     # in the covariance-less fallback so the tilt is a no-op there.
     matrix: np.ndarray | None = None
     if min_len < 2:
-        # Not enough overlapping observations to estimate a covariance
-        # structure; fall back to equal weight across survivors rather than
-        # fail. Still deterministic (equal split, sorted id order).
-        equal = 1.0 / float(len(survivors))
-        raw_weights = dict.fromkeys(survivors, equal)
+        # No covariance estimate means no allocation; callers retain cash.
+        if resolved_risk_scaling is not None and not diagnostic_permissive:
+            raise ValueError("enabled risk_scaling requires non-degenerate aligned return evidence")
+        return {}
     else:
-        # Trailing-window alignment: series of differing length are truncated
-        # to the shortest survivor's length by keeping the most recent
-        # observations. Callers that need calendar-exact alignment must supply
-        # equal-length, co-dated series themselves.
+        # Timestamped inputs were already intersected exactly above. Legacy
+        # untimestamped callers retain the historical trailing-window behavior.
         matrix = np.column_stack([series[-min_len:] for series in net_series])
-        upper_map = _resolve_upper(upper, survivors)
-        if (
-            correlation_shrinkage not in (None, False)
-            and str(method or "erc").strip().lower() == "hrp"
-        ):
+        upper_map = survivor_upper
+        if correlation_shrinkage not in (None, False) and method_token == "hrp":
             # Opt-in shrinkage-aware HRP linkage; OFF path (below) is untouched.
             raw_weights = _hrp_weights_with_correlation_shrinkage(
                 survivors, matrix, correlation_shrinkage=correlation_shrinkage
@@ -617,15 +1286,19 @@ def allocate_quality_gated(
                     raw_weights, upper=upper_map, target_sum=1.0
                 )
         else:
-            allocator = _build_allocator(method)
+            allocator = _build_allocator(method, allocator_params)
             raw_weights = allocator.allocate(survivors, matrix, upper=upper_map)
+        if not isinstance(raw_weights, Mapping):
+            raise ValueError("allocator must return exactly the surviving sleeve ids")
         if not raw_weights:
-            equal = 1.0 / float(len(survivors))
-            raw_weights = dict.fromkeys(survivors, equal)
+            if resolved_risk_scaling is not None and not diagnostic_permissive:
+                raise ValueError("enabled risk_scaling requires a non-degenerate allocator result")
+            return {}
+        raw_weights = _validate_allocation_output(raw_weights, survivors, upper_map)
 
     if turnover_penalty_lambda > 0.0:
         raw_weights = _turnover_tilted_weights(
-            raw_weights, survivors, quality, turnover_penalty_lambda, upper
+            raw_weights, survivors, quality, turnover_penalty_lambda, survivor_upper
         )
 
     if family_momentum_window > 0 and matrix is not None:
@@ -638,8 +1311,57 @@ def allocate_quality_gated(
             strength=family_momentum_tilt_strength,
             cap=family_momentum_tilt_cap,
             min_families=min_families,
-            upper=upper,
+            upper=survivor_upper,
         )
+
+    if method_token == "constrained_hrp":
+        from lumina_quant.portfolio import hierarchical as _hier
+
+        params = dict(allocator_params or {})
+        lo, hi = _hier._resolve_bounds(
+            {"lower": params["lower"], "upper": params["upper_bound"]}, len(survivors)
+        )
+        upper_map = survivor_upper
+        if upper_map is not None:
+            hi = np.minimum(hi, np.asarray([upper_map[sid] for sid in survivors], dtype=float))
+        projected = _hier.project_box_simplex(
+            [raw_weights.get(sleeve_id, 0.0) for sleeve_id in survivors], lo, hi
+        )
+        raw_weights = dict(zip(survivors, projected))
+
+    raw_weights = _validate_allocation_output(raw_weights, survivors, survivor_upper)
+
+    if resolved_risk_scaling is not None:
+        scaling_result = compute_risk_scaling(
+            raw_weights,
+            survivors,
+            matrix,
+            spec=resolved_risk_scaling,
+            provenance=risk_scaling_provenance,
+        )
+        if risk_scaling_out is not None:
+            risk_scaling_out.update(scaling_result.to_payload())
+        exposure = float(scaling_result.exposure)
+        if risk_scaling_out is not None:
+            # The manifest's child and cash weights are accounting values, not
+            # display metrics. Preserve their unrounded exposure identity.
+            risk_scaling_out["exposure"] = exposure
+            risk_scaling_out["cash_weight"] = 1.0 - exposure
+        total = float(sum(raw_weights.get(sleeve_id, 0.0) for sleeve_id in survivors))
+        if total > 0.0:
+            # Normalize-then-scale so the final weights sum to exactly L and the
+            # allocator's relative structure is preserved.
+            scaled = {
+                sleeve_id: raw_weights.get(sleeve_id, 0.0) / total * exposure
+                for sleeve_id in survivors
+            }
+            # Publish the last component as the residual of the exact values
+            # already selected for publication, rather than masking a rounding
+            # discrepancy in the manifest's exposure accounting.
+            scaled[survivors[-1]] = exposure - math.fsum(
+                scaled[sleeve_id] for sleeve_id in survivors[:-1]
+            )
+            return scaled
 
     return {sleeve_id: _round(raw_weights.get(sleeve_id, 0.0)) for sleeve_id in survivors}
 
@@ -660,7 +1382,10 @@ def build_allocation_manifest(
     family_momentum_window: int = 0,
     family_momentum_tilt_strength: float = 0.5,
     family_momentum_tilt_cap: float = 0.30,
-    min_families: int = 3,
+    min_families: int | None = None,
+    allocator_params: Mapping[str, Any] | None = None,
+    locked_oos_evaluation: Mapping[str, Any] | None = None,
+    risk_scaling: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build a manifest the live ``ArtifactPortfolioModeStrategy`` accepts as-is.
 
@@ -683,10 +1408,9 @@ def build_allocation_manifest(
     ``no_current_fold_oos_provenance=True`` and
     ``train_validation_optimizer_provenance=True``, a ``source_artifact_id``
     that reconciles against ``source_artifacts``, and per-leaf/per-netting-group
-    gross caps bounded by ``gross_cap``. When quality-gating leaves zero
-    survivors, this still emits a well-formed manifest with ``children: []`` --
-    the consumer's own ``manifest_children_empty`` fail-closed path (not a
-    special case here) safely routes that to 100% cash.
+    gross caps bounded by ``gross_cap``. Legacy callers without the materialized
+    return-data contract may still emit ``children: []``; opted-in research
+    inputs fail before freezing when their configured survivor floors are unmet.
 
     ``turnover_penalty_lambda``, ``correlation_shrinkage``, and the family
     meta-momentum kwargs (``families`` / ``family_momentum_window`` / ...) are
@@ -696,25 +1420,141 @@ def build_allocation_manifest(
     explicitly it is derived from each sleeve spec's optional ``"family"`` key
     (unmapped sleeves stay neutral under the tilt).
     """
-    sleeves = sleeves or {}
-    source_rows = [dict(artifact) for artifact in (source_artifacts or [])]
+    if sleeves is None:
+        sleeves = {}
+    if not isinstance(sleeves, Mapping):
+        raise ValueError("sleeves must be a mapping")
+    if any(not isinstance(spec, Mapping) for spec in sleeves.values()):
+        raise ValueError("sleeve specifications must be mappings")
+    sleeve_ids = [_canonical_identity(sleeve_id, name="sleeve id") for sleeve_id in sleeves]
+    if len(set(sleeve_ids)) != len(sleeve_ids):
+        raise ValueError("sleeve ids must be unique canonical identities")
+    gross_cap = _finite_nonnegative(gross_cap, name="gross_cap")
+    if gross_cap <= 0.0 or gross_cap > 1.0:
+        raise ValueError("gross_cap must be finite, positive, and no greater than 1")
+    if (
+        isinstance(source_artifacts, (str, bytes))
+        or not isinstance(source_artifacts, Sequence)
+        or any(not isinstance(artifact, Mapping) for artifact in source_artifacts)
+    ):
+        raise ValueError("source_artifacts must be a sequence of mappings")
+    source_rows = [dict(artifact) for artifact in source_artifacts]
+    source_by_id: dict[str, dict[str, Any]] = {}
+    for source in source_rows:
+        source_id = source.get("id")
+        _canonical_identity(source_id, name="source artifact id")
+        if source_id in source_by_id:
+            raise ValueError("source_artifacts ids must be unique canonical identities")
+        _validate_source_artifact(source_id, source)
+        source_by_id[source_id] = source
     sleeve_returns = {sid: (spec or {}).get("returns") for sid, spec in sleeves.items()}
     turnovers = {sid: (spec or {}).get("turnover", 0.0) for sid, spec in sleeves.items()}
+    _validate_materialized_data_contract(sleeves)
+    active_ids = {
+        sleeve_id
+        for sleeve_id, values in sleeve_returns.items()
+        if _return_panel(values, sleeve_id=sleeve_id).size > 0
+    }
+    return_timestamps = {
+        sleeve_id: (spec or {}).get("return_timestamps")
+        for sleeve_id, spec in sleeves.items()
+        if sleeve_id in active_ids and "return_timestamps" in (spec or {})
+    }
+    returns_are_net = {
+        sleeve_id: (spec or {}).get("returns_are_net", False)
+        for sleeve_id, spec in sleeves.items()
+        if sleeve_id in active_ids
+    }
+    returns_sources = {
+        sleeve_id: (spec or {}).get("returns_source")
+        for sleeve_id, spec in sleeves.items()
+        if sleeve_id in active_ids and "returns_source" in (spec or {})
+    }
+    opt_in_data_contract = any(
+        any(
+            key in (spec or {})
+            for key in ("return_timestamps", "returns_are_net", "returns_source")
+        )
+        for spec in sleeves.values()
+    )
+    if opt_in_data_contract:
+        for source_id, source in source_by_id.items():
+            _validate_source_artifact(source_id, source)
+        referenced_source_values = tuple(
+            spec.get("source_artifact_id", "") for spec in sleeves.values()
+        )
+        if any(
+            not isinstance(source_id, str) or not source_id
+            for source_id in referenced_source_values
+        ):
+            raise ValueError("source_artifact_id must be a nonempty string")
+        referenced_source_ids = set(referenced_source_values)
+        for source_id in sorted(referenced_source_ids):
+            source = source_by_id.get(source_id)
+            if source is None:
+                raise ValueError(f"referenced source artifact {source_id!r} is missing")
+            _validate_source_artifact(source_id, source)
+            referenced_sleeves = sorted(
+                sleeve_id
+                for sleeve_id in active_ids
+                if sleeves[sleeve_id].get("source_artifact_id") == source_id
+            )
+            declared_panels = source.get("return_panel_sha256_by_sleeve")
+            if not isinstance(declared_panels, Mapping) or set(declared_panels) != set(
+                referenced_sleeves
+            ):
+                raise ValueError(
+                    f"source artifact {source_id!r} must bind exactly its return panels"
+                )
+            for sleeve_id in referenced_sleeves:
+                declared = declared_panels[sleeve_id]
+                if (
+                    not isinstance(declared, str)
+                    or _SHA256_RE.fullmatch(declared) is None
+                    or declared != _materialized_return_panel_sha256(sleeve_id, sleeves[sleeve_id])
+                ):
+                    raise ValueError(
+                        f"source artifact {source_id!r} return panel digest mismatch "
+                        f"for {sleeve_id!r}"
+                    )
+    # Validate risk provenance against each raw timestamp vector before common
+    # intersection can erase an out-of-window observation.
+    resolved_risk_scaling = resolve_risk_scaling_spec(risk_scaling)
+    if (
+        resolved_risk_scaling is not None
+        and opt_in_data_contract
+        and resolved_risk_scaling.get("research_diagnostic_permissive") is True
+    ):
+        raise ValueError(
+            "research_diagnostic_permissive risk_scaling cannot materialize a manifest"
+        )
+    risk_scaling_provenance = (
+        _materialized_risk_provenance(sleeves, active_ids, source_by_id)
+        if resolved_risk_scaling is not None and active_ids
+        else None
+    )
+    prepared_returns, alignment, common_observations = _prepare_return_series(
+        sleeve_returns, return_timestamps or None
+    )
     if families is None:
-        derived = {
-            sid: str((spec or {}).get("family"))
-            for sid, spec in sleeves.items()
-            if (spec or {}).get("family") is not None
-        }
+        derived: dict[str, str] = {}
+        for sid, spec in sleeves.items():
+            family = (spec or {}).get("family")
+            if family is None:
+                continue
+            _canonical_identity(family, name="family label")
+            derived[sid] = family
         families = derived or None
 
+    resolved_upper = _resolve_upper(upper, sorted(active_ids))
+    risk_scaling_payload: dict[str, Any] = {}
     weights = allocate_quality_gated(
         sleeve_returns,
         turnovers,
         regime=regime,
         participation=participation,
         method=method,
-        upper=upper,
+        upper=resolved_upper,
         min_sleeves=min_sleeves,
         turnover_penalty_lambda=turnover_penalty_lambda,
         correlation_shrinkage=correlation_shrinkage,
@@ -722,29 +1562,83 @@ def build_allocation_manifest(
         family_momentum_window=family_momentum_window,
         family_momentum_tilt_strength=family_momentum_tilt_strength,
         family_momentum_tilt_cap=family_momentum_tilt_cap,
-        min_families=min_families,
+        min_families=3 if min_families is None else min_families,
+        allocator_params=allocator_params,
+        returns_are_net=returns_are_net,
+        return_timestamps=return_timestamps or None,
+        risk_scaling=resolved_risk_scaling,
+        risk_scaling_out=risk_scaling_payload if resolved_risk_scaling else None,
+        risk_scaling_provenance=risk_scaling_provenance,
     )
 
-    default_source_id = str(source_rows[0].get("id") or "") if len(source_rows) == 1 else ""
+    if resolved_risk_scaling and weights and not any(value > 0.0 for value in weights.values()):
+        raise ValueError(
+            "risk_scaling produced zero risky exposure (L == 0); refusing to freeze an "
+            "all-cash manifest through the scaling layer"
+        )
+    if resolved_risk_scaling is None:
+        # Base allocators resolve relative sleeve weights on a unit simplex;
+        # the manifest gross cap is the portfolio-level risky-exposure budget.
+        # Scale once here rather than publishing unit gross beneath a smaller
+        # declared cap. Risk-scaled weights already carry absolute exposure.
+        relative_total = math.fsum(float(weight) for weight in weights.values())
+        if relative_total > 0.0:
+            if not math.isclose(relative_total, 1.0, rel_tol=0.0, abs_tol=1e-8):
+                raise ValueError(
+                    "base allocator weights must resolve to a unit simplex before gross_cap scaling"
+                )
+            weights = {
+                sleeve_id: float(weight) * gross_cap / relative_total
+                for sleeve_id, weight in weights.items()
+            }
+            anchor = max(weights, key=weights.__getitem__)
+            weights[anchor] += gross_cap - math.fsum(weights.values())
+            while math.fsum(weights.values()) > gross_cap:
+                weights[anchor] = math.nextafter(weights[anchor], 0.0)
+    default_source_id = source_rows[0].get("id") if len(source_rows) == 1 else ""
 
+    # These are the exact numbers published to the manifest. Do not round again
+    # after this point: cap and cash accounting must audit the emitted values.
+    published_weights = {
+        sleeve_id: _finite_nonnegative(weight, name=f"published weight for {sleeve_id!r}")
+        for sleeve_id, weight in weights.items()
+    }
     children: list[dict[str, Any]] = []
-    for sleeve_id in sorted(weights):
-        weight = float(weights[sleeve_id])
+    for sleeve_id in sorted(published_weights):
+        weight = published_weights[sleeve_id]
         if weight <= 0.0:
             continue
         spec = sleeves.get(sleeve_id) or {}
-        source_artifact_id = str(spec.get("source_artifact_id") or default_source_id or "")
+        source_artifact_id = spec.get("source_artifact_id", default_source_id or "")
+        _canonical_identity(source_artifact_id, name="source_artifact_id")
+        source = source_by_id.get(source_artifact_id)
+        if source is None:
+            raise ValueError(
+                f"sleeve {sleeve_id!r} references missing source artifact {source_artifact_id!r}"
+            )
+        _validate_source_artifact(source_artifact_id, source)
+        strategy_class = spec.get("strategy_class")
+        symbols = spec.get("symbols")
+        name = spec.get("name", sleeve_id)
+        params = spec.get("params", {})
+        if not isinstance(symbols, Sequence) or isinstance(symbols, (str, bytes)) or not symbols:
+            raise ValueError(f"sleeve {sleeve_id!r} requires a nonempty strategy_class and symbols")
+        _canonical_identity(strategy_class, name="strategy_class")
+        _canonical_identity(name, name="name")
+        canonical_symbols = [_canonical_identity(symbol, name="symbol") for symbol in symbols]
+        if len(set(canonical_symbols)) != len(canonical_symbols) or not isinstance(params, Mapping):
+            raise ValueError(f"sleeve {sleeve_id!r} requires unique canonical symbols and params")
         children.append(
             {
-                "candidate_id": str(sleeve_id),
-                "name": str(spec.get("name") or sleeve_id),
-                "strategy_class": str(spec.get("strategy_class") or ""),
-                "symbols": [str(symbol) for symbol in list(spec.get("symbols") or [])],
-                "params": dict(spec.get("params") or {}),
+                "candidate_id": sleeve_id,
+                "name": name,
+                "strategy_class": strategy_class,
+                "symbols": canonical_symbols,
+                "params": dict(params),
                 "weight": weight,
                 "leaf_gross": weight,
                 "leaf_gross_cap": float(gross_cap),
-                "netting_group": str(sleeve_id),
+                "netting_group": sleeve_id,
                 "netting_group_gross_cap": float(gross_cap),
                 "source_artifact_id": source_artifact_id,
                 "ready": True,
@@ -769,19 +1663,60 @@ def build_allocation_manifest(
             }
         )
 
-    active_weight = _round(sum(child["weight"] for child in children)) if children else 0.0
+    active_weight = math.fsum(child["weight"] for child in children)
+    absolute_upper = (
+        {sleeve_id: gross_cap * cap for sleeve_id, cap in resolved_upper.items()}
+        if resolved_upper is not None
+        else {}
+    )
+    if (
+        any(
+            child["weight"] > min(gross_cap, absolute_upper.get(child["candidate_id"], gross_cap))
+            for child in children
+        )
+        or active_weight > gross_cap
+    ):
+        raise ValueError("final positive child gross exposure exceeds gross_cap")
+    if resolved_risk_scaling is not None:
+        exposure = float(risk_scaling_payload["exposure"])
+        if active_weight != exposure:
+            raise ValueError("published risk-scaled child weights must sum exactly to exposure")
+    cash_weight = 1.0 - active_weight
+    if math.fsum((active_weight, cash_weight)) != 1.0:
+        raise ValueError("manifest gross and cash weights must sum exactly to one")
+    if resolved_risk_scaling is not None and cash_weight != float(
+        risk_scaling_payload["cash_weight"]
+    ):
+        raise ValueError("manifest cash weight must equal the risk-scaling residual")
+    if opt_in_data_contract and len(children) < min_sleeves:
+        raise ValueError(
+            f"final allocation left {len(children)} sleeves; min_sleeves={min_sleeves} forbids "
+            "freezing an all-cash manifest"
+        )
+    if opt_in_data_contract and min_families is not None:
+        surviving_families = {
+            families[child["candidate_id"]]
+            for child in children
+            if families is not None and child["candidate_id"] in families
+        }
+        if len(surviving_families) < min_families:
+            raise ValueError(
+                f"final allocation left {len(surviving_families)} families; "
+                f"min_families={min_families} forbids freezing the manifest"
+            )
     sleeve_quality = {
         sid: compute_sleeve_quality(
-            sleeve_returns.get(sid),
+            prepared_returns.get(sid),
             turnovers.get(sid),
             regime=regime,
             participation=participation,
             turnover_penalty_lambda=turnover_penalty_lambda,
+            returns_are_net=returns_are_net.get(sid, False),
         )
         for sid in sorted(sleeves)
     }
 
-    return {
+    manifest = {
         "artifact_kind": "quality_gated_allocation_manifest",
         "real_money_execution": False,
         "allow_real_money": False,
@@ -796,11 +1731,45 @@ def build_allocation_manifest(
         "uses_locked_oos_for_correlation": False,
         "uses_locked_oos_for_sizing": False,
         "gross_cap": float(gross_cap),
-        "cash_weight": max(0.0, _round(1.0 - active_weight)),
+        "cash_weight": cash_weight,
         "allocation_method": str(method),
-        "optimizer_provenance": _default_optimizer_provenance(),
-        "correlation_input_provenance": _default_correlation_provenance(),
         "source_artifacts": source_rows,
         "children": children,
         "sleeve_quality": sleeve_quality,
     }
+    if active_ids:
+        manifest["optimizer_provenance"] = _default_optimizer_provenance()
+        manifest["correlation_input_provenance"] = _default_correlation_provenance()
+    if allocator_params:
+        # Opt-in provenance only: without allocator_params the manifest stays
+        # byte-identical to the pinned golden.
+        manifest["allocator_params"] = {str(k): v for k, v in dict(allocator_params).items()}
+    if resolved_risk_scaling:
+        # Opt-in provenance for the exposure layer: the requested spec plus the
+        # computed L / sigma / cash diagnostics. Child weights already sum to L,
+        # so the manifest's cash_weight reflects the risk-free residual.
+        manifest["risk_scaling"] = {
+            "spec": {str(k): v for k, v in dict(risk_scaling or {}).items()},
+            **risk_scaling_payload,
+        }
+    if active_ids:
+        manifest["return_data_contract"] = {
+            "alignment": alignment,
+            "common_observations": common_observations,
+            "returns_are_net": {sid: returns_are_net[sid] for sid in sorted(active_ids)},
+            "returns_source": {sid: returns_sources[sid] for sid in sorted(active_ids)},
+            "panel_sha256_by_sleeve": {
+                sid: _materialized_return_panel_sha256(sid, sleeves[sid])
+                for sid in sorted(active_ids)
+            },
+            "fit_apply_timestamps": {
+                sid: {
+                    key: sleeves[sid][key]
+                    for key in ("fit_start", "fit_end", "as_of", "apply_start")
+                }
+                for sid in sorted(active_ids)
+            },
+        }
+    if locked_oos_evaluation is not None:
+        manifest["locked_oos_evaluation"] = _normalize_locked_oos_evaluation(locked_oos_evaluation)
+    return manifest

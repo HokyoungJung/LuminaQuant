@@ -12,6 +12,7 @@ from typing import Any
 import polars as pl
 from lumina_quant.core.events import MarketEvent
 from lumina_quant.market_data import normalize_timeframe_token, timeframe_to_milliseconds
+from lumina_quant.utils.timeutil import utc_epoch_ms
 
 _DEFAULT_TIMEFRAMES = ("20s", "1m", "5m", "15m", "1h", "4h", "1d")
 _DEFAULT_LOOKBACK = 4096
@@ -75,6 +76,10 @@ class TimeframeAggregator:
             if abs(ts) < 100_000_000_000:
                 ts *= 1000
             return ts
+        if isinstance(value, datetime):
+            # Naive bar times are UTC (repo convention); host-local
+            # interpretation would shift every bucket label by the UTC offset.
+            return utc_epoch_ms(value)
         ts_fn = getattr(value, "timestamp", None)
         if callable(ts_fn):
             try:

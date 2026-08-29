@@ -64,6 +64,7 @@ from __future__ import annotations
 
 import math
 from collections import deque
+from itertools import pairwise
 from typing import Any
 
 from lumina_quant.core.plugin_registry import register
@@ -71,10 +72,12 @@ from lumina_quant.indicators.annualization import (
     annualize_per_bar_vol,
     bars_per_year_from_spacing,
 )
-from lumina_quant.indicators.common import safe_float
 from lumina_quant.indicators.rolling_stats import sample_std
 from lumina_quant.strategies.adaptive_crypto_alpha_sleeves import _age_cross_positions
-from lumina_quant.strategies.cross_sectional_anomaly_alpha_sleeves import _CrossUpdateMixin
+from lumina_quant.strategies.cross_sectional_anomaly_alpha_sleeves import (
+    _CrossUpdateMixin,
+    _event_datetime_from_key,
+)
 from lumina_quant.strategies.equity_xs_factor_alpha_sleeves import _state_size
 from lumina_quant.strategies.external_alpha_sleeves import (
     _EPS,
@@ -252,6 +255,7 @@ class DownsideTailRiskPremiumStrategy(_CrossUpdateMixin, Strategy):
             symbol: _CrossSectionalState(deque(maxlen=size), deque(maxlen=size))
             for symbol in self.symbol_list
         }
+        self._close_times = {symbol: deque(maxlen=size) for symbol in self.symbol_list}
         self._last_eval_time_key = ""
         self._tick = 0
         # Recent decision-bar epochs (seconds) for deterministic bar-spacing
@@ -268,16 +272,37 @@ class DownsideTailRiskPremiumStrategy(_CrossUpdateMixin, Strategy):
         return state
 
     def set_state(self, state: dict[str, Any]) -> None:
-        super().set_state(state)
         if not isinstance(state, dict):
             return
-        self._recent_times.clear()
-        raw_times = state.get("recent_times")
-        if isinstance(raw_times, (list, tuple)):
-            for value in raw_times[-int(self._recent_times.maxlen or 0) :]:
-                parsed = safe_float(value)
-                if parsed is not None:
-                    self._recent_times.append(parsed)
+        base_fields = set(super().get_state())
+        if set(state) != base_fields | {"recent_times"}:
+            return
+        raw_times = state["recent_times"]
+        if (
+            not isinstance(raw_times, list)
+            or len(raw_times) > int(self._recent_times.maxlen or 0)
+            or any(
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(value)
+                for value in raw_times
+            )
+            or any(right <= left for left, right in pairwise(raw_times))
+        ):
+            return
+        base_state = {key: state[key] for key in base_fields}
+        common_keys = base_state["close_times"][self.symbol_list[0]] if self.symbol_list else []
+        expected_times = [
+            dt.timestamp()
+            for key in common_keys[-int(self._recent_times.maxlen or 0) :]
+            if (dt := _event_datetime_from_key(key)) is not None
+        ]
+        if raw_times != expected_times:
+            return
+        super().set_state(base_state)
+        if super().get_state() != base_state:
+            return
+        self._recent_times = deque(raw_times, maxlen=self._recent_times.maxlen)
 
     # ------------------------------------------------------------------ #
     # scoring / selection
@@ -322,6 +347,10 @@ class DownsideTailRiskPremiumStrategy(_CrossUpdateMixin, Strategy):
             return {}, {}, {}
 
         scores = {symbol: float(residual_vec[idx]) for idx, symbol in enumerate(ordered)}
+        score_values = list(scores.values())
+        score_scale = max(1.0, *(abs(value) for value in score_values))
+        if max(score_values) - min(score_values) <= _EPS * score_scale:
+            return {}, {}, {}
         metas: dict[str, dict[str, Any]] = {
             symbol: {
                 "expected_shortfall": float(raw_es[symbol]),
@@ -338,6 +367,10 @@ class DownsideTailRiskPremiumStrategy(_CrossUpdateMixin, Strategy):
     ) -> tuple[dict[str, tuple[str, float, dict[str, Any]]], dict[str, float]]:
         scores, sigmas, metas = self._residual_scores()
         if not scores:
+            return {}, {}
+        score_values = list(scores.values())
+        score_scale = max(1.0, *(abs(value) for value in score_values))
+        if max(score_values) - min(score_values) <= _EPS * score_scale:
             return {}, {}
 
         ordered = sorted(scores, key=lambda symbol: (scores[symbol], symbol))

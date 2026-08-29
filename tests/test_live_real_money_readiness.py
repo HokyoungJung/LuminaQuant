@@ -435,8 +435,8 @@ def test_save_state_none_return_is_treated_as_success():
 # ── M1: state fingerprint + risk/hard-halt persistence ───────────────────────
 
 
-def test_paper_mode_accepts_legacy_state_without_fingerprint():
-    """Byte-identical default: paper mode restores state that has no fingerprint."""
+def test_paper_mode_rejects_incomplete_legacy_state():
+    """Partial legacy state cannot bypass transactional restore in paper mode."""
     t = _mk_trader()  # live_mode=paper, require_state_fingerprint=False
     applied = []
     t.state_manager = SimpleNamespace(load_state=lambda: {"portfolio": {"x": 1}})
@@ -447,8 +447,9 @@ def test_paper_mode_accepts_legacy_state_without_fingerprint():
     t.risk_manager = SimpleNamespace()
     t.outbox_events = []
 
-    t._load_state()
-    assert applied == [{"x": 1}]
+    with pytest.raises(RuntimeError, match="incomplete"):
+        t._load_state()
+    assert applied == []
 
 
 def test_enforced_mode_refuses_foreign_state():
@@ -475,7 +476,8 @@ def test_enforced_mode_refuses_foreign_state():
     t.risk_manager = SimpleNamespace(set_state=_noop)
     t.outbox_events = []
 
-    t._load_state()
+    with pytest.raises(RuntimeError, match="fingerprint rejected"):
+        t._load_state()
     assert applied == []  # foreign state refused
     assert "STATE_FINGERPRINT_REJECTED" in t.audit_store.reasons()
 
@@ -510,11 +512,28 @@ def test_state_roundtrip_restores_risk_and_hard_halt_in_enforced_mode():
     dst.live_mode = "real"
     dst.require_state_fingerprint = True
     dst.state_manager = SimpleNamespace(load_state=lambda: dict(saved))
-    dst.risk_manager = SimpleNamespace(set_state=lambda s: restored_risk.update(s))
-    dst.strategy = SimpleNamespace(set_state=_noop)
-    dst.runtime_cache = SimpleNamespace(restore=_noop, open_orders={})
+    dst.risk_manager = SimpleNamespace(
+        set_state=lambda s: (restored_risk.clear(), restored_risk.update(s)),
+        get_state=lambda: dict(restored_risk),
+    )
+    strategy_state: dict = {}
+    dst.strategy = SimpleNamespace(
+        set_state=lambda s: (strategy_state.clear(), strategy_state.update(s)),
+        get_state=lambda: dict(strategy_state),
+    )
+    runtime_state: dict = {}
+    dst.runtime_cache = SimpleNamespace(
+        restore=lambda s: (runtime_state.clear(), runtime_state.update(s)),
+        snapshot=lambda: dict(runtime_state),
+        open_orders={},
+    )
     dst.execution_handler = SimpleNamespace()
-    dst.portfolio = SimpleNamespace(set_state=_noop, trading_frozen=False)
+    portfolio_state: dict = {}
+    dst.portfolio = SimpleNamespace(
+        set_state=lambda s: (portfolio_state.clear(), portfolio_state.update(s)),
+        get_state=lambda: dict(portfolio_state),
+        trading_frozen=False,
+    )
     dst.outbox_events = []
     dst._hard_halt_active = False
     dst._hard_halt_reason = ""
@@ -523,6 +542,62 @@ def test_state_roundtrip_restores_risk_and_hard_halt_in_enforced_mode():
     assert restored_risk.get("consecutive_loss_count") == 4
     assert dst._hard_halt_active is True
     assert dst.portfolio.trading_frozen is True
+
+
+def test_transactional_state_restore_rolls_back_before_order_rehydration():
+    t = _mk_trader()
+    t.live_mode = "real"
+    t.require_state_fingerprint = True
+    portfolio_state = {"old": 1}
+    strategy_state = {"old": 2}
+    risk_state = {"old": 3}
+    runtime_state = {"old": 4}
+    rehydrated: list[object] = []
+    payload = {
+        "portfolio": {"new": 1},
+        "strategy": {"new": 2},
+        "runtime_cache": {"new": 4},
+        "outbox_events": [{"new": 5}],
+        "risk": {"new": 3},
+        "hard_halt": {"active": False, "reason": ""},
+        "fingerprint": t._state_fingerprint(),
+    }
+    t.state_manager = SimpleNamespace(load_state=lambda: payload)
+    t.portfolio = SimpleNamespace(
+        set_state=lambda s: (portfolio_state.clear(), portfolio_state.update(s)),
+        get_state=lambda: dict(portfolio_state),
+        trading_frozen=False,
+    )
+
+    def reject_strategy(state):
+        _ = state
+        raise ValueError("reject")
+
+    t.strategy = SimpleNamespace(
+        set_state=reject_strategy,
+        get_state=lambda: dict(strategy_state),
+    )
+    t.risk_manager = SimpleNamespace(
+        set_state=lambda s: (risk_state.clear(), risk_state.update(s)),
+        get_state=lambda: dict(risk_state),
+    )
+    t.runtime_cache = SimpleNamespace(
+        restore=lambda s: (runtime_state.clear(), runtime_state.update(s)),
+        snapshot=lambda: dict(runtime_state),
+        open_orders={},
+    )
+    t.execution_handler = SimpleNamespace(rehydrate_orders=lambda rows: rehydrated.append(rows))
+    t.outbox_events = [{"old": 5}]
+
+    with pytest.raises(RuntimeError, match="startup aborted"):
+        t._load_state()
+
+    assert portfolio_state == {"old": 1}
+    assert strategy_state == {"old": 2}
+    assert risk_state == {"old": 3}
+    assert runtime_state == {"old": 4}
+    assert t.outbox_events == [{"old": 5}]
+    assert rehydrated == []
 
 
 def test_state_fingerprint_ok_matrix():

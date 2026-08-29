@@ -214,6 +214,7 @@ _STRATEGY_TIER_HINTS: dict[str, str] = {
     "VolatilityCompressionReversionStrategy": "research_only",
     "MicroRangeExpansion1sStrategy": "research_only",
     "DacapogoDailySourceStrategy": "research_only",
+    "TrendGatedIbsReversionStrategy": "research_only",
     # New multi-factor book — research_only until backtest-validated on the
     # data-bearing machine (see docs/COST_REALISM_REMEASUREMENT.md). Promote to
     # live_opt_in only after the cost-realistic walk-forward passes the gates.
@@ -282,7 +283,115 @@ _STRATEGY_TIER_HINTS: dict[str, str] = {
     "SilentVolumeShockResolutionStrategy": "research_only",
     "RoundNumberBarrierStrategy": "research_only",
     "CrossSectionalOffSessionTugOfWarStrategy": "research_only",
+    # Named-quant public-rule suite, Claude lane (2026-08-19; see
+    # docs/research_note/named_quant_claude_suite_20260819.md and
+    # configs/research/named_quant_claude_suite_v1.json). Independent adaptations
+    # of publicly described rules (systrader79 / 물탄찬밥 / 아마추어퀀트 /
+    # 알바트로스 / FlightF / 워뇨띠(AOA) / 돌파고 lineage) -- research_only
+    # until the data-PC cost-realistic walk-forward passes the promotion gates.
+    "NoiseFilteredVolatilityBreakoutStrategy": "research_only",
+    "MaScoreVolTargetRotationStrategy": "research_only",
+    "TurtleUnitPyramidingStrategy": "research_only",
+    "KalmanPairsStatArbStrategy": "research_only",
+    "PcaResidualStatArbStrategy": "research_only",
+    "EquityCurveKillSwitchOverlayStrategy": "research_only",
+    "RsiDivergenceScaleOutStrategy": "research_only",
+    "PrevDayBoxQuartileReversionStrategy": "research_only",
+    "SessionHighBreakoutScalpStrategy": "research_only",
+    # Alpha-sleeve batch 2026-08-20 (adversarial design-panel survivors; see
+    # docs/research_note/research_note.md 2026-08-20 entries). research_only
+    # until the data-PC cost-realistic walk-forward passes the two-tier gate;
+    # each module docstring pre-registers its EXPECTED NULL and single
+    # falsifying measurement. Registration and these hints land atomically
+    # (live-safety), enforced by tests/test_strategy_tier_guard.py.
+    "CrossSectionalResidualTakerFlowStrategy": "research_only",
+    "BasisFundingGapConvergenceStrategy": "research_only",
+    "OffSessionBasisDislocationStrategy": "research_only",
+    "SalienceTheoryValueStrategy": "research_only",
+    "ProspectTheoryValueStrategy": "research_only",
+    "OpenInterestGrowthPressureStrategy": "research_only",
+    "IdiosyncraticVolatilityStrategy": "research_only",
+    "LotterySkewnessStrategy": "research_only",
+    "TrendEfficiencyMomentumStrategy": "research_only",
+    "DispersionConditionedReversionStrategy": "research_only",
+    "CusumChangePointTrendRiderStrategy": "research_only",
+    "VarianceRatioTrendRiderStrategy": "research_only",
 }
+
+# FROZEN legacy snapshot of the 68 glob-discovered classes that predate the
+# tier-hint contract (2026-07-03) and deliberately resolve ``live_default``
+# without an explicit hint.  APPEND-FORBIDDEN: a new strategy gets an explicit
+# ``_STRATEGY_TIER_HINTS`` entry (research_only until promoted) in the same
+# commit as its registration — never a slot here.  This set exists so the
+# unknown-name tier fallback below can fail SAFE (research_only) without
+# changing the tier of any pre-contract class; it must stay in lockstep with
+# the guard copy in tests/test_strategy_tier_guard.py.
+_LEGACY_UNHINTED_LIVE_DEFAULT: frozenset[str] = frozenset(
+    {
+        "AccelerationRiderStrategy",
+        "AdaptiveTrendRiderStrategy",
+        "AdfGatedReversionRiderStrategy",
+        "AmihudIlliquidityMomentumRiderStrategy",
+        "BenchmarkLeadLagContinuationStrategy",
+        "BettingAgainstBetaStrategy",
+        "BreadthRegimeTrendTimerStrategy",
+        "CalendarSeasonalityOverlayStrategy",
+        "CarryTrendConfluenceRiderStrategy",
+        "ConfidenceGatedTrendStrategy",
+        "CrossAssetDiversifiedTrendStrategy",
+        "CrossSectionalEquityMomentumStrategy",
+        "CrossSectionalShortTermReversalStrategy",
+        "DeepLearningForecastGateStrategy",
+        "DonchianAtrTrendStrategy",
+        "DualMomentumDefensiveRotationStrategy",
+        "DualMomentumIndexRotationStrategy",
+        "EquityBenchmarkResidualReversalStrategy",
+        "EquityMetalRiskRegimeRotationStrategy",
+        "FalseBreakoutReversalStrategy",
+        "FundingDislocationTrendCarryStrategy",
+        "FundingHarvestCarryStrategy",
+        "GarchInnovationRiderStrategy",
+        "GoldSilverRatioMeanReversionStrategy",
+        "GoldSilverRatioTrendStrategy",
+        "HurstRegimeGatedStrategy",
+        "IntermarketLeadLagContinuationStrategy",
+        "IntradayFlowPressureRiderStrategy",
+        "IntradaySeasonalMomentumRiderStrategy",
+        "KalmanTrendRiderStrategy",
+        "LeveragedTrendTimingRiderStrategy",
+        "LiquidationCascadeReversionStrategy",
+        "LiquidityShockReversionStrategy",
+        "LowVolatilityMomentumStrategy",
+        "MetalEquityDivergenceReversalStrategy",
+        "MetalsRelativeValueBasketStrategy",
+        "MultiTimeframeTrendEnsembleStrategy",
+        "NearHighMomentumStrategy",
+        "OpenInterestTrendConfirmationRiderStrategy",
+        "OpeningRangeBreakoutRiderStrategy",
+        "OpeningRangeContinuationStrategy",
+        "OrderBookImbalanceReversionStrategy",
+        "OvernightSessionReturnRiderStrategy",
+        "PairsSpreadMeanReversionStrategy",
+        "PermutationEntropyTrendRiderStrategy",
+        "PullbackTrendContinuationStrategy",
+        "RealizedSemivarianceTrendRiderStrategy",
+        "RealizedVolTermStructureStrategy",
+        "ResidualEquityMomentumStrategy",
+        "ResidualMomentumRotationStrategy",
+        "SeasonalMicroBreakoutRiderStrategy",
+        "SelectionGatedMomentumStrategy",
+        "SelectionGatedReversionStrategy",
+        "SemisLeadLagRotationStrategy",
+        "SpectralCycleRiderStrategy",
+        "TakerFlowImbalanceContinuationStrategy",
+        "VWAPCompressionReversionStrategy",
+        "VolManagedMomentumCrashGateStrategy",
+        "VolOfVolRegimeTrendGateStrategy",
+        "VolatilityBreakoutRiderStrategy",
+        "VolatilitySqueezeBreakoutRiderStrategy",
+        "VolatilitySqueezeBreakoutStrategy",
+    }
+)
 
 _STRATEGY_METADATA: dict[str, dict[str, Any]] = {
     name: {
@@ -385,8 +494,18 @@ def get_strategy_metadata(strategy_name: str) -> dict[str, Any]:
     # Glob-discovered strategies are not in _STRATEGY_METADATA (which is built over
     # the curated _STRATEGY_MAP), but an explicit _STRATEGY_TIER_HINTS entry must
     # still be honored so a new drop-in sleeve can pin itself to research_only /
-    # live_opt_in without being edited into _STRATEGY_MAP. Fail safe to the hint.
-    return {"name": token, "tier": str(_STRATEGY_TIER_HINTS.get(token, "live_default"))}
+    # live_opt_in without being edited into _STRATEGY_MAP.
+    hint = _STRATEGY_TIER_HINTS.get(token)
+    if hint is not None:
+        return {"name": token, "tier": str(hint)}
+    if token in _LEGACY_UNHINTED_LIVE_DEFAULT:
+        # Pre-contract classes keep their historical live_default resolution.
+        return {"name": token, "tier": "live_default"}
+    # FAIL-SAFE DEFAULT (H1): an unknown, unhinted drop-in must never
+    # auto-promote itself into the live tier — resolve research_only until a
+    # reviewed hint lands.  tests/test_strategy_tier_guard.py blocks unhinted
+    # registrations at CI; this guards the runtime path CI cannot see.
+    return {"name": token, "tier": "research_only"}
 
 
 def get_strategy_tier(strategy_name: str) -> str:

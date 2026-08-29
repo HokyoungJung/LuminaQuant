@@ -135,10 +135,8 @@ class MeanReversionStdStrategy(Strategy):
         return {
             "symbol_state": {
                 symbol: {
-                    "prices": list(item.zscore_window.values),
+                    "zscore_state": item.zscore_window.to_state(),
                     "raw_prices": list(item.raw_history),
-                    "sum_price": item.zscore_window.sum_value,
-                    "sum_squares": item.zscore_window.sum_squares,
                     "state": item.state,
                     "entry_price": item.entry_price,
                     "residual_price": item.residual_price,
@@ -159,13 +157,8 @@ class MeanReversionStdStrategy(Strategy):
             if symbol not in self._state or not isinstance(raw, dict):
                 continue
             item = self._state[symbol]
-            prices = []
-            for value in list(raw.get("prices") or [])[-self.window :]:
-                parsed = safe_float(value)
-                if parsed is not None:
-                    prices.append(parsed)
             item.zscore_window = RollingZScoreWindow(self.window)
-            item.zscore_window.load_state(prices)
+            item.zscore_window.load_state(raw.get("zscore_state"))
             item.raw_history = deque(maxlen=self.window + 1)
             for value in list(raw.get("raw_prices") or [])[-(self.window + 1) :]:
                 parsed = safe_float(value)

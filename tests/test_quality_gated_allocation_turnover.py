@@ -26,6 +26,7 @@ import hashlib
 import importlib.util
 import json
 import sys
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -37,6 +38,7 @@ from lumina_quant.portfolio.optimizers_extra import HRPPortfolio
 from lumina_quant.portfolio.quality_gated_allocation import (
     _hand_rolled_lw_correlation_shrinkage,
     _hrp_weights_with_correlation_shrinkage,
+    _materialized_return_panel_sha256,
     allocate_quality_gated,
     build_allocation_manifest,
     compute_sleeve_quality,
@@ -74,11 +76,18 @@ def _synthetic_returns(seed: int, n: int, *, drift: float, scale: float) -> list
     return [(value - 0.5) * scale + drift for value in _lcg_stream(seed, n)]
 
 
+def _return_timestamps(n: int) -> list[str]:
+    start = datetime(2024, 1, 1, tzinfo=UTC)
+    return [
+        (start + timedelta(days=index)).isoformat().replace("+00:00", "Z") for index in range(n)
+    ]
+
+
 def _sha256_of(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _source_artifacts(tmp_path: Path) -> list[dict[str, Any]]:
+def _source_artifacts(tmp_path: Path, sleeves: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
     source_path = tmp_path / "source.json"
     source_path.write_text(json.dumps({"ready": True}), encoding="utf-8")
     return [
@@ -89,16 +98,29 @@ def _source_artifacts(tmp_path: Path) -> list[dict[str, Any]]:
             "max_age_hours": 876_000,
             "ready": True,
             "portfolio_ready": True,
+            "return_panel_sha256_by_sleeve": {
+                sleeve_id: _materialized_return_panel_sha256(sleeve_id, spec)
+                for sleeve_id, spec in sleeves.items()
+            },
         }
     ]
 
 
 def _three_positive_sleeves() -> dict[str, dict[str, Any]]:
     """Three strongly-positive-edge sleeves with distinct turnovers."""
+    timestamps = _return_timestamps(80)
+    apply_timestamp = _return_timestamps(81)[-1]
     return {
         "alpha": {
             "returns": _synthetic_returns(101, 80, drift=0.004, scale=0.01),
             "turnover": 0.01,
+            "returns_are_net": False,
+            "return_timestamps": timestamps,
+            "returns_source": "train_validation",
+            "fit_start": timestamps[0],
+            "fit_end": timestamps[-1],
+            "as_of": apply_timestamp,
+            "apply_start": apply_timestamp,
             "strategy_class": "MovingAverageCrossStrategy",
             "symbols": ["BTC/USDT"],
             "params": {"short_window": 4, "long_window": 12},
@@ -107,6 +129,13 @@ def _three_positive_sleeves() -> dict[str, dict[str, Any]]:
         "beta": {
             "returns": _synthetic_returns(202, 80, drift=0.004, scale=0.012),
             "turnover": 0.02,
+            "returns_are_net": False,
+            "return_timestamps": timestamps,
+            "returns_source": "train_validation",
+            "fit_start": timestamps[0],
+            "fit_end": timestamps[-1],
+            "as_of": apply_timestamp,
+            "apply_start": apply_timestamp,
             "strategy_class": "MovingAverageCrossStrategy",
             "symbols": ["ETH/USDT"],
             "params": {"short_window": 6, "long_window": 20},
@@ -115,6 +144,13 @@ def _three_positive_sleeves() -> dict[str, dict[str, Any]]:
         "gamma": {
             "returns": _synthetic_returns(303, 80, drift=0.004, scale=0.014),
             "turnover": 0.03,
+            "returns_are_net": False,
+            "return_timestamps": timestamps,
+            "returns_source": "train_validation",
+            "fit_start": timestamps[0],
+            "fit_end": timestamps[-1],
+            "as_of": apply_timestamp,
+            "apply_start": apply_timestamp,
             "strategy_class": "MovingAverageCrossStrategy",
             "symbols": ["SOL/USDT"],
             "params": {"short_window": 8, "long_window": 24},
@@ -130,7 +166,7 @@ def _three_positive_sleeves() -> dict[str, dict[str, Any]]:
 
 def test_manifest_is_byte_identical_when_new_flags_default(tmp_path: Path) -> None:
     sleeves = _three_positive_sleeves()
-    source_artifacts = _source_artifacts(tmp_path)
+    source_artifacts = _source_artifacts(tmp_path, sleeves)
 
     default = build_allocation_manifest(
         sleeves, source_artifacts=source_artifacts, method="hrp", gross_cap=1.0
@@ -304,14 +340,12 @@ def test_allocate_hrp_shrinkage_only_active_via_flag() -> None:
 
     off = allocate_quality_gated(sleeve_returns, turnovers, method="hrp")
     on = allocate_quality_gated(sleeve_returns, turnovers, method="hrp", correlation_shrinkage=0.7)
-    # ERC ignores correlation_shrinkage (linkage is HRP-only) -> byte-identical.
-    erc_off = allocate_quality_gated(sleeve_returns, turnovers, method="erc")
-    erc_shrink = allocate_quality_gated(
-        sleeve_returns, turnovers, method="erc", correlation_shrinkage=0.7
-    )
+    # ERC has no correlation-linkage path, so supplying the HRP-only control is
+    # a contract error rather than a silently ignored option.
+    with pytest.raises(ValueError, match="supported only for method='hrp'"):
+        allocate_quality_gated(sleeve_returns, turnovers, method="erc", correlation_shrinkage=0.7)
 
     assert on != off
-    assert erc_off == erc_shrink
 
 
 # ---------------------------------------------------------------------------
@@ -338,7 +372,7 @@ def test_manifest_round_trips_through_real_consumer(tmp_path: Path, kwargs: dict
     sleeves = _three_positive_sleeves()
     manifest = build_allocation_manifest(
         sleeves,
-        source_artifacts=_source_artifacts(tmp_path),
+        source_artifacts=_source_artifacts(tmp_path, sleeves),
         method="hrp",
         gross_cap=1.0,
         **kwargs,
@@ -355,7 +389,7 @@ def test_manifest_on_constructs_the_real_strategy_off_cash(tmp_path: Path) -> No
     sleeves = _three_positive_sleeves()
     manifest = build_allocation_manifest(
         sleeves,
-        source_artifacts=_source_artifacts(tmp_path),
+        source_artifacts=_source_artifacts(tmp_path, sleeves),
         method="hrp",
         gross_cap=1.0,
         turnover_penalty_lambda=1.0,
@@ -407,7 +441,7 @@ def test_penalty_and_shrinkage_are_deterministic_run_twice(tmp_path: Path) -> No
     assert first == second
 
     sleeves = _three_positive_sleeves()
-    source_artifacts = _source_artifacts(tmp_path)
+    source_artifacts = _source_artifacts(tmp_path, sleeves)
     manifest_a = build_allocation_manifest(
         sleeves,
         source_artifacts=source_artifacts,

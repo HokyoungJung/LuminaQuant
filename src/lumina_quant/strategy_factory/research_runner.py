@@ -131,11 +131,12 @@ class _AlignedStrategyBarStore:
         low_price: float,
         close_price: float,
         volume: float,
+        features: Mapping[str, float] | None = None,
     ) -> None:
         token = canonical_symbol(str(symbol))
         if token not in self._rows:
             return
-        self._rows[token] = {
+        row = {
             "datetime": event_time,
             "open": float(open_price),
             "high": float(high_price),
@@ -143,12 +144,14 @@ class _AlignedStrategyBarStore:
             "close": float(close_price),
             "volume": float(volume),
         }
+        row.update(dict(features or {}))
+        self._rows[token] = row
 
-    def get_latest_bar_value(self, symbol: str, value_type: str) -> float:
+    def get_latest_bar_value(self, symbol: str, value_type: str) -> float | None:
         token = canonical_symbol(str(symbol))
         row = self._rows.get(token) or {}
-        value = row.get(str(value_type), 0.0)
-        return float(value) if value is not None else 0.0
+        value = row.get(str(value_type))
+        return float(value) if value is not None else None
 
     def get_latest_bar_datetime(self, symbol: str) -> Any:
         token = canonical_symbol(str(symbol))
@@ -263,6 +266,11 @@ def _simulate_event_driven_strategy_exposures(
     for idx in range(n):
         event_time = datetimes[idx]
         for symbol in canonical_symbols:
+            features = {
+                field: float(aligned[f"{symbol}:{field}"][idx])
+                for field in _FEATURE_POINT_COLUMNS
+                if f"{symbol}:{field}" in aligned
+            }
             bars.set_bar(
                 symbol,
                 event_time,
@@ -271,6 +279,7 @@ def _simulate_event_driven_strategy_exposures(
                 low_price=float(aligned[f"{symbol}:low"][idx]),
                 close_price=float(aligned[f"{symbol}:close"][idx]),
                 volume=float(aligned[f"{symbol}:volume"][idx]),
+                features=features,
             )
 
         if window_capable:
@@ -348,7 +357,14 @@ def _simulate_event_driven_strategy_exposures(
             elif signal_type == "SHORT":
                 position_state[token] = -1.0
             elif signal_type == "EXIT":
-                position_state[token] = 0.0
+                metadata = dict(getattr(signal, "metadata", {}) or {})
+                try:
+                    exit_fraction = float(metadata.get("exit_fraction", 1.0))
+                except TypeError, ValueError:
+                    exit_fraction = 1.0
+                if not math.isfinite(exit_fraction):
+                    exit_fraction = 1.0
+                position_state[token] *= 1.0 - min(1.0, max(0.0, exit_fraction))
             else:
                 raise ValueError(f"unsupported signal type: {signal_type}")
         for symbol, value in position_state.items():

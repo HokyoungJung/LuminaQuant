@@ -321,18 +321,11 @@ class TestFundingCoverage(unittest.TestCase):
         # "absent". round-1 treated bar 0.0 as missing (fallback not in (None, 0.0))
         # and raised on a leveraged run. A real 0.0 bar must skip silently (no raise,
         # no charge) even with no static default.
-        class ZeroBars(MockBars):
-            def get_latest_bar_value(self, symbol, val_type):
-                _ = symbol
-                if val_type == "funding_rate":
-                    return 0.0  # genuine zero funding for this bar
-                return self.close
-
         class Cfg(BaseConfig):
             REQUIRE_FUNDING_COVERAGE = True  # FUNDING_RATE_PER_8H stays 0.0
 
         events = queue.Queue()
-        bars = ZeroBars(datetime(2026, 1, 1, 0, 0), 100.0, funding_rate=None, has_feature=False)
+        bars = MockBars(datetime(2026, 1, 1, 0, 0), 100.0, funding_rate=0.0, has_feature=True)
         p = Portfolio(bars, events, bars.current_dt, Cfg)
         self.assertEqual(p._resolve_funding_rate("BTC/USDT", default=0.0), 0.0)
         p.current_positions["BTC/USDT"] = 1.0

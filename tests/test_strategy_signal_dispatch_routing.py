@@ -491,6 +491,46 @@ def test_flag_on_routes_unmapped_class_through_real_strategy() -> None:
     assert int(np.count_nonzero(r_on[2])) > 0
 
 
+def test_registry_simulator_propagates_funding_and_fails_closed_without_it() -> None:
+    aligned = _aligned_panel()
+    for index, symbol in enumerate(_SYMBOLS):
+        aligned[f"{symbol}:funding_rate"] = (
+            np.linspace(-0.003, -0.0001 * (index + 1), _N)
+            if index < 3
+            else np.linspace(0.003, 0.0001 * (index - 2), _N)
+        )
+    candidate = {
+        "strategy_class": "CrossSectionalFundingMomentumCarryStrategy",
+        "params": {
+            "true_carry_sign": True,
+            "threshold": 0.0,
+            "max_longs": 3,
+            "max_shorts": 3,
+            "min_symbols": 4,
+            "funding_diff_window": 3,
+            "funding_slope_window": 4,
+            "ewma_span": 2,
+            "vol_window": 4,
+            "rebalance_band": 0.0,
+            "max_hold_bars": 50,
+        },
+    }
+    funded = rr._strategy_signal(
+        candidate, aligned=aligned, symbols=_SYMBOLS, scoring_config=_ROUTE_ON
+    )
+    missing = rr._strategy_signal(
+        candidate,
+        aligned={key: value for key, value in aligned.items() if not key.endswith(":funding_rate")},
+        symbols=_SYMBOLS,
+        scoring_config=_ROUTE_ON,
+    )
+
+    assert funded[3].get("evaluation_mode") == "registry_simulator"
+    assert np.count_nonzero(funded[1]) > 0
+    assert np.count_nonzero(funded[0]) > 0
+    assert np.count_nonzero(missing[1]) == 0
+
+
 def test_flag_on_real_route_is_params_sensitive() -> None:
     base = _signal("CrossSectionalNearHighAnchoringStrategy", dict(_NEAR_HIGH_PARAMS), _ROUTE_ON)
     wide = _signal(

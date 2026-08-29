@@ -229,7 +229,10 @@ def test_u41_disabled_quality_empty_state_restores_without_unfrozen_read(preflig
     overlay.set_state(state)
 
     assert overlay.get_state() == state
-    assert config.runtime_read_audit == ("STRATEGY_QUALITY_ENABLED",)
+    assert config.runtime_read_audit == (
+        "STRATEGY_QUALITY_ENABLED",
+        "STRATEGY_QUALITY_MIN_HOLD_BARS",
+    )
 
 
 def test_u41_unknown_or_private_rt_read_fails_closed_and_audit_is_deterministic(

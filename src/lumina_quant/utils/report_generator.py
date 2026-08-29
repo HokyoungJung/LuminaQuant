@@ -2,7 +2,7 @@ import json
 import math
 import os
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 import numpy as np
@@ -27,7 +27,7 @@ class ReportGenerator:
 
     def generate_report(self, report_type="Backtest", strategy_name="Unknown", source_dir="."):
         """Generate a local report artifact pair (md + json)."""
-        date_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        date_str = datetime.now(UTC).strftime("%Y-%m-%d_%H-%M-%S")
         md_path = os.path.join(self.output_dir, f"{report_type}_Report_{date_str}.md")
         json_path = os.path.join(self.output_dir, f"{report_type}_Report_{date_str}.json")
 
@@ -57,7 +57,7 @@ class ReportGenerator:
         }
 
         payload = {
-            "generated_at": datetime.now().isoformat(),
+            "generated_at": datetime.now(UTC).isoformat(),
             "report_type": report_type,
             "strategy": strategy_name,
             "strategy_params": params,

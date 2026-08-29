@@ -8,6 +8,20 @@ from .moving_average import exponential_moving_average, simple_moving_average
 from .rolling_stats import sample_std
 
 
+def internal_bar_strength(high, low, close) -> float | None:
+    """Return the close's location within the bar range on ``[0, 1]``."""
+    try:
+        high_f, low_f, close_f = float(high), float(low), float(close)
+    except TypeError, ValueError:
+        return None
+    if not all(math.isfinite(value) for value in (high_f, low_f, close_f)):
+        return None
+    bar_range = high_f - low_f
+    if bar_range <= 0.0 or not low_f <= close_f <= high_f:
+        return None
+    return (close_f - low_f) / bar_range
+
+
 def relative_strength_index(values, *, period: int = 14) -> float | None:
     """Return latest RSI computed from close values."""
     period_i = max(1, int(period))

@@ -193,10 +193,13 @@ def test_upper_bound_caps_are_respected() -> None:
         assert value <= 0.4 + 1e-9
 
 
-def test_empty_and_mismatched_inputs_return_empty() -> None:
+def test_empty_inputs_return_empty_and_mismatched_inputs_raise_value_error() -> None:
     assert ox.ERCPortfolio().allocate([], np.zeros((0, 0))) == {}
-    # Column count mismatched with ids -> empty (defensive, no crash).
-    assert ox.HRPPortfolio().allocate(["A", "B"], np.zeros((10, 3))) == {}
+    with pytest.raises(ValueError) as exc_info:
+        ox.HRPPortfolio().allocate(["A", "B"], np.zeros((10, 3)))
+    assert (
+        str(exc_info.value) == "returns_matrix must be finite with shape (observations, len(ids))"
+    )
 
 
 # ---------------------------------------------------------------------------

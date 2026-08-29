@@ -1821,9 +1821,9 @@
   },
   "integrity": {
     "canonicalization": "json.dumps(value,sort_keys=True,separators=(\",\",\":\"),ensure_ascii=False,allow_nan=False).encode(\"utf-8\")",
-    "config_payload_sha256": "9222f4cecc3186934504986b9ca2277ba21c23a1f7415284fd4b3b7a327f35c6",
+    "config_payload_sha256": "46afc10dc091b04eeebf8e65dee57f5d08fdd7bf66fdb9b982787425bd261c38",
     "config_payload_sha256_scope": "entire_document_with_integrity.config_payload_sha256_omitted",
-    "runtime_contract_sha256": "a6c945e43870c3d45e0f5f745e689eb75d68d82e0da07d22918df29e14ada753"
+    "runtime_contract_sha256": "e3467cc20ab85d9c9b4fe5ee82992422bf02eda26c5cdde7a72b70a93f959b94"
   },
   "metrics_and_statistics": {
     "gate_mdd": "max(full_event_mdd,reporting_4h_mdd)",
@@ -1960,6 +1960,7 @@
       "ENFORCE_ORDER_RISK_GATE_IN_BACKTEST",
       "ENFORCE_REDUCE_ONLY",
       "FREEZE_NEW_ENTRIES_ON_BREACH",
+      "FUNDING_ENTRY_GUARD",
       "FUNDING_INTERVAL_HOURS",
       "FUNDING_ON_UTC_BOUNDARY",
       "FUNDING_RATE_PER_8H",
@@ -2010,6 +2011,8 @@
       "SPREAD_RATE",
       "START_DATE",
       "STRATEGY_QUALITY_ENABLED",
+      "STRATEGY_QUALITY_MIN_HOLD_BARS",
+      "STRATEGY_QUALITY_NO_TRADE_BAND_BPS",
       "SYMBOLS",
       "SYMBOL_LIMITS",
       "TAKER_FEE_RATE",
@@ -2136,6 +2139,7 @@
       "ENFORCE_REDUCE_ONLY": true,
       "FREEZE_NEW_ENTRIES_ON_BREACH": true,
       "FUNDING_INTERVAL_HOURS": 8,
+      "FUNDING_ENTRY_GUARD": false,
       "FUNDING_ON_UTC_BOUNDARY": true,
       "FUNDING_RATE_PER_8H": 0.0,
       "GPU_MODE": "cpu",
@@ -2182,6 +2186,8 @@
       "SORTINO_TARGET_MODE": "zero",
       "SPREAD_RATE": 0.0002,
       "STRATEGY_QUALITY_ENABLED": false,
+      "STRATEGY_QUALITY_MIN_HOLD_BARS": 0,
+      "STRATEGY_QUALITY_NO_TRADE_BAND_BPS": 0.0,
       "SYMBOL_LIMITS": {
         "ADAUSDT": {
           "min_notional": 5.0,

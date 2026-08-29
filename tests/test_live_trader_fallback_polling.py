@@ -69,7 +69,8 @@ def test_startup_reconciliation_timeout_enters_degraded_mode_when_not_hard_fail(
     trader._recovery_service = _RecoveryService()
     trader._run_startup_reconciliation_gate()
 
-    assert trader._startup_reconciliation_complete is True
+    assert trader._startup_reconciliation_complete is False
+    assert trader._startup_state == "degraded"
     assert trader.portfolio.trading_frozen is False
     assert any(
         reason == "STARTUP_RECONCILIATION_DEGRADED" for reason, _ in trader.audit_store.events
