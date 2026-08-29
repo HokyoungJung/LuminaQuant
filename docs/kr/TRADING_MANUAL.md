@@ -30,33 +30,27 @@ LuminaQuant에서는 반복문 안에서 직접 "주문을 넣는" 방식이 아
 ```python
 # LONG (매수)
 # signal_type="LONG" -> 시스템이 양(+)의 수량을 매수
-self.events.put(SignalEvent(
-    strategy_id=1,
-    symbol="BTC/USDT",
-    datetime=event.time,
-    signal_type="LONG",
-    strength=1.0
-))
+self.events.put(
+    SignalEvent(
+        strategy_id=1, symbol="BTC/USDT", datetime=event.time, signal_type="LONG", strength=1.0
+    )
+)
 
 # SHORT (매도/공매도)
 # signal_type="SHORT" -> 시스템이 매도(공매도 오픈)
-self.events.put(SignalEvent(
-    strategy_id=1,
-    symbol="BTC/USDT",
-    datetime=event.time,
-    signal_type="SHORT",
-    strength=1.0
-))
+self.events.put(
+    SignalEvent(
+        strategy_id=1, symbol="BTC/USDT", datetime=event.time, signal_type="SHORT", strength=1.0
+    )
+)
 
 # EXIT (포지션 청산)
 # signal_type="EXIT" -> 시스템이 현재 보유량을 계산하여 청산(0으로 만듦)
-self.events.put(SignalEvent(
-    strategy_id=1,
-    symbol="BTC/USDT",
-    datetime=event.time,
-    signal_type="EXIT",
-    strength=1.0
-))
+self.events.put(
+    SignalEvent(
+        strategy_id=1, symbol="BTC/USDT", datetime=event.time, signal_type="EXIT", strength=1.0
+    )
+)
 ```
 
 ---
@@ -84,8 +78,8 @@ if self.mode == "LIVE":
         quantity=0.1,
         params={
             "sl": 1.0500,  # 손절가 (Stop Loss Price)
-            "tp": 1.0700   # 익절가 (Take Profit Price)
-        }
+            "tp": 1.0700,  # 익절가 (Take Profit Price)
+        },
     )
 ```
 

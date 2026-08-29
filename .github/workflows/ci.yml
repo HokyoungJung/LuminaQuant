@@ -266,9 +266,12 @@ jobs:
       - name: Sync GPU dependencies
         run: uv sync --group dev --extra gpu
 
+      - name: Build native extensions
+        run: uv run --group dev python scripts/build_native_backends.py
+
       - name: GPU contract tests
         run: |
-          uv run pytest -q \
+          uv run --group dev pytest -q \
             tests/test_compute_engine.py \
             tests/test_verify_polars_gpu_runtime_script.py
 
@@ -301,6 +304,9 @@ jobs:
 
       - name: Sync GPU dependencies
         run: uv sync --group dev --extra gpu
+
+      - name: Build native extensions
+        run: uv run --group dev python scripts/build_native_backends.py
 
       - name: NVIDIA inventory
         run: nvidia-smi

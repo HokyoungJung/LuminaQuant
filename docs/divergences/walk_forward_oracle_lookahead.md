@@ -18,9 +18,9 @@ The shared MA-cross reference implementation (`ma_cross_equity` in
 
 ```python
 # BEFORE (lookahead):
-signal = np.where(short_ma > long_ma, 1.0, -1.0)   # MA at bar i INCLUDES close[i]
+signal = np.where(short_ma > long_ma, 1.0, -1.0)  # MA at bar i INCLUDES close[i]
 signal[:long_w] = 0.0
-daily_ret = np.diff(close, prepend=close[0]) / close   # denominator = close[i] (wrong)
+daily_ret = np.diff(close, prepend=close[0]) / close  # denominator = close[i] (wrong)
 equity = 10_000.0 * np.cumprod(1.0 + signal * daily_ret)  # signal[i] earns daily_ret[i]
 ```
 
@@ -35,8 +35,8 @@ Two defects:
 
 ```python
 # AFTER (causal, no lookahead):
-ret[i]  = (close[i] - close[i-1]) / close[i-1]   # prior-close denominator
-equity  = 10_000.0 * np.cumprod(1.0 + signal[i-1] * ret[i])  # prior-bar signal
+ret[i] = (close[i] - close[i - 1]) / close[i - 1]  # prior-close denominator
+equity = 10_000.0 * np.cumprod(1.0 + signal[i - 1] * ret[i])  # prior-bar signal
 ```
 
 Implemented via a single shared helper `_lagged_strategy_returns(prices, signal)`

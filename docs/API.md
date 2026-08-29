@@ -12,6 +12,7 @@ Strategies inherit from the `Strategy` abstract base class.
 from lumina_quant.strategy import Strategy
 from lumina_quant.core.events import SignalEvent
 
+
 class MyStrategy(Strategy):
     def __init__(self, bars, events, my_param=10):
         """
@@ -33,11 +34,11 @@ class MyStrategy(Strategy):
                 # 1. Get Data
                 # get_latest_bars_values(symbol, "close", N) returns list of floats
                 closes = self.bars.get_latest_bars_values(s, "close", N=self.my_param)
-                
+
                 # 2. Logic
                 if len(closes) < self.my_param:
                     continue
-                
+
                 # 3. Generate Signal
                 if closes[-1] > closes[0]:
                     # SignalEvent(strategy_id, symbol, datetime, signal_type, strength)

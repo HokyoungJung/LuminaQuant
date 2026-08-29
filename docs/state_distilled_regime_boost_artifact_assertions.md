@@ -9,7 +9,10 @@ assert summary["strategy_validity"]["calendar_primary"] is False
 assert summary["selection"]["uses_locked_oos_for_selection"] is False
 assert summary["selection"]["locked_oos_metrics_visible_during_selection"] is False
 assert summary["selection"]["candidate_freeze_before_locked_oos_gate"] is True
-assert summary["selection"]["freeze_artifact_hash"] == summary["locked_oos_gate"]["freeze_artifact_hash"]
+assert (
+    summary["selection"]["freeze_artifact_hash"]
+    == summary["locked_oos_gate"]["freeze_artifact_hash"]
+)
 assert summary["selection"]["evaluated_count"] <= min(
     summary["selection"]["configured_grid_limit"],
     256,

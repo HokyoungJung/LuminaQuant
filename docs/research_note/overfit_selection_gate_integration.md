@@ -228,7 +228,7 @@ from lumina_quant.strategy_factory.research_metrics import cross_trial_pbo_rejec
 
 reject_run_tail = cross_trial_pbo_rejects_run(
     candidate_fold_return_matrix,
-    max_cross_trial_pbo=0.50,   # from research.max_cross_trial_pbo
+    max_cross_trial_pbo=0.50,  # from research.max_cross_trial_pbo
     enabled=True,
 )
 ```
@@ -263,6 +263,7 @@ STRICT = {
     "pbo_gate_ceiling": 0.50,
 }
 
+
 def admit_fold(candidate_rows):
     # candidate_rows carry a 'validation' block with deflated_sharpe (whole-search
     # deflated), spa_pvalue, pbo, plus symbols/family/strategy_class/timeframe.
@@ -275,6 +276,7 @@ def admit_fold(candidate_rows):
         max_per_family_basket=1,
         enabled=True,
     )
+
 
 def stamp_merge(consolidated_rows):
     # Re-run the SAME gate at the merge/consolidation boundary so a candidate that

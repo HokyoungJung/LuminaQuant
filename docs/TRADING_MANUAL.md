@@ -30,33 +30,27 @@ Inside your strategy's `calculate_signals(self, event)` method:
 ```python
 # LONG (Buy)
 # signal_type="LONG" -> System buys positive quantity
-self.events.put(SignalEvent(
-    strategy_id=1,
-    symbol="BTC/USDT",
-    datetime=event.time,
-    signal_type="LONG",
-    strength=1.0
-))
+self.events.put(
+    SignalEvent(
+        strategy_id=1, symbol="BTC/USDT", datetime=event.time, signal_type="LONG", strength=1.0
+    )
+)
 
 # SHORT (Sell)
 # signal_type="SHORT" -> System sells (opens short)
-self.events.put(SignalEvent(
-    strategy_id=1,
-    symbol="BTC/USDT",
-    datetime=event.time,
-    signal_type="SHORT",
-    strength=1.0
-))
+self.events.put(
+    SignalEvent(
+        strategy_id=1, symbol="BTC/USDT", datetime=event.time, signal_type="SHORT", strength=1.0
+    )
+)
 
 # EXIT (Close Position)
 # signal_type="EXIT" -> System calculates current qty and flattens it
-self.events.put(SignalEvent(
-    strategy_id=1,
-    symbol="BTC/USDT",
-    datetime=event.time,
-    signal_type="EXIT",
-    strength=1.0
-))
+self.events.put(
+    SignalEvent(
+        strategy_id=1, symbol="BTC/USDT", datetime=event.time, signal_type="EXIT", strength=1.0
+    )
+)
 ```
 
 ---
@@ -88,18 +82,15 @@ if self.mode == "LIVE":
         quantity=0.1,
         params={
             "sl": 1.0500,  # Stop Loss Price
-            "tp": 1.0700   # Take Profit Price
-        }
+            "tp": 1.0700,  # Take Profit Price
+        },
     )
 ```
 
 #### Binance USDⓈ-M Futures (Native)
 Similar to MT5, pass `stopLoss` or `takeProfit` if supported, or send separate OCO orders.
 ```python
-params = {
-    "stopLoss": { "triggerPrice": 49000 },
-    "takeProfit": { "triggerPrice": 55000 }
-}
+params = {"stopLoss": {"triggerPrice": 49000}, "takeProfit": {"triggerPrice": 55000}}
 ```
 
 ### Method B: Soft TP/SL (Strategy Side)
