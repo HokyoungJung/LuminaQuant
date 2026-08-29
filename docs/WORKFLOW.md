@@ -13,15 +13,14 @@ This repository uses a dual-branch strategy to maintain a **private codebase** (
 - Treat local `private-main` as the working source of truth after it has been
   synchronized to `private/main`; worker worktrees are temporary evidence lanes,
   not final integration targets.
-- Before a broad `omx team` run, keep the leader workspace clean. If GitNexus
-  refreshes generated context first, commit that local context update before
-  opening worker worktrees.
+- Before a broad `omx team` run, keep the leader workspace clean. Keep the
+  local `.codegraph/` index out of commits and let CodeGraph auto-sync it.
 - Do not merge worker worktree changes or push `private/main` until the leader
-  has run the agreed verification gates, changed-file deslop review, GitNexus
-  status/detect fallback, and staged diff checks.
-- If GitNexus reports a stale index, run `npx gitnexus analyze` before symbol
-  renames/extractions/splits. Run `npx gitnexus detect-changes` before commit
-  when available; otherwise document the CLI/status fallback used.
+  has run the agreed verification gates, changed-file deslop review,
+  `codegraph status` when the repo is indexed, and staged diff checks.
+- If CodeGraph reports a stale index, run `codegraph sync` before symbol
+  renames/extractions/splits. If the repo is not indexed, skip CodeGraph rather
+  than creating an index as a side effect of verification.
 
 ## 1. Branch Structure
 

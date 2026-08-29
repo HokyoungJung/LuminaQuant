@@ -11,18 +11,18 @@
 - `private-main`: 연구/운영 전체 코드(전략, 내부 도구, 민감 워크플로우 포함)
 - `main`: 공개 배포용 브랜치(핵심 엔진 중심)
 
-## 0. Worktree / GitNexus 운영 규칙
+## 0. Worktree / CodeGraph 운영 규칙
 
 - `private-main`을 `private/main`과 동기화한 뒤에는 로컬 `private-main`을 작업 기준으로 봅니다.
   worker worktree는 임시 evidence lane일 뿐 최종 integration target이 아닙니다.
-- broad `omx team` 실행 전 leader workspace는 깨끗해야 합니다. GitNexus refresh가 먼저
-  AGENTS/CLAUDE context를 갱신했다면 worker worktree를 열기 전에 그 context update를
-  로컬 commit으로 고정합니다.
-- worker worktree 변경은 leader가 검증 gate, changed-file deslop review, GitNexus
-  status/detect fallback, staged diff check를 모두 확인하기 전까지 merge/push하지 않습니다.
-- GitNexus index가 stale이면 symbol rename/extract/split 전에 `npx gitnexus analyze`를
-  실행합니다. commit 전에는 가능한 경우 `npx gitnexus detect-changes`를 실행하고,
-  불가능하면 사용한 CLI/status fallback을 handoff에 기록합니다.
+- broad `omx team` 실행 전 leader workspace는 깨끗해야 합니다. 로컬 `.codegraph/`
+  index는 commit하지 않고 CodeGraph의 auto-sync에 맡깁니다.
+- worker worktree 변경은 leader가 검증 gate, changed-file deslop review, repo가
+  index된 경우 `codegraph status`, staged diff check를 모두 확인하기 전까지
+  merge/push하지 않습니다.
+- CodeGraph index가 stale이면 symbol rename/extract/split 전에 `codegraph sync`를
+  실행합니다. repo가 index되지 않았다면 verification 부작용으로 새 index를 만들지
+  말고 CodeGraph 단계를 건너뜁니다.
 
 ## 1. Public 브랜치 제거 대상
 

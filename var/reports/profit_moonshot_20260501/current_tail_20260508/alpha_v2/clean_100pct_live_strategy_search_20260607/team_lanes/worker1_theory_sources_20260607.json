@@ -1,0 +1,23 @@
+{
+  "created_at": "2026-06-07T07:03:30Z",
+  "ultragoal_story": "G002-contamination-and-eligibility-audit",
+  "sources": [
+    {
+      "topic": "backtest_overfitting",
+      "url": "https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2308659"
+    },
+    {
+      "topic": "time_series_momentum",
+      "url": "https://www.aqr.com/insights/research/journal-article/time-series-momentum"
+    },
+    {
+      "topic": "volatility_managed_portfolios",
+      "url": "https://www.nber.org/papers/w22208"
+    },
+    {
+      "topic": "trading_costs",
+      "url": "https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3229719"
+    }
+  ],
+  "conclusion": "source-backed families are trend/vol/risk/cost-aware only; no source justifies OOS-inspired promotion or arbitrary hardcoded rules"
+}

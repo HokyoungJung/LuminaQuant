@@ -43,7 +43,7 @@ The cleanup script deliberately preserves:
 - `.env`
 - `.venv` (kept so verification can run without reinstalling)
 - `best_optimized_parameters/`
-- `.gitnexus/` (refresh with `npx gitnexus analyze` after source changes)
+- `.codegraph/` (local CodeGraph index; refresh with `codegraph sync` when needed)
 - native Rust release build outputs under `native/rust_*/target/` (optional accelerators loaded by Python wrappers)
 
-Optional flags exist for explicit local-only cleanup of `.gitnexus/parse-cache`, `.venv`, or native Rust `target/` directories, but those are off by default.
+Optional flags exist for explicit local-only cleanup of `.venv` or native Rust `target/` directories, but those are off by default.

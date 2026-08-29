@@ -89,6 +89,7 @@ PRESERVED_ROOTS: tuple[Path, ...] = (
     Path(".omx/goals"),
     Path(".omx/interviews"),
     Path(".omx/manual-worktrees"),
+    Path(".codegraph"),
     Path("native/rust_metrics/target"),
     Path("native/rust_rawfirst/target"),
     Path("native/rust_hybrid_optuna/target"),
@@ -97,7 +98,6 @@ PRESERVED_ROOTS: tuple[Path, ...] = (
 
 WALK_PRUNE_DIRS: tuple[Path, ...] = (
     *PRESERVED_ROOTS,
-    Path(".gitnexus"),
     Path("apps/dashboard_web/node_modules"),
     Path("apps/dashboard_web/.next"),
 )
@@ -141,7 +141,6 @@ def _make_candidate(
 def _explicit_candidates(
     root: Path,
     *,
-    include_gitnexus_parse_cache: bool = False,
     include_venv: bool = False,
     include_native_targets: bool = False,
 ) -> list[CleanupCandidate]:
@@ -156,16 +155,6 @@ def _explicit_candidates(
             candidate = _make_candidate(root, rel_text, reason, allow_preserved=True)
             if candidate is not None:
                 candidates.append(candidate)
-
-    if include_gitnexus_parse_cache:
-        candidate = _make_candidate(
-            root,
-            ".gitnexus/parse-cache",
-            "GitNexus parser cache",
-            allow_preserved=True,
-        )
-        if candidate is not None:
-            candidates.append(candidate)
 
     if include_venv:
         candidate = _make_candidate(
@@ -231,7 +220,6 @@ def _collapse_candidates(candidates: list[CleanupCandidate]) -> tuple[CleanupCan
 def discover_candidates(
     repo_root: Path,
     *,
-    include_gitnexus_parse_cache: bool = False,
     include_venv: bool = False,
     include_native_targets: bool = False,
 ) -> tuple[CleanupCandidate, ...]:
@@ -239,7 +227,6 @@ def discover_candidates(
     root = _normalize_repo_root(repo_root)
     candidates = _explicit_candidates(
         root,
-        include_gitnexus_parse_cache=include_gitnexus_parse_cache,
         include_venv=include_venv,
         include_native_targets=include_native_targets,
     )
@@ -264,7 +251,6 @@ def run_cleanup(
     repo_root: Path,
     *,
     apply: bool = False,
-    include_gitnexus_parse_cache: bool = False,
     include_venv: bool = False,
     include_native_targets: bool = False,
 ) -> CleanupSummary:
@@ -272,7 +258,6 @@ def run_cleanup(
     root = _normalize_repo_root(repo_root)
     candidates = discover_candidates(
         root,
-        include_gitnexus_parse_cache=include_gitnexus_parse_cache,
         include_venv=include_venv,
         include_native_targets=include_native_targets,
     )
@@ -307,11 +292,6 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--repo-root", type=Path, default=Path.cwd(), help="repository root")
     parser.add_argument("--apply", action="store_true", help="delete discovered candidates")
     parser.add_argument(
-        "--include-gitnexus-parse-cache",
-        action="store_true",
-        help="also remove .gitnexus/parse-cache; the index can be rebuilt with npx gitnexus analyze",
-    )
-    parser.add_argument(
         "--include-venv",
         action="store_true",
         help="also remove .venv; off by default to keep local verification cheap",
@@ -334,7 +314,6 @@ def main(argv: list[str] | None = None) -> int:
     summary = run_cleanup(
         args.repo_root,
         apply=args.apply,
-        include_gitnexus_parse_cache=args.include_gitnexus_parse_cache,
         include_venv=args.include_venv,
         include_native_targets=args.include_native_targets,
     )
