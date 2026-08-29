@@ -7070,14 +7070,15 @@ def _alpha_max_training_day_checkpoint_bytes(
     previous_data_sha256: str,
 ) -> bytes:
     """Encode the complete, typed continuation state for one settled UTC day."""
-    if (
-        type(carry) is not _AlphaMaxDailyCarry
-        or not math.isfinite(endpoint_equity)
-        or endpoint_equity <= 0.0
-        or not math.isfinite(daily_return)
-        or ordinal <= 0
-        or re.fullmatch(r"[0-9a-f]{64}|", previous_data_sha256) is None
-    ):
+    if type(carry) is not _AlphaMaxDailyCarry:
+        raise AlphaMaxRuntimeContractError("alpha_max_training_day_checkpoint_invalid")
+    if not math.isfinite(endpoint_equity):
+        raise AlphaMaxRuntimeContractError("alpha_max_training_day_endpoint_nonfinite")
+    if endpoint_equity == 0.0:
+        raise AlphaMaxRuntimeContractError("alpha_max_training_day_endpoint_zero")
+    if not math.isfinite(daily_return):
+        raise AlphaMaxRuntimeContractError("alpha_max_training_day_return_nonfinite")
+    if ordinal <= 0 or re.fullmatch(r"[0-9a-f]{64}|", previous_data_sha256) is None:
         raise AlphaMaxRuntimeContractError("alpha_max_training_day_checkpoint_invalid")
     ledger = [
         {
@@ -7304,7 +7305,7 @@ def _alpha_max_training_day_from_checkpoint(
         ) from exc
     if (
         not math.isfinite(endpoint_equity)
-        or endpoint_equity <= 0.0
+        or endpoint_equity == 0.0
         or not math.isfinite(daily_return)
         or endpoint_equity.hex() != value["endpoint_equity_hex"]
         or daily_return.hex() != value["daily_return_hex"]
@@ -12987,9 +12988,10 @@ def _alpha_max_replay_training_component_worker(
     item: _AlphaMaxTrainingWorkerItem,
 ) -> _AlphaMaxTrainingWorkerResult:
     """Spawn worker with only primitive transport and fresh local authority."""
-    component_id = (
+    raw_component_id = (
         item[0] if type(item) is tuple and len(item) == 3 and type(item[0]) is str else ""
     )
+    component_id = raw_component_id if raw_component_id in _ALPHA_MAX_COMPONENT_IDS else "unknown"
     try:
         if (
             type(item) is not tuple
@@ -13189,13 +13191,19 @@ def _alpha_max_replay_training_component_worker(
                 os.close(output_fd)
             os.close(parent_fd)
     except BaseException as exc:
+        raw_token = str(exc) if type(exc) is AlphaMaxRuntimeContractError else type(exc).__name__
         token = (
-            str(exc)
-            if type(exc) is AlphaMaxRuntimeContractError
-            and re.fullmatch(r"[a-z0-9_:-]{1,128}", str(exc)) is not None
-            else type(exc).__name__
+            raw_token
+            if re.fullmatch(r"[a-z0-9_:-]{1,128}", raw_token) is not None
+            else re.sub(r"[^a-z0-9_]+", "_", type(exc).__name__.lower()).strip("_")[:64]
+            or "exception"
         )
-        return component_id, "semantic_failure", b"", token
+        print(
+            f"alpha_max_training_worker_failure:{component_id}:{token}",
+            file=sys.stderr,
+            flush=True,
+        )
+        return raw_component_id, "semantic_failure", b"", token
 
 
 def _run_alpha_max_training_component_workers(

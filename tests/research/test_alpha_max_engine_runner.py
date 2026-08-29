@@ -2830,6 +2830,27 @@ def test_native_finalization_receipt_seals_atomic_barrier_coverage_fail_closed()
         discarded_signal_sha256=hashlib.sha256(b"").hexdigest(),
     )
     assert receipt.to_payload()["native_coverage_by_child"][child_id] == coverage
+    historical_key = "2025-06-07"
+    historical_coverage = {
+        **coverage,
+        "completed_native_keys": [
+            ["BTCUSDT", historical_key],
+            ["BTCUSDT", key],
+            ["ETHUSDT", historical_key],
+            ["ETHUSDT", key],
+        ],
+        "completed_native_count_by_symbol": {"BTCUSDT": 2, "ETHUSDT": 2},
+    }
+    historical_receipt = alpha_max_evidence.build_alpha_max_native_finalization_receipt(
+        boundary_utc=datetime(2025, 6, 9, tzinfo=UTC),
+        finalized_children={child_id: 1},
+        native_coverage_by_child={child_id: historical_coverage},
+        discarded_signal_count=0,
+        discarded_signal_sha256=hashlib.sha256(b"").hexdigest(),
+    )
+    assert (
+        historical_receipt.to_payload()["native_coverage_by_child"][child_id] == historical_coverage
+    )
 
     for poison in (
         {"barrier_closed_keys": []},
@@ -2844,6 +2865,23 @@ def test_native_finalization_receipt_seals_atomic_barrier_coverage_fail_closed()
                 discarded_signal_count=0,
                 discarded_signal_sha256=hashlib.sha256(b"").hexdigest(),
             )
+
+
+@pytest.mark.parametrize("component_id", ("bad\ncomponent", "x" * 1024))
+def test_training_worker_failure_diagnostic_is_bounded(
+    component_id: str,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    result = alpha_max_runner._alpha_max_replay_training_component_worker((component_id, b"", ""))
+    assert result == (
+        component_id,
+        "semantic_failure",
+        b"",
+        "alpha_max_training_worker_start_method_invalid",
+    )
+    assert capsys.readouterr().err == (
+        "alpha_max_training_worker_failure:unknown:alpha_max_training_worker_start_method_invalid\n"
+    )
 
 
 @pytest.mark.parametrize(

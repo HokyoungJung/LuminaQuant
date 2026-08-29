@@ -1241,6 +1241,44 @@ def test_training_day_checkpoint_rejects_tamper_and_out_of_order(
     )
     assert restored == carry
     assert (endpoint, daily_return) == (10_100.0, 0.01)
+    negative_payload = runner._alpha_max_training_day_checkpoint_bytes(
+        component_id=context.manifest.row_id,
+        manifest=context.manifest,
+        prefix_sha256="a" * 64,
+        day_start=day,
+        carry=carry,
+        calendar_day="2024-01-02",
+        endpoint_equity=-100.0,
+        daily_return=-1.01,
+        ordinal=1,
+        previous_data_sha256="",
+    )
+    _, negative_endpoint, negative_return = runner._alpha_max_training_day_from_checkpoint(
+        negative_payload,
+        component_id=context.manifest.row_id,
+        manifest=context.manifest,
+        prefix_sha256="a" * 64,
+        expected_day_start=day,
+        ordinal=1,
+        previous_data_sha256="",
+    )
+    assert (negative_endpoint, negative_return) == (-100.0, -1.01)
+    with pytest.raises(
+        runner.AlphaMaxRuntimeContractError,
+        match="alpha_max_training_day_endpoint_zero",
+    ):
+        runner._alpha_max_training_day_checkpoint_bytes(
+            component_id=context.manifest.row_id,
+            manifest=context.manifest,
+            prefix_sha256="a" * 64,
+            day_start=day,
+            carry=carry,
+            calendar_day="2024-01-02",
+            endpoint_equity=0.0,
+            daily_return=-1.0,
+            ordinal=1,
+            previous_data_sha256="",
+        )
     with pytest.raises(runner.AlphaMaxRuntimeContractError):
         runner._alpha_max_training_day_from_checkpoint(
             payload,

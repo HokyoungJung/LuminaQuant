@@ -358,6 +358,37 @@ def test_near_high_full_state_matches_monolithic_across_partial_barrier_chunk() 
     }
 
 
+def test_near_high_full_state_restores_completed_history_without_barrier_cache() -> None:
+    symbols = ["ADAUSDT", "BTCUSDT"]
+    params = {
+        "admitted_symbols": symbols,
+        "min_symbols": 2,
+        "min_history_bars": 2,
+        "rebalance_bars": 1,
+        "vol_window": 2,
+    }
+    strategy = ResearchOnlyDailyCrossSectionalNearHighAnchoringStrategy(
+        _Bars(symbols), _Queue(), **params
+    )
+    strategy.calculate_signals_window(
+        _event_for(
+            {
+                "ADAUSDT": _bar(_dt(1), 100.0, high=105.0),
+                "BTCUSDT": _bar(_dt(1), 110.0, high=115.0),
+            }
+        )
+    )
+    snapshot = strategy.get_state()
+    snapshot["_alpha_max_chunk_state"]["barrier_pending"] = {}
+    snapshot["_alpha_max_chunk_state"]["barrier_closed"] = []
+
+    resumed = ResearchOnlyDailyCrossSectionalNearHighAnchoringStrategy(
+        _Bars(symbols), _Queue(), **params
+    )
+    resumed.set_state(snapshot)
+    assert resumed.get_state() == snapshot
+
+
 def test_near_high_full_state_preserves_failed_duplicate_and_partial_error() -> None:
     symbols = ["ADAUSDT", "BTCUSDT"]
     params = {

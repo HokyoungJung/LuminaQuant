@@ -843,13 +843,17 @@ class ResearchOnlyDailyCrossSectionalNearHighAnchoringStrategy(
                 or not isinstance(item[0], str)
                 or item[0] not in self._alpha_max_admitted_symbols
                 or not isinstance(item[1], str)
-                or item[1] not in closed_state
+                or not item[1]
             ):
                 raise ValueError("invalid_alpha_max_near_high_chunk_state")
             completed_state.add((item[0], item[1]))
-        if len(completed_state) != len(raw_completed) or completed_state != {
-            (symbol, key) for key in closed_state for symbol in self._alpha_max_admitted_symbols
-        }:
+        if (
+            len(completed_state) != len(raw_completed)
+            or not {
+                (symbol, key) for key in closed_state for symbol in self._alpha_max_admitted_symbols
+            }
+            <= completed_state
+        ):
             raise ValueError("invalid_alpha_max_near_high_chunk_state")
 
         raw_counts = raw_chunk.get("completed_native_count_by_symbol")

@@ -7430,7 +7430,7 @@ def _freeze_alpha_max_native_coverage(
             }
             if (
                 pending != closed
-                or completed_set != expected_completed
+                or not expected_completed <= completed_set
                 or set(finalized_completed) != expected_finalized
                 or len(finalized_barriers) != finalized_count
             ):
