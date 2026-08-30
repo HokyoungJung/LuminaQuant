@@ -372,7 +372,12 @@ def test_consumer_open_time_identity_mutations_fail_closed_before_events(
         target = Path(path)
         payload = target.read_bytes()
         if mutation == "same_bytes_rewrite":
+            before = target.stat()
             target.write_bytes(payload)
+            os.utime(
+                target,
+                ns=(before.st_atime_ns, max(before.st_mtime_ns, target.stat().st_mtime_ns) + 1),
+            )
         else:
             replacement = target.with_name("atomic-identical.json")
             replacement.write_bytes(payload)

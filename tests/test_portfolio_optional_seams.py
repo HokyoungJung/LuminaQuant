@@ -854,6 +854,11 @@ def test_funding_boundary_resolver_settles_each_crossed_boundary_independently()
     assert portfolio.total_funding_paid == pytest.approx(0.75)
     assert portfolio.current_holdings["cash"] == pytest.approx(999.25)
     assert portfolio.current_holdings["funding"] == pytest.approx(0.75)
+    assert portfolio._funding_exposure_cursor["BTC"] >= portfolio._last_funding_ts["BTC"]
+
+    restored, _ = _portfolio(funding_boundary_resolver=_Resolver())
+    restored.set_state(portfolio.get_state())
+    assert restored.get_state() == portfolio.get_state()
 
 
 def test_funding_boundary_resolver_failure_is_atomic_without_portfolio_access():

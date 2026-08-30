@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from collections import deque
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 
 import polars as pl
 import pytest
@@ -488,6 +489,24 @@ def test_warmup_end_hook_fires_in_continuation_chunk_via_had_warmup():
 
     assert _ProbeHookStrategy.hook_fired_total == 1
     assert backtest.get_engine_state().get("had_warmup") is True
+
+
+def test_engine_state_restores_false_warmup_and_absent_live_boundary_exactly():
+    engine = TradingEngine(
+        None,
+        None,
+        SimpleNamespace(uses_timeframe_aggregator=False),
+        None,
+        None,
+    )
+    engine._had_warmup = True
+    engine._live_start_ms = 123
+
+    engine.set_engine_state({"had_warmup": False, "live_start_ms": None})
+
+    state = engine.get_engine_state()
+    assert state["had_warmup"] is False
+    assert state["live_start_ms"] is None
 
 
 def test_warmup_restores_exact_boundary_suppresses_bad_time_and_retries_failed_hook():

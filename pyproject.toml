@@ -92,6 +92,9 @@ extend-exclude = [
     "var",
 ]
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
 [tool.ruff.lint]
 select = [
     "E",

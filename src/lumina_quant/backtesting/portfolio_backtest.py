@@ -1111,7 +1111,13 @@ class Portfolio:
             self.current_holdings["funding"] += batch_total
             self.total_funding_paid += batch_total
             for symbol, boundary_index, _ in pending_payments:
-                self._last_funding_ts[symbol] = float(boundary_index * interval_seconds)
+                boundary_seconds = float(boundary_index * interval_seconds)
+                self._last_funding_ts[symbol] = boundary_seconds
+                exposure_cursor = self._funding_exposure_cursor.get(symbol)
+                self._funding_exposure_cursor[symbol] = max(
+                    boundary_seconds,
+                    boundary_seconds if exposure_cursor is None else float(exposure_cursor),
+                )
         else:
             # Preserve legacy resolver arithmetic/order exactly.
             for symbol, boundary_index, payment in pending_payments:
@@ -1121,9 +1127,19 @@ class Portfolio:
                 self.current_holdings["funding"] += payment
                 self.total_funding_paid += payment
                 self._last_funding_ts[symbol] = boundary_seconds
+                exposure_cursor = self._funding_exposure_cursor.get(symbol)
+                self._funding_exposure_cursor[symbol] = max(
+                    boundary_seconds,
+                    boundary_seconds if exposure_cursor is None else float(exposure_cursor),
+                )
 
         for symbol, anchor_ts in pending_anchors.items():
             self._last_funding_ts[symbol] = anchor_ts
+            exposure_cursor = self._funding_exposure_cursor.get(symbol)
+            self._funding_exposure_cursor[symbol] = max(
+                anchor_ts,
+                anchor_ts if exposure_cursor is None else float(exposure_cursor),
+            )
 
     def update_timeindex(self, event):
         """Updates the positions from the current locations to the

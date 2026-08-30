@@ -12884,7 +12884,7 @@ def _alpha_max_replay_training_component_worker(
     except BaseException as exc:
         raw_token = (
             str(exc)
-            if type(exc) in {AlphaMaxRuntimeContractError, ValueError}
+            if isinstance(exc, (AlphaMaxRuntimeContractError, ValueError))
             else type(exc).__name__
         )
         token = (

@@ -596,16 +596,16 @@ class TradingEngine(ABC):
 
         if "warmup_end_hook_fired" in state:
             self._warmup_end_hook_fired = bool(state.get("warmup_end_hook_fired"))
-        if state.get("had_warmup"):
-            self._had_warmup = True
+        if "had_warmup" in state:
+            self._had_warmup = bool(state.get("had_warmup"))
         if "live_start_ms" in state:
             raw = state.get("live_start_ms")
             try:
                 restored_live_start_ms = int(raw) if raw is not None else None
             except TypeError, ValueError:
                 restored_live_start_ms = None
+            self._live_start_ms = restored_live_start_ms
             if restored_live_start_ms is not None:
-                self._live_start_ms = restored_live_start_ms
                 self._had_warmup = True
 
         aggregator_state = state.get("timeframe_aggregator")

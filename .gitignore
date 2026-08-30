@@ -282,6 +282,7 @@ var/reports/archive/
 var/reports/**
 !var/reports/**/
 !var/reports/**/.gitkeep
+var/g003-evaluation/
 var/scripts/*
 
 # Keep source package namespace even with root-level data/ ignores.
