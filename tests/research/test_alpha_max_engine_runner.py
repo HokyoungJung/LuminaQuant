@@ -1503,6 +1503,47 @@ def test_exact_tick_reducer_includes_reporting_timeframe() -> None:
     )
 
 
+def test_next_tick_action_groups_equivalent_order_thresholds() -> None:
+    symbol = "BTCUSDT"
+    timestamps = np.asarray([1_000, 2_000, 3_000, 4_000], dtype=np.int64)
+    numeric = np.asarray(
+        [
+            [10.0, 10.0, 9.0, 10.0, 1.0],
+            [10.0, 12.0, 8.0, 10.0, 1.0],
+            [10.0, 15.0, 7.0, 10.0, 1.0],
+            [10.0, 20.0, 6.0, 10.0, 1.0],
+        ],
+        dtype=np.float64,
+    )
+    orders = [
+        {"symbol": symbol, "type": "STOP", "direction": "SELL", "stop_price": 7.5},
+        {"symbol": symbol, "type": "STOP", "direction": "SELL", "stop_price": 8.5},
+        {"symbol": symbol, "type": "LMT", "direction": "BUY", "limit_price": 7.0},
+        {"symbol": symbol, "type": "LMT", "direction": "BUY", "limit_price": 7.2},
+    ]
+    activation = SimpleNamespace(
+        admitted_symbols=(symbol,),
+        backtest=SimpleNamespace(
+            execution_handler=SimpleNamespace(active_orders=orders),
+            portfolio=SimpleNamespace(
+                current_positions={},
+                entry_prices={},
+                _pending_liquidation=set(),
+            ),
+        ),
+    )
+
+    assert (
+        alpha_max_runner._alpha_max_next_tick_action_index(
+            activation,
+            {symbol: (timestamps, numeric)},
+            start_index=0,
+            end_index=3,
+        )
+        == 1
+    )
+
+
 def test_native_release_ignores_reporting_only_timeframe_for_strategy() -> None:
     release_timestamp_ms = 1_700_000_000_000
     observed: list[dict[str, object]] = []

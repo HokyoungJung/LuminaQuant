@@ -5487,6 +5487,7 @@ def _alpha_max_next_tick_action_index(
     )
     candidates = [] if boundary is None else [boundary]
     execution = activation.backtest.execution_handler
+    grouped_levels: dict[tuple[str, str, str], float] = {}
     for order in execution.active_orders:
         if not isinstance(order, Mapping):
             return start_index
@@ -5498,41 +5499,42 @@ def _alpha_max_next_tick_action_index(
         if direction not in {"BUY", "SELL"}:
             candidates.append(start_index)
             continue
-        numeric = view[symbol][1][start_index : end_index + 1]
         if order_type in {"MKT", "TRAIL_STOP"}:
             candidates.append(start_index)
             continue
         if order_type == "LMT":
             level = order.get("limit_price")
-            if not isinstance(level, (int, float)) or isinstance(level, bool):
-                candidates.append(start_index)
-                continue
-            mask = (
-                numeric[:, 2] < float(level) if direction == "BUY" else numeric[:, 1] > float(level)
-            )
-        elif order_type == "STOP":
+        elif order_type in {"STOP", "TAKE_PROFIT"}:
             level = order.get("stop_price")
-            if not isinstance(level, (int, float)) or isinstance(level, bool):
-                candidates.append(start_index)
-                continue
-            mask = (
-                numeric[:, 2] <= float(level)
-                if direction == "SELL"
-                else numeric[:, 1] >= float(level)
-            )
-        elif order_type == "TAKE_PROFIT":
-            level = order.get("stop_price")
-            if not isinstance(level, (int, float)) or isinstance(level, bool):
-                candidates.append(start_index)
-                continue
-            mask = (
-                numeric[:, 1] >= float(level)
-                if direction == "SELL"
-                else numeric[:, 2] <= float(level)
-            )
         else:
             candidates.append(start_index)
             continue
+        if not isinstance(level, (int, float)) or isinstance(level, bool):
+            candidates.append(start_index)
+            continue
+        key = (symbol, order_type, direction)
+        parsed_level = float(level)
+        prior = grouped_levels.get(key)
+        use_maximum = (order_type, direction) in {
+            ("LMT", "BUY"),
+            ("STOP", "SELL"),
+            ("TAKE_PROFIT", "BUY"),
+        }
+        if (
+            prior is None
+            or (use_maximum and parsed_level > prior)
+            or (not use_maximum and parsed_level < prior)
+        ):
+            grouped_levels[key] = parsed_level
+
+    for (symbol, order_type, direction), level in grouped_levels.items():
+        numeric = view[symbol][1][start_index : end_index + 1]
+        if order_type == "LMT":
+            mask = numeric[:, 2] < level if direction == "BUY" else numeric[:, 1] > level
+        elif order_type == "STOP":
+            mask = numeric[:, 2] <= level if direction == "SELL" else numeric[:, 1] >= level
+        else:
+            mask = numeric[:, 1] >= level if direction == "SELL" else numeric[:, 2] <= level
         trigger = _alpha_max_first_true_index(mask, offset=start_index)
         if trigger is not None:
             candidates.append(trigger)

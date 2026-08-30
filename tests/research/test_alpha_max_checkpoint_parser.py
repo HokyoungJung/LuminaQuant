@@ -302,8 +302,11 @@ def test_indicator_day_checkpoint_cached_identity_rejects_prior_tamper(
         )
     )
     state = root / "days" / "20240101" / "STATE.json"
-    state.chmod(0o600)
-    state.chmod(0o400)
+    state_stat = state.stat()
+    os.utime(
+        state,
+        ns=(state_stat.st_atime_ns, state_stat.st_mtime_ns + 1_000_000_000),
+    )
 
     with pytest.raises(
         runner.AlphaMaxRuntimeContractError,
