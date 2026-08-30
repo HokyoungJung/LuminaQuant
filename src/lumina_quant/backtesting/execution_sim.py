@@ -292,6 +292,26 @@ class SimulatedExecutionHandler(ExecutionHandler):
         # Store conditional orders: { order_id: { 'symbol':..., 'type':..., 'trigger_price':..., 'parent_id':...} }
         # For simplicity, just list of order dicts
         self.active_orders: list[dict[str, Any]] = []
+        self._active_orders_by_symbol: dict[str, tuple[dict[str, Any], ...]] = {}
+        self._active_order_index_list_id = id(self.active_orders)
+        self._active_order_index_size = 0
+
+    def _rebuild_active_order_index(self) -> None:
+        grouped: dict[str, list[dict[str, Any]]] = {}
+        for order in self.active_orders:
+            grouped.setdefault(str(order.get("symbol") or ""), []).append(order)
+        self._active_orders_by_symbol = {
+            symbol: tuple(orders) for symbol, orders in grouped.items()
+        }
+        self._active_order_index_list_id = id(self.active_orders)
+        self._active_order_index_size = len(self.active_orders)
+
+    def _active_orders_for_symbol(self, symbol: str) -> tuple[dict[str, Any], ...]:
+        if self._active_order_index_list_id != id(
+            self.active_orders
+        ) or self._active_order_index_size != len(self.active_orders):
+            self._rebuild_active_order_index()
+        return self._active_orders_by_symbol.get(str(symbol), ())
 
     @property
     def record_cost_attribution(self) -> bool:
@@ -811,6 +831,10 @@ class SimulatedExecutionHandler(ExecutionHandler):
         """
         if event.type != "MARKET" or not self.active_orders:
             return
+        symbol_orders = self._active_orders_for_symbol(str(event.symbol))
+        if not symbol_orders:
+            return
+        original_active_orders = self.active_orders
 
         bar_open = event.open
         bar_high = event.high
@@ -824,13 +848,9 @@ class SimulatedExecutionHandler(ExecutionHandler):
         closed_oco_groups: set[str] = set()
         closed_positions: set[tuple[str, str | None]] = set()
 
-        for order in self.active_orders:
+        for order in symbol_orders:
             oco_group = order.get("oco_group")
             if oco_group and str(oco_group) in closed_oco_groups:
-                continue
-
-            if order["symbol"] != event.symbol:
-                next_active_orders.append(order)
                 continue
 
             triggered = False
@@ -1140,7 +1160,24 @@ class SimulatedExecutionHandler(ExecutionHandler):
 
         if remainder_orders:
             next_active_orders.extend(remainder_orders)
-        self.active_orders = next_active_orders
+        membership_unchanged = len(next_active_orders) == len(symbol_orders) and all(
+            current is original
+            for current, original in zip(next_active_orders, symbol_orders, strict=True)
+        )
+        if membership_unchanged:
+            return
+        original_symbol_order_ids = {id(order) for order in symbol_orders}
+        surviving_order_ids = {id(order) for order in next_active_orders}
+        rebuilt = [
+            order
+            for order in original_active_orders
+            if id(order) not in original_symbol_order_ids or id(order) in surviving_order_ids
+        ]
+        rebuilt.extend(
+            order for order in next_active_orders if id(order) not in original_symbol_order_ids
+        )
+        self.active_orders = rebuilt
+        self._rebuild_active_order_index()
 
 
 class LatencyModel:
