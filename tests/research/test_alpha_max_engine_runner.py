@@ -1452,7 +1452,45 @@ def test_actual_backtest_construction_binds_all_alpha_runtime_seams(
     assert funding_boundaries == [reporting_end]
 
 
-def test_fold_equity_fanout_batch_matches_pointwise_streams() -> None:
+def test_reporting_boundary_carries_last_completed_native_close_across_sparse_bucket() -> None:
+    symbol = "BTCUSDT"
+    reporting_start = datetime(2025, 6, 8, tzinfo=UTC)
+    completed_close = 101.0
+    hostile_later_close = 999.0
+    aggregator = alpha_max_runner.TimeframeAggregator(timeframes=["4h"])
+    aggregator.update_from_1s_batch(
+        symbol,
+        (
+            (
+                int(
+                    (reporting_start - timedelta(hours=4) + timedelta(seconds=5)).timestamp() * 1000
+                ),
+                completed_close,
+                completed_close,
+                completed_close,
+                completed_close,
+                1.0,
+            ),
+            (
+                int((reporting_start + timedelta(hours=4, seconds=5)).timestamp() * 1000),
+                hostile_later_close,
+                hostile_later_close,
+                hostile_later_close,
+                hostile_later_close,
+                1.0,
+            ),
+        ),
+    )
+    tracker = object.__new__(alpha_max_runner._AlphaMaxFoldEquityFanout)
+    tracker._backtest = SimpleNamespace(timeframe_aggregator=aggregator)
+
+    assert tracker._completed_native_close(
+        symbol,
+        int((reporting_start + timedelta(hours=4)).timestamp() * 1000),
+    ) == pytest.approx(completed_close)
+
+
+def test_alpha_max_fold_equity_fanout_batch_matches_pointwise_reference() -> None:
     start = datetime(2025, 1, 1, tzinfo=UTC)
     end = start + timedelta(hours=8)
     points = np.array(

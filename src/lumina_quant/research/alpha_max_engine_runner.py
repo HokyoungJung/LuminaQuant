@@ -761,13 +761,15 @@ class _AlphaMaxFoldEquityFanout(AlphaMaxStreamingEquityTracker):
                             value.get("volume"),
                         )
                     )
-        matches = [
-            value
+        eligible = [
+            (self._bar_timestamp_ms(value[0]), value)
             for value in candidates
             if isinstance(value, (list, tuple))
             and len(value) >= 5
-            and self._bar_timestamp_ms(value[0]) == target_bucket_ms
+            and self._bar_timestamp_ms(value[0]) <= target_bucket_ms
         ]
+        latest_timestamp_ms = max((timestamp_ms for timestamp_ms, _value in eligible), default=None)
+        matches = [value for timestamp_ms, value in eligible if timestamp_ms == latest_timestamp_ms]
         if len(matches) != 1:
             raise AlphaMaxRuntimeContractError("alpha_max_reporting_native_bar_incomplete")
         close = float(matches[0][4])
