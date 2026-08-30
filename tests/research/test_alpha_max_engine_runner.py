@@ -1542,6 +1542,21 @@ def test_native_release_ignores_reporting_only_timeframe_for_strategy() -> None:
     assert len(observed) == 1
     assert tuple(observed[0]["bars_by_timeframe"]) == ("1m",)
 
+    alpha_max_runner._alpha_max_replay_tick_releases(
+        activation,
+        (
+            alpha_max_runner.NativeBarRelease(
+                release_timestamp_ms=release_timestamp_ms,
+                symbol="BTCUSDT",
+                timeframe="4h",
+                bar=bar,
+            ),
+        ),
+        release_timestamp_ms=release_timestamp_ms,
+    )
+
+    assert len(observed) == 1
+
 
 def test_alpha_max_fold_equity_fanout_batch_matches_pointwise_reference() -> None:
     start = datetime(2025, 1, 1, tzinfo=UTC)

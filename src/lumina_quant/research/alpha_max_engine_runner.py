@@ -5628,6 +5628,8 @@ def _alpha_max_replay_tick_releases(
         )
     if not set(grouped) <= set(_alpha_max_exact_tick_timeframes(activation.backtest)):
         raise AlphaMaxRuntimeContractError("alpha_max_tick_native_release_timeframe_invalid")
+    if not ordered:
+        return
     activation.backtest.strategy.calculate_signals_completed_native_release(
         release_timestamp_ms=release_timestamp_ms,
         bars_by_timeframe=MappingProxyType(ordered),
