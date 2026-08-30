@@ -293,6 +293,7 @@ class SimulatedExecutionHandler(ExecutionHandler):
         # For simplicity, just list of order dicts
         self.active_orders: list[dict[str, Any]] = []
         self._active_orders_by_symbol: dict[str, tuple[dict[str, Any], ...]] = {}
+        self._active_order_stop_bounds: dict[str, tuple[bool, float | None, float | None]] = {}
         self._active_order_index_list_id = id(self.active_orders)
         self._active_order_index_size = 0
 
@@ -303,6 +304,29 @@ class SimulatedExecutionHandler(ExecutionHandler):
         self._active_orders_by_symbol = {
             symbol: tuple(orders) for symbol, orders in grouped.items()
         }
+        stop_bounds: dict[str, tuple[bool, float | None, float | None]] = {}
+        for symbol, orders in grouped.items():
+            all_stop = True
+            sell_stops: list[float] = []
+            buy_stops: list[float] = []
+            for order in orders:
+                if str(order.get("type")) != "STOP" or order.get("stop_price") is None:
+                    all_stop = False
+                    break
+                stop_price = float(order["stop_price"])
+                if str(order.get("direction")).upper() == "SELL":
+                    sell_stops.append(stop_price)
+                elif str(order.get("direction")).upper() == "BUY":
+                    buy_stops.append(stop_price)
+                else:
+                    all_stop = False
+                    break
+            stop_bounds[symbol] = (
+                all_stop,
+                max(sell_stops) if sell_stops else None,
+                min(buy_stops) if buy_stops else None,
+            )
+        self._active_order_stop_bounds = stop_bounds
         self._active_order_index_list_id = id(self.active_orders)
         self._active_order_index_size = len(self.active_orders)
 
@@ -840,6 +864,16 @@ class SimulatedExecutionHandler(ExecutionHandler):
         bar_high = event.high
         bar_low = event.low
         bar_volume = event.volume
+        all_stop, highest_sell_stop, lowest_buy_stop = self._active_order_stop_bounds.get(
+            str(event.symbol),
+            (False, None, None),
+        )
+        if (
+            all_stop
+            and (highest_sell_stop is None or bar_low > highest_sell_stop)
+            and (lowest_buy_stop is None or bar_high < lowest_buy_stop)
+        ):
+            return
         # Normalised bar range — used to scale slippage on volatile bars.
         volatility = (bar_high - bar_low) / bar_open if bar_open > 0 else 0.0
 
