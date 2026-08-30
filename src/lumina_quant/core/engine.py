@@ -610,11 +610,13 @@ class TradingEngine(ABC):
 
         aggregator_state = state.get("timeframe_aggregator")
         if isinstance(aggregator_state, dict) and self._strategy_uses_timeframe_aggregator():
-            aggregator = self._ensure_timeframe_aggregator()
-            if aggregator is not None:
-                set_state_fn = getattr(aggregator, "set_state", None)
-                if callable(set_state_fn):
-                    set_state_fn(dict(aggregator_state))
+            from lumina_quant.timeframe_aggregator import TimeframeAggregator
+
+            self.timeframe_aggregator = TimeframeAggregator(
+                timeframes=aggregator_state.get("timeframes"),
+                lookbacks=aggregator_state.get("lookbacks"),
+            )
+            self.timeframe_aggregator.set_state(dict(aggregator_state))
 
     def on_fill(self, event):
         """Hook for post-fill actions (e.g. logging, saving state).

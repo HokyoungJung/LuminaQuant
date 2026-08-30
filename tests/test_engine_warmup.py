@@ -22,6 +22,7 @@ from lumina_quant.backtesting.chunked_runner import run_backtest_chunked
 from lumina_quant.backtesting.data import HistoricCSVDataHandler
 from lumina_quant.backtesting.data_windowed_parquet import HistoricParquetWindowedDataHandler
 from lumina_quant.backtesting.execution_sim import SimulatedExecutionHandler
+from lumina_quant.timeframe_aggregator import TimeframeAggregator
 from lumina_quant.backtesting.portfolio_backtest import Portfolio
 from lumina_quant.core.engine import TradingEngine
 from lumina_quant.core.events import SignalEvent
@@ -507,6 +508,23 @@ def test_engine_state_restores_false_warmup_and_absent_live_boundary_exactly():
     state = engine.get_engine_state()
     assert state["had_warmup"] is False
     assert state["live_start_ms"] is None
+
+
+def test_engine_state_restores_exact_checkpoint_aggregator_contract():
+    strategy = SimpleNamespace(
+        uses_timeframe_aggregator=True,
+        required_timeframes=("4h",),
+        required_lookbacks={"1s": 16, "4h": 16},
+    )
+    engine = TradingEngine(None, None, strategy, None, None)
+    checkpoint_aggregator = TimeframeAggregator(
+        timeframes=("4h",),
+        lookbacks={"1s": 16, "4h": 16},
+    ).get_state()
+
+    engine.set_engine_state({"timeframe_aggregator": checkpoint_aggregator})
+
+    assert engine.get_engine_state()["timeframe_aggregator"] == checkpoint_aggregator
 
 
 def test_warmup_restores_exact_boundary_suppresses_bad_time_and_retries_failed_hook():
