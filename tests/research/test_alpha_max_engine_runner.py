@@ -1490,6 +1490,19 @@ def test_reporting_boundary_carries_last_completed_native_close_across_sparse_bu
     ) == pytest.approx(completed_close)
 
 
+def test_exact_tick_reducer_includes_reporting_timeframe() -> None:
+    backtest = SimpleNamespace(
+        strategy=SimpleNamespace(required_timeframes=("20s", "1m")),
+        portfolio=SimpleNamespace(reporting_sampling_timeframe="4h"),
+    )
+
+    assert alpha_max_runner._alpha_max_exact_tick_timeframes(backtest) == (
+        "20s",
+        "1m",
+        "4h",
+    )
+
+
 def test_alpha_max_fold_equity_fanout_batch_matches_pointwise_reference() -> None:
     start = datetime(2025, 1, 1, tzinfo=UTC)
     end = start + timedelta(hours=8)

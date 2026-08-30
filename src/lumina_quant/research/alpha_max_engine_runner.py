@@ -5704,6 +5704,21 @@ def _alpha_max_process_tick_action(
         activation.backtest.process_event(queued)
 
 
+def _alpha_max_exact_tick_timeframes(backtest: Backtest) -> tuple[str, ...]:
+    required = getattr(backtest.strategy, "required_timeframes", ())
+    if callable(required):
+        required = required()
+    if not isinstance(required, (list, tuple)):
+        raise AlphaMaxRuntimeContractError("alpha_max_tick_timeframes_invalid")
+    reporting = getattr(backtest.portfolio, "reporting_sampling_timeframe", None)
+    values = [*required]
+    if type(reporting) is str and reporting:
+        values.append(reporting)
+    if any(type(value) is not str or not value for value in values):
+        raise AlphaMaxRuntimeContractError("alpha_max_tick_timeframes_invalid")
+    return tuple(dict.fromkeys(values))
+
+
 def _run_alpha_max_exact_tick_reducer(activation: AlphaMaxEngineActivation) -> None:
     """Run one validated day with exact event semantics and inert mark batches."""
     handler = activation.backtest.data_handler
@@ -5721,7 +5736,7 @@ def _run_alpha_max_exact_tick_reducer(activation: AlphaMaxEngineActivation) -> N
         None if retained_aggregator is None else copy.deepcopy(retained_aggregator.get_state())
     )
     activation.backtest.timeframe_aggregator = TimeframeAggregator(
-        timeframes=list(activation.backtest.strategy.required_timeframes),
+        timeframes=list(_alpha_max_exact_tick_timeframes(activation.backtest)),
         lookbacks=activation.backtest._resolve_required_lookbacks(),
     )
     if retained_aggregator_state is not None:
