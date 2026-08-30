@@ -1503,6 +1503,46 @@ def test_exact_tick_reducer_includes_reporting_timeframe() -> None:
     )
 
 
+def test_native_release_ignores_reporting_only_timeframe_for_strategy() -> None:
+    release_timestamp_ms = 1_700_000_000_000
+    observed: list[dict[str, object]] = []
+    strategy = SimpleNamespace(
+        required_timeframes=("1m",),
+        calculate_signals_completed_native_release=lambda **kwargs: observed.append(kwargs),
+    )
+    activation = SimpleNamespace(
+        admitted_symbols=("BTCUSDT",),
+        ordered_lookup=object(),
+        backtest=SimpleNamespace(
+            strategy=strategy,
+            portfolio=SimpleNamespace(reporting_sampling_timeframe="4h"),
+        ),
+    )
+    bar = (release_timestamp_ms, 1.0, 1.0, 1.0, 1.0, 1.0)
+
+    alpha_max_runner._alpha_max_replay_tick_releases(
+        activation,
+        (
+            alpha_max_runner.NativeBarRelease(
+                release_timestamp_ms=release_timestamp_ms,
+                symbol="BTCUSDT",
+                timeframe="1m",
+                bar=bar,
+            ),
+            alpha_max_runner.NativeBarRelease(
+                release_timestamp_ms=release_timestamp_ms,
+                symbol="BTCUSDT",
+                timeframe="4h",
+                bar=bar,
+            ),
+        ),
+        release_timestamp_ms=release_timestamp_ms,
+    )
+
+    assert len(observed) == 1
+    assert tuple(observed[0]["bars_by_timeframe"]) == ("1m",)
+
+
 def test_alpha_max_fold_equity_fanout_batch_matches_pointwise_reference() -> None:
     start = datetime(2025, 1, 1, tzinfo=UTC)
     end = start + timedelta(hours=8)
