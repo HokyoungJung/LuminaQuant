@@ -8,6 +8,7 @@ import struct
 import subprocess
 import sys
 import threading
+from concurrent.futures import Future
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import MappingProxyType, SimpleNamespace
@@ -190,16 +191,17 @@ def test_worker_rejects_missing_training_prefix_without_building(
 
 def test_spawn_worker_runner_completes_from_a_threaded_parent() -> None:
     """The production runner uses a fresh spawn pool, never forked state."""
-    result: list[tuple[tuple[str, str, bytes, str], ...]] = []
+    errors: list[BaseException] = []
     assert pl.DataFrame({"value": [1]}).select(pl.col("value").sum()).item() == 1
 
     def invoke() -> None:
-        result.append(
+        try:
             alpha_max_runner._run_alpha_max_training_component_workers(
                 (("invalid", b"{}\n", "0" * 64),),
                 max_training_workers=1,
             )
-        )
+        except BaseException as exc:
+            errors.append(exc)
 
     # Keep a Python thread live while native libraries have already been imported.
     ready = threading.Event()
@@ -213,9 +215,11 @@ def test_spawn_worker_runner_completes_from_a_threaded_parent() -> None:
     release.set()
     native_thread.join(2)
     assert not parent.is_alive(), "spawn worker runner deadlocked"
-    assert result == [
-        (("invalid", "semantic_failure", b"", "alpha_max_training_worker_binding_invalid"),)
-    ]
+    assert len(errors) == 1
+    assert isinstance(errors[0], AlphaMaxRuntimeContractError)
+    assert str(errors[0]) == (
+        "alpha_max_training_worker_result_invalid:invalid:alpha_max_training_worker_binding_invalid"
+    )
 
 
 def test_spawn_workers_reconstruct_real_authorities_in_a_clean_subprocess(
@@ -504,44 +508,37 @@ def test_prelock_worker_caps_order_publication_and_failure_taxonomy(
 
         def __init__(self, *, max_workers: int, **_kwargs: object) -> None:
             worker_counts.append(max_workers)
+            self.submitted: list[str] = []
 
-        def __enter__(self) -> Executor:
-            assert prepared_prefixes == [component_ids]
-            return self
-
-        def __exit__(self, *_args: object) -> None:
-            pass
-
-        def map(self, _worker: object, items: tuple[tuple[str, bytes, str], ...]):
-            assert tuple(item[0] for item in items) == component_ids
-            worker_output_snapshots.append(
-                tuple(sorted(path.name for path in (tmp_path / "output").iterdir()))
-            )
-            if self.mode is not None:
-                raise self.mode
-            # Deliberately complete out of order; map's contract restores input order.
-            return iter(
-                (
-                    (
-                        "component_carry_1x",
-                        "complete",
-                        b"worker:component_carry_1x",
-                        "",
-                    ),
-                    (
-                        "component_near_high_1x",
-                        "complete",
-                        b"worker:component_near_high_1x",
-                        "",
-                    ),
-                    (
-                        "component_trend_1x",
-                        "complete",
-                        b"worker:component_trend_1x",
-                        "",
-                    ),
+        def submit(
+            self,
+            _worker: object,
+            item: tuple[str, bytes, str],
+        ) -> Future[tuple[str, str, bytes, str]]:
+            if not self.submitted:
+                worker_output_snapshots.append(
+                    tuple(sorted(path.name for path in (tmp_path / "output").iterdir()))
                 )
-            )
+            component_id = item[0]
+            self.submitted.append(component_id)
+            future: Future[tuple[str, str, bytes, str]] = Future()
+            if self.mode is not None:
+                future.set_exception(self.mode)
+            else:
+                future.set_result(
+                    (
+                        component_id,
+                        "complete",
+                        f"worker:{component_id}".encode(),
+                        "",
+                    )
+                )
+            return future
+
+        def shutdown(self, *, wait: bool, cancel_futures: bool) -> None:
+            _ = wait, cancel_futures
+            assert prepared_prefixes == [component_ids]
+            assert tuple(self.submitted) == component_ids
 
     preflight = SimpleNamespace(
         config_bytes=b"{}\n",

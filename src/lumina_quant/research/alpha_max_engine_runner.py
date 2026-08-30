@@ -31,7 +31,7 @@ import tempfile
 import types
 from collections.abc import Mapping, Sequence
 from contextlib import contextmanager
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from concurrent.futures.process import BrokenProcessPool
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
@@ -12912,11 +12912,58 @@ def _run_alpha_max_training_component_workers(
         raise AlphaMaxRuntimeContractError("alpha_max_training_worker_count_invalid")
     if tuple(item[0] for item in items) != tuple(sorted(item[0] for item in items)):
         raise AlphaMaxRuntimeContractError("alpha_max_training_worker_item_order_invalid")
-    with ProcessPoolExecutor(
+    executor = ProcessPoolExecutor(
         max_workers=min(max_training_workers, len(items), 3),
         mp_context=multiprocessing.get_context("spawn"),
-    ) as executor:
-        return tuple(executor.map(_alpha_max_replay_training_component_worker, items))
+    )
+    terminated = False
+    try:
+        futures = {
+            executor.submit(_alpha_max_replay_training_component_worker, item): item[0]
+            for item in items
+        }
+        results: dict[str, _AlphaMaxTrainingWorkerResult] = {}
+        for future in as_completed(futures):
+            result = future.result()
+            component_id = futures[future]
+            if (
+                type(result) is not tuple
+                or len(result) != 4
+                or result[0] != component_id
+                or result[1] not in {"complete", "semantic_failure"}
+                or type(result[2]) is not bytes
+                or type(result[3]) is not str
+            ):
+                raise AlphaMaxRuntimeContractError("alpha_max_training_worker_result_invalid")
+            if result[1] != "complete" or result[3]:
+                for pending in futures:
+                    pending.cancel()
+                terminate_workers = getattr(executor, "terminate_workers", None)
+                if callable(terminate_workers):
+                    terminate_workers()
+                    terminated = True
+                else:
+                    executor.shutdown(wait=False, cancel_futures=True)
+                    terminated = True
+                raise AlphaMaxRuntimeContractError(
+                    "alpha_max_training_worker_result_invalid:"
+                    f"{component_id}:{result[3] or result[1]}"
+                )
+            results[component_id] = result
+        return tuple(results[item[0]] for item in items)
+    except BaseException:
+        if not terminated:
+            terminate_workers = getattr(executor, "terminate_workers", None)
+            if callable(terminate_workers):
+                terminate_workers()
+                terminated = True
+            else:
+                executor.shutdown(wait=False, cancel_futures=True)
+                terminated = True
+        raise
+    finally:
+        if not terminated:
+            executor.shutdown(wait=True, cancel_futures=False)
 
 
 def run_alpha_max_prelock_process(
