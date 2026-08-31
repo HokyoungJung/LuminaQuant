@@ -296,6 +296,7 @@ class _NativeCompletedAdapterMixin:
         self._alpha_max_completed_native_count_by_symbol: dict[str, int] = {}
         self._alpha_max_bound_aggregator: Any = None
         self._alpha_max_partial_bucket_error: str | None = None
+        self._alpha_max_last_completed_cutoff: int | None = None
 
     @classmethod
     def canonical_component_params(cls) -> dict[str, Any]:
@@ -330,6 +331,14 @@ class _NativeCompletedAdapterMixin:
         self, aggregator: Any, watermark_ms: int | None, *, include_final: bool
     ) -> int:
         self._alpha_max_bound_aggregator = aggregator
+        cutoff = None if watermark_ms is None else int(watermark_ms) // self.native_timeframe_ms
+        if (
+            not include_final
+            and cutoff is not None
+            and self._alpha_max_last_completed_cutoff is not None
+            and cutoff <= self._alpha_max_last_completed_cutoff
+        ):
+            return 0
         processed = 0
         for symbol in list(getattr(self, "symbol_list", []) or []):
             for bar in _get_completed_bars(
@@ -339,6 +348,8 @@ class _NativeCompletedAdapterMixin:
                     symbol, bar
                 ):
                     processed += 1
+        if not include_final and cutoff is not None:
+            self._alpha_max_last_completed_cutoff = cutoff
         return processed
 
     def calculate_signals_window(self, event: Any, aggregator: Any = None) -> None:
