@@ -5478,6 +5478,7 @@ _ALPHA_MAX_TICK_INDEX_BLOCK_SIZE = 256
 class _AlphaMaxTickActionIndex:
     boundary_indices: np.ndarray
     extrema_by_symbol: Mapping[str, tuple[np.ndarray, np.ndarray]]
+    threshold_cache: dict[tuple[str, int, str, float], tuple[int, int | None]]
 
 
 def _alpha_max_build_tick_action_index(
@@ -5497,6 +5498,7 @@ def _alpha_max_build_tick_action_index(
     return _AlphaMaxTickActionIndex(
         boundary_indices=np.asarray(boundaries, dtype=np.int64),
         extrema_by_symbol=MappingProxyType(extrema),
+        threshold_cache={},
     )
 
 
@@ -5554,6 +5556,36 @@ def _alpha_max_first_threshold_index(
         match(values[final_start : end_index + 1]),
         offset=final_start,
     )
+
+
+def _alpha_max_cached_threshold_index(
+    action_index: _AlphaMaxTickActionIndex,
+    view: Mapping[str, tuple[np.ndarray, np.ndarray]],
+    *,
+    symbol: str,
+    column: int,
+    start_index: int,
+    end_index: int,
+    level: float,
+    relation: str,
+) -> int | None:
+    key = (symbol, column, relation, level)
+    cached = action_index.threshold_cache.get(key)
+    if cached is not None:
+        cached_end, cached_trigger = cached
+        if cached_end == end_index and (cached_trigger is None or cached_trigger >= start_index):
+            return cached_trigger
+    low_blocks, high_blocks = action_index.extrema_by_symbol[symbol]
+    trigger = _alpha_max_first_threshold_index(
+        view[symbol][1][:, column],
+        low_blocks if column == 2 else high_blocks,
+        start_index=start_index,
+        end_index=end_index,
+        level=level,
+        relation=relation,
+    )
+    action_index.threshold_cache[key] = (end_index, trigger)
+    return trigger
 
 
 def _alpha_max_next_tick_action_index(
@@ -5626,10 +5658,11 @@ def _alpha_max_next_tick_action_index(
         else:
             column = 1 if direction == "SELL" else 2
             relation = "ge" if direction == "SELL" else "le"
-        low_blocks, high_blocks = action_index.extrema_by_symbol[symbol]
-        trigger = _alpha_max_first_threshold_index(
-            view[symbol][1][:, column],
-            low_blocks if column == 2 else high_blocks,
+        trigger = _alpha_max_cached_threshold_index(
+            action_index,
+            view,
+            symbol=symbol,
+            column=column,
             start_index=start_index,
             end_index=end_index,
             level=level,
@@ -5658,10 +5691,11 @@ def _alpha_max_next_tick_action_index(
         if liquidation_price is None:
             continue
         column = 2 if quantity > 0.0 else 1
-        low_blocks, high_blocks = action_index.extrema_by_symbol[symbol]
-        trigger = _alpha_max_first_threshold_index(
-            view[symbol][1][:, column],
-            low_blocks if column == 2 else high_blocks,
+        trigger = _alpha_max_cached_threshold_index(
+            action_index,
+            view,
+            symbol=symbol,
+            column=column,
             start_index=start_index,
             end_index=end_index,
             level=liquidation_price,

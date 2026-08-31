@@ -1532,16 +1532,35 @@ def test_next_tick_action_groups_equivalent_order_thresholds() -> None:
             ),
         ),
     )
+    view = {symbol: (timestamps, numeric)}
+    action_index = alpha_max_runner._alpha_max_build_tick_action_index(
+        activation,
+        view,
+    )
 
     assert (
         alpha_max_runner._alpha_max_next_tick_action_index(
             activation,
-            {symbol: (timestamps, numeric)},
+            view,
             start_index=0,
             end_index=3,
+            action_index=action_index,
         )
         == 1
     )
+    cached_lmt = (symbol, 2, "lt", 7.2)
+    assert action_index.threshold_cache[cached_lmt] == (3, 2)
+    assert (
+        alpha_max_runner._alpha_max_next_tick_action_index(
+            activation,
+            view,
+            start_index=2,
+            end_index=3,
+            action_index=action_index,
+        )
+        == 2
+    )
+    assert action_index.threshold_cache[cached_lmt] == (3, 2)
 
 
 @pytest.mark.parametrize(
