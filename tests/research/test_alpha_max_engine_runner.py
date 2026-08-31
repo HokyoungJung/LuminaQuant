@@ -1544,6 +1544,53 @@ def test_next_tick_action_groups_equivalent_order_thresholds() -> None:
     )
 
 
+@pytest.mark.parametrize(
+    ("relation", "level", "use_minimum"),
+    [
+        ("lt", 17.25, True),
+        ("le", 17.25, True),
+        ("gt", 17.25, False),
+        ("ge", 17.25, False),
+    ],
+)
+def test_tick_action_block_index_matches_exact_scan(
+    relation: str,
+    level: float,
+    use_minimum: bool,
+) -> None:
+    values = np.asarray(
+        [float((index * 37) % 101) / 3.0 for index in range(777)],
+        dtype=np.float64,
+    )
+    starts = np.arange(0, len(values), alpha_max_runner._ALPHA_MAX_TICK_INDEX_BLOCK_SIZE)
+    extrema = (
+        np.minimum.reduceat(values, starts) if use_minimum else np.maximum.reduceat(values, starts)
+    )
+    start_index = 173
+    end_index = 731
+    if relation == "lt":
+        mask = values[start_index : end_index + 1] < level
+    elif relation == "le":
+        mask = values[start_index : end_index + 1] <= level
+    elif relation == "gt":
+        mask = values[start_index : end_index + 1] > level
+    else:
+        mask = values[start_index : end_index + 1] >= level
+    expected = alpha_max_runner._alpha_max_first_true_index(mask, offset=start_index)
+
+    assert (
+        alpha_max_runner._alpha_max_first_threshold_index(
+            values,
+            extrema,
+            start_index=start_index,
+            end_index=end_index,
+            level=level,
+            relation=relation,
+        )
+        == expected
+    )
+
+
 def test_native_release_ignores_reporting_only_timeframe_for_strategy() -> None:
     release_timestamp_ms = 1_700_000_000_000
     observed: list[dict[str, object]] = []

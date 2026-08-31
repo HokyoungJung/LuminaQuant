@@ -5471,19 +5471,108 @@ def _alpha_max_first_true_index(mask: np.ndarray, *, offset: int) -> int | None:
     return offset + index if bool(flat[index]) else None
 
 
+_ALPHA_MAX_TICK_INDEX_BLOCK_SIZE = 256
+
+
+@dataclass(frozen=True, slots=True)
+class _AlphaMaxTickActionIndex:
+    boundary_indices: np.ndarray
+    extrema_by_symbol: Mapping[str, tuple[np.ndarray, np.ndarray]]
+
+
+def _alpha_max_build_tick_action_index(
+    activation: AlphaMaxEngineActivation,
+    view: Mapping[str, tuple[np.ndarray, np.ndarray]],
+) -> _AlphaMaxTickActionIndex:
+    timestamps = view[activation.admitted_symbols[0]][0]
+    boundaries = np.flatnonzero(timestamps % 14_400_000 == 0)
+    starts = np.arange(0, len(timestamps), _ALPHA_MAX_TICK_INDEX_BLOCK_SIZE)
+    extrema: dict[str, tuple[np.ndarray, np.ndarray]] = {}
+    for symbol in activation.admitted_symbols:
+        numeric = view[symbol][1]
+        extrema[symbol] = (
+            np.minimum.reduceat(numeric[:, 2], starts),
+            np.maximum.reduceat(numeric[:, 1], starts),
+        )
+    return _AlphaMaxTickActionIndex(
+        boundary_indices=np.asarray(boundaries, dtype=np.int64),
+        extrema_by_symbol=MappingProxyType(extrema),
+    )
+
+
+def _alpha_max_first_threshold_index(
+    values: np.ndarray,
+    block_extrema: np.ndarray,
+    *,
+    start_index: int,
+    end_index: int,
+    level: float,
+    relation: str,
+) -> int | None:
+    block_size = _ALPHA_MAX_TICK_INDEX_BLOCK_SIZE
+
+    def match(candidate: np.ndarray) -> np.ndarray:
+        if relation == "lt":
+            return candidate < level
+        if relation == "le":
+            return candidate <= level
+        if relation == "gt":
+            return candidate > level
+        if relation == "ge":
+            return candidate >= level
+        raise ValueError("alpha_max_tick_threshold_relation_invalid")
+
+    start_block = start_index // block_size
+    end_block = end_index // block_size
+    if start_block == end_block:
+        return _alpha_max_first_true_index(
+            match(values[start_index : end_index + 1]),
+            offset=start_index,
+        )
+    first_end = min(end_index, (start_block + 1) * block_size - 1)
+    first = _alpha_max_first_true_index(
+        match(values[start_index : first_end + 1]),
+        offset=start_index,
+    )
+    if first is not None:
+        return first
+    middle_start = start_block + 1
+    middle_end = end_block - 1
+    if middle_start <= middle_end:
+        block = _alpha_max_first_true_index(
+            match(block_extrema[middle_start : middle_end + 1]),
+            offset=middle_start,
+        )
+        if block is not None:
+            offset = block * block_size
+            return _alpha_max_first_true_index(
+                match(values[offset : offset + block_size]),
+                offset=offset,
+            )
+    final_start = end_block * block_size
+    return _alpha_max_first_true_index(
+        match(values[final_start : end_index + 1]),
+        offset=final_start,
+    )
+
+
 def _alpha_max_next_tick_action_index(
     activation: AlphaMaxEngineActivation,
     view: Mapping[str, tuple[np.ndarray, np.ndarray]],
     *,
     start_index: int,
     end_index: int,
+    action_index: _AlphaMaxTickActionIndex | None = None,
 ) -> int | None:
     """Return the earliest boundary, conditional fill, or liquidation second."""
-    timestamps = view[activation.admitted_symbols[0]][0]
-    scoped_timestamps = timestamps[start_index : end_index + 1]
-    boundary = _alpha_max_first_true_index(
-        scoped_timestamps % 14_400_000 == 0,
-        offset=start_index,
+    if action_index is None:
+        action_index = _alpha_max_build_tick_action_index(activation, view)
+    boundary_offset = int(np.searchsorted(action_index.boundary_indices, start_index))
+    boundary = (
+        int(action_index.boundary_indices[boundary_offset])
+        if boundary_offset < len(action_index.boundary_indices)
+        and int(action_index.boundary_indices[boundary_offset]) <= end_index
+        else None
     )
     candidates = [] if boundary is None else [boundary]
     execution = activation.backtest.execution_handler
@@ -5528,14 +5617,24 @@ def _alpha_max_next_tick_action_index(
             grouped_levels[key] = parsed_level
 
     for (symbol, order_type, direction), level in grouped_levels.items():
-        numeric = view[symbol][1][start_index : end_index + 1]
         if order_type == "LMT":
-            mask = numeric[:, 2] < level if direction == "BUY" else numeric[:, 1] > level
+            column = 2 if direction == "BUY" else 1
+            relation = "lt" if direction == "BUY" else "gt"
         elif order_type == "STOP":
-            mask = numeric[:, 2] <= level if direction == "SELL" else numeric[:, 1] >= level
+            column = 2 if direction == "SELL" else 1
+            relation = "le" if direction == "SELL" else "ge"
         else:
-            mask = numeric[:, 1] >= level if direction == "SELL" else numeric[:, 2] <= level
-        trigger = _alpha_max_first_true_index(mask, offset=start_index)
+            column = 1 if direction == "SELL" else 2
+            relation = "ge" if direction == "SELL" else "le"
+        low_blocks, high_blocks = action_index.extrema_by_symbol[symbol]
+        trigger = _alpha_max_first_threshold_index(
+            view[symbol][1][:, column],
+            low_blocks if column == 2 else high_blocks,
+            start_index=start_index,
+            end_index=end_index,
+            level=level,
+            relation=relation,
+        )
         if trigger is not None:
             candidates.append(trigger)
 
@@ -5558,13 +5657,16 @@ def _alpha_max_next_tick_action_index(
         )
         if liquidation_price is None:
             continue
-        numeric = view[symbol][1][start_index : end_index + 1]
-        mask = (
-            numeric[:, 2] <= liquidation_price
-            if quantity > 0.0
-            else numeric[:, 1] >= liquidation_price
+        column = 2 if quantity > 0.0 else 1
+        low_blocks, high_blocks = action_index.extrema_by_symbol[symbol]
+        trigger = _alpha_max_first_threshold_index(
+            view[symbol][1][:, column],
+            low_blocks if column == 2 else high_blocks,
+            start_index=start_index,
+            end_index=end_index,
+            level=liquidation_price,
+            relation="le" if quantity > 0.0 else "ge",
         )
-        trigger = _alpha_max_first_true_index(mask, offset=start_index)
         if trigger is not None:
             candidates.append(trigger)
     return min(candidates) if candidates else None
@@ -5751,6 +5853,7 @@ def _run_alpha_max_exact_tick_reducer(activation: AlphaMaxEngineActivation) -> N
         raise AlphaMaxRuntimeContractError("alpha_max_tick_columnar_view_invalid") from exc
     if tuple(view) != activation.admitted_symbols:
         raise AlphaMaxRuntimeContractError("alpha_max_tick_symbol_order_invalid")
+    action_index = _alpha_max_build_tick_action_index(activation, view)
     row_count = len(view[activation.admitted_symbols[0]][0])
     cursor = 0
     while cursor < row_count:
@@ -5759,6 +5862,7 @@ def _run_alpha_max_exact_tick_reducer(activation: AlphaMaxEngineActivation) -> N
             view,
             start_index=cursor,
             end_index=row_count - 1,
+            action_index=action_index,
         )
         segment_end = row_count - 1 if action is None else action
         releases = _alpha_max_feed_exact_tick_rows(
