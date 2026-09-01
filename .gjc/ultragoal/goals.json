@@ -1,0 +1,184 @@
+{
+  "version": 1,
+  "brief": "Approved plan: `.gjc/plans/ralplan/2026-06-07-0457-b89b/pending-approval.md`\nSource spec: `.gjc/specs/deep-interview-alpha-strategy-improvement.md`\nGlobal constraints: no locked-OOS tuning/selection/threshold/tie-break/correlation/sizing; weak-data TradFi is shadow/research-only; MDD<=30%; no liquidation/account wipeout; shadow benchmark >64.42% comp or return/MDD >3.49; clean/paper benchmark >34.39% comp; real-money excluded; no commit/push.\n\n@goal: Implement alpha promotion schema and discovery reporting gates\nAdd reusable gate/report fields for candidate identity, family/source bucket, theory, data sufficiency, weak-data shadow-only status, locked-OOS usage flags, train/validation freeze hashes, benchmark tier, MDD/liquidation/cost/telemetry gate results, promotion status, rejection reasons, and tried-universe coverage. Extend the clean new-alpha discovery smoke output so JSON+Markdown reports expose these fields while preserving train/validation-only selection.\n\n@goal: Add existing strategy reassessment smoke wrapper\nCreate or extend a research script that enumerates registered/runnable strategies, records runnable status, tier metadata, skip/audit flags, tried-universe coverage, current known evidence where available, full-WF promotion eligibility, survivor list, correlation/report placeholders, and rejection reasons. Smoke is lenient for coverage, but full-WF promotion requires strict gates.\n\n@goal: Expand candidate family and survivor manifest workflow\nBroaden discovery/family coverage using existing data only across crypto price/volume, cross-asset/residual/dispersion, funding/OI/taker-flow/BBO/depth/liquidation, existing-winner overlays, and TradFi-linked candidates where data permits. Implement survivor manifest/freeze contract so only train/validation-frozen candidates can be forwarded to full WF, with locked-OOS attached only after freeze.\n\n@goal: Implement artifact portfolio manifest fail-closed mode\nAdd manifest-driven portfolio composition beside existing artifact portfolio aliases. It must validate source artifact sha/freshness, child readiness, no-current-fold-OOS provenance, train/validation-only optimizer provenance, gross cap, per-leaf netting, correlation input provenance, and fail closed to cash on missing/stale/unreconciled/OOS-contaminated/gross-cap-breaching children. Keep real-money disabled.\n\n@goal: Run focused verification and produce execution evidence\nRun focused tests for discovery invariants, existing strategy reassessment, survivor manifests, strategy/registry tiering, artifact portfolio manifest fail-closed behavior, and report schemas. Run a bounded smoke/probe only if safe within time and available data; otherwise record no-promotion/watchlist evidence without weakening gates.",
+  "gjcGoalMode": "aggregate",
+  "gjcObjective": "Complete the durable ultragoal plan in .gjc/ultragoal/goals.json, including later accepted/appended stories, under the original brief constraints; use .gjc/ultragoal/ledger.jsonl as the audit trail.",
+  "goals": [
+    {
+      "id": "G001",
+      "title": "Implement alpha promotion schema and discovery reporting gates",
+      "objective": "Add reusable gate/report fields for candidate identity, family/source bucket, theory, data sufficiency, weak-data shadow-only status, locked-OOS usage flags, train/validation freeze hashes, benchmark tier, MDD/liquidation/cost/telemetry gate results, promotion status, rejection reasons, and tried-universe coverage. Extend the clean new-alpha discovery smoke output so JSON+Markdown reports expose these fields while preserving train/validation-only selection.",
+      "status": "complete",
+      "createdAt": "2026-06-18T13:06:55.954Z",
+      "updatedAt": "2026-06-18T13:27:53.005Z",
+      "startedAt": "2026-06-18T13:07:06.725Z",
+      "completedAt": "2026-06-18T13:27:53.005Z",
+      "evidence": "Implemented alpha promotion schema/reporting gates in scripts/research/run_alpha_zoo_clean_new_alpha_discovery.py and tests/test_alpha_zoo_clean_new_alpha_discovery.py; focused verification passed: uv run pytest tests/test_alpha_zoo_clean_new_alpha_discovery.py -> 33 passed; cleanup/architect/QA gates clean.",
+      "completionVerification": {
+        "schemaVersion": 1,
+        "receiptId": "09be7115-872c-44eb-a6e5-d1e02b524134",
+        "verifiedAt": "2026-06-18T13:27:53.005Z",
+        "goalId": "G001",
+        "receiptKind": "per-goal",
+        "goalStatusBeforeCheckpoint": "active",
+        "gjcGoalMode": "aggregate",
+        "gjcObjective": "Complete the durable ultragoal plan in .gjc/ultragoal/goals.json, including later accepted/appended stories, under the original brief constraints; use .gjc/ultragoal/ledger.jsonl as the audit trail.",
+        "qualityGateHash": "5847a155938bfb439923d32dc2d8ed9e6a55bda5571557c693d1ee02bca4fef1",
+        "gjcGoalSnapshotHash": "cb81e1e840b70a3b7bfe3663d8773f96aae3dea8f250ca2d75eef0b0b34cc930",
+        "planGeneration": "c48a6bb80b5109d2307bf0e7e3810df58e54b9855722f67826b2321cb2f5f8b8",
+        "basis": {
+          "planHashBeforeCheckpoint": "fd266755711fe6dcc1a0e79237eaa793201f4cf97f7383188abafb4bfc40bbbe",
+          "latestRelevantLedgerEventIdBeforeCheckpoint": "f208f9e6-1768-42b5-a842-d2bcc2020cb3",
+          "goalUpdatedAtBeforeCheckpoint": "2026-06-18T13:27:53.005Z",
+          "relevantGoalIdsBeforeCheckpoint": [
+            "G001"
+          ],
+          "requiredGoalSetHashBeforeCheckpoint": "e72c469d4d2322fe2f8ec87c970a8f7c73013661f4554aaca4ec088586fa546a"
+        },
+        "checkpointLedgerEventId": "5985a1ca-adb9-422e-961d-f0edcf1030d3"
+      }
+    },
+    {
+      "id": "G002",
+      "title": "Add existing strategy reassessment smoke wrapper",
+      "objective": "Create or extend a research script that enumerates registered/runnable strategies, records runnable status, tier metadata, skip/audit flags, tried-universe coverage, current known evidence where available, full-WF promotion eligibility, survivor list, correlation/report placeholders, and rejection reasons. Smoke is lenient for coverage, but full-WF promotion requires strict gates.",
+      "status": "complete",
+      "createdAt": "2026-06-18T13:06:55.954Z",
+      "updatedAt": "2026-06-18T13:32:36.324Z",
+      "startedAt": "2026-06-18T13:27:53.012Z",
+      "completedAt": "2026-06-18T13:32:36.324Z",
+      "evidence": "Added existing strategy reassessment smoke wrapper, tests, and generated probe JSON/Markdown report. Verification: uv run pytest tests/test_alpha_zoo_existing_strategy_reassessment.py -> 3 passed; cleanup/architect/QA gates clean.",
+      "completionVerification": {
+        "schemaVersion": 1,
+        "receiptId": "08389bcf-5344-4e99-b411-9e75caf0026c",
+        "verifiedAt": "2026-06-18T13:32:36.324Z",
+        "goalId": "G002",
+        "receiptKind": "per-goal",
+        "goalStatusBeforeCheckpoint": "active",
+        "gjcGoalMode": "aggregate",
+        "gjcObjective": "Complete the durable ultragoal plan in .gjc/ultragoal/goals.json, including later accepted/appended stories, under the original brief constraints; use .gjc/ultragoal/ledger.jsonl as the audit trail.",
+        "qualityGateHash": "712eeb0f4a3947e56f1540723a8f2f747523421fb79071742718b0aa516aea7d",
+        "gjcGoalSnapshotHash": "0f761fff4845c08071be66426c0f832c80c83d1f10a8e60c8ab4ef45ff1e14c8",
+        "planGeneration": "473eea8d90a5434e65da9ecc2d9cd6b2e059273708e2add6523e03fea75458fa",
+        "basis": {
+          "planHashBeforeCheckpoint": "90cfe98f93e8401da6f261bb6fcffac828c4ed866140a8d0290dc37d4dab1578",
+          "latestRelevantLedgerEventIdBeforeCheckpoint": "d9131fde-5de4-40b6-adbe-f5ea088c9bdd",
+          "goalUpdatedAtBeforeCheckpoint": "2026-06-18T13:32:36.324Z",
+          "relevantGoalIdsBeforeCheckpoint": [
+            "G002"
+          ],
+          "requiredGoalSetHashBeforeCheckpoint": "d4c3dc27f3fc4432d0394686df9cef25996e450406b93209c5fcce38d23893a5"
+        },
+        "checkpointLedgerEventId": "99878b4d-aca9-457e-952a-370931e33672"
+      }
+    },
+    {
+      "id": "G003",
+      "title": "Expand candidate family and survivor manifest workflow",
+      "objective": "Broaden discovery/family coverage using existing data only across crypto price/volume, cross-asset/residual/dispersion, funding/OI/taker-flow/BBO/depth/liquidation, existing-winner overlays, and TradFi-linked candidates where data permits. Implement survivor manifest/freeze contract so only train/validation-frozen candidates can be forwarded to full WF, with locked-OOS attached only after freeze.",
+      "status": "complete",
+      "createdAt": "2026-06-18T13:06:55.954Z",
+      "updatedAt": "2026-06-18T13:54:21.292Z",
+      "startedAt": "2026-06-18T13:32:36.332Z",
+      "completedAt": "2026-06-18T13:54:21.292Z",
+      "evidence": "Implemented survivor manifest/freeze workflow with train/validation-only forwarding, locked-OOS scrub/hash invariants, selected-only full-WF retest reporting, standalone survivor manifest artifact, and focused tests. Verification: discovery tests 38 passed; reassessment tests 3 passed; focused suite 74 passed; final cleanup/architect/QA gates clean.",
+      "completionVerification": {
+        "schemaVersion": 1,
+        "receiptId": "e8e467c0-f2ef-4add-923b-bfff55b8fef5",
+        "verifiedAt": "2026-06-18T13:54:21.292Z",
+        "goalId": "G003",
+        "receiptKind": "per-goal",
+        "goalStatusBeforeCheckpoint": "active",
+        "gjcGoalMode": "aggregate",
+        "gjcObjective": "Complete the durable ultragoal plan in .gjc/ultragoal/goals.json, including later accepted/appended stories, under the original brief constraints; use .gjc/ultragoal/ledger.jsonl as the audit trail.",
+        "qualityGateHash": "0483c2898e98dfd978eb0c2e430fd23926b1dfb992251919e3e2b401c40b15e2",
+        "gjcGoalSnapshotHash": "205136dced02bf836993a977f844b0aa1d90e3aac77ad1592c59d368bd6f1fac",
+        "planGeneration": "83bed8dc5d9a26541613a5323f5d74535ae0f21fd67950fcd1f5715dbec97d1f",
+        "basis": {
+          "planHashBeforeCheckpoint": "da88cfa27c7a388b3ab1cbfcb6184bf21aa22597c4cdee594953004f920ac1c4",
+          "latestRelevantLedgerEventIdBeforeCheckpoint": "de7e91c6-3c85-4b80-8cef-f788ab8592ed",
+          "goalUpdatedAtBeforeCheckpoint": "2026-06-18T13:54:21.292Z",
+          "relevantGoalIdsBeforeCheckpoint": [
+            "G003"
+          ],
+          "requiredGoalSetHashBeforeCheckpoint": "c093e87c25918ae5955c8480c144b640fcac58cac742b569fab2a19b731113a0"
+        },
+        "checkpointLedgerEventId": "c607073b-34ef-4815-b06d-a4cb452882aa"
+      }
+    },
+    {
+      "id": "G004",
+      "title": "Implement artifact portfolio manifest fail-closed mode",
+      "objective": "Add manifest-driven portfolio composition beside existing artifact portfolio aliases. It must validate source artifact sha/freshness, child readiness, no-current-fold-OOS provenance, train/validation-only optimizer provenance, gross cap, per-leaf netting, correlation input provenance, and fail closed to cash on missing/stale/unreconciled/OOS-contaminated/gross-cap-breaching children. Keep real-money disabled.",
+      "status": "complete",
+      "createdAt": "2026-06-18T13:06:55.954Z",
+      "updatedAt": "2026-06-18T14:25:05.321Z",
+      "startedAt": "2026-06-18T13:54:21.299Z",
+      "completedAt": "2026-06-18T14:25:05.321Z",
+      "evidence": "Implemented artifact portfolio manifest fail-closed mode with artifact_manifest_mode and manifest:<path> routing, source sha/freshness/readiness validation, child provenance/schema/gross-cap validation, and cash-only fail-closed behavior. Verification: manifest/backtest live tests 46 passed; final focused suite 88 passed; final cleaner/architect/QA gates clean.",
+      "completionVerification": {
+        "schemaVersion": 1,
+        "receiptId": "ca4b15e2-5d72-4513-b91c-350e2bf1b616",
+        "verifiedAt": "2026-06-18T14:25:05.321Z",
+        "goalId": "G004",
+        "receiptKind": "per-goal",
+        "goalStatusBeforeCheckpoint": "active",
+        "gjcGoalMode": "aggregate",
+        "gjcObjective": "Complete the durable ultragoal plan in .gjc/ultragoal/goals.json, including later accepted/appended stories, under the original brief constraints; use .gjc/ultragoal/ledger.jsonl as the audit trail.",
+        "qualityGateHash": "27aa1eb9ae331dea57ef634d526f584df7425e802acd94dd0d0c4481317dfcca",
+        "gjcGoalSnapshotHash": "251117a5f9c344c78ea2c74f2b3d4d29d10b8fef1dc5219c4f825b19676dd5bb",
+        "planGeneration": "942e8149a1a172e39cbad81b0f40c16be53244a7350630fcb7ede787a6c262ff",
+        "basis": {
+          "planHashBeforeCheckpoint": "7d5ced09782e5c85b104d703bb547f2cbf43aa2384c10609b6e3bf971765f9f1",
+          "latestRelevantLedgerEventIdBeforeCheckpoint": "da938cc7-38a3-47e6-9090-6e52af0f87be",
+          "goalUpdatedAtBeforeCheckpoint": "2026-06-18T14:25:05.321Z",
+          "relevantGoalIdsBeforeCheckpoint": [
+            "G004"
+          ],
+          "requiredGoalSetHashBeforeCheckpoint": "08a7a6e8fecc1702b6a63804be539be16431668845bea95dc6a55700a733c4cf"
+        },
+        "checkpointLedgerEventId": "bc4207cc-f5cd-412e-9d77-f06cc07521f6"
+      }
+    },
+    {
+      "id": "G005",
+      "title": "Run focused verification and produce execution evidence",
+      "objective": "Run focused tests for discovery invariants, existing strategy reassessment, survivor manifests, strategy/registry tiering, artifact portfolio manifest fail-closed behavior, and report schemas. Run a bounded smoke/probe only if safe within time and available data; otherwise record no-promotion/watchlist evidence without weakening gates.",
+      "status": "complete",
+      "createdAt": "2026-06-18T13:06:55.954Z",
+      "updatedAt": "2026-06-19T10:12:30.928Z",
+      "startedAt": "2026-06-18T14:25:05.326Z",
+      "completedAt": "2026-06-19T10:12:30.928Z",
+      "evidence": "G005 final focused verification completed. Focused ruff passed; focused pytest passed 88 tests in 2.38s after adding account-wipeout fail-closed coverage; report gate assertions passed over five evidence artifacts with no promotions, no real-money, train/validation-only selection, locked-OOS forbidden usage false, zero survivors/full-WF retest candidates, MDD<=30%, and no liquidation/wipeout. Cleanup, architect, QA, and native ultragoal review gates are clean.",
+      "completionVerification": {
+        "schemaVersion": 1,
+        "receiptId": "fa633453-5759-41b2-aabe-65fedc6aaa9a",
+        "verifiedAt": "2026-06-19T10:12:30.928Z",
+        "goalId": "G005",
+        "receiptKind": "final-aggregate",
+        "goalStatusBeforeCheckpoint": "active",
+        "gjcGoalMode": "aggregate",
+        "gjcObjective": "Complete the durable ultragoal plan in .gjc/ultragoal/goals.json, including later accepted/appended stories, under the original brief constraints; use .gjc/ultragoal/ledger.jsonl as the audit trail.",
+        "qualityGateHash": "d5bd72b4183e8e477c227117885c142189431bada7f208eb8b1b7edcf40f3f5d",
+        "gjcGoalSnapshotHash": "a1259e83314427c890c2d408a6a4c1dcea0c69d6aa7336f97e696260326ae286",
+        "planGeneration": "29a4c98ba54695ed63091ad1b06445f6fb986ed6ebef4d1877f471527ef0ca79",
+        "basis": {
+          "planHashBeforeCheckpoint": "3cd67fb8a5aff0d2136885736257fedd679f3353b11746601a1010283bb90927",
+          "latestRelevantLedgerEventIdBeforeCheckpoint": "0c1ee979-4647-4aea-a27b-2b9f2f63fe45",
+          "goalUpdatedAtBeforeCheckpoint": "2026-06-19T10:12:30.928Z",
+          "relevantGoalIdsBeforeCheckpoint": [
+            "G001",
+            "G002",
+            "G003",
+            "G004",
+            "G005"
+          ],
+          "requiredGoalSetHashBeforeCheckpoint": "7bb96422133e45e9d403f645ed414ceab19304de6d8205c2b724023a65822add"
+        },
+        "checkpointLedgerEventId": "05444d35-97c4-4272-b76d-c0c93f24198a"
+      }
+    }
+  ],
+  "createdAt": "2026-06-18T13:06:55.954Z",
+  "updatedAt": "2026-06-19T10:12:30.928Z"
+}

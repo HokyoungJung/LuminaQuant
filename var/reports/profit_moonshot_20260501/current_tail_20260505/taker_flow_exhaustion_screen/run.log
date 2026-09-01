@@ -1,0 +1,466 @@
+load BTC/USDT
+done BTC/USDT checked 432000 survivors 124 rss 2054.51171875
+load ETH/USDT
+done ETH/USDT checked 864000 survivors 254 rss 2568.76953125
+load SOL/USDT
+done SOL/USDT checked 1296000 survivors 506 rss 2577.42578125
+{
+  "checked": 1296000,
+  "count": 506,
+  "top": [
+    {
+      "symbol": "ETH/USDT",
+      "family": "taker_flow_exhaustion_reversal",
+      "params": {
+        "cadence": 180,
+        "flow_lb": 90,
+        "mom_lb": 180,
+        "horizon": "12h",
+        "flow_abs": 0.14,
+        "shock_abs": 0.006,
+        "funding_cap": 0.00015,
+        "vol_lb": 180,
+        "vol_cap": 0.008,
+        "hour_profile": "us_eu_overlap"
+      },
+      "metrics": {
+        "train": {
+          "count": 75,
+          "edge": 0.0022438927986837475,
+          "hit": 0.5333333333333333,
+          "sum_edge": 0.16829195990128107,
+          "trade_sharpe": 0.8829244587865652,
+          "mdd": 0.13863548077570884
+        },
+        "val": {
+          "count": 10,
+          "edge": 0.006467029549882576,
+          "hit": 0.6,
+          "sum_edge": 0.06467029549882576,
+          "trade_sharpe": 0.8907947224377837,
+          "mdd": 0.05721049309151616
+        },
+        "oos": {
+          "count": 13,
+          "edge": 0.010923119039358916,
+          "hit": 0.8461538461538461,
+          "sum_edge": 0.1420005475116659,
+          "trade_sharpe": 1.923084668756402,
+          "mdd": 0.004580207372190975
+        }
+      },
+      "score": 0.008904024183675308
+    },
+    {
+      "symbol": "ETH/USDT",
+      "family": "taker_flow_exhaustion_reversal",
+      "params": {
+        "cadence": 180,
+        "flow_lb": 90,
+        "mom_lb": 180,
+        "horizon": "12h",
+        "flow_abs": 0.14,
+        "shock_abs": 0.006,
+        "funding_cap": 0.0003,
+        "vol_lb": 180,
+        "vol_cap": 0.008,
+        "hour_profile": "us_eu_overlap"
+      },
+      "metrics": {
+        "train": {
+          "count": 75,
+          "edge": 0.0022438927986837475,
+          "hit": 0.5333333333333333,
+          "sum_edge": 0.16829195990128107,
+          "trade_sharpe": 0.8829244587865652,
+          "mdd": 0.13863548077570884
+        },
+        "val": {
+          "count": 10,
+          "edge": 0.006467029549882576,
+          "hit": 0.6,
+          "sum_edge": 0.06467029549882576,
+          "trade_sharpe": 0.8907947224377837,
+          "mdd": 0.05721049309151616
+        },
+        "oos": {
+          "count": 15,
+          "edge": 0.00888478394363713,
+          "hit": 0.8,
+          "sum_edge": 0.13327175915455697,
+          "trade_sharpe": 1.7340769134432714,
+          "mdd": 0.010480980213006114
+        }
+      },
+      "score": 0.007797765635287374
+    },
+    {
+      "symbol": "ETH/USDT",
+      "family": "taker_flow_exhaustion_reversal",
+      "params": {
+        "cadence": 180,
+        "flow_lb": 90,
+        "mom_lb": 180,
+        "horizon": "12h",
+        "flow_abs": 0.14,
+        "shock_abs": 0.006,
+        "funding_cap": 0.0006,
+        "vol_lb": 180,
+        "vol_cap": 0.008,
+        "hour_profile": "us_eu_overlap"
+      },
+      "metrics": {
+        "train": {
+          "count": 75,
+          "edge": 0.0022438927986837475,
+          "hit": 0.5333333333333333,
+          "sum_edge": 0.16829195990128107,
+          "trade_sharpe": 0.8829244587865652,
+          "mdd": 0.13863548077570884
+        },
+        "val": {
+          "count": 10,
+          "edge": 0.006467029549882576,
+          "hit": 0.6,
+          "sum_edge": 0.06467029549882576,
+          "trade_sharpe": 0.8907947224377837,
+          "mdd": 0.05721049309151616
+        },
+        "oos": {
+          "count": 15,
+          "edge": 0.00888478394363713,
+          "hit": 0.8,
+          "sum_edge": 0.13327175915455697,
+          "trade_sharpe": 1.7340769134432714,
+          "mdd": 0.010480980213006114
+        }
+      },
+      "score": 0.007797765635287374
+    },
+    {
+      "symbol": "ETH/USDT",
+      "family": "taker_flow_exhaustion_reversal",
+      "params": {
+        "cadence": 180,
+        "flow_lb": 90,
+        "mom_lb": 180,
+        "horizon": "12h",
+        "flow_abs": 0.14,
+        "shock_abs": 0.006,
+        "funding_cap": 999.0,
+        "vol_lb": 180,
+        "vol_cap": 0.008,
+        "hour_profile": "us_eu_overlap"
+      },
+      "metrics": {
+        "train": {
+          "count": 75,
+          "edge": 0.0022438927986837475,
+          "hit": 0.5333333333333333,
+          "sum_edge": 0.16829195990128107,
+          "trade_sharpe": 0.8829244587865652,
+          "mdd": 0.13863548077570884
+        },
+        "val": {
+          "count": 10,
+          "edge": 0.006467029549882576,
+          "hit": 0.6,
+          "sum_edge": 0.06467029549882576,
+          "trade_sharpe": 0.8907947224377837,
+          "mdd": 0.05721049309151616
+        },
+        "oos": {
+          "count": 15,
+          "edge": 0.00888478394363713,
+          "hit": 0.8,
+          "sum_edge": 0.13327175915455697,
+          "trade_sharpe": 1.7340769134432714,
+          "mdd": 0.010480980213006114
+        }
+      },
+      "score": 0.007797765635287374
+    },
+    {
+      "symbol": "ETH/USDT",
+      "family": "taker_flow_exhaustion_reversal",
+      "params": {
+        "cadence": 360,
+        "flow_lb": 720,
+        "mom_lb": 180,
+        "horizon": "12h",
+        "flow_abs": 0.04,
+        "shock_abs": 0.004,
+        "funding_cap": 0.00015,
+        "vol_lb": 180,
+        "vol_cap": 0.008,
+        "hour_profile": "us_eu_overlap"
+      },
+      "metrics": {
+        "train": {
+          "count": 64,
+          "edge": 0.0029738716049837093,
+          "hit": 0.578125,
+          "sum_edge": 0.1903277827189574,
+          "trade_sharpe": 0.9871048643174872,
+          "mdd": 0.1280462054152891
+        },
+        "val": {
+          "count": 8,
+          "edge": 0.00855573571165624,
+          "hit": 0.75,
+          "sum_edge": 0.06844588569324991,
+          "trade_sharpe": 1.8588295023097023,
+          "mdd": 0.01167047492527393
+        },
+        "oos": {
+          "count": 12,
+          "edge": 0.007225258456755059,
+          "hit": 0.75,
+          "sum_edge": 0.08670310148106071,
+          "trade_sharpe": 1.4344358783136,
+          "mdd": 0.02347402824209572
+        }
+      },
+      "score": 0.0074195104327641785
+    },
+    {
+      "symbol": "ETH/USDT",
+      "family": "taker_flow_exhaustion_reversal",
+      "params": {
+        "cadence": 180,
+        "flow_lb": 90,
+        "mom_lb": 180,
+        "horizon": "8h",
+        "flow_abs": 0.14,
+        "shock_abs": 0.006,
+        "funding_cap": 0.00015,
+        "vol_lb": 180,
+        "vol_cap": 0.008,
+        "hour_profile": "us_eu_overlap"
+      },
+      "metrics": {
+        "train": {
+          "count": 75,
+          "edge": 0.002222751254765914,
+          "hit": 0.5733333333333334,
+          "sum_edge": 0.16670634410744353,
+          "trade_sharpe": 0.7930703327365539,
+          "mdd": 0.12399064299724408
+        },
+        "val": {
+          "count": 10,
+          "edge": 0.001371268065688338,
+          "hit": 0.4,
+          "sum_edge": 0.013712680656883379,
+          "trade_sharpe": 0.1950402413757272,
+          "mdd": 0.0705090707064657
+        },
+        "oos": {
+          "count": 13,
+          "edge": 0.009928799272713942,
+          "hit": 0.6923076923076923,
+          "sum_edge": 0.12907439054528125,
+          "trade_sharpe": 1.80916582310316,
+          "mdd": 0.004417648807553104
+        }
+      },
+      "score": 0.007064492763199702
+    },
+    {
+      "symbol": "ETH/USDT",
+      "family": "taker_flow_exhaustion_reversal",
+      "params": {
+        "cadence": 360,
+        "flow_lb": 720,
+        "mom_lb": 180,
+        "horizon": "12h",
+        "flow_abs": 0.04,
+        "shock_abs": 0.004,
+        "funding_cap": 0.0003,
+        "vol_lb": 180,
+        "vol_cap": 0.008,
+        "hour_profile": "us_eu_overlap"
+      },
+      "metrics": {
+        "train": {
+          "count": 64,
+          "edge": 0.0029738716049837093,
+          "hit": 0.578125,
+          "sum_edge": 0.1903277827189574,
+          "trade_sharpe": 0.9871048643174872,
+          "mdd": 0.1280462054152891
+        },
+        "val": {
+          "count": 8,
+          "edge": 0.00855573571165624,
+          "hit": 0.75,
+          "sum_edge": 0.06844588569324991,
+          "trade_sharpe": 1.8588295023097023,
+          "mdd": 0.01167047492527393
+        },
+        "oos": {
+          "count": 14,
+          "edge": 0.005569593794567984,
+          "hit": 0.7142857142857143,
+          "sum_edge": 0.07797431312395177,
+          "trade_sharpe": 1.2429916212682186,
+          "mdd": 0.03043449239548837
+        }
+      },
+      "score": 0.006483017077734614
+    },
+    {
+      "symbol": "ETH/USDT",
+      "family": "taker_flow_exhaustion_reversal",
+      "params": {
+        "cadence": 360,
+        "flow_lb": 720,
+        "mom_lb": 180,
+        "horizon": "12h",
+        "flow_abs": 0.04,
+        "shock_abs": 0.004,
+        "funding_cap": 0.0006,
+        "vol_lb": 180,
+        "vol_cap": 0.008,
+        "hour_profile": "us_eu_overlap"
+      },
+      "metrics": {
+        "train": {
+          "count": 64,
+          "edge": 0.0029738716049837093,
+          "hit": 0.578125,
+          "sum_edge": 0.1903277827189574,
+          "trade_sharpe": 0.9871048643174872,
+          "mdd": 0.1280462054152891
+        },
+        "val": {
+          "count": 8,
+          "edge": 0.00855573571165624,
+          "hit": 0.75,
+          "sum_edge": 0.06844588569324991,
+          "trade_sharpe": 1.8588295023097023,
+          "mdd": 0.01167047492527393
+        },
+        "oos": {
+          "count": 14,
+          "edge": 0.005569593794567984,
+          "hit": 0.7142857142857143,
+          "sum_edge": 0.07797431312395177,
+          "trade_sharpe": 1.2429916212682186,
+          "mdd": 0.03043449239548837
+        }
+      },
+      "score": 0.006483017077734614
+    },
+    {
+      "symbol": "ETH/USDT",
+      "family": "taker_flow_exhaustion_reversal",
+      "params": {
+        "cadence": 360,
+        "flow_lb": 720,
+        "mom_lb": 180,
+        "horizon": "12h",
+        "flow_abs": 0.04,
+        "shock_abs": 0.004,
+        "funding_cap": 999.0,
+        "vol_lb": 180,
+        "vol_cap": 0.008,
+        "hour_profile": "us_eu_overlap"
+      },
+      "metrics": {
+        "train": {
+          "count": 64,
+          "edge": 0.0029738716049837093,
+          "hit": 0.578125,
+          "sum_edge": 0.1903277827189574,
+          "trade_sharpe": 0.9871048643174872,
+          "mdd": 0.1280462054152891
+        },
+        "val": {
+          "count": 8,
+          "edge": 0.00855573571165624,
+          "hit": 0.75,
+          "sum_edge": 0.06844588569324991,
+          "trade_sharpe": 1.8588295023097023,
+          "mdd": 0.01167047492527393
+        },
+        "oos": {
+          "count": 14,
+          "edge": 0.005569593794567984,
+          "hit": 0.7142857142857143,
+          "sum_edge": 0.07797431312395177,
+          "trade_sharpe": 1.2429916212682186,
+          "mdd": 0.03043449239548837
+        }
+      },
+      "score": 0.006483017077734614
+    },
+    {
+      "symbol": "ETH/USDT",
+      "family": "taker_flow_exhaustion_reversal",
+      "params": {
+        "cadence": 180,
+        "flow_lb": 90,
+        "mom_lb": 180,
+        "horizon": "8h",
+        "flow_abs": 0.14,
+        "shock_abs": 0.006,
+        "funding_cap": 0.0003,
+        "vol_lb": 180,
+        "vol_cap": 0.008,
+        "hour_profile": "us_eu_overlap"
+      },
+      "metrics": {
+        "train": {
+          "count": 75,
+          "edge": 0.002222751254765914,
+          "hit": 0.5733333333333334,
+          "sum_edge": 0.16670634410744353,
+          "trade_sharpe": 0.7930703327365539,
+          "mdd": 0.12399064299724408
+        },
+        "val": {
+          "count": 10,
+          "edge": 0.001371268065688338,
+          "hit": 0.4,
+          "sum_edge": 0.013712680656883379,
+          "trade_sharpe": 0.1950402413757272,
+          "mdd": 0.0705090707064657
+        },
+        "oos": {
+          "count": 15,
+          "edge": 0.008150868680517972,
+          "hit": 0.6,
+          "sum_edge": 0.12226303020776957,
+          "trade_sharpe": 1.6682205712377614,
+          "mdd": 0.006811360337511674
+        }
+      },
+      "score": 0.006123478744846117
+    }
+  ],
+  "rss_mib": 2577.42578125
+}
+	Command being timed: "uv run python /tmp/screen_taker_flow_exhaustion_fast.py"
+	User time (seconds): 145.79
+	System time (seconds): 5.91
+	Percent of CPU this job got: 108%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:20.04
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 2639284
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 7
+	Minor (reclaiming a frame) page faults: 585332
+	Voluntary context switches: 34437
+	Involuntary context switches: 530
+	Swaps: 0
+	File system inputs: 1232
+	File system outputs: 1184
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

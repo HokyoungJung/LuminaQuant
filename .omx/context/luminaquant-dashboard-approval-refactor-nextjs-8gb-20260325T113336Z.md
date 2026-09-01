@@ -1,0 +1,37 @@
+# Context Snapshot: LuminaQuant dashboard approval refactor + Next migration under 8GB (2026-03-25)
+
+- task statement: Execute the requested `$ralplan -> $team -> $ralph` workflow to continue the LuminaQuant dashboard React/Next migration while also performing approval-grade refactoring: functional decomposition, code splitting, OOP/service boundaries, module separation, directory/file cleanup, and bug fixing, without losing existing behavior and while keeping the total active execution posture under 8GB RAM.
+- desired outcome:
+  - converge on an APPROVE-grade plan and implementation path
+  - preserve current dashboard/runtime behavior while moving more dashboard capability behind explicit Next + Python bridge contracts
+  - reduce monolith pressure in Streamlit/dashboard migration hotspots via service extraction and module boundaries
+  - keep verification sequential/heavy-lane-safe under the 8GB hardware cap
+  - finish with team execution evidence plus Ralph follow-up verification/fixes/cleanup
+- known facts/evidence:
+  - repo branch is `private-main`
+  - current working tree already contains an in-progress exact-window parity slice in `apps/dashboard_web/` and `src/lumina_quant/dashboard/exact_window_service.py`
+  - existing migration artifacts already exist: `.omx/plans/prd-dashboard-react-nextjs-migration.md`, `.omx/plans/test-spec-dashboard-react-nextjs-migration.md`
+  - existing approval refactor artifacts already exist: `.omx/plans/prd-luminaquant-full-refactor-approve-8gb.md`, `.omx/plans/test-spec-luminaquant-full-refactor-approve-8gb.md`
+  - current dashboard migration hotspots include `apps/dashboard/app.py`, `apps/dashboard/services/*`, `src/lumina_quant/dashboard/*`, and `apps/dashboard_web/*`
+  - Next dashboard currently has overview/workflows/risk-health plus new exact-window parity slice WIP
+  - memory constraint is explicit: total execution posture must stay below 8GB; prior repo guidance says heavy_run_parallelism=1 and light_worker_parallelism=2
+  - tmux + omx are available in-session
+- constraints:
+  - preserve or improve functionality; no regressions accepted without equivalent replacement and tests
+  - no new dependencies unless absolutely required (currently avoid)
+  - <=2 workers total; prefer 1 worker for active team execution to keep memory safe
+  - no concurrent heavy verification; full pytest/build/8GB gates must run sequentially
+  - PRD + test spec must exist before Ralph execution work
+- unknowns/open questions:
+  - how far to push Streamlit decomposition in the same wave versus keeping focus on migration seams
+  - whether approval is best achieved by another safe vertical slice (exact-window + contract cleanup + launcher parity) or by a broader service extraction wave around `apps/dashboard/app.py`
+  - which remaining hotspots most threaten final cold APPROVE after the latest Next parity additions
+- likely codebase touchpoints:
+  - `apps/dashboard_web/`
+  - `src/lumina_quant/dashboard/`
+  - `apps/dashboard/app.py`
+  - `apps/dashboard/services/workflow_jobs.py`
+  - `apps/dashboard/services/risk_dashboard.py`
+  - `apps/dashboard/services/exact_window*.py`
+  - `src/lumina_quant/cli/dashboard.py`
+  - dashboard CLI/bridge tests and docs

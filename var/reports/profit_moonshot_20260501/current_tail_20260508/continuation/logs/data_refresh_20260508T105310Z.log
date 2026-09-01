@@ -1,0 +1,357 @@
+{
+  "aggregation_backend_diagnostics": {
+    "auto_fallback_warning_count": 0,
+    "auto_fallback_warning_reasons": [],
+    "description": "rust:/home/hoky/Quants-agent/LuminaQuant/native/rust_rawfirst/target/release/liblumina_rawfirst.so",
+    "native_library_path": "/home/hoky/Quants-agent/LuminaQuant/native/rust_rawfirst/target/release/liblumina_rawfirst.so",
+    "native_load_error": null,
+    "requested_backend": "auto",
+    "resolved_backend": "rust"
+  },
+  "aggregation_backend_requested": "auto",
+  "aggregation_backend_resolved": "rust:/home/hoky/Quants-agent/LuminaQuant/native/rust_rawfirst/target/release/liblumina_rawfirst.so",
+  "artifact_kind": "continuity_validation_data_refresh",
+  "canonical_source": "binance_raw_aggtrades",
+  "collection_cutoff_utc": "2026-05-08T10:53:10Z",
+  "effective_memory_budget_bytes": 6979321856,
+  "error": null,
+  "feature_results": [
+    {
+      "after_feature_day_utc": "2026-05-08",
+      "before_feature_day_utc": "2026-05-06",
+      "cutoff_utc": "2026-05-08T10:53:10Z",
+      "first_timestamp_utc": "2026-05-06T00:00:00Z",
+      "last_timestamp_utc": "2026-05-08T10:53:00Z",
+      "resume_start_utc": "2026-05-06T00:00:00Z",
+      "symbol": "BTC/USDT",
+      "upserted_rows": 3539
+    },
+    {
+      "after_feature_day_utc": "2026-05-08",
+      "before_feature_day_utc": "2026-05-06",
+      "cutoff_utc": "2026-05-08T10:53:10Z",
+      "first_timestamp_utc": "2026-05-06T00:00:00Z",
+      "last_timestamp_utc": "2026-05-08T10:53:00Z",
+      "resume_start_utc": "2026-05-06T00:00:00Z",
+      "symbol": "ETH/USDT",
+      "upserted_rows": 3539
+    },
+    {
+      "after_feature_day_utc": "2026-05-08",
+      "before_feature_day_utc": "2026-05-06",
+      "cutoff_utc": "2026-05-08T10:53:10Z",
+      "first_timestamp_utc": "2026-05-06T00:00:00Z",
+      "last_timestamp_utc": "2026-05-08T10:53:00Z",
+      "resume_start_utc": "2026-05-06T00:00:00Z",
+      "symbol": "BNB/USDT",
+      "upserted_rows": 3539
+    },
+    {
+      "after_feature_day_utc": "2026-05-08",
+      "before_feature_day_utc": "2026-05-06",
+      "cutoff_utc": "2026-05-08T10:53:10Z",
+      "first_timestamp_utc": "2026-05-06T00:00:00Z",
+      "last_timestamp_utc": "2026-05-08T10:53:00Z",
+      "resume_start_utc": "2026-05-06T00:00:00Z",
+      "symbol": "SOL/USDT",
+      "upserted_rows": 3539
+    },
+    {
+      "after_feature_day_utc": "2026-05-08",
+      "before_feature_day_utc": "2026-05-06",
+      "cutoff_utc": "2026-05-08T10:53:10Z",
+      "first_timestamp_utc": "2026-05-06T00:00:00Z",
+      "last_timestamp_utc": "2026-05-08T10:53:00Z",
+      "resume_start_utc": "2026-05-06T00:00:00Z",
+      "symbol": "TRX/USDT",
+      "upserted_rows": 3539
+    }
+  ],
+  "feature_symbols": [
+    "BTC/USDT",
+    "ETH/USDT",
+    "BNB/USDT",
+    "SOL/USDT",
+    "TRX/USDT"
+  ],
+  "final_signoff_source_of_truth": false,
+  "generated_at": "2026-05-08T10:53:10.413493+00:00",
+  "memory": {
+    "budget_bytes": 6979321856,
+    "budget_mib": 6656.0,
+    "error": null,
+    "generated_at": "2026-05-08T11:02:18.217181+00:00",
+    "hard_limit_bytes": 6979321856,
+    "hard_limit_mib": 6656.0,
+    "hard_trigger_count": 0,
+    "label": "continuity_validation_data_refresh",
+    "peak_rss_bytes": 4301713408,
+    "peak_rss_mib": 4102.43359375,
+    "rss_log_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/continuation/data_refresh_rss.jsonl",
+    "sample_count": 21,
+    "soft_limit_bytes": 6979321856,
+    "soft_limit_mib": 6656.0,
+    "soft_trigger_count": 0,
+    "status": "completed"
+  },
+  "memory_budget_bytes": 8589934592,
+  "ohlcv_derivation": "derived_from_raw_aggtrades",
+  "ohlcv_results": [
+    {
+      "after_ohlcv_max_utc": "2026-05-08T10:53:09Z",
+      "after_raw_agg_trade_utc": "2026-05-08T10:53:09.268000Z",
+      "archive_days_considered": 2,
+      "archive_days_downloaded": 1,
+      "archive_days_missing": 0,
+      "archive_raw_rows_fetched": 880969,
+      "archive_raw_rows_upserted": 880969,
+      "before_ohlcv_max_utc": "2026-05-07T10:16:45Z",
+      "before_raw_agg_trade_utc": "2026-05-07T10:16:45.767000Z",
+      "cutoff_utc": "2026-05-08T10:53:10Z",
+      "derived_ohlcv_rows_upserted": 88585,
+      "live_raw_rows_fetched": 423600,
+      "live_raw_rows_upserted": 423600,
+      "live_tail_status": "fetched",
+      "resume_start_utc": "2026-05-07T10:16:45Z",
+      "source_mix": "archive_and_live_recent_archive_cutover",
+      "stage_timings_seconds": {
+        "archive_download": 9.414543,
+        "archive_parse": 2.227033,
+        "checkpoint_write": 0.042252,
+        "derive_1s": 2.939052,
+        "live_fetch": 180.292264,
+        "ohlcv_upsert": 7.647741,
+        "raw_upsert": 1.586564,
+        "total_refresh": 213.55329
+      },
+      "symbol": "BTC/USDT"
+    },
+    {
+      "after_ohlcv_max_utc": "2026-05-08T10:53:09Z",
+      "after_raw_agg_trade_utc": "2026-05-08T10:53:09.054000Z",
+      "archive_days_considered": 3,
+      "archive_days_downloaded": 1,
+      "archive_days_missing": 0,
+      "archive_raw_rows_fetched": 1170875,
+      "archive_raw_rows_upserted": 1170875,
+      "before_ohlcv_max_utc": "2026-05-06T23:59:58Z",
+      "before_raw_agg_trade_utc": "2026-05-06T23:59:58.641000Z",
+      "cutoff_utc": "2026-05-08T10:53:10Z",
+      "derived_ohlcv_rows_upserted": 125591,
+      "live_raw_rows_fetched": 346884,
+      "live_raw_rows_upserted": 346884,
+      "live_tail_status": "fetched",
+      "resume_start_utc": "2026-05-06T23:59:58Z",
+      "source_mix": "archive_and_live_recent_archive_cutover",
+      "stage_timings_seconds": {
+        "archive_download": 20.406293,
+        "archive_parse": 3.221198,
+        "checkpoint_write": 0.047196,
+        "derive_1s": 3.289363,
+        "live_fetch": 169.325969,
+        "ohlcv_upsert": 7.367037,
+        "raw_upsert": 1.756497,
+        "total_refresh": 212.981546
+      },
+      "symbol": "ETH/USDT"
+    },
+    {
+      "after_ohlcv_max_utc": "2026-05-08T10:53:09Z",
+      "after_raw_agg_trade_utc": "2026-05-08T10:53:06.847000Z",
+      "archive_days_considered": 3,
+      "archive_days_downloaded": 1,
+      "archive_days_missing": 0,
+      "archive_raw_rows_fetched": 235569,
+      "archive_raw_rows_upserted": 235569,
+      "before_ohlcv_max_utc": "2026-05-06T23:59:58Z",
+      "before_raw_agg_trade_utc": "2026-05-06T23:59:58.890000Z",
+      "cutoff_utc": "2026-05-08T10:53:10Z",
+      "derived_ohlcv_rows_upserted": 125591,
+      "live_raw_rows_fetched": 81094,
+      "live_raw_rows_upserted": 81094,
+      "live_tail_status": "fetched",
+      "resume_start_utc": "2026-05-06T23:59:58Z",
+      "source_mix": "archive_and_live_recent_archive_cutover",
+      "stage_timings_seconds": {
+        "archive_download": 5.038675,
+        "archive_parse": 0.578968,
+        "checkpoint_write": 0.024669,
+        "derive_1s": 0.580936,
+        "live_fetch": 23.448254,
+        "ohlcv_upsert": 7.540978,
+        "raw_upsert": 0.302532,
+        "total_refresh": 44.599845
+      },
+      "symbol": "BNB/USDT"
+    },
+    {
+      "after_ohlcv_max_utc": "2026-05-08T10:53:09Z",
+      "after_raw_agg_trade_utc": "2026-05-08T10:53:09.359000Z",
+      "archive_days_considered": 3,
+      "archive_days_downloaded": 1,
+      "archive_days_missing": 0,
+      "archive_raw_rows_fetched": 302095,
+      "archive_raw_rows_upserted": 302095,
+      "before_ohlcv_max_utc": "2026-05-06T23:59:58Z",
+      "before_raw_agg_trade_utc": "2026-05-06T23:59:58.587000Z",
+      "cutoff_utc": "2026-05-08T10:53:10Z",
+      "derived_ohlcv_rows_upserted": 125591,
+      "live_raw_rows_fetched": 87965,
+      "live_raw_rows_upserted": 87965,
+      "live_tail_status": "fetched",
+      "resume_start_utc": "2026-05-06T23:59:58Z",
+      "source_mix": "archive_and_live_recent_archive_cutover",
+      "stage_timings_seconds": {
+        "archive_download": 4.808794,
+        "archive_parse": 0.765543,
+        "checkpoint_write": 0.024764,
+        "derive_1s": 0.61954,
+        "live_fetch": 41.872631,
+        "ohlcv_upsert": 7.231126,
+        "raw_upsert": 0.351525,
+        "total_refresh": 63.075051
+      },
+      "symbol": "SOL/USDT"
+    },
+    {
+      "after_ohlcv_max_utc": "2026-05-08T10:53:09Z",
+      "after_raw_agg_trade_utc": "2026-05-08T10:53:09.834000Z",
+      "archive_days_considered": 3,
+      "archive_days_downloaded": 1,
+      "archive_days_missing": 0,
+      "archive_raw_rows_fetched": 108711,
+      "archive_raw_rows_upserted": 108711,
+      "before_ohlcv_max_utc": "2026-05-06T23:59:58Z",
+      "before_raw_agg_trade_utc": "2026-05-06T23:59:58.624000Z",
+      "cutoff_utc": "2026-05-08T10:53:10Z",
+      "derived_ohlcv_rows_upserted": 125592,
+      "live_raw_rows_fetched": 56693,
+      "live_raw_rows_upserted": 56693,
+      "live_tail_status": "fetched",
+      "resume_start_utc": "2026-05-06T23:59:58Z",
+      "source_mix": "archive_and_live_recent_archive_cutover",
+      "stage_timings_seconds": {
+        "archive_download": 1.459522,
+        "archive_parse": 0.274692,
+        "checkpoint_write": 0.025523,
+        "derive_1s": 0.275038,
+        "live_fetch": 10.820658,
+        "ohlcv_upsert": 6.9351,
+        "raw_upsert": 0.160207,
+        "total_refresh": 26.993192
+      },
+      "symbol": "TRX/USDT"
+    }
+  ],
+  "parallel": {
+    "effective_memory_budget_bytes": 6979321856,
+    "memory_budget_bytes": 6979321856,
+    "mode": "sequential",
+    "peak_worker_rss_bytes": 0,
+    "per_worker_memory_bytes": 2147483648,
+    "projected_worker_budget_bytes": 2147483648,
+    "requested_workers": 1,
+    "reserve_memory_bytes": 1610612736,
+    "safe_session_memory_cap_bytes": 8589934592,
+    "selected_workers": 1,
+    "system_memory_budget_bytes": 15657508864
+  },
+  "portfolio_symbols": [
+    "BTC/USDT",
+    "ETH/USDT",
+    "BNB/USDT",
+    "SOL/USDT",
+    "TRX/USDT"
+  ],
+  "safe_session_memory_cap_bytes": 8589934592,
+  "session_memory_lease": {
+    "lock_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/exact_window_backtests/followup_status/session_memory_budget.lock",
+    "status": "acquired"
+  },
+  "session_memory_lease_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/exact_window_backtests/followup_status/session_memory_budget.lock",
+  "source_skew_summary": {
+    "symbols_with_live_tail": [
+      "BTC/USDT",
+      "ETH/USDT",
+      "BNB/USDT",
+      "SOL/USDT",
+      "TRX/USDT"
+    ],
+    "top_live_fetch_seconds": [
+      {
+        "seconds": 180.292264,
+        "symbol": "BTC/USDT"
+      },
+      {
+        "seconds": 169.325969,
+        "symbol": "ETH/USDT"
+      },
+      {
+        "seconds": 41.872631,
+        "symbol": "SOL/USDT"
+      },
+      {
+        "seconds": 23.448254,
+        "symbol": "BNB/USDT"
+      },
+      {
+        "seconds": 10.820658,
+        "symbol": "TRX/USDT"
+      }
+    ],
+    "top_total_refresh_seconds": [
+      {
+        "seconds": 213.55329,
+        "symbol": "BTC/USDT"
+      },
+      {
+        "seconds": 212.981546,
+        "symbol": "ETH/USDT"
+      },
+      {
+        "seconds": 63.075051,
+        "symbol": "SOL/USDT"
+      },
+      {
+        "seconds": 44.599845,
+        "symbol": "BNB/USDT"
+      },
+      {
+        "seconds": 26.993192,
+        "symbol": "TRX/USDT"
+      }
+    ],
+    "unsupported_live_tail_symbols": []
+  },
+  "status": "completed",
+  "support_inventory": {
+    "csv_path": "var/reports/profit_moonshot_20260501/current_tail_20260508/continuation/support_inventory_latest.csv",
+    "json_path": "var/reports/profit_moonshot_20260501/current_tail_20260508/continuation/support_inventory_latest.json",
+    "symbol_count": 5
+  },
+  "system_memory_budget_bytes": 15657508864,
+  "validation_mode": "continuity_only_extension_refresh"
+}
+	Command being timed: "uv run python scripts/research/refresh_final_portfolio_validation_data.py --symbols BTC/USDT,ETH/USDT,SOL/USDT,BNB/USDT,TRX/USDT --priority-symbols BTC/USDT,ETH/USDT,BNB/USDT,SOL/USDT,TRX/USDT --output-json var/reports/profit_moonshot_20260501/current_tail_20260508/continuation/data_refresh_latest.json --output-md var/reports/profit_moonshot_20260501/current_tail_20260508/continuation/data_refresh_latest.md --rss-log var/reports/profit_moonshot_20260501/current_tail_20260508/continuation/data_refresh_rss.jsonl --support-inventory-json var/reports/profit_moonshot_20260501/current_tail_20260508/continuation/support_inventory_latest.json --support-inventory-csv var/reports/profit_moonshot_20260501/current_tail_20260508/continuation/support_inventory_latest.csv --memory-budget-bytes 8589934592 --soft-rss-bytes 7730941132 --max-workers 1"
+	User time (seconds): 105.66
+	System time (seconds): 12.85
+	Percent of CPU this job got: 21%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 9:08.24
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 4239800
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 4905
+	Minor (reclaiming a frame) page faults: 1600114
+	Voluntary context switches: 194938
+	Involuntary context switches: 326
+	Swaps: 0
+	File system inputs: 1836000
+	File system outputs: 541232
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

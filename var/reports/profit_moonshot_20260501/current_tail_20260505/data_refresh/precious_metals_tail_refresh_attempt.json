@@ -1,0 +1,17 @@
+{
+  "artifact_kind": "precious_metals_tail_refresh_attempt",
+  "generated_at": "2026-05-05T13:22:24.517575+00:00",
+  "command": "scripts/research/refresh_final_portfolio_validation_data.py --symbols XAU/USDT,XAG/USDT,XPT/USDT,XPD/USDT --min-start-utc 2026-03-28T00:00:00Z --cutoff-utc 2026-05-05T00:00:00Z --max-workers 1 --soft-rss-bytes 7000000000",
+  "status": "aborted_after_no_progress_stall",
+  "elapsed_before_kill": "~28 minutes",
+  "rss_log": "var/reports/profit_moonshot_20260501/current_tail_20260505/data_refresh/precious_metals_tail_refresh_rss.jsonl",
+  "observed_peak_rss_mib": 1537.184,
+  "completed_observed_effects": {
+    "XAU/USDT": "raw aggtrade archive extended through date=2026-05-04 and ohlcv WAL written; final refresh json/md not produced because process was killed after CloudFront/no-progress stall"
+  },
+  "not_completed": [
+    "XAG/USDT tail beyond 2026-03-28",
+    "XPT/USDT tail beyond 2026-03-28",
+    "XPD/USDT tail beyond 2026-03-28"
+  ]
+}

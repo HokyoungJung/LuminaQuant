@@ -1,0 +1,125 @@
+{
+  "ok": true,
+  "plan": {
+    "version": 1,
+    "createdAt": "2026-06-07T06:51:53.943Z",
+    "updatedAt": "2026-06-07T10:09:43.021Z",
+    "briefPath": ".omx/ultragoal/brief.md",
+    "goalsPath": ".omx/ultragoal/goals.json",
+    "ledgerPath": ".omx/ultragoal/ledger.jsonl",
+    "codexGoalMode": "aggregate",
+    "goals": [
+      {
+        "id": "G001-preserve-execution-context-and-stale",
+        "title": "Preserve execution context and stale state.",
+        "objective": "Preserve execution context and stale state.\nRecord git status, archived stale ultragoal evidence, and output ownership plan.",
+        "status": "complete",
+        "attempt": 1,
+        "createdAt": "2026-06-07T06:51:53.943Z",
+        "updatedAt": "2026-06-07T06:52:44.932Z",
+        "startedAt": "2026-06-07T06:51:58.707Z",
+        "completedAt": "2026-06-07T06:52:44.932Z",
+        "evidence": "G001 complete: execution context/gstatus saved at var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/clean_100pct_live_strategy_search_20260607/execution_context_g001.{md,json}; stale ultragoal archived at .omx/ultragoal/archive/stale-before-clean-100pct-live-strategy-search-20260607T065200Z and annotated before new goals."
+      },
+      {
+        "id": "G002-contamination-and-eligibility-audit",
+        "title": "Contamination and eligibility audit.",
+        "objective": "Contamination and eligibility audit.\nExisting artifacts only classify contamination/eligibility; no promotion from historical OOS.",
+        "status": "complete",
+        "attempt": 1,
+        "createdAt": "2026-06-07T06:51:53.943Z",
+        "updatedAt": "2026-06-07T07:07:36.129Z",
+        "startedAt": "2026-06-07T06:52:53.138Z",
+        "completedAt": "2026-06-07T07:07:36.129Z",
+        "evidence": "G002 complete: team clean-100pct-live-tar-4a549153 reached 7/7 terminal completed tasks, then shutdown complete; lane artifacts copied into var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/clean_100pct_live_strategy_search_20260607/team_lanes; .omx/ultragoal G002 contamination/eligibility audit classifies existing OOS artifacts as contamination map/report-only controls only, with clean_input_meta_selector shadow_freeze_only not promotion-eligible."
+      },
+      {
+        "id": "G003-immutable-manifest",
+        "title": "Immutable manifest.",
+        "objective": "Immutable manifest.\nFreeze hypothesis family, universe, split, code/source hashes, seeds, metrics, costs, label rules, command ledger, output paths before any new replay interpretation.",
+        "status": "complete",
+        "attempt": 1,
+        "createdAt": "2026-06-07T06:51:53.943Z",
+        "updatedAt": "2026-06-07T07:14:01.456Z",
+        "startedAt": "2026-06-07T07:07:39.675Z",
+        "completedAt": "2026-06-07T07:14:01.456Z",
+        "evidence": "G003 complete: immutable final audit manifest written at var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/clean_100pct_live_strategy_search_20260607/immutable_manifest_g003_20260607.json; freezes split policy, 100pct reporting-label-only rule, cost grid requirements, label rules, source artifact hashes, and dirty git context before final label assignment. Codex hidden goal snapshot caveat recorded in final_quality_gate_20260607.json."
+      },
+      {
+        "id": "G004-train-validation-only-search-or-runn",
+        "title": "Train/validation-only search or runner.",
+        "objective": "Train/validation-only search or runner.\nImplement/reuse bounded clean runner; Optuna/hybrid only train/val; locked OOS excluded from selection and 100% threshold excluded from objectives.",
+        "status": "complete",
+        "attempt": 1,
+        "createdAt": "2026-06-07T06:51:53.943Z",
+        "updatedAt": "2026-06-07T07:14:01.776Z",
+        "startedAt": "2026-06-07T07:12:00.156Z",
+        "completedAt": "2026-06-07T07:14:01.776Z",
+        "evidence": "G004 complete: reused existing bounded clean discovery/runner artifacts rather than mining locked OOS. clean_new_alpha_discovery full artifact reports selection_inputs train/validation and locked-OOS flags false, OOS comp 2.51% / ann 3.01%; feature-bounded rerun OOS comp -0.24% / ann -0.57%; no 100pct current clean promotion candidate found. No new Optuna objective used 100pct threshold."
+      },
+      {
+        "id": "G005-locked-oos-report-only-and-metrics-a",
+        "title": "Locked OOS report-only and metrics aggregation.",
+        "objective": "Locked OOS report-only and metrics aggregation.\nAttach locked OOS only after choices; report all repo metrics and fold tables.",
+        "status": "complete",
+        "attempt": 1,
+        "createdAt": "2026-06-07T06:51:53.943Z",
+        "updatedAt": "2026-06-07T07:14:02.099Z",
+        "startedAt": "2026-06-07T07:12:21.925Z",
+        "completedAt": "2026-06-07T07:14:02.099Z",
+        "evidence": "G005 complete: final_label_report_20260607.{md,json} aggregates locked-OOS/report-only metrics after candidate classification; locked OOS remains report/gate only and may not select, tune, prune, fit, rerun, or promote. Worker2 policy artifacts and JSON assertions validate report-only role."
+      },
+      {
+        "id": "G006-independent-cost-turnover-theory-ver",
+        "title": "Independent cost/turnover/theory verification.",
+        "objective": "Independent cost/turnover/theory verification.\n10/15/20bps, turnover/RPT, capacity/liquidity/slippage, MDD/tail risk; source-backed market rationale.",
+        "status": "complete",
+        "attempt": 1,
+        "createdAt": "2026-06-07T06:51:53.943Z",
+        "updatedAt": "2026-06-07T07:14:02.427Z",
+        "startedAt": "2026-06-07T07:12:38.749Z",
+        "completedAt": "2026-06-07T07:14:02.427Z",
+        "evidence": "G006 complete: worker4_cost_verifier.{md,json} copied into report team_lanes; it blocks live eligibility until explicit 10/15/20bps rows, RPT/turnover, tail/CVaR, capacity/liquidity, and paper fill telemetry exist. worker1_theory_sources_20260607.{md,json} records trend/vol/cost/overfit sources and rejects arbitrary/OOS-inspired rules."
+      },
+      {
+        "id": "G007-final-strict-label-assignment-and-re",
+        "title": "Final strict label assignment and report.",
+        "objective": "Final strict label assignment and report.\nState found/not_found for 100%+ reporting label; no real-money approval without fresh-forward and telemetry; update research note; run final quality gate.",
+        "status": "review_blocked",
+        "attempt": 1,
+        "createdAt": "2026-06-07T06:51:53.943Z",
+        "updatedAt": "2026-06-07T07:14:42.974Z",
+        "startedAt": "2026-06-07T07:13:04.874Z",
+        "reviewBlockedAt": "2026-06-07T07:14:42.974Z",
+        "evidence": "Final report and validation artifacts are complete, but G007 cannot be merge-ready approved because the available native subagent tool schema lacks the required agent_type field for OMX code-reviewer/architect lanes, and current get_goal reports an older completed latency objective rather than the active ultragoal aggregate. Per code-review skill, independent review unavailable blocks approval; final_quality_gate_20260607.json records pass_with_goal_snapshot_caveat."
+      },
+      {
+        "id": "G008-resolve-final-independent-review-and",
+        "title": "Resolve final independent review and hidden goal checkpoint blocker",
+        "objective": "Run/attach independent code-reviewer APPROVE and architect CLEAR evidence using a tool surface that supports OMX agent_type, then reconcile the hidden Codex goal snapshot before final ultragoal checkpoint.",
+        "status": "in_progress",
+        "attempt": 1,
+        "createdAt": "2026-06-07T07:14:42.974Z",
+        "updatedAt": "2026-06-07T10:09:43.021Z",
+        "evidence": "Final report and validation artifacts are complete, but G007 cannot be merge-ready approved because the available native subagent tool schema lacks the required agent_type field for OMX code-reviewer/architect lanes, and current get_goal reports an older completed latency objective rather than the active ultragoal aggregate. Per code-review skill, independent review unavailable blocks approval; final_quality_gate_20260607.json records pass_with_goal_snapshot_caveat.",
+        "startedAt": "2026-06-07T09:55:04.028Z"
+      }
+    ],
+    "codexObjective": "Complete the durable ultragoal plan in .omx/ultragoal/goals.json, including later accepted/appended stories, under the original brief constraints; use .omx/ultragoal/ledger.jsonl as the audit trail.",
+    "activeGoalId": "G008-resolve-final-independent-review-and"
+  },
+  "summary": {
+    "total": 8,
+    "pending": 0,
+    "inProgress": 1,
+    "complete": 6,
+    "failed": 0,
+    "reviewBlocked": 1,
+    "needsUserDecision": 0,
+    "superseded": 0,
+    "steeringBlocked": 0,
+    "aggregateComplete": false,
+    "artifactComplete": false,
+    "activeGoalId": "G008-resolve-final-independent-review-and"
+  }
+}

@@ -1,0 +1,8 @@
+artifact_kind=alpha_zoo_pnl_correlation_decision
+paper_universe_candidate_count=136
+captured_paper_pnl_candidate_count=136
+selected_candidate_count=11
+ready_for_real=False
+real_money_execution=False
+locked_oos_used_for_selection=False
+runner_peak_rss_mib=6329.95

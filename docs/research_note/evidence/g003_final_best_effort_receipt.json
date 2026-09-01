@@ -1,0 +1,77 @@
+{
+  "artifact_kind": "luminaquant_g003_final_best_effort_receipt.v1",
+  "artifact_sha256": {
+    "external_cleanup": "950497e12542e2354184a0d6eb3aa49b6b96f747c588a13f7cb5d3e69373c3cf",
+    "fallback_policy": "6c85fc538b928c144c8a0a28c40ea807d2df867585671c56edaec332b08c6efe",
+    "historical_v44_skipped": "6f50664251d470482aa19a430516af10e45cf2ab8ec1e0f8d24c3b0bf2d03328",
+    "observability_v22_skipped": "b2062709a2be37c89484bf6cb150dd54e397ae4ff5d7bc56648c0b8629e498cb",
+    "parity_v53": "32877ae747f800b5cc005fc7938ed13f2f95320c6e796f53e821771dca2308e1",
+    "post_cutoff": "f3ac236543a5f9f61d5fce7df6c736eee831419548e73bffb425fcf83068f9ea",
+    "prelock_v51_disqualified": "42afc1d186f206db2cb410d6db73518f222b6603b70e7b4850314aa4a9664724",
+    "prelock_v52_incomplete": "a6b0a6e03eae0b17cd43fb552c0e4db5704de2fc9d998d57dbc0b17719279501",
+    "runtime_v53": "981984b047f4606a13b404a65b3d00191f3e11f08794987f19a703d949153866",
+    "tradfi_archive": "ff1a55d8941aa0a0a43e6c42db350e988b0ddbdefef223a9ad1cdc05730d262a"
+  },
+  "audited_at": "2026-09-01T22:06:25Z",
+  "canonical_head": "6e4b72c013e28899ad1015bf34501be9ca1a9337",
+  "canonical_repository": "/home/hoky/Quants-agent/LuminaQuant",
+  "canonical_tree": "f2d48f41af594e01aa41a4833b55bad8df46db39",
+  "ci": {
+    "conclusion": "success",
+    "run_id": 33562325953
+  },
+  "evaluation": {
+    "historical": {
+      "expected_fold_count": 680,
+      "official_output_eligible": false,
+      "status": "SKIPPED_DEPENDENCY"
+    },
+    "observability": {
+      "official_output_eligible": false,
+      "status": "SKIPPED_DEPENDENCY"
+    },
+    "prelock": {
+      "expected_precompute_units": 1588,
+      "official_output_eligible": false,
+      "sealed_precompute_units": 1569,
+      "status": "SKIPPED_INCOMPLETE"
+    }
+  },
+  "external_cleanup_roots_absent": [
+    "/home/hoky/alpha-max-g003-evaluation",
+    "/home/hoky/quants-direct-alpha-max",
+    "/home/hoky/quants-external-data",
+    "/home/hoky/quants-recovery-market",
+    "/home/hoky/quants-recovery-runs"
+  ],
+  "incomplete_reasons": [
+    "official_816_fold_prelock_not_completed",
+    "fresh_680_fold_historical_not_executed",
+    "observability_acceptance_not_produced"
+  ],
+  "lineage": {
+    "optimized_source_commit": "e5d39cb0d68642a55b512d5c3d8522846c4cd160",
+    "parity_checkpoint_days": 365,
+    "parity_v53_acceptance_sha256": "32877ae747f800b5cc005fc7938ed13f2f95320c6e796f53e821771dca2308e1",
+    "runtime_v53_seal_sha256": "23f155e0c3841975d38c287a9981bca4cecbb8dc3eb2d44a9aeb999c76ed6e76"
+  },
+  "objective_complete": false,
+  "order_routing_enabled": false,
+  "pull_request": {
+    "mergeable": true,
+    "number": 41,
+    "state": "OPEN"
+  },
+  "sleep_disabled_until_manual_final_closure": true,
+  "storage": {
+    "available_bytes": 597011390464,
+    "minimum_required_bytes": 68719476736,
+    "reserve_satisfied": true
+  },
+  "verification": {
+    "format": true,
+    "pytest": "7636 passed, 20 skipped, 3 xfailed, 44 subtests passed",
+    "ruff": true,
+    "uv_lock": true
+  }
+}

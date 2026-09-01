@@ -1,0 +1,43 @@
+alpha_zoo_htf_momentum_crowding_discovery local verification
+verified_at_utc=2026-05-22T12:48:54Z
+verified_at_kst=2026-05-22T21:48:54+09:00
+
+Artifact regeneration:
+- command: /usr/bin/time -v uv run --extra dev python scripts/research/run_alpha_zoo_htf_momentum_crowding_discovery.py
+- exit_status=0
+- timestamped_json=var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_htf_momentum_crowding_discovery_20260522/alpha_zoo_htf_momentum_crowding_discovery_20260522T124629Z.json
+- runner_max_rss_kib=6568400
+- runner_peak_rss_mib_recorded=6414.453 (<8192 MiB)
+
+Artifact invariants:
+- candidate_count=2732
+- family_counts={funding_squeeze_continuation:540, htf_donchian_breakout:400, htf_trend_persistence:1600, liquid_cross_sectional_momentum:192}
+- backtest_sample_gate_pass_count=1
+- execution_efficiency_proxy_gate_pass_count=1
+- paper_candidate_gate_pass_count=0
+- ready_for_paper=false
+- ready_for_real=false
+- real_money_execution=false
+- paper_execution_allowed=false
+- locked_oos discovery/selection/objective/pruning/parameter_fitting flags all false
+- top/candidate CSV includes the backtest-sample-pass shadow row and the execution-efficiency-proxy row despite top-N truncation.
+
+Commands passed:
+- uv run --extra dev pytest tests/test_alpha_zoo_htf_momentum_crowding_discovery.py tests/test_alpha_zoo_paper_fill_efficiency_gate.py tests/test_alpha_zoo_sample_guarded_alpha_discovery.py -q
+  result: 17 passed in 0.58s
+- uv run --extra dev ruff check .
+  result: All checks passed!
+- uv run --extra dev python -m compileall -q src scripts tests
+  result: passed
+- git diff --check
+  result: passed
+- python artifact invariant assertion block
+  result: artifact invariants passed
+- uv run --extra dev python scripts/audit_hardcoded_params.py
+  result: Hardcoded parameter audit: total=567 new=0 baselined=567
+- /usr/bin/time -v uv run --extra dev pytest -q
+  result: 1395 passed in 58.42s; max_rss_kib=2744828 (<8192 MiB)
+
+Real-money safety:
+- No order/execution runner was invoked.
+- All generated artifacts remain paper/testnet research only and keep ready_for_real=false, real_money_execution=false.

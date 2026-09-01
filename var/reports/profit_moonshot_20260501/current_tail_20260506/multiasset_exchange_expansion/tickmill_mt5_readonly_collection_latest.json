@@ -1,0 +1,17 @@
+{
+  "artifact_kind": "tickmill_mt5_readonly_collection",
+  "blocked_reason": "LQ_MT5_BRIDGE_PYTHON / LQ__LIVE__MT5_BRIDGE_PYTHON is not configured.",
+  "bridge_python_configured": false,
+  "direct_trading_blocked": true,
+  "direct_trading_blocked_reason": "No direct trading until spread/swap/session/lot-size/fill models and raw-first evidence exist.",
+  "generated_at_utc": "2026-05-07T09:59:19.932244Z",
+  "limit": 2000,
+  "official_docs": {
+    "instruments": "https://www.tickmill.com/trading-instruments/",
+    "spreads_swaps": "https://www.tickmill.com/conditions/spreads-swaps"
+  },
+  "read_only": true,
+  "status": "blocked",
+  "symbols": [],
+  "timeframe": "1h"
+}

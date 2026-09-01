@@ -1,0 +1,27 @@
+# Docker is out of scope for the supported runtime (see docs/DEPLOYMENT.md); this
+# compose file mirrors the documented `uv sync --extra optimize --extra live-binance --extra live-polymarket` +
+# `lq live` install for parity/experimentation only.
+#
+#   docker compose up --build
+#
+# Provide TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID and exchange creds via .env.
+
+services:
+  lumina-quant:
+    build:
+      context: .
+      args:
+        PYTHON_VERSION: "3.14"
+    image: lumina-quant:latest
+    container_name: lumina_quant
+    # on-failure (not always/unless-stopped): a clean/intentional exit must NOT
+    # be auto-restarted into a kill-switch it just tripped.
+    restart: on-failure
+    env_file:
+      - .env
+    volumes:
+      # Persist structured logs and local runtime state (state.json, parquet)
+      # across restarts; the source + venv are baked into the image.
+      - ./logs:/app/logs
+      - ./data:/app/data
+    command: ["lq", "live"]

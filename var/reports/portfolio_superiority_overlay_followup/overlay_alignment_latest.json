@@ -1,0 +1,577 @@
+{
+  "generated_at": "2026-04-22T10:47:06.920658+00:00",
+  "artifact_kind": "portfolio_superiority_overlay_alignment",
+  "baseline_stream_contract": {
+    "train": {
+      "start": "2025-01-01",
+      "end": "2025-12-31"
+    },
+    "val": {
+      "start": "2026-01-01",
+      "end": "2026-02-28"
+    },
+    "oos": {
+      "start": "2026-03-01",
+      "end": "2026-04-03"
+    }
+  },
+  "wave2_original_contract": {
+    "train_start": "2025-01-01T00:00:00Z",
+    "train_end_exclusive": "2026-01-01T00:00:00Z",
+    "val_start": "2026-01-01T00:00:00Z",
+    "val_end_exclusive": "2026-02-01T00:00:00Z",
+    "oos_start": "2026-02-01T00:00:00Z",
+    "oos_end": "2026-04-20T13:26:24Z",
+    "train_end": "2025-12-31T23:59:59.999000Z",
+    "val_end": "2026-01-31T23:59:59.999000Z",
+    "strategy_timeframe": "15m",
+    "mode": "exact_dates"
+  },
+  "scoreboard_current_default": {
+    "allocation": {
+      "production_guarded_portfolio": 1.0
+    },
+    "max_drawdown": 0.003184175320409821,
+    "mode": "production_guarded_mode",
+    "oos_total_return": 0.0036539751477997484,
+    "reason": "Mixed regime and the production-guarded candidate beats balanced on OOS return/sharpe while reducing drawdown (\u0394return=+0.2563%, \u0394sharpe=+1.1251) -> promote production guarded mode.",
+    "sharpe": 1.6079500601746737,
+    "status": "switch_default"
+  },
+  "benchmark_snapshot": {
+    "production_guarded": {
+      "label": "Production guarded current default",
+      "artifact_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/exact_window_backtests/followup_status/portfolio_incumbent_autoresearch_grouped/portfolio_production_guarded_current/production_guarded_portfolio_latest.json",
+      "notes": [
+        "switch_default"
+      ],
+      "metrics": {
+        "train": {
+          "total_return": 0.044809498222434074,
+          "cagr": 0.044809498222434074,
+          "sharpe": 0.6242198120042229,
+          "sortino": 1.1281536862380164,
+          "calmar": 0.8205593156286258,
+          "max_drawdown": 0.05460848151861608,
+          "volatility": 0.07465461604057394,
+          "return": 0.044809498222434074,
+          "days": 365
+        },
+        "val": {
+          "total_return": 0.07394688555478246,
+          "cagr": 0.5547954896872049,
+          "sharpe": 3.889087709838336,
+          "sortino": 11.89644069283011,
+          "calmar": 48.06730585463991,
+          "max_drawdown": 0.011542055037679022,
+          "volatility": 0.11520011158772547,
+          "return": 0.07394688555478246,
+          "days": 59
+        },
+        "oos": {
+          "total_return": 0.0036539751477997484,
+          "cagr": 0.03993166647999802,
+          "sharpe": 1.6079500601746737,
+          "sortino": 2.1734208156245796,
+          "calmar": 12.540662011932996,
+          "max_drawdown": 0.003184175320409821,
+          "volatility": 0.02453339945818646,
+          "return": 0.0036539751477997484,
+          "days": 34
+        }
+      },
+      "participation": {
+        "train": {
+          "total_days": 365,
+          "active_days": 362,
+          "active_day_ratio": 0.9917808219178083
+        },
+        "val": {
+          "total_days": 59,
+          "active_days": 59,
+          "active_day_ratio": 1.0
+        },
+        "oos": {
+          "total_days": 34,
+          "active_days": 8,
+          "active_day_ratio": 0.23529411764705882
+        }
+      }
+    },
+    "hybrid_guarded": {
+      "label": "Hybrid guarded challenger",
+      "artifact_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/exact_window_backtests/followup_status/portfolio_incumbent_autoresearch_grouped/portfolio_hybrid_online_current/hybrid_online_portfolio_latest.json",
+      "notes": [
+        "guarded_challenger"
+      ],
+      "metrics": {
+        "train": {
+          "total_return": 0.06964170970228722,
+          "cagr": 0.06964170970228722,
+          "sharpe": 0.8957917111788695,
+          "sortino": 1.5082663105733576,
+          "calmar": 1.394125428183764,
+          "max_drawdown": 0.049953690173354715,
+          "volatility": 0.0785758083482393,
+          "return": 0.06964170970228722,
+          "days": 365
+        },
+        "val": {
+          "total_return": 0.06677633838335151,
+          "cagr": 0.49167518325202186,
+          "sharpe": 3.305313347521935,
+          "sortino": 8.940229070146314,
+          "calmar": 38.66709022525689,
+          "max_drawdown": 0.012715598209944057,
+          "volatility": 0.12326980391207122,
+          "return": 0.06677633838335151,
+          "days": 59
+        },
+        "oos": {
+          "total_return": 0.001617979335523323,
+          "cagr": 0.017506928297035262,
+          "sharpe": 0.7763172405928882,
+          "sortino": 0.8998624362864446,
+          "calmar": 3.575246760792684,
+          "max_drawdown": 0.004896704890141268,
+          "volatility": 0.022677674055641042,
+          "return": 0.001617979335523323,
+          "days": 34
+        }
+      },
+      "participation": {
+        "train": {
+          "total_days": 365,
+          "active_days": 295,
+          "active_day_ratio": 0.8082191780821918
+        },
+        "val": {
+          "total_days": 59,
+          "active_days": 41,
+          "active_day_ratio": 0.6949152542372882
+        },
+        "oos": {
+          "total_days": 34,
+          "active_days": 8,
+          "active_day_ratio": 0.23529411764705882
+        }
+      }
+    },
+    "soft_three_way": {
+      "label": "Soft three-way regime",
+      "artifact_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/exact_window_backtests/followup_status/portfolio_incumbent_autoresearch_grouped/current_switch_validation_current/refreshed_soft_three_way_allocator_current/soft_three_way_market_regime_allocator_latest.json",
+      "notes": [
+        "core_mode"
+      ],
+      "metrics": {
+        "train": {
+          "total_return": 0.04326372315719418,
+          "cagr": 0.04326372315719418,
+          "sharpe": 0.5226828786397808,
+          "sortino": 0.9431644202663535,
+          "calmar": 0.600170535314131,
+          "max_drawdown": 0.0720857166614316,
+          "volatility": 0.08845525142325995,
+          "return": 0.04326372315719418,
+          "days": 365
+        },
+        "val": {
+          "total_return": 0.09189196705502578,
+          "cagr": 0.722646909621868,
+          "sharpe": 4.112491534015418,
+          "sortino": 11.950689210891776,
+          "calmar": 53.080516849509735,
+          "max_drawdown": 0.01361416490481182,
+          "volatility": 0.13446868134859993,
+          "return": 0.09189196705502578,
+          "days": 59
+        },
+        "oos": {
+          "total_return": 0.0008871113034689682,
+          "cagr": 0.047321563035285674,
+          "sharpe": 0.7422961066883907,
+          "sortino": 2.035053621238738,
+          "calmar": 8.252309318430727,
+          "max_drawdown": 0.0057343418925897005,
+          "volatility": 0.06470520784089931,
+          "return": 0.0008871113034689682,
+          "days": 7
+        }
+      },
+      "participation": {
+        "train": {
+          "total_days": 365,
+          "active_days": 362,
+          "active_day_ratio": 0.9917808219178083
+        },
+        "val": {
+          "total_days": 59,
+          "active_days": 59,
+          "active_day_ratio": 1.0
+        },
+        "oos": {
+          "total_days": 7,
+          "active_days": 7,
+          "active_day_ratio": 1.0
+        }
+      }
+    },
+    "three_way": {
+      "label": "Three-way regime",
+      "artifact_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/exact_window_backtests/followup_status/portfolio_incumbent_autoresearch_grouped/current_switch_validation_current/refreshed_three_way_allocator_current/three_way_market_regime_allocator_latest.json",
+      "notes": [
+        "aggressive_realized_mode"
+      ],
+      "metrics": {
+        "train": {
+          "total_return": 0.05604705845253344,
+          "cagr": 0.05604705845253344,
+          "sharpe": 0.6323112265823114,
+          "sortino": 1.150751552611867,
+          "calmar": 0.7936757240085243,
+          "max_drawdown": 0.07061707540891282,
+          "volatility": 0.0930282132660887,
+          "return": 0.05604705845253344,
+          "days": 365
+        },
+        "val": {
+          "total_return": 0.09658142261929226,
+          "cagr": 0.7689296216630106,
+          "sharpe": 4.165593422276218,
+          "sortino": 12.14037081373918,
+          "calmar": 53.85637715722416,
+          "max_drawdown": 0.01427741081466094,
+          "volatility": 0.1392813988667985,
+          "return": 0.09658142261929226,
+          "days": 59
+        },
+        "oos": {
+          "total_return": 0.0019732347599001887,
+          "cagr": 0.10825722995276177,
+          "sharpe": 1.3086956348526622,
+          "sortino": 3.6165393782566664,
+          "calmar": 14.847105612206771,
+          "max_drawdown": 0.007291470322926541,
+          "volatility": 0.08068065379426254,
+          "return": 0.0019732347599001887,
+          "days": 7
+        }
+      },
+      "participation": {
+        "train": {
+          "total_days": 365,
+          "active_days": 360,
+          "active_day_ratio": 0.9863013698630136
+        },
+        "val": {
+          "total_days": 59,
+          "active_days": 59,
+          "active_day_ratio": 1.0
+        },
+        "oos": {
+          "total_days": 7,
+          "active_days": 7,
+          "active_day_ratio": 1.0
+        }
+      }
+    },
+    "balanced_overlay": {
+      "label": "Balanced overlay 80/20",
+      "artifact_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/exact_window_backtests/followup_status/portfolio_incumbent_autoresearch_grouped/current_switch_validation_current/refreshed_balanced_overlay_strategy_latest.json",
+      "notes": [
+        "small_overlay_backup"
+      ],
+      "metrics": {
+        "train": {
+          "total_return": 0.039763950455758756,
+          "cagr": 0.039763950455758756,
+          "sharpe": 0.5292678158548181,
+          "sortino": 0.9532561144635011,
+          "calmar": 0.6080667807856291,
+          "max_drawdown": 0.06539405162765721,
+          "volatility": 0.07961798966585329,
+          "return": 0.039763950455758756,
+          "days": 365
+        },
+        "val": {
+          "total_return": 0.08307806753919622,
+          "cagr": 0.6384023335793583,
+          "sharpe": 4.111980216582392,
+          "sortino": 12.03574312763367,
+          "calmar": 52.0788788512886,
+          "max_drawdown": 0.01225837321502865,
+          "volatility": 0.12189829013503752,
+          "return": 0.08307806753919622,
+          "days": 59
+        },
+        "oos": {
+          "total_return": 0.0010908766261372715,
+          "cagr": 0.011773264175781506,
+          "sharpe": 0.4828032243356779,
+          "sortino": 0.5651343388456853,
+          "calmar": 2.2809130372847446,
+          "max_drawdown": 0.005161645351370647,
+          "volatility": 0.02486363414996068,
+          "return": 0.0010908766261372715,
+          "days": 34
+        }
+      },
+      "participation": {
+        "train": {
+          "total_days": 365,
+          "active_days": 362,
+          "active_day_ratio": 0.9917808219178083
+        },
+        "val": {
+          "total_days": 59,
+          "active_days": 59,
+          "active_day_ratio": 1.0
+        },
+        "oos": {
+          "total_days": 34,
+          "active_days": 8,
+          "active_day_ratio": 0.23529411764705882
+        }
+      }
+    },
+    "incumbent": {
+      "label": "Current one-shot incumbent",
+      "artifact_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/exact_window_backtests/followup_status/portfolio_incumbent_autoresearch_grouped/current_switch_validation_current/refreshed_current_one_shot_incumbent_portfolio_latest.json",
+      "notes": [
+        "benchmark_incumbent"
+      ],
+      "metrics": {
+        "train": {
+          "total_return": 0.04887910496798242,
+          "cagr": 0.04887910496798242,
+          "sharpe": 0.5431522053457357,
+          "sortino": 0.9625629824367934,
+          "calmar": 0.6118154260048163,
+          "max_drawdown": 0.07989191329673606,
+          "volatility": 0.09633438902674207,
+          "return": 0.04887910496798242,
+          "days": 365
+        },
+        "val": {
+          "total_return": 0.09432415331620803,
+          "cagr": 0.7465230149489772,
+          "sharpe": 4.086716839536673,
+          "sortino": 11.797334529204491,
+          "calmar": 52.287002499248715,
+          "max_drawdown": 0.01427741081466094,
+          "volatility": 0.13883034207176406,
+          "return": 0.09432415331620803,
+          "days": 59
+        },
+        "oos": {
+          "total_return": -0.0031538790429648245,
+          "cagr": -0.15186218797823758,
+          "sharpe": -2.5718362580597094,
+          "sortino": -5.415322882333689,
+          "calmar": -20.827375172979572,
+          "max_drawdown": 0.007291470322926541,
+          "volatility": 0.0633615011693436,
+          "return": -0.0031538790429648245,
+          "days": 7
+        }
+      },
+      "participation": {
+        "train": {
+          "total_days": 365,
+          "active_days": 360,
+          "active_day_ratio": 0.9863013698630136
+        },
+        "val": {
+          "total_days": 59,
+          "active_days": 59,
+          "active_day_ratio": 1.0
+        },
+        "oos": {
+          "total_days": 7,
+          "active_days": 7,
+          "active_day_ratio": 1.0
+        }
+      }
+    },
+    "pair_old": {
+      "label": "Historical pair tactical comparator",
+      "artifact_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/exact_window_backtests/followup_status/portfolio_incumbent_autoresearch_grouped/current_switch_validation_current/refreshed_pair_fast_exit_candidate_latest.json",
+      "notes": [
+        "tactical_only",
+        "historical_pair_tactical"
+      ],
+      "metrics": {
+        "train": {
+          "total_return": 0.0052435869294611415,
+          "cagr": 0.007397531894954845,
+          "sharpe": 0.5911832440558643,
+          "sortino": 0.3337013805203672,
+          "calmar": 0.8990509359812959,
+          "max_drawdown": 0.008228156602585135,
+          "volatility": 0.012600767165277395,
+          "return": 0.0052435869294611415,
+          "days": 259
+        },
+        "val": {
+          "total_return": 0.005731271563915508,
+          "cagr": 0.03598737101158522,
+          "sharpe": 3.0740781568905606,
+          "sortino": 0.0,
+          "calmar": 195.13919785855975,
+          "max_drawdown": 0.00018441897582088806,
+          "volatility": 0.011522723291373518,
+          "return": 0.005731271563915508,
+          "days": 59
+        },
+        "oos": {
+          "total_return": 0.002891851580793414,
+          "cagr": 0.031485581278054564,
+          "sharpe": 3.276475868619675,
+          "sortino": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "volatility": 0.009475081920099418,
+          "return": 0.002891851580793414,
+          "days": 34
+        }
+      },
+      "participation": {
+        "train": {
+          "total_days": 259,
+          "active_days": 30,
+          "active_day_ratio": 0.11583011583011583
+        },
+        "val": {
+          "total_days": 59,
+          "active_days": 3,
+          "active_day_ratio": 0.05084745762711865
+        },
+        "oos": {
+          "total_days": 34,
+          "active_days": 1,
+          "active_day_ratio": 0.029411764705882353
+        }
+      }
+    },
+    "pair_wave2_common": {
+      "label": "Wave2 survivor aligned to current baseline window",
+      "artifact_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/portfolio_superiority_wave2/candidate_research_wave2_filtered_latest.json",
+      "notes": [
+        "wave2_survivor",
+        "aligned_common_window"
+      ],
+      "metrics": {
+        "train": {
+          "total_return": -0.07146823388385826,
+          "cagr": -0.07146823388385826,
+          "sharpe": -0.874047911013688,
+          "sortino": -0.6895886026400156,
+          "calmar": -0.6226642614204864,
+          "max_drawdown": 0.11477812091032413,
+          "volatility": 0.08107765149012951,
+          "return": -0.07146823388385826,
+          "days": 365
+        },
+        "val": {
+          "total_return": 0.09388586664590193,
+          "cagr": 0.7422001029012324,
+          "sharpe": 3.6690694114583877,
+          "sortino": 6.9613562087157925,
+          "calmar": 34.78134475430955,
+          "max_drawdown": 0.02133902838271573,
+          "volatility": 0.1545629816960561,
+          "return": 0.09388586664590193,
+          "days": 59
+        },
+        "oos": {
+          "total_return": 0.0011812010861260713,
+          "cagr": 0.01275370133332654,
+          "sharpe": 0.23761230946174597,
+          "sortino": 0.10635559495958578,
+          "calmar": 0.9037652659566093,
+          "max_drawdown": 0.01411174097272605,
+          "volatility": 0.06095146039463603,
+          "return": 0.0011812010861260713,
+          "days": 34
+        }
+      },
+      "participation": {
+        "train": {
+          "total_days": 365,
+          "active_days": 109,
+          "active_day_ratio": 0.29863013698630136
+        },
+        "val": {
+          "total_days": 59,
+          "active_days": 17,
+          "active_day_ratio": 0.288135593220339
+        },
+        "oos": {
+          "total_days": 34,
+          "active_days": 8,
+          "active_day_ratio": 0.23529411764705882
+        }
+      }
+    },
+    "cash": {
+      "label": "Risk-off cash",
+      "artifact_path": null,
+      "notes": [
+        "risk_off"
+      ],
+      "metrics": {
+        "train": {
+          "total_return": 0.0,
+          "cagr": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "volatility": 0.0,
+          "return": 0.0,
+          "days": 365
+        },
+        "val": {
+          "total_return": 0.0,
+          "cagr": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "volatility": 0.0,
+          "return": 0.0,
+          "days": 59
+        },
+        "oos": {
+          "total_return": 0.0,
+          "cagr": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "volatility": 0.0,
+          "return": 0.0,
+          "days": 34
+        }
+      },
+      "participation": {
+        "train": {
+          "total_days": 365,
+          "active_days": 0,
+          "active_day_ratio": 0.0
+        },
+        "val": {
+          "total_days": 59,
+          "active_days": 0,
+          "active_day_ratio": 0.0
+        },
+        "oos": {
+          "total_days": 34,
+          "active_days": 0,
+          "active_day_ratio": 0.0
+        }
+      }
+    }
+  },
+  "finding": "The wave2 survivor was originally evaluated on train=2025, val=2026-01, oos=2026-02-01..2026-04-20, while the current production/hybrid baseline artifacts carry the shared stream window train=2025, val=2026-01..2026-02, oos=2026-03-01..2026-04-03. The pair sleeve was therefore realigned to the baseline contract before overlay testing."
+}

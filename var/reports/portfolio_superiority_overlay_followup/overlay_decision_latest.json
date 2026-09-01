@@ -1,0 +1,1043 @@
+{
+  "generated_at": "2026-04-22T10:47:17.684282+00:00",
+  "artifact_kind": "portfolio_superiority_overlay_decision",
+  "verdict": "better_but_not_promotable_yet",
+  "verdict_reason": "Some requested overlays improve one axis (return or Sharpe or drawdown), but none beat their base on both OOS return and OOS Sharpe.",
+  "current_default": {
+    "allocation": {
+      "production_guarded_portfolio": 1.0
+    },
+    "max_drawdown": 0.003184175320409821,
+    "mode": "production_guarded_mode",
+    "oos_total_return": 0.0036539751477997484,
+    "reason": "Mixed regime and the production-guarded candidate beats balanced on OOS return/sharpe while reducing drawdown (\u0394return=+0.2563%, \u0394sharpe=+1.1251) -> promote production guarded mode.",
+    "sharpe": 1.6079500601746737,
+    "status": "switch_default"
+  },
+  "aligned_wave2_pair": {
+    "label": "Wave2 survivor aligned to current baseline window",
+    "metrics": {
+      "train": {
+        "total_return": -0.07146823388385826,
+        "cagr": -0.07146823388385826,
+        "sharpe": -0.874047911013688,
+        "sortino": -0.6895886026400156,
+        "calmar": -0.6226642614204864,
+        "max_drawdown": 0.11477812091032413,
+        "volatility": 0.08107765149012951,
+        "return": -0.07146823388385826,
+        "days": 365
+      },
+      "val": {
+        "total_return": 0.09388586664590193,
+        "cagr": 0.7422001029012324,
+        "sharpe": 3.6690694114583877,
+        "sortino": 6.9613562087157925,
+        "calmar": 34.78134475430955,
+        "max_drawdown": 0.02133902838271573,
+        "volatility": 0.1545629816960561,
+        "return": 0.09388586664590193,
+        "days": 59
+      },
+      "oos": {
+        "total_return": 0.0011812010861260713,
+        "cagr": 0.01275370133332654,
+        "sharpe": 0.23761230946174597,
+        "sortino": 0.10635559495958578,
+        "calmar": 0.9037652659566093,
+        "max_drawdown": 0.01411174097272605,
+        "volatility": 0.06095146039463603,
+        "return": 0.0011812010861260713,
+        "days": 34
+      }
+    },
+    "participation": {
+      "train": {
+        "total_days": 365,
+        "active_days": 109,
+        "active_day_ratio": 0.29863013698630136
+      },
+      "val": {
+        "total_days": 59,
+        "active_days": 17,
+        "active_day_ratio": 0.288135593220339
+      },
+      "oos": {
+        "total_days": 34,
+        "active_days": 8,
+        "active_day_ratio": 0.23529411764705882
+      }
+    }
+  },
+  "requested_frontier_highlights": {
+    "production_guarded": {
+      "best_requested_sharpe": {
+        "weights": {
+          "base": 0.9,
+          "pair": 0.1,
+          "cash": 0.0
+        },
+        "base_candidate_key": "production_guarded_mode",
+        "base_label": "Production guarded current default",
+        "metrics": {
+          "train": {
+            "total_return": 0.032750500195594556,
+            "cagr": 0.032750500195594556,
+            "sharpe": 0.47897043959632346,
+            "sortino": 0.8254829104464878,
+            "calmar": 0.5709873272159648,
+            "max_drawdown": 0.057357665633807176,
+            "volatility": 0.07276905478545996,
+            "return": 0.032750500195594556,
+            "days": 365
+          },
+          "val": {
+            "total_return": 0.07595932086144241,
+            "cagr": 0.5729073904435902,
+            "sharpe": 3.8984811651812654,
+            "sortino": 11.752559879526105,
+            "calmar": 47.19782441044358,
+            "max_drawdown": 0.012138427938149232,
+            "volatility": 0.11797703148327002,
+            "return": 0.07595932086144241,
+            "days": 59
+          },
+          "oos": {
+            "total_return": 0.0034241527759435453,
+            "cagr": 0.037378124377877686,
+            "sharpe": 1.6145410403100724,
+            "sortino": 3.1975359681631206,
+            "calmar": 11.563587179508984,
+            "max_drawdown": 0.0032323987182898417,
+            "volatility": 0.022886946708656687,
+            "return": 0.0034241527759435453,
+            "days": 34
+          }
+        },
+        "oos_monthly_returns": [
+          {
+            "month": "2026-03",
+            "total_return": 0.0034241527759435453,
+            "days": 31
+          },
+          {
+            "month": "2026-04",
+            "total_return": 0.0,
+            "days": 3
+          }
+        ],
+        "oos_monthly_mean": 0.0017120763879717726,
+        "pair_active_participation_oos": {
+          "total_days": 34,
+          "active_days": 8,
+          "active_day_ratio": 0.23529411764705882
+        },
+        "beats_base": {
+          "return": false,
+          "sharpe": true,
+          "max_drawdown": false
+        },
+        "passes_user_bar": true,
+        "robustness_notes": {
+          "train_positive": true,
+          "val_positive": true,
+          "oos_positive": true
+        },
+        "allocator_notional_gross": 1.0,
+        "estimated_total_cash": 0.04500000000000004,
+        "estimated_total_active": 0.955
+      },
+      "best_requested_return": {
+        "weights": {
+          "base": 0.9,
+          "pair": 0.1,
+          "cash": 0.0
+        },
+        "base_candidate_key": "production_guarded_mode",
+        "base_label": "Production guarded current default",
+        "metrics": {
+          "train": {
+            "total_return": 0.032750500195594556,
+            "cagr": 0.032750500195594556,
+            "sharpe": 0.47897043959632346,
+            "sortino": 0.8254829104464878,
+            "calmar": 0.5709873272159648,
+            "max_drawdown": 0.057357665633807176,
+            "volatility": 0.07276905478545996,
+            "return": 0.032750500195594556,
+            "days": 365
+          },
+          "val": {
+            "total_return": 0.07595932086144241,
+            "cagr": 0.5729073904435902,
+            "sharpe": 3.8984811651812654,
+            "sortino": 11.752559879526105,
+            "calmar": 47.19782441044358,
+            "max_drawdown": 0.012138427938149232,
+            "volatility": 0.11797703148327002,
+            "return": 0.07595932086144241,
+            "days": 59
+          },
+          "oos": {
+            "total_return": 0.0034241527759435453,
+            "cagr": 0.037378124377877686,
+            "sharpe": 1.6145410403100724,
+            "sortino": 3.1975359681631206,
+            "calmar": 11.563587179508984,
+            "max_drawdown": 0.0032323987182898417,
+            "volatility": 0.022886946708656687,
+            "return": 0.0034241527759435453,
+            "days": 34
+          }
+        },
+        "oos_monthly_returns": [
+          {
+            "month": "2026-03",
+            "total_return": 0.0034241527759435453,
+            "days": 31
+          },
+          {
+            "month": "2026-04",
+            "total_return": 0.0,
+            "days": 3
+          }
+        ],
+        "oos_monthly_mean": 0.0017120763879717726,
+        "pair_active_participation_oos": {
+          "total_days": 34,
+          "active_days": 8,
+          "active_day_ratio": 0.23529411764705882
+        },
+        "beats_base": {
+          "return": false,
+          "sharpe": true,
+          "max_drawdown": false
+        },
+        "passes_user_bar": true,
+        "robustness_notes": {
+          "train_positive": true,
+          "val_positive": true,
+          "oos_positive": true
+        },
+        "allocator_notional_gross": 1.0,
+        "estimated_total_cash": 0.04500000000000004,
+        "estimated_total_active": 0.955
+      },
+      "requested_promotable_count": 15,
+      "requested_beats_base_both_count": 0,
+      "diagnostic_best_sharpe": {
+        "weights": {
+          "base": 0.825,
+          "pair": 0.05,
+          "cash": 0.125
+        },
+        "base_candidate_key": "production_guarded_mode",
+        "base_label": "Production guarded current default",
+        "metrics": {
+          "train": {
+            "total_return": 0.03339275208330239,
+            "cagr": 0.03339275208330239,
+            "sharpe": 0.5426037986473499,
+            "sortino": 0.9558500472435568,
+            "calmar": 0.6777868821703861,
+            "max_drawdown": 0.04926733308318576,
+            "volatility": 0.06432400042737198,
+            "return": 0.03339275208330239,
+            "days": 365
+          },
+          "val": {
+            "total_return": 0.0655373657275804,
+            "cagr": 0.4809896647104974,
+            "sharpe": 3.8958508741071984,
+            "sortino": 11.825587824199308,
+            "calmar": 46.248494853087735,
+            "max_drawdown": 0.010400114992680343,
+            "volatility": 0.10215338888642674,
+            "return": 0.0655373657275804,
+            "days": 59
+          },
+          "oos": {
+            "total_return": 0.0030847730734233636,
+            "cagr": 0.033617694756073346,
+            "sharpe": 1.6261774058362133,
+            "sortino": 2.891062712014754,
+            "calmar": 11.961267909862993,
+            "max_drawdown": 0.0028105460900472723,
+            "volatility": 0.02045849221647824,
+            "return": 0.0030847730734233636,
+            "days": 34
+          }
+        },
+        "oos_monthly_returns": [
+          {
+            "month": "2026-03",
+            "total_return": 0.0030847730734233636,
+            "days": 31
+          },
+          {
+            "month": "2026-04",
+            "total_return": 0.0,
+            "days": 3
+          }
+        ],
+        "oos_monthly_mean": 0.0015423865367116818,
+        "pair_active_participation_oos": {
+          "total_days": 34,
+          "active_days": 8,
+          "active_day_ratio": 0.23529411764705882
+        },
+        "beats_base": {
+          "return": false,
+          "sharpe": true,
+          "max_drawdown": true
+        },
+        "passes_user_bar": true,
+        "robustness_notes": {
+          "train_positive": true,
+          "val_positive": true,
+          "oos_positive": true
+        },
+        "allocator_notional_gross": 0.875,
+        "estimated_total_cash": 0.16625000000000004,
+        "estimated_total_active": 0.83375
+      }
+    },
+    "hybrid_guarded": {
+      "best_requested_sharpe": {
+        "weights": {
+          "base": 0.9,
+          "pair": 0.1,
+          "cash": 0.0
+        },
+        "base_candidate_key": "hybrid_guarded_mode",
+        "base_label": "Hybrid guarded challenger",
+        "metrics": {
+          "train": {
+            "total_return": 0.054853243305968524,
+            "cagr": 0.054853243305968524,
+            "sharpe": 0.7410054418629837,
+            "sortino": 1.2257442430802343,
+            "calmar": 1.0139757471362962,
+            "max_drawdown": 0.054097194593546116,
+            "volatility": 0.07592687403596401,
+            "return": 0.054853243305968524,
+            "days": 365
+          },
+          "val": {
+            "total_return": 0.06949709508317015,
+            "cagr": 0.5153673367433218,
+            "sharpe": 3.391206287100691,
+            "sortino": 9.039270587963973,
+            "calmar": 39.05973759391871,
+            "max_drawdown": 0.013194336892410674,
+            "volatility": 0.1248555795129047,
+            "return": 0.06949709508317015,
+            "days": 59
+          },
+          "oos": {
+            "total_return": 0.0015908497933900811,
+            "cagr": 0.017211103607924327,
+            "sharpe": 0.7976617148106935,
+            "sortino": 0.8966330610269256,
+            "calmar": 3.605410975856533,
+            "max_drawdown": 0.004773687028518436,
+            "volatility": 0.0216794210091853,
+            "return": 0.0015908497933900811,
+            "days": 34
+          }
+        },
+        "oos_monthly_returns": [
+          {
+            "month": "2026-03",
+            "total_return": 0.0015908497933900811,
+            "days": 31
+          },
+          {
+            "month": "2026-04",
+            "total_return": 0.0,
+            "days": 3
+          }
+        ],
+        "oos_monthly_mean": 0.0007954248966950406,
+        "pair_active_participation_oos": {
+          "total_days": 34,
+          "active_days": 8,
+          "active_day_ratio": 0.23529411764705882
+        },
+        "beats_base": {
+          "return": false,
+          "sharpe": true,
+          "max_drawdown": true
+        },
+        "passes_user_bar": false,
+        "robustness_notes": {
+          "train_positive": true,
+          "val_positive": true,
+          "oos_positive": true
+        },
+        "allocator_notional_gross": 1.0,
+        "estimated_total_cash": 0.32294986927074404,
+        "estimated_total_active": 0.677050130729256
+      },
+      "best_requested_return": {
+        "weights": {
+          "base": 0.9,
+          "pair": 0.1,
+          "cash": 0.0
+        },
+        "base_candidate_key": "hybrid_guarded_mode",
+        "base_label": "Hybrid guarded challenger",
+        "metrics": {
+          "train": {
+            "total_return": 0.054853243305968524,
+            "cagr": 0.054853243305968524,
+            "sharpe": 0.7410054418629837,
+            "sortino": 1.2257442430802343,
+            "calmar": 1.0139757471362962,
+            "max_drawdown": 0.054097194593546116,
+            "volatility": 0.07592687403596401,
+            "return": 0.054853243305968524,
+            "days": 365
+          },
+          "val": {
+            "total_return": 0.06949709508317015,
+            "cagr": 0.5153673367433218,
+            "sharpe": 3.391206287100691,
+            "sortino": 9.039270587963973,
+            "calmar": 39.05973759391871,
+            "max_drawdown": 0.013194336892410674,
+            "volatility": 0.1248555795129047,
+            "return": 0.06949709508317015,
+            "days": 59
+          },
+          "oos": {
+            "total_return": 0.0015908497933900811,
+            "cagr": 0.017211103607924327,
+            "sharpe": 0.7976617148106935,
+            "sortino": 0.8966330610269256,
+            "calmar": 3.605410975856533,
+            "max_drawdown": 0.004773687028518436,
+            "volatility": 0.0216794210091853,
+            "return": 0.0015908497933900811,
+            "days": 34
+          }
+        },
+        "oos_monthly_returns": [
+          {
+            "month": "2026-03",
+            "total_return": 0.0015908497933900811,
+            "days": 31
+          },
+          {
+            "month": "2026-04",
+            "total_return": 0.0,
+            "days": 3
+          }
+        ],
+        "oos_monthly_mean": 0.0007954248966950406,
+        "pair_active_participation_oos": {
+          "total_days": 34,
+          "active_days": 8,
+          "active_day_ratio": 0.23529411764705882
+        },
+        "beats_base": {
+          "return": false,
+          "sharpe": true,
+          "max_drawdown": true
+        },
+        "passes_user_bar": false,
+        "robustness_notes": {
+          "train_positive": true,
+          "val_positive": true,
+          "oos_positive": true
+        },
+        "allocator_notional_gross": 1.0,
+        "estimated_total_cash": 0.32294986927074404,
+        "estimated_total_active": 0.677050130729256
+      },
+      "requested_promotable_count": 0,
+      "requested_beats_base_both_count": 0,
+      "diagnostic_best_sharpe": {
+        "weights": {
+          "base": 0.825,
+          "pair": 0.075,
+          "cash": 0.1
+        },
+        "base_candidate_key": "hybrid_guarded_mode",
+        "base_label": "Hybrid guarded challenger",
+        "metrics": {
+          "train": {
+            "total_return": 0.051703901935092667,
+            "cagr": 0.051703901935092667,
+            "sharpe": 0.7679411800483229,
+            "sortino": 1.2785099421054569,
+            "calmar": 1.0740351922418712,
+            "max_drawdown": 0.04813985827333023,
+            "volatility": 0.06869641214256955,
+            "return": 0.051703901935092667,
+            "days": 365
+          },
+          "val": {
+            "total_return": 0.0620472309257285,
+            "cagr": 0.4512333803704607,
+            "sharpe": 3.377803856975839,
+            "sortino": 9.028356231141498,
+            "calmar": 38.22103787007149,
+            "max_drawdown": 0.011805890303250854,
+            "volatility": 0.11210688510474923,
+            "return": 0.0620472309257285,
+            "days": 59
+          },
+          "oos": {
+            "total_return": 0.0014378693344321292,
+            "cagr": 0.015544440629571055,
+            "sharpe": 0.7985706897287611,
+            "sortino": 0.9243792724731211,
+            "calmar": 3.602179542247502,
+            "max_drawdown": 0.004315287577218441,
+            "volatility": 0.019547916930072254,
+            "return": 0.0014378693344321292,
+            "days": 34
+          }
+        },
+        "oos_monthly_returns": [
+          {
+            "month": "2026-03",
+            "total_return": 0.0014378693344321292,
+            "days": 31
+          },
+          {
+            "month": "2026-04",
+            "total_return": 0.0,
+            "days": 3
+          }
+        ],
+        "oos_monthly_mean": 0.0007189346672160646,
+        "pair_active_participation_oos": {
+          "total_days": 34,
+          "active_days": 8,
+          "active_day_ratio": 0.23529411764705882
+        },
+        "beats_base": {
+          "return": false,
+          "sharpe": true,
+          "max_drawdown": true
+        },
+        "passes_user_bar": false,
+        "robustness_notes": {
+          "train_positive": true,
+          "val_positive": true,
+          "oos_positive": true
+        },
+        "allocator_notional_gross": 0.8999999999999999,
+        "estimated_total_cash": 0.3960373801648487,
+        "estimated_total_active": 0.6039626198351513
+      }
+    },
+    "soft_three_way": {
+      "best_requested_sharpe": {
+        "weights": {
+          "base": 0.5,
+          "pair": 0.15,
+          "cash": 0.35
+        },
+        "base_candidate_key": "soft_three_way_regime",
+        "base_label": "Soft three-way regime",
+        "metrics": {
+          "train": {
+            "total_return": 0.01116394952006039,
+            "cagr": 0.01116394952006039,
+            "sharpe": 0.2365657479231697,
+            "sortino": 0.3861680646044326,
+            "calmar": 0.2288766774760619,
+            "max_drawdown": 0.04877713903911429,
+            "volatility": 0.052785156113075604,
+            "return": 0.01116394952006039,
+            "days": 365
+          },
+          "val": {
+            "total_return": 0.059502882848240235,
+            "cagr": 0.4298580242636789,
+            "sharpe": 4.079971724881267,
+            "sortino": 11.446006509306441,
+            "calmar": 46.81543435292639,
+            "max_drawdown": 0.009181972360292945,
+            "volatility": 0.08861973254763414,
+            "return": 0.059502882848240235,
+            "days": 59
+          },
+          "oos": {
+            "total_return": 0.0006505521712354412,
+            "cagr": 0.00700602636912806,
+            "sharpe": 0.42644950343394566,
+            "sortino": 0.4367768784164918,
+            "calmar": 2.049258609151906,
+            "max_drawdown": 0.0034188102652537022,
+            "volatility": 0.016688332081342162,
+            "return": 0.0006505521712354412,
+            "days": 34
+          }
+        },
+        "oos_monthly_returns": [
+          {
+            "month": "2026-03",
+            "total_return": 0.0006505521712354412,
+            "days": 31
+          },
+          {
+            "month": "2026-04",
+            "total_return": 0.0,
+            "days": 3
+          }
+        ],
+        "oos_monthly_mean": 0.0003252760856177206,
+        "pair_active_participation_oos": {
+          "total_days": 34,
+          "active_days": 8,
+          "active_day_ratio": 0.23529411764705882
+        },
+        "beats_base": {
+          "return": false,
+          "sharpe": false,
+          "max_drawdown": true
+        },
+        "passes_user_bar": false,
+        "robustness_notes": {
+          "train_positive": true,
+          "val_positive": true,
+          "oos_positive": true
+        },
+        "allocator_notional_gross": 0.65,
+        "estimated_total_cash": 0.35,
+        "estimated_total_active": 0.65
+      },
+      "best_requested_return": {
+        "weights": {
+          "base": 0.7,
+          "pair": 0.3,
+          "cash": 0.0
+        },
+        "base_candidate_key": "soft_three_way_regime",
+        "base_label": "Soft three-way regime",
+        "metrics": {
+          "train": {
+            "total_return": 0.00799049616327796,
+            "cagr": 0.00799049616327796,
+            "sharpe": 0.13950123543994566,
+            "sortino": 0.21922661058831228,
+            "calmar": 0.10521454984680477,
+            "max_drawdown": 0.07594478306386654,
+            "volatility": 0.07959862292135568,
+            "return": 0.00799049616327796,
+            "days": 365
+          },
+          "val": {
+            "total_return": 0.09257392855817081,
+            "cagr": 0.7293137607362274,
+            "sharpe": 4.059980068862987,
+            "sortino": 11.365430191026563,
+            "calmar": 50.583152641661606,
+            "max_drawdown": 0.01441811596645215,
+            "volatility": 0.1372498393044893,
+            "return": 0.09257392855817081,
+            "days": 59
+          },
+          "oos": {
+            "total_return": 0.0010174815579195862,
+            "cagr": 0.010977222987315738,
+            "sharpe": 0.4198839718132414,
+            "sortino": 0.3608300974213833,
+            "calmar": 2.1464359014178456,
+            "max_drawdown": 0.005114162961989521,
+            "volatility": 0.026833310179749745,
+            "return": 0.0010174815579195862,
+            "days": 34
+          }
+        },
+        "oos_monthly_returns": [
+          {
+            "month": "2026-03",
+            "total_return": 0.0010174815579195862,
+            "days": 31
+          },
+          {
+            "month": "2026-04",
+            "total_return": 0.0,
+            "days": 3
+          }
+        ],
+        "oos_monthly_mean": 0.0005087407789597931,
+        "pair_active_participation_oos": {
+          "total_days": 34,
+          "active_days": 8,
+          "active_day_ratio": 0.23529411764705882
+        },
+        "beats_base": {
+          "return": true,
+          "sharpe": false,
+          "max_drawdown": true
+        },
+        "passes_user_bar": false,
+        "robustness_notes": {
+          "train_positive": true,
+          "val_positive": true,
+          "oos_positive": true
+        },
+        "allocator_notional_gross": 1.0,
+        "estimated_total_cash": 0.0,
+        "estimated_total_active": 1.0
+      },
+      "requested_promotable_count": 0,
+      "requested_beats_base_both_count": 0,
+      "diagnostic_best_sharpe": {
+        "weights": {
+          "base": 0.25,
+          "pair": 0.075,
+          "cash": 0.675
+        },
+        "base_candidate_key": "soft_three_way_regime",
+        "base_label": "Soft three-way regime",
+        "metrics": {
+          "train": {
+            "total_return": 0.005914179793850005,
+            "cagr": 0.005914179793850005,
+            "sharpe": 0.2365657479231697,
+            "sortino": 0.3861680646044326,
+            "calmar": 0.24036804441104992,
+            "max_drawdown": 0.024604684072464522,
+            "volatility": 0.026392578056537802,
+            "return": 0.005914179793850005,
+            "days": 365
+          },
+          "val": {
+            "total_return": 0.029486582888972546,
+            "cagr": 0.19695316001031027,
+            "sharpe": 4.079971724881267,
+            "sortino": 11.446006509306441,
+            "calmar": 42.86376319443334,
+            "max_drawdown": 0.004594863944094585,
+            "volatility": 0.04430986627381707,
+            "return": 0.029486582888972546,
+            "days": 59
+          },
+          "oos": {
+            "total_return": 0.00032837009549013807,
+            "cagr": 0.0035307895082030694,
+            "sharpe": 0.42644950343394566,
+            "sortino": 0.4367768784164918,
+            "calmar": 2.064623897342067,
+            "max_drawdown": 0.0017101368984193677,
+            "volatility": 0.008344166040671081,
+            "return": 0.00032837009549013807,
+            "days": 34
+          }
+        },
+        "oos_monthly_returns": [
+          {
+            "month": "2026-03",
+            "total_return": 0.00032837009549013807,
+            "days": 31
+          },
+          {
+            "month": "2026-04",
+            "total_return": 0.0,
+            "days": 3
+          }
+        ],
+        "oos_monthly_mean": 0.00016418504774506903,
+        "pair_active_participation_oos": {
+          "total_days": 34,
+          "active_days": 8,
+          "active_day_ratio": 0.23529411764705882
+        },
+        "beats_base": {
+          "return": false,
+          "sharpe": false,
+          "max_drawdown": true
+        },
+        "passes_user_bar": false,
+        "robustness_notes": {
+          "train_positive": true,
+          "val_positive": true,
+          "oos_positive": true
+        },
+        "allocator_notional_gross": 0.325,
+        "estimated_total_cash": 0.675,
+        "estimated_total_active": 0.32499999999999996
+      }
+    }
+  },
+  "wave2_resliced_common_window": {
+    "survivor_count": 1,
+    "top_rows": [
+      {
+        "name": "pair_spread_1h_exec_tightstop_tp_btcusdt_xauusdt_2.2_0.55",
+        "family": "market_neutral",
+        "strategy_class": "PairSpreadZScoreStrategy",
+        "symbols": [
+          "BTC/USDT",
+          "XAU/USDT"
+        ],
+        "train": {
+          "total_return": -0.0008000000000000229,
+          "cagr": -0.013814025227931848,
+          "sharpe": -4.16904693916396,
+          "sortino": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "volatility": 0.0033352375513311674,
+          "return": -0.0008000000000000229,
+          "days": 21
+        },
+        "val": {
+          "total_return": -0.015507464145445793,
+          "cagr": -0.09216047441656783,
+          "sharpe": -1.3436605330521263,
+          "sortino": -0.981805679920374,
+          "calmar": -2.3502112774754718,
+          "max_drawdown": 0.039213697636394595,
+          "volatility": 0.07014244598040395,
+          "return": -0.015507464145445793,
+          "days": 59
+        },
+        "oos": {
+          "total_return": 0.005245019265933015,
+          "cagr": 0.07328022406090606,
+          "sharpe": 0.8834872492051119,
+          "sortino": 1.1428044310749377,
+          "calmar": 3.3899124893193973,
+          "max_drawdown": 0.021617143301424502,
+          "volatility": 0.0838792965747603,
+          "return": 0.005245019265933015,
+          "days": 27
+        },
+        "oos_participation": {
+          "total_days": 27,
+          "active_days": 8,
+          "active_day_ratio": 0.2962962962962963
+        },
+        "resliced_source": "wave2_raw_report_realigned_to_current_baseline_window",
+        "artifact_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/portfolio_superiority_wave2/candidate_research_wave2_latest.json"
+      },
+      {
+        "name": "pair_spread_1h_exec_tightstop_tp_bnbusdt_trxusdt_2.2_0.55",
+        "family": "market_neutral",
+        "strategy_class": "PairSpreadZScoreStrategy",
+        "symbols": [
+          "BNB/USDT",
+          "TRX/USDT"
+        ],
+        "train": {
+          "total_return": -0.07146823388385826,
+          "cagr": -0.07146823388385826,
+          "sharpe": -0.874047911013688,
+          "sortino": -0.6895886026400156,
+          "calmar": -0.6226642614204864,
+          "max_drawdown": 0.11477812091032413,
+          "volatility": 0.08107765149012951,
+          "return": -0.07146823388385826,
+          "days": 365
+        },
+        "val": {
+          "total_return": 0.09388586664590193,
+          "cagr": 0.7422001029012324,
+          "sharpe": 3.6690694114583877,
+          "sortino": 6.9613562087157925,
+          "calmar": 34.78134475430955,
+          "max_drawdown": 0.02133902838271573,
+          "volatility": 0.1545629816960561,
+          "return": 0.09388586664590193,
+          "days": 59
+        },
+        "oos": {
+          "total_return": 0.0011812010861260713,
+          "cagr": 0.01275370133332654,
+          "sharpe": 0.23761230946174597,
+          "sortino": 0.10635559495958578,
+          "calmar": 0.9037652659566093,
+          "max_drawdown": 0.01411174097272605,
+          "volatility": 0.06095146039463603,
+          "return": 0.0011812010861260713,
+          "days": 34
+        },
+        "oos_participation": {
+          "total_days": 34,
+          "active_days": 8,
+          "active_day_ratio": 0.23529411764705882
+        },
+        "resliced_source": "wave2_raw_report_realigned_to_current_baseline_window",
+        "artifact_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/portfolio_superiority_wave2/candidate_research_wave2_latest.json"
+      },
+      {
+        "name": "carry_trend_factor_rotation_1h_production_lo_guarded_48_12_0.250",
+        "family": "cross_sectional",
+        "strategy_class": "CarryTrendFactorRotationStrategy",
+        "symbols": [
+          "BTC/USDT",
+          "ETH/USDT",
+          "BNB/USDT",
+          "SOL/USDT",
+          "TRX/USDT"
+        ],
+        "train": {
+          "total_return": -0.06440573028971552,
+          "cagr": -0.06440573028971552,
+          "sharpe": -0.3634356142145882,
+          "sortino": -0.4577502126217353,
+          "calmar": -0.45244646468356686,
+          "max_drawdown": 0.1423499470479005,
+          "volatility": 0.15177424718581917,
+          "return": -0.06440573028971552,
+          "days": 365
+        },
+        "val": {
+          "total_return": -0.024598496372902345,
+          "cagr": -0.14279662146521588,
+          "sharpe": -1.5578030909640417,
+          "sortino": -1.6210202201439263,
+          "calmar": -2.653277067025551,
+          "max_drawdown": 0.05381896343953918,
+          "volatility": 0.09597847067570815,
+          "return": -0.024598496372902345,
+          "days": 59
+        },
+        "oos": {
+          "total_return": 0.0006737023702874101,
+          "cagr": 0.007256157193966661,
+          "sharpe": 0.11864900180057904,
+          "sortino": 0.20409013732157474,
+          "calmar": 0.3002486760562582,
+          "max_drawdown": 0.024167158001413003,
+          "volatility": 0.1356937771328317,
+          "return": 0.0006737023702874101,
+          "days": 34
+        },
+        "oos_participation": {
+          "total_days": 34,
+          "active_days": 22,
+          "active_day_ratio": 0.6470588235294118
+        },
+        "resliced_source": "wave2_raw_report_realigned_to_current_baseline_window",
+        "artifact_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/portfolio_superiority_wave2/candidate_research_wave2_latest.json"
+      },
+      {
+        "name": "funding_liquidation_crowding_fade_30m_balanced_ls_96_0.85",
+        "family": "mean_reversion",
+        "strategy_class": "FundingLiquidationCrowdingFadeStrategy",
+        "symbols": [
+          "BTC/USDT",
+          "ETH/USDT",
+          "BNB/USDT",
+          "SOL/USDT",
+          "TRX/USDT"
+        ],
+        "train": {
+          "total_return": 0.0,
+          "cagr": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "volatility": 0.0,
+          "return": 0.0,
+          "days": 365
+        },
+        "val": {
+          "total_return": 0.0,
+          "cagr": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "volatility": 0.0,
+          "return": 0.0,
+          "days": 59
+        },
+        "oos": {
+          "total_return": 0.0,
+          "cagr": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "volatility": 0.0,
+          "return": 0.0,
+          "days": 34
+        },
+        "oos_participation": {
+          "total_days": 34,
+          "active_days": 0,
+          "active_day_ratio": 0.0
+        },
+        "resliced_source": "wave2_raw_report_realigned_to_current_baseline_window",
+        "artifact_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/portfolio_superiority_wave2/candidate_research_wave2_latest.json"
+      },
+      {
+        "name": "last_day_liquidity_regime_1d_guarded_lo_1_1_0.006",
+        "family": "cross_sectional",
+        "strategy_class": "LastDayLiquidityRegimeStrategy",
+        "symbols": [
+          "BTC/USDT",
+          "ETH/USDT",
+          "BNB/USDT",
+          "SOL/USDT",
+          "TRX/USDT"
+        ],
+        "train": {
+          "total_return": -0.10949446138575114,
+          "cagr": -0.10949446138575114,
+          "sharpe": -0.5985673275727553,
+          "sortino": -0.6639628846241659,
+          "calmar": -0.6490299621878469,
+          "max_drawdown": 0.16870478678156997,
+          "volatility": 0.1696948289227696,
+          "return": -0.10949446138575114,
+          "days": 365
+        },
+        "val": {
+          "total_return": -0.036391281031356915,
+          "cagr": -0.20493476269678623,
+          "sharpe": -1.9896974523438442,
+          "sortino": -1.9424516442191007,
+          "calmar": -2.5395459654928505,
+          "max_drawdown": 0.08069740240240719,
+          "volatility": 0.11210789379378608,
+          "return": -0.036391281031356915,
+          "days": 59
+        },
+        "oos": {
+          "total_return": -0.01593946279396563,
+          "cagr": -0.15843601156849296,
+          "sharpe": -0.8410726286183159,
+          "sortino": -1.204870378872876,
+          "calmar": -2.45030199014383,
+          "max_drawdown": 0.0646597897752158,
+          "volatility": 0.18528964235761153,
+          "return": -0.01593946279396563,
+          "days": 34
+        },
+        "oos_participation": {
+          "total_days": 34,
+          "active_days": 25,
+          "active_day_ratio": 0.7352941176470589
+        },
+        "resliced_source": "wave2_raw_report_realigned_to_current_baseline_window",
+        "artifact_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/portfolio_superiority_wave2/candidate_research_wave2_latest.json"
+      }
+    ]
+  },
+  "next_wave": {
+    "recommended_lane": "metals_crypto_relative_value_dense_pairs",
+    "why": [
+      "The aligned current-window overlay lane failed; the BNB/TRX pair no longer dominates once February-only gains are removed.",
+      "The resliced broader wave2 leaderboard shows BTC/XAU pair relative value has the best short aligned OOS return, but its train/val are still negative.",
+      "The next heavy sweep should therefore focus on denser metals/crypto pair variants and participation-aware donor filters, not on enlarging the current overlay cap."
+    ],
+    "candidate_hints_from_resliced_wave2": [
+      "pair_spread_1h_exec_tightstop_tp_btcusdt_xauusdt_2.2_0.55",
+      "pair_spread_1h_exec_tightstop_tp_bnbusdt_trxusdt_2.2_0.55",
+      "carry_trend_factor_rotation_1h_production_lo_guarded_48_12_0.250"
+    ],
+    "execution_note": "Keep heavy research sequential and benchmark every new pair donor against the aligned production_guarded March-window contract before optimizer promotion."
+  }
+}

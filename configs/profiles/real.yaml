@@ -1,0 +1,7 @@
+profile: real
+live:
+  is_testnet: false
+  enable_live_real: true
+data:
+  # real profile: no aggtrades_tick (validation-only; not for always-on live)
+  kinds: [ohlcv, funding, feature_points]

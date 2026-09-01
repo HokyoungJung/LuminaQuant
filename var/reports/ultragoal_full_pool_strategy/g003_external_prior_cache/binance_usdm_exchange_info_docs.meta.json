@@ -1,0 +1,10 @@
+{
+  "bytes": 74325,
+  "cache_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g003_external_prior_cache/binance_usdm_exchange_info_docs.source",
+  "content_type": "text/html; charset=utf-8",
+  "error": null,
+  "retrieved_at": "2026-07-02T14:21:38Z",
+  "sha256": "a8bcf3c0bff97a842a13a91984414a6586b957781bbc1f5e8424f1cd22140953",
+  "status": 200,
+  "url": "https://developers.binance.com/docs/derivatives/usds-margined-futures/market-data/rest-api/Exchange-Information"
+}

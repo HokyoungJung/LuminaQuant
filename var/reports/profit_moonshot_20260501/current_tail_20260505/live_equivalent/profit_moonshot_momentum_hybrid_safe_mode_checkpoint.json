@@ -1,0 +1,65 @@
+{
+  "artifact_kind": "live_equivalent_backtest_checkpoint",
+  "split_results": {
+    "profit_moonshot_momentum_hybrid_safe_mode": {
+      "oos": {
+        "equivalence_key": "20b27ca2b5a1c96822dc2d55a0a34882ed3c22b5964183ef0df417abae916c39",
+        "final_equity": 9966.54015331788,
+        "liquidation_count": 0,
+        "metrics": {
+          "cagr": -9.011633402167263e-06,
+          "calmar": -0.00025790235171118276,
+          "max_drawdown": 0.03494203655908933,
+          "sharpe": -0.0014105326084949065,
+          "sortino": -0.0014164076710275531,
+          "total_return": -0.003341526314212029,
+          "volatility": 0.0030634955203091207
+        },
+        "mode": "profit_moonshot_momentum_hybrid_safe_mode",
+        "source_mode": "profit_moonshot_momentum_hybrid_safe_mode",
+        "split": "oos",
+        "status": "completed",
+        "trade_count": 136
+      },
+      "train": {
+        "equivalence_key": "20b27ca2b5a1c96822dc2d55a0a34882ed3c22b5964183ef0df417abae916c39",
+        "final_equity": 9864.467075039582,
+        "liquidation_count": 0,
+        "metrics": {
+          "cagr": -6.542949715915292e-06,
+          "calmar": -5.289583699882014e-05,
+          "max_drawdown": 0.1236949840884687,
+          "sharpe": 0.004175236857947524,
+          "sortino": 0.004367273527303323,
+          "total_return": -0.013551486496041987,
+          "volatility": 0.009733907879882611
+        },
+        "mode": "profit_moonshot_momentum_hybrid_safe_mode",
+        "source_mode": "profit_moonshot_momentum_hybrid_safe_mode",
+        "split": "train",
+        "status": "completed",
+        "trade_count": 1185
+      },
+      "val": {
+        "equivalence_key": "20b27ca2b5a1c96822dc2d55a0a34882ed3c22b5964183ef0df417abae916c39",
+        "final_equity": 10028.407172179252,
+        "liquidation_count": 0,
+        "metrics": {
+          "cagr": 8.403884874219614e-06,
+          "calmar": 0.0008051134934472035,
+          "max_drawdown": 0.010438136911899503,
+          "sharpe": 0.010167858124343822,
+          "sortino": 0.009833095226985623,
+          "total_return": 0.002837148217925023,
+          "volatility": 0.0008631453963458669
+        },
+        "mode": "profit_moonshot_momentum_hybrid_safe_mode",
+        "source_mode": "profit_moonshot_momentum_hybrid_safe_mode",
+        "split": "val",
+        "status": "completed",
+        "trade_count": 183
+      }
+    }
+  },
+  "updated_at": "2026-05-05T06:16:40.968579Z"
+}

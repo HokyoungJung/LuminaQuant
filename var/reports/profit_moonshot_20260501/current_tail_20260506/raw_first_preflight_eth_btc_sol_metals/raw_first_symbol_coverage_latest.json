@@ -1,0 +1,363 @@
+{
+  "splits": [
+    {
+      "end_inclusive": "2025-12-31",
+      "name": "train",
+      "role": "sanity_filter",
+      "start": "2025-01-01"
+    },
+    {
+      "end_inclusive": "2026-02-28",
+      "name": "val",
+      "role": "primary_selection",
+      "start": "2026-01-01"
+    },
+    {
+      "end_inclusive": "2026-05-05",
+      "name": "oos",
+      "role": "report_only",
+      "start": "2026-03-01"
+    }
+  ],
+  "symbols": {
+    "BTC/USDT": {
+      "oos": {
+        "committed_day_count": 65,
+        "complete_raw_first": false,
+        "first_missing_days": [
+          "2026-05-05"
+        ],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/BTCUSDT/2026-03.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/BTCUSDT/2026-04.parquet"
+        ],
+        "legacy_monthly_files_present": 2,
+        "missing_day_count": 1,
+        "required_day_count": 66
+      },
+      "train": {
+        "committed_day_count": 365,
+        "complete_raw_first": true,
+        "first_missing_days": [],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/BTCUSDT/2025-01.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/BTCUSDT/2025-02.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/BTCUSDT/2025-03.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/BTCUSDT/2025-04.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/BTCUSDT/2025-05.parquet"
+        ],
+        "legacy_monthly_files_present": 12,
+        "missing_day_count": 0,
+        "required_day_count": 365
+      },
+      "val": {
+        "committed_day_count": 59,
+        "complete_raw_first": true,
+        "first_missing_days": [],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/BTCUSDT/2026-01.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/BTCUSDT/2026-02.parquet"
+        ],
+        "legacy_monthly_files_present": 2,
+        "missing_day_count": 0,
+        "required_day_count": 59
+      }
+    },
+    "ETH/USDT": {
+      "oos": {
+        "committed_day_count": 65,
+        "complete_raw_first": false,
+        "first_missing_days": [
+          "2026-05-05"
+        ],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/ETHUSDT/2026-03.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/ETHUSDT/2026-04.parquet"
+        ],
+        "legacy_monthly_files_present": 2,
+        "missing_day_count": 1,
+        "required_day_count": 66
+      },
+      "train": {
+        "committed_day_count": 365,
+        "complete_raw_first": true,
+        "first_missing_days": [],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/ETHUSDT/2025-01.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/ETHUSDT/2025-02.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/ETHUSDT/2025-03.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/ETHUSDT/2025-04.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/ETHUSDT/2025-05.parquet"
+        ],
+        "legacy_monthly_files_present": 12,
+        "missing_day_count": 0,
+        "required_day_count": 365
+      },
+      "val": {
+        "committed_day_count": 59,
+        "complete_raw_first": true,
+        "first_missing_days": [],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/ETHUSDT/2026-01.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/ETHUSDT/2026-02.parquet"
+        ],
+        "legacy_monthly_files_present": 2,
+        "missing_day_count": 0,
+        "required_day_count": 59
+      }
+    },
+    "SOL/USDT": {
+      "oos": {
+        "committed_day_count": 65,
+        "complete_raw_first": false,
+        "first_missing_days": [
+          "2026-05-05"
+        ],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/SOLUSDT/2026-03.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/SOLUSDT/2026-04.parquet"
+        ],
+        "legacy_monthly_files_present": 2,
+        "missing_day_count": 1,
+        "required_day_count": 66
+      },
+      "train": {
+        "committed_day_count": 365,
+        "complete_raw_first": true,
+        "first_missing_days": [],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/SOLUSDT/2025-01.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/SOLUSDT/2025-02.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/SOLUSDT/2025-03.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/SOLUSDT/2025-04.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/SOLUSDT/2025-05.parquet"
+        ],
+        "legacy_monthly_files_present": 12,
+        "missing_day_count": 0,
+        "required_day_count": 365
+      },
+      "val": {
+        "committed_day_count": 59,
+        "complete_raw_first": true,
+        "first_missing_days": [],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/SOLUSDT/2026-01.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/SOLUSDT/2026-02.parquet"
+        ],
+        "legacy_monthly_files_present": 2,
+        "missing_day_count": 0,
+        "required_day_count": 59
+      }
+    },
+    "XAG/USDT": {
+      "oos": {
+        "committed_day_count": 0,
+        "complete_raw_first": false,
+        "first_missing_days": [
+          "2026-03-01",
+          "2026-03-02",
+          "2026-03-03",
+          "2026-03-04",
+          "2026-03-05"
+        ],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/XAGUSDT/2026-03.parquet"
+        ],
+        "legacy_monthly_files_present": 1,
+        "missing_day_count": 66,
+        "required_day_count": 66
+      },
+      "train": {
+        "committed_day_count": 0,
+        "complete_raw_first": false,
+        "first_missing_days": [
+          "2025-01-01",
+          "2025-01-02",
+          "2025-01-03",
+          "2025-01-04",
+          "2025-01-05"
+        ],
+        "legacy_monthly_files": [],
+        "legacy_monthly_files_present": 0,
+        "missing_day_count": 365,
+        "required_day_count": 365
+      },
+      "val": {
+        "committed_day_count": 0,
+        "complete_raw_first": false,
+        "first_missing_days": [
+          "2026-01-01",
+          "2026-01-02",
+          "2026-01-03",
+          "2026-01-04",
+          "2026-01-05"
+        ],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/XAGUSDT/2026-01.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/XAGUSDT/2026-02.parquet"
+        ],
+        "legacy_monthly_files_present": 2,
+        "missing_day_count": 59,
+        "required_day_count": 59
+      }
+    },
+    "XAU/USDT": {
+      "oos": {
+        "committed_day_count": 0,
+        "complete_raw_first": false,
+        "first_missing_days": [
+          "2026-03-01",
+          "2026-03-02",
+          "2026-03-03",
+          "2026-03-04",
+          "2026-03-05"
+        ],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/XAUUSDT/2026-03.parquet"
+        ],
+        "legacy_monthly_files_present": 1,
+        "missing_day_count": 66,
+        "required_day_count": 66
+      },
+      "train": {
+        "committed_day_count": 0,
+        "complete_raw_first": false,
+        "first_missing_days": [
+          "2025-01-01",
+          "2025-01-02",
+          "2025-01-03",
+          "2025-01-04",
+          "2025-01-05"
+        ],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/XAUUSDT/2025-12.parquet"
+        ],
+        "legacy_monthly_files_present": 1,
+        "missing_day_count": 365,
+        "required_day_count": 365
+      },
+      "val": {
+        "committed_day_count": 0,
+        "complete_raw_first": false,
+        "first_missing_days": [
+          "2026-01-01",
+          "2026-01-02",
+          "2026-01-03",
+          "2026-01-04",
+          "2026-01-05"
+        ],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/XAUUSDT/2026-01.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/XAUUSDT/2026-02.parquet"
+        ],
+        "legacy_monthly_files_present": 2,
+        "missing_day_count": 59,
+        "required_day_count": 59
+      }
+    },
+    "XPD/USDT": {
+      "oos": {
+        "committed_day_count": 0,
+        "complete_raw_first": false,
+        "first_missing_days": [
+          "2026-03-01",
+          "2026-03-02",
+          "2026-03-03",
+          "2026-03-04",
+          "2026-03-05"
+        ],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/XPDUSDT/2026-03.parquet"
+        ],
+        "legacy_monthly_files_present": 1,
+        "missing_day_count": 66,
+        "required_day_count": 66
+      },
+      "train": {
+        "committed_day_count": 0,
+        "complete_raw_first": false,
+        "first_missing_days": [
+          "2025-01-01",
+          "2025-01-02",
+          "2025-01-03",
+          "2025-01-04",
+          "2025-01-05"
+        ],
+        "legacy_monthly_files": [],
+        "legacy_monthly_files_present": 0,
+        "missing_day_count": 365,
+        "required_day_count": 365
+      },
+      "val": {
+        "committed_day_count": 0,
+        "complete_raw_first": false,
+        "first_missing_days": [
+          "2026-01-01",
+          "2026-01-02",
+          "2026-01-03",
+          "2026-01-04",
+          "2026-01-05"
+        ],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/XPDUSDT/2026-01.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/XPDUSDT/2026-02.parquet"
+        ],
+        "legacy_monthly_files_present": 2,
+        "missing_day_count": 59,
+        "required_day_count": 59
+      }
+    },
+    "XPT/USDT": {
+      "oos": {
+        "committed_day_count": 0,
+        "complete_raw_first": false,
+        "first_missing_days": [
+          "2026-03-01",
+          "2026-03-02",
+          "2026-03-03",
+          "2026-03-04",
+          "2026-03-05"
+        ],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/XPTUSDT/2026-03.parquet"
+        ],
+        "legacy_monthly_files_present": 1,
+        "missing_day_count": 66,
+        "required_day_count": 66
+      },
+      "train": {
+        "committed_day_count": 0,
+        "complete_raw_first": false,
+        "first_missing_days": [
+          "2025-01-01",
+          "2025-01-02",
+          "2025-01-03",
+          "2025-01-04",
+          "2025-01-05"
+        ],
+        "legacy_monthly_files": [],
+        "legacy_monthly_files_present": 0,
+        "missing_day_count": 365,
+        "required_day_count": 365
+      },
+      "val": {
+        "committed_day_count": 0,
+        "complete_raw_first": false,
+        "first_missing_days": [
+          "2026-01-01",
+          "2026-01-02",
+          "2026-01-03",
+          "2026-01-04",
+          "2026-01-05"
+        ],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/XPTUSDT/2026-01.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/XPTUSDT/2026-02.parquet"
+        ],
+        "legacy_monthly_files_present": 2,
+        "missing_day_count": 59,
+        "required_day_count": 59
+      }
+    }
+  }
+}

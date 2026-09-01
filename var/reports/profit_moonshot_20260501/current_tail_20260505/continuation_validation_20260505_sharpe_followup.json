@@ -1,0 +1,21 @@
+{
+  "baseline_mode": "profit_moonshot_adaptive_momentum_mode",
+  "baseline_val_return": 0.0026493262,
+  "blockers": [],
+  "candidate_liquidations": 0,
+  "candidate_mode": "profit_moonshot_hourly_shock_reversion_eth_12h_mode",
+  "candidate_primary_split": "oos",
+  "candidate_sharpe": 0.10065076094708575,
+  "candidate_sortino": 0.12832138288955808,
+  "candidate_trades": 30,
+  "candidate_val_return": 0.008284409681674987,
+  "generated_at": "2026-05-05T11:26:07.138005Z",
+  "improved_candidate_count": 18,
+  "improved_over_baseline": true,
+  "operator_oos_override_active": true,
+  "passed": true,
+  "promoted_by_summary": "profit_moonshot_momentum_hybrid_safe_mode",
+  "status": "passed",
+  "summary": "profit_moonshot_hourly_shock_reversion_eth_12h_mode oos_return=0.008284 vs baseline 0.002649; passed=True",
+  "summary_path": "var/reports/profit_moonshot_20260501/profit_moonshot_summary_latest.json"
+}

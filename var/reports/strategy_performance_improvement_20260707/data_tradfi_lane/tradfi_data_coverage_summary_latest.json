@@ -1,0 +1,86 @@
+{
+  "artifact_kind": "tradfi_data_lane_coverage_summary",
+  "collector_command_mode": "dry_run_discovery_no_data_write",
+  "collector_report_path": "var/reports/strategy_performance_improvement_20260707/data_tradfi_lane/binance_1m_research_universe_collection_latest.json",
+  "command_log_path": "var/reports/strategy_performance_improvement_20260707/data_tradfi_lane/command_log.md",
+  "compaction_status": {
+    "command": "uv run python scripts/compact_wal_to_monthly_parquet.py --root-path data/market_parquet --exchange binance",
+    "exit_status": 0,
+    "result": "No symbols found for compaction; no WAL compaction performed in this worktree."
+  },
+  "data_coverage_counts": {
+    "collector_error_count": 0,
+    "collector_request_count": 0,
+    "collector_up_to_date_count": 128,
+    "core_crypto_snapshot_count": 10,
+    "discovered_tradfi_trading_count": 118,
+    "fetched_rows": 0,
+    "new_tradfi_since_static_snapshot_count": 18,
+    "selected_symbol_count": 128,
+    "static_tradfi_snapshot_count": 100,
+    "upserted_rows": 0
+  },
+  "delegation_evidence": {
+    "children": [
+      {
+        "id": "019f3c57-e09e-70d1-b944-b131f4b0fec5",
+        "integrated_findings": [
+          "Existing focused tests cover static universe counts, dynamic exchangeInfo append behavior, collector URL/spec planning, and default static-plus-fapi-tradfi discovery.",
+          "Gaps remain for fapi-tradfi-only branch, explicit-symbol discovery policy, full collector main/report aggregation, and coverage-inventory artifact shape."
+        ],
+        "name": "Task 1 test coverage probe"
+      },
+      {
+        "id": "019f3c57-f1f9-7ee1-9678-5b5cd9fdd014",
+        "integrated_findings": [
+          "Safe slices are side-effect-free research_universe constants/helpers, collector reporting, and local 1s WAL compaction.",
+          "Growth-mode dynamic universe is not fixed-cardinality; use static or explicit symbols for reproducibility.",
+          "WAL compaction is destructive unless --keep-wal; approved command found no symbols here, so no local WAL mutation occurred.",
+          "Probe cited older repo-local artifact counts (117/7); current live dry-run is authoritative for this task at 128 selected / 18 new TradFi symbols."
+        ],
+        "name": "Task 1 change-slice/hazard probe"
+      }
+    ],
+    "serial_repo_searches_before_spawn": 0,
+    "subagent_model": "gpt-5.4-mini",
+    "subagents_spawned": 2
+  },
+  "full_universe_claim_status": {
+    "claim": "not_claimed_full_data_refresh",
+    "reason": "Task 1 validated supported dynamic universe discovery with a no-write dry-run; full historical/current data refresh was not run because it is an external/heavy data job and would need staged resource/API handling.",
+    "safe_next_command": "uv run python scripts/collect_binance_1m_research_universe.py --source data-vision --universe-source static-plus-fapi-tradfi --db-path data/market_parquet --exchange binance --since 2025-01-01T00:00:00Z --workers 4 --global-request-interval-sec 1.0"
+  },
+  "generated_at_utc": "2026-07-07T11:36:11.441774Z",
+  "known_test_gaps": [
+    "No direct regression test for resolve_default_symbols(..., universe_source=\"fapi-tradfi\").",
+    "No direct regression test for universe_discovery_payload(..., explicit_symbols=True).",
+    "Collector main/report aggregation is not unit-tested with monkeypatched exchangeInfo/download/upsert hooks.",
+    "Coverage-inventory JSON/markdown artifact shape is not directly covered by a dedicated test file."
+  ],
+  "new_tradfi_since_static_snapshot_symbols": [
+    "ALABUSDT",
+    "BSPUSDT",
+    "CATUSDT",
+    "CIENUSDT",
+    "FLEXUSDT",
+    "KLACUSDT",
+    "KORUUSDT",
+    "KSTRUSDT",
+    "LRCXUSDT",
+    "MVLLUSDT",
+    "SMCIUSDT",
+    "SONYUSDT",
+    "SQQQUSDT",
+    "STRCUSDT",
+    "TERUSDT",
+    "TQQQUSDT",
+    "TTWOUSDT",
+    "TXNUSDT"
+  ],
+  "notes": [
+    "Static research_universe snapshot was left unchanged for reproducibility.",
+    "Collector default static-plus-fapi-tradfi selected the frozen snapshot plus current Binance TRADIFI_PERPETUAL/USDT discovery.",
+    "Dry-run used an end-before-start window so no market-data downloads or writes were performed; exchangeInfo discovery was still validated."
+  ],
+  "verification_log_path": "var/reports/strategy_performance_improvement_20260707/data_tradfi_lane/verification_log.md"
+}

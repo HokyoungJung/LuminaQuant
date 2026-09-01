@@ -1,0 +1,1569 @@
+{
+  "aggregate": {
+    "annualized_oos_return_approx": 0.0,
+    "compounded_oos_return": 0.0,
+    "fold_count": 0,
+    "latest_oos_return": 0.0,
+    "max_oos_mdd": 0.0,
+    "min_oos_return": 0.0,
+    "monthly_equity_mdd": 0.0,
+    "monthly_sharpe_approx": 0.0,
+    "positive_oos_folds": 0,
+    "profit_factor": 0.0,
+    "profit_factor_unbounded": true
+  },
+  "artifact_kind": "alpha_zoo_clean_new_alpha_discovery",
+  "candidate_cap_sort_policy": "eligible_first_active_train_validation_selection_score",
+  "candidate_row_count_total": 5,
+  "candidate_rows": [
+    {
+      "allocation_fraction": 0.1,
+      "asset_group": "crypto_core",
+      "candidate_freeze_sha256": "ac16007e6c5c2f6a8dabf77cd7ec0daac74380fdee568639e3f81dbbacd664b0",
+      "clean_promotion_eligible": false,
+      "cooldown_bars": 2,
+      "decision": "no_promotion_shadow_or_reject",
+      "execution_efficiency_proxy_gate_pass": false,
+      "exit_threshold": 0.0,
+      "family": "volatility_squeeze_breakout",
+      "fold_id": "2026-06",
+      "integer_leverage": 2,
+      "label_blockers": [
+        "continuous_position_state_across_split_boundaries",
+        "fresh_forward_required_before_promotion"
+      ],
+      "locked_oos_account_wipeout_count_report_only": 0,
+      "locked_oos_liquidation_count_report_only": 0,
+      "locked_oos_mdd_report_only": 0.006873202248088406,
+      "locked_oos_return_report_only": -0.003280340620586575,
+      "locked_oos_sharpe_report_only": -3.7036163909549744,
+      "locked_oos_sortino_report_only": -1.4336560429251486,
+      "locked_oos_trade_event_count_report_only": 4,
+      "lookback_bars": 24,
+      "min_hold_bars": 4,
+      "model_id": "az69_squeeze_1h_btcusdt_lb24_q0p15_br24_hold4_lev2_4f71536f",
+      "nested_hybrid_dependency": false,
+      "notional_fraction": 0.2,
+      "post_oos_selector_trusted": false,
+      "pre_registered_search_space_sha256": "b4bdb079ba4d9ad5e7202b053858c6d219359126dddaa2a546e38c863ccccca4",
+      "promotion_gate": {
+        "can_advance_to_full_wf": false,
+        "data_sufficiency": {
+          "feature_backed": false,
+          "locked_oos_feature_coverage_report_only": 1.0,
+          "min_required_train_validation_feature_coverage": 0.6,
+          "sufficient_for_clean_paper_candidate": true,
+          "train_feature_coverage": 1.0,
+          "validation_feature_coverage": 1.0,
+          "weak_data_shadow_only": false
+        },
+        "fresh_forward_monthly_folds_required": 2,
+        "fresh_forward_required": true,
+        "locked_oos_usage_flags": {
+          "uses_locked_oos_for_correlation": false,
+          "uses_locked_oos_for_objective": false,
+          "uses_locked_oos_for_parameter_fitting": false,
+          "uses_locked_oos_for_pruning": false,
+          "uses_locked_oos_for_selection": false,
+          "uses_locked_oos_for_sizing": false,
+          "uses_locked_oos_for_threshold": false,
+          "uses_locked_oos_for_tie_break": false
+        },
+        "promotion_status": "rejected_before_full_wf",
+        "ready_for_real": false,
+        "real_money_execution": false,
+        "rejection_reasons": [
+          "continuous_position_state_across_split_boundaries",
+          "fresh_forward_required_before_promotion",
+          "not_train_validation_freeze_eligible",
+          "validation_cost_turnover_proxy_non_positive"
+        ],
+        "report_only_locked_oos": {
+          "clean_paper_benchmark_pass": false,
+          "mdd": 0.006873202248088406,
+          "return": -0.003280340620586575,
+          "return_mdd": -0.3280340620586575,
+          "risk_gate_pass": true,
+          "risk_metrics_present": true,
+          "shadow_benchmark_pass": false
+        },
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "train_validation_smoke_survivor": false
+      },
+      "promotion_status": "rejected_before_full_wf",
+      "ready_for_paper": false,
+      "ready_for_real": false,
+      "real_execution_allowed": false,
+      "real_money_execution": false,
+      "rejection_reasons": [
+        "continuous_position_state_across_split_boundaries",
+        "fresh_forward_required_before_promotion",
+        "not_train_validation_freeze_eligible",
+        "validation_cost_turnover_proxy_non_positive"
+      ],
+      "relaxed_backtest_gate_pass": false,
+      "robust_train_validation_v1_eligible": false,
+      "sample_gate_pass": false,
+      "selected_by_train_validation_freeze": false,
+      "selection_inputs": [
+        "train",
+        "validation"
+      ],
+      "selection_policy": "default_train_validation",
+      "selection_score_active_train_validation_only": -0.29340952015012517,
+      "selection_score_robust_v1_train_validation_only": -1.369406070019777,
+      "selection_score_train_validation_only": -0.29340952015012517,
+      "side": "long_short",
+      "split_simulation_policy": "continuous_full_period_signal_slice_report_only",
+      "strict_backtest_gate_pass": false,
+      "symbol": "BTCUSDT",
+      "threshold": 0.15,
+      "timeframe": "1h",
+      "train_calmar": 0.5730580433462042,
+      "train_exposure_bar_count": 1330,
+      "train_mdd": 0.03618718072026572,
+      "train_minus_validation_return": 0.03010149600950729,
+      "train_return": 0.02073735497777096,
+      "train_return_per_turnover_proxy_bps": 7.005863168165864,
+      "train_sharpe": 0.47021283419585047,
+      "train_sortino": 0.23573729239207658,
+      "train_trade_event_count": 148,
+      "train_validation_return_ratio": 0.0,
+      "train_validation_score": -0.37681104327651527,
+      "uses_continuous_position_state_across_split_boundaries": true,
+      "uses_locked_oos_for_correlation": false,
+      "uses_locked_oos_for_objective": false,
+      "uses_locked_oos_for_parameter_fitting": false,
+      "uses_locked_oos_for_pruning": false,
+      "uses_locked_oos_for_selection": false,
+      "uses_locked_oos_for_sizing": false,
+      "uses_locked_oos_for_threshold": false,
+      "uses_locked_oos_for_tie_break": false,
+      "validation_calmar": -0.6546382104476025,
+      "validation_exposure_bar_count": 97,
+      "validation_mdd": 0.014304299508172136,
+      "validation_return": -0.009364141031736328,
+      "validation_return_per_turnover_proxy_bps": -26.011502865934244,
+      "validation_sharpe": -2.4201854431282612,
+      "validation_sortino": -0.9134758925583918,
+      "validation_trade_event_count": 18
+    },
+    {
+      "allocation_fraction": 0.1,
+      "asset_group": "crypto_core",
+      "candidate_freeze_sha256": "63437674486eaa695e235f886fc619dcac060da562b0ec6ea6d365226a143e46",
+      "clean_promotion_eligible": false,
+      "cooldown_bars": 2,
+      "decision": "no_promotion_shadow_or_reject",
+      "execution_efficiency_proxy_gate_pass": false,
+      "exit_threshold": 0.0,
+      "family": "volatility_squeeze_breakout",
+      "fold_id": "2026-06",
+      "integer_leverage": 2,
+      "label_blockers": [
+        "continuous_position_state_across_split_boundaries",
+        "fresh_forward_required_before_promotion"
+      ],
+      "locked_oos_account_wipeout_count_report_only": 0,
+      "locked_oos_liquidation_count_report_only": 0,
+      "locked_oos_mdd_report_only": 0.011341575297579065,
+      "locked_oos_return_report_only": 0.03281919960100632,
+      "locked_oos_sharpe_report_only": 9.174919629480996,
+      "locked_oos_sortino_report_only": 9.79000836137011,
+      "locked_oos_trade_event_count_report_only": 3,
+      "lookback_bars": 72,
+      "min_hold_bars": 4,
+      "model_id": "az69_squeeze_1h_btcusdt_lb72_q0p25_br24_hold4_lev2_0b6f78eb",
+      "nested_hybrid_dependency": false,
+      "notional_fraction": 0.2,
+      "post_oos_selector_trusted": false,
+      "pre_registered_search_space_sha256": "b4bdb079ba4d9ad5e7202b053858c6d219359126dddaa2a546e38c863ccccca4",
+      "promotion_gate": {
+        "can_advance_to_full_wf": false,
+        "data_sufficiency": {
+          "feature_backed": false,
+          "locked_oos_feature_coverage_report_only": 1.0,
+          "min_required_train_validation_feature_coverage": 0.6,
+          "sufficient_for_clean_paper_candidate": true,
+          "train_feature_coverage": 1.0,
+          "validation_feature_coverage": 1.0,
+          "weak_data_shadow_only": false
+        },
+        "fresh_forward_monthly_folds_required": 2,
+        "fresh_forward_required": true,
+        "locked_oos_usage_flags": {
+          "uses_locked_oos_for_correlation": false,
+          "uses_locked_oos_for_objective": false,
+          "uses_locked_oos_for_parameter_fitting": false,
+          "uses_locked_oos_for_pruning": false,
+          "uses_locked_oos_for_selection": false,
+          "uses_locked_oos_for_sizing": false,
+          "uses_locked_oos_for_threshold": false,
+          "uses_locked_oos_for_tie_break": false
+        },
+        "promotion_status": "rejected_before_full_wf",
+        "ready_for_real": false,
+        "real_money_execution": false,
+        "rejection_reasons": [
+          "continuous_position_state_across_split_boundaries",
+          "fresh_forward_required_before_promotion",
+          "not_train_validation_freeze_eligible",
+          "validation_cost_turnover_proxy_non_positive"
+        ],
+        "report_only_locked_oos": {
+          "clean_paper_benchmark_pass": false,
+          "mdd": 0.011341575297579065,
+          "return": 0.03281919960100632,
+          "return_mdd": 2.8937073325265317,
+          "risk_gate_pass": true,
+          "risk_metrics_present": true,
+          "shadow_benchmark_pass": false
+        },
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "train_validation_smoke_survivor": false
+      },
+      "promotion_status": "rejected_before_full_wf",
+      "ready_for_paper": false,
+      "ready_for_real": false,
+      "real_execution_allowed": false,
+      "real_money_execution": false,
+      "rejection_reasons": [
+        "continuous_position_state_across_split_boundaries",
+        "fresh_forward_required_before_promotion",
+        "not_train_validation_freeze_eligible",
+        "validation_cost_turnover_proxy_non_positive"
+      ],
+      "relaxed_backtest_gate_pass": false,
+      "robust_train_validation_v1_eligible": false,
+      "sample_gate_pass": false,
+      "selected_by_train_validation_freeze": false,
+      "selection_inputs": [
+        "train",
+        "validation"
+      ],
+      "selection_policy": "default_train_validation",
+      "selection_score_active_train_validation_only": -0.32488686734442224,
+      "selection_score_robust_v1_train_validation_only": -1.1558785138865,
+      "selection_score_train_validation_only": -0.32488686734442224,
+      "side": "long_short",
+      "split_simulation_policy": "continuous_full_period_signal_slice_report_only",
+      "strict_backtest_gate_pass": false,
+      "symbol": "BTCUSDT",
+      "threshold": 0.25,
+      "timeframe": "1h",
+      "train_calmar": -0.17217063161712554,
+      "train_exposure_bar_count": 4553,
+      "train_mdd": 0.046759448252263414,
+      "train_minus_validation_return": 0.0013377252983185484,
+      "train_return": -0.008050603739660489,
+      "train_return_per_turnover_proxy_bps": -1.7970097633170734,
+      "train_sharpe": -0.08586833793782098,
+      "train_sortino": -0.08023709871515779,
+      "train_trade_event_count": 224,
+      "train_validation_return_ratio": 0.0,
+      "train_validation_score": -0.335907206852198,
+      "uses_continuous_position_state_across_split_boundaries": true,
+      "uses_locked_oos_for_correlation": false,
+      "uses_locked_oos_for_objective": false,
+      "uses_locked_oos_for_parameter_fitting": false,
+      "uses_locked_oos_for_pruning": false,
+      "uses_locked_oos_for_selection": false,
+      "uses_locked_oos_for_sizing": false,
+      "uses_locked_oos_for_threshold": false,
+      "uses_locked_oos_for_tie_break": false,
+      "validation_calmar": -0.5462207093330823,
+      "validation_exposure_bar_count": 577,
+      "validation_mdd": 0.017187794013599156,
+      "validation_return": -0.009388329037979037,
+      "validation_return_per_turnover_proxy_bps": -14.669264121842245,
+      "validation_sharpe": -1.3058245496032261,
+      "validation_sortino": -1.1996130721900014,
+      "validation_trade_event_count": 32
+    },
+    {
+      "allocation_fraction": 0.1,
+      "asset_group": "crypto_core",
+      "candidate_freeze_sha256": "2d61d8f38a69a16cf46c5c8eb01ed04b3ff1c1469476ea749a969829a185883d",
+      "clean_promotion_eligible": false,
+      "cooldown_bars": 2,
+      "decision": "no_promotion_shadow_or_reject",
+      "execution_efficiency_proxy_gate_pass": false,
+      "exit_threshold": 0.0,
+      "family": "volatility_squeeze_breakout",
+      "fold_id": "2026-06",
+      "integer_leverage": 2,
+      "label_blockers": [
+        "continuous_position_state_across_split_boundaries",
+        "fresh_forward_required_before_promotion"
+      ],
+      "locked_oos_account_wipeout_count_report_only": 0,
+      "locked_oos_liquidation_count_report_only": 0,
+      "locked_oos_mdd_report_only": 0.006773879636052027,
+      "locked_oos_return_report_only": -0.0030763796769900376,
+      "locked_oos_sharpe_report_only": -3.4702489211396244,
+      "locked_oos_sortino_report_only": -1.3440600101206424,
+      "locked_oos_trade_event_count_report_only": 4,
+      "lookback_bars": 24,
+      "min_hold_bars": 8,
+      "model_id": "az69_squeeze_1h_btcusdt_lb24_q0p15_br24_hold8_lev2_fbf70704",
+      "nested_hybrid_dependency": false,
+      "notional_fraction": 0.2,
+      "post_oos_selector_trusted": false,
+      "pre_registered_search_space_sha256": "b4bdb079ba4d9ad5e7202b053858c6d219359126dddaa2a546e38c863ccccca4",
+      "promotion_gate": {
+        "can_advance_to_full_wf": false,
+        "data_sufficiency": {
+          "feature_backed": false,
+          "locked_oos_feature_coverage_report_only": 1.0,
+          "min_required_train_validation_feature_coverage": 0.6,
+          "sufficient_for_clean_paper_candidate": true,
+          "train_feature_coverage": 1.0,
+          "validation_feature_coverage": 1.0,
+          "weak_data_shadow_only": false
+        },
+        "fresh_forward_monthly_folds_required": 2,
+        "fresh_forward_required": true,
+        "locked_oos_usage_flags": {
+          "uses_locked_oos_for_correlation": false,
+          "uses_locked_oos_for_objective": false,
+          "uses_locked_oos_for_parameter_fitting": false,
+          "uses_locked_oos_for_pruning": false,
+          "uses_locked_oos_for_selection": false,
+          "uses_locked_oos_for_sizing": false,
+          "uses_locked_oos_for_threshold": false,
+          "uses_locked_oos_for_tie_break": false
+        },
+        "promotion_status": "rejected_before_full_wf",
+        "ready_for_real": false,
+        "real_money_execution": false,
+        "rejection_reasons": [
+          "continuous_position_state_across_split_boundaries",
+          "fresh_forward_required_before_promotion",
+          "not_train_validation_freeze_eligible",
+          "validation_cost_turnover_proxy_non_positive"
+        ],
+        "report_only_locked_oos": {
+          "clean_paper_benchmark_pass": false,
+          "mdd": 0.006773879636052027,
+          "return": -0.0030763796769900376,
+          "return_mdd": -0.30763796769900376,
+          "risk_gate_pass": true,
+          "risk_metrics_present": true,
+          "shadow_benchmark_pass": false
+        },
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "train_validation_smoke_survivor": false
+      },
+      "promotion_status": "rejected_before_full_wf",
+      "ready_for_paper": false,
+      "ready_for_real": false,
+      "real_execution_allowed": false,
+      "real_money_execution": false,
+      "rejection_reasons": [
+        "continuous_position_state_across_split_boundaries",
+        "fresh_forward_required_before_promotion",
+        "not_train_validation_freeze_eligible",
+        "validation_cost_turnover_proxy_non_positive"
+      ],
+      "relaxed_backtest_gate_pass": false,
+      "robust_train_validation_v1_eligible": false,
+      "sample_gate_pass": false,
+      "selected_by_train_validation_freeze": false,
+      "selection_inputs": [
+        "train",
+        "validation"
+      ],
+      "selection_policy": "default_train_validation",
+      "selection_score_active_train_validation_only": -0.33371728544225515,
+      "selection_score_robust_v1_train_validation_only": -1.2721204047872183,
+      "selection_score_train_validation_only": -0.33371728544225515,
+      "side": "long_short",
+      "split_simulation_policy": "continuous_full_period_signal_slice_report_only",
+      "strict_backtest_gate_pass": false,
+      "symbol": "BTCUSDT",
+      "threshold": 0.15,
+      "timeframe": "1h",
+      "train_calmar": 0.15006419114889732,
+      "train_exposure_bar_count": 1393,
+      "train_mdd": 0.048512568715351256,
+      "train_minus_validation_return": 0.01651299776126569,
+      "train_return": 0.007279999384824487,
+      "train_return_per_turnover_proxy_bps": 2.459459251629894,
+      "train_sharpe": 0.17590253412065432,
+      "train_sortino": 0.08983359131330251,
+      "train_trade_event_count": 148,
+      "train_validation_return_ratio": 0.0,
+      "train_validation_score": -0.410258716499471,
+      "uses_continuous_position_state_across_split_boundaries": true,
+      "uses_locked_oos_for_correlation": false,
+      "uses_locked_oos_for_objective": false,
+      "uses_locked_oos_for_parameter_fitting": false,
+      "uses_locked_oos_for_pruning": false,
+      "uses_locked_oos_for_selection": false,
+      "uses_locked_oos_for_sizing": false,
+      "uses_locked_oos_for_threshold": false,
+      "uses_locked_oos_for_tie_break": false,
+      "validation_calmar": -0.6359729725117621,
+      "validation_exposure_bar_count": 118,
+      "validation_mdd": 0.014517909998558065,
+      "validation_return": -0.009232998376441204,
+      "validation_return_per_turnover_proxy_bps": -25.647217712336676,
+      "validation_sharpe": -2.1724827796503603,
+      "validation_sortino": -0.9163862455855367,
+      "validation_trade_event_count": 18
+    },
+    {
+      "allocation_fraction": 0.1,
+      "asset_group": "crypto_core",
+      "candidate_freeze_sha256": "b3481fd1bea71e83e769ebf3ec325b20c00a9c140b4e53b167c270821f81803e",
+      "clean_promotion_eligible": false,
+      "cooldown_bars": 2,
+      "decision": "no_promotion_shadow_or_reject",
+      "execution_efficiency_proxy_gate_pass": false,
+      "exit_threshold": 0.0,
+      "family": "volatility_squeeze_breakout",
+      "fold_id": "2026-06",
+      "integer_leverage": 2,
+      "label_blockers": [
+        "continuous_position_state_across_split_boundaries",
+        "fresh_forward_required_before_promotion"
+      ],
+      "locked_oos_account_wipeout_count_report_only": 0,
+      "locked_oos_liquidation_count_report_only": 0,
+      "locked_oos_mdd_report_only": 0.011341575297579065,
+      "locked_oos_return_report_only": 0.03281919960100632,
+      "locked_oos_sharpe_report_only": 9.174919629480996,
+      "locked_oos_sortino_report_only": 9.79000836137011,
+      "locked_oos_trade_event_count_report_only": 3,
+      "lookback_bars": 72,
+      "min_hold_bars": 4,
+      "model_id": "az69_squeeze_1h_btcusdt_lb72_q0p25_br12_hold4_lev2_ce23a56b",
+      "nested_hybrid_dependency": false,
+      "notional_fraction": 0.2,
+      "post_oos_selector_trusted": false,
+      "pre_registered_search_space_sha256": "b4bdb079ba4d9ad5e7202b053858c6d219359126dddaa2a546e38c863ccccca4",
+      "promotion_gate": {
+        "can_advance_to_full_wf": false,
+        "data_sufficiency": {
+          "feature_backed": false,
+          "locked_oos_feature_coverage_report_only": 1.0,
+          "min_required_train_validation_feature_coverage": 0.6,
+          "sufficient_for_clean_paper_candidate": true,
+          "train_feature_coverage": 1.0,
+          "validation_feature_coverage": 1.0,
+          "weak_data_shadow_only": false
+        },
+        "fresh_forward_monthly_folds_required": 2,
+        "fresh_forward_required": true,
+        "locked_oos_usage_flags": {
+          "uses_locked_oos_for_correlation": false,
+          "uses_locked_oos_for_objective": false,
+          "uses_locked_oos_for_parameter_fitting": false,
+          "uses_locked_oos_for_pruning": false,
+          "uses_locked_oos_for_selection": false,
+          "uses_locked_oos_for_sizing": false,
+          "uses_locked_oos_for_threshold": false,
+          "uses_locked_oos_for_tie_break": false
+        },
+        "promotion_status": "rejected_before_full_wf",
+        "ready_for_real": false,
+        "real_money_execution": false,
+        "rejection_reasons": [
+          "continuous_position_state_across_split_boundaries",
+          "fresh_forward_required_before_promotion",
+          "not_train_validation_freeze_eligible",
+          "validation_cost_turnover_proxy_non_positive"
+        ],
+        "report_only_locked_oos": {
+          "clean_paper_benchmark_pass": false,
+          "mdd": 0.011341575297579065,
+          "return": 0.03281919960100632,
+          "return_mdd": 2.8937073325265317,
+          "risk_gate_pass": true,
+          "risk_metrics_present": true,
+          "shadow_benchmark_pass": false
+        },
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "train_validation_smoke_survivor": false
+      },
+      "promotion_status": "rejected_before_full_wf",
+      "ready_for_paper": false,
+      "ready_for_real": false,
+      "real_execution_allowed": false,
+      "real_money_execution": false,
+      "rejection_reasons": [
+        "continuous_position_state_across_split_boundaries",
+        "fresh_forward_required_before_promotion",
+        "not_train_validation_freeze_eligible",
+        "validation_cost_turnover_proxy_non_positive"
+      ],
+      "relaxed_backtest_gate_pass": false,
+      "robust_train_validation_v1_eligible": false,
+      "sample_gate_pass": false,
+      "selected_by_train_validation_freeze": false,
+      "selection_inputs": [
+        "train",
+        "validation"
+      ],
+      "selection_policy": "default_train_validation",
+      "selection_score_active_train_validation_only": -0.349870998363374,
+      "selection_score_robust_v1_train_validation_only": -0.9391486464194116,
+      "selection_score_train_validation_only": -0.349870998363374,
+      "side": "long_short",
+      "split_simulation_policy": "continuous_full_period_signal_slice_report_only",
+      "strict_backtest_gate_pass": false,
+      "symbol": "BTCUSDT",
+      "threshold": 0.25,
+      "timeframe": "1h",
+      "train_calmar": -0.4163782316990925,
+      "train_exposure_bar_count": 4929,
+      "train_mdd": 0.06289301961985838,
+      "train_minus_validation_return": -0.01911256925949334,
+      "train_return": -0.026187284295532964,
+      "train_return_per_turnover_proxy_bps": -4.578196555163106,
+      "train_sharpe": -0.3363622623130977,
+      "train_sortino": -0.32490300818622325,
+      "train_trade_event_count": 286,
+      "train_validation_return_ratio": 0.0,
+      "train_validation_score": -0.4249264638934556,
+      "uses_continuous_position_state_across_split_boundaries": true,
+      "uses_locked_oos_for_correlation": false,
+      "uses_locked_oos_for_objective": false,
+      "uses_locked_oos_for_parameter_fitting": false,
+      "uses_locked_oos_for_pruning": false,
+      "uses_locked_oos_for_selection": false,
+      "uses_locked_oos_for_sizing": false,
+      "uses_locked_oos_for_threshold": false,
+      "uses_locked_oos_for_tie_break": false,
+      "validation_calmar": -0.35491845537661004,
+      "validation_exposure_bar_count": 600,
+      "validation_mdd": 0.01993335350378589,
+      "validation_return": -0.007074715036039625,
+      "validation_return_per_turnover_proxy_bps": -10.403992700058271,
+      "validation_sharpe": -0.9442206426443318,
+      "validation_sortino": -0.8873784290076603,
+      "validation_trade_event_count": 34
+    },
+    {
+      "allocation_fraction": 0.1,
+      "asset_group": "crypto_core",
+      "candidate_freeze_sha256": "93f6c1619bf2ff3609522eb530f78d176c89d2ab3b4d3176f513152fd42daebc",
+      "clean_promotion_eligible": false,
+      "cooldown_bars": 2,
+      "decision": "no_promotion_shadow_or_reject",
+      "execution_efficiency_proxy_gate_pass": false,
+      "exit_threshold": 0.0,
+      "family": "volatility_squeeze_breakout",
+      "fold_id": "2026-06",
+      "integer_leverage": 2,
+      "label_blockers": [
+        "continuous_position_state_across_split_boundaries",
+        "fresh_forward_required_before_promotion"
+      ],
+      "locked_oos_account_wipeout_count_report_only": 0,
+      "locked_oos_liquidation_count_report_only": 0,
+      "locked_oos_mdd_report_only": 0.00919349028277694,
+      "locked_oos_return_report_only": 0.032370310696203,
+      "locked_oos_sharpe_report_only": 9.310040524008448,
+      "locked_oos_sortino_report_only": 8.745826025342916,
+      "locked_oos_trade_event_count_report_only": 2,
+      "lookback_bars": 72,
+      "min_hold_bars": 4,
+      "model_id": "az69_squeeze_1h_btcusdt_lb72_q0p15_br12_hold4_lev2_05340a26",
+      "nested_hybrid_dependency": false,
+      "notional_fraction": 0.2,
+      "post_oos_selector_trusted": false,
+      "pre_registered_search_space_sha256": "b4bdb079ba4d9ad5e7202b053858c6d219359126dddaa2a546e38c863ccccca4",
+      "promotion_gate": {
+        "can_advance_to_full_wf": false,
+        "data_sufficiency": {
+          "feature_backed": false,
+          "locked_oos_feature_coverage_report_only": 1.0,
+          "min_required_train_validation_feature_coverage": 0.6,
+          "sufficient_for_clean_paper_candidate": true,
+          "train_feature_coverage": 1.0,
+          "validation_feature_coverage": 1.0,
+          "weak_data_shadow_only": false
+        },
+        "fresh_forward_monthly_folds_required": 2,
+        "fresh_forward_required": true,
+        "locked_oos_usage_flags": {
+          "uses_locked_oos_for_correlation": false,
+          "uses_locked_oos_for_objective": false,
+          "uses_locked_oos_for_parameter_fitting": false,
+          "uses_locked_oos_for_pruning": false,
+          "uses_locked_oos_for_selection": false,
+          "uses_locked_oos_for_sizing": false,
+          "uses_locked_oos_for_threshold": false,
+          "uses_locked_oos_for_tie_break": false
+        },
+        "promotion_status": "rejected_before_full_wf",
+        "ready_for_real": false,
+        "real_money_execution": false,
+        "rejection_reasons": [
+          "continuous_position_state_across_split_boundaries",
+          "fresh_forward_required_before_promotion",
+          "not_train_validation_freeze_eligible",
+          "validation_cost_turnover_proxy_non_positive"
+        ],
+        "report_only_locked_oos": {
+          "clean_paper_benchmark_pass": false,
+          "mdd": 0.00919349028277694,
+          "return": 0.032370310696203,
+          "return_mdd": 3.2370310696202997,
+          "risk_gate_pass": true,
+          "risk_metrics_present": true,
+          "shadow_benchmark_pass": false
+        },
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "train_validation_smoke_survivor": false
+      },
+      "promotion_status": "rejected_before_full_wf",
+      "ready_for_paper": false,
+      "ready_for_real": false,
+      "real_execution_allowed": false,
+      "real_money_execution": false,
+      "rejection_reasons": [
+        "continuous_position_state_across_split_boundaries",
+        "fresh_forward_required_before_promotion",
+        "not_train_validation_freeze_eligible",
+        "validation_cost_turnover_proxy_non_positive"
+      ],
+      "relaxed_backtest_gate_pass": false,
+      "robust_train_validation_v1_eligible": false,
+      "sample_gate_pass": false,
+      "selected_by_train_validation_freeze": false,
+      "selection_inputs": [
+        "train",
+        "validation"
+      ],
+      "selection_policy": "default_train_validation",
+      "selection_score_active_train_validation_only": -0.3735322690786688,
+      "selection_score_robust_v1_train_validation_only": -1.050375867272324,
+      "selection_score_train_validation_only": -0.3735322690786688,
+      "side": "long_short",
+      "split_simulation_policy": "continuous_full_period_signal_slice_report_only",
+      "strict_backtest_gate_pass": false,
+      "symbol": "BTCUSDT",
+      "threshold": 0.15,
+      "timeframe": "1h",
+      "train_calmar": -0.17529820725946132,
+      "train_exposure_bar_count": 3584,
+      "train_mdd": 0.05315520247258876,
+      "train_minus_validation_return": -6.677572795998898e-05,
+      "train_return": -0.009318011699958495,
+      "train_return_per_turnover_proxy_bps": -2.137158646779471,
+      "train_sharpe": -0.12516806330161415,
+      "train_sortino": -0.10245199852221272,
+      "train_trade_event_count": 218,
+      "train_validation_return_ratio": 0.0,
+      "train_validation_score": -0.38994146523927964,
+      "uses_continuous_position_state_across_split_boundaries": true,
+      "uses_locked_oos_for_correlation": false,
+      "uses_locked_oos_for_objective": false,
+      "uses_locked_oos_for_parameter_fitting": false,
+      "uses_locked_oos_for_pruning": false,
+      "uses_locked_oos_for_selection": false,
+      "uses_locked_oos_for_sizing": false,
+      "uses_locked_oos_for_threshold": false,
+      "uses_locked_oos_for_tie_break": false,
+      "validation_calmar": -0.4296154312073401,
+      "validation_exposure_bar_count": 376,
+      "validation_mdd": 0.021533760894016152,
+      "validation_return": -0.009251235971998506,
+      "validation_return_per_turnover_proxy_bps": -17.790838407689435,
+      "validation_sharpe": -1.5362063201087846,
+      "validation_sortino": -1.1351771673052662,
+      "validation_trade_event_count": 26
+    }
+  ],
+  "candidate_rows_truncated": false,
+  "clean_promotion_eligible": false,
+  "data_coverage": {
+    "data_root": "/home/hoky/Quants-agent/LuminaQuant/data/market_parquet/exchange=binance",
+    "global_earliest_utc": "2025-01-01T00:00:00",
+    "global_latest_utc": "2026-06-13T08:00:00",
+    "loaded_symbol_count": 1,
+    "missing_symbol_timeframes": [],
+    "missing_symbols": [],
+    "requested_symbol_count": 1,
+    "source": "direct_1m_ohlcv_resampled_to_30m_plus",
+    "symbol_count": 1,
+    "symbols_with_any_rows": [
+      "BTCUSDT"
+    ],
+    "timeframes": {
+      "1h": {
+        "BTCUSDT": {
+          "earliest": "2025-01-01T00:00:00",
+          "latest": "2026-06-13T08:00:00",
+          "rows": 12681
+        }
+      }
+    }
+  },
+  "enabled_families": [
+    "volatility_squeeze_breakout"
+  ],
+  "fold_count": 1,
+  "fold_workers": 1,
+  "fresh_forward_required": true,
+  "gate_contract": {
+    "benchmarks": {
+      "clean_paper_compounded_oos_return": 0.3439,
+      "fresh_forward_monthly_folds_required": 2,
+      "max_mdd": 0.3,
+      "shadow_compounded_oos_return": 0.6442,
+      "shadow_return_mdd": 3.49
+    },
+    "locked_oos_forbidden_uses": [
+      "uses_locked_oos_for_selection",
+      "uses_locked_oos_for_objective",
+      "uses_locked_oos_for_pruning",
+      "uses_locked_oos_for_parameter_fitting",
+      "uses_locked_oos_for_threshold",
+      "uses_locked_oos_for_tie_break",
+      "uses_locked_oos_for_correlation",
+      "uses_locked_oos_for_sizing"
+    ],
+    "locked_oos_policy": "report_gate_only_after_train_validation_freeze",
+    "real_money_execution": false,
+    "selection_inputs": [
+      "train",
+      "validation"
+    ],
+    "selection_policy": "default_train_validation",
+    "weak_data_tradfi_policy": "shadow_research_only"
+  },
+  "generated_at_utc": "2026-06-18T13:55:22.219945Z",
+  "integer_leverages": [
+    2
+  ],
+  "label_blockers": [
+    "continuous_position_state_across_split_boundaries",
+    "fresh_forward_required_before_promotion"
+  ],
+  "max_candidate_rows_output": 5,
+  "optimization_policy": {
+    "bounded_grid_justification": "small deterministic OHLCV new-alpha grid; no post-OOS selector, lagged-shadow, nested, or locked-OOS objective inputs",
+    "candidate_cap_sort_policy": "eligible_first_active_train_validation_selection_score",
+    "candidate_row_count_total": 5,
+    "clean_promotion_eligible": false,
+    "enabled_families": [
+      "volatility_squeeze_breakout"
+    ],
+    "fold_workers": 1,
+    "fresh_forward_required": true,
+    "integer_leverages": [
+      2
+    ],
+    "label_blockers": [
+      "continuous_position_state_across_split_boundaries",
+      "fresh_forward_required_before_promotion"
+    ],
+    "max_candidate_rows_output": 5,
+    "objective_policy": "rank_train_validation_only_then_attach_locked_oos_report_gate",
+    "post_oos_selector_trusted": false,
+    "real_money_execution": false,
+    "search_method": "bounded_grid_pre_registered_new_alpha",
+    "selection_inputs": [
+      "train",
+      "validation"
+    ],
+    "selection_policy": "default_train_validation",
+    "selection_policy_status": "pre_existing_default_policy",
+    "simulation_backend": {
+      "native_available": true,
+      "native_library_path": null,
+      "native_load_error": null,
+      "requested_backend": "python",
+      "resolved_backend": "python"
+    },
+    "split_simulation_policy": "continuous_full_period_signal_slice_report_only",
+    "uses_locked_oos_for_objective": false,
+    "uses_locked_oos_for_parameter_fitting": false,
+    "uses_locked_oos_for_pruning": false,
+    "uses_locked_oos_for_selection": false
+  },
+  "output_paths": {
+    "json": "var/reports/strategy_research/g005_clean_alpha_probe_20260618/clean_new_alpha_discovery_latest.json",
+    "markdown": "var/reports/strategy_research/g005_clean_alpha_probe_20260618/clean_new_alpha_discovery_latest.md",
+    "survivor_manifest_json": "var/reports/strategy_research/g005_clean_alpha_probe_20260618/clean_new_alpha_survivor_manifest_latest.json"
+  },
+  "pre_registered_search_space_sha256": "b4bdb079ba4d9ad5e7202b053858c6d219359126dddaa2a546e38c863ccccca4",
+  "promotion_summary": {
+    "candidate_count_total": 5,
+    "family_counts": {
+      "volatility_squeeze_breakout": 5
+    },
+    "promotion_status_counts": {
+      "rejected_before_full_wf": 5
+    },
+    "rejection_reason_counts": {
+      "continuous_position_state_across_split_boundaries": 5,
+      "fresh_forward_required_before_promotion": 5,
+      "not_train_validation_freeze_eligible": 5,
+      "validation_cost_turnover_proxy_non_positive": 5
+    },
+    "selected_fold_count": 0,
+    "selected_model_ids": []
+  },
+  "ready_for_real": false,
+  "real_money_execution": false,
+  "realism_diagnostics": {
+    "blockers": [
+      "no_selected_fold_rows"
+    ],
+    "external_priors_reflected": [
+      "time_series_and_cross_sectional_momentum",
+      "volatility_managed_momentum_and_crash_gates",
+      "lead_lag_information_flow",
+      "btc_eth_beta_residual_momentum",
+      "kalman_filter_residual_reversion",
+      "cross_sectional_vol_adjusted_residual_momentum",
+      "perp_funding_open_interest_taker_flow_crowding",
+      "order_book_spread_depth_imbalance_microstructure",
+      "train_only_standardized_indicator_ridge_leaf"
+    ],
+    "live_performance_plausibility": "not_supported",
+    "locked_oos_annualized_return_report_only": 0.0,
+    "locked_oos_compounded_return_report_only": 0.0,
+    "locked_oos_monthly_equity_mdd_report_only": 0.0,
+    "max_validation_sharpe": 0.0,
+    "mean_locked_oos_return_report_only": 0.0,
+    "mean_validation_return": 0.0,
+    "min_validation_trade_event_count": 0,
+    "positive_locked_oos_fold_share": 0.0,
+    "ready_for_real": false,
+    "real_money_execution": false,
+    "selected_fold_count": 0,
+    "selection_policy": "default_train_validation"
+  },
+  "search_space": {
+    "allocation_fraction": 0.1,
+    "btc_beta_residual_momentum": {
+      "benchmark_crash_gate": [
+        0.025,
+        0.05
+      ],
+      "beta_window": [
+        48,
+        96
+      ],
+      "lookback": [
+        12,
+        24,
+        48
+      ],
+      "max_realized_vol": [
+        0.012,
+        0.02
+      ],
+      "min_hold": [
+        4,
+        8
+      ],
+      "residual_threshold": [
+        0.003,
+        0.006
+      ]
+    },
+    "cross_asset_lead_lag_momentum": {
+      "leader_threshold": [
+        0.01,
+        0.02
+      ],
+      "lookback": [
+        6,
+        12,
+        24
+      ],
+      "min_hold": [
+        4,
+        8
+      ],
+      "target_lag_fraction": [
+        0.25,
+        0.5
+      ]
+    },
+    "cross_sectional_dispersion_gated_momentum": {
+      "dispersion_window": [
+        48,
+        96
+      ],
+      "lookback": [
+        12,
+        24,
+        48
+      ],
+      "market_stress_gate": [
+        0.025,
+        0.05
+      ],
+      "max_dispersion_quantile": [
+        0.6,
+        0.8
+      ],
+      "max_realized_vol": [
+        0.012,
+        0.02
+      ],
+      "min_hold": [
+        4,
+        8
+      ],
+      "score_threshold": [
+        0.5,
+        1.0
+      ],
+      "vol_window": [
+        24,
+        48
+      ]
+    },
+    "cross_sectional_residual_reversal": {
+      "lookback": [
+        12,
+        24,
+        48
+      ],
+      "market_stress_gate": [
+        0.025,
+        0.05
+      ],
+      "max_realized_vol": [
+        0.012,
+        0.02
+      ],
+      "max_trend_z": [
+        0.75,
+        1.25
+      ],
+      "min_hold": [
+        4,
+        8
+      ],
+      "residual_z_min": [
+        1.25,
+        1.75
+      ],
+      "vol_window": [
+        24,
+        48
+      ]
+    },
+    "cross_sectional_vol_adjusted_momentum": {
+      "lookback": [
+        12,
+        24,
+        48
+      ],
+      "market_stress_gate": [
+        0.025,
+        0.05
+      ],
+      "max_realized_vol": [
+        0.012,
+        0.02
+      ],
+      "min_hold": [
+        4,
+        8
+      ],
+      "score_threshold": [
+        0.5,
+        1.0
+      ],
+      "vol_window": [
+        24,
+        48
+      ]
+    },
+    "deep_research_flow_imbalance_liquidation_sweep": {
+      "flow_or_depth_min": [
+        0.1,
+        0.2
+      ],
+      "liquidation_z_min": [
+        1.0,
+        1.5
+      ],
+      "lookback": [
+        12,
+        24
+      ],
+      "max_spread_bps": [
+        8.0,
+        12.0
+      ],
+      "min_hold": [
+        4,
+        8
+      ],
+      "return_shock_min": [
+        0.004,
+        0.008
+      ]
+    },
+    "deep_research_funding_dislocation_trend_carry": {
+      "funding_carry_min": [
+        0.0,
+        5e-05
+      ],
+      "lookback": [
+        12,
+        24,
+        48
+      ],
+      "min_hold": [
+        4,
+        8
+      ],
+      "momentum_min": [
+        0.004,
+        0.008
+      ],
+      "oi_z_cap": [
+        1.5,
+        2.5
+      ]
+    },
+    "deep_research_vol_managed_momentum_crash_gate": {
+      "benchmark_crash_return": [
+        0.035,
+        0.055
+      ],
+      "benchmark_crash_window": [
+        12,
+        24
+      ],
+      "lookback": [
+        12,
+        24,
+        48
+      ],
+      "min_hold": [
+        4,
+        8
+      ],
+      "momentum_min": [
+        0.006,
+        0.012
+      ],
+      "realized_vol_max": [
+        0.018,
+        0.028
+      ]
+    },
+    "families": {
+      "btc_beta_residual_momentum": "Enter residual target momentum after rolling BTC/ETH beta adjustment, with benchmark crash and realized-volatility gates. Uses only prior bars and is designed to avoid paying for plain market beta.",
+      "cross_asset_lead_lag_momentum": "Enter target symbols from lagged leader-symbol momentum when the target has not yet fully moved with the leader. This is a pre-registered cross-asset information-flow alpha using only prior bars.",
+      "cross_sectional_dispersion_gated_momentum": "Enter residual relative-strength momentum only when lagged cross-sectional return dispersion is not elevated versus its own rolling history. This keeps the leaf aligned with crypto momentum state-dependence research without using locked-OOS feedback.",
+      "cross_sectional_residual_reversal": "Fade short-horizon panel-median residual shocks when the target is not in a strong own-trend regime. This is a cross-sectional stat-arb style mean-reversion leaf using prior bars only, with market-stress and volatility gates.",
+      "cross_sectional_vol_adjusted_momentum": "Enter residual relative-strength momentum after subtracting the panel median move and scaling by realized volatility. Uses prior bars only, with market-stress and volatility gates to avoid raw beta chasing.",
+      "deep_research_flow_imbalance_liquidation_sweep": "Report-inspired leaf alpha: contrarian sweep entries after return shocks, liquidation imbalance, taker-flow/depth confirmation, and spread-quality filters. Requires train/validation feature coverage.",
+      "deep_research_funding_dislocation_trend_carry": "Report-inspired leaf alpha: align medium-horizon momentum with perp funding carry and open-interest crowding caps. Requires train/validation feature coverage and remains blocked from promotion until fresh-forward/cost gates.",
+      "deep_research_vol_managed_momentum_crash_gate": "Report-inspired leaf alpha: momentum entries only when realized volatility and BTC benchmark stress gates are acceptable. This is a leaf search input, not a post-OOS router or live promotion rule.",
+      "feature_bbo_flow_exhaustion_reversal": "Use Binance BBO spread expansion together with taker-flow exhaustion to fade microstructure dislocations. Requires historical BBO feature coverage.",
+      "feature_book_depth_imbalance_reversal": "Use official Binance public-data bookDepth nearest-bucket notional imbalance as a post-2024 orderbook pressure source. This is a separate depth feature, not a synthetic BBO quote.",
+      "feature_flow_crowding_reversal": "Use local funding/open-interest/taker-flow feature points to fade crowded directional flow after funding/flow extremes. Feature coverage must exist in train and validation; locked-OOS features are report-only.",
+      "feature_flow_oi_trend_continuation": "Use Binance taker-flow plus open-interest expansion with neutral funding to continue internal Binance orderflow leadership without cross-venue or post-OOS selector inputs.",
+      "feature_liquidation_imbalance_reversal": "Use local liquidation imbalance with funding/open-interest context to fade one-sided squeeze cascades after crowding extremes. Feature coverage must exist in train and validation; locked-OOS features are report-only.",
+      "feature_microstructure_squeeze_reversal": "Combine Binance taker-flow, liquidation imbalance, BBO spread, and 1pct book-depth imbalance to fade short-horizon squeeze dislocations only when microstructure stress confirms one-sided pressure. Requires train/validation feature coverage and remains fresh-forward gated.",
+      "feature_taker_flow_exhaustion_reversal": "Fade short-horizon Binance taker-flow and price-extension exhaustion when funding remains contained. Uses only Binance feature points and prior bars.",
+      "funding_oi_taker_crowding_continuation": "Use Binance taker-flow and open-interest expansion with neutral funding to continue internal Binance perp crowding when feature-backed state is present. No post-OOS selector inputs.",
+      "indicator_kalman_residual_reversion": "Indicator leaf alpha: use scalar Kalman filter residual z-score as an adaptive mean-reversion setup, gated by weak filter slope and realized volatility so it does not fight strong trends.",
+      "indicator_kalman_volatility_trend": "Indicator leaf alpha: use a scalar Kalman price filter as an adaptive moving average, then trade standardized filter slope with ATR/volatility gates.",
+      "indicator_vwap_atr_bollinger_reversion": "Indicator leaf alpha: fade standardized VWAP/Bollinger dislocations only when ATR and realized-volatility gates keep the setup inside a tradable 30m+ mean-reversion regime.",
+      "indicator_vwap_kalman_pullback_continuation": "Indicator leaf alpha: trade pullback continuation when an adaptive Kalman trend, rolling VWAP, Bollinger location, ATR distance, and train/validation volatility gates agree. Uses prior bars only and is a theory-plausible 30m+ trend-reentry setup, not a hard-coded post-OOS rescue rule.",
+      "perp_crowding_score_reversion": "Compute a Binance-only perp crowding score from funding, open-interest, and liquidation imbalance z-scores, then fade one-sided crowding after extreme buildup. No post-OOS selector inputs.",
+      "range_reclaim_continuation": "Enter when price reclaims a prior range after false breakdown/breakout; exit on range midline failure. Uses only rolling range state.",
+      "standardized_indicator_ridge_directional": "Small ML-style leaf alpha: train-only standardized OHLCV indicator features feed a bounded ridge directional score; train/validation select thresholds and locked OOS remains report-only.",
+      "volatility_squeeze_breakout": "Enter with Donchian breakout only after Bollinger-width compression; exit on mid-band loss or opposite breakout. This is a pre-registered compression/expansion alpha, not a post-OOS router.",
+      "volume_absorption_reversal": "Enter reversal after abnormal volume and wick/close absorption; exit on z-score normalization. Uses OHLCV only and no calendar features."
+    },
+    "feature_bbo_flow_exhaustion_reversal": {
+      "flow_imbalance_min": [
+        0.1,
+        0.15
+      ],
+      "lookback": [
+        6,
+        12
+      ],
+      "min_hold": [
+        4,
+        8
+      ],
+      "price_extension_min": [
+        0.004,
+        0.008
+      ],
+      "spread_z_min": [
+        1.0,
+        1.5
+      ]
+    },
+    "feature_book_depth_imbalance_reversal": {
+      "depth_imbalance_min": [
+        0.1,
+        0.2
+      ],
+      "lookback": [
+        6,
+        12
+      ],
+      "min_hold": [
+        4,
+        8
+      ],
+      "price_extension_min": [
+        0.003,
+        0.006
+      ]
+    },
+    "feature_flow_crowding_reversal": {
+      "flow_abs_min": [
+        0.15,
+        0.3
+      ],
+      "funding_abs_min": [
+        5e-05,
+        0.0001
+      ],
+      "lookback": [
+        12,
+        24
+      ],
+      "min_hold": [
+        4,
+        8
+      ],
+      "oi_z_min": [
+        0.5,
+        1.0
+      ]
+    },
+    "feature_flow_oi_trend_continuation": {
+      "flow_abs_min": [
+        0.15,
+        0.3
+      ],
+      "funding_abs_max": [
+        0.0001,
+        0.0002
+      ],
+      "lookback": [
+        12,
+        24
+      ],
+      "min_hold": [
+        4,
+        8
+      ],
+      "oi_z_min": [
+        0.5,
+        1.0
+      ]
+    },
+    "feature_liquidation_imbalance_reversal": {
+      "funding_abs_min": [
+        5e-05,
+        0.0001
+      ],
+      "liq_z_min": [
+        1.0,
+        1.5
+      ],
+      "lookback": [
+        12,
+        24
+      ],
+      "min_hold": [
+        4,
+        8
+      ],
+      "oi_z_min": [
+        0.5,
+        1.0
+      ]
+    },
+    "feature_microstructure_squeeze_reversal": {
+      "depth_imbalance_min": [
+        0.1,
+        0.2
+      ],
+      "flow_abs_min": [
+        0.1,
+        0.2
+      ],
+      "lookback": [
+        6,
+        12
+      ],
+      "min_hold": [
+        4,
+        8
+      ],
+      "return_shock_min": [
+        0.003,
+        0.006
+      ],
+      "spread_z_min": [
+        1.0,
+        1.5
+      ]
+    },
+    "feature_taker_flow_exhaustion_reversal": {
+      "flow_imbalance_min": [
+        0.1,
+        0.15
+      ],
+      "funding_abs_cap": [
+        0.00015,
+        0.0003
+      ],
+      "lookback": [
+        6,
+        12
+      ],
+      "max_realized_vol": [
+        0.008,
+        0.012
+      ],
+      "min_hold": [
+        4,
+        8
+      ],
+      "price_extension_min": [
+        0.004,
+        0.008
+      ]
+    },
+    "funding_oi_taker_crowding_continuation": {
+      "funding_abs_max": [
+        0.0001,
+        0.00025
+      ],
+      "imbalance_threshold": [
+        0.0,
+        0.05
+      ],
+      "lookback": [
+        6,
+        12
+      ],
+      "min_hold": [
+        8
+      ]
+    },
+    "indicator_kalman_residual_reversion": {
+      "lookback": [
+        24,
+        48
+      ],
+      "max_realized_vol": [
+        0.018,
+        0.028
+      ],
+      "max_slope_z": [
+        0.25,
+        0.5
+      ],
+      "measurement_noise": [
+        0.02,
+        0.08
+      ],
+      "min_hold": [
+        4,
+        8
+      ],
+      "process_noise": [
+        0.0005,
+        0.002
+      ],
+      "residual_z_min": [
+        1.25,
+        1.75
+      ]
+    },
+    "indicator_kalman_volatility_trend": {
+      "lookback": [
+        24,
+        48
+      ],
+      "max_realized_vol": [
+        0.018,
+        0.028
+      ],
+      "measurement_noise": [
+        0.02,
+        0.08
+      ],
+      "min_hold": [
+        4,
+        8
+      ],
+      "process_noise": [
+        0.0005,
+        0.002
+      ],
+      "slope_z_min": [
+        0.25,
+        0.5
+      ]
+    },
+    "indicator_vwap_atr_bollinger_reversion": {
+      "bollinger_z": [
+        1.5,
+        2.0
+      ],
+      "lookback": [
+        24,
+        48
+      ],
+      "max_atr_pct": [
+        0.018,
+        0.028
+      ],
+      "min_hold": [
+        4,
+        8
+      ],
+      "vwap_deviation_z": [
+        1.25,
+        1.75
+      ]
+    },
+    "indicator_vwap_kalman_pullback_continuation": {
+      "lookback": [
+        48,
+        96
+      ],
+      "max_atr_distance": [
+        1.5,
+        2.5
+      ],
+      "max_realized_vol": [
+        0.018,
+        0.028
+      ],
+      "measurement_noise": [
+        0.02,
+        0.08
+      ],
+      "min_hold": [
+        4,
+        8
+      ],
+      "process_noise": [
+        0.0005,
+        0.002
+      ],
+      "pullback_z": [
+        0.25,
+        0.75
+      ],
+      "trend_slope_z": [
+        0.25,
+        0.5
+      ]
+    },
+    "integer_leverages": [
+      2,
+      3,
+      4
+    ],
+    "leader_symbols": [
+      "BTCUSDT",
+      "ETHUSDT",
+      "SOLUSDT"
+    ],
+    "perp_crowding_score_reversion": {
+      "crowding_threshold": [
+        0.55,
+        0.75
+      ],
+      "lookback": [
+        24,
+        48
+      ],
+      "min_hold": [
+        4,
+        8
+      ]
+    },
+    "range_reclaim_continuation": {
+      "false_break_z": [
+        0.25,
+        0.5
+      ],
+      "lookback": [
+        24,
+        48,
+        96
+      ],
+      "min_hold": [
+        4,
+        8
+      ]
+    },
+    "standardized_indicator_ridge_directional": {
+      "feature_set": [
+        "returns",
+        "vwap",
+        "bollinger",
+        "atr",
+        "kalman",
+        "volume"
+      ],
+      "min_hold": [
+        4,
+        8
+      ],
+      "min_train_observations": 240,
+      "ridge_alpha": [
+        1.0,
+        10.0
+      ],
+      "score_threshold": [
+        0.0005,
+        0.001
+      ],
+      "standardization_scope": "train_only"
+    },
+    "timeframes": [
+      "1h",
+      "4h"
+    ],
+    "volatility_squeeze_breakout": {
+      "breakout_window": [
+        12,
+        24
+      ],
+      "compression_quantile": [
+        0.15,
+        0.25
+      ],
+      "lookback": [
+        24,
+        48,
+        72
+      ],
+      "min_hold": [
+        4,
+        8
+      ]
+    },
+    "volume_absorption_reversal": {
+      "lookback": [
+        24,
+        48
+      ],
+      "min_hold": [
+        4,
+        8
+      ],
+      "volume_z": [
+        1.5,
+        2.0
+      ],
+      "wick_ratio": [
+        0.45,
+        0.6
+      ]
+    }
+  },
+  "selected_fold_rows": [],
+  "selection_policy": "default_train_validation",
+  "simulation_backend": {
+    "native_available": true,
+    "native_library_path": null,
+    "native_load_error": null,
+    "requested_backend": "python",
+    "resolved_backend": "python"
+  },
+  "split_simulation_policy": "continuous_full_period_signal_slice_report_only",
+  "survivor_manifest": {
+    "artifact_kind": "alpha_zoo_clean_new_alpha_survivor_manifest",
+    "enabled_families": [
+      "volatility_squeeze_breakout"
+    ],
+    "fresh_forward_monthly_folds_required": 2,
+    "fresh_forward_required": true,
+    "frozen_survivor_count": 0,
+    "frozen_survivors": [],
+    "full_wf_retest_candidate_count": 0,
+    "full_wf_retest_candidates": [],
+    "generated_at_utc": "2026-06-18T13:55:22.219905Z",
+    "integer_leverages": [
+      2
+    ],
+    "oos_holdout_policy": "attach_after_train_validation_freeze_report_gate_only",
+    "optimizer_holdout_use_allowed": false,
+    "output_path": "var/reports/strategy_research/g005_clean_alpha_probe_20260618/clean_new_alpha_survivor_manifest_latest.json",
+    "pre_registered_search_space_sha256": "b4bdb079ba4d9ad5e7202b053858c6d219359126dddaa2a546e38c863ccccca4",
+    "ready_for_real": false,
+    "real_money_execution": false,
+    "selection_inputs": [
+      "train",
+      "validation"
+    ],
+    "selection_policy": "default_train_validation",
+    "survivor_manifest_sha256": "024446a922c30fb230d9eb407a4948ab041b81ee3f91ba08f47532fb5b00c6ea",
+    "universe": {
+      "symbols": [
+        "BTCUSDT"
+      ],
+      "timeframes": [
+        "1h"
+      ]
+    }
+  },
+  "tried_universe": {
+    "enabled_families": [
+      "volatility_squeeze_breakout"
+    ],
+    "family_candidate_counts": {
+      "volatility_squeeze_breakout": 5
+    },
+    "fold_ids": [
+      "2026-06"
+    ],
+    "integer_leverages": [
+      2
+    ],
+    "max_candidates_per_fold": 5,
+    "skipped_families": [],
+    "symbols": [
+      "BTCUSDT"
+    ],
+    "timeframes": [
+      "1h"
+    ]
+  },
+  "universe": {
+    "symbols": [
+      "BTCUSDT"
+    ],
+    "timeframes": [
+      "1h"
+    ]
+  }
+}

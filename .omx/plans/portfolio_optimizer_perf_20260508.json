@@ -1,0 +1,12 @@
+{
+  "artifact_kind": "portfolio_optimizer_stream_cache_microbenchmark",
+  "cached_seconds": 1.7218335879999813,
+  "candidate_count": 80,
+  "checksums_match": true,
+  "iterations": 40,
+  "peak_rss_bytes": 109727744,
+  "points_per_split": 600,
+  "speedup": 9.919575204616242,
+  "uncached_seconds": 17.079857766000032,
+  "under_8gib": true
+}

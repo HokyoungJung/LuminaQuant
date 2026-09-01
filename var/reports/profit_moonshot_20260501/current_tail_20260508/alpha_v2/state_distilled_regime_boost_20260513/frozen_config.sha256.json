@@ -1,0 +1,7 @@
+{
+  "artifact_kind": "state_distilled_regime_boost_freeze_manifest",
+  "created_at": "2026-05-13T14:04:49Z",
+  "freeze_artifact_hash": "68db1c473bf43778ccdaba7c2e78ab4a754f71dde2557643fa4267b73d8b3535",
+  "freeze_artifact_path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/state_distilled_regime_boost_20260513/frozen_config.json",
+  "hash_policy": "sha256_of_frozen_config_payload_file_hash_not_embedded_inside_payload"
+}

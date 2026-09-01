@@ -1,0 +1,289 @@
+{
+  "artifact_kind": "profit_moonshot_candidate_hybrid",
+  "best_candidate_hybrid": {},
+  "candidate_basis": {
+    "active_hybrid_input_count": 0,
+    "available_sleeve_count": 0,
+    "candidate_portfolio_json": "var/reports/profit_moonshot_20260501/dynamic_restart_20260510/tuning/fresh_portfolio_tuning_latest.json",
+    "default_candidates": [],
+    "discarded_non_integer_leverage_source_count": 0,
+    "discarded_non_integer_leverage_sources": [],
+    "discarded_source_candidate_count": 8,
+    "discarded_source_candidates": [
+      {
+        "leverage": 5.0,
+        "name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600__fr_liquidation_aware_5x",
+        "reason": "calendar_primary_source_invalid",
+        "reasons": [
+          "calendar_primary_source_invalid",
+          "research_history_source_metadata_missing"
+        ],
+        "source_artifact": "liquidation_json",
+        "source_key": "promoted_candidate",
+        "source_kind": "liquidation"
+      },
+      {
+        "leverage": 4.0,
+        "name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600__fr_liquidation_aware_4x",
+        "reason": "calendar_primary_source_invalid",
+        "reasons": [
+          "calendar_primary_source_invalid",
+          "research_history_source_metadata_missing"
+        ],
+        "source_artifact": "liquidation_json",
+        "source_key": "selected_by_train_validation_retune",
+        "source_kind": "liquidation"
+      },
+      {
+        "leverage": 5.0,
+        "name": "current_base_tuple_liquidation_aware_5x",
+        "reason": "calendar_primary_source_invalid",
+        "reasons": [
+          "calendar_primary_source_invalid",
+          "research_history_source_metadata_missing",
+          "liquidation_source_unsafe"
+        ],
+        "source_artifact": "liquidation_json",
+        "source_key": "forced_5x",
+        "source_kind": "liquidation"
+      },
+      {
+        "leverage": 3.0,
+        "name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600__fr_liquidation_aware_3x",
+        "reason": "calendar_primary_source_invalid",
+        "reasons": [
+          "calendar_primary_source_invalid",
+          "research_history_source_metadata_missing"
+        ],
+        "source_artifact": "liquidation_json",
+        "source_key": "retune_results_01",
+        "source_kind": "liquidation"
+      },
+      {
+        "leverage": 2.0,
+        "name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600__fr_liquidation_aware_2x",
+        "reason": "calendar_primary_source_invalid",
+        "reasons": [
+          "calendar_primary_source_invalid",
+          "research_history_source_metadata_missing"
+        ],
+        "source_artifact": "liquidation_json",
+        "source_key": "retune_results_02",
+        "source_kind": "liquidation"
+      },
+      {
+        "leverage": 4.0,
+        "name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600__fr_liquidation_aware_4x",
+        "reason": "calendar_primary_source_invalid",
+        "reasons": [
+          "calendar_primary_source_invalid",
+          "research_history_source_metadata_missing"
+        ],
+        "source_artifact": "liquidation_json",
+        "source_key": "retune_results_03",
+        "source_kind": "liquidation"
+      },
+      {
+        "leverage": 5.0,
+        "name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600__fr_liquidation_aware_5x",
+        "reason": "calendar_primary_source_invalid",
+        "reasons": [
+          "calendar_primary_source_invalid",
+          "research_history_source_metadata_missing"
+        ],
+        "source_artifact": "liquidation_json",
+        "source_key": "retune_results_05",
+        "source_kind": "liquidation"
+      },
+      {
+        "leverage": 5.0,
+        "name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600__fr_liquidation_aware_5x",
+        "reason": "calendar_primary_source_invalid",
+        "reasons": [
+          "calendar_primary_source_invalid",
+          "research_history_source_metadata_missing"
+        ],
+        "source_artifact": "liquidation_json",
+        "source_key": "retune_results_06",
+        "source_kind": "liquidation"
+      }
+    ],
+    "integer_leverage_source_candidate_rows": 0,
+    "liquidation_json": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json",
+    "live_integer_leverage_required": true,
+    "live_source_gate_accepted_candidate_rows": 0,
+    "missing_sleeves": [],
+    "risk_pruned_active_id_prefixes": [],
+    "risk_pruned_source_sleeves": [],
+    "source_candidate_rows": 8,
+    "source_live_gate_policy": {
+      "calendar_primary_source_rejected": true,
+      "integer_leverage_required": true,
+      "liquidation_unsafe_source_rejected": true,
+      "research_history_source_metadata_required": true
+    }
+  },
+  "data_metadata": {
+    "feature_points": [
+      {
+        "funding_rows": 1481,
+        "open_interest_rows": 18145,
+        "rows": 2112510,
+        "symbol": "BTC/USDT",
+        "taker_flow_rows": 2101668
+      },
+      {
+        "funding_rows": 1482,
+        "open_interest_rows": 18433,
+        "rows": 2113782,
+        "symbol": "ETH/USDT",
+        "taker_flow_rows": 2102583
+      },
+      {
+        "funding_rows": 1482,
+        "open_interest_rows": 18433,
+        "rows": 2111685,
+        "symbol": "SOL/USDT",
+        "taker_flow_rows": 2099436
+      },
+      {
+        "funding_rows": 1482,
+        "open_interest_rows": 18433,
+        "rows": 712059,
+        "symbol": "BNB/USDT",
+        "taker_flow_rows": 0
+      },
+      {
+        "funding_rows": 1482,
+        "open_interest_rows": 18433,
+        "rows": 712059,
+        "symbol": "TRX/USDT",
+        "taker_flow_rows": 0
+      }
+    ],
+    "panel_cache": {
+      "cache_hit": true,
+      "cache_key": "9c2a95e4ee6a94f0492d7d6d4b6fd9b885f75109d0310d4d96b23cadf918526e",
+      "end": "2026-05-09",
+      "exchange": "binance",
+      "market_root": "/home/hoky/Quants-agent/LuminaQuant/data/market_parquet",
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/cache/profit_moonshot_fresh_start/joined_panel_9c2a95e4ee6a94f0492d7d6d.parquet",
+      "schema": 2,
+      "source_count": 7460,
+      "source_latest_mtime_ns": 1778392435140551597,
+      "source_total_bytes": 3564960010,
+      "start": "2025-01-01",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT"
+      ]
+    },
+    "rows": 11769
+  },
+  "final_allocation": {},
+  "full_tuning_result_count": 0,
+  "generated_at_utc": "2026-05-10T11:24:51.842249Z",
+  "liquidation_replay": {
+    "engine": "dynamic_weight_candidate_hybrid_margin_replay_v1",
+    "margin_model": {
+      "funding_rate_per_8h": 0.0001,
+      "liquidation_fee_rate": 0.005,
+      "maintenance_margin_rate": 0.01,
+      "margin_mode": "cross",
+      "slippage_rate": 0.0005,
+      "source": "conservative_scalar_fallback_without_authenticated_symbol_brackets",
+      "stress_buffer_rate": 0.0025,
+      "taker_fee_rate": 0.001
+    },
+    "split_summaries": {}
+  },
+  "memory_policy": {
+    "disk_budget_gib": 30.0,
+    "exact_window_hard_fraction": 0.8,
+    "exact_window_soft_fraction": 0.6,
+    "explicit_budget_bytes": 6979321856,
+    "explicit_budget_gib": 6.5,
+    "heavy_lock_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/exact_window_backtests/followup_status/portfolio_followup_heavy_run.lock",
+    "heavy_run_cap_gib": 6.5,
+    "heavy_run_parallelism": 1,
+    "light_worker_parallelism": 2,
+    "rss_limit_fraction": 0.9,
+    "rss_limit_gib": 7.2,
+    "session_memory_lease_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/exact_window_backtests/followup_status/session_memory_budget.lock",
+    "total_memory_cap_bytes": 8589934592,
+    "total_memory_cap_gib": 8.0
+  },
+  "memory_summary": {
+    "artifact_kind": "portfolio_followup_memory_summary",
+    "budget_bytes": 6979321856,
+    "budget_mib": 6656.0,
+    "context": {
+      "full_tuning_result_count": 0,
+      "selected": ""
+    },
+    "error": null,
+    "generated_at": "2026-05-10T11:24:51.845539+00:00",
+    "hard_limit_bytes": 5583457484,
+    "hard_limit_mib": 5324.799999237061,
+    "hard_trigger_count": 0,
+    "label": "portfolio_followup::profit_moonshot_candidate_hybrid",
+    "memory_policy": {
+      "disk_budget_gib": 30.0,
+      "exact_window_hard_fraction": 0.8,
+      "exact_window_soft_fraction": 0.6,
+      "explicit_budget_bytes": 6979321856,
+      "explicit_budget_gib": 6.5,
+      "heavy_lock_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/exact_window_backtests/followup_status/portfolio_followup_heavy_run.lock",
+      "heavy_run_cap_gib": 6.5,
+      "heavy_run_parallelism": 1,
+      "light_worker_parallelism": 2,
+      "rss_limit_fraction": 0.9,
+      "rss_limit_gib": 7.2,
+      "session_memory_lease_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/exact_window_backtests/followup_status/session_memory_budget.lock",
+      "total_memory_cap_bytes": 8589934592,
+      "total_memory_cap_gib": 8.0
+    },
+    "output_dir": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/dynamic_restart_20260510/candidate_hybrid",
+    "peak_rss_bytes": 59342848,
+    "peak_rss_mib": 56.59375,
+    "rss_log_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/dynamic_restart_20260510/candidate_hybrid/_memory_guard/profit_moonshot_candidate_hybrid_rss_latest.jsonl",
+    "run_name": "profit_moonshot_candidate_hybrid",
+    "sample_count": 1,
+    "schema_version": "1.0",
+    "soft_limit_bytes": 4187593113,
+    "soft_limit_mib": 3993.5999994277954,
+    "soft_trigger_count": 0,
+    "status": "completed",
+    "summary_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/dynamic_restart_20260510/candidate_hybrid/_memory_guard/profit_moonshot_candidate_hybrid_memory_latest.json"
+  },
+  "memory_summary_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/dynamic_restart_20260510/candidate_hybrid/_memory_guard/profit_moonshot_candidate_hybrid_memory_latest.json",
+  "oos_end_date": "2026-05-09",
+  "peak_rss_mib": 251.5546875,
+  "rss_log_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/dynamic_restart_20260510/candidate_hybrid/_memory_guard/profit_moonshot_candidate_hybrid_rss_latest.jsonl",
+  "selected_by_train_validation": {},
+  "selection_basis": "candidate_derived_online_hybrid_train_validation_only",
+  "selection_policy": {
+    "locked_oos": "report_only_gate_only",
+    "selection_inputs": [
+      "train",
+      "validation"
+    ],
+    "tuning_objective": "frozen_weighted_train_validation_score_v1",
+    "uses_locked_oos_for_selection": false
+  },
+  "source_sleeve_metrics": {},
+  "split_windows": {
+    "oos_end_inclusive": "2026-05-09",
+    "oos_start": "2026-03-01",
+    "pre_oos_days": 424,
+    "train_end_inclusive": "2025-12-31",
+    "train_start": "2025-01-01",
+    "val_end_inclusive": "2026-02-28",
+    "val_start": "2026-01-01"
+  },
+  "status": "no_live_source_candidates",
+  "tuning_results": []
+}

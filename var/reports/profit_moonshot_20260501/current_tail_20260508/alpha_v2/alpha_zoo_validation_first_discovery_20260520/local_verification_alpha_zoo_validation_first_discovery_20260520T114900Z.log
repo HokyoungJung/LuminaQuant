@@ -1,0 +1,37 @@
+Alpha Zoo validation-first discovery final verification
+generated_at_utc=2026-05-20T11:54:23Z
+worktree=/home/hoky/Quants-agent/LuminaQuant
+head=bf434170570c09fcdd3758021d3147fa79aba27a
+== regenerate validation-first artifacts ==
+{"artifact_generation_validation_log": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_validation_first_discovery_20260520/artifact_generation_validation_latest.log", "latest_json": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_validation_first_discovery_20260520/alpha_zoo_validation_first_discovery_latest.json", "latest_markdown": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_validation_first_discovery_20260520/alpha_zoo_validation_first_discovery_latest.md", "monitoring_contract_csv": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_validation_first_discovery_20260520/validation_first_monitoring_contract_latest.csv", "monitoring_contract_json": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_validation_first_discovery_20260520/validation_first_monitoring_contract_latest.json", "selected_csv": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_validation_first_discovery_20260520/alpha_zoo_validation_first_selected_latest.csv", "timestamped_json": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_validation_first_discovery_20260520/alpha_zoo_validation_first_discovery_20260520T115425Z.json"}
+== targeted pytest ==
+..........................                                               [100%]
+26 passed in 0.30s
+== full pytest with memory measurement ==
+........................................................................ [  5%]
+........................................................................ [ 10%]
+........................................................................ [ 15%]
+........................................................................ [ 20%]
+........................................................................ [ 26%]
+........................................................................ [ 31%]
+........................................................................ [ 36%]
+........................................................................ [ 41%]
+........................................................................ [ 47%]
+........................................................................ [ 52%]
+........................................................................ [ 57%]
+........................................................................ [ 62%]
+........................................................................ [ 68%]
+........................................................................ [ 73%]
+........................................................................ [ 78%]
+........................................................................ [ 83%]
+........................................................................ [ 89%]
+........................................................................ [ 94%]
+........................................................................ [ 99%]
+....                                                                     [100%]
+1372 passed in 63.42s (0:01:03)
+max_rss_kb=2791264
+== ruff ==
+All checks passed!
+== compileall ==
+== git diff checks ==
+final_verification=PASS

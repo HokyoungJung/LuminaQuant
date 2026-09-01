@@ -1,0 +1,5307 @@
+{
+  "artifact_kind": "multiasset_exchange_stateful_replay",
+  "candidate_results": [
+    {
+      "absolute_gate_shape": false,
+      "absolute_gates": {
+        "oos_mdd_beats_funding_guard": true,
+        "oos_return_beats_baseline": false,
+        "oos_sharpe_beats_funding_guard": true,
+        "oos_sharpe_gt_1": false,
+        "oos_trades_not_starved": true,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "filters": {
+        "cooldown_bars": 0,
+        "excluded_hours": [
+          0,
+          1,
+          8,
+          9,
+          16,
+          17
+        ],
+        "hl_basis_abs_max": 0.0,
+        "hl_funding_abs_cap": 5e-05,
+        "hl_oi_z_min": 0.0,
+        "hl_require_funding_sign_match": true,
+        "return_threshold": 0.008,
+        "tickmill_macro_filter": ""
+      },
+      "name": "hl_funding_divergence_funding_guard_50ppm",
+      "replay_relative_gates": {
+        "oos_mdd_beats_replay_incumbents": true,
+        "oos_return_beats_replay_incumbents": true,
+        "oos_sharpe_beats_replay_incumbents": true,
+        "oos_trades_not_starved": true,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 44,
+          "final_equity": 10020.637016562394,
+          "metrics": {
+            "cagr": 0.0003345807101782228,
+            "calmar": 0.2847695468243241,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.001174917451354542,
+            "min_equity": 9990.926317158961,
+            "raw_final_equity": 10020.637016562394,
+            "raw_max_drawdown": 0.001174917451354542,
+            "raw_total_return": 0.0020637016562394805,
+            "sharpe": 0.4607596266159049,
+            "sortino": 0.6373039595208673,
+            "total_return": 0.0020637016562394805,
+            "volatility": 0.0007266017976636384
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 30,
+            "hl_binance_funding_sign_divergence": 48
+          },
+          "round_trips": 22
+        },
+        "train": {
+          "fills": 332,
+          "final_equity": 9993.585927465068,
+          "metrics": {
+            "cagr": -1.8526983967204202e-05,
+            "calmar": -0.0026582223436976554,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0069696893531609894,
+            "min_equity": 9975.673223086706,
+            "raw_final_equity": 9993.585927465068,
+            "raw_max_drawdown": 0.0069696893531609894,
+            "raw_total_return": -0.0006414072534931536,
+            "sharpe": -0.019552145656342806,
+            "sortino": -0.025358927190750814,
+            "total_return": -0.0006414072534931536,
+            "volatility": 0.0009256669333493885
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 94,
+            "hl_binance_funding_sign_divergence": 129,
+            "hl_funding_abs_cap": 19
+          },
+          "round_trips": 166
+        },
+        "val": {
+          "fills": 60,
+          "final_equity": 9964.27105473873,
+          "metrics": {
+            "cagr": -0.0006372397913471106,
+            "calmar": -0.10244768365369392,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.006220148358855881,
+            "min_equity": 9939.776426852899,
+            "raw_final_equity": 9964.27105473873,
+            "raw_max_drawdown": 0.006220148358855881,
+            "raw_total_return": -0.0035728945261269685,
+            "sharpe": -0.7318328432935411,
+            "sortino": -0.8275189110194774,
+            "total_return": -0.0035728945261269685,
+            "volatility": 0.000870504078221007
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 31,
+            "hl_binance_funding_sign_divergence": 47
+          },
+          "round_trips": 30
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "absolute_gate_shape": false,
+      "absolute_gates": {
+        "oos_mdd_beats_funding_guard": true,
+        "oos_return_beats_baseline": false,
+        "oos_sharpe_beats_funding_guard": true,
+        "oos_sharpe_gt_1": false,
+        "oos_trades_not_starved": true,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "filters": {
+        "cooldown_bars": 0,
+        "excluded_hours": [
+          0,
+          1,
+          8,
+          9,
+          16,
+          17
+        ],
+        "hl_basis_abs_max": 0.0,
+        "hl_funding_abs_cap": 7.5e-05,
+        "hl_oi_z_min": 0.0,
+        "hl_require_funding_sign_match": true,
+        "return_threshold": 0.008,
+        "tickmill_macro_filter": ""
+      },
+      "name": "hl_funding_divergence_funding_guard_75ppm",
+      "replay_relative_gates": {
+        "oos_mdd_beats_replay_incumbents": true,
+        "oos_return_beats_replay_incumbents": true,
+        "oos_sharpe_beats_replay_incumbents": true,
+        "oos_trades_not_starved": true,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 44,
+          "final_equity": 10020.637016562394,
+          "metrics": {
+            "cagr": 0.0003345807101782228,
+            "calmar": 0.2847695468243241,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.001174917451354542,
+            "min_equity": 9990.926317158961,
+            "raw_final_equity": 10020.637016562394,
+            "raw_max_drawdown": 0.001174917451354542,
+            "raw_total_return": 0.0020637016562394805,
+            "sharpe": 0.4607596266159049,
+            "sortino": 0.6373039595208673,
+            "total_return": 0.0020637016562394805,
+            "volatility": 0.0007266017976636384
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 30,
+            "hl_binance_funding_sign_divergence": 48
+          },
+          "round_trips": 22
+        },
+        "train": {
+          "fills": 332,
+          "final_equity": 9996.333007100566,
+          "metrics": {
+            "cagr": -1.0590658737319458e-05,
+            "calmar": -0.0015804002472035923,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.006701251000219019,
+            "min_equity": 9978.420302722203,
+            "raw_final_equity": 9996.333007100566,
+            "raw_max_drawdown": 0.006701251000219019,
+            "raw_total_return": -0.000366699289943373,
+            "sharpe": -0.011005996388966722,
+            "sortino": -0.014303335879386286,
+            "total_return": -0.000366699289943373,
+            "volatility": 0.0009235250647148712
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 92,
+            "hl_binance_funding_sign_divergence": 127,
+            "hl_funding_abs_cap": 4
+          },
+          "round_trips": 166
+        },
+        "val": {
+          "fills": 60,
+          "final_equity": 9964.27105473873,
+          "metrics": {
+            "cagr": -0.0006372397913471106,
+            "calmar": -0.10244768365369392,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.006220148358855881,
+            "min_equity": 9939.776426852899,
+            "raw_final_equity": 9964.27105473873,
+            "raw_max_drawdown": 0.006220148358855881,
+            "raw_total_return": -0.0035728945261269685,
+            "sharpe": -0.7318328432935411,
+            "sortino": -0.8275189110194774,
+            "total_return": -0.0035728945261269685,
+            "volatility": 0.000870504078221007
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 31,
+            "hl_binance_funding_sign_divergence": 47
+          },
+          "round_trips": 30
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "absolute_gate_shape": false,
+      "absolute_gates": {
+        "oos_mdd_beats_funding_guard": true,
+        "oos_return_beats_baseline": false,
+        "oos_sharpe_beats_funding_guard": true,
+        "oos_sharpe_gt_1": false,
+        "oos_trades_not_starved": true,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "filters": {
+        "cooldown_bars": 0,
+        "excluded_hours": [
+          0,
+          1,
+          8,
+          9,
+          16,
+          17
+        ],
+        "hl_basis_abs_max": 0.0,
+        "hl_funding_abs_cap": 0.0001,
+        "hl_oi_z_min": 0.0,
+        "hl_require_funding_sign_match": true,
+        "return_threshold": 0.008,
+        "tickmill_macro_filter": ""
+      },
+      "name": "hl_funding_divergence_funding_guard_100ppm",
+      "replay_relative_gates": {
+        "oos_mdd_beats_replay_incumbents": true,
+        "oos_return_beats_replay_incumbents": true,
+        "oos_sharpe_beats_replay_incumbents": true,
+        "oos_trades_not_starved": true,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 44,
+          "final_equity": 10020.637016562394,
+          "metrics": {
+            "cagr": 0.0003345807101782228,
+            "calmar": 0.2847695468243241,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.001174917451354542,
+            "min_equity": 9990.926317158961,
+            "raw_final_equity": 10020.637016562394,
+            "raw_max_drawdown": 0.001174917451354542,
+            "raw_total_return": 0.0020637016562394805,
+            "sharpe": 0.4607596266159049,
+            "sortino": 0.6373039595208673,
+            "total_return": 0.0020637016562394805,
+            "volatility": 0.0007266017976636384
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 30,
+            "hl_binance_funding_sign_divergence": 48
+          },
+          "round_trips": 22
+        },
+        "train": {
+          "fills": 334,
+          "final_equity": 9992.083153737878,
+          "metrics": {
+            "cagr": -2.2869400442049326e-05,
+            "calmar": -0.0032100551862500504,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0071243013328892634,
+            "min_equity": 9974.170449359515,
+            "raw_final_equity": 9992.083153737878,
+            "raw_max_drawdown": 0.0071243013328892634,
+            "raw_total_return": -0.0007916846262121524,
+            "sharpe": -0.024270089203973083,
+            "sortino": -0.03152915526053828,
+            "total_return": -0.0007916846262121524,
+            "volatility": 0.0009246850221301771
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 90,
+            "hl_binance_funding_sign_divergence": 127
+          },
+          "round_trips": 167
+        },
+        "val": {
+          "fills": 60,
+          "final_equity": 9964.27105473873,
+          "metrics": {
+            "cagr": -0.0006372397913471106,
+            "calmar": -0.10244768365369392,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.006220148358855881,
+            "min_equity": 9939.776426852899,
+            "raw_final_equity": 9964.27105473873,
+            "raw_max_drawdown": 0.006220148358855881,
+            "raw_total_return": -0.0035728945261269685,
+            "sharpe": -0.7318328432935411,
+            "sortino": -0.8275189110194774,
+            "total_return": -0.0035728945261269685,
+            "volatility": 0.000870504078221007
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 31,
+            "hl_binance_funding_sign_divergence": 47
+          },
+          "round_trips": 30
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "absolute_gate_shape": false,
+      "absolute_gates": {
+        "oos_mdd_beats_funding_guard": true,
+        "oos_return_beats_baseline": false,
+        "oos_sharpe_beats_funding_guard": true,
+        "oos_sharpe_gt_1": false,
+        "oos_trades_not_starved": true,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "filters": {
+        "cooldown_bars": 0,
+        "excluded_hours": [
+          0,
+          1,
+          8,
+          9,
+          16,
+          17
+        ],
+        "hl_basis_abs_max": 0.0,
+        "hl_funding_abs_cap": 0.00015,
+        "hl_oi_z_min": 0.0,
+        "hl_require_funding_sign_match": true,
+        "return_threshold": 0.008,
+        "tickmill_macro_filter": ""
+      },
+      "name": "hl_funding_divergence_funding_guard_150ppm",
+      "replay_relative_gates": {
+        "oos_mdd_beats_replay_incumbents": true,
+        "oos_return_beats_replay_incumbents": true,
+        "oos_sharpe_beats_replay_incumbents": true,
+        "oos_trades_not_starved": true,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 44,
+          "final_equity": 10020.637016562394,
+          "metrics": {
+            "cagr": 0.0003345807101782228,
+            "calmar": 0.2847695468243241,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.001174917451354542,
+            "min_equity": 9990.926317158961,
+            "raw_final_equity": 10020.637016562394,
+            "raw_max_drawdown": 0.001174917451354542,
+            "raw_total_return": 0.0020637016562394805,
+            "sharpe": 0.4607596266159049,
+            "sortino": 0.6373039595208673,
+            "total_return": 0.0020637016562394805,
+            "volatility": 0.0007266017976636384
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 30,
+            "hl_binance_funding_sign_divergence": 48
+          },
+          "round_trips": 22
+        },
+        "train": {
+          "fills": 334,
+          "final_equity": 9992.083153737878,
+          "metrics": {
+            "cagr": -2.2869400442049326e-05,
+            "calmar": -0.0032100551862500504,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0071243013328892634,
+            "min_equity": 9974.170449359515,
+            "raw_final_equity": 9992.083153737878,
+            "raw_max_drawdown": 0.0071243013328892634,
+            "raw_total_return": -0.0007916846262121524,
+            "sharpe": -0.024270089203973083,
+            "sortino": -0.03152915526053828,
+            "total_return": -0.0007916846262121524,
+            "volatility": 0.0009246850221301771
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 90,
+            "hl_binance_funding_sign_divergence": 127
+          },
+          "round_trips": 167
+        },
+        "val": {
+          "fills": 60,
+          "final_equity": 9964.27105473873,
+          "metrics": {
+            "cagr": -0.0006372397913471106,
+            "calmar": -0.10244768365369392,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.006220148358855881,
+            "min_equity": 9939.776426852899,
+            "raw_final_equity": 9964.27105473873,
+            "raw_max_drawdown": 0.006220148358855881,
+            "raw_total_return": -0.0035728945261269685,
+            "sharpe": -0.7318328432935411,
+            "sortino": -0.8275189110194774,
+            "total_return": -0.0035728945261269685,
+            "volatility": 0.000870504078221007
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 31,
+            "hl_binance_funding_sign_divergence": 47
+          },
+          "round_trips": 30
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "absolute_gate_shape": false,
+      "absolute_gates": {
+        "oos_mdd_beats_funding_guard": true,
+        "oos_return_beats_baseline": false,
+        "oos_sharpe_beats_funding_guard": true,
+        "oos_sharpe_gt_1": false,
+        "oos_trades_not_starved": true,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "filters": {
+        "cooldown_bars": 0,
+        "excluded_hours": [
+          0,
+          1,
+          8,
+          9,
+          16,
+          17
+        ],
+        "hl_basis_abs_max": 0.0,
+        "hl_funding_abs_cap": 0.00025,
+        "hl_oi_z_min": 0.0,
+        "hl_require_funding_sign_match": true,
+        "return_threshold": 0.008,
+        "tickmill_macro_filter": ""
+      },
+      "name": "hl_funding_divergence_funding_guard_250ppm",
+      "replay_relative_gates": {
+        "oos_mdd_beats_replay_incumbents": true,
+        "oos_return_beats_replay_incumbents": true,
+        "oos_sharpe_beats_replay_incumbents": true,
+        "oos_trades_not_starved": true,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 44,
+          "final_equity": 10020.637016562394,
+          "metrics": {
+            "cagr": 0.0003345807101782228,
+            "calmar": 0.2847695468243241,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.001174917451354542,
+            "min_equity": 9990.926317158961,
+            "raw_final_equity": 10020.637016562394,
+            "raw_max_drawdown": 0.001174917451354542,
+            "raw_total_return": 0.0020637016562394805,
+            "sharpe": 0.4607596266159049,
+            "sortino": 0.6373039595208673,
+            "total_return": 0.0020637016562394805,
+            "volatility": 0.0007266017976636384
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 30,
+            "hl_binance_funding_sign_divergence": 48
+          },
+          "round_trips": 22
+        },
+        "train": {
+          "fills": 334,
+          "final_equity": 9992.083153737878,
+          "metrics": {
+            "cagr": -2.2869400442049326e-05,
+            "calmar": -0.0032100551862500504,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0071243013328892634,
+            "min_equity": 9974.170449359515,
+            "raw_final_equity": 9992.083153737878,
+            "raw_max_drawdown": 0.0071243013328892634,
+            "raw_total_return": -0.0007916846262121524,
+            "sharpe": -0.024270089203973083,
+            "sortino": -0.03152915526053828,
+            "total_return": -0.0007916846262121524,
+            "volatility": 0.0009246850221301771
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 90,
+            "hl_binance_funding_sign_divergence": 127
+          },
+          "round_trips": 167
+        },
+        "val": {
+          "fills": 60,
+          "final_equity": 9964.27105473873,
+          "metrics": {
+            "cagr": -0.0006372397913471106,
+            "calmar": -0.10244768365369392,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.006220148358855881,
+            "min_equity": 9939.776426852899,
+            "raw_final_equity": 9964.27105473873,
+            "raw_max_drawdown": 0.006220148358855881,
+            "raw_total_return": -0.0035728945261269685,
+            "sharpe": -0.7318328432935411,
+            "sortino": -0.8275189110194774,
+            "total_return": -0.0035728945261269685,
+            "volatility": 0.000870504078221007
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 31,
+            "hl_binance_funding_sign_divergence": 47
+          },
+          "round_trips": 30
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "absolute_gate_shape": false,
+      "absolute_gates": {
+        "oos_mdd_beats_funding_guard": true,
+        "oos_return_beats_baseline": false,
+        "oos_sharpe_beats_funding_guard": true,
+        "oos_sharpe_gt_1": false,
+        "oos_trades_not_starved": true,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "filters": {
+        "cooldown_bars": 0,
+        "excluded_hours": [],
+        "hl_basis_abs_max": 0.0,
+        "hl_funding_abs_cap": 5e-05,
+        "hl_oi_z_min": 0.0,
+        "hl_require_funding_sign_match": true,
+        "return_threshold": 0.01,
+        "tickmill_macro_filter": ""
+      },
+      "name": "hl_funding_divergence_base_50ppm",
+      "replay_relative_gates": {
+        "oos_mdd_beats_replay_incumbents": true,
+        "oos_return_beats_replay_incumbents": true,
+        "oos_sharpe_beats_replay_incumbents": true,
+        "oos_trades_not_starved": true,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 44,
+          "final_equity": 10015.304057011253,
+          "metrics": {
+            "cagr": 0.0002481746586120437,
+            "calmar": 0.1964152790044835,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0012635201287287772,
+            "min_equity": 9990.09307431098,
+            "raw_final_equity": 10015.304057011253,
+            "raw_max_drawdown": 0.0012635201287287772,
+            "raw_total_return": 0.0015304057011253924,
+            "sharpe": 0.33896412151779026,
+            "sortino": 0.4300151951885293,
+            "total_return": 0.0015304057011253924,
+            "volatility": 0.000732857377655481
+          },
+          "reject_counts": {
+            "hl_binance_funding_sign_divergence": 63
+          },
+          "round_trips": 22
+        },
+        "train": {
+          "fills": 330,
+          "final_equity": 9994.75386918001,
+          "metrics": {
+            "cagr": -1.5152536325113708e-05,
+            "calmar": -0.0030867737788012528,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.004908858701980483,
+            "min_equity": 9961.797876651748,
+            "raw_final_equity": 9994.75386918001,
+            "raw_max_drawdown": 0.004908858701980483,
+            "raw_total_return": -0.0005246130819991368,
+            "sharpe": -0.015939891428914648,
+            "sortino": -0.020319309200278773,
+            "total_return": -0.0005246130819991368,
+            "volatility": 0.0009238428976637838
+          },
+          "reject_counts": {
+            "hl_binance_funding_sign_divergence": 180,
+            "hl_funding_abs_cap": 23
+          },
+          "round_trips": 165
+        },
+        "val": {
+          "fills": 64,
+          "final_equity": 9976.636466410697,
+          "metrics": {
+            "cagr": -0.0004164856108077597,
+            "calmar": -0.07941800174305225,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.005244221733949573,
+            "min_equity": 9947.674405458187,
+            "raw_final_equity": 9976.636466410697,
+            "raw_max_drawdown": 0.005244221733949573,
+            "raw_total_return": -0.002336353358930343,
+            "sharpe": -0.443508494561436,
+            "sortino": -0.5092008916061651,
+            "total_return": -0.002336353358930343,
+            "volatility": 0.000938273208153192
+          },
+          "reject_counts": {
+            "hl_binance_funding_sign_divergence": 40
+          },
+          "round_trips": 32
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "absolute_gate_shape": false,
+      "absolute_gates": {
+        "oos_mdd_beats_funding_guard": true,
+        "oos_return_beats_baseline": false,
+        "oos_sharpe_beats_funding_guard": true,
+        "oos_sharpe_gt_1": false,
+        "oos_trades_not_starved": true,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "filters": {
+        "cooldown_bars": 0,
+        "excluded_hours": [],
+        "hl_basis_abs_max": 0.0,
+        "hl_funding_abs_cap": 7.5e-05,
+        "hl_oi_z_min": 0.0,
+        "hl_require_funding_sign_match": true,
+        "return_threshold": 0.01,
+        "tickmill_macro_filter": ""
+      },
+      "name": "hl_funding_divergence_base_75ppm",
+      "replay_relative_gates": {
+        "oos_mdd_beats_replay_incumbents": true,
+        "oos_return_beats_replay_incumbents": true,
+        "oos_sharpe_beats_replay_incumbents": true,
+        "oos_trades_not_starved": true,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 44,
+          "final_equity": 10015.304057011253,
+          "metrics": {
+            "cagr": 0.0002481746586120437,
+            "calmar": 0.1964152790044835,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0012635201287287772,
+            "min_equity": 9990.09307431098,
+            "raw_final_equity": 10015.304057011253,
+            "raw_max_drawdown": 0.0012635201287287772,
+            "raw_total_return": 0.0015304057011253924,
+            "sharpe": 0.33896412151779026,
+            "sortino": 0.4300151951885293,
+            "total_return": 0.0015304057011253924,
+            "volatility": 0.000732857377655481
+          },
+          "reject_counts": {
+            "hl_binance_funding_sign_divergence": 63
+          },
+          "round_trips": 22
+        },
+        "train": {
+          "fills": 332,
+          "final_equity": 9982.064439640204,
+          "metrics": {
+            "cagr": -5.1835705711655855e-05,
+            "calmar": -0.009218948283731569,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.005622735274817512,
+            "min_equity": 9959.755371959754,
+            "raw_final_equity": 9982.064439640204,
+            "raw_max_drawdown": 0.005622735274817512,
+            "raw_total_return": -0.0017935560359796376,
+            "sharpe": -0.05548788373979606,
+            "sortino": -0.07086914191272581,
+            "total_return": -0.0017935560359796376,
+            "volatility": 0.0009264710425956223
+          },
+          "reject_counts": {
+            "hl_binance_funding_sign_divergence": 177,
+            "hl_funding_abs_cap": 6
+          },
+          "round_trips": 166
+        },
+        "val": {
+          "fills": 64,
+          "final_equity": 9976.636466410697,
+          "metrics": {
+            "cagr": -0.0004164856108077597,
+            "calmar": -0.07941800174305225,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.005244221733949573,
+            "min_equity": 9947.674405458187,
+            "raw_final_equity": 9976.636466410697,
+            "raw_max_drawdown": 0.005244221733949573,
+            "raw_total_return": -0.002336353358930343,
+            "sharpe": -0.443508494561436,
+            "sortino": -0.5092008916061651,
+            "total_return": -0.002336353358930343,
+            "volatility": 0.000938273208153192
+          },
+          "reject_counts": {
+            "hl_binance_funding_sign_divergence": 40
+          },
+          "round_trips": 32
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "absolute_gate_shape": false,
+      "absolute_gates": {
+        "oos_mdd_beats_funding_guard": true,
+        "oos_return_beats_baseline": false,
+        "oos_sharpe_beats_funding_guard": true,
+        "oos_sharpe_gt_1": false,
+        "oos_trades_not_starved": true,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "filters": {
+        "cooldown_bars": 0,
+        "excluded_hours": [],
+        "hl_basis_abs_max": 0.0,
+        "hl_funding_abs_cap": 0.0001,
+        "hl_oi_z_min": 0.0,
+        "hl_require_funding_sign_match": true,
+        "return_threshold": 0.01,
+        "tickmill_macro_filter": ""
+      },
+      "name": "hl_funding_divergence_base_100ppm",
+      "replay_relative_gates": {
+        "oos_mdd_beats_replay_incumbents": true,
+        "oos_return_beats_replay_incumbents": true,
+        "oos_sharpe_beats_replay_incumbents": true,
+        "oos_trades_not_starved": true,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 44,
+          "final_equity": 10015.304057011253,
+          "metrics": {
+            "cagr": 0.0002481746586120437,
+            "calmar": 0.1964152790044835,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0012635201287287772,
+            "min_equity": 9990.09307431098,
+            "raw_final_equity": 10015.304057011253,
+            "raw_max_drawdown": 0.0012635201287287772,
+            "raw_total_return": 0.0015304057011253924,
+            "sharpe": 0.33896412151779026,
+            "sortino": 0.4300151951885293,
+            "total_return": 0.0015304057011253924,
+            "volatility": 0.000732857377655481
+          },
+          "reject_counts": {
+            "hl_binance_funding_sign_divergence": 63
+          },
+          "round_trips": 22
+        },
+        "train": {
+          "fills": 334,
+          "final_equity": 9977.830176678559,
+          "metrics": {
+            "cagr": -6.408637950428009e-05,
+            "calmar": -0.010600706212417188,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.006045482085826716,
+            "min_equity": 9955.52110899811,
+            "raw_final_equity": 9977.830176678559,
+            "raw_max_drawdown": 0.006045482085826716,
+            "raw_total_return": -0.0022169823321440685,
+            "sharpe": -0.06866135181552728,
+            "sortino": -0.08769092325048658,
+            "total_return": -0.0022169823321440685,
+            "volatility": 0.0009271398981166556
+          },
+          "reject_counts": {
+            "hl_binance_funding_sign_divergence": 177
+          },
+          "round_trips": 167
+        },
+        "val": {
+          "fills": 64,
+          "final_equity": 9976.636466410697,
+          "metrics": {
+            "cagr": -0.0004164856108077597,
+            "calmar": -0.07941800174305225,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.005244221733949573,
+            "min_equity": 9947.674405458187,
+            "raw_final_equity": 9976.636466410697,
+            "raw_max_drawdown": 0.005244221733949573,
+            "raw_total_return": -0.002336353358930343,
+            "sharpe": -0.443508494561436,
+            "sortino": -0.5092008916061651,
+            "total_return": -0.002336353358930343,
+            "volatility": 0.000938273208153192
+          },
+          "reject_counts": {
+            "hl_binance_funding_sign_divergence": 40
+          },
+          "round_trips": 32
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "absolute_gate_shape": false,
+      "absolute_gates": {
+        "oos_mdd_beats_funding_guard": true,
+        "oos_return_beats_baseline": false,
+        "oos_sharpe_beats_funding_guard": true,
+        "oos_sharpe_gt_1": false,
+        "oos_trades_not_starved": true,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "filters": {
+        "cooldown_bars": 0,
+        "excluded_hours": [],
+        "hl_basis_abs_max": 0.0,
+        "hl_funding_abs_cap": 0.00015,
+        "hl_oi_z_min": 0.0,
+        "hl_require_funding_sign_match": true,
+        "return_threshold": 0.01,
+        "tickmill_macro_filter": ""
+      },
+      "name": "hl_funding_divergence_base_150ppm",
+      "replay_relative_gates": {
+        "oos_mdd_beats_replay_incumbents": true,
+        "oos_return_beats_replay_incumbents": true,
+        "oos_sharpe_beats_replay_incumbents": true,
+        "oos_trades_not_starved": true,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 44,
+          "final_equity": 10015.304057011253,
+          "metrics": {
+            "cagr": 0.0002481746586120437,
+            "calmar": 0.1964152790044835,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0012635201287287772,
+            "min_equity": 9990.09307431098,
+            "raw_final_equity": 10015.304057011253,
+            "raw_max_drawdown": 0.0012635201287287772,
+            "raw_total_return": 0.0015304057011253924,
+            "sharpe": 0.33896412151779026,
+            "sortino": 0.4300151951885293,
+            "total_return": 0.0015304057011253924,
+            "volatility": 0.000732857377655481
+          },
+          "reject_counts": {
+            "hl_binance_funding_sign_divergence": 63
+          },
+          "round_trips": 22
+        },
+        "train": {
+          "fills": 334,
+          "final_equity": 9977.830176678559,
+          "metrics": {
+            "cagr": -6.408637950428009e-05,
+            "calmar": -0.010600706212417188,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.006045482085826716,
+            "min_equity": 9955.52110899811,
+            "raw_final_equity": 9977.830176678559,
+            "raw_max_drawdown": 0.006045482085826716,
+            "raw_total_return": -0.0022169823321440685,
+            "sharpe": -0.06866135181552728,
+            "sortino": -0.08769092325048658,
+            "total_return": -0.0022169823321440685,
+            "volatility": 0.0009271398981166556
+          },
+          "reject_counts": {
+            "hl_binance_funding_sign_divergence": 177
+          },
+          "round_trips": 167
+        },
+        "val": {
+          "fills": 64,
+          "final_equity": 9976.636466410697,
+          "metrics": {
+            "cagr": -0.0004164856108077597,
+            "calmar": -0.07941800174305225,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.005244221733949573,
+            "min_equity": 9947.674405458187,
+            "raw_final_equity": 9976.636466410697,
+            "raw_max_drawdown": 0.005244221733949573,
+            "raw_total_return": -0.002336353358930343,
+            "sharpe": -0.443508494561436,
+            "sortino": -0.5092008916061651,
+            "total_return": -0.002336353358930343,
+            "volatility": 0.000938273208153192
+          },
+          "reject_counts": {
+            "hl_binance_funding_sign_divergence": 40
+          },
+          "round_trips": 32
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "absolute_gate_shape": false,
+      "absolute_gates": {
+        "oos_mdd_beats_funding_guard": true,
+        "oos_return_beats_baseline": false,
+        "oos_sharpe_beats_funding_guard": true,
+        "oos_sharpe_gt_1": false,
+        "oos_trades_not_starved": true,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "filters": {
+        "cooldown_bars": 0,
+        "excluded_hours": [],
+        "hl_basis_abs_max": 0.0,
+        "hl_funding_abs_cap": 0.00025,
+        "hl_oi_z_min": 0.0,
+        "hl_require_funding_sign_match": true,
+        "return_threshold": 0.01,
+        "tickmill_macro_filter": ""
+      },
+      "name": "hl_funding_divergence_base_250ppm",
+      "replay_relative_gates": {
+        "oos_mdd_beats_replay_incumbents": true,
+        "oos_return_beats_replay_incumbents": true,
+        "oos_sharpe_beats_replay_incumbents": true,
+        "oos_trades_not_starved": true,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 44,
+          "final_equity": 10015.304057011253,
+          "metrics": {
+            "cagr": 0.0002481746586120437,
+            "calmar": 0.1964152790044835,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0012635201287287772,
+            "min_equity": 9990.09307431098,
+            "raw_final_equity": 10015.304057011253,
+            "raw_max_drawdown": 0.0012635201287287772,
+            "raw_total_return": 0.0015304057011253924,
+            "sharpe": 0.33896412151779026,
+            "sortino": 0.4300151951885293,
+            "total_return": 0.0015304057011253924,
+            "volatility": 0.000732857377655481
+          },
+          "reject_counts": {
+            "hl_binance_funding_sign_divergence": 63
+          },
+          "round_trips": 22
+        },
+        "train": {
+          "fills": 334,
+          "final_equity": 9977.830176678559,
+          "metrics": {
+            "cagr": -6.408637950428009e-05,
+            "calmar": -0.010600706212417188,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.006045482085826716,
+            "min_equity": 9955.52110899811,
+            "raw_final_equity": 9977.830176678559,
+            "raw_max_drawdown": 0.006045482085826716,
+            "raw_total_return": -0.0022169823321440685,
+            "sharpe": -0.06866135181552728,
+            "sortino": -0.08769092325048658,
+            "total_return": -0.0022169823321440685,
+            "volatility": 0.0009271398981166556
+          },
+          "reject_counts": {
+            "hl_binance_funding_sign_divergence": 177
+          },
+          "round_trips": 167
+        },
+        "val": {
+          "fills": 64,
+          "final_equity": 9976.636466410697,
+          "metrics": {
+            "cagr": -0.0004164856108077597,
+            "calmar": -0.07941800174305225,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.005244221733949573,
+            "min_equity": 9947.674405458187,
+            "raw_final_equity": 9976.636466410697,
+            "raw_max_drawdown": 0.005244221733949573,
+            "raw_total_return": -0.002336353358930343,
+            "sharpe": -0.443508494561436,
+            "sortino": -0.5092008916061651,
+            "total_return": -0.002336353358930343,
+            "volatility": 0.000938273208153192
+          },
+          "reject_counts": {
+            "hl_binance_funding_sign_divergence": 40
+          },
+          "round_trips": 32
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "absolute_gate_shape": false,
+      "absolute_gates": {
+        "oos_mdd_beats_funding_guard": true,
+        "oos_return_beats_baseline": false,
+        "oos_sharpe_beats_funding_guard": true,
+        "oos_sharpe_gt_1": false,
+        "oos_trades_not_starved": true,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "filters": {
+        "cooldown_bars": 0,
+        "excluded_hours": [],
+        "hl_basis_abs_max": 0.0,
+        "hl_funding_abs_cap": 0.0,
+        "hl_oi_z_min": 0.0,
+        "hl_require_funding_sign_match": false,
+        "return_threshold": 0.01,
+        "tickmill_macro_filter": ""
+      },
+      "name": "replay_base_12h_threshold_100bp",
+      "replay_relative_gates": {
+        "oos_mdd_beats_replay_incumbents": false,
+        "oos_return_beats_replay_incumbents": false,
+        "oos_sharpe_beats_replay_incumbents": false,
+        "oos_trades_not_starved": true,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 52,
+          "final_equity": 10011.831575492059,
+          "metrics": {
+            "cagr": 0.00019392870104462112,
+            "calmar": 0.12067353751935878,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.001607052424509479,
+            "min_equity": 9990.41408487102,
+            "raw_final_equity": 10011.831575492059,
+            "raw_max_drawdown": 0.001607052424509479,
+            "raw_total_return": 0.0011957225354917167,
+            "sharpe": 0.2511367987500571,
+            "sortino": 0.31401894296248917,
+            "total_return": 0.0011957225354917167,
+            "volatility": 0.0007733187550446284
+          },
+          "reject_counts": {},
+          "round_trips": 26
+        },
+        "train": {
+          "fills": 356,
+          "final_equity": 9962.959780244772,
+          "metrics": {
+            "cagr": -0.00010714981199899665,
+            "calmar": -0.010604959722121363,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.010103745304707572,
+            "min_equity": 9931.724153667019,
+            "raw_final_equity": 9962.959780244772,
+            "raw_max_drawdown": 0.010103745304707572,
+            "raw_total_return": -0.0037040219755228865,
+            "sharpe": -0.1126163975756344,
+            "sortino": -0.14471761987965842,
+            "total_return": -0.0037040219755228865,
+            "volatility": 0.0009475234581048218
+          },
+          "reject_counts": {},
+          "round_trips": 178
+        },
+        "val": {
+          "fills": 68,
+          "final_equity": 9991.11071615294,
+          "metrics": {
+            "cagr": -0.00015836878441188862,
+            "calmar": -0.0317424705583564,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.004989176381867891,
+            "min_equity": 9950.224888879913,
+            "raw_final_equity": 9991.11071615294,
+            "raw_max_drawdown": 0.004989176381867891,
+            "raw_total_return": -0.0008889283847060003,
+            "sharpe": -0.16044186426769969,
+            "sortino": -0.1906658249803786,
+            "total_return": -0.0008889283847060003,
+            "volatility": 0.0009841405520975626
+          },
+          "reject_counts": {},
+          "round_trips": 34
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "absolute_gate_shape": false,
+      "absolute_gates": {
+        "oos_mdd_beats_funding_guard": true,
+        "oos_return_beats_baseline": false,
+        "oos_sharpe_beats_funding_guard": true,
+        "oos_sharpe_gt_1": false,
+        "oos_trades_not_starved": true,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "filters": {
+        "cooldown_bars": 0,
+        "excluded_hours": [],
+        "hl_basis_abs_max": 0.0,
+        "hl_funding_abs_cap": 5e-05,
+        "hl_oi_z_min": 0.0,
+        "hl_require_funding_sign_match": false,
+        "return_threshold": 0.01,
+        "tickmill_macro_filter": ""
+      },
+      "name": "hl_funding_abs_cap_base_50ppm",
+      "replay_relative_gates": {
+        "oos_mdd_beats_replay_incumbents": false,
+        "oos_return_beats_replay_incumbents": false,
+        "oos_sharpe_beats_replay_incumbents": false,
+        "oos_trades_not_starved": true,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 52,
+          "final_equity": 10011.831575492059,
+          "metrics": {
+            "cagr": 0.00019392870104462112,
+            "calmar": 0.12067353751935878,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.001607052424509479,
+            "min_equity": 9990.41408487102,
+            "raw_final_equity": 10011.831575492059,
+            "raw_max_drawdown": 0.001607052424509479,
+            "raw_total_return": 0.0011957225354917167,
+            "sharpe": 0.2511367987500571,
+            "sortino": 0.31401894296248917,
+            "total_return": 0.0011957225354917167,
+            "volatility": 0.0007733187550446284
+          },
+          "reject_counts": {},
+          "round_trips": 26
+        },
+        "train": {
+          "fills": 354,
+          "final_equity": 9970.37661870454,
+          "metrics": {
+            "cagr": -8.566346755034537e-05,
+            "calmar": -0.009121876884933574,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.009390991418864033,
+            "min_equity": 9938.875281828254,
+            "raw_final_equity": 9970.37661870454,
+            "raw_max_drawdown": 0.009390991418864033,
+            "raw_total_return": -0.0029623381295459383,
+            "sharpe": -0.09000912344219088,
+            "sortino": -0.11498858096798378,
+            "total_return": -0.0029623381295459383,
+            "volatility": 0.0009467815003268914
+          },
+          "reject_counts": {
+            "hl_funding_abs_cap": 23
+          },
+          "round_trips": 177
+        },
+        "val": {
+          "fills": 68,
+          "final_equity": 9991.11071615294,
+          "metrics": {
+            "cagr": -0.00015836878441188862,
+            "calmar": -0.0317424705583564,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.004989176381867891,
+            "min_equity": 9950.224888879913,
+            "raw_final_equity": 9991.11071615294,
+            "raw_max_drawdown": 0.004989176381867891,
+            "raw_total_return": -0.0008889283847060003,
+            "sharpe": -0.16044186426769969,
+            "sortino": -0.1906658249803786,
+            "total_return": -0.0008889283847060003,
+            "volatility": 0.0009841405520975626
+          },
+          "reject_counts": {},
+          "round_trips": 34
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "absolute_gate_shape": false,
+      "absolute_gates": {
+        "oos_mdd_beats_funding_guard": true,
+        "oos_return_beats_baseline": false,
+        "oos_sharpe_beats_funding_guard": true,
+        "oos_sharpe_gt_1": false,
+        "oos_trades_not_starved": true,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "filters": {
+        "cooldown_bars": 0,
+        "excluded_hours": [],
+        "hl_basis_abs_max": 0.0,
+        "hl_funding_abs_cap": 7.5e-05,
+        "hl_oi_z_min": 0.0,
+        "hl_require_funding_sign_match": false,
+        "return_threshold": 0.01,
+        "tickmill_macro_filter": ""
+      },
+      "name": "hl_funding_abs_cap_base_75ppm",
+      "replay_relative_gates": {
+        "oos_mdd_beats_replay_incumbents": false,
+        "oos_return_beats_replay_incumbents": false,
+        "oos_sharpe_beats_replay_incumbents": false,
+        "oos_trades_not_starved": true,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 52,
+          "final_equity": 10011.831575492059,
+          "metrics": {
+            "cagr": 0.00019392870104462112,
+            "calmar": 0.12067353751935878,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.001607052424509479,
+            "min_equity": 9990.41408487102,
+            "raw_final_equity": 10011.831575492059,
+            "raw_max_drawdown": 0.001607052424509479,
+            "raw_total_return": 0.0011957225354917167,
+            "sharpe": 0.2511367987500571,
+            "sortino": 0.31401894296248917,
+            "total_return": 0.0011957225354917167,
+            "volatility": 0.0007733187550446284
+          },
+          "reject_counts": {},
+          "round_trips": 26
+        },
+        "train": {
+          "fills": 354,
+          "final_equity": 9967.106509995609,
+          "metrics": {
+            "cagr": -9.513495438784325e-05,
+            "calmar": -0.009790645522632854,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.009716923584652466,
+            "min_equity": 9935.605173119322,
+            "raw_final_equity": 9967.106509995609,
+            "raw_max_drawdown": 0.009716923584652466,
+            "raw_total_return": -0.00328934900043909,
+            "sharpe": -0.10001490418758491,
+            "sortino": -0.12856950567555656,
+            "total_return": -0.00328934900043909,
+            "volatility": 0.0009467721113236917
+          },
+          "reject_counts": {
+            "hl_funding_abs_cap": 6
+          },
+          "round_trips": 177
+        },
+        "val": {
+          "fills": 68,
+          "final_equity": 9991.11071615294,
+          "metrics": {
+            "cagr": -0.00015836878441188862,
+            "calmar": -0.0317424705583564,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.004989176381867891,
+            "min_equity": 9950.224888879913,
+            "raw_final_equity": 9991.11071615294,
+            "raw_max_drawdown": 0.004989176381867891,
+            "raw_total_return": -0.0008889283847060003,
+            "sharpe": -0.16044186426769969,
+            "sortino": -0.1906658249803786,
+            "total_return": -0.0008889283847060003,
+            "volatility": 0.0009841405520975626
+          },
+          "reject_counts": {},
+          "round_trips": 34
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "absolute_gate_shape": false,
+      "absolute_gates": {
+        "oos_mdd_beats_funding_guard": true,
+        "oos_return_beats_baseline": false,
+        "oos_sharpe_beats_funding_guard": true,
+        "oos_sharpe_gt_1": false,
+        "oos_trades_not_starved": true,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "filters": {
+        "cooldown_bars": 0,
+        "excluded_hours": [],
+        "hl_basis_abs_max": 0.0,
+        "hl_funding_abs_cap": 0.0001,
+        "hl_oi_z_min": 0.0,
+        "hl_require_funding_sign_match": false,
+        "return_threshold": 0.01,
+        "tickmill_macro_filter": ""
+      },
+      "name": "hl_funding_abs_cap_base_100ppm",
+      "replay_relative_gates": {
+        "oos_mdd_beats_replay_incumbents": false,
+        "oos_return_beats_replay_incumbents": false,
+        "oos_sharpe_beats_replay_incumbents": false,
+        "oos_trades_not_starved": true,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 52,
+          "final_equity": 10011.831575492059,
+          "metrics": {
+            "cagr": 0.00019392870104462112,
+            "calmar": 0.12067353751935878,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.001607052424509479,
+            "min_equity": 9990.41408487102,
+            "raw_final_equity": 10011.831575492059,
+            "raw_max_drawdown": 0.001607052424509479,
+            "raw_total_return": 0.0011957225354917167,
+            "sharpe": 0.2511367987500571,
+            "sortino": 0.31401894296248917,
+            "total_return": 0.0011957225354917167,
+            "volatility": 0.0007733187550446284
+          },
+          "reject_counts": {},
+          "round_trips": 26
+        },
+        "train": {
+          "fills": 356,
+          "final_equity": 9962.959780244772,
+          "metrics": {
+            "cagr": -0.00010714981199899665,
+            "calmar": -0.010604959722121363,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.010103745304707572,
+            "min_equity": 9931.724153667019,
+            "raw_final_equity": 9962.959780244772,
+            "raw_max_drawdown": 0.010103745304707572,
+            "raw_total_return": -0.0037040219755228865,
+            "sharpe": -0.1126163975756344,
+            "sortino": -0.14471761987965842,
+            "total_return": -0.0037040219755228865,
+            "volatility": 0.0009475234581048218
+          },
+          "reject_counts": {},
+          "round_trips": 178
+        },
+        "val": {
+          "fills": 68,
+          "final_equity": 9991.11071615294,
+          "metrics": {
+            "cagr": -0.00015836878441188862,
+            "calmar": -0.0317424705583564,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.004989176381867891,
+            "min_equity": 9950.224888879913,
+            "raw_final_equity": 9991.11071615294,
+            "raw_max_drawdown": 0.004989176381867891,
+            "raw_total_return": -0.0008889283847060003,
+            "sharpe": -0.16044186426769969,
+            "sortino": -0.1906658249803786,
+            "total_return": -0.0008889283847060003,
+            "volatility": 0.0009841405520975626
+          },
+          "reject_counts": {},
+          "round_trips": 34
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "absolute_gate_shape": false,
+      "absolute_gates": {
+        "oos_mdd_beats_funding_guard": true,
+        "oos_return_beats_baseline": false,
+        "oos_sharpe_beats_funding_guard": true,
+        "oos_sharpe_gt_1": false,
+        "oos_trades_not_starved": true,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "filters": {
+        "cooldown_bars": 0,
+        "excluded_hours": [],
+        "hl_basis_abs_max": 0.0,
+        "hl_funding_abs_cap": 0.00015,
+        "hl_oi_z_min": 0.0,
+        "hl_require_funding_sign_match": false,
+        "return_threshold": 0.01,
+        "tickmill_macro_filter": ""
+      },
+      "name": "hl_funding_abs_cap_base_150ppm",
+      "replay_relative_gates": {
+        "oos_mdd_beats_replay_incumbents": false,
+        "oos_return_beats_replay_incumbents": false,
+        "oos_sharpe_beats_replay_incumbents": false,
+        "oos_trades_not_starved": true,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 52,
+          "final_equity": 10011.831575492059,
+          "metrics": {
+            "cagr": 0.00019392870104462112,
+            "calmar": 0.12067353751935878,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.001607052424509479,
+            "min_equity": 9990.41408487102,
+            "raw_final_equity": 10011.831575492059,
+            "raw_max_drawdown": 0.001607052424509479,
+            "raw_total_return": 0.0011957225354917167,
+            "sharpe": 0.2511367987500571,
+            "sortino": 0.31401894296248917,
+            "total_return": 0.0011957225354917167,
+            "volatility": 0.0007733187550446284
+          },
+          "reject_counts": {},
+          "round_trips": 26
+        },
+        "train": {
+          "fills": 356,
+          "final_equity": 9962.959780244772,
+          "metrics": {
+            "cagr": -0.00010714981199899665,
+            "calmar": -0.010604959722121363,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.010103745304707572,
+            "min_equity": 9931.724153667019,
+            "raw_final_equity": 9962.959780244772,
+            "raw_max_drawdown": 0.010103745304707572,
+            "raw_total_return": -0.0037040219755228865,
+            "sharpe": -0.1126163975756344,
+            "sortino": -0.14471761987965842,
+            "total_return": -0.0037040219755228865,
+            "volatility": 0.0009475234581048218
+          },
+          "reject_counts": {},
+          "round_trips": 178
+        },
+        "val": {
+          "fills": 68,
+          "final_equity": 9991.11071615294,
+          "metrics": {
+            "cagr": -0.00015836878441188862,
+            "calmar": -0.0317424705583564,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.004989176381867891,
+            "min_equity": 9950.224888879913,
+            "raw_final_equity": 9991.11071615294,
+            "raw_max_drawdown": 0.004989176381867891,
+            "raw_total_return": -0.0008889283847060003,
+            "sharpe": -0.16044186426769969,
+            "sortino": -0.1906658249803786,
+            "total_return": -0.0008889283847060003,
+            "volatility": 0.0009841405520975626
+          },
+          "reject_counts": {},
+          "round_trips": 34
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "absolute_gate_shape": false,
+      "absolute_gates": {
+        "oos_mdd_beats_funding_guard": true,
+        "oos_return_beats_baseline": false,
+        "oos_sharpe_beats_funding_guard": true,
+        "oos_sharpe_gt_1": false,
+        "oos_trades_not_starved": true,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "filters": {
+        "cooldown_bars": 0,
+        "excluded_hours": [],
+        "hl_basis_abs_max": 0.0,
+        "hl_funding_abs_cap": 0.00025,
+        "hl_oi_z_min": 0.0,
+        "hl_require_funding_sign_match": false,
+        "return_threshold": 0.01,
+        "tickmill_macro_filter": ""
+      },
+      "name": "hl_funding_abs_cap_base_250ppm",
+      "replay_relative_gates": {
+        "oos_mdd_beats_replay_incumbents": false,
+        "oos_return_beats_replay_incumbents": false,
+        "oos_sharpe_beats_replay_incumbents": false,
+        "oos_trades_not_starved": true,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 52,
+          "final_equity": 10011.831575492059,
+          "metrics": {
+            "cagr": 0.00019392870104462112,
+            "calmar": 0.12067353751935878,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.001607052424509479,
+            "min_equity": 9990.41408487102,
+            "raw_final_equity": 10011.831575492059,
+            "raw_max_drawdown": 0.001607052424509479,
+            "raw_total_return": 0.0011957225354917167,
+            "sharpe": 0.2511367987500571,
+            "sortino": 0.31401894296248917,
+            "total_return": 0.0011957225354917167,
+            "volatility": 0.0007733187550446284
+          },
+          "reject_counts": {},
+          "round_trips": 26
+        },
+        "train": {
+          "fills": 356,
+          "final_equity": 9962.959780244772,
+          "metrics": {
+            "cagr": -0.00010714981199899665,
+            "calmar": -0.010604959722121363,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.010103745304707572,
+            "min_equity": 9931.724153667019,
+            "raw_final_equity": 9962.959780244772,
+            "raw_max_drawdown": 0.010103745304707572,
+            "raw_total_return": -0.0037040219755228865,
+            "sharpe": -0.1126163975756344,
+            "sortino": -0.14471761987965842,
+            "total_return": -0.0037040219755228865,
+            "volatility": 0.0009475234581048218
+          },
+          "reject_counts": {},
+          "round_trips": 178
+        },
+        "val": {
+          "fills": 68,
+          "final_equity": 9991.11071615294,
+          "metrics": {
+            "cagr": -0.00015836878441188862,
+            "calmar": -0.0317424705583564,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.004989176381867891,
+            "min_equity": 9950.224888879913,
+            "raw_final_equity": 9991.11071615294,
+            "raw_max_drawdown": 0.004989176381867891,
+            "raw_total_return": -0.0008889283847060003,
+            "sharpe": -0.16044186426769969,
+            "sortino": -0.1906658249803786,
+            "total_return": -0.0008889283847060003,
+            "volatility": 0.0009841405520975626
+          },
+          "reject_counts": {},
+          "round_trips": 34
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "absolute_gate_shape": false,
+      "absolute_gates": {
+        "oos_mdd_beats_funding_guard": false,
+        "oos_return_beats_baseline": false,
+        "oos_sharpe_beats_funding_guard": true,
+        "oos_sharpe_gt_1": false,
+        "oos_trades_not_starved": true,
+        "train_positive": true,
+        "val_positive": false
+      },
+      "filters": {
+        "cooldown_bars": 0,
+        "excluded_hours": [
+          0,
+          1,
+          8,
+          9,
+          16,
+          17
+        ],
+        "hl_basis_abs_max": 0.0,
+        "hl_funding_abs_cap": 0.0,
+        "hl_oi_z_min": 0.0,
+        "hl_require_funding_sign_match": false,
+        "return_threshold": 0.008,
+        "tickmill_macro_filter": ""
+      },
+      "name": "replay_funding_guard_current_threshold_80bp",
+      "replay_relative_gates": {
+        "oos_mdd_beats_replay_incumbents": false,
+        "oos_return_beats_replay_incumbents": false,
+        "oos_sharpe_beats_replay_incumbents": false,
+        "oos_trades_not_starved": true,
+        "train_positive": true,
+        "val_positive": false
+      },
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 54,
+          "final_equity": 10008.25167551091,
+          "metrics": {
+            "cagr": 0.0001338508609325384,
+            "calmar": 0.07438151899886794,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0017995177126535363,
+            "min_equity": 9986.486994224628,
+            "raw_final_equity": 10008.25167551091,
+            "raw_max_drawdown": 0.0017995177126535363,
+            "raw_total_return": 0.0008251675510910772,
+            "sharpe": 0.17748975685893909,
+            "sortino": 0.22308660736450048,
+            "total_return": 0.0008251675510910772,
+            "volatility": 0.0007556903279844122
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 9
+          },
+          "round_trips": 27
+        },
+        "train": {
+          "fills": 346,
+          "final_equity": 10022.061769737044,
+          "metrics": {
+            "cagr": 6.363720621505031e-05,
+            "calmar": 0.013272446534835908,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.004794685444618149,
+            "min_equity": 9984.81269596301,
+            "raw_final_equity": 10022.061769737044,
+            "raw_max_drawdown": 0.004794685444618149,
+            "raw_total_return": 0.002206176973704288,
+            "sharpe": 0.06809733606530802,
+            "sortino": 0.09012222871343463,
+            "total_return": 0.002206176973704288,
+            "volatility": 0.0009409744601786143
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 42
+          },
+          "round_trips": 173
+        },
+        "val": {
+          "fills": 66,
+          "final_equity": 9966.925479509746,
+          "metrics": {
+            "cagr": -0.0005898325578994612,
+            "calmar": -0.13158607271342415,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.004482484701736126,
+            "min_equity": 9955.5029468154,
+            "raw_final_equity": 9966.925479509746,
+            "raw_max_drawdown": 0.004482484701736126,
+            "raw_total_return": -0.0033074520490253834,
+            "sharpe": -0.6231139711350202,
+            "sortino": -0.7328047243137646,
+            "total_return": -0.0033074520490253834,
+            "volatility": 0.0009461488977164315
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 14
+          },
+          "round_trips": 33
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "absolute_gate_shape": false,
+      "absolute_gates": {
+        "oos_mdd_beats_funding_guard": false,
+        "oos_return_beats_baseline": false,
+        "oos_sharpe_beats_funding_guard": true,
+        "oos_sharpe_gt_1": false,
+        "oos_trades_not_starved": true,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "filters": {
+        "cooldown_bars": 0,
+        "excluded_hours": [
+          0,
+          1,
+          8,
+          9,
+          16,
+          17
+        ],
+        "hl_basis_abs_max": 0.0,
+        "hl_funding_abs_cap": 5e-05,
+        "hl_oi_z_min": 0.0,
+        "hl_require_funding_sign_match": false,
+        "return_threshold": 0.008,
+        "tickmill_macro_filter": ""
+      },
+      "name": "hl_funding_abs_cap_funding_guard_50ppm",
+      "replay_relative_gates": {
+        "oos_mdd_beats_replay_incumbents": false,
+        "oos_return_beats_replay_incumbents": false,
+        "oos_sharpe_beats_replay_incumbents": false,
+        "oos_trades_not_starved": true,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 54,
+          "final_equity": 10008.25167551091,
+          "metrics": {
+            "cagr": 0.0001338508609325384,
+            "calmar": 0.07438151899886794,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0017995177126535363,
+            "min_equity": 9986.486994224628,
+            "raw_final_equity": 10008.25167551091,
+            "raw_max_drawdown": 0.0017995177126535363,
+            "raw_total_return": 0.0008251675510910772,
+            "sharpe": 0.17748975685893909,
+            "sortino": 0.22308660736450048,
+            "total_return": 0.0008251675510910772,
+            "volatility": 0.0007556903279844122
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 9
+          },
+          "round_trips": 27
+        },
+        "train": {
+          "fills": 348,
+          "final_equity": 9999.94386704956,
+          "metrics": {
+            "cagr": -1.6208940145645556e-07,
+            "calmar": -2.3135196400806535e-05,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.007006182210357412,
+            "min_equity": 9982.019641112332,
+            "raw_final_equity": 9999.94386704956,
+            "raw_max_drawdown": 0.007006182210357412,
+            "raw_total_return": -5.613295044004651e-06,
+            "sharpe": 0.00029809684183509266,
+            "sortino": 0.0003900585969123989,
+            "total_return": -5.613295044004651e-06,
+            "volatility": 0.0009408581994367239
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 46,
+            "hl_funding_abs_cap": 19
+          },
+          "round_trips": 174
+        },
+        "val": {
+          "fills": 66,
+          "final_equity": 9966.925479509746,
+          "metrics": {
+            "cagr": -0.0005898325578994612,
+            "calmar": -0.13158607271342415,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.004482484701736126,
+            "min_equity": 9955.5029468154,
+            "raw_final_equity": 9966.925479509746,
+            "raw_max_drawdown": 0.004482484701736126,
+            "raw_total_return": -0.0033074520490253834,
+            "sharpe": -0.6231139711350202,
+            "sortino": -0.7328047243137646,
+            "total_return": -0.0033074520490253834,
+            "volatility": 0.0009461488977164315
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 14
+          },
+          "round_trips": 33
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "absolute_gate_shape": false,
+      "absolute_gates": {
+        "oos_mdd_beats_funding_guard": false,
+        "oos_return_beats_baseline": false,
+        "oos_sharpe_beats_funding_guard": true,
+        "oos_sharpe_gt_1": false,
+        "oos_trades_not_starved": true,
+        "train_positive": true,
+        "val_positive": false
+      },
+      "filters": {
+        "cooldown_bars": 0,
+        "excluded_hours": [
+          0,
+          1,
+          8,
+          9,
+          16,
+          17
+        ],
+        "hl_basis_abs_max": 0.0,
+        "hl_funding_abs_cap": 7.5e-05,
+        "hl_oi_z_min": 0.0,
+        "hl_require_funding_sign_match": false,
+        "return_threshold": 0.008,
+        "tickmill_macro_filter": ""
+      },
+      "name": "hl_funding_abs_cap_funding_guard_75ppm",
+      "replay_relative_gates": {
+        "oos_mdd_beats_replay_incumbents": false,
+        "oos_return_beats_replay_incumbents": false,
+        "oos_sharpe_beats_replay_incumbents": false,
+        "oos_trades_not_starved": true,
+        "train_positive": true,
+        "val_positive": false
+      },
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 54,
+          "final_equity": 10008.25167551091,
+          "metrics": {
+            "cagr": 0.0001338508609325384,
+            "calmar": 0.07438151899886794,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0017995177126535363,
+            "min_equity": 9986.486994224628,
+            "raw_final_equity": 10008.25167551091,
+            "raw_max_drawdown": 0.0017995177126535363,
+            "raw_total_return": 0.0008251675510910772,
+            "sharpe": 0.17748975685893909,
+            "sortino": 0.22308660736450048,
+            "total_return": 0.0008251675510910772,
+            "volatility": 0.0007556903279844122
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 9
+          },
+          "round_trips": 27
+        },
+        "train": {
+          "fills": 344,
+          "final_equity": 10026.311623099731,
+          "metrics": {
+            "cagr": 7.588028558180859e-05,
+            "calmar": 0.017356285622961033,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.004371919616339155,
+            "min_equity": 9984.81269596301,
+            "raw_final_equity": 10026.311623099731,
+            "raw_max_drawdown": 0.004371919616339155,
+            "raw_total_return": 0.0026311623099730674,
+            "sharpe": 0.08120590880553266,
+            "sortino": 0.10751180762727337,
+            "total_return": 0.0026311623099730674,
+            "volatility": 0.0009398207473718306
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 44,
+            "hl_funding_abs_cap": 4
+          },
+          "round_trips": 172
+        },
+        "val": {
+          "fills": 66,
+          "final_equity": 9966.925479509746,
+          "metrics": {
+            "cagr": -0.0005898325578994612,
+            "calmar": -0.13158607271342415,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.004482484701736126,
+            "min_equity": 9955.5029468154,
+            "raw_final_equity": 9966.925479509746,
+            "raw_max_drawdown": 0.004482484701736126,
+            "raw_total_return": -0.0033074520490253834,
+            "sharpe": -0.6231139711350202,
+            "sortino": -0.7328047243137646,
+            "total_return": -0.0033074520490253834,
+            "volatility": 0.0009461488977164315
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 14
+          },
+          "round_trips": 33
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "absolute_gate_shape": false,
+      "absolute_gates": {
+        "oos_mdd_beats_funding_guard": false,
+        "oos_return_beats_baseline": false,
+        "oos_sharpe_beats_funding_guard": true,
+        "oos_sharpe_gt_1": false,
+        "oos_trades_not_starved": true,
+        "train_positive": true,
+        "val_positive": false
+      },
+      "filters": {
+        "cooldown_bars": 0,
+        "excluded_hours": [
+          0,
+          1,
+          8,
+          9,
+          16,
+          17
+        ],
+        "hl_basis_abs_max": 0.0,
+        "hl_funding_abs_cap": 0.0001,
+        "hl_oi_z_min": 0.0,
+        "hl_require_funding_sign_match": false,
+        "return_threshold": 0.008,
+        "tickmill_macro_filter": ""
+      },
+      "name": "hl_funding_abs_cap_funding_guard_100ppm",
+      "replay_relative_gates": {
+        "oos_mdd_beats_replay_incumbents": false,
+        "oos_return_beats_replay_incumbents": false,
+        "oos_sharpe_beats_replay_incumbents": false,
+        "oos_trades_not_starved": true,
+        "train_positive": true,
+        "val_positive": false
+      },
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 54,
+          "final_equity": 10008.25167551091,
+          "metrics": {
+            "cagr": 0.0001338508609325384,
+            "calmar": 0.07438151899886794,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0017995177126535363,
+            "min_equity": 9986.486994224628,
+            "raw_final_equity": 10008.25167551091,
+            "raw_max_drawdown": 0.0017995177126535363,
+            "raw_total_return": 0.0008251675510910772,
+            "sharpe": 0.17748975685893909,
+            "sortino": 0.22308660736450048,
+            "total_return": 0.0008251675510910772,
+            "volatility": 0.0007556903279844122
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 9
+          },
+          "round_trips": 27
+        },
+        "train": {
+          "fills": 346,
+          "final_equity": 10022.061769737044,
+          "metrics": {
+            "cagr": 6.363720621505031e-05,
+            "calmar": 0.013272446534835908,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.004794685444618149,
+            "min_equity": 9984.81269596301,
+            "raw_final_equity": 10022.061769737044,
+            "raw_max_drawdown": 0.004794685444618149,
+            "raw_total_return": 0.002206176973704288,
+            "sharpe": 0.06809733606530802,
+            "sortino": 0.09012222871343463,
+            "total_return": 0.002206176973704288,
+            "volatility": 0.0009409744601786143
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 42
+          },
+          "round_trips": 173
+        },
+        "val": {
+          "fills": 66,
+          "final_equity": 9966.925479509746,
+          "metrics": {
+            "cagr": -0.0005898325578994612,
+            "calmar": -0.13158607271342415,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.004482484701736126,
+            "min_equity": 9955.5029468154,
+            "raw_final_equity": 9966.925479509746,
+            "raw_max_drawdown": 0.004482484701736126,
+            "raw_total_return": -0.0033074520490253834,
+            "sharpe": -0.6231139711350202,
+            "sortino": -0.7328047243137646,
+            "total_return": -0.0033074520490253834,
+            "volatility": 0.0009461488977164315
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 14
+          },
+          "round_trips": 33
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "absolute_gate_shape": false,
+      "absolute_gates": {
+        "oos_mdd_beats_funding_guard": false,
+        "oos_return_beats_baseline": false,
+        "oos_sharpe_beats_funding_guard": true,
+        "oos_sharpe_gt_1": false,
+        "oos_trades_not_starved": true,
+        "train_positive": true,
+        "val_positive": false
+      },
+      "filters": {
+        "cooldown_bars": 0,
+        "excluded_hours": [
+          0,
+          1,
+          8,
+          9,
+          16,
+          17
+        ],
+        "hl_basis_abs_max": 0.0,
+        "hl_funding_abs_cap": 0.00015,
+        "hl_oi_z_min": 0.0,
+        "hl_require_funding_sign_match": false,
+        "return_threshold": 0.008,
+        "tickmill_macro_filter": ""
+      },
+      "name": "hl_funding_abs_cap_funding_guard_150ppm",
+      "replay_relative_gates": {
+        "oos_mdd_beats_replay_incumbents": false,
+        "oos_return_beats_replay_incumbents": false,
+        "oos_sharpe_beats_replay_incumbents": false,
+        "oos_trades_not_starved": true,
+        "train_positive": true,
+        "val_positive": false
+      },
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 54,
+          "final_equity": 10008.25167551091,
+          "metrics": {
+            "cagr": 0.0001338508609325384,
+            "calmar": 0.07438151899886794,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0017995177126535363,
+            "min_equity": 9986.486994224628,
+            "raw_final_equity": 10008.25167551091,
+            "raw_max_drawdown": 0.0017995177126535363,
+            "raw_total_return": 0.0008251675510910772,
+            "sharpe": 0.17748975685893909,
+            "sortino": 0.22308660736450048,
+            "total_return": 0.0008251675510910772,
+            "volatility": 0.0007556903279844122
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 9
+          },
+          "round_trips": 27
+        },
+        "train": {
+          "fills": 346,
+          "final_equity": 10022.061769737044,
+          "metrics": {
+            "cagr": 6.363720621505031e-05,
+            "calmar": 0.013272446534835908,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.004794685444618149,
+            "min_equity": 9984.81269596301,
+            "raw_final_equity": 10022.061769737044,
+            "raw_max_drawdown": 0.004794685444618149,
+            "raw_total_return": 0.002206176973704288,
+            "sharpe": 0.06809733606530802,
+            "sortino": 0.09012222871343463,
+            "total_return": 0.002206176973704288,
+            "volatility": 0.0009409744601786143
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 42
+          },
+          "round_trips": 173
+        },
+        "val": {
+          "fills": 66,
+          "final_equity": 9966.925479509746,
+          "metrics": {
+            "cagr": -0.0005898325578994612,
+            "calmar": -0.13158607271342415,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.004482484701736126,
+            "min_equity": 9955.5029468154,
+            "raw_final_equity": 9966.925479509746,
+            "raw_max_drawdown": 0.004482484701736126,
+            "raw_total_return": -0.0033074520490253834,
+            "sharpe": -0.6231139711350202,
+            "sortino": -0.7328047243137646,
+            "total_return": -0.0033074520490253834,
+            "volatility": 0.0009461488977164315
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 14
+          },
+          "round_trips": 33
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "absolute_gate_shape": false,
+      "absolute_gates": {
+        "oos_mdd_beats_funding_guard": false,
+        "oos_return_beats_baseline": false,
+        "oos_sharpe_beats_funding_guard": true,
+        "oos_sharpe_gt_1": false,
+        "oos_trades_not_starved": true,
+        "train_positive": true,
+        "val_positive": false
+      },
+      "filters": {
+        "cooldown_bars": 0,
+        "excluded_hours": [
+          0,
+          1,
+          8,
+          9,
+          16,
+          17
+        ],
+        "hl_basis_abs_max": 0.0,
+        "hl_funding_abs_cap": 0.00025,
+        "hl_oi_z_min": 0.0,
+        "hl_require_funding_sign_match": false,
+        "return_threshold": 0.008,
+        "tickmill_macro_filter": ""
+      },
+      "name": "hl_funding_abs_cap_funding_guard_250ppm",
+      "replay_relative_gates": {
+        "oos_mdd_beats_replay_incumbents": false,
+        "oos_return_beats_replay_incumbents": false,
+        "oos_sharpe_beats_replay_incumbents": false,
+        "oos_trades_not_starved": true,
+        "train_positive": true,
+        "val_positive": false
+      },
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 54,
+          "final_equity": 10008.25167551091,
+          "metrics": {
+            "cagr": 0.0001338508609325384,
+            "calmar": 0.07438151899886794,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0017995177126535363,
+            "min_equity": 9986.486994224628,
+            "raw_final_equity": 10008.25167551091,
+            "raw_max_drawdown": 0.0017995177126535363,
+            "raw_total_return": 0.0008251675510910772,
+            "sharpe": 0.17748975685893909,
+            "sortino": 0.22308660736450048,
+            "total_return": 0.0008251675510910772,
+            "volatility": 0.0007556903279844122
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 9
+          },
+          "round_trips": 27
+        },
+        "train": {
+          "fills": 346,
+          "final_equity": 10022.061769737044,
+          "metrics": {
+            "cagr": 6.363720621505031e-05,
+            "calmar": 0.013272446534835908,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.004794685444618149,
+            "min_equity": 9984.81269596301,
+            "raw_final_equity": 10022.061769737044,
+            "raw_max_drawdown": 0.004794685444618149,
+            "raw_total_return": 0.002206176973704288,
+            "sharpe": 0.06809733606530802,
+            "sortino": 0.09012222871343463,
+            "total_return": 0.002206176973704288,
+            "volatility": 0.0009409744601786143
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 42
+          },
+          "round_trips": 173
+        },
+        "val": {
+          "fills": 66,
+          "final_equity": 9966.925479509746,
+          "metrics": {
+            "cagr": -0.0005898325578994612,
+            "calmar": -0.13158607271342415,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.004482484701736126,
+            "min_equity": 9955.5029468154,
+            "raw_final_equity": 9966.925479509746,
+            "raw_max_drawdown": 0.004482484701736126,
+            "raw_total_return": -0.0033074520490253834,
+            "sharpe": -0.6231139711350202,
+            "sortino": -0.7328047243137646,
+            "total_return": -0.0033074520490253834,
+            "volatility": 0.0009461488977164315
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 14
+          },
+          "round_trips": 33
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "absolute_gate_shape": false,
+      "absolute_gates": {
+        "oos_mdd_beats_funding_guard": true,
+        "oos_return_beats_baseline": false,
+        "oos_sharpe_beats_funding_guard": false,
+        "oos_sharpe_gt_1": false,
+        "oos_trades_not_starved": false,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "filters": {
+        "cooldown_bars": 0,
+        "excluded_hours": [],
+        "hl_basis_abs_max": 0.0,
+        "hl_funding_abs_cap": 0.0,
+        "hl_oi_z_min": 0.5,
+        "hl_require_funding_sign_match": false,
+        "return_threshold": 0.01,
+        "tickmill_macro_filter": ""
+      },
+      "name": "hl_oi_exhaustion_base_z05",
+      "replay_relative_gates": {
+        "oos_mdd_beats_replay_incumbents": true,
+        "oos_return_beats_replay_incumbents": false,
+        "oos_sharpe_beats_replay_incumbents": false,
+        "oos_trades_not_starved": false,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 0,
+          "final_equity": 10000.0,
+          "metrics": {
+            "cagr": 0.0,
+            "calmar": 0.0,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0,
+            "min_equity": 10000.0,
+            "raw_final_equity": 10000.0,
+            "raw_max_drawdown": 0.0,
+            "raw_total_return": 0.0,
+            "sharpe": 0.0,
+            "sortino": 0.0,
+            "total_return": 0.0,
+            "volatility": 0.0
+          },
+          "reject_counts": {
+            "hl_oi_history_missing": 813
+          },
+          "round_trips": 0
+        },
+        "train": {
+          "fills": 0,
+          "final_equity": 10000.0,
+          "metrics": {
+            "cagr": 0.0,
+            "calmar": 0.0,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0,
+            "min_equity": 10000.0,
+            "raw_final_equity": 10000.0,
+            "raw_max_drawdown": 0.0,
+            "raw_total_return": 0.0,
+            "sharpe": 0.0,
+            "sortino": 0.0,
+            "total_return": 0.0,
+            "volatility": 0.0
+          },
+          "reject_counts": {
+            "hl_oi_history_missing": 5255
+          },
+          "round_trips": 0
+        },
+        "val": {
+          "fills": 0,
+          "final_equity": 10000.0,
+          "metrics": {
+            "cagr": 0.0,
+            "calmar": 0.0,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0,
+            "min_equity": 10000.0,
+            "raw_final_equity": 10000.0,
+            "raw_max_drawdown": 0.0,
+            "raw_total_return": 0.0,
+            "sharpe": 0.0,
+            "sortino": 0.0,
+            "total_return": 0.0,
+            "volatility": 0.0
+          },
+          "reject_counts": {
+            "hl_oi_history_missing": 799
+          },
+          "round_trips": 0
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "absolute_gate_shape": false,
+      "absolute_gates": {
+        "oos_mdd_beats_funding_guard": true,
+        "oos_return_beats_baseline": false,
+        "oos_sharpe_beats_funding_guard": false,
+        "oos_sharpe_gt_1": false,
+        "oos_trades_not_starved": false,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "filters": {
+        "cooldown_bars": 0,
+        "excluded_hours": [],
+        "hl_basis_abs_max": 0.0,
+        "hl_funding_abs_cap": 0.0,
+        "hl_oi_z_min": 1.0,
+        "hl_require_funding_sign_match": false,
+        "return_threshold": 0.01,
+        "tickmill_macro_filter": ""
+      },
+      "name": "hl_oi_exhaustion_base_z10",
+      "replay_relative_gates": {
+        "oos_mdd_beats_replay_incumbents": true,
+        "oos_return_beats_replay_incumbents": false,
+        "oos_sharpe_beats_replay_incumbents": false,
+        "oos_trades_not_starved": false,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 0,
+          "final_equity": 10000.0,
+          "metrics": {
+            "cagr": 0.0,
+            "calmar": 0.0,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0,
+            "min_equity": 10000.0,
+            "raw_final_equity": 10000.0,
+            "raw_max_drawdown": 0.0,
+            "raw_total_return": 0.0,
+            "sharpe": 0.0,
+            "sortino": 0.0,
+            "total_return": 0.0,
+            "volatility": 0.0
+          },
+          "reject_counts": {
+            "hl_oi_history_missing": 813
+          },
+          "round_trips": 0
+        },
+        "train": {
+          "fills": 0,
+          "final_equity": 10000.0,
+          "metrics": {
+            "cagr": 0.0,
+            "calmar": 0.0,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0,
+            "min_equity": 10000.0,
+            "raw_final_equity": 10000.0,
+            "raw_max_drawdown": 0.0,
+            "raw_total_return": 0.0,
+            "sharpe": 0.0,
+            "sortino": 0.0,
+            "total_return": 0.0,
+            "volatility": 0.0
+          },
+          "reject_counts": {
+            "hl_oi_history_missing": 5255
+          },
+          "round_trips": 0
+        },
+        "val": {
+          "fills": 0,
+          "final_equity": 10000.0,
+          "metrics": {
+            "cagr": 0.0,
+            "calmar": 0.0,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0,
+            "min_equity": 10000.0,
+            "raw_final_equity": 10000.0,
+            "raw_max_drawdown": 0.0,
+            "raw_total_return": 0.0,
+            "sharpe": 0.0,
+            "sortino": 0.0,
+            "total_return": 0.0,
+            "volatility": 0.0
+          },
+          "reject_counts": {
+            "hl_oi_history_missing": 799
+          },
+          "round_trips": 0
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "absolute_gate_shape": false,
+      "absolute_gates": {
+        "oos_mdd_beats_funding_guard": true,
+        "oos_return_beats_baseline": false,
+        "oos_sharpe_beats_funding_guard": false,
+        "oos_sharpe_gt_1": false,
+        "oos_trades_not_starved": false,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "filters": {
+        "cooldown_bars": 0,
+        "excluded_hours": [],
+        "hl_basis_abs_max": 0.001,
+        "hl_funding_abs_cap": 0.0,
+        "hl_oi_z_min": 0.0,
+        "hl_require_funding_sign_match": false,
+        "return_threshold": 0.01,
+        "tickmill_macro_filter": ""
+      },
+      "name": "hl_mark_basis_stress_base_10bp",
+      "replay_relative_gates": {
+        "oos_mdd_beats_replay_incumbents": true,
+        "oos_return_beats_replay_incumbents": false,
+        "oos_sharpe_beats_replay_incumbents": false,
+        "oos_trades_not_starved": false,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 0,
+          "final_equity": 10000.0,
+          "metrics": {
+            "cagr": 0.0,
+            "calmar": 0.0,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0,
+            "min_equity": 10000.0,
+            "raw_final_equity": 10000.0,
+            "raw_max_drawdown": 0.0,
+            "raw_total_return": 0.0,
+            "sharpe": 0.0,
+            "sortino": 0.0,
+            "total_return": 0.0,
+            "volatility": 0.0
+          },
+          "reject_counts": {
+            "hl_mark_history_missing": 813
+          },
+          "round_trips": 0
+        },
+        "train": {
+          "fills": 0,
+          "final_equity": 10000.0,
+          "metrics": {
+            "cagr": 0.0,
+            "calmar": 0.0,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0,
+            "min_equity": 10000.0,
+            "raw_final_equity": 10000.0,
+            "raw_max_drawdown": 0.0,
+            "raw_total_return": 0.0,
+            "sharpe": 0.0,
+            "sortino": 0.0,
+            "total_return": 0.0,
+            "volatility": 0.0
+          },
+          "reject_counts": {
+            "hl_mark_history_missing": 5255
+          },
+          "round_trips": 0
+        },
+        "val": {
+          "fills": 0,
+          "final_equity": 10000.0,
+          "metrics": {
+            "cagr": 0.0,
+            "calmar": 0.0,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0,
+            "min_equity": 10000.0,
+            "raw_final_equity": 10000.0,
+            "raw_max_drawdown": 0.0,
+            "raw_total_return": 0.0,
+            "sharpe": 0.0,
+            "sortino": 0.0,
+            "total_return": 0.0,
+            "volatility": 0.0
+          },
+          "reject_counts": {
+            "hl_mark_history_missing": 799
+          },
+          "round_trips": 0
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "absolute_gate_shape": false,
+      "absolute_gates": {
+        "oos_mdd_beats_funding_guard": true,
+        "oos_return_beats_baseline": false,
+        "oos_sharpe_beats_funding_guard": false,
+        "oos_sharpe_gt_1": false,
+        "oos_trades_not_starved": false,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "filters": {
+        "cooldown_bars": 0,
+        "excluded_hours": [],
+        "hl_basis_abs_max": 0.0025,
+        "hl_funding_abs_cap": 0.0,
+        "hl_oi_z_min": 0.0,
+        "hl_require_funding_sign_match": false,
+        "return_threshold": 0.01,
+        "tickmill_macro_filter": ""
+      },
+      "name": "hl_mark_basis_stress_base_25bp",
+      "replay_relative_gates": {
+        "oos_mdd_beats_replay_incumbents": true,
+        "oos_return_beats_replay_incumbents": false,
+        "oos_sharpe_beats_replay_incumbents": false,
+        "oos_trades_not_starved": false,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 0,
+          "final_equity": 10000.0,
+          "metrics": {
+            "cagr": 0.0,
+            "calmar": 0.0,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0,
+            "min_equity": 10000.0,
+            "raw_final_equity": 10000.0,
+            "raw_max_drawdown": 0.0,
+            "raw_total_return": 0.0,
+            "sharpe": 0.0,
+            "sortino": 0.0,
+            "total_return": 0.0,
+            "volatility": 0.0
+          },
+          "reject_counts": {
+            "hl_mark_history_missing": 813
+          },
+          "round_trips": 0
+        },
+        "train": {
+          "fills": 0,
+          "final_equity": 10000.0,
+          "metrics": {
+            "cagr": 0.0,
+            "calmar": 0.0,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0,
+            "min_equity": 10000.0,
+            "raw_final_equity": 10000.0,
+            "raw_max_drawdown": 0.0,
+            "raw_total_return": 0.0,
+            "sharpe": 0.0,
+            "sortino": 0.0,
+            "total_return": 0.0,
+            "volatility": 0.0
+          },
+          "reject_counts": {
+            "hl_mark_history_missing": 5255
+          },
+          "round_trips": 0
+        },
+        "val": {
+          "fills": 0,
+          "final_equity": 10000.0,
+          "metrics": {
+            "cagr": 0.0,
+            "calmar": 0.0,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0,
+            "min_equity": 10000.0,
+            "raw_final_equity": 10000.0,
+            "raw_max_drawdown": 0.0,
+            "raw_total_return": 0.0,
+            "sharpe": 0.0,
+            "sortino": 0.0,
+            "total_return": 0.0,
+            "volatility": 0.0
+          },
+          "reject_counts": {
+            "hl_mark_history_missing": 799
+          },
+          "round_trips": 0
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "absolute_gate_shape": false,
+      "absolute_gates": {
+        "oos_mdd_beats_funding_guard": true,
+        "oos_return_beats_baseline": false,
+        "oos_sharpe_beats_funding_guard": false,
+        "oos_sharpe_gt_1": false,
+        "oos_trades_not_starved": false,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "filters": {
+        "cooldown_bars": 0,
+        "excluded_hours": [],
+        "hl_basis_abs_max": 0.005,
+        "hl_funding_abs_cap": 0.0,
+        "hl_oi_z_min": 0.0,
+        "hl_require_funding_sign_match": false,
+        "return_threshold": 0.01,
+        "tickmill_macro_filter": ""
+      },
+      "name": "hl_mark_basis_stress_base_50bp",
+      "replay_relative_gates": {
+        "oos_mdd_beats_replay_incumbents": true,
+        "oos_return_beats_replay_incumbents": false,
+        "oos_sharpe_beats_replay_incumbents": false,
+        "oos_trades_not_starved": false,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 0,
+          "final_equity": 10000.0,
+          "metrics": {
+            "cagr": 0.0,
+            "calmar": 0.0,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0,
+            "min_equity": 10000.0,
+            "raw_final_equity": 10000.0,
+            "raw_max_drawdown": 0.0,
+            "raw_total_return": 0.0,
+            "sharpe": 0.0,
+            "sortino": 0.0,
+            "total_return": 0.0,
+            "volatility": 0.0
+          },
+          "reject_counts": {
+            "hl_mark_history_missing": 813
+          },
+          "round_trips": 0
+        },
+        "train": {
+          "fills": 0,
+          "final_equity": 10000.0,
+          "metrics": {
+            "cagr": 0.0,
+            "calmar": 0.0,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0,
+            "min_equity": 10000.0,
+            "raw_final_equity": 10000.0,
+            "raw_max_drawdown": 0.0,
+            "raw_total_return": 0.0,
+            "sharpe": 0.0,
+            "sortino": 0.0,
+            "total_return": 0.0,
+            "volatility": 0.0
+          },
+          "reject_counts": {
+            "hl_mark_history_missing": 5255
+          },
+          "round_trips": 0
+        },
+        "val": {
+          "fills": 0,
+          "final_equity": 10000.0,
+          "metrics": {
+            "cagr": 0.0,
+            "calmar": 0.0,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0,
+            "min_equity": 10000.0,
+            "raw_final_equity": 10000.0,
+            "raw_max_drawdown": 0.0,
+            "raw_total_return": 0.0,
+            "sharpe": 0.0,
+            "sortino": 0.0,
+            "total_return": 0.0,
+            "volatility": 0.0
+          },
+          "reject_counts": {
+            "hl_mark_history_missing": 799
+          },
+          "round_trips": 0
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "absolute_gate_shape": false,
+      "absolute_gates": {
+        "oos_mdd_beats_funding_guard": true,
+        "oos_return_beats_baseline": false,
+        "oos_sharpe_beats_funding_guard": false,
+        "oos_sharpe_gt_1": false,
+        "oos_trades_not_starved": false,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "filters": {
+        "cooldown_bars": 0,
+        "excluded_hours": [],
+        "hl_basis_abs_max": 0.0,
+        "hl_funding_abs_cap": 0.0,
+        "hl_oi_z_min": 0.0,
+        "hl_require_funding_sign_match": false,
+        "return_threshold": 0.01,
+        "tickmill_macro_filter": "usd_risk"
+      },
+      "name": "tickmill_macro_usd_risk_base",
+      "replay_relative_gates": {
+        "oos_mdd_beats_replay_incumbents": true,
+        "oos_return_beats_replay_incumbents": false,
+        "oos_sharpe_beats_replay_incumbents": false,
+        "oos_trades_not_starved": false,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 0,
+          "final_equity": 10000.0,
+          "metrics": {
+            "cagr": 0.0,
+            "calmar": 0.0,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0,
+            "min_equity": 10000.0,
+            "raw_final_equity": 10000.0,
+            "raw_max_drawdown": 0.0,
+            "raw_total_return": 0.0,
+            "sharpe": 0.0,
+            "sortino": 0.0,
+            "total_return": 0.0,
+            "volatility": 0.0
+          },
+          "reject_counts": {
+            "tickmill_mt5_macro_data_unavailable": 813
+          },
+          "round_trips": 0
+        },
+        "train": {
+          "fills": 0,
+          "final_equity": 10000.0,
+          "metrics": {
+            "cagr": 0.0,
+            "calmar": 0.0,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0,
+            "min_equity": 10000.0,
+            "raw_final_equity": 10000.0,
+            "raw_max_drawdown": 0.0,
+            "raw_total_return": 0.0,
+            "sharpe": 0.0,
+            "sortino": 0.0,
+            "total_return": 0.0,
+            "volatility": 0.0
+          },
+          "reject_counts": {
+            "tickmill_mt5_macro_data_unavailable": 5255
+          },
+          "round_trips": 0
+        },
+        "val": {
+          "fills": 0,
+          "final_equity": 10000.0,
+          "metrics": {
+            "cagr": 0.0,
+            "calmar": 0.0,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0,
+            "min_equity": 10000.0,
+            "raw_final_equity": 10000.0,
+            "raw_max_drawdown": 0.0,
+            "raw_total_return": 0.0,
+            "sharpe": 0.0,
+            "sortino": 0.0,
+            "total_return": 0.0,
+            "volatility": 0.0
+          },
+          "reject_counts": {
+            "tickmill_mt5_macro_data_unavailable": 799
+          },
+          "round_trips": 0
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "absolute_gate_shape": false,
+      "absolute_gates": {
+        "oos_mdd_beats_funding_guard": true,
+        "oos_return_beats_baseline": false,
+        "oos_sharpe_beats_funding_guard": false,
+        "oos_sharpe_gt_1": false,
+        "oos_trades_not_starved": false,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "filters": {
+        "cooldown_bars": 0,
+        "excluded_hours": [],
+        "hl_basis_abs_max": 0.0,
+        "hl_funding_abs_cap": 0.0,
+        "hl_oi_z_min": 0.0,
+        "hl_require_funding_sign_match": false,
+        "return_threshold": 0.01,
+        "tickmill_macro_filter": "xau_xag_stress"
+      },
+      "name": "tickmill_macro_xau_xag_stress_base",
+      "replay_relative_gates": {
+        "oos_mdd_beats_replay_incumbents": true,
+        "oos_return_beats_replay_incumbents": false,
+        "oos_sharpe_beats_replay_incumbents": false,
+        "oos_trades_not_starved": false,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 0,
+          "final_equity": 10000.0,
+          "metrics": {
+            "cagr": 0.0,
+            "calmar": 0.0,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0,
+            "min_equity": 10000.0,
+            "raw_final_equity": 10000.0,
+            "raw_max_drawdown": 0.0,
+            "raw_total_return": 0.0,
+            "sharpe": 0.0,
+            "sortino": 0.0,
+            "total_return": 0.0,
+            "volatility": 0.0
+          },
+          "reject_counts": {
+            "tickmill_mt5_macro_data_unavailable": 813
+          },
+          "round_trips": 0
+        },
+        "train": {
+          "fills": 0,
+          "final_equity": 10000.0,
+          "metrics": {
+            "cagr": 0.0,
+            "calmar": 0.0,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0,
+            "min_equity": 10000.0,
+            "raw_final_equity": 10000.0,
+            "raw_max_drawdown": 0.0,
+            "raw_total_return": 0.0,
+            "sharpe": 0.0,
+            "sortino": 0.0,
+            "total_return": 0.0,
+            "volatility": 0.0
+          },
+          "reject_counts": {
+            "tickmill_mt5_macro_data_unavailable": 5255
+          },
+          "round_trips": 0
+        },
+        "val": {
+          "fills": 0,
+          "final_equity": 10000.0,
+          "metrics": {
+            "cagr": 0.0,
+            "calmar": 0.0,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0,
+            "min_equity": 10000.0,
+            "raw_final_equity": 10000.0,
+            "raw_max_drawdown": 0.0,
+            "raw_total_return": 0.0,
+            "sharpe": 0.0,
+            "sortino": 0.0,
+            "total_return": 0.0,
+            "volatility": 0.0
+          },
+          "reject_counts": {
+            "tickmill_mt5_macro_data_unavailable": 799
+          },
+          "round_trips": 0
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "absolute_gate_shape": false,
+      "absolute_gates": {
+        "oos_mdd_beats_funding_guard": true,
+        "oos_return_beats_baseline": false,
+        "oos_sharpe_beats_funding_guard": false,
+        "oos_sharpe_gt_1": false,
+        "oos_trades_not_starved": false,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "filters": {
+        "cooldown_bars": 0,
+        "excluded_hours": [],
+        "hl_basis_abs_max": 0.0,
+        "hl_funding_abs_cap": 0.0,
+        "hl_oi_z_min": 0.0,
+        "hl_require_funding_sign_match": false,
+        "return_threshold": 0.01,
+        "tickmill_macro_filter": "indices_risk_off"
+      },
+      "name": "tickmill_macro_indices_risk_off_base",
+      "replay_relative_gates": {
+        "oos_mdd_beats_replay_incumbents": true,
+        "oos_return_beats_replay_incumbents": false,
+        "oos_sharpe_beats_replay_incumbents": false,
+        "oos_trades_not_starved": false,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 0,
+          "final_equity": 10000.0,
+          "metrics": {
+            "cagr": 0.0,
+            "calmar": 0.0,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0,
+            "min_equity": 10000.0,
+            "raw_final_equity": 10000.0,
+            "raw_max_drawdown": 0.0,
+            "raw_total_return": 0.0,
+            "sharpe": 0.0,
+            "sortino": 0.0,
+            "total_return": 0.0,
+            "volatility": 0.0
+          },
+          "reject_counts": {
+            "tickmill_mt5_macro_data_unavailable": 813
+          },
+          "round_trips": 0
+        },
+        "train": {
+          "fills": 0,
+          "final_equity": 10000.0,
+          "metrics": {
+            "cagr": 0.0,
+            "calmar": 0.0,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0,
+            "min_equity": 10000.0,
+            "raw_final_equity": 10000.0,
+            "raw_max_drawdown": 0.0,
+            "raw_total_return": 0.0,
+            "sharpe": 0.0,
+            "sortino": 0.0,
+            "total_return": 0.0,
+            "volatility": 0.0
+          },
+          "reject_counts": {
+            "tickmill_mt5_macro_data_unavailable": 5255
+          },
+          "round_trips": 0
+        },
+        "val": {
+          "fills": 0,
+          "final_equity": 10000.0,
+          "metrics": {
+            "cagr": 0.0,
+            "calmar": 0.0,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0,
+            "min_equity": 10000.0,
+            "raw_final_equity": 10000.0,
+            "raw_max_drawdown": 0.0,
+            "raw_total_return": 0.0,
+            "sharpe": 0.0,
+            "sortino": 0.0,
+            "total_return": 0.0,
+            "volatility": 0.0
+          },
+          "reject_counts": {
+            "tickmill_mt5_macro_data_unavailable": 799
+          },
+          "round_trips": 0
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "absolute_gate_shape": false,
+      "absolute_gates": {
+        "oos_mdd_beats_funding_guard": true,
+        "oos_return_beats_baseline": false,
+        "oos_sharpe_beats_funding_guard": false,
+        "oos_sharpe_gt_1": false,
+        "oos_trades_not_starved": false,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "filters": {
+        "cooldown_bars": 0,
+        "excluded_hours": [
+          0,
+          1,
+          8,
+          9,
+          16,
+          17
+        ],
+        "hl_basis_abs_max": 0.0,
+        "hl_funding_abs_cap": 0.0,
+        "hl_oi_z_min": 0.5,
+        "hl_require_funding_sign_match": false,
+        "return_threshold": 0.008,
+        "tickmill_macro_filter": ""
+      },
+      "name": "hl_oi_exhaustion_funding_guard_z05",
+      "replay_relative_gates": {
+        "oos_mdd_beats_replay_incumbents": true,
+        "oos_return_beats_replay_incumbents": false,
+        "oos_sharpe_beats_replay_incumbents": false,
+        "oos_trades_not_starved": false,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 0,
+          "final_equity": 10000.0,
+          "metrics": {
+            "cagr": 0.0,
+            "calmar": 0.0,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0,
+            "min_equity": 10000.0,
+            "raw_final_equity": 10000.0,
+            "raw_max_drawdown": 0.0,
+            "raw_total_return": 0.0,
+            "sharpe": 0.0,
+            "sortino": 0.0,
+            "total_return": 0.0,
+            "volatility": 0.0
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 234,
+            "hl_oi_history_missing": 689
+          },
+          "round_trips": 0
+        },
+        "train": {
+          "fills": 0,
+          "final_equity": 10000.0,
+          "metrics": {
+            "cagr": 0.0,
+            "calmar": 0.0,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0,
+            "min_equity": 10000.0,
+            "raw_final_equity": 10000.0,
+            "raw_max_drawdown": 0.0,
+            "raw_total_return": 0.0,
+            "sharpe": 0.0,
+            "sortino": 0.0,
+            "total_return": 0.0,
+            "volatility": 0.0
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 1478,
+            "hl_oi_history_missing": 4324
+          },
+          "round_trips": 0
+        },
+        "val": {
+          "fills": 0,
+          "final_equity": 10000.0,
+          "metrics": {
+            "cagr": 0.0,
+            "calmar": 0.0,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0,
+            "min_equity": 10000.0,
+            "raw_final_equity": 10000.0,
+            "raw_max_drawdown": 0.0,
+            "raw_total_return": 0.0,
+            "sharpe": 0.0,
+            "sortino": 0.0,
+            "total_return": 0.0,
+            "volatility": 0.0
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 226,
+            "hl_oi_history_missing": 673
+          },
+          "round_trips": 0
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "absolute_gate_shape": false,
+      "absolute_gates": {
+        "oos_mdd_beats_funding_guard": true,
+        "oos_return_beats_baseline": false,
+        "oos_sharpe_beats_funding_guard": false,
+        "oos_sharpe_gt_1": false,
+        "oos_trades_not_starved": false,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "filters": {
+        "cooldown_bars": 0,
+        "excluded_hours": [
+          0,
+          1,
+          8,
+          9,
+          16,
+          17
+        ],
+        "hl_basis_abs_max": 0.0,
+        "hl_funding_abs_cap": 0.0,
+        "hl_oi_z_min": 1.0,
+        "hl_require_funding_sign_match": false,
+        "return_threshold": 0.008,
+        "tickmill_macro_filter": ""
+      },
+      "name": "hl_oi_exhaustion_funding_guard_z10",
+      "replay_relative_gates": {
+        "oos_mdd_beats_replay_incumbents": true,
+        "oos_return_beats_replay_incumbents": false,
+        "oos_sharpe_beats_replay_incumbents": false,
+        "oos_trades_not_starved": false,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 0,
+          "final_equity": 10000.0,
+          "metrics": {
+            "cagr": 0.0,
+            "calmar": 0.0,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0,
+            "min_equity": 10000.0,
+            "raw_final_equity": 10000.0,
+            "raw_max_drawdown": 0.0,
+            "raw_total_return": 0.0,
+            "sharpe": 0.0,
+            "sortino": 0.0,
+            "total_return": 0.0,
+            "volatility": 0.0
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 234,
+            "hl_oi_history_missing": 689
+          },
+          "round_trips": 0
+        },
+        "train": {
+          "fills": 0,
+          "final_equity": 10000.0,
+          "metrics": {
+            "cagr": 0.0,
+            "calmar": 0.0,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0,
+            "min_equity": 10000.0,
+            "raw_final_equity": 10000.0,
+            "raw_max_drawdown": 0.0,
+            "raw_total_return": 0.0,
+            "sharpe": 0.0,
+            "sortino": 0.0,
+            "total_return": 0.0,
+            "volatility": 0.0
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 1478,
+            "hl_oi_history_missing": 4324
+          },
+          "round_trips": 0
+        },
+        "val": {
+          "fills": 0,
+          "final_equity": 10000.0,
+          "metrics": {
+            "cagr": 0.0,
+            "calmar": 0.0,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0,
+            "min_equity": 10000.0,
+            "raw_final_equity": 10000.0,
+            "raw_max_drawdown": 0.0,
+            "raw_total_return": 0.0,
+            "sharpe": 0.0,
+            "sortino": 0.0,
+            "total_return": 0.0,
+            "volatility": 0.0
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 226,
+            "hl_oi_history_missing": 673
+          },
+          "round_trips": 0
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "absolute_gate_shape": false,
+      "absolute_gates": {
+        "oos_mdd_beats_funding_guard": true,
+        "oos_return_beats_baseline": false,
+        "oos_sharpe_beats_funding_guard": false,
+        "oos_sharpe_gt_1": false,
+        "oos_trades_not_starved": false,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "filters": {
+        "cooldown_bars": 0,
+        "excluded_hours": [
+          0,
+          1,
+          8,
+          9,
+          16,
+          17
+        ],
+        "hl_basis_abs_max": 0.001,
+        "hl_funding_abs_cap": 0.0,
+        "hl_oi_z_min": 0.0,
+        "hl_require_funding_sign_match": false,
+        "return_threshold": 0.008,
+        "tickmill_macro_filter": ""
+      },
+      "name": "hl_mark_basis_stress_funding_guard_10bp",
+      "replay_relative_gates": {
+        "oos_mdd_beats_replay_incumbents": true,
+        "oos_return_beats_replay_incumbents": false,
+        "oos_sharpe_beats_replay_incumbents": false,
+        "oos_trades_not_starved": false,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 0,
+          "final_equity": 10000.0,
+          "metrics": {
+            "cagr": 0.0,
+            "calmar": 0.0,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0,
+            "min_equity": 10000.0,
+            "raw_final_equity": 10000.0,
+            "raw_max_drawdown": 0.0,
+            "raw_total_return": 0.0,
+            "sharpe": 0.0,
+            "sortino": 0.0,
+            "total_return": 0.0,
+            "volatility": 0.0
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 234,
+            "hl_mark_history_missing": 689
+          },
+          "round_trips": 0
+        },
+        "train": {
+          "fills": 0,
+          "final_equity": 10000.0,
+          "metrics": {
+            "cagr": 0.0,
+            "calmar": 0.0,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0,
+            "min_equity": 10000.0,
+            "raw_final_equity": 10000.0,
+            "raw_max_drawdown": 0.0,
+            "raw_total_return": 0.0,
+            "sharpe": 0.0,
+            "sortino": 0.0,
+            "total_return": 0.0,
+            "volatility": 0.0
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 1478,
+            "hl_mark_history_missing": 4324
+          },
+          "round_trips": 0
+        },
+        "val": {
+          "fills": 0,
+          "final_equity": 10000.0,
+          "metrics": {
+            "cagr": 0.0,
+            "calmar": 0.0,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0,
+            "min_equity": 10000.0,
+            "raw_final_equity": 10000.0,
+            "raw_max_drawdown": 0.0,
+            "raw_total_return": 0.0,
+            "sharpe": 0.0,
+            "sortino": 0.0,
+            "total_return": 0.0,
+            "volatility": 0.0
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 226,
+            "hl_mark_history_missing": 673
+          },
+          "round_trips": 0
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "absolute_gate_shape": false,
+      "absolute_gates": {
+        "oos_mdd_beats_funding_guard": true,
+        "oos_return_beats_baseline": false,
+        "oos_sharpe_beats_funding_guard": false,
+        "oos_sharpe_gt_1": false,
+        "oos_trades_not_starved": false,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "filters": {
+        "cooldown_bars": 0,
+        "excluded_hours": [
+          0,
+          1,
+          8,
+          9,
+          16,
+          17
+        ],
+        "hl_basis_abs_max": 0.0025,
+        "hl_funding_abs_cap": 0.0,
+        "hl_oi_z_min": 0.0,
+        "hl_require_funding_sign_match": false,
+        "return_threshold": 0.008,
+        "tickmill_macro_filter": ""
+      },
+      "name": "hl_mark_basis_stress_funding_guard_25bp",
+      "replay_relative_gates": {
+        "oos_mdd_beats_replay_incumbents": true,
+        "oos_return_beats_replay_incumbents": false,
+        "oos_sharpe_beats_replay_incumbents": false,
+        "oos_trades_not_starved": false,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 0,
+          "final_equity": 10000.0,
+          "metrics": {
+            "cagr": 0.0,
+            "calmar": 0.0,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0,
+            "min_equity": 10000.0,
+            "raw_final_equity": 10000.0,
+            "raw_max_drawdown": 0.0,
+            "raw_total_return": 0.0,
+            "sharpe": 0.0,
+            "sortino": 0.0,
+            "total_return": 0.0,
+            "volatility": 0.0
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 234,
+            "hl_mark_history_missing": 689
+          },
+          "round_trips": 0
+        },
+        "train": {
+          "fills": 0,
+          "final_equity": 10000.0,
+          "metrics": {
+            "cagr": 0.0,
+            "calmar": 0.0,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0,
+            "min_equity": 10000.0,
+            "raw_final_equity": 10000.0,
+            "raw_max_drawdown": 0.0,
+            "raw_total_return": 0.0,
+            "sharpe": 0.0,
+            "sortino": 0.0,
+            "total_return": 0.0,
+            "volatility": 0.0
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 1478,
+            "hl_mark_history_missing": 4324
+          },
+          "round_trips": 0
+        },
+        "val": {
+          "fills": 0,
+          "final_equity": 10000.0,
+          "metrics": {
+            "cagr": 0.0,
+            "calmar": 0.0,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0,
+            "min_equity": 10000.0,
+            "raw_final_equity": 10000.0,
+            "raw_max_drawdown": 0.0,
+            "raw_total_return": 0.0,
+            "sharpe": 0.0,
+            "sortino": 0.0,
+            "total_return": 0.0,
+            "volatility": 0.0
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 226,
+            "hl_mark_history_missing": 673
+          },
+          "round_trips": 0
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "absolute_gate_shape": false,
+      "absolute_gates": {
+        "oos_mdd_beats_funding_guard": true,
+        "oos_return_beats_baseline": false,
+        "oos_sharpe_beats_funding_guard": false,
+        "oos_sharpe_gt_1": false,
+        "oos_trades_not_starved": false,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "filters": {
+        "cooldown_bars": 0,
+        "excluded_hours": [
+          0,
+          1,
+          8,
+          9,
+          16,
+          17
+        ],
+        "hl_basis_abs_max": 0.005,
+        "hl_funding_abs_cap": 0.0,
+        "hl_oi_z_min": 0.0,
+        "hl_require_funding_sign_match": false,
+        "return_threshold": 0.008,
+        "tickmill_macro_filter": ""
+      },
+      "name": "hl_mark_basis_stress_funding_guard_50bp",
+      "replay_relative_gates": {
+        "oos_mdd_beats_replay_incumbents": true,
+        "oos_return_beats_replay_incumbents": false,
+        "oos_sharpe_beats_replay_incumbents": false,
+        "oos_trades_not_starved": false,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 0,
+          "final_equity": 10000.0,
+          "metrics": {
+            "cagr": 0.0,
+            "calmar": 0.0,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0,
+            "min_equity": 10000.0,
+            "raw_final_equity": 10000.0,
+            "raw_max_drawdown": 0.0,
+            "raw_total_return": 0.0,
+            "sharpe": 0.0,
+            "sortino": 0.0,
+            "total_return": 0.0,
+            "volatility": 0.0
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 234,
+            "hl_mark_history_missing": 689
+          },
+          "round_trips": 0
+        },
+        "train": {
+          "fills": 0,
+          "final_equity": 10000.0,
+          "metrics": {
+            "cagr": 0.0,
+            "calmar": 0.0,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0,
+            "min_equity": 10000.0,
+            "raw_final_equity": 10000.0,
+            "raw_max_drawdown": 0.0,
+            "raw_total_return": 0.0,
+            "sharpe": 0.0,
+            "sortino": 0.0,
+            "total_return": 0.0,
+            "volatility": 0.0
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 1478,
+            "hl_mark_history_missing": 4324
+          },
+          "round_trips": 0
+        },
+        "val": {
+          "fills": 0,
+          "final_equity": 10000.0,
+          "metrics": {
+            "cagr": 0.0,
+            "calmar": 0.0,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0,
+            "min_equity": 10000.0,
+            "raw_final_equity": 10000.0,
+            "raw_max_drawdown": 0.0,
+            "raw_total_return": 0.0,
+            "sharpe": 0.0,
+            "sortino": 0.0,
+            "total_return": 0.0,
+            "volatility": 0.0
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 226,
+            "hl_mark_history_missing": 673
+          },
+          "round_trips": 0
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "absolute_gate_shape": false,
+      "absolute_gates": {
+        "oos_mdd_beats_funding_guard": true,
+        "oos_return_beats_baseline": false,
+        "oos_sharpe_beats_funding_guard": false,
+        "oos_sharpe_gt_1": false,
+        "oos_trades_not_starved": false,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "filters": {
+        "cooldown_bars": 0,
+        "excluded_hours": [
+          0,
+          1,
+          8,
+          9,
+          16,
+          17
+        ],
+        "hl_basis_abs_max": 0.0,
+        "hl_funding_abs_cap": 0.0,
+        "hl_oi_z_min": 0.0,
+        "hl_require_funding_sign_match": false,
+        "return_threshold": 0.008,
+        "tickmill_macro_filter": "usd_risk"
+      },
+      "name": "tickmill_macro_usd_risk_funding_guard",
+      "replay_relative_gates": {
+        "oos_mdd_beats_replay_incumbents": true,
+        "oos_return_beats_replay_incumbents": false,
+        "oos_sharpe_beats_replay_incumbents": false,
+        "oos_trades_not_starved": false,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 0,
+          "final_equity": 10000.0,
+          "metrics": {
+            "cagr": 0.0,
+            "calmar": 0.0,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0,
+            "min_equity": 10000.0,
+            "raw_final_equity": 10000.0,
+            "raw_max_drawdown": 0.0,
+            "raw_total_return": 0.0,
+            "sharpe": 0.0,
+            "sortino": 0.0,
+            "total_return": 0.0,
+            "volatility": 0.0
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 234,
+            "tickmill_mt5_macro_data_unavailable": 689
+          },
+          "round_trips": 0
+        },
+        "train": {
+          "fills": 0,
+          "final_equity": 10000.0,
+          "metrics": {
+            "cagr": 0.0,
+            "calmar": 0.0,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0,
+            "min_equity": 10000.0,
+            "raw_final_equity": 10000.0,
+            "raw_max_drawdown": 0.0,
+            "raw_total_return": 0.0,
+            "sharpe": 0.0,
+            "sortino": 0.0,
+            "total_return": 0.0,
+            "volatility": 0.0
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 1478,
+            "tickmill_mt5_macro_data_unavailable": 4324
+          },
+          "round_trips": 0
+        },
+        "val": {
+          "fills": 0,
+          "final_equity": 10000.0,
+          "metrics": {
+            "cagr": 0.0,
+            "calmar": 0.0,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0,
+            "min_equity": 10000.0,
+            "raw_final_equity": 10000.0,
+            "raw_max_drawdown": 0.0,
+            "raw_total_return": 0.0,
+            "sharpe": 0.0,
+            "sortino": 0.0,
+            "total_return": 0.0,
+            "volatility": 0.0
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 226,
+            "tickmill_mt5_macro_data_unavailable": 673
+          },
+          "round_trips": 0
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "absolute_gate_shape": false,
+      "absolute_gates": {
+        "oos_mdd_beats_funding_guard": true,
+        "oos_return_beats_baseline": false,
+        "oos_sharpe_beats_funding_guard": false,
+        "oos_sharpe_gt_1": false,
+        "oos_trades_not_starved": false,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "filters": {
+        "cooldown_bars": 0,
+        "excluded_hours": [
+          0,
+          1,
+          8,
+          9,
+          16,
+          17
+        ],
+        "hl_basis_abs_max": 0.0,
+        "hl_funding_abs_cap": 0.0,
+        "hl_oi_z_min": 0.0,
+        "hl_require_funding_sign_match": false,
+        "return_threshold": 0.008,
+        "tickmill_macro_filter": "xau_xag_stress"
+      },
+      "name": "tickmill_macro_xau_xag_stress_funding_guard",
+      "replay_relative_gates": {
+        "oos_mdd_beats_replay_incumbents": true,
+        "oos_return_beats_replay_incumbents": false,
+        "oos_sharpe_beats_replay_incumbents": false,
+        "oos_trades_not_starved": false,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 0,
+          "final_equity": 10000.0,
+          "metrics": {
+            "cagr": 0.0,
+            "calmar": 0.0,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0,
+            "min_equity": 10000.0,
+            "raw_final_equity": 10000.0,
+            "raw_max_drawdown": 0.0,
+            "raw_total_return": 0.0,
+            "sharpe": 0.0,
+            "sortino": 0.0,
+            "total_return": 0.0,
+            "volatility": 0.0
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 234,
+            "tickmill_mt5_macro_data_unavailable": 689
+          },
+          "round_trips": 0
+        },
+        "train": {
+          "fills": 0,
+          "final_equity": 10000.0,
+          "metrics": {
+            "cagr": 0.0,
+            "calmar": 0.0,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0,
+            "min_equity": 10000.0,
+            "raw_final_equity": 10000.0,
+            "raw_max_drawdown": 0.0,
+            "raw_total_return": 0.0,
+            "sharpe": 0.0,
+            "sortino": 0.0,
+            "total_return": 0.0,
+            "volatility": 0.0
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 1478,
+            "tickmill_mt5_macro_data_unavailable": 4324
+          },
+          "round_trips": 0
+        },
+        "val": {
+          "fills": 0,
+          "final_equity": 10000.0,
+          "metrics": {
+            "cagr": 0.0,
+            "calmar": 0.0,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0,
+            "min_equity": 10000.0,
+            "raw_final_equity": 10000.0,
+            "raw_max_drawdown": 0.0,
+            "raw_total_return": 0.0,
+            "sharpe": 0.0,
+            "sortino": 0.0,
+            "total_return": 0.0,
+            "volatility": 0.0
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 226,
+            "tickmill_mt5_macro_data_unavailable": 673
+          },
+          "round_trips": 0
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "absolute_gate_shape": false,
+      "absolute_gates": {
+        "oos_mdd_beats_funding_guard": true,
+        "oos_return_beats_baseline": false,
+        "oos_sharpe_beats_funding_guard": false,
+        "oos_sharpe_gt_1": false,
+        "oos_trades_not_starved": false,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "filters": {
+        "cooldown_bars": 0,
+        "excluded_hours": [
+          0,
+          1,
+          8,
+          9,
+          16,
+          17
+        ],
+        "hl_basis_abs_max": 0.0,
+        "hl_funding_abs_cap": 0.0,
+        "hl_oi_z_min": 0.0,
+        "hl_require_funding_sign_match": false,
+        "return_threshold": 0.008,
+        "tickmill_macro_filter": "indices_risk_off"
+      },
+      "name": "tickmill_macro_indices_risk_off_funding_guard",
+      "replay_relative_gates": {
+        "oos_mdd_beats_replay_incumbents": true,
+        "oos_return_beats_replay_incumbents": false,
+        "oos_sharpe_beats_replay_incumbents": false,
+        "oos_trades_not_starved": false,
+        "train_positive": false,
+        "val_positive": false
+      },
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 0,
+          "final_equity": 10000.0,
+          "metrics": {
+            "cagr": 0.0,
+            "calmar": 0.0,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0,
+            "min_equity": 10000.0,
+            "raw_final_equity": 10000.0,
+            "raw_max_drawdown": 0.0,
+            "raw_total_return": 0.0,
+            "sharpe": 0.0,
+            "sortino": 0.0,
+            "total_return": 0.0,
+            "volatility": 0.0
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 234,
+            "tickmill_mt5_macro_data_unavailable": 689
+          },
+          "round_trips": 0
+        },
+        "train": {
+          "fills": 0,
+          "final_equity": 10000.0,
+          "metrics": {
+            "cagr": 0.0,
+            "calmar": 0.0,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0,
+            "min_equity": 10000.0,
+            "raw_final_equity": 10000.0,
+            "raw_max_drawdown": 0.0,
+            "raw_total_return": 0.0,
+            "sharpe": 0.0,
+            "sortino": 0.0,
+            "total_return": 0.0,
+            "volatility": 0.0
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 1478,
+            "tickmill_mt5_macro_data_unavailable": 4324
+          },
+          "round_trips": 0
+        },
+        "val": {
+          "fills": 0,
+          "final_equity": 10000.0,
+          "metrics": {
+            "cagr": 0.0,
+            "calmar": 0.0,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0,
+            "min_equity": 10000.0,
+            "raw_final_equity": 10000.0,
+            "raw_max_drawdown": 0.0,
+            "raw_total_return": 0.0,
+            "sharpe": 0.0,
+            "sortino": 0.0,
+            "total_return": 0.0,
+            "volatility": 0.0
+          },
+          "reject_counts": {
+            "funding_hour_excluded": 226,
+            "tickmill_mt5_macro_data_unavailable": 673
+          },
+          "round_trips": 0
+        }
+      },
+      "success_candidate": false
+    }
+  ],
+  "candidate_rows": [
+    {
+      "absolute_gate_shape": false,
+      "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [0, 1, 8, 9, 16, 17], \"hl_basis_abs_max\": 0.0, \"hl_funding_abs_cap\": 5e-05, \"hl_oi_z_min\": 0.0, \"hl_require_funding_sign_match\": true, \"return_threshold\": 0.008, \"tickmill_macro_filter\": \"\"}",
+      "name": "hl_funding_divergence_funding_guard_50ppm",
+      "oos_fills": 44,
+      "oos_max_drawdown": 0.001174917451354542,
+      "oos_round_trips": 22,
+      "oos_sharpe": 0.4607596266159049,
+      "oos_sortino": 0.6373039595208673,
+      "oos_total_return": 0.0020637016562394805,
+      "oos_volatility": 0.0007266017976636384,
+      "reject_top": "{\"funding_hour_excluded\": 30, \"hl_binance_funding_sign_divergence\": 48}",
+      "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": true, \"oos_return_beats_replay_incumbents\": true, \"oos_sharpe_beats_replay_incumbents\": true, \"oos_trades_not_starved\": true, \"train_positive\": false, \"val_positive\": false}",
+      "replay_survivor": false,
+      "success_candidate": false,
+      "train_fills": 332,
+      "train_max_drawdown": 0.0069696893531609894,
+      "train_round_trips": 166,
+      "train_sharpe": -0.019552145656342806,
+      "train_sortino": -0.025358927190750814,
+      "train_total_return": -0.0006414072534931536,
+      "train_volatility": 0.0009256669333493885,
+      "val_fills": 60,
+      "val_max_drawdown": 0.006220148358855881,
+      "val_round_trips": 30,
+      "val_sharpe": -0.7318328432935411,
+      "val_sortino": -0.8275189110194774,
+      "val_total_return": -0.0035728945261269685,
+      "val_volatility": 0.000870504078221007
+    },
+    {
+      "absolute_gate_shape": false,
+      "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [0, 1, 8, 9, 16, 17], \"hl_basis_abs_max\": 0.0, \"hl_funding_abs_cap\": 7.5e-05, \"hl_oi_z_min\": 0.0, \"hl_require_funding_sign_match\": true, \"return_threshold\": 0.008, \"tickmill_macro_filter\": \"\"}",
+      "name": "hl_funding_divergence_funding_guard_75ppm",
+      "oos_fills": 44,
+      "oos_max_drawdown": 0.001174917451354542,
+      "oos_round_trips": 22,
+      "oos_sharpe": 0.4607596266159049,
+      "oos_sortino": 0.6373039595208673,
+      "oos_total_return": 0.0020637016562394805,
+      "oos_volatility": 0.0007266017976636384,
+      "reject_top": "{\"funding_hour_excluded\": 30, \"hl_binance_funding_sign_divergence\": 48}",
+      "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": true, \"oos_return_beats_replay_incumbents\": true, \"oos_sharpe_beats_replay_incumbents\": true, \"oos_trades_not_starved\": true, \"train_positive\": false, \"val_positive\": false}",
+      "replay_survivor": false,
+      "success_candidate": false,
+      "train_fills": 332,
+      "train_max_drawdown": 0.006701251000219019,
+      "train_round_trips": 166,
+      "train_sharpe": -0.011005996388966722,
+      "train_sortino": -0.014303335879386286,
+      "train_total_return": -0.000366699289943373,
+      "train_volatility": 0.0009235250647148712,
+      "val_fills": 60,
+      "val_max_drawdown": 0.006220148358855881,
+      "val_round_trips": 30,
+      "val_sharpe": -0.7318328432935411,
+      "val_sortino": -0.8275189110194774,
+      "val_total_return": -0.0035728945261269685,
+      "val_volatility": 0.000870504078221007
+    },
+    {
+      "absolute_gate_shape": false,
+      "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [0, 1, 8, 9, 16, 17], \"hl_basis_abs_max\": 0.0, \"hl_funding_abs_cap\": 0.0001, \"hl_oi_z_min\": 0.0, \"hl_require_funding_sign_match\": true, \"return_threshold\": 0.008, \"tickmill_macro_filter\": \"\"}",
+      "name": "hl_funding_divergence_funding_guard_100ppm",
+      "oos_fills": 44,
+      "oos_max_drawdown": 0.001174917451354542,
+      "oos_round_trips": 22,
+      "oos_sharpe": 0.4607596266159049,
+      "oos_sortino": 0.6373039595208673,
+      "oos_total_return": 0.0020637016562394805,
+      "oos_volatility": 0.0007266017976636384,
+      "reject_top": "{\"funding_hour_excluded\": 30, \"hl_binance_funding_sign_divergence\": 48}",
+      "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": true, \"oos_return_beats_replay_incumbents\": true, \"oos_sharpe_beats_replay_incumbents\": true, \"oos_trades_not_starved\": true, \"train_positive\": false, \"val_positive\": false}",
+      "replay_survivor": false,
+      "success_candidate": false,
+      "train_fills": 334,
+      "train_max_drawdown": 0.0071243013328892634,
+      "train_round_trips": 167,
+      "train_sharpe": -0.024270089203973083,
+      "train_sortino": -0.03152915526053828,
+      "train_total_return": -0.0007916846262121524,
+      "train_volatility": 0.0009246850221301771,
+      "val_fills": 60,
+      "val_max_drawdown": 0.006220148358855881,
+      "val_round_trips": 30,
+      "val_sharpe": -0.7318328432935411,
+      "val_sortino": -0.8275189110194774,
+      "val_total_return": -0.0035728945261269685,
+      "val_volatility": 0.000870504078221007
+    },
+    {
+      "absolute_gate_shape": false,
+      "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [0, 1, 8, 9, 16, 17], \"hl_basis_abs_max\": 0.0, \"hl_funding_abs_cap\": 0.00015, \"hl_oi_z_min\": 0.0, \"hl_require_funding_sign_match\": true, \"return_threshold\": 0.008, \"tickmill_macro_filter\": \"\"}",
+      "name": "hl_funding_divergence_funding_guard_150ppm",
+      "oos_fills": 44,
+      "oos_max_drawdown": 0.001174917451354542,
+      "oos_round_trips": 22,
+      "oos_sharpe": 0.4607596266159049,
+      "oos_sortino": 0.6373039595208673,
+      "oos_total_return": 0.0020637016562394805,
+      "oos_volatility": 0.0007266017976636384,
+      "reject_top": "{\"funding_hour_excluded\": 30, \"hl_binance_funding_sign_divergence\": 48}",
+      "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": true, \"oos_return_beats_replay_incumbents\": true, \"oos_sharpe_beats_replay_incumbents\": true, \"oos_trades_not_starved\": true, \"train_positive\": false, \"val_positive\": false}",
+      "replay_survivor": false,
+      "success_candidate": false,
+      "train_fills": 334,
+      "train_max_drawdown": 0.0071243013328892634,
+      "train_round_trips": 167,
+      "train_sharpe": -0.024270089203973083,
+      "train_sortino": -0.03152915526053828,
+      "train_total_return": -0.0007916846262121524,
+      "train_volatility": 0.0009246850221301771,
+      "val_fills": 60,
+      "val_max_drawdown": 0.006220148358855881,
+      "val_round_trips": 30,
+      "val_sharpe": -0.7318328432935411,
+      "val_sortino": -0.8275189110194774,
+      "val_total_return": -0.0035728945261269685,
+      "val_volatility": 0.000870504078221007
+    },
+    {
+      "absolute_gate_shape": false,
+      "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [0, 1, 8, 9, 16, 17], \"hl_basis_abs_max\": 0.0, \"hl_funding_abs_cap\": 0.00025, \"hl_oi_z_min\": 0.0, \"hl_require_funding_sign_match\": true, \"return_threshold\": 0.008, \"tickmill_macro_filter\": \"\"}",
+      "name": "hl_funding_divergence_funding_guard_250ppm",
+      "oos_fills": 44,
+      "oos_max_drawdown": 0.001174917451354542,
+      "oos_round_trips": 22,
+      "oos_sharpe": 0.4607596266159049,
+      "oos_sortino": 0.6373039595208673,
+      "oos_total_return": 0.0020637016562394805,
+      "oos_volatility": 0.0007266017976636384,
+      "reject_top": "{\"funding_hour_excluded\": 30, \"hl_binance_funding_sign_divergence\": 48}",
+      "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": true, \"oos_return_beats_replay_incumbents\": true, \"oos_sharpe_beats_replay_incumbents\": true, \"oos_trades_not_starved\": true, \"train_positive\": false, \"val_positive\": false}",
+      "replay_survivor": false,
+      "success_candidate": false,
+      "train_fills": 334,
+      "train_max_drawdown": 0.0071243013328892634,
+      "train_round_trips": 167,
+      "train_sharpe": -0.024270089203973083,
+      "train_sortino": -0.03152915526053828,
+      "train_total_return": -0.0007916846262121524,
+      "train_volatility": 0.0009246850221301771,
+      "val_fills": 60,
+      "val_max_drawdown": 0.006220148358855881,
+      "val_round_trips": 30,
+      "val_sharpe": -0.7318328432935411,
+      "val_sortino": -0.8275189110194774,
+      "val_total_return": -0.0035728945261269685,
+      "val_volatility": 0.000870504078221007
+    },
+    {
+      "absolute_gate_shape": false,
+      "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [], \"hl_basis_abs_max\": 0.0, \"hl_funding_abs_cap\": 5e-05, \"hl_oi_z_min\": 0.0, \"hl_require_funding_sign_match\": true, \"return_threshold\": 0.01, \"tickmill_macro_filter\": \"\"}",
+      "name": "hl_funding_divergence_base_50ppm",
+      "oos_fills": 44,
+      "oos_max_drawdown": 0.0012635201287287772,
+      "oos_round_trips": 22,
+      "oos_sharpe": 0.33896412151779026,
+      "oos_sortino": 0.4300151951885293,
+      "oos_total_return": 0.0015304057011253924,
+      "oos_volatility": 0.000732857377655481,
+      "reject_top": "{\"hl_binance_funding_sign_divergence\": 63}",
+      "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": true, \"oos_return_beats_replay_incumbents\": true, \"oos_sharpe_beats_replay_incumbents\": true, \"oos_trades_not_starved\": true, \"train_positive\": false, \"val_positive\": false}",
+      "replay_survivor": false,
+      "success_candidate": false,
+      "train_fills": 330,
+      "train_max_drawdown": 0.004908858701980483,
+      "train_round_trips": 165,
+      "train_sharpe": -0.015939891428914648,
+      "train_sortino": -0.020319309200278773,
+      "train_total_return": -0.0005246130819991368,
+      "train_volatility": 0.0009238428976637838,
+      "val_fills": 64,
+      "val_max_drawdown": 0.005244221733949573,
+      "val_round_trips": 32,
+      "val_sharpe": -0.443508494561436,
+      "val_sortino": -0.5092008916061651,
+      "val_total_return": -0.002336353358930343,
+      "val_volatility": 0.000938273208153192
+    },
+    {
+      "absolute_gate_shape": false,
+      "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [], \"hl_basis_abs_max\": 0.0, \"hl_funding_abs_cap\": 7.5e-05, \"hl_oi_z_min\": 0.0, \"hl_require_funding_sign_match\": true, \"return_threshold\": 0.01, \"tickmill_macro_filter\": \"\"}",
+      "name": "hl_funding_divergence_base_75ppm",
+      "oos_fills": 44,
+      "oos_max_drawdown": 0.0012635201287287772,
+      "oos_round_trips": 22,
+      "oos_sharpe": 0.33896412151779026,
+      "oos_sortino": 0.4300151951885293,
+      "oos_total_return": 0.0015304057011253924,
+      "oos_volatility": 0.000732857377655481,
+      "reject_top": "{\"hl_binance_funding_sign_divergence\": 63}",
+      "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": true, \"oos_return_beats_replay_incumbents\": true, \"oos_sharpe_beats_replay_incumbents\": true, \"oos_trades_not_starved\": true, \"train_positive\": false, \"val_positive\": false}",
+      "replay_survivor": false,
+      "success_candidate": false,
+      "train_fills": 332,
+      "train_max_drawdown": 0.005622735274817512,
+      "train_round_trips": 166,
+      "train_sharpe": -0.05548788373979606,
+      "train_sortino": -0.07086914191272581,
+      "train_total_return": -0.0017935560359796376,
+      "train_volatility": 0.0009264710425956223,
+      "val_fills": 64,
+      "val_max_drawdown": 0.005244221733949573,
+      "val_round_trips": 32,
+      "val_sharpe": -0.443508494561436,
+      "val_sortino": -0.5092008916061651,
+      "val_total_return": -0.002336353358930343,
+      "val_volatility": 0.000938273208153192
+    },
+    {
+      "absolute_gate_shape": false,
+      "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [], \"hl_basis_abs_max\": 0.0, \"hl_funding_abs_cap\": 0.0001, \"hl_oi_z_min\": 0.0, \"hl_require_funding_sign_match\": true, \"return_threshold\": 0.01, \"tickmill_macro_filter\": \"\"}",
+      "name": "hl_funding_divergence_base_100ppm",
+      "oos_fills": 44,
+      "oos_max_drawdown": 0.0012635201287287772,
+      "oos_round_trips": 22,
+      "oos_sharpe": 0.33896412151779026,
+      "oos_sortino": 0.4300151951885293,
+      "oos_total_return": 0.0015304057011253924,
+      "oos_volatility": 0.000732857377655481,
+      "reject_top": "{\"hl_binance_funding_sign_divergence\": 63}",
+      "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": true, \"oos_return_beats_replay_incumbents\": true, \"oos_sharpe_beats_replay_incumbents\": true, \"oos_trades_not_starved\": true, \"train_positive\": false, \"val_positive\": false}",
+      "replay_survivor": false,
+      "success_candidate": false,
+      "train_fills": 334,
+      "train_max_drawdown": 0.006045482085826716,
+      "train_round_trips": 167,
+      "train_sharpe": -0.06866135181552728,
+      "train_sortino": -0.08769092325048658,
+      "train_total_return": -0.0022169823321440685,
+      "train_volatility": 0.0009271398981166556,
+      "val_fills": 64,
+      "val_max_drawdown": 0.005244221733949573,
+      "val_round_trips": 32,
+      "val_sharpe": -0.443508494561436,
+      "val_sortino": -0.5092008916061651,
+      "val_total_return": -0.002336353358930343,
+      "val_volatility": 0.000938273208153192
+    },
+    {
+      "absolute_gate_shape": false,
+      "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [], \"hl_basis_abs_max\": 0.0, \"hl_funding_abs_cap\": 0.00015, \"hl_oi_z_min\": 0.0, \"hl_require_funding_sign_match\": true, \"return_threshold\": 0.01, \"tickmill_macro_filter\": \"\"}",
+      "name": "hl_funding_divergence_base_150ppm",
+      "oos_fills": 44,
+      "oos_max_drawdown": 0.0012635201287287772,
+      "oos_round_trips": 22,
+      "oos_sharpe": 0.33896412151779026,
+      "oos_sortino": 0.4300151951885293,
+      "oos_total_return": 0.0015304057011253924,
+      "oos_volatility": 0.000732857377655481,
+      "reject_top": "{\"hl_binance_funding_sign_divergence\": 63}",
+      "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": true, \"oos_return_beats_replay_incumbents\": true, \"oos_sharpe_beats_replay_incumbents\": true, \"oos_trades_not_starved\": true, \"train_positive\": false, \"val_positive\": false}",
+      "replay_survivor": false,
+      "success_candidate": false,
+      "train_fills": 334,
+      "train_max_drawdown": 0.006045482085826716,
+      "train_round_trips": 167,
+      "train_sharpe": -0.06866135181552728,
+      "train_sortino": -0.08769092325048658,
+      "train_total_return": -0.0022169823321440685,
+      "train_volatility": 0.0009271398981166556,
+      "val_fills": 64,
+      "val_max_drawdown": 0.005244221733949573,
+      "val_round_trips": 32,
+      "val_sharpe": -0.443508494561436,
+      "val_sortino": -0.5092008916061651,
+      "val_total_return": -0.002336353358930343,
+      "val_volatility": 0.000938273208153192
+    },
+    {
+      "absolute_gate_shape": false,
+      "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [], \"hl_basis_abs_max\": 0.0, \"hl_funding_abs_cap\": 0.00025, \"hl_oi_z_min\": 0.0, \"hl_require_funding_sign_match\": true, \"return_threshold\": 0.01, \"tickmill_macro_filter\": \"\"}",
+      "name": "hl_funding_divergence_base_250ppm",
+      "oos_fills": 44,
+      "oos_max_drawdown": 0.0012635201287287772,
+      "oos_round_trips": 22,
+      "oos_sharpe": 0.33896412151779026,
+      "oos_sortino": 0.4300151951885293,
+      "oos_total_return": 0.0015304057011253924,
+      "oos_volatility": 0.000732857377655481,
+      "reject_top": "{\"hl_binance_funding_sign_divergence\": 63}",
+      "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": true, \"oos_return_beats_replay_incumbents\": true, \"oos_sharpe_beats_replay_incumbents\": true, \"oos_trades_not_starved\": true, \"train_positive\": false, \"val_positive\": false}",
+      "replay_survivor": false,
+      "success_candidate": false,
+      "train_fills": 334,
+      "train_max_drawdown": 0.006045482085826716,
+      "train_round_trips": 167,
+      "train_sharpe": -0.06866135181552728,
+      "train_sortino": -0.08769092325048658,
+      "train_total_return": -0.0022169823321440685,
+      "train_volatility": 0.0009271398981166556,
+      "val_fills": 64,
+      "val_max_drawdown": 0.005244221733949573,
+      "val_round_trips": 32,
+      "val_sharpe": -0.443508494561436,
+      "val_sortino": -0.5092008916061651,
+      "val_total_return": -0.002336353358930343,
+      "val_volatility": 0.000938273208153192
+    },
+    {
+      "absolute_gate_shape": false,
+      "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [], \"hl_basis_abs_max\": 0.0, \"hl_funding_abs_cap\": 0.0, \"hl_oi_z_min\": 0.0, \"hl_require_funding_sign_match\": false, \"return_threshold\": 0.01, \"tickmill_macro_filter\": \"\"}",
+      "name": "replay_base_12h_threshold_100bp",
+      "oos_fills": 52,
+      "oos_max_drawdown": 0.001607052424509479,
+      "oos_round_trips": 26,
+      "oos_sharpe": 0.2511367987500571,
+      "oos_sortino": 0.31401894296248917,
+      "oos_total_return": 0.0011957225354917167,
+      "oos_volatility": 0.0007733187550446284,
+      "reject_top": "{}",
+      "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": false, \"oos_return_beats_replay_incumbents\": false, \"oos_sharpe_beats_replay_incumbents\": false, \"oos_trades_not_starved\": true, \"train_positive\": false, \"val_positive\": false}",
+      "replay_survivor": false,
+      "success_candidate": false,
+      "train_fills": 356,
+      "train_max_drawdown": 0.010103745304707572,
+      "train_round_trips": 178,
+      "train_sharpe": -0.1126163975756344,
+      "train_sortino": -0.14471761987965842,
+      "train_total_return": -0.0037040219755228865,
+      "train_volatility": 0.0009475234581048218,
+      "val_fills": 68,
+      "val_max_drawdown": 0.004989176381867891,
+      "val_round_trips": 34,
+      "val_sharpe": -0.16044186426769969,
+      "val_sortino": -0.1906658249803786,
+      "val_total_return": -0.0008889283847060003,
+      "val_volatility": 0.0009841405520975626
+    },
+    {
+      "absolute_gate_shape": false,
+      "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [], \"hl_basis_abs_max\": 0.0, \"hl_funding_abs_cap\": 5e-05, \"hl_oi_z_min\": 0.0, \"hl_require_funding_sign_match\": false, \"return_threshold\": 0.01, \"tickmill_macro_filter\": \"\"}",
+      "name": "hl_funding_abs_cap_base_50ppm",
+      "oos_fills": 52,
+      "oos_max_drawdown": 0.001607052424509479,
+      "oos_round_trips": 26,
+      "oos_sharpe": 0.2511367987500571,
+      "oos_sortino": 0.31401894296248917,
+      "oos_total_return": 0.0011957225354917167,
+      "oos_volatility": 0.0007733187550446284,
+      "reject_top": "{}",
+      "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": false, \"oos_return_beats_replay_incumbents\": false, \"oos_sharpe_beats_replay_incumbents\": false, \"oos_trades_not_starved\": true, \"train_positive\": false, \"val_positive\": false}",
+      "replay_survivor": false,
+      "success_candidate": false,
+      "train_fills": 354,
+      "train_max_drawdown": 0.009390991418864033,
+      "train_round_trips": 177,
+      "train_sharpe": -0.09000912344219088,
+      "train_sortino": -0.11498858096798378,
+      "train_total_return": -0.0029623381295459383,
+      "train_volatility": 0.0009467815003268914,
+      "val_fills": 68,
+      "val_max_drawdown": 0.004989176381867891,
+      "val_round_trips": 34,
+      "val_sharpe": -0.16044186426769969,
+      "val_sortino": -0.1906658249803786,
+      "val_total_return": -0.0008889283847060003,
+      "val_volatility": 0.0009841405520975626
+    },
+    {
+      "absolute_gate_shape": false,
+      "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [], \"hl_basis_abs_max\": 0.0, \"hl_funding_abs_cap\": 7.5e-05, \"hl_oi_z_min\": 0.0, \"hl_require_funding_sign_match\": false, \"return_threshold\": 0.01, \"tickmill_macro_filter\": \"\"}",
+      "name": "hl_funding_abs_cap_base_75ppm",
+      "oos_fills": 52,
+      "oos_max_drawdown": 0.001607052424509479,
+      "oos_round_trips": 26,
+      "oos_sharpe": 0.2511367987500571,
+      "oos_sortino": 0.31401894296248917,
+      "oos_total_return": 0.0011957225354917167,
+      "oos_volatility": 0.0007733187550446284,
+      "reject_top": "{}",
+      "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": false, \"oos_return_beats_replay_incumbents\": false, \"oos_sharpe_beats_replay_incumbents\": false, \"oos_trades_not_starved\": true, \"train_positive\": false, \"val_positive\": false}",
+      "replay_survivor": false,
+      "success_candidate": false,
+      "train_fills": 354,
+      "train_max_drawdown": 0.009716923584652466,
+      "train_round_trips": 177,
+      "train_sharpe": -0.10001490418758491,
+      "train_sortino": -0.12856950567555656,
+      "train_total_return": -0.00328934900043909,
+      "train_volatility": 0.0009467721113236917,
+      "val_fills": 68,
+      "val_max_drawdown": 0.004989176381867891,
+      "val_round_trips": 34,
+      "val_sharpe": -0.16044186426769969,
+      "val_sortino": -0.1906658249803786,
+      "val_total_return": -0.0008889283847060003,
+      "val_volatility": 0.0009841405520975626
+    },
+    {
+      "absolute_gate_shape": false,
+      "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [], \"hl_basis_abs_max\": 0.0, \"hl_funding_abs_cap\": 0.0001, \"hl_oi_z_min\": 0.0, \"hl_require_funding_sign_match\": false, \"return_threshold\": 0.01, \"tickmill_macro_filter\": \"\"}",
+      "name": "hl_funding_abs_cap_base_100ppm",
+      "oos_fills": 52,
+      "oos_max_drawdown": 0.001607052424509479,
+      "oos_round_trips": 26,
+      "oos_sharpe": 0.2511367987500571,
+      "oos_sortino": 0.31401894296248917,
+      "oos_total_return": 0.0011957225354917167,
+      "oos_volatility": 0.0007733187550446284,
+      "reject_top": "{}",
+      "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": false, \"oos_return_beats_replay_incumbents\": false, \"oos_sharpe_beats_replay_incumbents\": false, \"oos_trades_not_starved\": true, \"train_positive\": false, \"val_positive\": false}",
+      "replay_survivor": false,
+      "success_candidate": false,
+      "train_fills": 356,
+      "train_max_drawdown": 0.010103745304707572,
+      "train_round_trips": 178,
+      "train_sharpe": -0.1126163975756344,
+      "train_sortino": -0.14471761987965842,
+      "train_total_return": -0.0037040219755228865,
+      "train_volatility": 0.0009475234581048218,
+      "val_fills": 68,
+      "val_max_drawdown": 0.004989176381867891,
+      "val_round_trips": 34,
+      "val_sharpe": -0.16044186426769969,
+      "val_sortino": -0.1906658249803786,
+      "val_total_return": -0.0008889283847060003,
+      "val_volatility": 0.0009841405520975626
+    },
+    {
+      "absolute_gate_shape": false,
+      "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [], \"hl_basis_abs_max\": 0.0, \"hl_funding_abs_cap\": 0.00015, \"hl_oi_z_min\": 0.0, \"hl_require_funding_sign_match\": false, \"return_threshold\": 0.01, \"tickmill_macro_filter\": \"\"}",
+      "name": "hl_funding_abs_cap_base_150ppm",
+      "oos_fills": 52,
+      "oos_max_drawdown": 0.001607052424509479,
+      "oos_round_trips": 26,
+      "oos_sharpe": 0.2511367987500571,
+      "oos_sortino": 0.31401894296248917,
+      "oos_total_return": 0.0011957225354917167,
+      "oos_volatility": 0.0007733187550446284,
+      "reject_top": "{}",
+      "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": false, \"oos_return_beats_replay_incumbents\": false, \"oos_sharpe_beats_replay_incumbents\": false, \"oos_trades_not_starved\": true, \"train_positive\": false, \"val_positive\": false}",
+      "replay_survivor": false,
+      "success_candidate": false,
+      "train_fills": 356,
+      "train_max_drawdown": 0.010103745304707572,
+      "train_round_trips": 178,
+      "train_sharpe": -0.1126163975756344,
+      "train_sortino": -0.14471761987965842,
+      "train_total_return": -0.0037040219755228865,
+      "train_volatility": 0.0009475234581048218,
+      "val_fills": 68,
+      "val_max_drawdown": 0.004989176381867891,
+      "val_round_trips": 34,
+      "val_sharpe": -0.16044186426769969,
+      "val_sortino": -0.1906658249803786,
+      "val_total_return": -0.0008889283847060003,
+      "val_volatility": 0.0009841405520975626
+    },
+    {
+      "absolute_gate_shape": false,
+      "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [], \"hl_basis_abs_max\": 0.0, \"hl_funding_abs_cap\": 0.00025, \"hl_oi_z_min\": 0.0, \"hl_require_funding_sign_match\": false, \"return_threshold\": 0.01, \"tickmill_macro_filter\": \"\"}",
+      "name": "hl_funding_abs_cap_base_250ppm",
+      "oos_fills": 52,
+      "oos_max_drawdown": 0.001607052424509479,
+      "oos_round_trips": 26,
+      "oos_sharpe": 0.2511367987500571,
+      "oos_sortino": 0.31401894296248917,
+      "oos_total_return": 0.0011957225354917167,
+      "oos_volatility": 0.0007733187550446284,
+      "reject_top": "{}",
+      "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": false, \"oos_return_beats_replay_incumbents\": false, \"oos_sharpe_beats_replay_incumbents\": false, \"oos_trades_not_starved\": true, \"train_positive\": false, \"val_positive\": false}",
+      "replay_survivor": false,
+      "success_candidate": false,
+      "train_fills": 356,
+      "train_max_drawdown": 0.010103745304707572,
+      "train_round_trips": 178,
+      "train_sharpe": -0.1126163975756344,
+      "train_sortino": -0.14471761987965842,
+      "train_total_return": -0.0037040219755228865,
+      "train_volatility": 0.0009475234581048218,
+      "val_fills": 68,
+      "val_max_drawdown": 0.004989176381867891,
+      "val_round_trips": 34,
+      "val_sharpe": -0.16044186426769969,
+      "val_sortino": -0.1906658249803786,
+      "val_total_return": -0.0008889283847060003,
+      "val_volatility": 0.0009841405520975626
+    },
+    {
+      "absolute_gate_shape": false,
+      "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [0, 1, 8, 9, 16, 17], \"hl_basis_abs_max\": 0.0, \"hl_funding_abs_cap\": 0.0, \"hl_oi_z_min\": 0.0, \"hl_require_funding_sign_match\": false, \"return_threshold\": 0.008, \"tickmill_macro_filter\": \"\"}",
+      "name": "replay_funding_guard_current_threshold_80bp",
+      "oos_fills": 54,
+      "oos_max_drawdown": 0.0017995177126535363,
+      "oos_round_trips": 27,
+      "oos_sharpe": 0.17748975685893909,
+      "oos_sortino": 0.22308660736450048,
+      "oos_total_return": 0.0008251675510910772,
+      "oos_volatility": 0.0007556903279844122,
+      "reject_top": "{\"funding_hour_excluded\": 9}",
+      "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": false, \"oos_return_beats_replay_incumbents\": false, \"oos_sharpe_beats_replay_incumbents\": false, \"oos_trades_not_starved\": true, \"train_positive\": true, \"val_positive\": false}",
+      "replay_survivor": false,
+      "success_candidate": false,
+      "train_fills": 346,
+      "train_max_drawdown": 0.004794685444618149,
+      "train_round_trips": 173,
+      "train_sharpe": 0.06809733606530802,
+      "train_sortino": 0.09012222871343463,
+      "train_total_return": 0.002206176973704288,
+      "train_volatility": 0.0009409744601786143,
+      "val_fills": 66,
+      "val_max_drawdown": 0.004482484701736126,
+      "val_round_trips": 33,
+      "val_sharpe": -0.6231139711350202,
+      "val_sortino": -0.7328047243137646,
+      "val_total_return": -0.0033074520490253834,
+      "val_volatility": 0.0009461488977164315
+    },
+    {
+      "absolute_gate_shape": false,
+      "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [0, 1, 8, 9, 16, 17], \"hl_basis_abs_max\": 0.0, \"hl_funding_abs_cap\": 5e-05, \"hl_oi_z_min\": 0.0, \"hl_require_funding_sign_match\": false, \"return_threshold\": 0.008, \"tickmill_macro_filter\": \"\"}",
+      "name": "hl_funding_abs_cap_funding_guard_50ppm",
+      "oos_fills": 54,
+      "oos_max_drawdown": 0.0017995177126535363,
+      "oos_round_trips": 27,
+      "oos_sharpe": 0.17748975685893909,
+      "oos_sortino": 0.22308660736450048,
+      "oos_total_return": 0.0008251675510910772,
+      "oos_volatility": 0.0007556903279844122,
+      "reject_top": "{\"funding_hour_excluded\": 9}",
+      "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": false, \"oos_return_beats_replay_incumbents\": false, \"oos_sharpe_beats_replay_incumbents\": false, \"oos_trades_not_starved\": true, \"train_positive\": false, \"val_positive\": false}",
+      "replay_survivor": false,
+      "success_candidate": false,
+      "train_fills": 348,
+      "train_max_drawdown": 0.007006182210357412,
+      "train_round_trips": 174,
+      "train_sharpe": 0.00029809684183509266,
+      "train_sortino": 0.0003900585969123989,
+      "train_total_return": -5.613295044004651e-06,
+      "train_volatility": 0.0009408581994367239,
+      "val_fills": 66,
+      "val_max_drawdown": 0.004482484701736126,
+      "val_round_trips": 33,
+      "val_sharpe": -0.6231139711350202,
+      "val_sortino": -0.7328047243137646,
+      "val_total_return": -0.0033074520490253834,
+      "val_volatility": 0.0009461488977164315
+    },
+    {
+      "absolute_gate_shape": false,
+      "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [0, 1, 8, 9, 16, 17], \"hl_basis_abs_max\": 0.0, \"hl_funding_abs_cap\": 7.5e-05, \"hl_oi_z_min\": 0.0, \"hl_require_funding_sign_match\": false, \"return_threshold\": 0.008, \"tickmill_macro_filter\": \"\"}",
+      "name": "hl_funding_abs_cap_funding_guard_75ppm",
+      "oos_fills": 54,
+      "oos_max_drawdown": 0.0017995177126535363,
+      "oos_round_trips": 27,
+      "oos_sharpe": 0.17748975685893909,
+      "oos_sortino": 0.22308660736450048,
+      "oos_total_return": 0.0008251675510910772,
+      "oos_volatility": 0.0007556903279844122,
+      "reject_top": "{\"funding_hour_excluded\": 9}",
+      "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": false, \"oos_return_beats_replay_incumbents\": false, \"oos_sharpe_beats_replay_incumbents\": false, \"oos_trades_not_starved\": true, \"train_positive\": true, \"val_positive\": false}",
+      "replay_survivor": false,
+      "success_candidate": false,
+      "train_fills": 344,
+      "train_max_drawdown": 0.004371919616339155,
+      "train_round_trips": 172,
+      "train_sharpe": 0.08120590880553266,
+      "train_sortino": 0.10751180762727337,
+      "train_total_return": 0.0026311623099730674,
+      "train_volatility": 0.0009398207473718306,
+      "val_fills": 66,
+      "val_max_drawdown": 0.004482484701736126,
+      "val_round_trips": 33,
+      "val_sharpe": -0.6231139711350202,
+      "val_sortino": -0.7328047243137646,
+      "val_total_return": -0.0033074520490253834,
+      "val_volatility": 0.0009461488977164315
+    },
+    {
+      "absolute_gate_shape": false,
+      "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [0, 1, 8, 9, 16, 17], \"hl_basis_abs_max\": 0.0, \"hl_funding_abs_cap\": 0.0001, \"hl_oi_z_min\": 0.0, \"hl_require_funding_sign_match\": false, \"return_threshold\": 0.008, \"tickmill_macro_filter\": \"\"}",
+      "name": "hl_funding_abs_cap_funding_guard_100ppm",
+      "oos_fills": 54,
+      "oos_max_drawdown": 0.0017995177126535363,
+      "oos_round_trips": 27,
+      "oos_sharpe": 0.17748975685893909,
+      "oos_sortino": 0.22308660736450048,
+      "oos_total_return": 0.0008251675510910772,
+      "oos_volatility": 0.0007556903279844122,
+      "reject_top": "{\"funding_hour_excluded\": 9}",
+      "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": false, \"oos_return_beats_replay_incumbents\": false, \"oos_sharpe_beats_replay_incumbents\": false, \"oos_trades_not_starved\": true, \"train_positive\": true, \"val_positive\": false}",
+      "replay_survivor": false,
+      "success_candidate": false,
+      "train_fills": 346,
+      "train_max_drawdown": 0.004794685444618149,
+      "train_round_trips": 173,
+      "train_sharpe": 0.06809733606530802,
+      "train_sortino": 0.09012222871343463,
+      "train_total_return": 0.002206176973704288,
+      "train_volatility": 0.0009409744601786143,
+      "val_fills": 66,
+      "val_max_drawdown": 0.004482484701736126,
+      "val_round_trips": 33,
+      "val_sharpe": -0.6231139711350202,
+      "val_sortino": -0.7328047243137646,
+      "val_total_return": -0.0033074520490253834,
+      "val_volatility": 0.0009461488977164315
+    },
+    {
+      "absolute_gate_shape": false,
+      "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [0, 1, 8, 9, 16, 17], \"hl_basis_abs_max\": 0.0, \"hl_funding_abs_cap\": 0.00015, \"hl_oi_z_min\": 0.0, \"hl_require_funding_sign_match\": false, \"return_threshold\": 0.008, \"tickmill_macro_filter\": \"\"}",
+      "name": "hl_funding_abs_cap_funding_guard_150ppm",
+      "oos_fills": 54,
+      "oos_max_drawdown": 0.0017995177126535363,
+      "oos_round_trips": 27,
+      "oos_sharpe": 0.17748975685893909,
+      "oos_sortino": 0.22308660736450048,
+      "oos_total_return": 0.0008251675510910772,
+      "oos_volatility": 0.0007556903279844122,
+      "reject_top": "{\"funding_hour_excluded\": 9}",
+      "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": false, \"oos_return_beats_replay_incumbents\": false, \"oos_sharpe_beats_replay_incumbents\": false, \"oos_trades_not_starved\": true, \"train_positive\": true, \"val_positive\": false}",
+      "replay_survivor": false,
+      "success_candidate": false,
+      "train_fills": 346,
+      "train_max_drawdown": 0.004794685444618149,
+      "train_round_trips": 173,
+      "train_sharpe": 0.06809733606530802,
+      "train_sortino": 0.09012222871343463,
+      "train_total_return": 0.002206176973704288,
+      "train_volatility": 0.0009409744601786143,
+      "val_fills": 66,
+      "val_max_drawdown": 0.004482484701736126,
+      "val_round_trips": 33,
+      "val_sharpe": -0.6231139711350202,
+      "val_sortino": -0.7328047243137646,
+      "val_total_return": -0.0033074520490253834,
+      "val_volatility": 0.0009461488977164315
+    },
+    {
+      "absolute_gate_shape": false,
+      "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [0, 1, 8, 9, 16, 17], \"hl_basis_abs_max\": 0.0, \"hl_funding_abs_cap\": 0.00025, \"hl_oi_z_min\": 0.0, \"hl_require_funding_sign_match\": false, \"return_threshold\": 0.008, \"tickmill_macro_filter\": \"\"}",
+      "name": "hl_funding_abs_cap_funding_guard_250ppm",
+      "oos_fills": 54,
+      "oos_max_drawdown": 0.0017995177126535363,
+      "oos_round_trips": 27,
+      "oos_sharpe": 0.17748975685893909,
+      "oos_sortino": 0.22308660736450048,
+      "oos_total_return": 0.0008251675510910772,
+      "oos_volatility": 0.0007556903279844122,
+      "reject_top": "{\"funding_hour_excluded\": 9}",
+      "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": false, \"oos_return_beats_replay_incumbents\": false, \"oos_sharpe_beats_replay_incumbents\": false, \"oos_trades_not_starved\": true, \"train_positive\": true, \"val_positive\": false}",
+      "replay_survivor": false,
+      "success_candidate": false,
+      "train_fills": 346,
+      "train_max_drawdown": 0.004794685444618149,
+      "train_round_trips": 173,
+      "train_sharpe": 0.06809733606530802,
+      "train_sortino": 0.09012222871343463,
+      "train_total_return": 0.002206176973704288,
+      "train_volatility": 0.0009409744601786143,
+      "val_fills": 66,
+      "val_max_drawdown": 0.004482484701736126,
+      "val_round_trips": 33,
+      "val_sharpe": -0.6231139711350202,
+      "val_sortino": -0.7328047243137646,
+      "val_total_return": -0.0033074520490253834,
+      "val_volatility": 0.0009461488977164315
+    },
+    {
+      "absolute_gate_shape": false,
+      "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [], \"hl_basis_abs_max\": 0.0, \"hl_funding_abs_cap\": 0.0, \"hl_oi_z_min\": 0.5, \"hl_require_funding_sign_match\": false, \"return_threshold\": 0.01, \"tickmill_macro_filter\": \"\"}",
+      "name": "hl_oi_exhaustion_base_z05",
+      "oos_fills": 0,
+      "oos_max_drawdown": 0.0,
+      "oos_round_trips": 0,
+      "oos_sharpe": 0.0,
+      "oos_sortino": 0.0,
+      "oos_total_return": 0.0,
+      "oos_volatility": 0.0,
+      "reject_top": "{\"hl_oi_history_missing\": 813}",
+      "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": true, \"oos_return_beats_replay_incumbents\": false, \"oos_sharpe_beats_replay_incumbents\": false, \"oos_trades_not_starved\": false, \"train_positive\": false, \"val_positive\": false}",
+      "replay_survivor": false,
+      "success_candidate": false,
+      "train_fills": 0,
+      "train_max_drawdown": 0.0,
+      "train_round_trips": 0,
+      "train_sharpe": 0.0,
+      "train_sortino": 0.0,
+      "train_total_return": 0.0,
+      "train_volatility": 0.0,
+      "val_fills": 0,
+      "val_max_drawdown": 0.0,
+      "val_round_trips": 0,
+      "val_sharpe": 0.0,
+      "val_sortino": 0.0,
+      "val_total_return": 0.0,
+      "val_volatility": 0.0
+    },
+    {
+      "absolute_gate_shape": false,
+      "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [], \"hl_basis_abs_max\": 0.0, \"hl_funding_abs_cap\": 0.0, \"hl_oi_z_min\": 1.0, \"hl_require_funding_sign_match\": false, \"return_threshold\": 0.01, \"tickmill_macro_filter\": \"\"}",
+      "name": "hl_oi_exhaustion_base_z10",
+      "oos_fills": 0,
+      "oos_max_drawdown": 0.0,
+      "oos_round_trips": 0,
+      "oos_sharpe": 0.0,
+      "oos_sortino": 0.0,
+      "oos_total_return": 0.0,
+      "oos_volatility": 0.0,
+      "reject_top": "{\"hl_oi_history_missing\": 813}",
+      "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": true, \"oos_return_beats_replay_incumbents\": false, \"oos_sharpe_beats_replay_incumbents\": false, \"oos_trades_not_starved\": false, \"train_positive\": false, \"val_positive\": false}",
+      "replay_survivor": false,
+      "success_candidate": false,
+      "train_fills": 0,
+      "train_max_drawdown": 0.0,
+      "train_round_trips": 0,
+      "train_sharpe": 0.0,
+      "train_sortino": 0.0,
+      "train_total_return": 0.0,
+      "train_volatility": 0.0,
+      "val_fills": 0,
+      "val_max_drawdown": 0.0,
+      "val_round_trips": 0,
+      "val_sharpe": 0.0,
+      "val_sortino": 0.0,
+      "val_total_return": 0.0,
+      "val_volatility": 0.0
+    },
+    {
+      "absolute_gate_shape": false,
+      "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [], \"hl_basis_abs_max\": 0.001, \"hl_funding_abs_cap\": 0.0, \"hl_oi_z_min\": 0.0, \"hl_require_funding_sign_match\": false, \"return_threshold\": 0.01, \"tickmill_macro_filter\": \"\"}",
+      "name": "hl_mark_basis_stress_base_10bp",
+      "oos_fills": 0,
+      "oos_max_drawdown": 0.0,
+      "oos_round_trips": 0,
+      "oos_sharpe": 0.0,
+      "oos_sortino": 0.0,
+      "oos_total_return": 0.0,
+      "oos_volatility": 0.0,
+      "reject_top": "{\"hl_mark_history_missing\": 813}",
+      "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": true, \"oos_return_beats_replay_incumbents\": false, \"oos_sharpe_beats_replay_incumbents\": false, \"oos_trades_not_starved\": false, \"train_positive\": false, \"val_positive\": false}",
+      "replay_survivor": false,
+      "success_candidate": false,
+      "train_fills": 0,
+      "train_max_drawdown": 0.0,
+      "train_round_trips": 0,
+      "train_sharpe": 0.0,
+      "train_sortino": 0.0,
+      "train_total_return": 0.0,
+      "train_volatility": 0.0,
+      "val_fills": 0,
+      "val_max_drawdown": 0.0,
+      "val_round_trips": 0,
+      "val_sharpe": 0.0,
+      "val_sortino": 0.0,
+      "val_total_return": 0.0,
+      "val_volatility": 0.0
+    },
+    {
+      "absolute_gate_shape": false,
+      "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [], \"hl_basis_abs_max\": 0.0025, \"hl_funding_abs_cap\": 0.0, \"hl_oi_z_min\": 0.0, \"hl_require_funding_sign_match\": false, \"return_threshold\": 0.01, \"tickmill_macro_filter\": \"\"}",
+      "name": "hl_mark_basis_stress_base_25bp",
+      "oos_fills": 0,
+      "oos_max_drawdown": 0.0,
+      "oos_round_trips": 0,
+      "oos_sharpe": 0.0,
+      "oos_sortino": 0.0,
+      "oos_total_return": 0.0,
+      "oos_volatility": 0.0,
+      "reject_top": "{\"hl_mark_history_missing\": 813}",
+      "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": true, \"oos_return_beats_replay_incumbents\": false, \"oos_sharpe_beats_replay_incumbents\": false, \"oos_trades_not_starved\": false, \"train_positive\": false, \"val_positive\": false}",
+      "replay_survivor": false,
+      "success_candidate": false,
+      "train_fills": 0,
+      "train_max_drawdown": 0.0,
+      "train_round_trips": 0,
+      "train_sharpe": 0.0,
+      "train_sortino": 0.0,
+      "train_total_return": 0.0,
+      "train_volatility": 0.0,
+      "val_fills": 0,
+      "val_max_drawdown": 0.0,
+      "val_round_trips": 0,
+      "val_sharpe": 0.0,
+      "val_sortino": 0.0,
+      "val_total_return": 0.0,
+      "val_volatility": 0.0
+    },
+    {
+      "absolute_gate_shape": false,
+      "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [], \"hl_basis_abs_max\": 0.005, \"hl_funding_abs_cap\": 0.0, \"hl_oi_z_min\": 0.0, \"hl_require_funding_sign_match\": false, \"return_threshold\": 0.01, \"tickmill_macro_filter\": \"\"}",
+      "name": "hl_mark_basis_stress_base_50bp",
+      "oos_fills": 0,
+      "oos_max_drawdown": 0.0,
+      "oos_round_trips": 0,
+      "oos_sharpe": 0.0,
+      "oos_sortino": 0.0,
+      "oos_total_return": 0.0,
+      "oos_volatility": 0.0,
+      "reject_top": "{\"hl_mark_history_missing\": 813}",
+      "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": true, \"oos_return_beats_replay_incumbents\": false, \"oos_sharpe_beats_replay_incumbents\": false, \"oos_trades_not_starved\": false, \"train_positive\": false, \"val_positive\": false}",
+      "replay_survivor": false,
+      "success_candidate": false,
+      "train_fills": 0,
+      "train_max_drawdown": 0.0,
+      "train_round_trips": 0,
+      "train_sharpe": 0.0,
+      "train_sortino": 0.0,
+      "train_total_return": 0.0,
+      "train_volatility": 0.0,
+      "val_fills": 0,
+      "val_max_drawdown": 0.0,
+      "val_round_trips": 0,
+      "val_sharpe": 0.0,
+      "val_sortino": 0.0,
+      "val_total_return": 0.0,
+      "val_volatility": 0.0
+    },
+    {
+      "absolute_gate_shape": false,
+      "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [], \"hl_basis_abs_max\": 0.0, \"hl_funding_abs_cap\": 0.0, \"hl_oi_z_min\": 0.0, \"hl_require_funding_sign_match\": false, \"return_threshold\": 0.01, \"tickmill_macro_filter\": \"usd_risk\"}",
+      "name": "tickmill_macro_usd_risk_base",
+      "oos_fills": 0,
+      "oos_max_drawdown": 0.0,
+      "oos_round_trips": 0,
+      "oos_sharpe": 0.0,
+      "oos_sortino": 0.0,
+      "oos_total_return": 0.0,
+      "oos_volatility": 0.0,
+      "reject_top": "{\"tickmill_mt5_macro_data_unavailable\": 813}",
+      "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": true, \"oos_return_beats_replay_incumbents\": false, \"oos_sharpe_beats_replay_incumbents\": false, \"oos_trades_not_starved\": false, \"train_positive\": false, \"val_positive\": false}",
+      "replay_survivor": false,
+      "success_candidate": false,
+      "train_fills": 0,
+      "train_max_drawdown": 0.0,
+      "train_round_trips": 0,
+      "train_sharpe": 0.0,
+      "train_sortino": 0.0,
+      "train_total_return": 0.0,
+      "train_volatility": 0.0,
+      "val_fills": 0,
+      "val_max_drawdown": 0.0,
+      "val_round_trips": 0,
+      "val_sharpe": 0.0,
+      "val_sortino": 0.0,
+      "val_total_return": 0.0,
+      "val_volatility": 0.0
+    },
+    {
+      "absolute_gate_shape": false,
+      "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [], \"hl_basis_abs_max\": 0.0, \"hl_funding_abs_cap\": 0.0, \"hl_oi_z_min\": 0.0, \"hl_require_funding_sign_match\": false, \"return_threshold\": 0.01, \"tickmill_macro_filter\": \"xau_xag_stress\"}",
+      "name": "tickmill_macro_xau_xag_stress_base",
+      "oos_fills": 0,
+      "oos_max_drawdown": 0.0,
+      "oos_round_trips": 0,
+      "oos_sharpe": 0.0,
+      "oos_sortino": 0.0,
+      "oos_total_return": 0.0,
+      "oos_volatility": 0.0,
+      "reject_top": "{\"tickmill_mt5_macro_data_unavailable\": 813}",
+      "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": true, \"oos_return_beats_replay_incumbents\": false, \"oos_sharpe_beats_replay_incumbents\": false, \"oos_trades_not_starved\": false, \"train_positive\": false, \"val_positive\": false}",
+      "replay_survivor": false,
+      "success_candidate": false,
+      "train_fills": 0,
+      "train_max_drawdown": 0.0,
+      "train_round_trips": 0,
+      "train_sharpe": 0.0,
+      "train_sortino": 0.0,
+      "train_total_return": 0.0,
+      "train_volatility": 0.0,
+      "val_fills": 0,
+      "val_max_drawdown": 0.0,
+      "val_round_trips": 0,
+      "val_sharpe": 0.0,
+      "val_sortino": 0.0,
+      "val_total_return": 0.0,
+      "val_volatility": 0.0
+    },
+    {
+      "absolute_gate_shape": false,
+      "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [], \"hl_basis_abs_max\": 0.0, \"hl_funding_abs_cap\": 0.0, \"hl_oi_z_min\": 0.0, \"hl_require_funding_sign_match\": false, \"return_threshold\": 0.01, \"tickmill_macro_filter\": \"indices_risk_off\"}",
+      "name": "tickmill_macro_indices_risk_off_base",
+      "oos_fills": 0,
+      "oos_max_drawdown": 0.0,
+      "oos_round_trips": 0,
+      "oos_sharpe": 0.0,
+      "oos_sortino": 0.0,
+      "oos_total_return": 0.0,
+      "oos_volatility": 0.0,
+      "reject_top": "{\"tickmill_mt5_macro_data_unavailable\": 813}",
+      "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": true, \"oos_return_beats_replay_incumbents\": false, \"oos_sharpe_beats_replay_incumbents\": false, \"oos_trades_not_starved\": false, \"train_positive\": false, \"val_positive\": false}",
+      "replay_survivor": false,
+      "success_candidate": false,
+      "train_fills": 0,
+      "train_max_drawdown": 0.0,
+      "train_round_trips": 0,
+      "train_sharpe": 0.0,
+      "train_sortino": 0.0,
+      "train_total_return": 0.0,
+      "train_volatility": 0.0,
+      "val_fills": 0,
+      "val_max_drawdown": 0.0,
+      "val_round_trips": 0,
+      "val_sharpe": 0.0,
+      "val_sortino": 0.0,
+      "val_total_return": 0.0,
+      "val_volatility": 0.0
+    },
+    {
+      "absolute_gate_shape": false,
+      "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [0, 1, 8, 9, 16, 17], \"hl_basis_abs_max\": 0.0, \"hl_funding_abs_cap\": 0.0, \"hl_oi_z_min\": 0.5, \"hl_require_funding_sign_match\": false, \"return_threshold\": 0.008, \"tickmill_macro_filter\": \"\"}",
+      "name": "hl_oi_exhaustion_funding_guard_z05",
+      "oos_fills": 0,
+      "oos_max_drawdown": 0.0,
+      "oos_round_trips": 0,
+      "oos_sharpe": 0.0,
+      "oos_sortino": 0.0,
+      "oos_total_return": 0.0,
+      "oos_volatility": 0.0,
+      "reject_top": "{\"funding_hour_excluded\": 234, \"hl_oi_history_missing\": 689}",
+      "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": true, \"oos_return_beats_replay_incumbents\": false, \"oos_sharpe_beats_replay_incumbents\": false, \"oos_trades_not_starved\": false, \"train_positive\": false, \"val_positive\": false}",
+      "replay_survivor": false,
+      "success_candidate": false,
+      "train_fills": 0,
+      "train_max_drawdown": 0.0,
+      "train_round_trips": 0,
+      "train_sharpe": 0.0,
+      "train_sortino": 0.0,
+      "train_total_return": 0.0,
+      "train_volatility": 0.0,
+      "val_fills": 0,
+      "val_max_drawdown": 0.0,
+      "val_round_trips": 0,
+      "val_sharpe": 0.0,
+      "val_sortino": 0.0,
+      "val_total_return": 0.0,
+      "val_volatility": 0.0
+    },
+    {
+      "absolute_gate_shape": false,
+      "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [0, 1, 8, 9, 16, 17], \"hl_basis_abs_max\": 0.0, \"hl_funding_abs_cap\": 0.0, \"hl_oi_z_min\": 1.0, \"hl_require_funding_sign_match\": false, \"return_threshold\": 0.008, \"tickmill_macro_filter\": \"\"}",
+      "name": "hl_oi_exhaustion_funding_guard_z10",
+      "oos_fills": 0,
+      "oos_max_drawdown": 0.0,
+      "oos_round_trips": 0,
+      "oos_sharpe": 0.0,
+      "oos_sortino": 0.0,
+      "oos_total_return": 0.0,
+      "oos_volatility": 0.0,
+      "reject_top": "{\"funding_hour_excluded\": 234, \"hl_oi_history_missing\": 689}",
+      "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": true, \"oos_return_beats_replay_incumbents\": false, \"oos_sharpe_beats_replay_incumbents\": false, \"oos_trades_not_starved\": false, \"train_positive\": false, \"val_positive\": false}",
+      "replay_survivor": false,
+      "success_candidate": false,
+      "train_fills": 0,
+      "train_max_drawdown": 0.0,
+      "train_round_trips": 0,
+      "train_sharpe": 0.0,
+      "train_sortino": 0.0,
+      "train_total_return": 0.0,
+      "train_volatility": 0.0,
+      "val_fills": 0,
+      "val_max_drawdown": 0.0,
+      "val_round_trips": 0,
+      "val_sharpe": 0.0,
+      "val_sortino": 0.0,
+      "val_total_return": 0.0,
+      "val_volatility": 0.0
+    },
+    {
+      "absolute_gate_shape": false,
+      "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [0, 1, 8, 9, 16, 17], \"hl_basis_abs_max\": 0.001, \"hl_funding_abs_cap\": 0.0, \"hl_oi_z_min\": 0.0, \"hl_require_funding_sign_match\": false, \"return_threshold\": 0.008, \"tickmill_macro_filter\": \"\"}",
+      "name": "hl_mark_basis_stress_funding_guard_10bp",
+      "oos_fills": 0,
+      "oos_max_drawdown": 0.0,
+      "oos_round_trips": 0,
+      "oos_sharpe": 0.0,
+      "oos_sortino": 0.0,
+      "oos_total_return": 0.0,
+      "oos_volatility": 0.0,
+      "reject_top": "{\"funding_hour_excluded\": 234, \"hl_mark_history_missing\": 689}",
+      "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": true, \"oos_return_beats_replay_incumbents\": false, \"oos_sharpe_beats_replay_incumbents\": false, \"oos_trades_not_starved\": false, \"train_positive\": false, \"val_positive\": false}",
+      "replay_survivor": false,
+      "success_candidate": false,
+      "train_fills": 0,
+      "train_max_drawdown": 0.0,
+      "train_round_trips": 0,
+      "train_sharpe": 0.0,
+      "train_sortino": 0.0,
+      "train_total_return": 0.0,
+      "train_volatility": 0.0,
+      "val_fills": 0,
+      "val_max_drawdown": 0.0,
+      "val_round_trips": 0,
+      "val_sharpe": 0.0,
+      "val_sortino": 0.0,
+      "val_total_return": 0.0,
+      "val_volatility": 0.0
+    },
+    {
+      "absolute_gate_shape": false,
+      "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [0, 1, 8, 9, 16, 17], \"hl_basis_abs_max\": 0.0025, \"hl_funding_abs_cap\": 0.0, \"hl_oi_z_min\": 0.0, \"hl_require_funding_sign_match\": false, \"return_threshold\": 0.008, \"tickmill_macro_filter\": \"\"}",
+      "name": "hl_mark_basis_stress_funding_guard_25bp",
+      "oos_fills": 0,
+      "oos_max_drawdown": 0.0,
+      "oos_round_trips": 0,
+      "oos_sharpe": 0.0,
+      "oos_sortino": 0.0,
+      "oos_total_return": 0.0,
+      "oos_volatility": 0.0,
+      "reject_top": "{\"funding_hour_excluded\": 234, \"hl_mark_history_missing\": 689}",
+      "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": true, \"oos_return_beats_replay_incumbents\": false, \"oos_sharpe_beats_replay_incumbents\": false, \"oos_trades_not_starved\": false, \"train_positive\": false, \"val_positive\": false}",
+      "replay_survivor": false,
+      "success_candidate": false,
+      "train_fills": 0,
+      "train_max_drawdown": 0.0,
+      "train_round_trips": 0,
+      "train_sharpe": 0.0,
+      "train_sortino": 0.0,
+      "train_total_return": 0.0,
+      "train_volatility": 0.0,
+      "val_fills": 0,
+      "val_max_drawdown": 0.0,
+      "val_round_trips": 0,
+      "val_sharpe": 0.0,
+      "val_sortino": 0.0,
+      "val_total_return": 0.0,
+      "val_volatility": 0.0
+    },
+    {
+      "absolute_gate_shape": false,
+      "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [0, 1, 8, 9, 16, 17], \"hl_basis_abs_max\": 0.005, \"hl_funding_abs_cap\": 0.0, \"hl_oi_z_min\": 0.0, \"hl_require_funding_sign_match\": false, \"return_threshold\": 0.008, \"tickmill_macro_filter\": \"\"}",
+      "name": "hl_mark_basis_stress_funding_guard_50bp",
+      "oos_fills": 0,
+      "oos_max_drawdown": 0.0,
+      "oos_round_trips": 0,
+      "oos_sharpe": 0.0,
+      "oos_sortino": 0.0,
+      "oos_total_return": 0.0,
+      "oos_volatility": 0.0,
+      "reject_top": "{\"funding_hour_excluded\": 234, \"hl_mark_history_missing\": 689}",
+      "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": true, \"oos_return_beats_replay_incumbents\": false, \"oos_sharpe_beats_replay_incumbents\": false, \"oos_trades_not_starved\": false, \"train_positive\": false, \"val_positive\": false}",
+      "replay_survivor": false,
+      "success_candidate": false,
+      "train_fills": 0,
+      "train_max_drawdown": 0.0,
+      "train_round_trips": 0,
+      "train_sharpe": 0.0,
+      "train_sortino": 0.0,
+      "train_total_return": 0.0,
+      "train_volatility": 0.0,
+      "val_fills": 0,
+      "val_max_drawdown": 0.0,
+      "val_round_trips": 0,
+      "val_sharpe": 0.0,
+      "val_sortino": 0.0,
+      "val_total_return": 0.0,
+      "val_volatility": 0.0
+    },
+    {
+      "absolute_gate_shape": false,
+      "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [0, 1, 8, 9, 16, 17], \"hl_basis_abs_max\": 0.0, \"hl_funding_abs_cap\": 0.0, \"hl_oi_z_min\": 0.0, \"hl_require_funding_sign_match\": false, \"return_threshold\": 0.008, \"tickmill_macro_filter\": \"usd_risk\"}",
+      "name": "tickmill_macro_usd_risk_funding_guard",
+      "oos_fills": 0,
+      "oos_max_drawdown": 0.0,
+      "oos_round_trips": 0,
+      "oos_sharpe": 0.0,
+      "oos_sortino": 0.0,
+      "oos_total_return": 0.0,
+      "oos_volatility": 0.0,
+      "reject_top": "{\"funding_hour_excluded\": 234, \"tickmill_mt5_macro_data_unavailable\": 689}",
+      "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": true, \"oos_return_beats_replay_incumbents\": false, \"oos_sharpe_beats_replay_incumbents\": false, \"oos_trades_not_starved\": false, \"train_positive\": false, \"val_positive\": false}",
+      "replay_survivor": false,
+      "success_candidate": false,
+      "train_fills": 0,
+      "train_max_drawdown": 0.0,
+      "train_round_trips": 0,
+      "train_sharpe": 0.0,
+      "train_sortino": 0.0,
+      "train_total_return": 0.0,
+      "train_volatility": 0.0,
+      "val_fills": 0,
+      "val_max_drawdown": 0.0,
+      "val_round_trips": 0,
+      "val_sharpe": 0.0,
+      "val_sortino": 0.0,
+      "val_total_return": 0.0,
+      "val_volatility": 0.0
+    },
+    {
+      "absolute_gate_shape": false,
+      "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [0, 1, 8, 9, 16, 17], \"hl_basis_abs_max\": 0.0, \"hl_funding_abs_cap\": 0.0, \"hl_oi_z_min\": 0.0, \"hl_require_funding_sign_match\": false, \"return_threshold\": 0.008, \"tickmill_macro_filter\": \"xau_xag_stress\"}",
+      "name": "tickmill_macro_xau_xag_stress_funding_guard",
+      "oos_fills": 0,
+      "oos_max_drawdown": 0.0,
+      "oos_round_trips": 0,
+      "oos_sharpe": 0.0,
+      "oos_sortino": 0.0,
+      "oos_total_return": 0.0,
+      "oos_volatility": 0.0,
+      "reject_top": "{\"funding_hour_excluded\": 234, \"tickmill_mt5_macro_data_unavailable\": 689}",
+      "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": true, \"oos_return_beats_replay_incumbents\": false, \"oos_sharpe_beats_replay_incumbents\": false, \"oos_trades_not_starved\": false, \"train_positive\": false, \"val_positive\": false}",
+      "replay_survivor": false,
+      "success_candidate": false,
+      "train_fills": 0,
+      "train_max_drawdown": 0.0,
+      "train_round_trips": 0,
+      "train_sharpe": 0.0,
+      "train_sortino": 0.0,
+      "train_total_return": 0.0,
+      "train_volatility": 0.0,
+      "val_fills": 0,
+      "val_max_drawdown": 0.0,
+      "val_round_trips": 0,
+      "val_sharpe": 0.0,
+      "val_sortino": 0.0,
+      "val_total_return": 0.0,
+      "val_volatility": 0.0
+    },
+    {
+      "absolute_gate_shape": false,
+      "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [0, 1, 8, 9, 16, 17], \"hl_basis_abs_max\": 0.0, \"hl_funding_abs_cap\": 0.0, \"hl_oi_z_min\": 0.0, \"hl_require_funding_sign_match\": false, \"return_threshold\": 0.008, \"tickmill_macro_filter\": \"indices_risk_off\"}",
+      "name": "tickmill_macro_indices_risk_off_funding_guard",
+      "oos_fills": 0,
+      "oos_max_drawdown": 0.0,
+      "oos_round_trips": 0,
+      "oos_sharpe": 0.0,
+      "oos_sortino": 0.0,
+      "oos_total_return": 0.0,
+      "oos_volatility": 0.0,
+      "reject_top": "{\"funding_hour_excluded\": 234, \"tickmill_mt5_macro_data_unavailable\": 689}",
+      "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": true, \"oos_return_beats_replay_incumbents\": false, \"oos_sharpe_beats_replay_incumbents\": false, \"oos_trades_not_starved\": false, \"train_positive\": false, \"val_positive\": false}",
+      "replay_survivor": false,
+      "success_candidate": false,
+      "train_fills": 0,
+      "train_max_drawdown": 0.0,
+      "train_round_trips": 0,
+      "train_sharpe": 0.0,
+      "train_sortino": 0.0,
+      "train_total_return": 0.0,
+      "train_volatility": 0.0,
+      "val_fills": 0,
+      "val_max_drawdown": 0.0,
+      "val_round_trips": 0,
+      "val_sharpe": 0.0,
+      "val_sortino": 0.0,
+      "val_total_return": 0.0,
+      "val_volatility": 0.0
+    }
+  ],
+  "data_metadata": {
+    "eth_feature_points": {
+      "first_timestamp_utc": "2025-01-01T00:00:00.015000+00:00",
+      "has_liquidation": false,
+      "has_taker_flow": true,
+      "last_timestamp_utc": "2026-05-05T00:00:00+00:00",
+      "rows": 2106573
+    },
+    "first_hour": "2025-01-01 00:00:00",
+    "hourly_rows": 11698,
+    "hyperliquid_eth_feature_points": {
+      "first_timestamp_ms": 1735689600054,
+      "first_timestamp_utc": "2025-01-01T00:00:00.054000+00:00",
+      "funding_rows": 11736,
+      "has_funding": true,
+      "has_mark_history": false,
+      "has_open_interest_history": false,
+      "last_timestamp_ms": 1777935600055,
+      "last_timestamp_utc": "2026-05-04T23:00:00.055000+00:00",
+      "mark_rows": 0,
+      "open_interest_rows": 0,
+      "rows": 11736
+    },
+    "last_hour": "2026-05-04 23:00:00"
+  },
+  "exchange": "binance",
+  "gate_thresholds": {
+    "baseline_oos_return": 0.008284,
+    "funding_guard_oos_mdd": 0.001778,
+    "funding_guard_oos_sharpe": 0.111225,
+    "success_sharpe_min": 1.0
+  },
+  "generated_at_utc": "2026-05-07T10:00:17.164056Z",
+  "market_root": "data/market_parquet",
+  "oos_end_date": "2026-05-04",
+  "replay_survivors": [],
+  "resource_usage": {
+    "max_rss_mib": 6710.816,
+    "rss_limit_mib": 8192
+  },
+  "split_windows": [
+    {
+      "end_inclusive": "2025-12-31",
+      "name": "train",
+      "role": "sanity_filter",
+      "start": "2025-01-01"
+    },
+    {
+      "end_inclusive": "2026-02-28",
+      "name": "val",
+      "role": "primary_selection",
+      "start": "2026-01-01"
+    },
+    {
+      "end_inclusive": "2026-05-04",
+      "name": "oos",
+      "role": "report_only",
+      "start": "2026-03-01"
+    }
+  ],
+  "success_candidates": [],
+  "tickmill_macro_status": "blocked"
+}

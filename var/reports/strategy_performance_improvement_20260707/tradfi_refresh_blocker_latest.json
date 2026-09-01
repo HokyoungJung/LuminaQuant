@@ -1,0 +1,17 @@
+{
+  "command_log_path": "var/reports/strategy_performance_improvement_20260707/command_log_latest.txt",
+  "created_at": "2026-07-07T11:39:43.237254Z",
+  "data_coverage_counts": {
+    "basis": "Leader WF rerun used existing local direct 1m-derived market_parquet data; collector/backfill writes were not run in this update.",
+    "global_latest_utc": "2026-07-04T06:30:00",
+    "loaded": 110,
+    "missing": 0,
+    "monitor_only": 0,
+    "requested": 110,
+    "train_eligible": 110
+  },
+  "details": "The earlier worker4 verification-worktree no-data blocker is superseded by the leader rerun: full-universe WF loaded 110/110 requested symbols from existing local market_parquet and completed all 11 folds. The TradFi discovery lane remains dry-run/no-write; no collector/backfill mutation was performed.",
+  "schema_version": "1.0",
+  "status": "superseded_by_completed_leader_wf_rerun",
+  "superseded_at_utc": "2026-07-08T11:47:52Z"
+}

@@ -1,0 +1,63 @@
+{
+  "skill": "ultragoal",
+  "status": "complete",
+  "current_phase": "complete",
+  "active": false,
+  "goals": [
+    {
+      "id": "G001",
+      "title": "Sync the latest LuminaQuant private-main, read the updated in-repo data-PC ha...",
+      "status": "complete"
+    }
+  ],
+  "counts": {
+    "pending": 0,
+    "active": 0,
+    "complete": 1,
+    "failed": 0,
+    "blocked": 0,
+    "review_blocked": 0,
+    "superseded": 0
+  },
+  "ledger_path": "/home/hoky/Quants-agent/LuminaQuant/.gjc/_session-019f467d-90ec-7000-9de8-ef4285955c9b/ultragoal/ledger.jsonl",
+  "brief_path": "/home/hoky/Quants-agent/LuminaQuant/.gjc/_session-019f467d-90ec-7000-9de8-ef4285955c9b/ultragoal/brief.md",
+  "goals_path": "/home/hoky/Quants-agent/LuminaQuant/.gjc/_session-019f467d-90ec-7000-9de8-ef4285955c9b/ultragoal/goals.json",
+  "version": 2,
+  "updated_at": "2026-07-09T14:11:25.287Z",
+  "receipt": {
+    "version": 1,
+    "skill": "ultragoal",
+    "owner": "gjc-runtime",
+    "command": "gjc ultragoal (reconcile)",
+    "state_path": "/home/hoky/Quants-agent/LuminaQuant/.gjc/state/sessions/019f467d-90ec-7000-9de8-ef4285955c9b/skill-active-state.json",
+    "storage_path": "/home/hoky/Quants-agent/LuminaQuant/.gjc/state/sessions/019f467d-90ec-7000-9de8-ef4285955c9b/ultragoal-state.json",
+    "mutated_at": "2026-07-09T14:11:25.287Z",
+    "fresh_until": "2026-07-09T14:41:25.287Z",
+    "status": "fresh",
+    "mutation_id": "ultragoal:reconcile:2026-07-09T14:11:25.287Z",
+    "verb": "reconcile",
+    "from_phase": "complete",
+    "to_phase": "complete",
+    "forced": true,
+    "content_sha256": {
+      "algorithm": "sha256",
+      "value": "0fae52b4c48cbd2a9d193482760111d661f1d58b03eb8ca88e113949e1351360",
+      "covered_path": "/home/hoky/Quants-agent/LuminaQuant/.gjc/_session-019f467d-90ec-7000-9de8-ef4285955c9b/state/ultragoal-state.json",
+      "computed_at": "2026-07-09T14:11:25.289Z"
+    }
+  },
+  "session_id": "019f467d-90ec-7000-9de8-ef4285955c9b",
+  "gjc_objective": "Complete the durable ultragoal plan in .gjc/ultragoal/goals.json, including later accepted/appended stories, under the original brief constraints; use .gjc/ultragoal/ledger.jsonl as the audit trail.",
+  "nudge_budget": 10,
+  "nudge_count": 0,
+  "nudge_remaining": 10,
+  "nudge_goal_id": "G001",
+  "nudge_target_kind": "final_aggregate_receipt",
+  "latestLedgerEvent": {
+    "event": "steering_accepted",
+    "timestamp": "2026-07-09T14:11:25.276Z",
+    "kind": "annotate_ledger",
+    "evidence": "Final post-v2c verification completed before push. Clean detached worktree f2e32dfd passed: ruff check, ruff format --check, native build, full pytest 4142 passed / 21 skipped / 3 xfailed, architecture gates, check_architecture, hardcoded audit total=1609 new=0 baselined=1609, verify_docs 146 markdown files, compileall, dashboard lint/test/typecheck/build, native parity/version tests 43 passed plus native benchmarks. Main data worktree benchmark/8GB gate passed with median 0.035847s, 17686 bars/sec, peak RSS 248.58MiB < 7372.80MiB. V2c architect review 3-V2cDocEvidenceReview CLEAR/APPROVE and executor QA 4-V2cDocEvidenceQA passed; no real/paper/testnet/live/order execution occurred."
+  },
+  "state_revision": 7
+}

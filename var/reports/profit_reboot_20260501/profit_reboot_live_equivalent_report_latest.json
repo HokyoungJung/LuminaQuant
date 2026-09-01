@@ -1,0 +1,179 @@
+{
+  "artifact_kind": "profit_reboot_live_equivalent_validation",
+  "evidence_paths": {
+    "train_checkpoint": "var/reports/profit_reboot_20260501/balanced_train_checkpoint.json",
+    "val_checkpoint": "var/reports/profit_reboot_20260501/balanced_val_checkpoint.json",
+    "vector_grid": "var/reports/profit_reboot_20260501/vector_low_turnover_top.json"
+  },
+  "gate": {
+    "alpha_blocking_reasons": [],
+    "fallback_eligible": false,
+    "selection_eligible": true,
+    "selection_role": "alpha",
+    "train_final_equity": 9815.155250903485,
+    "train_liquidation_count": 0,
+    "train_trade_count": 353,
+    "val_final_equity": 10025.550130401376,
+    "val_liquidation_count": 0,
+    "val_trade_count": 51
+  },
+  "generated_at": "2026-05-01T07:35:08.738301Z",
+  "mode": "profit_reboot_adaptive_momentum_mode",
+  "params": {
+    "broad_threshold": 0.0,
+    "btc_symbol": "BTC/USDT",
+    "gross_exposure": 0.005,
+    "lookback_bars": 360,
+    "max_hold_bars": 0,
+    "max_longs": 1,
+    "max_order_value": 200.0,
+    "max_realized_vol": 0.0,
+    "max_shorts": 2,
+    "min_price": 0.1,
+    "rebalance_bars": 72,
+    "regime_lookback_bars": 360,
+    "risk_off_exit": true,
+    "short_lookback_bars": 24,
+    "signal_threshold": 0.04,
+    "stop_loss_pct": 0.0,
+    "take_profit_pct": 0.0,
+    "trailing_exit_pct": 0.0,
+    "volatility_lookback_bars": 60
+  },
+  "result": {
+    "metrics": {
+      "oos": {
+        "cagr": 0.0,
+        "calmar": 0.0,
+        "max_drawdown": 0.0,
+        "sharpe": 0.0,
+        "sortino": 0.0,
+        "total_return": 0.0,
+        "volatility": 0.0
+      },
+      "train": {
+        "cagr": -8.947123219971154e-06,
+        "calmar": -7.418300999756296e-05,
+        "max_drawdown": 0.12060879196281038,
+        "sharpe": 0.004379782973960779,
+        "sortino": 0.004599015283651762,
+        "total_return": -0.018484663909651533,
+        "volatility": 0.010510273333234302
+      },
+      "val": {
+        "cagr": 7.558296142740062e-06,
+        "calmar": 0.0009942289564417125,
+        "max_drawdown": 0.007602168588803492,
+        "sharpe": 0.0119697544306497,
+        "sortino": 0.011600672983836864,
+        "total_return": 0.002551315040137725,
+        "volatility": 0.0006490433967422531
+      }
+    },
+    "mode": "profit_reboot_adaptive_momentum_mode",
+    "scores": {
+      "oos_scaled_score_report_only": 10.0,
+      "selection_score": 10.611527022514924,
+      "train_scaled_score": 2.1442384513113377,
+      "train_val_mdd_ok": true,
+      "val_scaled_score": 10.225564101278882
+    },
+    "split_runs": [
+      {
+        "equivalence_key": "9fdb60795b5587d58cd4f5147112d47b719e297c378fa39ceaef53398fdc5012",
+        "final_equity": 9815.155250903485,
+        "liquidation_count": 0,
+        "metrics": {
+          "cagr": -8.947123219971154e-06,
+          "calmar": -7.418300999756296e-05,
+          "max_drawdown": 0.12060879196281038,
+          "sharpe": 0.004379782973960779,
+          "sortino": 0.004599015283651762,
+          "total_return": -0.018484663909651533,
+          "volatility": 0.010510273333234302
+        },
+        "mode": "profit_reboot_adaptive_momentum_mode",
+        "source_mode": "profit_reboot_adaptive_momentum_mode",
+        "split": "train",
+        "status": "completed",
+        "trade_count": 353
+      },
+      {
+        "equivalence_key": "9fdb60795b5587d58cd4f5147112d47b719e297c378fa39ceaef53398fdc5012",
+        "final_equity": 10025.550130401376,
+        "liquidation_count": 0,
+        "metrics": {
+          "cagr": 7.558296142740062e-06,
+          "calmar": 0.0009942289564417125,
+          "max_drawdown": 0.007602168588803492,
+          "sharpe": 0.0119697544306497,
+          "sortino": 0.011600672983836864,
+          "total_return": 0.002551315040137725,
+          "volatility": 0.0006490433967422531
+        },
+        "mode": "profit_reboot_adaptive_momentum_mode",
+        "source_mode": "profit_reboot_adaptive_momentum_mode",
+        "split": "val",
+        "status": "completed",
+        "trade_count": 51
+      }
+    ],
+    "status": "live_equivalent_validated"
+  },
+  "row": {
+    "alpha_blocking_reasons": "",
+    "blocking_reasons": "",
+    "cash_weight": 0.0,
+    "fallback_eligible": false,
+    "mode": "profit_reboot_adaptive_momentum_mode",
+    "oos_cagr": 0.0,
+    "oos_calmar": 0.0,
+    "oos_max_drawdown": 0.0,
+    "oos_scaled_score_report_only": 10.0,
+    "oos_sharpe": 0.0,
+    "oos_sortino": 0.0,
+    "oos_total_return": 0.0,
+    "oos_volatility": 0.0,
+    "selection_eligible": true,
+    "selection_role": "alpha",
+    "selection_score": 10.611527022514924,
+    "status": "live_equivalent_validated",
+    "symbols": "BTC/USDT,ETH/USDT,BNB/USDT,SOL/USDT,TRX/USDT",
+    "train_cagr": -8.947123219971154e-06,
+    "train_calmar": -7.418300999756296e-05,
+    "train_final_equity": 9815.155250903485,
+    "train_liquidation_count": 0,
+    "train_max_drawdown": 0.12060879196281038,
+    "train_scaled_score": 2.1442384513113377,
+    "train_sharpe": 0.004379782973960779,
+    "train_sortino": 0.004599015283651762,
+    "train_total_return": -0.018484663909651533,
+    "train_trade_count": 353,
+    "train_volatility": 0.010510273333234302,
+    "val_cagr": 7.558296142740062e-06,
+    "val_calmar": 0.0009942289564417125,
+    "val_final_equity": 10025.550130401376,
+    "val_liquidation_count": 0,
+    "val_max_drawdown": 0.007602168588803492,
+    "val_scaled_score": 10.225564101278882,
+    "val_sharpe": 0.0119697544306497,
+    "val_sortino": 0.011600672983836864,
+    "val_total_return": 0.002551315040137725,
+    "val_trade_count": 51,
+    "val_volatility": 0.0006490433967422531
+  },
+  "selection_policy": {
+    "active_train_mdd_cap": 0.2,
+    "active_val_mdd_cap": 0.12,
+    "alpha_gate": "positive val return/sharpe/sortino; train return >= -3%; active train MDD <=20%; active val MDD <=12%; min trades; zero liquidations",
+    "train_return_floor": -0.03
+  },
+  "strategy": "AdaptiveRegimeMomentumStrategy",
+  "symbols": [
+    "BTC/USDT",
+    "ETH/USDT",
+    "BNB/USDT",
+    "SOL/USDT",
+    "TRX/USDT"
+  ]
+}

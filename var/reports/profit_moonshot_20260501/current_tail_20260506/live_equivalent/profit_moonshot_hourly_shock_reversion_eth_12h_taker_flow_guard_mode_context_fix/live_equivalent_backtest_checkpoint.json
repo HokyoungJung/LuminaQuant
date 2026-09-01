@@ -1,0 +1,65 @@
+{
+  "artifact_kind": "live_equivalent_backtest_checkpoint",
+  "split_results": {
+    "profit_moonshot_hourly_shock_reversion_eth_12h_taker_flow_guard_mode": {
+      "oos": {
+        "equivalence_key": "beeb636f5d49bef272be9c373968fb0aac7ea4fb3dfd7e8a1cd30f6230240cb6",
+        "final_equity": 10058.784757109475,
+        "liquidation_count": 0,
+        "metrics": {
+          "cagr": 1.5827009157698413e-05,
+          "calmar": 0.004940992511369399,
+          "max_drawdown": 0.0032032044414720125,
+          "sharpe": 0.07068826093340334,
+          "sortino": 0.08549034804036248,
+          "total_return": 0.005870978710947661,
+          "volatility": 0.00022425263364256765
+        },
+        "mode": "profit_moonshot_hourly_shock_reversion_eth_12h_taker_flow_guard_mode",
+        "source_mode": "profit_moonshot_hourly_shock_reversion_eth_12h_taker_flow_guard_mode",
+        "split": "oos",
+        "status": "completed",
+        "trade_count": 35
+      },
+      "train": {
+        "equivalence_key": "beeb636f5d49bef272be9c373968fb0aac7ea4fb3dfd7e8a1cd30f6230240cb6",
+        "final_equity": 10002.50533258496,
+        "liquidation_count": 0,
+        "metrics": {
+          "cagr": 1.2275173677522844e-07,
+          "calmar": 3.203777265792785e-06,
+          "max_drawdown": 0.038314691250814256,
+          "sharpe": 0.0005181245232513319,
+          "sortino": 0.0005989868354089933,
+          "total_return": 0.0002554682584958723,
+          "volatility": 0.0006695887220813254
+        },
+        "mode": "profit_moonshot_hourly_shock_reversion_eth_12h_taker_flow_guard_mode",
+        "source_mode": "profit_moonshot_hourly_shock_reversion_eth_12h_taker_flow_guard_mode",
+        "split": "train",
+        "status": "completed",
+        "trade_count": 236
+      },
+      "val": {
+        "equivalence_key": "beeb636f5d49bef272be9c373968fb0aac7ea4fb3dfd7e8a1cd30f6230240cb6",
+        "final_equity": 10083.752397851078,
+        "liquidation_count": 0,
+        "metrics": {
+          "cagr": 2.473530533375623e-05,
+          "calmar": 0.012206172516582311,
+          "max_drawdown": 0.0020264587691311803,
+          "sharpe": 0.10970097937305354,
+          "sortino": 0.12207726133826421,
+          "total_return": 0.008373304785107782,
+          "volatility": 0.000225708765731858
+        },
+        "mode": "profit_moonshot_hourly_shock_reversion_eth_12h_taker_flow_guard_mode",
+        "source_mode": "profit_moonshot_hourly_shock_reversion_eth_12h_taker_flow_guard_mode",
+        "split": "val",
+        "status": "completed",
+        "trade_count": 37
+      }
+    }
+  },
+  "updated_at": "2026-05-06T10:33:16.240269Z"
+}

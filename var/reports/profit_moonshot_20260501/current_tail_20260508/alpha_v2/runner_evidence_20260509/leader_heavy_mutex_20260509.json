@@ -1,0 +1,8 @@
+{
+  "completed_at": "2026-05-09T08:17:28Z",
+  "exclusive": true,
+  "lock_path": "var/reports/exact_window_backtests/followup_status/portfolio_followup_heavy_run.lock",
+  "overlap_check": "passed",
+  "started_at": "2026-05-09T08:13:08Z",
+  "status": "completed"
+}

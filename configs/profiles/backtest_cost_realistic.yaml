@@ -1,0 +1,422 @@
+# ==========================================
+# LuminaQuant Configuration — COST-REALISTIC backtest profile
+# ==========================================
+# Derived from the root config.yaml with ONLY the cost-realism flags flipped ON
+# (execution.slippage_impact_model=sqrt_impact + coefficient, require_funding_coverage,
+# risk.attach_default_protective_stop, risk.enforce_order_risk_gate_in_backtest).
+# Everything else is identical to config.yaml — KEEP IN SYNC if config.yaml changes.
+#
+# Usage on the backtest PC (LQ_CONFIG_PATH REPLACES config.yaml; it does NOT merge):
+#   A/B baseline (flat):  uv run lq optimize --folds 10 --oos-days 30 --validation-days 30 --run-id flat
+#   A/B realistic:        LQ_CONFIG_PATH=configs/profiles/backtest_cost_realistic.yaml \
+#                           uv run lq optimize --folds 10 --oos-days 30 --validation-days 30 --run-id realistic
+# Requires funding data collected (data.kinds includes funding) or the run fails
+# loudly by design. See docs/COST_REALISM_REMEASUREMENT.md (calibration, cost grid,
+# interpretation, go/no-go).
+profile: backtest_cost_realistic
+
+# ------------------------------------------
+# System Settings
+# ------------------------------------------
+system:
+  log_level: "INFO"
+
+# ------------------------------------------
+# Trading Settings (Live & Backtest)
+# ------------------------------------------
+trading:
+  # `symbols` intentionally omitted so it defaults to the FULL research universe
+  # (BINANCE_EXTENDED_RESEARCH_SYMBOLS_SLASHED in src/lumina_quant/research_universe.py).
+  # The universe expands dynamically: add an instrument to that constant and the
+  # live + research symbol set grows automatically — no edit needed here.
+  # To pin a custom live set instead, add an explicit `symbols:` list below.
+  timeframes:
+    - "1s"
+    - "1m"
+    - "5m"
+    - "15m"
+    - "30m"
+    - "1h"
+    - "4h"
+    - "1d"
+  timeframe: "1m"
+  initial_capital: 10000.0
+  target_allocation: 0.1  # 10% of capital per trade
+  min_trade_qty: 0.001
+
+# ------------------------------------------
+# Risk Settings (Shared)
+# ------------------------------------------
+risk:
+  risk_per_trade: 0.005          # 0.5%
+  max_daily_loss_pct: 0.03       # 3%
+  max_intraday_drawdown_pct: 0.03
+  max_rolling_loss_pct_1h: 0.05
+  max_total_margin_pct: 0.50     # 50%
+  max_symbol_exposure_pct: 0.25  # 25%
+  max_order_value: 5000.0
+  default_stop_loss_pct: 0.01
+  freeze_new_entries_on_breach: true
+  auto_flatten_on_breach: false
+  # --- Audit-hardening risk controls (fix/audit-hardening) ---
+  # allow_metadata_risk_override: when false (SAFE default) a strategy's signal
+  #   metadata may only LOWER a risk ceiling — any override raising leverage /
+  #   exposure / order value / notional-pct above its config value is clamped back.
+  #   Set true only to restore the legacy unclamped behavior.
+  allow_metadata_risk_override: false
+  # max_leverage: absolute ceiling for metadata leverage overrides when the clamp is
+  #   active. 0.0 => metadata may not raise leverage above the configured run leverage.
+  max_leverage: 0.0
+  # hard_drawdown_flatten_pct: > 0 => flatten ALL open positions when intraday
+  #   drawdown exceeds this fraction, even if auto_flatten_on_breach is false
+  #   (a hard de-risk tier above the soft FREEZE threshold). 0.0 => disabled.
+  hard_drawdown_flatten_pct: 0.0
+  # attach_default_protective_stop: true => give a signal with no stop_loss a
+  #   synthetic stop at default_stop_loss_pct so no position runs naked.
+  #   Default false preserves existing backtest numerics (enable on the backtest PC).
+  attach_default_protective_stop: true
+  # enforce_order_risk_gate_in_backtest: true => run the same RiskManager.check_order
+  #   gate in the backtest order path as in live. Default false preserves the golden
+  #   baseline (enable on the backtest PC to unify backtest/live enforcement).
+  enforce_order_risk_gate_in_backtest: true
+
+# ------------------------------------------
+# Execution Model (Shared)
+# ------------------------------------------
+execution:
+  maker_fee_rate: 0.0002
+  taker_fee_rate: 0.0004
+  spread_rate: 0.0002
+  slippage_rate: 0.0005
+  funding_rate_per_8h: 0.0
+  funding_interval_hours: 8
+  maintenance_margin_rate: 0.005
+  liquidation_buffer_rate: 0.0005
+  # --- Audit-hardening fill realism (fix/audit-hardening) ---
+  # slippage_impact_model: "flat" (default, golden-stable, size-blind) or
+  #   "sqrt_impact" (adds a sqrt market-impact term scaled by order participation
+  #   so large/leveraged orders pay more). Enable on the backtest PC to measure cost.
+  slippage_impact_model: "sqrt_impact"
+  slippage_impact_coefficient: 0.10   # impact strength (only used by sqrt_impact)
+  slippage_adv_quote: 0.0            # participation denominator; 0 => per-bar volume
+  # require_funding_coverage: true => a leveraged backtest fails instead of silently
+  #   charging 0.0 funding when funding feature data is absent. Default false.
+  require_funding_coverage: true
+  # funding_on_utc_boundary: true => charge funding on the Binance 00:00/08:00/16:00
+  #   UTC settlement snapshots a position is open across, instead of the legacy
+  #   entry-anchored 8h clock (any sub-8h round trip pays ZERO funding otherwise —
+  #   ~1-5%/yr inflation; strategy_viability_assessment 2026-07-06 Axis 3 #7).
+  funding_on_utc_boundary: true
+  # enforce_reduce_only: true => reduce-only fills clamp to live-exchange semantics
+  # (never flip through zero) — 2026-07-03 audit fix #2.
+  enforce_reduce_only: true
+  # conditional (stop/tp/trail) fills respect the bar-volume liquidity cap; the
+  # excess chases as a MKT remainder (2026-07-03 audit finding B).
+  apply_liquidity_cap_to_conditional_fills: true
+  compute_backend: "auto" # auto|cpu|gpu|forced-gpu
+  gpu_mode: "auto" # auto|cpu|gpu|forced-gpu
+  gpu_vram_gb: 8.0
+
+# ------------------------------------------
+# Storage / Audit
+# ------------------------------------------
+storage:
+  backend: "parquet-postgres"
+  postgres_dsn: ""
+  postgres_dsn_env: "LQ_POSTGRES_DSN"
+  market_data_parquet_path: "data/market_parquet"
+  market_data_exchange: "binance"
+  wal_max_bytes: 268435456
+  wal_compact_on_threshold: true
+  wal_compaction_interval_seconds: 3600
+  collector_periodic_enabled: true
+  collector_poll_seconds: 2
+  collector_bootstrap_lookback_hours: 24 # used when first run has no checkpoint and no --since
+  materializer_periodic_enabled: true
+  materializer_poll_seconds: 5
+  materializer_base_timeframe: "1s"
+  materializer_required_timeframes:
+    - "1s"
+    - "1m"
+    - "5m"
+    - "15m"
+    - "30m"
+    - "1h"
+    - "4h"
+    - "1d"
+  export_csv: false
+
+# ------------------------------------------
+# Market Window Contract / Rollout
+# ------------------------------------------
+market_window:
+  parity_v2_enabled: false
+  metrics_log_path: "logs/live/market_window_metrics.ndjson"
+
+# ------------------------------------------
+# Backtest Specific Settings
+# ------------------------------------------
+backtest:
+  start_date: "2025-01-01"
+  end_date: null  # null means "up to now" or end of data
+  mode: "windowed"
+  data_source: "auto" # auto|csv|db|external
+  commission_rate: 0.001  # 0.1%
+  slippage_rate: 0.0005   # 0.05%
+  annual_periods: 252     # Daily: 252, 1h: 252*24, 1m: 252*24*60
+  risk_free_rate: 0.0     # legacy alias; use the fields below for reporting
+  risk_free_mode: "us_treasury_constant"   # zero|us_treasury_constant|us_treasury_series
+  risk_free_tenor: "3m"
+  risk_free_annual: 0.0370  # US Treasury 3M reference (coupon-equivalent, 2026-03-18)
+  risk_free_series_path: ""
+  sortino_target_mode: "same_as_rf" # zero|same_as_rf|explicit
+  sortino_target_annual: 0.0
+  random_seed: 42
+  persist_output: false
+  leverage: 3
+  poll_seconds: 20
+  backtest_poll_seconds: 20
+  window_seconds: 20
+  backtest_window_seconds: 20
+  decision_cadence_seconds: 20
+  backtest_decision_seconds: 20
+  chunk_days: 1
+  chunk_warmup_bars: 0
+  skip_ahead_enabled: true
+  external:
+    source_kind: "csv" # csv|parquet|memory(test-only)
+    root_path: ""
+    symbol_map: {}
+
+# ------------------------------------------
+# Live Trading Specific Settings
+# ------------------------------------------
+live:
+  mode: "paper" # paper|real
+  market_data_source: "committed" # committed|binance_futures|external|polymarket_live
+  order_state_source: "polling" # polling|user_stream
+  shadow_live_enabled: false
+  # --- Go-live stage pipeline (R7) --------------------------------------------
+  # Free stage composition with per-stage entry checks. Promotion is gated; you
+  # cannot skip ahead. testnet -> shadow -> canary -> full.
+  go_live_stage: "testnet" # testnet|shadow|canary|full
+  # Kill switch is always-on by contract; validate.py REJECTS kill_switch_enabled: false.
+  kill_switch_enabled: true
+  # Position sizing fraction applied during the canary stage. Range (0, 1].
+  canary_position_fraction: 0.10
+  # Shadow-stage entry check: minimum measured signal-agreement ratio between the
+  # shadow (testnet-routed) run and the reference over shadow_parity_window_bars.
+  shadow_parity_min_ratio: 0.99
+  shadow_parity_window_bars: 1000
+  reconciliation_poll_fallback_enabled: true
+  book_ticker_enabled: false
+  # Limit-first live execution. Market orders are disabled unless both
+  # default_order_type: "MKT" and allow_market_orders: true are set explicitly.
+  default_order_type: "LMT" # LMT|MKT; default must remain limit-first
+  allow_market_orders: false
+  limit_price_mode: "one_tick_worse" # same_price|one_tick_worse|one_tick_better
+  limit_price_offset_ticks: 1 # default: BUY one tick above / SELL one tick below reference
+  limit_price_tick_fallback: 0.0 # use exchange tick metadata; nonzero only for offline fallback
+  limit_time_in_force: "GTC"
+  protective_order_style: "limit" # limit => STOP/TAKE_PROFIT limit; market requires allow_market_orders=true
+  startup_reconciliation_hard_fail: false
+  exchange:
+    driver: "binance_futures" # Options: "binance_futures", "mt5", "polymarket"
+    name: "binance" # Native Binance USDⓈ-M Futures exchange adapter
+    market_type: "future" # USDⓈ-M futures only
+    position_mode: "HEDGE" # ONEWAY|HEDGE
+    margin_mode: "isolated" # isolated|cross
+    leverage: 3
+  testnet: true
+  require_real_enable_flag: true
+  poll_interval: 20  # Seconds
+  poll_seconds: 20
+  live_poll_seconds: 20
+  window_seconds: 20
+  ingest_window_seconds: 20
+  decision_cadence_seconds: 20
+  materialized_staleness_threshold_seconds: 45
+  materialized_staleness_alert_cooldown_seconds: 60
+  heartbeat_interval_sec: 30
+  order_timeout: 10 # Seconds
+  reconciliation_interval_sec: 30
+  # Audit-hardening (fix/audit-hardening): reject limit orders validated against a
+  # cached best-bid/offer older than this many seconds (fail-closed during websocket
+  # stalls / dislocations). Live-only, no backtest impact. 0.0 => disabled.
+  max_bbo_age_seconds: 2.0
+  # API Keys are best loaded from .env, but can be set here if needed (NOT RECOMMENDED for git)
+  # api_key: "YOUR_KEY"
+  # secret_key: "YOUR_SECRET"
+
+  # MT5 Specific Settings
+  mt5_magic: 234000
+  mt5_deviation: 20
+  mt5_bridge_python: ""  # WSL: set to Windows python.exe path for bridge mode
+  mt5_bridge_script: "scripts/mt5_bridge_worker.py"
+  mt5_bridge_use_wslpath: true
+  external:
+    source_kind: "jsonl" # jsonl|parquet|pipe
+    path: ""
+    poll_seconds: 2
+    allow_stale_seconds: 45
+    schema: "market_window_v1" # market_window_v1|ohlcv_1s_v1
+  polymarket:
+    host: "https://clob.polymarket.com"
+    gamma_host: "https://gamma-api.polymarket.com"
+    data_host: "https://data-api.polymarket.com"
+    market_ws_url: "wss://ws-subscriptions-clob.polymarket.com/ws/market"
+    user_ws_url: "wss://ws-subscriptions-clob.polymarket.com/ws/user"
+    asset_ids: []
+    private_key_env: "POLYMARKET_PRIVATE_KEY"
+    api_key_env: "POLYMARKET_API_KEY"
+    api_secret_env: "POLYMARKET_API_SECRET"
+    api_passphrase_env: "POLYMARKET_API_PASSPHRASE"
+    funder: ""
+    signature_type: 0
+    allow_real_execution: false
+
+# ------------------------------------------
+# Optimization (Hyperparameter Tuning)
+# ------------------------------------------
+optimization:
+  method: "OPTUNA" # Options: "GRID", "OPTUNA"
+  strategy: "RsiStrategy" # Class name of the strategy to optimize
+  validation_days: 30
+  oos_days: 30
+  walk_forward_folds: 3
+  overfit_penalty: 0.5
+  max_workers: 1
+  persist_best_params: false
+  
+  # Optuna Settings
+  optuna:
+    n_trials: 20
+    params:
+      rsi_period:
+        type: "int"
+        low: 5
+        high: 30
+      oversold:
+        type: "int"
+        low: 20
+        high: 40
+      overbought:
+        type: "int"
+        low: 60
+        high: 90
+
+  # Grid Search Settings
+  grid:
+    params:
+      rsi_period: [10, 14, 20]
+      oversold: [20, 25, 30]
+      overbought: [70, 75, 80]
+
+# ------------------------------------------
+# Promotion Gate (Soak -> Promote)
+# ------------------------------------------
+promotion_gate:
+  days: 14
+  max_order_rejects: 0
+  max_order_timeouts: 0
+  max_reconciliation_alerts: 0
+  max_critical_errors: 0
+  require_alpha_card: false
+  strategy_profiles:
+    RsiStrategy:
+      max_order_rejects: 1
+      max_order_timeouts: 1
+      max_reconciliation_alerts: 0
+      max_critical_errors: 0
+      require_alpha_card: true
+      alpha_card_path: "reports/alpha_card_rsi_strategy.md"
+
+# ------------------------------------------
+# Memory Budget (8GB-baseline enforcement)
+# ------------------------------------------
+memory:
+  # Hard RSS cap (GiB) for execution paths. Enforced at engine start:
+  # if the process RSS already exceeds this cap the run errors clearly
+  # (MemoryCapExceededError) instead of risking an OOM kill. Lower this on
+  # constrained hosts; raise it on big-memory boxes.
+  cap_gb: 8.0
+
+# ------------------------------------------
+# Validation / Golden Contracts
+# ------------------------------------------
+validation:
+  # Relative tolerance for golden-record comparisons (np.testing.assert_allclose
+  # rtol=). Tightening this makes regression gates stricter.
+  golden_rtol: 1.0e-8
+
+# ------------------------------------------
+# Research / Selection Validation Wiring — CORRECTED GATES (all ON)
+# ------------------------------------------
+# This is an honest-research profile: every promotion-gate correction from
+# docs/audits/strategy_viability_assessment_20260706.md (Axis 3) is turned ON so a
+# cost-realistic run uses the stringent gates, not the legacy lie-by-omission ones.
+# Consumers read these defensively via getattr(config.research, <flag>, <legacy>).
+research:
+  # #1 deflated-Sharpe / SPA is a HARD reject in the strategy hurdle (not a soft weight).
+  strict_selection_gate: true
+  # #2 4-way train/val/oos/lockbox split; rank + gate on validation, report lockbox as OOS.
+  use_lockbox_split: true
+  # purge + embargo gap (bars) between contiguous splits (multi-bar-label leakage guard).
+  purge_embargo_bars: 1
+  # #3 remove the N_eff double-discount so the binding DSR gate is actually stringent.
+  single_correlation_discount: true
+  # #4/#5 HAC / block-correct the iid inference (DSR/Sharpe n AND rank-IC t-stat).
+  hac_inference: true
+  # CSCV PBO estimator as the binding gate (else approx_pbo stays advisory).
+  cscv_pbo: true
+  # #6 exposure-normalize the portfolio-superiority objective so leverage cannot buy it.
+  exposure_normalized_promotion: true
+  # Anti-overfit HARD selection-reject gate (overfit_selection_gates 2026-07-08).
+  # Master ON switch for the reject + basket-dedup pass in the monthly-refit
+  # walk-forward selection engine, with binding DSR / SPA / PBO floors that are
+  # promote-nothing no-ops at their default (0.0 / 1.0 / 1.0 / 1.0) values.
+  enforce_selection_reject_gate: true
+  dsr_gate_floor: 0.90
+  spa_gate_ceiling: 0.05
+  pbo_gate_ceiling: 0.50
+  # cross-trial CSCV/PBO ceiling: reject the run tail when family-wise PBO exceeds this.
+  max_cross_trial_pbo: 0.50
+  # Basket-dedup caps (default None = OFF/byte-identical). Keep at most 2 clones per
+  # identical-symbol basket, 1 per lineage, 1 per family-basket so a single
+  # over-searched basket cannot flood the shortlist with near-identical variants.
+  max_per_symbol_basket: 2
+  max_per_lineage: 1
+  max_per_family_basket: 1
+  # v5 defect fix: evaluate registered research strategies through their registry
+  # simulator instead of the shared generic fallback proxy.
+  route_unmapped_registered_strategies: true
+  # Honest realistic cost floor for the VECTORIZED research scorer
+  # (performance_lever_measurement 2026-07-08). The scorer charges a LINEAR
+  # per-turnover cost (net = returns - turnover * cost_rate); its shipped base map
+  # is ~5 bps/turnover. This multiplier lifts EVERY class's scalar to align with
+  # this profile's one-way execution cost: taker_fee_rate (0.0004) + spread_rate
+  # (0.0002) + slippage_rate (0.0005) = 0.0011 (11 bps) vs the 5 bps base ->
+  # 11/5 = 2.2x. It aligns a SCALAR only; it deliberately does NOT reproduce the
+  # nonlinear sqrt-impact + funding shape the REAL backtest engine charges (that is
+  # measured on the real engine, not here), and it is monotonically >= the legacy
+  # cost for every class -- so it can only make a lever look WORSE, never
+  # manufacture a gain. cost_rate_bps_override stays unset (null) so the multiplier
+  # path is used and the per-class relative structure is preserved.
+  cost_rate_multiplier: 2.2
+  # Portfolio-layer honest gate (DSR/CSCV-PBO/SPA on the weighted-portfolio NET
+  # stream, DSR deflated by the total allocation config-grid cells searched).
+  portfolio_honest_gate: true
+  # G004 frozen actual-engine replay/proof wiring; this replacement profile is hashed.
+  require_actual_engine_routing: true
+  emit_candidate_overfit_stats: true
+
+# ------------------------------------------
+# Data Collection
+# ------------------------------------------
+data:
+  # Explicit list of data kinds the collector fetches.
+  # Valid: ohlcv | funding | feature_points | aggtrades_tick
+  # aggtrades_tick is validation-only (testnet/paper/replay; never live orders).
+  kinds: [ohlcv, funding, feature_points]
+  # Optional override for the raw aggTrades parquet root ("" = storage default).
+  tick_path: ""

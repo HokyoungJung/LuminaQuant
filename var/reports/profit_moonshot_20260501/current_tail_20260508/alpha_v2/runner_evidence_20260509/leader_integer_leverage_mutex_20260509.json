@@ -1,0 +1,9 @@
+{
+  "completed_at": "2026-05-09T12:50:07Z",
+  "exclusive": true,
+  "lock_path": "var/reports/exact_window_backtests/followup_status/portfolio_followup_heavy_run.lock",
+  "overlap_check": "passed",
+  "reason": "integer leverage rerun with forced current-base combo",
+  "started_at": "2026-05-09T12:42:56Z",
+  "status": "completed"
+}

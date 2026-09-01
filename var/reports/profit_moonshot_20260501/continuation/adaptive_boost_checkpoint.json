@@ -1,0 +1,46 @@
+{
+  "artifact_kind": "live_equivalent_backtest_checkpoint",
+  "split_results": {
+    "profit_moonshot_adaptive_momentum_boost_mode": {
+      "train": {
+        "equivalence_key": "68d754733aa06616914256885f5cac91eb2e8684a44fca52164b1d8bdec38a80",
+        "final_equity": 9700.522338156265,
+        "liquidation_count": 0,
+        "metrics": {
+          "cagr": -1.4580701138244834e-05,
+          "calmar": -8.090911737512437e-05,
+          "max_drawdown": 0.18021085399613682,
+          "sharpe": 0.007080880835991556,
+          "sortino": 0.007647827757362831,
+          "total_return": -0.029947955184373543,
+          "volatility": 0.016141746997967475
+        },
+        "mode": "profit_moonshot_adaptive_momentum_boost_mode",
+        "source_mode": "profit_moonshot_adaptive_momentum_boost_mode",
+        "split": "train",
+        "status": "completed",
+        "trade_count": 361
+      },
+      "val": {
+        "equivalence_key": "68d754733aa06616914256885f5cac91eb2e8684a44fca52164b1d8bdec38a80",
+        "final_equity": 10051.054249511804,
+        "liquidation_count": 0,
+        "metrics": {
+          "cagr": 1.5062584109326593e-05,
+          "calmar": 0.001108953728073854,
+          "max_drawdown": 0.013582698473351862,
+          "sharpe": 0.014751419665942234,
+          "sortino": 0.014526512459382655,
+          "total_return": 0.005090819951180325,
+          "volatility": 0.0010591045060488076
+        },
+        "mode": "profit_moonshot_adaptive_momentum_boost_mode",
+        "source_mode": "profit_moonshot_adaptive_momentum_boost_mode",
+        "split": "val",
+        "status": "completed",
+        "trade_count": 56
+      }
+    }
+  },
+  "updated_at": "2026-05-01T13:12:56.553486Z"
+}

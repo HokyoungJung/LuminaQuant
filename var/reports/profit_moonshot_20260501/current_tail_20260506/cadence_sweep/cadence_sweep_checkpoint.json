@@ -1,0 +1,4431 @@
+{
+  "artifact_kind": "profit_moonshot_cadence_sweep_checkpoint",
+  "runs": {
+    "derivatives_flow_squeeze_mode__cadence_1440b": {
+      "val_screen": {
+        "base_mode": "derivatives_flow_squeeze_mode",
+        "candidate_id": "derivatives_flow_squeeze_mode__cadence_1440b",
+        "engine_seconds": 1.4868272990006517,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 2.349799979128875e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 473.23046875,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_1440b",
+        "wall_seconds": 1.486850797000443
+      }
+    },
+    "derivatives_flow_squeeze_mode__cadence_15b": {
+      "val_screen": {
+        "base_mode": "derivatives_flow_squeeze_mode",
+        "candidate_id": "derivatives_flow_squeeze_mode__cadence_15b",
+        "engine_seconds": 3.5689029040004243,
+        "final_equity": 9981.606535176617,
+        "liquidation_count": 0,
+        "load_seconds": 2.2294999325822573e-05,
+        "metrics": {
+          "cagr": -0.0003226380816738761,
+          "calmar": -0.15106088280590668,
+          "max_drawdown": 0.0021358148825889193,
+          "sharpe": -0.7546804952589184,
+          "sortino": -0.7135979104313488,
+          "total_return": -0.0018409664823382244,
+          "volatility": 0.00042746385586062006
+        },
+        "rss_mib": 467.79296875,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 85,
+        "variant": "cadence_15b",
+        "wall_seconds": 3.56892519899975
+      }
+    },
+    "derivatives_flow_squeeze_mode__cadence_180b": {
+      "val_screen": {
+        "base_mode": "derivatives_flow_squeeze_mode",
+        "candidate_id": "derivatives_flow_squeeze_mode__cadence_180b",
+        "engine_seconds": 1.8730720479998126,
+        "final_equity": 10003.460130171952,
+        "liquidation_count": 0,
+        "load_seconds": 2.3996999516384676e-05,
+        "metrics": {
+          "cagr": 6.058571186362549e-05,
+          "calmar": 0.24283494637845354,
+          "max_drawdown": 0.00024949338127471914,
+          "sharpe": 0.3981632614329518,
+          "sortino": 0.2308790324018179,
+          "total_return": 0.0003460130171952791,
+          "volatility": 0.00015218746234960088
+        },
+        "rss_mib": 471.60546875,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 14,
+        "variant": "cadence_180b",
+        "wall_seconds": 1.873096044999329
+      }
+    },
+    "derivatives_flow_squeeze_mode__cadence_1b": {
+      "val_screen": {
+        "base_mode": "derivatives_flow_squeeze_mode",
+        "candidate_id": "derivatives_flow_squeeze_mode__cadence_1b",
+        "engine_seconds": 6.815367601999242,
+        "final_equity": 9959.19981340152,
+        "liquidation_count": 0,
+        "load_seconds": 2.6726000214694068e-05,
+        "metrics": {
+          "cagr": -0.0007149839947945269,
+          "calmar": -0.1582300189872638,
+          "max_drawdown": 0.0045186368514060354,
+          "sharpe": -0.9765095418956679,
+          "sortino": -1.0842148031493786,
+          "total_return": -0.004075916659847967,
+          "volatility": 0.0007321698506431753
+        },
+        "rss_mib": 466.3671875,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 189,
+        "variant": "cadence_1b",
+        "wall_seconds": 6.815394327999456
+      }
+    },
+    "derivatives_flow_squeeze_mode__cadence_360b": {
+      "val_screen": {
+        "base_mode": "derivatives_flow_squeeze_mode",
+        "candidate_id": "derivatives_flow_squeeze_mode__cadence_360b",
+        "engine_seconds": 1.695160450000003,
+        "final_equity": 10000.514464667409,
+        "liquidation_count": 0,
+        "load_seconds": 2.354199932597112e-05,
+        "metrics": {
+          "cagr": 9.00919703927805e-06,
+          "calmar": 0.036109964093027185,
+          "max_drawdown": 0.00024949338127471914,
+          "sharpe": 0.09210444107336664,
+          "sortino": 0.03414892983807146,
+          "total_return": 5.144646674093423e-05,
+          "volatility": 9.786653204101381e-05
+        },
+        "rss_mib": 472.3828125,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 4,
+        "variant": "cadence_360b",
+        "wall_seconds": 1.695183991999329
+      }
+    },
+    "derivatives_flow_squeeze_mode__cadence_45b": {
+      "val_screen": {
+        "base_mode": "derivatives_flow_squeeze_mode",
+        "candidate_id": "derivatives_flow_squeeze_mode__cadence_45b",
+        "engine_seconds": 2.2888258309994853,
+        "final_equity": 10000.641244426373,
+        "liquidation_count": 0,
+        "load_seconds": 2.577299983386183e-05,
+        "metrics": {
+          "cagr": 1.1229278796154318e-05,
+          "calmar": 0.014703136618791617,
+          "max_drawdown": 0.0007637335547710636,
+          "sharpe": 0.039649476660107943,
+          "sortino": 0.022532315946168304,
+          "total_return": 6.412444263736994e-05,
+          "volatility": 0.0002842302805802359
+        },
+        "rss_mib": 469.39453125,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 33,
+        "variant": "cadence_45b",
+        "wall_seconds": 2.288851603999319
+      }
+    },
+    "derivatives_flow_squeeze_mode__cadence_60b": {
+      "val_screen": {
+        "base_mode": "derivatives_flow_squeeze_mode",
+        "candidate_id": "derivatives_flow_squeeze_mode__cadence_60b",
+        "engine_seconds": 2.16375306899954,
+        "final_equity": 9997.525320788847,
+        "liquidation_count": 0,
+        "load_seconds": 2.4603000383649487e-05,
+        "metrics": {
+          "cagr": -4.334140519646201e-05,
+          "calmar": -0.044728218090990306,
+          "max_drawdown": 0.0009689946759849205,
+          "sharpe": -0.20560005282524815,
+          "sortino": -0.12205631683104656,
+          "total_return": -0.00024746792111529636,
+          "volatility": 0.00021070110575379462
+        },
+        "rss_mib": 469.94921875,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 29,
+        "variant": "cadence_60b",
+        "wall_seconds": 2.1637776719999238
+      }
+    },
+    "derivatives_flow_squeeze_mode__native": {
+      "val_screen": {
+        "base_mode": "derivatives_flow_squeeze_mode",
+        "candidate_id": "derivatives_flow_squeeze_mode__native",
+        "engine_seconds": 2.189639649000128,
+        "final_equity": 10000.020539410572,
+        "liquidation_count": 0,
+        "load_seconds": 3.0358832239999174,
+        "metrics": {
+          "cagr": 3.5968916467510326e-07,
+          "calmar": 0.0005449936387677088,
+          "max_drawdown": 0.0006599878220384379,
+          "sharpe": 0.0014958156683385012,
+          "sortino": 0.0008617192101382642,
+          "total_return": 2.053941057233999e-06,
+          "volatility": 0.0002636897630930819
+        },
+        "rss_mib": 463.3359375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 27,
+        "variant": "native",
+        "wall_seconds": 5.225522873000045
+      }
+    },
+    "profit_moonshot_adaptive_momentum_120_mode__cadence_1440b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_120_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_120_mode__cadence_1440b",
+        "engine_seconds": 0.46594339800049056,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 2.3562999558635056e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 473.23046875,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_1440b",
+        "wall_seconds": 0.4659669610000492
+      }
+    },
+    "profit_moonshot_adaptive_momentum_120_mode__cadence_15b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_120_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_120_mode__cadence_15b",
+        "engine_seconds": 0.9244786259996545,
+        "final_equity": 10002.308067129128,
+        "liquidation_count": 0,
+        "load_seconds": 1.86120005309931e-05,
+        "metrics": {
+          "cagr": 4.154366242770102e-05,
+          "calmar": 0.06925773074949815,
+          "max_drawdown": 0.0005998415191794608,
+          "sharpe": 0.13375915646453967,
+          "sortino": 0.10781941825871577,
+          "total_return": 0.00023725071291291755,
+          "volatility": 0.0003109402914710247
+        },
+        "rss_mib": 473.23046875,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 4,
+        "variant": "cadence_15b",
+        "wall_seconds": 0.9244972380001855
+      }
+    },
+    "profit_moonshot_adaptive_momentum_120_mode__cadence_1b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_120_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_120_mode__cadence_1b",
+        "engine_seconds": 1.1655945200000133,
+        "final_equity": 10007.10681478133,
+        "liquidation_count": 0,
+        "load_seconds": 1.7778000255930237e-05,
+        "metrics": {
+          "cagr": 0.00012728496448932702,
+          "calmar": 0.056373842713509315,
+          "max_drawdown": 0.0022578727715296355,
+          "sharpe": 0.10702772472764126,
+          "sortino": 0.08599329748853571,
+          "total_return": 0.0007270554781328986,
+          "volatility": 0.0011958719144696617
+        },
+        "rss_mib": 473.23046875,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 16,
+        "variant": "cadence_1b",
+        "wall_seconds": 1.1656122980002692
+      }
+    },
+    "profit_moonshot_adaptive_momentum_120_mode__cadence_360b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_120_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_120_mode__cadence_360b",
+        "engine_seconds": 0.4619778200003566,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 2.3334999241342302e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 473.23046875,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_360b",
+        "wall_seconds": 0.46200115499959793
+      }
+    },
+    "profit_moonshot_adaptive_momentum_120_mode__cadence_60b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_120_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_120_mode__cadence_60b",
+        "engine_seconds": 0.46753545999945345,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 2.321700048923958e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 473.23046875,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_60b",
+        "wall_seconds": 0.4675586769999427
+      }
+    },
+    "profit_moonshot_adaptive_momentum_120_mode__native": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_120_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_120_mode__native",
+        "engine_seconds": 0.8803943329994581,
+        "final_equity": 10000.320403486568,
+        "liquidation_count": 0,
+        "load_seconds": 2.3292000150831882e-05,
+        "metrics": {
+          "cagr": 5.757281115625901e-06,
+          "calmar": 0.02659773803157096,
+          "max_drawdown": 0.0002164575464572261,
+          "sharpe": 0.05103546234211561,
+          "sortino": 0.04041199437111451,
+          "total_return": 3.2876348656785126e-05,
+          "volatility": 0.00011293396706602176
+        },
+        "rss_mib": 473.23046875,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 2,
+        "variant": "native",
+        "wall_seconds": 0.880417624999609
+      }
+    },
+    "profit_moonshot_adaptive_momentum_130_mode__cadence_1440b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_130_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_130_mode__cadence_1440b",
+        "engine_seconds": 0.45247099100015475,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 7.995199939614395e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 473.23046875,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_1440b",
+        "wall_seconds": 0.4525509429995509
+      }
+    },
+    "profit_moonshot_adaptive_momentum_130_mode__cadence_15b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_130_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_130_mode__cadence_15b",
+        "engine_seconds": 0.9306713430005402,
+        "final_equity": 10002.528671665717,
+        "liquidation_count": 0,
+        "load_seconds": 2.3562999558635056e-05,
+        "metrics": {
+          "cagr": 4.551328509649899e-05,
+          "calmar": 0.06941962239279778,
+          "max_drawdown": 0.0006556256506117347,
+          "sharpe": 0.13420244721849345,
+          "sortino": 0.10818207929797741,
+          "total_return": 0.00025992316657186265,
+          "volatility": 0.00033956060310254315
+        },
+        "rss_mib": 473.23046875,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 4,
+        "variant": "cadence_15b",
+        "wall_seconds": 0.9306949060000989
+      }
+    },
+    "profit_moonshot_adaptive_momentum_130_mode__cadence_1b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_130_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_130_mode__cadence_1b",
+        "engine_seconds": 1.1354146459998447,
+        "final_equity": 10007.80173129059,
+        "liquidation_count": 0,
+        "load_seconds": 1.792900002328679e-05,
+        "metrics": {
+          "cagr": 0.00013972402284712082,
+          "calmar": 0.05670487608260286,
+          "max_drawdown": 0.0024640565767850846,
+          "sharpe": 0.1077249941578604,
+          "sortino": 0.08662001271260338,
+          "total_return": 0.000798131129059243,
+          "volatility": 0.001304850581455191
+        },
+        "rss_mib": 473.23046875,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 16,
+        "variant": "cadence_1b",
+        "wall_seconds": 1.135432574999868
+      }
+    },
+    "profit_moonshot_adaptive_momentum_130_mode__cadence_360b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_130_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_130_mode__cadence_360b",
+        "engine_seconds": 0.48610179900060757,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 2.3920999410620425e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 473.23046875,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_360b",
+        "wall_seconds": 0.4861257200000182
+      }
+    },
+    "profit_moonshot_adaptive_momentum_130_mode__cadence_60b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_130_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_130_mode__cadence_60b",
+        "engine_seconds": 0.48946082499969634,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 2.2296000679489225e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 473.23046875,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_60b",
+        "wall_seconds": 0.48948312100037583
+      }
+    },
+    "profit_moonshot_adaptive_momentum_130_mode__native": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_130_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_130_mode__native",
+        "engine_seconds": 0.9469156780005505,
+        "final_equity": 10000.345008022325,
+        "liquidation_count": 0,
+        "load_seconds": 2.6108999918506015e-05,
+        "metrics": {
+          "cagr": 6.199004814133602e-06,
+          "calmar": 0.026545833863191027,
+          "max_drawdown": 0.00023352081709248032,
+          "sharpe": 0.050940100390737396,
+          "sortino": 0.04033335817683593,
+          "total_return": 3.5398802232577964e-05,
+          "volatility": 0.00012183726845271727
+        },
+        "rss_mib": 473.23046875,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 2,
+        "variant": "native",
+        "wall_seconds": 0.946941787000469
+      }
+    },
+    "profit_moonshot_adaptive_momentum_140_mode__cadence_1440b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_140_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_140_mode__cadence_1440b",
+        "engine_seconds": 0.4572122950003177,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 2.6801999410963617e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 473.6484375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_1440b",
+        "wall_seconds": 0.45723909699972864
+      }
+    },
+    "profit_moonshot_adaptive_momentum_140_mode__cadence_15b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_140_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_140_mode__cadence_15b",
+        "engine_seconds": 1.056734146000963,
+        "final_equity": 10002.709198732613,
+        "liquidation_count": 0,
+        "load_seconds": 2.268599928356707e-05,
+        "metrics": {
+          "cagr": 4.876154372213115e-05,
+          "calmar": 0.06935740660610658,
+          "max_drawdown": 0.0007030473904403159,
+          "sharpe": 0.1340772270965606,
+          "sortino": 0.10808055116066366,
+          "total_return": 0.00027847587326124135,
+          "volatility": 0.0003641679012666279
+        },
+        "rss_mib": 473.6484375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 4,
+        "variant": "cadence_15b",
+        "wall_seconds": 1.0567568320002465
+      }
+    },
+    "profit_moonshot_adaptive_momentum_140_mode__cadence_1b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_140_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_140_mode__cadence_1b",
+        "engine_seconds": 1.3487862170004519,
+        "final_equity": 10008.36158797664,
+        "liquidation_count": 0,
+        "load_seconds": 2.493899955879897e-05,
+        "metrics": {
+          "cagr": 0.00014974074506413082,
+          "calmar": 0.05662213589430517,
+          "max_drawdown": 0.002644561931461705,
+          "sharpe": 0.10759057375589998,
+          "sortino": 0.08650715673184665,
+          "total_return": 0.0008553687976637914,
+          "volatility": 0.001400773022891245
+        },
+        "rss_mib": 473.23046875,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 16,
+        "variant": "cadence_1b",
+        "wall_seconds": 1.3488111560000107
+      }
+    },
+    "profit_moonshot_adaptive_momentum_140_mode__cadence_360b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_140_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_140_mode__cadence_360b",
+        "engine_seconds": 0.4511465429995951,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 2.0073999621672556e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 473.6484375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_360b",
+        "wall_seconds": 0.4511666169992168
+      }
+    },
+    "profit_moonshot_adaptive_momentum_140_mode__cadence_60b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_140_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_140_mode__cadence_60b",
+        "engine_seconds": 0.478532670000277,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 2.203599979111459e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 473.6484375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_60b",
+        "wall_seconds": 0.4785547060000681
+      }
+    },
+    "profit_moonshot_adaptive_momentum_140_mode__native": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_140_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_140_mode__native",
+        "engine_seconds": 1.0179100060004203,
+        "final_equity": 10000.369576256637,
+        "liquidation_count": 0,
+        "load_seconds": 2.346499968552962e-05,
+        "metrics": {
+          "cagr": 6.639741664260512e-06,
+          "calmar": 0.026459266467613388,
+          "max_drawdown": 0.0002509420158108946,
+          "sharpe": 0.05077824493657204,
+          "sortino": 0.04019991997880114,
+          "total_return": 3.791562566357598e-05,
+          "volatility": 0.00013092781794626386
+        },
+        "rss_mib": 473.23046875,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 2,
+        "variant": "native",
+        "wall_seconds": 1.0179334710001058
+      }
+    },
+    "profit_moonshot_adaptive_momentum_asym_dynamic_mode__cadence_1440b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_asym_dynamic_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_asym_dynamic_mode__cadence_1440b",
+        "engine_seconds": 0.756375401000696,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 2.3855999643274117e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 473.6484375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_1440b",
+        "wall_seconds": 0.7563992570003393
+      }
+    },
+    "profit_moonshot_adaptive_momentum_asym_dynamic_mode__cadence_15b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_asym_dynamic_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_asym_dynamic_mode__cadence_15b",
+        "engine_seconds": 0.8924576589997741,
+        "final_equity": 9999.24395589407,
+        "liquidation_count": 0,
+        "load_seconds": 1.7995000234805048e-05,
+        "metrics": {
+          "cagr": -1.324037914540721e-05,
+          "calmar": -0.14680636980842585,
+          "max_drawdown": 9.018940501481761e-05,
+          "sharpe": -0.6711304507754826,
+          "sortino": -0.1745476380914651,
+          "total_return": -7.560441059306644e-05,
+          "volatility": 1.972831357586509e-05
+        },
+        "rss_mib": 473.6484375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 8,
+        "variant": "cadence_15b",
+        "wall_seconds": 0.8924756540000089
+      }
+    },
+    "profit_moonshot_adaptive_momentum_asym_dynamic_mode__cadence_1b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_asym_dynamic_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_asym_dynamic_mode__cadence_1b",
+        "engine_seconds": 1.161117790001299,
+        "final_equity": 9996.34905341537,
+        "liquidation_count": 0,
+        "load_seconds": 2.4147999283741228e-05,
+        "metrics": {
+          "cagr": -6.39455947814005e-05,
+          "calmar": -0.1394127333014575,
+          "max_drawdown": 0.0004586782947804952,
+          "sharpe": -0.7362349144457038,
+          "sortino": -0.22005337991789828,
+          "total_return": -0.0003650946584630166,
+          "volatility": 8.685252611930134e-05
+        },
+        "rss_mib": 473.6484375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 32,
+        "variant": "cadence_1b",
+        "wall_seconds": 1.1611419380005827
+      }
+    },
+    "profit_moonshot_adaptive_momentum_asym_dynamic_mode__cadence_360b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_asym_dynamic_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_asym_dynamic_mode__cadence_360b",
+        "engine_seconds": 0.8037702430001445,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 1.818999953684397e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 473.6484375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_360b",
+        "wall_seconds": 0.8037884329996814
+      }
+    },
+    "profit_moonshot_adaptive_momentum_asym_dynamic_mode__cadence_60b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_asym_dynamic_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_asym_dynamic_mode__cadence_60b",
+        "engine_seconds": 0.7843133699998361,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 2.3043000510369893e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 473.6484375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_60b",
+        "wall_seconds": 0.7843364130003465
+      }
+    },
+    "profit_moonshot_adaptive_momentum_asym_dynamic_mode__native": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_asym_dynamic_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_asym_dynamic_mode__native",
+        "engine_seconds": 0.8094775190011205,
+        "final_equity": 9999.677908840835,
+        "liquidation_count": 0,
+        "load_seconds": 2.429999949526973e-05,
+        "metrics": {
+          "cagr": -5.640587239508221e-06,
+          "calmar": -0.1388222540837101,
+          "max_drawdown": 4.063172203000634e-05,
+          "sharpe": -0.546043428299892,
+          "sortino": -0.08546831009225792,
+          "total_return": -3.220911591650388e-05,
+          "volatility": 1.0329855605173876e-05
+        },
+        "rss_mib": 473.6484375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 4,
+        "variant": "native",
+        "wall_seconds": 0.8095018190006158
+      }
+    },
+    "profit_moonshot_adaptive_momentum_boost_mode__cadence_1440b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_boost_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_boost_mode__cadence_1440b",
+        "engine_seconds": 0.5214751839994278,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 1.8276000446348917e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 473.76953125,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_1440b",
+        "wall_seconds": 0.5214934599998742
+      }
+    },
+    "profit_moonshot_adaptive_momentum_boost_mode__cadence_15b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_boost_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_boost_mode__cadence_15b",
+        "engine_seconds": 1.0206409140009782,
+        "final_equity": 10002.889725799503,
+        "liquidation_count": 0,
+        "load_seconds": 2.267399941047188e-05,
+        "metrics": {
+          "cagr": 5.2009752651516195e-05,
+          "calmar": 0.06930304477581802,
+          "max_drawdown": 0.0007504685085591509,
+          "sharpe": 0.13396931625260314,
+          "sortino": 0.10799314489440044,
+          "total_return": 0.00029702857995017595,
+          "volatility": 0.00038877503569746924
+        },
+        "rss_mib": 473.76953125,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 4,
+        "variant": "cadence_15b",
+        "wall_seconds": 1.0206635880003887
+      }
+    },
+    "profit_moonshot_adaptive_momentum_boost_mode__cadence_1b": {
+      "oos": {
+        "base_mode": "profit_moonshot_adaptive_momentum_boost_mode",
+        "batch_wall_seconds": 221.13960567899994,
+        "candidate_id": "profit_moonshot_adaptive_momentum_boost_mode__cadence_1b",
+        "engine_seconds": 76.01354709499901,
+        "final_equity": 9905.811118794707,
+        "liquidation_count": 0,
+        "load_seconds": 145.12601053800063,
+        "metrics": {
+          "cagr": -2.6023178181233675e-05,
+          "calmar": -7.885269536685558e-05,
+          "max_drawdown": 0.33002268419821307,
+          "sharpe": 0.0120102809288089,
+          "sortino": 0.014639170599858734,
+          "total_return": -0.009618904120529237,
+          "volatility": 0.02728007698750896
+        },
+        "rss_mib": 4693.50390625,
+        "shared_load_seconds": 145.12601053800063,
+        "split": "oos",
+        "status": "completed",
+        "trade_count": 374,
+        "variant": "cadence_1b",
+        "wall_seconds": 221.13955763299964
+      },
+      "train": {
+        "base_mode": "profit_moonshot_adaptive_momentum_boost_mode",
+        "batch_wall_seconds": 1352.3218779790004,
+        "candidate_id": "profit_moonshot_adaptive_momentum_boost_mode__cadence_1b",
+        "engine_seconds": 473.0317018189962,
+        "final_equity": -1159.4279708010554,
+        "liquidation_count": 5,
+        "load_seconds": 879.2898622159992,
+        "metrics": {
+          "cagr": -1.0,
+          "calmar": -0.5688669077793801,
+          "max_drawdown": 1.757880422159876,
+          "sharpe": 0.03554001582890543,
+          "sortino": 0.07640504476663364,
+          "total_return": -1.1158936570801055,
+          "volatility": 7.82712496566853
+        },
+        "rss_mib": 4691.65234375,
+        "shared_load_seconds": 879.2898622159992,
+        "split": "train",
+        "status": "completed",
+        "trade_count": 2606,
+        "variant": "cadence_1b",
+        "wall_seconds": 1352.3215640349954
+      },
+      "val": {
+        "base_mode": "profit_moonshot_adaptive_momentum_boost_mode",
+        "batch_wall_seconds": 198.92299449300117,
+        "candidate_id": "profit_moonshot_adaptive_momentum_boost_mode__cadence_1b",
+        "engine_seconds": 68.03937755200059,
+        "final_equity": 11259.717898974915,
+        "liquidation_count": 0,
+        "load_seconds": 130.88347068800067,
+        "metrics": {
+          "cagr": 0.000351398366844613,
+          "calmar": 0.0013575102927108754,
+          "max_drawdown": 0.258855029484078,
+          "sharpe": 0.031136228116046705,
+          "sortino": 0.03390835959125374,
+          "total_return": 0.12574345689749178,
+          "volatility": 0.014803669506170325
+        },
+        "rss_mib": 4693.50390625,
+        "shared_load_seconds": 130.88347068800067,
+        "split": "val",
+        "status": "completed",
+        "trade_count": 661,
+        "variant": "cadence_1b",
+        "wall_seconds": 198.92284824000126
+      },
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_boost_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_boost_mode__cadence_1b",
+        "engine_seconds": 1.166625294998994,
+        "final_equity": 10008.921427958816,
+        "liquidation_count": 0,
+        "load_seconds": 2.3834000785427634e-05,
+        "metrics": {
+          "cagr": 0.00015975705244475336,
+          "calmar": 0.05655593080554294,
+          "max_drawdown": 0.0028247621455307365,
+          "sharpe": 0.1074917672804689,
+          "sortino": 0.08642454869227514,
+          "total_return": 0.0009126067958815653,
+          "volatility": 0.001496517764777534
+        },
+        "rss_mib": 473.76953125,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 16,
+        "variant": "cadence_1b",
+        "wall_seconds": 1.1666491289997794
+      }
+    },
+    "profit_moonshot_adaptive_momentum_boost_mode__cadence_360b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_boost_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_boost_mode__cadence_360b",
+        "engine_seconds": 0.50649501099997,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 2.3021999368211254e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 473.76953125,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_360b",
+        "wall_seconds": 0.5065180329993382
+      }
+    },
+    "profit_moonshot_adaptive_momentum_boost_mode__cadence_60b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_boost_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_boost_mode__cadence_60b",
+        "engine_seconds": 0.5010678529997676,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 1.976000021386426e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 473.76953125,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_60b",
+        "wall_seconds": 0.5010876129999815
+      }
+    },
+    "profit_moonshot_adaptive_momentum_boost_mode__native": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_boost_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_boost_mode__native",
+        "engine_seconds": 0.978874681999514,
+        "final_equity": 10000.394144490949,
+        "liquidation_count": 0,
+        "load_seconds": 2.289199983351864e-05,
+        "metrics": {
+          "cagr": 7.080477599341606e-06,
+          "calmar": 0.02638394062549602,
+          "max_drawdown": 0.0002683631569614515,
+          "sharpe": 0.050637965436032065,
+          "sortino": 0.040084285501592556,
+          "total_return": 4.043244909479604e-05,
+          "volatility": 0.00014001842987287972
+        },
+        "rss_mib": 473.76953125,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 2,
+        "variant": "native",
+        "wall_seconds": 0.9788975739993475
+      }
+    },
+    "profit_moonshot_adaptive_momentum_governed_mode__cadence_1440b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_governed_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_governed_mode__cadence_1440b",
+        "engine_seconds": 0.5456349639989639,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 1.609900027688127e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 474.0703125,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_1440b",
+        "wall_seconds": 0.5456510629992408
+      }
+    },
+    "profit_moonshot_adaptive_momentum_governed_mode__cadence_15b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_governed_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_governed_mode__cadence_15b",
+        "engine_seconds": 1.2697660999992877,
+        "final_equity": 10002.709198732613,
+        "liquidation_count": 0,
+        "load_seconds": 1.8991000615642406e-05,
+        "metrics": {
+          "cagr": 4.876154372213115e-05,
+          "calmar": 0.06935740660610658,
+          "max_drawdown": 0.0007030473904403159,
+          "sharpe": 0.1340772270965606,
+          "sortino": 0.10808055116066366,
+          "total_return": 0.00027847587326124135,
+          "volatility": 0.0003641679012666279
+        },
+        "rss_mib": 474.0703125,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 4,
+        "variant": "cadence_15b",
+        "wall_seconds": 1.2697850909999033
+      }
+    },
+    "profit_moonshot_adaptive_momentum_governed_mode__cadence_1b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_governed_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_governed_mode__cadence_1b",
+        "engine_seconds": 1.5714508370001568,
+        "final_equity": 10008.36158797664,
+        "liquidation_count": 0,
+        "load_seconds": 2.0507999579422176e-05,
+        "metrics": {
+          "cagr": 0.00014974074506413082,
+          "calmar": 0.05662213589430517,
+          "max_drawdown": 0.002644561931461705,
+          "sharpe": 0.10759057375589998,
+          "sortino": 0.08650715673184665,
+          "total_return": 0.0008553687976637914,
+          "volatility": 0.001400773022891245
+        },
+        "rss_mib": 473.8203125,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 16,
+        "variant": "cadence_1b",
+        "wall_seconds": 1.5714713449997362
+      }
+    },
+    "profit_moonshot_adaptive_momentum_governed_mode__cadence_360b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_governed_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_governed_mode__cadence_360b",
+        "engine_seconds": 0.645236622000084,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 2.293499983352376e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 474.0703125,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_360b",
+        "wall_seconds": 0.6452595569999175
+      }
+    },
+    "profit_moonshot_adaptive_momentum_governed_mode__cadence_60b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_governed_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_governed_mode__cadence_60b",
+        "engine_seconds": 0.6004221430002872,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 2.174299970647553e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 474.0703125,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_60b",
+        "wall_seconds": 0.6004438859999937
+      }
+    },
+    "profit_moonshot_adaptive_momentum_governed_mode__native": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_governed_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_governed_mode__native",
+        "engine_seconds": 1.2457802089993493,
+        "final_equity": 10000.369576256637,
+        "liquidation_count": 0,
+        "load_seconds": 7.624699992447859e-05,
+        "metrics": {
+          "cagr": 6.639741664260512e-06,
+          "calmar": 0.026459266467613388,
+          "max_drawdown": 0.0002509420158108946,
+          "sharpe": 0.05077824493657204,
+          "sortino": 0.04019991997880114,
+          "total_return": 3.791562566357598e-05,
+          "volatility": 0.00013092781794626386
+        },
+        "rss_mib": 473.76953125,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 2,
+        "variant": "native",
+        "wall_seconds": 1.2458564559992737
+      }
+    },
+    "profit_moonshot_adaptive_momentum_mode__cadence_1440b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_mode__cadence_1440b",
+        "engine_seconds": 0.30867479400058073,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 1.4526999621011782e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 474.75390625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_1440b",
+        "wall_seconds": 0.30868932100020174
+      }
+    },
+    "profit_moonshot_adaptive_momentum_mode__cadence_15b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_mode__cadence_15b",
+        "engine_seconds": 0.612015925000378,
+        "final_equity": 10001.877172631397,
+        "liquidation_count": 0,
+        "load_seconds": 1.6379999578930438e-05,
+        "metrics": {
+          "cagr": 3.3785496635463375e-05,
+          "calmar": 0.06904335144353996,
+          "max_drawdown": 0.0004893374369738031,
+          "sharpe": 0.13333246423466893,
+          "sortino": 0.10740767498206594,
+          "total_return": 0.00019294126313962323,
+          "volatility": 0.00025362967628519707
+        },
+        "rss_mib": 474.75390625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 4,
+        "variant": "cadence_15b",
+        "wall_seconds": 0.612032304999957
+      }
+    },
+    "profit_moonshot_adaptive_momentum_mode__cadence_1b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_mode__cadence_1b",
+        "engine_seconds": 0.7838464919996113,
+        "final_equity": 10005.842724384896,
+        "liquidation_count": 0,
+        "load_seconds": 1.946800057339715e-05,
+        "metrics": {
+          "cagr": 0.00010462451697001995,
+          "calmar": 0.0562920380211961,
+          "max_drawdown": 0.0018586024000521145,
+          "sharpe": 0.10666511992531341,
+          "sortino": 0.08573292742632622,
+          "total_return": 0.0005975864384895058,
+          "volatility": 0.000985366158214078
+        },
+        "rss_mib": 474.75390625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 16,
+        "variant": "cadence_1b",
+        "wall_seconds": 0.7838659600001847
+      }
+    },
+    "profit_moonshot_adaptive_momentum_mode__cadence_360b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_mode__cadence_360b",
+        "engine_seconds": 0.2928297159996873,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 1.42680000863038e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 474.75390625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_360b",
+        "wall_seconds": 0.2928439839997736
+      }
+    },
+    "profit_moonshot_adaptive_momentum_mode__cadence_60b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_mode__cadence_60b",
+        "engine_seconds": 0.3114040169994041,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 1.4062000445846934e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 474.75390625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_60b",
+        "wall_seconds": 0.31141807899984997
+      }
+    },
+    "profit_moonshot_adaptive_momentum_mode__native": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_mode__native",
+        "engine_seconds": 0.6069555969997964,
+        "final_equity": 10000.24579124745,
+        "liquidation_count": 0,
+        "load_seconds": 1.7117000425059814e-05,
+        "metrics": {
+          "cagr": 4.4104138372524915e-06,
+          "calmar": 0.025472643212794965,
+          "max_drawdown": 0.00017314315598929015,
+          "sharpe": 0.0488622674359896,
+          "sortino": 0.03862240015587311,
+          "total_return": 2.5185124744808718e-05,
+          "volatility": 9.034542801965302e-05
+        },
+        "rss_mib": 474.62890625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 2,
+        "variant": "native",
+        "wall_seconds": 0.6069727140002215
+      }
+    },
+    "profit_moonshot_adaptive_momentum_vol_target_132_mode__cadence_1440b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_vol_target_132_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_vol_target_132_mode__cadence_1440b",
+        "engine_seconds": 0.4938778240002648,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 2.591399970697239e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 474.859375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_1440b",
+        "wall_seconds": 0.4939037379999718
+      }
+    },
+    "profit_moonshot_adaptive_momentum_vol_target_132_mode__cadence_15b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_vol_target_132_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_vol_target_132_mode__cadence_15b",
+        "engine_seconds": 0.8163949589988988,
+        "final_equity": 10001.896396499269,
+        "liquidation_count": 0,
+        "load_seconds": 1.5016000361356419e-05,
+        "metrics": {
+          "cagr": 3.417006987738169e-05,
+          "calmar": 0.07040942307940538,
+          "max_drawdown": 0.0004853053523652059,
+          "sharpe": 0.1350443412339448,
+          "sortino": 0.10792382349837379,
+          "total_return": 0.00019513764992695748,
+          "volatility": 0.00025326153170648143
+        },
+        "rss_mib": 474.859375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 4,
+        "variant": "cadence_15b",
+        "wall_seconds": 0.8164099749992602
+      }
+    },
+    "profit_moonshot_adaptive_momentum_vol_target_132_mode__cadence_1b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_vol_target_132_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_vol_target_132_mode__cadence_1b",
+        "engine_seconds": 0.7786516430005577,
+        "final_equity": 10006.02388891578,
+        "liquidation_count": 0,
+        "load_seconds": 1.4494999959424604e-05,
+        "metrics": {
+          "cagr": 0.000108109521205213,
+          "calmar": 0.05835932696921068,
+          "max_drawdown": 0.0018524806028391934,
+          "sharpe": 0.11118177652749851,
+          "sortino": 0.08889276955974791,
+          "total_return": 0.0006174968915781953,
+          "volatility": 0.0009766010570857332
+        },
+        "rss_mib": 474.859375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 16,
+        "variant": "cadence_1b",
+        "wall_seconds": 0.7786661380005171
+      }
+    },
+    "profit_moonshot_adaptive_momentum_vol_target_132_mode__cadence_360b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_vol_target_132_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_vol_target_132_mode__cadence_360b",
+        "engine_seconds": 0.4977604149999024,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 2.3530999897047877e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 474.859375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_360b",
+        "wall_seconds": 0.49778394599979947
+      }
+    },
+    "profit_moonshot_adaptive_momentum_vol_target_132_mode__cadence_60b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_vol_target_132_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_vol_target_132_mode__cadence_60b",
+        "engine_seconds": 0.49992431300051976,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 2.2272999558481388e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 474.859375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_60b",
+        "wall_seconds": 0.49994658600007824
+      }
+    },
+    "profit_moonshot_adaptive_momentum_vol_target_132_mode__native": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_vol_target_132_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_vol_target_132_mode__native",
+        "engine_seconds": 0.5878707660003784,
+        "final_equity": 10000.195710941192,
+        "liquidation_count": 0,
+        "load_seconds": 1.4299999747890979e-05,
+        "metrics": {
+          "cagr": 3.503295429752029e-06,
+          "calmar": 0.02373378728345721,
+          "max_drawdown": 0.00014760793917597284,
+          "sharpe": 0.04550851895650203,
+          "sortino": 0.035882634979378776,
+          "total_return": 2.000509411925755e-05,
+          "volatility": 7.704613094207029e-05
+        },
+        "rss_mib": 474.82421875,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 2,
+        "variant": "native",
+        "wall_seconds": 0.5878850660001262
+      }
+    },
+    "profit_moonshot_adaptive_momentum_vol_target_mode__cadence_1440b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_vol_target_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_vol_target_mode__cadence_1440b",
+        "engine_seconds": 0.49857111199889914,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 2.5611000637582038e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 476.31640625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_1440b",
+        "wall_seconds": 0.4985967229995367
+      }
+    },
+    "profit_moonshot_adaptive_momentum_vol_target_mode__cadence_15b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_vol_target_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_vol_target_mode__cadence_15b",
+        "engine_seconds": 1.09042209800009,
+        "final_equity": 10001.833393878347,
+        "liquidation_count": 0,
+        "load_seconds": 2.0182999833195936e-05,
+        "metrics": {
+          "cagr": 3.303261402609614e-05,
+          "calmar": 0.0706224364389012,
+          "max_drawdown": 0.00046773540664621805,
+          "sharpe": 0.13569481321889526,
+          "sortino": 0.10857531903511096,
+          "total_return": 0.0001886413878346982,
+          "volatility": 0.00024364772107897064
+        },
+        "rss_mib": 476.31640625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 4,
+        "variant": "cadence_15b",
+        "wall_seconds": 1.0904422809999232
+      }
+    },
+    "profit_moonshot_adaptive_momentum_vol_target_mode__cadence_1b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_vol_target_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_vol_target_mode__cadence_1b",
+        "engine_seconds": 1.3930663110004389,
+        "final_equity": 10005.767363025225,
+        "liquidation_count": 0,
+        "load_seconds": 1.8892999833042268e-05,
+        "metrics": {
+          "cagr": 0.00010351301588107376,
+          "calmar": 0.05833507020661103,
+          "max_drawdown": 0.0017744560093002643,
+          "sharpe": 0.11115378016185772,
+          "sortino": 0.08889507790520387,
+          "total_return": 0.0005912363025224465,
+          "volatility": 0.0009351424513947305
+        },
+        "rss_mib": 475.31640625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 16,
+        "variant": "cadence_1b",
+        "wall_seconds": 1.393085204000272
+      }
+    },
+    "profit_moonshot_adaptive_momentum_vol_target_mode__cadence_360b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_vol_target_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_vol_target_mode__cadence_360b",
+        "engine_seconds": 0.5269512980012223,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 2.4645999474159908e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 476.31640625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_360b",
+        "wall_seconds": 0.5269759440006965
+      }
+    },
+    "profit_moonshot_adaptive_momentum_vol_target_mode__cadence_60b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_vol_target_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_vol_target_mode__cadence_60b",
+        "engine_seconds": 0.5452931540003192,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 2.5393999749212526e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 476.31640625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_60b",
+        "wall_seconds": 0.5453185480000684
+      }
+    },
+    "profit_moonshot_adaptive_momentum_vol_target_mode__native": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_vol_target_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_vol_target_mode__native",
+        "engine_seconds": 0.9402230650002821,
+        "final_equity": 10000.196146558561,
+        "liquidation_count": 0,
+        "load_seconds": 2.5143999664578587e-05,
+        "metrics": {
+          "cagr": 3.5151267545607823e-06,
+          "calmar": 0.024527781429078032,
+          "max_drawdown": 0.00014331205472964422,
+          "sharpe": 0.047036598566111316,
+          "sortino": 0.037133144354496196,
+          "total_return": 2.0072655856129273e-05,
+          "volatility": 7.479102689208545e-05
+        },
+        "rss_mib": 475.015625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 2,
+        "variant": "native",
+        "wall_seconds": 0.9402482089999467
+      }
+    },
+    "profit_moonshot_adaptive_momentum_volume_guard_mode__cadence_1440b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_volume_guard_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_volume_guard_mode__cadence_1440b",
+        "engine_seconds": 0.8117867490009303,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 2.332499934709631e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 476.44140625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_1440b",
+        "wall_seconds": 0.8118100740002774
+      }
+    },
+    "profit_moonshot_adaptive_momentum_volume_guard_mode__cadence_15b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_volume_guard_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_volume_guard_mode__cadence_15b",
+        "engine_seconds": 0.9977729569991425,
+        "final_equity": 9999.612364008108,
+        "liquidation_count": 0,
+        "load_seconds": 2.7961000341747422e-05,
+        "metrics": {
+          "cagr": -6.788452518002863e-06,
+          "calmar": -0.14268168948334675,
+          "max_drawdown": 4.757760118052979e-05,
+          "sharpe": -0.5635351851863448,
+          "sortino": -0.13239249402418982,
+          "total_return": -3.8763599189195475e-05,
+          "volatility": 1.2046103140487497e-05
+        },
+        "rss_mib": 476.31640625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 8,
+        "variant": "cadence_15b",
+        "wall_seconds": 0.9978009179994842
+      }
+    },
+    "profit_moonshot_adaptive_momentum_volume_guard_mode__cadence_1b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_volume_guard_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_volume_guard_mode__cadence_1b",
+        "engine_seconds": 1.2213079579996702,
+        "final_equity": 9998.201500615802,
+        "liquidation_count": 0,
+        "load_seconds": 2.5535000531817786e-05,
+        "metrics": {
+          "cagr": -3.149794768642078e-05,
+          "calmar": -0.1318919376139646,
+          "max_drawdown": 0.00023881632385000162,
+          "sharpe": -0.6728062407704817,
+          "sortino": -0.19514783336789324,
+          "total_return": -0.00017984993841979602,
+          "volatility": 4.681488489936607e-05
+        },
+        "rss_mib": 476.31640625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 32,
+        "variant": "cadence_1b",
+        "wall_seconds": 1.221333493000202
+      }
+    },
+    "profit_moonshot_adaptive_momentum_volume_guard_mode__cadence_360b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_volume_guard_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_volume_guard_mode__cadence_360b",
+        "engine_seconds": 0.7917538080000668,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 2.1830000150657725e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 476.44140625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_360b",
+        "wall_seconds": 0.7917756380002174
+      }
+    },
+    "profit_moonshot_adaptive_momentum_volume_guard_mode__cadence_60b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_volume_guard_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_volume_guard_mode__cadence_60b",
+        "engine_seconds": 0.7931603360002555,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 1.915400025609415e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 476.31640625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_60b",
+        "wall_seconds": 0.7931794900005116
+      }
+    },
+    "profit_moonshot_adaptive_momentum_volume_guard_mode__native": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_adaptive_momentum_volume_guard_mode",
+        "candidate_id": "profit_moonshot_adaptive_momentum_volume_guard_mode__native",
+        "engine_seconds": 0.8698601130008683,
+        "final_equity": 9999.840111995158,
+        "liquidation_count": 0,
+        "load_seconds": 1.8632999854162335e-05,
+        "metrics": {
+          "cagr": -2.800002982805694e-06,
+          "calmar": -0.13265695443565198,
+          "max_drawdown": 2.1107095325061856e-05,
+          "sharpe": -0.4481965260883692,
+          "sortino": -0.057842069362985186,
+          "total_return": -1.598880048425677e-05,
+          "volatility": 6.2472313458125195e-06
+        },
+        "rss_mib": 476.31640625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 4,
+        "variant": "native",
+        "wall_seconds": 0.8698787460007225
+      }
+    },
+    "profit_moonshot_balanced_mode__cadence_1440b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_balanced_mode",
+        "candidate_id": "profit_moonshot_balanced_mode__cadence_1440b",
+        "engine_seconds": 0.5386290730002656,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 2.5848999939626083e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 476.69140625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_1440b",
+        "wall_seconds": 0.5386549220002053
+      }
+    },
+    "profit_moonshot_balanced_mode__cadence_15b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_balanced_mode",
+        "candidate_id": "profit_moonshot_balanced_mode__cadence_15b",
+        "engine_seconds": 1.2499763590003568,
+        "final_equity": 9999.286004327476,
+        "liquidation_count": 0,
+        "load_seconds": 2.5631999960751273e-05,
+        "metrics": {
+          "cagr": -1.2503975551747537e-05,
+          "calmar": -0.14173133818032937,
+          "max_drawdown": 8.822308257499357e-05,
+          "sharpe": -0.5351696078441041,
+          "sortino": -0.42256865663084386,
+          "total_return": -7.139956725243923e-05,
+          "volatility": 2.336414564959036e-05
+        },
+        "rss_mib": 476.69140625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 6,
+        "variant": "cadence_15b",
+        "wall_seconds": 1.2500019910003175
+      }
+    },
+    "profit_moonshot_balanced_mode__cadence_1b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_balanced_mode",
+        "candidate_id": "profit_moonshot_balanced_mode__cadence_1b",
+        "engine_seconds": 6.548399837000034,
+        "final_equity": 9995.447690687539,
+        "liquidation_count": 0,
+        "load_seconds": 2.335699991817819e-05,
+        "metrics": {
+          "cagr": -7.998100924455631e-05,
+          "calmar": -0.11474423417281657,
+          "max_drawdown": 0.0006970372831465912,
+          "sharpe": -0.49968989678220427,
+          "sortino": -0.6180174014588903,
+          "total_return": -0.00045663093124603815,
+          "volatility": 0.00016004205390935286
+        },
+        "rss_mib": 476.69140625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 85,
+        "variant": "cadence_1b",
+        "wall_seconds": 6.548423193999952
+      }
+    },
+    "profit_moonshot_balanced_mode__cadence_30b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_balanced_mode",
+        "candidate_id": "profit_moonshot_balanced_mode__cadence_30b",
+        "engine_seconds": 0.7296500019992891,
+        "final_equity": 9999.690641545352,
+        "liquidation_count": 0,
+        "load_seconds": 1.9142000382998958e-05,
+        "metrics": {
+          "cagr": -5.417604257984543e-06,
+          "calmar": -0.17418759784138063,
+          "max_drawdown": 3.1102123946378444e-05,
+          "sharpe": -0.4561739767724283,
+          "sortino": -0.1390385010971112,
+          "total_return": -3.093584546476347e-05,
+          "volatility": 1.1876057555907424e-05
+        },
+        "rss_mib": 476.69140625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 2,
+        "variant": "cadence_30b",
+        "wall_seconds": 0.7296691439996721
+      }
+    },
+    "profit_moonshot_balanced_mode__cadence_360b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_balanced_mode",
+        "candidate_id": "profit_moonshot_balanced_mode__cadence_360b",
+        "engine_seconds": 0.5551327570001376,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 2.422400029900018e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 476.69140625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_360b",
+        "wall_seconds": 0.5551569810004366
+      }
+    },
+    "profit_moonshot_balanced_mode__cadence_60b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_balanced_mode",
+        "candidate_id": "profit_moonshot_balanced_mode__cadence_60b",
+        "engine_seconds": 0.6112314850006442,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 2.3377999241347425e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 476.69140625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_60b",
+        "wall_seconds": 0.6112548629998855
+      }
+    },
+    "profit_moonshot_balanced_mode__cadence_720b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_balanced_mode",
+        "candidate_id": "profit_moonshot_balanced_mode__cadence_720b",
+        "engine_seconds": 0.5763202800008003,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 2.796099943225272e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 476.69140625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_720b",
+        "wall_seconds": 0.5763482410002325
+      }
+    },
+    "profit_moonshot_balanced_mode__native": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_balanced_mode",
+        "candidate_id": "profit_moonshot_balanced_mode__native",
+        "engine_seconds": 0.6747448919995804,
+        "final_equity": 9999.690641545352,
+        "liquidation_count": 0,
+        "load_seconds": 2.4808000489429105e-05,
+        "metrics": {
+          "cagr": -5.417604257984543e-06,
+          "calmar": -0.17418759784138063,
+          "max_drawdown": 3.1102123946378444e-05,
+          "sharpe": -0.4561739767724283,
+          "sortino": -0.1390385010971112,
+          "total_return": -3.093584546476347e-05,
+          "volatility": 1.1876057555907424e-05
+        },
+        "rss_mib": 476.44140625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 2,
+        "variant": "native",
+        "wall_seconds": 0.6747697000000699
+      }
+    },
+    "profit_moonshot_breakout_mode__cadence_1440b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_breakout_mode",
+        "candidate_id": "profit_moonshot_breakout_mode__cadence_1440b",
+        "engine_seconds": 0.5064916539995465,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 2.0421000044734683e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 476.69140625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_1440b",
+        "wall_seconds": 0.5065120749995913
+      }
+    },
+    "profit_moonshot_breakout_mode__cadence_15b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_breakout_mode",
+        "candidate_id": "profit_moonshot_breakout_mode__cadence_15b",
+        "engine_seconds": 0.4775819609994869,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 2.4570000277890358e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 476.69140625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_15b",
+        "wall_seconds": 0.4776065309997648
+      }
+    },
+    "profit_moonshot_breakout_mode__cadence_1b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_breakout_mode",
+        "candidate_id": "profit_moonshot_breakout_mode__cadence_1b",
+        "engine_seconds": 0.5285880150004232,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 2.375799977016868e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 476.69140625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_1b",
+        "wall_seconds": 0.5286117730001934
+      }
+    },
+    "profit_moonshot_breakout_mode__cadence_360b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_breakout_mode",
+        "candidate_id": "profit_moonshot_breakout_mode__cadence_360b",
+        "engine_seconds": 0.45992521600055625,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 1.9792999410128687e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 476.69140625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_360b",
+        "wall_seconds": 0.4599450089999664
+      }
+    },
+    "profit_moonshot_breakout_mode__native": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_breakout_mode",
+        "candidate_id": "profit_moonshot_breakout_mode__native",
+        "engine_seconds": 0.5095770029993218,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 1.9522000002325512e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 476.69140625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "native",
+        "wall_seconds": 0.5095965249993242
+      }
+    },
+    "profit_moonshot_derivatives_taker_flow_mode__cadence_1440b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_derivatives_taker_flow_mode",
+        "candidate_id": "profit_moonshot_derivatives_taker_flow_mode__cadence_1440b",
+        "engine_seconds": 0.7949097830005485,
+        "final_equity": 9999.90911198207,
+        "liquidation_count": 0,
+        "load_seconds": 1.77570000232663e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 477.109375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 1,
+        "variant": "cadence_1440b",
+        "wall_seconds": 0.7949275400005718
+      }
+    },
+    "profit_moonshot_derivatives_taker_flow_mode__cadence_15b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_derivatives_taker_flow_mode",
+        "candidate_id": "profit_moonshot_derivatives_taker_flow_mode__cadence_15b",
+        "engine_seconds": 1.4649578640000982,
+        "final_equity": 9993.173561429376,
+        "liquidation_count": 0,
+        "load_seconds": 2.1427999854495283e-05,
+        "metrics": {
+          "cagr": -0.00011815022878181036,
+          "calmar": -0.16039901213645175,
+          "max_drawdown": 0.0007366019728431976,
+          "sharpe": -0.8251598187805547,
+          "sortino": -0.5262766821926965,
+          "total_return": -0.000674487604915508,
+          "volatility": 0.00014318067282106264
+        },
+        "rss_mib": 476.859375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 43,
+        "variant": "cadence_15b",
+        "wall_seconds": 1.4649792919999527
+      }
+    },
+    "profit_moonshot_derivatives_taker_flow_mode__cadence_180b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_derivatives_taker_flow_mode",
+        "candidate_id": "profit_moonshot_derivatives_taker_flow_mode__cadence_180b",
+        "engine_seconds": 0.9744780190003439,
+        "final_equity": 10003.702363493545,
+        "liquidation_count": 0,
+        "load_seconds": 2.177500027755741e-05,
+        "metrics": {
+          "cagr": 6.632011490759204e-05,
+          "calmar": 0.8361441423056198,
+          "max_drawdown": 7.931660529812252e-05,
+          "sharpe": 0.8394568400906182,
+          "sortino": 0.4414692279518594,
+          "total_return": 0.0003787680671898386,
+          "volatility": 7.900470879460976e-05
+        },
+        "rss_mib": 477.109375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 9,
+        "variant": "cadence_180b",
+        "wall_seconds": 0.9744997940006215
+      }
+    },
+    "profit_moonshot_derivatives_taker_flow_mode__cadence_1b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_derivatives_taker_flow_mode",
+        "candidate_id": "profit_moonshot_derivatives_taker_flow_mode__cadence_1b",
+        "engine_seconds": 2.8623959099986678,
+        "final_equity": 9996.755145444173,
+        "liquidation_count": 0,
+        "load_seconds": 1.9804000658041332e-05,
+        "metrics": {
+          "cagr": -5.742409282305516e-05,
+          "calmar": -0.06626069372197527,
+          "max_drawdown": 0.0008666388713647068,
+          "sharpe": -0.22197013109168146,
+          "sortino": -0.19989541620076298,
+          "total_return": -0.000327865455582832,
+          "volatility": 0.000258558805578633
+        },
+        "rss_mib": 476.74609375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 82,
+        "variant": "cadence_1b",
+        "wall_seconds": 2.862415713999326
+      }
+    },
+    "profit_moonshot_derivatives_taker_flow_mode__cadence_360b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_derivatives_taker_flow_mode",
+        "candidate_id": "profit_moonshot_derivatives_taker_flow_mode__cadence_360b",
+        "engine_seconds": 0.801024129000325,
+        "final_equity": 9999.90911198207,
+        "liquidation_count": 0,
+        "load_seconds": 1.4647000170953106e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 477.109375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 1,
+        "variant": "cadence_360b",
+        "wall_seconds": 0.801038776000496
+      }
+    },
+    "profit_moonshot_derivatives_taker_flow_mode__cadence_60b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_derivatives_taker_flow_mode",
+        "candidate_id": "profit_moonshot_derivatives_taker_flow_mode__cadence_60b",
+        "engine_seconds": 1.270598408999831,
+        "final_equity": 9996.669509003952,
+        "liquidation_count": 0,
+        "load_seconds": 1.7907999790622853e-05,
+        "metrics": {
+          "cagr": -5.699126771696594e-05,
+          "calmar": -0.1602582740637942,
+          "max_drawdown": 0.00035562137462106554,
+          "sharpe": -0.6561061109117701,
+          "sortino": -0.33297981336240473,
+          "total_return": -0.00032539455275615303,
+          "volatility": 8.685960196398929e-05
+        },
+        "rss_mib": 476.984375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 20,
+        "variant": "cadence_60b",
+        "wall_seconds": 1.2706163169996216
+      }
+    },
+    "profit_moonshot_derivatives_taker_flow_mode__native": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_derivatives_taker_flow_mode",
+        "candidate_id": "profit_moonshot_derivatives_taker_flow_mode__native",
+        "engine_seconds": 0.963295503000154,
+        "final_equity": 10003.702363493545,
+        "liquidation_count": 0,
+        "load_seconds": 2.005300029850332e-05,
+        "metrics": {
+          "cagr": 6.632011490759204e-05,
+          "calmar": 0.8361441423056198,
+          "max_drawdown": 7.931660529812252e-05,
+          "sharpe": 0.8394568400906182,
+          "sortino": 0.4414692279518594,
+          "total_return": 0.0003787680671898386,
+          "volatility": 7.900470879460976e-05
+        },
+        "rss_mib": 476.69140625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 9,
+        "variant": "native",
+        "wall_seconds": 0.9633155560004525
+      }
+    },
+    "profit_moonshot_derivatives_taker_flow_sparse_mode__cadence_1440b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_derivatives_taker_flow_sparse_mode",
+        "candidate_id": "profit_moonshot_derivatives_taker_flow_sparse_mode__cadence_1440b",
+        "engine_seconds": 0.6133336920001966,
+        "final_equity": 9999.931833986551,
+        "liquidation_count": 0,
+        "load_seconds": 2.278299962199526e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 477.25390625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 1,
+        "variant": "cadence_1440b",
+        "wall_seconds": 0.6133564749998186
+      }
+    },
+    "profit_moonshot_derivatives_taker_flow_sparse_mode__cadence_15b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_derivatives_taker_flow_sparse_mode",
+        "candidate_id": "profit_moonshot_derivatives_taker_flow_sparse_mode__cadence_15b",
+        "engine_seconds": 0.9181323909997445,
+        "final_equity": 9999.39322843619,
+        "liquidation_count": 0,
+        "load_seconds": 1.9142999917676207e-05,
+        "metrics": {
+          "cagr": -9.557064146070715e-06,
+          "calmar": -0.025300574970248447,
+          "max_drawdown": 0.0003777409864127237,
+          "sharpe": -0.0943452053552806,
+          "sortino": -0.038572755280733693,
+          "total_return": -5.457264190666944e-05,
+          "volatility": 0.00010124508058585655
+        },
+        "rss_mib": 477.109375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 17,
+        "variant": "cadence_15b",
+        "wall_seconds": 0.9181515339996622
+      }
+    },
+    "profit_moonshot_derivatives_taker_flow_sparse_mode__cadence_1b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_derivatives_taker_flow_sparse_mode",
+        "candidate_id": "profit_moonshot_derivatives_taker_flow_sparse_mode__cadence_1b",
+        "engine_seconds": 1.8885795930000313,
+        "final_equity": 9997.10200026127,
+        "liquidation_count": 0,
+        "load_seconds": 1.9533000340743456e-05,
+        "metrics": {
+          "cagr": -5.044801812248423e-05,
+          "calmar": -0.06496628657814604,
+          "max_drawdown": 0.0007765261149996897,
+          "sharpe": -0.24465013725953544,
+          "sortino": -0.17871684189698475,
+          "total_return": -0.0002880399738731665,
+          "volatility": 0.00020612314971450555
+        },
+        "rss_mib": 477.109375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 53,
+        "variant": "cadence_1b",
+        "wall_seconds": 1.888599126000372
+      }
+    },
+    "profit_moonshot_derivatives_taker_flow_sparse_mode__cadence_60b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_derivatives_taker_flow_sparse_mode",
+        "candidate_id": "profit_moonshot_derivatives_taker_flow_sparse_mode__cadence_60b",
+        "engine_seconds": 0.8036615399996663,
+        "final_equity": 10001.513423577902,
+        "liquidation_count": 0,
+        "load_seconds": 1.5319000340241473e-05,
+        "metrics": {
+          "cagr": 2.650166352302641e-05,
+          "calmar": 0.15800676562731458,
+          "max_drawdown": 0.00016772486556388997,
+          "sharpe": 0.3244204808900905,
+          "sortino": 0.157896402210768,
+          "total_return": 0.0001513423577901296,
+          "volatility": 8.16984448100476e-05
+        },
+        "rss_mib": 477.15234375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 10,
+        "variant": "cadence_60b",
+        "wall_seconds": 0.8036768590000065
+      }
+    },
+    "profit_moonshot_derivatives_taker_flow_sparse_mode__native": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_derivatives_taker_flow_sparse_mode",
+        "candidate_id": "profit_moonshot_derivatives_taker_flow_sparse_mode__native",
+        "engine_seconds": 0.656273037999199,
+        "final_equity": 9999.931833986551,
+        "liquidation_count": 0,
+        "load_seconds": 1.822200010792585e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 477.109375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 1,
+        "variant": "native",
+        "wall_seconds": 0.6562912599993069
+      }
+    },
+    "profit_moonshot_ensemble_mode__cadence_1440b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_ensemble_mode",
+        "candidate_id": "profit_moonshot_ensemble_mode__cadence_1440b",
+        "engine_seconds": 0.47627978899981827,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 2.335699991817819e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 480.62890625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_1440b",
+        "wall_seconds": 0.47630314599973644
+      }
+    },
+    "profit_moonshot_ensemble_mode__cadence_15b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_ensemble_mode",
+        "candidate_id": "profit_moonshot_ensemble_mode__cadence_15b",
+        "engine_seconds": 1.1754052489995956,
+        "final_equity": 9999.398016861855,
+        "liquidation_count": 0,
+        "load_seconds": 2.4558999939472415e-05,
+        "metrics": {
+          "cagr": -1.0542287517290028e-05,
+          "calmar": -0.142107111938422,
+          "max_drawdown": 7.418550256554523e-05,
+          "sharpe": -0.5393031588828323,
+          "sortino": -0.42444965845172,
+          "total_return": -6.0198313814541216e-05,
+          "volatility": 1.954772889668571e-05
+        },
+        "rss_mib": 480.62890625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 6,
+        "variant": "cadence_15b",
+        "wall_seconds": 1.1754298079995351
+      }
+    },
+    "profit_moonshot_ensemble_mode__cadence_1b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_ensemble_mode",
+        "candidate_id": "profit_moonshot_ensemble_mode__cadence_1b",
+        "engine_seconds": 6.387115158999222,
+        "final_equity": 9996.080514482243,
+        "liquidation_count": 0,
+        "load_seconds": 2.389900055277394e-05,
+        "metrics": {
+          "cagr": -6.882844261502097e-05,
+          "calmar": -0.11695205804357925,
+          "max_drawdown": 0.0005885184388065559,
+          "sharpe": -0.5140283887959077,
+          "sortino": -0.6324976676234382,
+          "total_return": -0.00039296855177561874,
+          "volatility": 0.00013388724600538882
+        },
+        "rss_mib": 480.62890625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 85,
+        "variant": "cadence_1b",
+        "wall_seconds": 6.387139057999775
+      }
+    },
+    "profit_moonshot_ensemble_mode__cadence_30b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_ensemble_mode",
+        "candidate_id": "profit_moonshot_ensemble_mode__cadence_30b",
+        "engine_seconds": 0.6498554759991748,
+        "final_equity": 9999.742201287792,
+        "liquidation_count": 0,
+        "load_seconds": 1.7832000594353303e-05,
+        "metrics": {
+          "cagr": -4.514660614240995e-06,
+          "calmar": -0.174187222592061,
+          "max_drawdown": 2.5918437340344628e-05,
+          "sharpe": -0.4561748911437288,
+          "sortino": -0.13903868819142265,
+          "total_return": -2.577987122076575e-05,
+          "volatility": 9.896690752479217e-06
+        },
+        "rss_mib": 480.62890625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 2,
+        "variant": "cadence_30b",
+        "wall_seconds": 0.6498733079997692
+      }
+    },
+    "profit_moonshot_ensemble_mode__cadence_360b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_ensemble_mode",
+        "candidate_id": "profit_moonshot_ensemble_mode__cadence_360b",
+        "engine_seconds": 0.4864529179994861,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 2.5383000320289284e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 480.62890625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_360b",
+        "wall_seconds": 0.4864783009998064
+      }
+    },
+    "profit_moonshot_ensemble_mode__cadence_60b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_ensemble_mode",
+        "candidate_id": "profit_moonshot_ensemble_mode__cadence_60b",
+        "engine_seconds": 0.5227619880006387,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 2.533899987611221e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 480.62890625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_60b",
+        "wall_seconds": 0.5227873270005148
+      }
+    },
+    "profit_moonshot_ensemble_mode__cadence_720b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_ensemble_mode",
+        "candidate_id": "profit_moonshot_ensemble_mode__cadence_720b",
+        "engine_seconds": 0.47684699699948396,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 1.8514000657887664e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 480.62890625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_720b",
+        "wall_seconds": 0.47686551100014185
+      }
+    },
+    "profit_moonshot_ensemble_mode__native": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_ensemble_mode",
+        "candidate_id": "profit_moonshot_ensemble_mode__native",
+        "engine_seconds": 0.699743117998878,
+        "final_equity": 9999.742201287792,
+        "liquidation_count": 0,
+        "load_seconds": 2.3553000573883764e-05,
+        "metrics": {
+          "cagr": -4.514660614240995e-06,
+          "calmar": -0.174187222592061,
+          "max_drawdown": 2.5918437340344628e-05,
+          "sharpe": -0.4561748911437288,
+          "sortino": -0.13903868819142265,
+          "total_return": -2.577987122076575e-05,
+          "volatility": 9.896690752479217e-06
+        },
+        "rss_mib": 477.25390625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 2,
+        "variant": "native",
+        "wall_seconds": 0.6997666709994519
+      }
+    },
+    "profit_moonshot_momentum_hybrid_core_mode__cadence_1440b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_momentum_hybrid_core_mode",
+        "candidate_id": "profit_moonshot_momentum_hybrid_core_mode__cadence_1440b",
+        "engine_seconds": 1.3827258719993551,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 1.8515000192564912e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 480.75390625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_1440b",
+        "wall_seconds": 1.3827443869995477
+      }
+    },
+    "profit_moonshot_momentum_hybrid_core_mode__cadence_15b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_momentum_hybrid_core_mode",
+        "candidate_id": "profit_moonshot_momentum_hybrid_core_mode__cadence_15b",
+        "engine_seconds": 2.0682329179999215,
+        "final_equity": 10002.127046124624,
+        "liquidation_count": 0,
+        "load_seconds": 1.7170999853988178e-05,
+        "metrics": {
+          "cagr": 3.830030203522128e-05,
+          "calmar": 0.0684857981508213,
+          "max_drawdown": 0.000559244442926332,
+          "sharpe": 0.1318156026617162,
+          "sortino": 0.10568686003706514,
+          "total_return": 0.00021872661246225,
+          "volatility": 0.00029087486817530947
+        },
+        "rss_mib": 480.75390625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 11,
+        "variant": "cadence_15b",
+        "wall_seconds": 2.0682500889997755
+      }
+    },
+    "profit_moonshot_momentum_hybrid_core_mode__cadence_1b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_momentum_hybrid_core_mode",
+        "candidate_id": "profit_moonshot_momentum_hybrid_core_mode__cadence_1b",
+        "engine_seconds": 2.8015536639995844,
+        "final_equity": 10006.918070121774,
+        "liquidation_count": 0,
+        "load_seconds": 1.8849999833037145e-05,
+        "metrics": {
+          "cagr": 0.00012397214183512695,
+          "calmar": 0.0562861596657488,
+          "max_drawdown": 0.0022025333149627963,
+          "sharpe": 0.10689014573798022,
+          "sortino": 0.08564688746045142,
+          "total_return": 0.0007081270121773731,
+          "volatility": 0.001166093443192015
+        },
+        "rss_mib": 480.75390625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 47,
+        "variant": "cadence_1b",
+        "wall_seconds": 2.8015725139994174
+      }
+    },
+    "profit_moonshot_momentum_hybrid_core_mode__cadence_360b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_momentum_hybrid_core_mode",
+        "candidate_id": "profit_moonshot_momentum_hybrid_core_mode__cadence_360b",
+        "engine_seconds": 1.597786921000079,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 3.804700008913642e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 480.75390625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_360b",
+        "wall_seconds": 1.5978249680001682
+      }
+    },
+    "profit_moonshot_momentum_hybrid_core_mode__cadence_60b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_momentum_hybrid_core_mode",
+        "candidate_id": "profit_moonshot_momentum_hybrid_core_mode__cadence_60b",
+        "engine_seconds": 1.37487177300045,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 2.26419997488847e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 480.75390625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_60b",
+        "wall_seconds": 1.374894415000199
+      }
+    },
+    "profit_moonshot_momentum_hybrid_core_mode__cadence_72b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_momentum_hybrid_core_mode",
+        "candidate_id": "profit_moonshot_momentum_hybrid_core_mode__cadence_72b",
+        "engine_seconds": 2.0587097140005426,
+        "final_equity": 10000.2162911142,
+        "liquidation_count": 0,
+        "load_seconds": 2.6584999432088807e-05,
+        "metrics": {
+          "cagr": 3.859839879050142e-06,
+          "calmar": 0.021478517027562732,
+          "max_drawdown": 0.000179707000911512,
+          "sharpe": 0.04117288213009548,
+          "sortino": 0.032369110387143,
+          "total_return": 2.2041111420012527e-05,
+          "volatility": 9.385385420044115e-05
+        },
+        "rss_mib": 480.75390625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 5,
+        "variant": "cadence_72b",
+        "wall_seconds": 2.0587362989999747
+      }
+    },
+    "profit_moonshot_momentum_hybrid_core_mode__cadence_96b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_momentum_hybrid_core_mode",
+        "candidate_id": "profit_moonshot_momentum_hybrid_core_mode__cadence_96b",
+        "engine_seconds": 1.931555790000857,
+        "final_equity": 10000.2162911142,
+        "liquidation_count": 0,
+        "load_seconds": 2.343300002394244e-05,
+        "metrics": {
+          "cagr": 3.859839879050142e-06,
+          "calmar": 0.021478517027562732,
+          "max_drawdown": 0.000179707000911512,
+          "sharpe": 0.04117288213009548,
+          "sortino": 0.032369110387143,
+          "total_return": 2.2041111420012527e-05,
+          "volatility": 9.385385420044115e-05
+        },
+        "rss_mib": 480.75390625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 5,
+        "variant": "cadence_96b",
+        "wall_seconds": 1.931579223000881
+      }
+    },
+    "profit_moonshot_momentum_hybrid_core_mode__native": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_momentum_hybrid_core_mode",
+        "candidate_id": "profit_moonshot_momentum_hybrid_core_mode__native",
+        "engine_seconds": 1.9003312690001621,
+        "final_equity": 10000.2162911142,
+        "liquidation_count": 0,
+        "load_seconds": 2.428900006634649e-05,
+        "metrics": {
+          "cagr": 3.859839879050142e-06,
+          "calmar": 0.021478517027562732,
+          "max_drawdown": 0.000179707000911512,
+          "sharpe": 0.04117288213009548,
+          "sortino": 0.032369110387143,
+          "total_return": 2.2041111420012527e-05,
+          "volatility": 9.385385420044115e-05
+        },
+        "rss_mib": 480.75390625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 5,
+        "variant": "native",
+        "wall_seconds": 1.9003555580002285
+      }
+    },
+    "profit_moonshot_momentum_hybrid_return_mode__cadence_1440b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_momentum_hybrid_return_mode",
+        "candidate_id": "profit_moonshot_momentum_hybrid_return_mode__cadence_1440b",
+        "engine_seconds": 0.9348149540001032,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 2.6564000108919572e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 481.11328125,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_1440b",
+        "wall_seconds": 0.9348415180002121
+      }
+    },
+    "profit_moonshot_momentum_hybrid_return_mode__cadence_15b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_momentum_hybrid_return_mode",
+        "candidate_id": "profit_moonshot_momentum_hybrid_return_mode__cadence_15b",
+        "engine_seconds": 1.8377433700006804,
+        "final_equity": 10002.34774062723,
+        "liquidation_count": 0,
+        "load_seconds": 2.7072999728261493e-05,
+        "metrics": {
+          "cagr": 4.2265607582692155e-05,
+          "calmar": 0.06819029230876966,
+          "max_drawdown": 0.0006198185423712659,
+          "sharpe": 0.13129388407536405,
+          "sortino": 0.10522078845933353,
+          "total_return": 0.0002413740627231764,
+          "volatility": 0.00032230459234385824
+        },
+        "rss_mib": 480.86328125,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 10,
+        "variant": "cadence_15b",
+        "wall_seconds": 1.8377704430004087
+      }
+    },
+    "profit_moonshot_momentum_hybrid_return_mode__cadence_1b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_momentum_hybrid_return_mode",
+        "candidate_id": "profit_moonshot_momentum_hybrid_return_mode__cadence_1b",
+        "engine_seconds": 2.545521739999458,
+        "final_equity": 10007.657618492069,
+        "liquidation_count": 0,
+        "load_seconds": 2.5340000320284162e-05,
+        "metrics": {
+          "cagr": 0.00013714523886521057,
+          "calmar": 0.05591479978307957,
+          "max_drawdown": 0.0024527538218372057,
+          "sharpe": 0.10611890676659722,
+          "sortino": 0.08510524328448797,
+          "total_return": 0.000783395849206947,
+          "volatility": 0.0013002451894954387
+        },
+        "rss_mib": 480.75390625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 46,
+        "variant": "cadence_1b",
+        "wall_seconds": 2.5455470799997784
+      }
+    },
+    "profit_moonshot_momentum_hybrid_return_mode__cadence_360b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_momentum_hybrid_return_mode",
+        "candidate_id": "profit_moonshot_momentum_hybrid_return_mode__cadence_360b",
+        "engine_seconds": 0.9581047020001279,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 2.7051999495597556e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 481.11328125,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_360b",
+        "wall_seconds": 0.9581317539996235
+      }
+    },
+    "profit_moonshot_momentum_hybrid_return_mode__cadence_60b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_momentum_hybrid_return_mode",
+        "candidate_id": "profit_moonshot_momentum_hybrid_return_mode__cadence_60b",
+        "engine_seconds": 0.9424134860000777,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 1.843900008680066e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 480.86328125,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_60b",
+        "wall_seconds": 0.9424319250001645
+      }
+    },
+    "profit_moonshot_momentum_hybrid_return_mode__cadence_72b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_momentum_hybrid_return_mode",
+        "candidate_id": "profit_moonshot_momentum_hybrid_return_mode__cadence_72b",
+        "engine_seconds": 1.5284474689997296,
+        "final_equity": 10000.216126989753,
+        "liquidation_count": 0,
+        "load_seconds": 2.4093999854812864e-05,
+        "metrics": {
+          "cagr": 3.842956282529286e-06,
+          "calmar": 0.019806348911944598,
+          "max_drawdown": 0.00019402648613403543,
+          "sharpe": 0.03794647472824157,
+          "sortino": 0.029754598770131202,
+          "total_return": 2.1944698975318033e-05,
+          "volatility": 0.00010140829179639136
+        },
+        "rss_mib": 481.11328125,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 4,
+        "variant": "cadence_72b",
+        "wall_seconds": 1.5284715629995844
+      }
+    },
+    "profit_moonshot_momentum_hybrid_return_mode__cadence_96b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_momentum_hybrid_return_mode",
+        "candidate_id": "profit_moonshot_momentum_hybrid_return_mode__cadence_96b",
+        "engine_seconds": 1.6640267150005457,
+        "final_equity": 10000.216126989753,
+        "liquidation_count": 0,
+        "load_seconds": 2.171100004488835e-05,
+        "metrics": {
+          "cagr": 3.842956282529286e-06,
+          "calmar": 0.019806348911944598,
+          "max_drawdown": 0.00019402648613403543,
+          "sharpe": 0.03794647472824157,
+          "sortino": 0.029754598770131202,
+          "total_return": 2.1944698975318033e-05,
+          "volatility": 0.00010140829179639136
+        },
+        "rss_mib": 481.11328125,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 4,
+        "variant": "cadence_96b",
+        "wall_seconds": 1.6640484260005906
+      }
+    },
+    "profit_moonshot_momentum_hybrid_return_mode__native": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_momentum_hybrid_return_mode",
+        "candidate_id": "profit_moonshot_momentum_hybrid_return_mode__native",
+        "engine_seconds": 1.6206490240001585,
+        "final_equity": 10000.216126989753,
+        "liquidation_count": 0,
+        "load_seconds": 2.0442999812075868e-05,
+        "metrics": {
+          "cagr": 3.842956282529286e-06,
+          "calmar": 0.019806348911944598,
+          "max_drawdown": 0.00019402648613403543,
+          "sharpe": 0.03794647472824157,
+          "sortino": 0.029754598770131202,
+          "total_return": 2.1944698975318033e-05,
+          "volatility": 0.00010140829179639136
+        },
+        "rss_mib": 480.75390625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 4,
+        "variant": "native",
+        "wall_seconds": 1.6206694669999706
+      }
+    },
+    "profit_moonshot_momentum_hybrid_safe_mode__cadence_1440b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_momentum_hybrid_safe_mode",
+        "candidate_id": "profit_moonshot_momentum_hybrid_safe_mode__cadence_1440b",
+        "engine_seconds": 1.3275109670003076,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 2.318399947398575e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 481.33984375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_1440b",
+        "wall_seconds": 1.3275341509997816
+      }
+    },
+    "profit_moonshot_momentum_hybrid_safe_mode__cadence_15b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_momentum_hybrid_safe_mode",
+        "candidate_id": "profit_moonshot_momentum_hybrid_safe_mode__cadence_15b",
+        "engine_seconds": 2.0627891969988923,
+        "final_equity": 10002.17473940476,
+        "liquidation_count": 0,
+        "load_seconds": 2.5588000426068902e-05,
+        "metrics": {
+          "cagr": 3.9159174290759324e-05,
+          "calmar": 0.06923620574561555,
+          "max_drawdown": 0.0005655881033492237,
+          "sharpe": 0.13351936161437233,
+          "sortino": 0.1073883398494726,
+          "total_return": 0.0002236319404760323,
+          "volatility": 0.00029360147442656747
+        },
+        "rss_mib": 481.33984375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 12,
+        "variant": "cadence_15b",
+        "wall_seconds": 2.0628147849993184
+      }
+    },
+    "profit_moonshot_momentum_hybrid_safe_mode__cadence_1b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_momentum_hybrid_safe_mode",
+        "candidate_id": "profit_moonshot_momentum_hybrid_safe_mode__cadence_1b",
+        "engine_seconds": 3.025619108000683,
+        "final_equity": 10006.737948723843,
+        "liquidation_count": 0,
+        "load_seconds": 2.8340999961073976e-05,
+        "metrics": {
+          "cagr": 0.00012073773447163205,
+          "calmar": 0.056675626256686554,
+          "max_drawdown": 0.0021303290752325388,
+          "sharpe": 0.10762624865512166,
+          "sortino": 0.08636668558371774,
+          "total_return": 0.0006896468723844862,
+          "volatility": 0.0011276602072372733
+        },
+        "rss_mib": 481.33984375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 48,
+        "variant": "cadence_1b",
+        "wall_seconds": 3.025647449000644
+      }
+    },
+    "profit_moonshot_momentum_hybrid_safe_mode__cadence_360b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_momentum_hybrid_safe_mode",
+        "candidate_id": "profit_moonshot_momentum_hybrid_safe_mode__cadence_360b",
+        "engine_seconds": 1.3463425180007107,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 2.472199957992416e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 481.33984375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_360b",
+        "wall_seconds": 1.3463672400002906
+      }
+    },
+    "profit_moonshot_momentum_hybrid_safe_mode__cadence_60b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_momentum_hybrid_safe_mode",
+        "candidate_id": "profit_moonshot_momentum_hybrid_safe_mode__cadence_60b",
+        "engine_seconds": 1.3163207890002013,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 2.684599985514069e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 481.33984375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_60b",
+        "wall_seconds": 1.3163476350000565
+      }
+    },
+    "profit_moonshot_momentum_hybrid_safe_mode__cadence_72b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_momentum_hybrid_safe_mode",
+        "candidate_id": "profit_moonshot_momentum_hybrid_safe_mode__cadence_72b",
+        "engine_seconds": 1.9259753300002558,
+        "final_equity": 10000.267191106948,
+        "liquidation_count": 0,
+        "load_seconds": 4.0236000131699257e-05,
+        "metrics": {
+          "cagr": 4.793919394119328e-06,
+          "calmar": 0.024922308412274025,
+          "max_drawdown": 0.00019235454897742794,
+          "sharpe": 0.04781210639383326,
+          "sortino": 0.03777432366834726,
+          "total_return": 2.737511069472731e-05,
+          "volatility": 0.00010037084681038276
+        },
+        "rss_mib": 481.33984375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 6,
+        "variant": "cadence_72b",
+        "wall_seconds": 1.9260155660003875
+      }
+    },
+    "profit_moonshot_momentum_hybrid_safe_mode__cadence_96b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_momentum_hybrid_safe_mode",
+        "candidate_id": "profit_moonshot_momentum_hybrid_safe_mode__cadence_96b",
+        "engine_seconds": 2.011040955999306,
+        "final_equity": 10000.267191106948,
+        "liquidation_count": 0,
+        "load_seconds": 3.0085000616963953e-05,
+        "metrics": {
+          "cagr": 4.793919394119328e-06,
+          "calmar": 0.024922308412274025,
+          "max_drawdown": 0.00019235454897742794,
+          "sharpe": 0.04781210639383326,
+          "sortino": 0.03777432366834726,
+          "total_return": 2.737511069472731e-05,
+          "volatility": 0.00010037084681038276
+        },
+        "rss_mib": 481.33984375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 6,
+        "variant": "cadence_96b",
+        "wall_seconds": 2.011071040999923
+      }
+    },
+    "profit_moonshot_momentum_hybrid_safe_mode__native": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_momentum_hybrid_safe_mode",
+        "candidate_id": "profit_moonshot_momentum_hybrid_safe_mode__native",
+        "engine_seconds": 2.0188501700004053,
+        "final_equity": 10000.267191106948,
+        "liquidation_count": 0,
+        "load_seconds": 2.7408000278228428e-05,
+        "metrics": {
+          "cagr": 4.793919394119328e-06,
+          "calmar": 0.024922308412274025,
+          "max_drawdown": 0.00019235454897742794,
+          "sharpe": 0.04781210639383326,
+          "sortino": 0.03777432366834726,
+          "total_return": 2.737511069472731e-05,
+          "volatility": 0.00010037084681038276
+        },
+        "rss_mib": 481.33984375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 6,
+        "variant": "native",
+        "wall_seconds": 2.0188775780006836
+      }
+    },
+    "profit_moonshot_reversion_mode__cadence_1440b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_reversion_mode",
+        "candidate_id": "profit_moonshot_reversion_mode__cadence_1440b",
+        "engine_seconds": 0.2856684590005898,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 1.6033000065363012e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 481.33984375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_1440b",
+        "wall_seconds": 0.28568449200065515
+      }
+    },
+    "profit_moonshot_reversion_mode__cadence_15b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_reversion_mode",
+        "candidate_id": "profit_moonshot_reversion_mode__cadence_15b",
+        "engine_seconds": 0.7109411809997255,
+        "final_equity": 9997.589064948272,
+        "liquidation_count": 0,
+        "load_seconds": 1.4344000192068052e-05,
+        "metrics": {
+          "cagr": -4.222488221328202e-05,
+          "calmar": -0.14206352362791244,
+          "max_drawdown": 0.0002972253618309221,
+          "sharpe": -0.53868336545458,
+          "sortino": -0.4241741914242614,
+          "total_return": -0.00024109350517287353,
+          "volatility": 7.838129631939194e-05
+        },
+        "rss_mib": 481.33984375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 6,
+        "variant": "cadence_15b",
+        "wall_seconds": 0.7109555249999175
+      }
+    },
+    "profit_moonshot_reversion_mode__cadence_1b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_reversion_mode",
+        "candidate_id": "profit_moonshot_reversion_mode__cadence_1b",
+        "engine_seconds": 4.8869985289993565,
+        "final_equity": 9983.872371908448,
+        "liquidation_count": 0,
+        "load_seconds": 2.5058000574063044e-05,
+        "metrics": {
+          "cagr": -0.0002834099255776268,
+          "calmar": -0.11696092343080017,
+          "max_drawdown": 0.0024231163474466412,
+          "sharpe": -0.5202191026415937,
+          "sortino": -0.6395594077268363,
+          "total_return": -0.0016172808091551305,
+          "volatility": 0.0005445816045225456
+        },
+        "rss_mib": 481.33984375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 89,
+        "variant": "cadence_1b",
+        "wall_seconds": 4.887023586999931
+      }
+    },
+    "profit_moonshot_reversion_mode__cadence_360b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_reversion_mode",
+        "candidate_id": "profit_moonshot_reversion_mode__cadence_360b",
+        "engine_seconds": 0.2840013370005181,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 1.66729996635695e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 481.33984375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_360b",
+        "wall_seconds": 0.2840180100001817
+      }
+    },
+    "profit_moonshot_reversion_mode__cadence_60b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_reversion_mode",
+        "candidate_id": "profit_moonshot_reversion_mode__cadence_60b",
+        "engine_seconds": 0.33885746899977676,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 1.5947000065352768e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 481.33984375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_60b",
+        "wall_seconds": 0.3388734159998421
+      }
+    },
+    "profit_moonshot_reversion_mode__native": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_reversion_mode",
+        "candidate_id": "profit_moonshot_reversion_mode__native",
+        "engine_seconds": 0.689292342999579,
+        "final_equity": 9998.967027229019,
+        "liquidation_count": 0,
+        "load_seconds": 2.5610999728087336e-05,
+        "metrics": {
+          "cagr": -1.8090356438849042e-05,
+          "calmar": -0.17419286452699423,
+          "max_drawdown": 0.00010385245393358593,
+          "sharpe": -0.4561611435933651,
+          "sortino": -0.1390358751900494,
+          "total_return": -0.00010329727709812442,
+          "volatility": 3.965645453440986e-05
+        },
+        "rss_mib": 481.33984375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 2,
+        "variant": "native",
+        "wall_seconds": 0.6893179539993071
+      }
+    },
+    "profit_moonshot_taker_flow_exhaustion_eth_hold_mode__cadence_1440b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_taker_flow_exhaustion_eth_hold_mode",
+        "candidate_id": "profit_moonshot_taker_flow_exhaustion_eth_hold_mode__cadence_1440b",
+        "engine_seconds": 0.1578292469994267,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 8.396000339416787e-06,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 481.33984375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_1440b",
+        "wall_seconds": 0.1578376429997661
+      }
+    },
+    "profit_moonshot_taker_flow_exhaustion_eth_hold_mode__cadence_15b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_taker_flow_exhaustion_eth_hold_mode",
+        "candidate_id": "profit_moonshot_taker_flow_exhaustion_eth_hold_mode__cadence_15b",
+        "engine_seconds": 0.16464562300006946,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 9.825999768509064e-06,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 481.33984375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_15b",
+        "wall_seconds": 0.16465544899983797
+      }
+    },
+    "profit_moonshot_taker_flow_exhaustion_eth_hold_mode__cadence_360b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_taker_flow_exhaustion_eth_hold_mode",
+        "candidate_id": "profit_moonshot_taker_flow_exhaustion_eth_hold_mode__cadence_360b",
+        "engine_seconds": 0.17299662700042973,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 9.316999239672441e-06,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 481.33984375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_360b",
+        "wall_seconds": 0.1730059439996694
+      }
+    },
+    "profit_moonshot_taker_flow_exhaustion_eth_hold_mode__cadence_60b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_taker_flow_exhaustion_eth_hold_mode",
+        "candidate_id": "profit_moonshot_taker_flow_exhaustion_eth_hold_mode__cadence_60b",
+        "engine_seconds": 0.16409901399947557,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 8.558999979868531e-06,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 481.33984375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_60b",
+        "wall_seconds": 0.16410757299945544
+      }
+    },
+    "profit_moonshot_taker_flow_exhaustion_eth_hold_mode__native": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_taker_flow_exhaustion_eth_hold_mode",
+        "candidate_id": "profit_moonshot_taker_flow_exhaustion_eth_hold_mode__native",
+        "engine_seconds": 0.18907739300084359,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 8.655999408802018e-06,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 481.33984375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "native",
+        "wall_seconds": 0.1890860490002524
+      }
+    },
+    "profit_moonshot_taker_flow_exhaustion_eth_mode__cadence_1440b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_taker_flow_exhaustion_eth_mode",
+        "candidate_id": "profit_moonshot_taker_flow_exhaustion_eth_mode__cadence_1440b",
+        "engine_seconds": 0.16613649600003555,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 9.999000212701503e-06,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 481.33984375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_1440b",
+        "wall_seconds": 0.16614649500024825
+      }
+    },
+    "profit_moonshot_taker_flow_exhaustion_eth_mode__cadence_15b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_taker_flow_exhaustion_eth_mode",
+        "candidate_id": "profit_moonshot_taker_flow_exhaustion_eth_mode__cadence_15b",
+        "engine_seconds": 0.16855011299958278,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 8.687999979883898e-06,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 481.33984375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_15b",
+        "wall_seconds": 0.16855880099956266
+      }
+    },
+    "profit_moonshot_taker_flow_exhaustion_eth_mode__cadence_1b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_taker_flow_exhaustion_eth_mode",
+        "candidate_id": "profit_moonshot_taker_flow_exhaustion_eth_mode__cadence_1b",
+        "engine_seconds": 0.1845458769994366,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 9.295000381825957e-06,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 481.33984375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_1b",
+        "wall_seconds": 0.1845551719998184
+      }
+    },
+    "profit_moonshot_taker_flow_exhaustion_eth_mode__cadence_360b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_taker_flow_exhaustion_eth_mode",
+        "candidate_id": "profit_moonshot_taker_flow_exhaustion_eth_mode__cadence_360b",
+        "engine_seconds": 0.15803792099995917,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 8.146999789460097e-06,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 481.33984375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_360b",
+        "wall_seconds": 0.15804606799974863
+      }
+    },
+    "profit_moonshot_taker_flow_exhaustion_eth_mode__cadence_60b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_taker_flow_exhaustion_eth_mode",
+        "candidate_id": "profit_moonshot_taker_flow_exhaustion_eth_mode__cadence_60b",
+        "engine_seconds": 0.15686135400028434,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 9.176000276056584e-06,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 481.33984375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_60b",
+        "wall_seconds": 0.1568705300005604
+      }
+    },
+    "profit_moonshot_taker_flow_exhaustion_eth_mode__native": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_taker_flow_exhaustion_eth_mode",
+        "candidate_id": "profit_moonshot_taker_flow_exhaustion_eth_mode__native",
+        "engine_seconds": 0.15845316099967022,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 8.363000233657658e-06,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 481.33984375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "native",
+        "wall_seconds": 0.15846152399990387
+      }
+    },
+    "profit_moonshot_taker_flow_exhaustion_eth_reactive_mode__cadence_1440b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_taker_flow_exhaustion_eth_reactive_mode",
+        "candidate_id": "profit_moonshot_taker_flow_exhaustion_eth_reactive_mode__cadence_1440b",
+        "engine_seconds": 0.16809489800016308,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 8.666999747219961e-06,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 481.5,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_1440b",
+        "wall_seconds": 0.1681035649999103
+      }
+    },
+    "profit_moonshot_taker_flow_exhaustion_eth_reactive_mode__cadence_15b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_taker_flow_exhaustion_eth_reactive_mode",
+        "candidate_id": "profit_moonshot_taker_flow_exhaustion_eth_reactive_mode__cadence_15b",
+        "engine_seconds": 0.16325773200060212,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 9.045999831869267e-06,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 481.33984375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_15b",
+        "wall_seconds": 0.163266778000434
+      }
+    },
+    "profit_moonshot_taker_flow_exhaustion_eth_reactive_mode__cadence_360b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_taker_flow_exhaustion_eth_reactive_mode",
+        "candidate_id": "profit_moonshot_taker_flow_exhaustion_eth_reactive_mode__cadence_360b",
+        "engine_seconds": 0.1684208460010268,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 8.677999176143203e-06,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 481.375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_360b",
+        "wall_seconds": 0.16842952400020295
+      }
+    },
+    "profit_moonshot_taker_flow_exhaustion_eth_reactive_mode__cadence_60b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_taker_flow_exhaustion_eth_reactive_mode",
+        "candidate_id": "profit_moonshot_taker_flow_exhaustion_eth_reactive_mode__cadence_60b",
+        "engine_seconds": 0.15867247499954829,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 7.995000487426296e-06,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 481.33984375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_60b",
+        "wall_seconds": 0.1586804700000357
+      }
+    },
+    "profit_moonshot_taker_flow_exhaustion_eth_reactive_mode__native": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_taker_flow_exhaustion_eth_reactive_mode",
+        "candidate_id": "profit_moonshot_taker_flow_exhaustion_eth_reactive_mode__native",
+        "engine_seconds": 0.19803952600068442,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 8.146999789460097e-06,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 481.33984375,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "native",
+        "wall_seconds": 0.19804767300047388
+      }
+    },
+    "profit_moonshot_taker_flow_exhaustion_eth_slow_momentum_mode__cadence_1440b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_taker_flow_exhaustion_eth_slow_momentum_mode",
+        "candidate_id": "profit_moonshot_taker_flow_exhaustion_eth_slow_momentum_mode__cadence_1440b",
+        "engine_seconds": 0.16122173799976736,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 9.458000022277702e-06,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 481.59765625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_1440b",
+        "wall_seconds": 0.16123119599978963
+      }
+    },
+    "profit_moonshot_taker_flow_exhaustion_eth_slow_momentum_mode__cadence_15b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_taker_flow_exhaustion_eth_slow_momentum_mode",
+        "candidate_id": "profit_moonshot_taker_flow_exhaustion_eth_slow_momentum_mode__cadence_15b",
+        "engine_seconds": 0.17947227900003782,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 9.100000170292333e-06,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 481.5,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_15b",
+        "wall_seconds": 0.1794813790002081
+      }
+    },
+    "profit_moonshot_taker_flow_exhaustion_eth_slow_momentum_mode__cadence_360b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_taker_flow_exhaustion_eth_slow_momentum_mode",
+        "candidate_id": "profit_moonshot_taker_flow_exhaustion_eth_slow_momentum_mode__cadence_360b",
+        "engine_seconds": 0.15948610699979326,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 9.284000043408014e-06,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 481.59765625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_360b",
+        "wall_seconds": 0.15949539099983667
+      }
+    },
+    "profit_moonshot_taker_flow_exhaustion_eth_slow_momentum_mode__cadence_60b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_taker_flow_exhaustion_eth_slow_momentum_mode",
+        "candidate_id": "profit_moonshot_taker_flow_exhaustion_eth_slow_momentum_mode__cadence_60b",
+        "engine_seconds": 0.17475104200002534,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 9.988999408960808e-06,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 481.59765625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_60b",
+        "wall_seconds": 0.1747610309994343
+      }
+    },
+    "profit_moonshot_taker_flow_exhaustion_eth_slow_momentum_mode__native": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_taker_flow_exhaustion_eth_slow_momentum_mode",
+        "candidate_id": "profit_moonshot_taker_flow_exhaustion_eth_slow_momentum_mode__native",
+        "engine_seconds": 0.19358477300011145,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 7.984000149008352e-06,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 481.5,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "native",
+        "wall_seconds": 0.19359275700026046
+      }
+    },
+    "profit_moonshot_trend_mode__cadence_1440b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_trend_mode",
+        "candidate_id": "profit_moonshot_trend_mode__cadence_1440b",
+        "engine_seconds": 0.2810246240005654,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 1.6770999536674935e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 481.59765625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_1440b",
+        "wall_seconds": 0.28104139500010206
+      }
+    },
+    "profit_moonshot_trend_mode__cadence_15b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_trend_mode",
+        "candidate_id": "profit_moonshot_trend_mode__cadence_15b",
+        "engine_seconds": 0.305121176999819,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 1.628300014999695e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 481.59765625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_15b",
+        "wall_seconds": 0.305137459999969
+      }
+    },
+    "profit_moonshot_trend_mode__cadence_1b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_trend_mode",
+        "candidate_id": "profit_moonshot_trend_mode__cadence_1b",
+        "engine_seconds": 0.30280918999960704,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 1.5102000361366663e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 481.59765625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_1b",
+        "wall_seconds": 0.3028242919999684
+      }
+    },
+    "profit_moonshot_trend_mode__cadence_360b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_trend_mode",
+        "candidate_id": "profit_moonshot_trend_mode__cadence_360b",
+        "engine_seconds": 0.28111039599934884,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 1.4820000615145545e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 481.59765625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_360b",
+        "wall_seconds": 0.281125215999964
+      }
+    },
+    "profit_moonshot_trend_mode__cadence_60b": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_trend_mode",
+        "candidate_id": "profit_moonshot_trend_mode__cadence_60b",
+        "engine_seconds": 0.2873758320001798,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 1.5470000107598025e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 481.59765625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_60b",
+        "wall_seconds": 0.2873913020002874
+      }
+    },
+    "profit_moonshot_trend_mode__native": {
+      "val_screen": {
+        "base_mode": "profit_moonshot_trend_mode",
+        "candidate_id": "profit_moonshot_trend_mode__native",
+        "engine_seconds": 0.29484423599933507,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 1.6510000023117755e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 481.59765625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "native",
+        "wall_seconds": 0.2948607459993582
+      }
+    },
+    "profit_reboot_adaptive_momentum_defensive_mode__cadence_1440b": {
+      "val_screen": {
+        "base_mode": "profit_reboot_adaptive_momentum_defensive_mode",
+        "candidate_id": "profit_reboot_adaptive_momentum_defensive_mode__cadence_1440b",
+        "engine_seconds": 0.3143325929986531,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 1.4918000488250982e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 481.59765625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_1440b",
+        "wall_seconds": 0.3143475109991414
+      }
+    },
+    "profit_reboot_adaptive_momentum_defensive_mode__cadence_15b": {
+      "val_screen": {
+        "base_mode": "profit_reboot_adaptive_momentum_defensive_mode",
+        "candidate_id": "profit_reboot_adaptive_momentum_defensive_mode__cadence_15b",
+        "engine_seconds": 0.31948297200051456,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 1.6164000044227578e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 481.59765625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_15b",
+        "wall_seconds": 0.3194991360005588
+      }
+    },
+    "profit_reboot_adaptive_momentum_defensive_mode__cadence_1b": {
+      "val_screen": {
+        "base_mode": "profit_reboot_adaptive_momentum_defensive_mode",
+        "candidate_id": "profit_reboot_adaptive_momentum_defensive_mode__cadence_1b",
+        "engine_seconds": 0.3150919299996531,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 1.5470000107598025e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 481.59765625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_1b",
+        "wall_seconds": 0.3151073999997607
+      }
+    },
+    "profit_reboot_adaptive_momentum_defensive_mode__cadence_60b": {
+      "val_screen": {
+        "base_mode": "profit_reboot_adaptive_momentum_defensive_mode",
+        "candidate_id": "profit_reboot_adaptive_momentum_defensive_mode__cadence_60b",
+        "engine_seconds": 0.3273208179998619,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 1.6467000023112632e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 481.59765625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_60b",
+        "wall_seconds": 0.327337284999885
+      }
+    },
+    "profit_reboot_adaptive_momentum_defensive_mode__native": {
+      "val_screen": {
+        "base_mode": "profit_reboot_adaptive_momentum_defensive_mode",
+        "candidate_id": "profit_reboot_adaptive_momentum_defensive_mode__native",
+        "engine_seconds": 0.32029760899968096,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 1.5362000340246595e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 481.59765625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "native",
+        "wall_seconds": 0.3203129710000212
+      }
+    },
+    "profit_reboot_adaptive_momentum_mode__cadence_1440b": {
+      "val_screen": {
+        "base_mode": "profit_reboot_adaptive_momentum_mode",
+        "candidate_id": "profit_reboot_adaptive_momentum_mode__cadence_1440b",
+        "engine_seconds": 0.308408412000972,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 1.57409995154012e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 481.59765625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_1440b",
+        "wall_seconds": 0.3084241530004874
+      }
+    },
+    "profit_reboot_adaptive_momentum_mode__cadence_15b": {
+      "val_screen": {
+        "base_mode": "profit_reboot_adaptive_momentum_mode",
+        "candidate_id": "profit_reboot_adaptive_momentum_mode__cadence_15b",
+        "engine_seconds": 0.6145044449995112,
+        "final_equity": 10001.877172631397,
+        "liquidation_count": 0,
+        "load_seconds": 1.4756000382476486e-05,
+        "metrics": {
+          "cagr": 3.3785496635463375e-05,
+          "calmar": 0.06904335144353996,
+          "max_drawdown": 0.0004893374369738031,
+          "sharpe": 0.13333246423466893,
+          "sortino": 0.10740767498206594,
+          "total_return": 0.00019294126313962323,
+          "volatility": 0.00025362967628519707
+        },
+        "rss_mib": 481.59765625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 4,
+        "variant": "cadence_15b",
+        "wall_seconds": 0.6145192009998937
+      }
+    },
+    "profit_reboot_adaptive_momentum_mode__cadence_1b": {
+      "val_screen": {
+        "base_mode": "profit_reboot_adaptive_momentum_mode",
+        "candidate_id": "profit_reboot_adaptive_momentum_mode__cadence_1b",
+        "engine_seconds": 0.7858429070001876,
+        "final_equity": 10005.842724384896,
+        "liquidation_count": 0,
+        "load_seconds": 1.358600002276944e-05,
+        "metrics": {
+          "cagr": 0.00010462451697001995,
+          "calmar": 0.0562920380211961,
+          "max_drawdown": 0.0018586024000521145,
+          "sharpe": 0.10666511992531341,
+          "sortino": 0.08573292742632622,
+          "total_return": 0.0005975864384895058,
+          "volatility": 0.000985366158214078
+        },
+        "rss_mib": 481.59765625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 16,
+        "variant": "cadence_1b",
+        "wall_seconds": 0.7858564930002103
+      }
+    },
+    "profit_reboot_adaptive_momentum_mode__cadence_360b": {
+      "val_screen": {
+        "base_mode": "profit_reboot_adaptive_momentum_mode",
+        "candidate_id": "profit_reboot_adaptive_momentum_mode__cadence_360b",
+        "engine_seconds": 0.3160788430004686,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 1.5394999536511023e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 481.59765625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_360b",
+        "wall_seconds": 0.31609423800000513
+      }
+    },
+    "profit_reboot_adaptive_momentum_mode__cadence_60b": {
+      "val_screen": {
+        "base_mode": "profit_reboot_adaptive_momentum_mode",
+        "candidate_id": "profit_reboot_adaptive_momentum_mode__cadence_60b",
+        "engine_seconds": 0.30868021399965073,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 1.440899995941436e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 481.59765625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_60b",
+        "wall_seconds": 0.30869462299961015
+      }
+    },
+    "profit_reboot_adaptive_momentum_mode__native": {
+      "val_screen": {
+        "base_mode": "profit_reboot_adaptive_momentum_mode",
+        "candidate_id": "profit_reboot_adaptive_momentum_mode__native",
+        "engine_seconds": 0.6148434930000803,
+        "final_equity": 10000.24579124745,
+        "liquidation_count": 0,
+        "load_seconds": 1.6574999790464062e-05,
+        "metrics": {
+          "cagr": 4.4104138372524915e-06,
+          "calmar": 0.025472643212794965,
+          "max_drawdown": 0.00017314315598929015,
+          "sharpe": 0.0488622674359896,
+          "sortino": 0.03862240015587311,
+          "total_return": 2.5185124744808718e-05,
+          "volatility": 9.034542801965302e-05
+        },
+        "rss_mib": 481.59765625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 2,
+        "variant": "native",
+        "wall_seconds": 0.6148600679998708
+      }
+    },
+    "profit_reboot_adaptive_momentum_short_bias_mode__cadence_1440b": {
+      "val_screen": {
+        "base_mode": "profit_reboot_adaptive_momentum_short_bias_mode",
+        "candidate_id": "profit_reboot_adaptive_momentum_short_bias_mode__cadence_1440b",
+        "engine_seconds": 0.3403003589992295,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 1.5578000784444157e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 481.59765625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_1440b",
+        "wall_seconds": 0.34031593700001395
+      }
+    },
+    "profit_reboot_adaptive_momentum_short_bias_mode__cadence_15b": {
+      "val_screen": {
+        "base_mode": "profit_reboot_adaptive_momentum_short_bias_mode",
+        "candidate_id": "profit_reboot_adaptive_momentum_short_bias_mode__cadence_15b",
+        "engine_seconds": 0.31443074500020884,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 1.5058999451866839e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 481.59765625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_15b",
+        "wall_seconds": 0.3144458039996607
+      }
+    },
+    "profit_reboot_adaptive_momentum_short_bias_mode__cadence_1b": {
+      "val_screen": {
+        "base_mode": "profit_reboot_adaptive_momentum_short_bias_mode",
+        "candidate_id": "profit_reboot_adaptive_momentum_short_bias_mode__cadence_1b",
+        "engine_seconds": 0.3300979789992198,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 1.5243000234477222e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 481.59765625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_1b",
+        "wall_seconds": 0.33011322199945425
+      }
+    },
+    "profit_reboot_adaptive_momentum_short_bias_mode__cadence_60b": {
+      "val_screen": {
+        "base_mode": "profit_reboot_adaptive_momentum_short_bias_mode",
+        "candidate_id": "profit_reboot_adaptive_momentum_short_bias_mode__cadence_60b",
+        "engine_seconds": 0.32327535999957036,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 1.4907000149833038e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 481.59765625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "cadence_60b",
+        "wall_seconds": 0.3232902669997202
+      }
+    },
+    "profit_reboot_adaptive_momentum_short_bias_mode__native": {
+      "val_screen": {
+        "base_mode": "profit_reboot_adaptive_momentum_short_bias_mode",
+        "candidate_id": "profit_reboot_adaptive_momentum_short_bias_mode__native",
+        "engine_seconds": 0.32730266699945787,
+        "final_equity": 10000.0,
+        "liquidation_count": 0,
+        "load_seconds": 4.64550003016484e-05,
+        "metrics": {
+          "cagr": 0.0,
+          "calmar": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "rss_mib": 481.59765625,
+        "split": "val_screen",
+        "status": "completed",
+        "trade_count": 0,
+        "variant": "native",
+        "wall_seconds": 0.3273491219997595
+      }
+    }
+  },
+  "updated_at": "2026-05-06T12:53:45.354477Z"
+}

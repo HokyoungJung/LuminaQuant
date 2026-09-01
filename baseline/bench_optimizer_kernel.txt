@@ -1,0 +1,4 @@
+benchmark_optimization_kernel
+bars=50000 evals=5000
+elapsed_sec=178.076144
+evals_per_sec=28.08

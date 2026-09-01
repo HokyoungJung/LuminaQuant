@@ -1,0 +1,9 @@
+{
+  "completed_at": "2026-05-09T13:21:06Z",
+  "exclusive": true,
+  "lock_path": "var/reports/exact_window_backtests/followup_status/portfolio_followup_heavy_run.lock",
+  "overlap_check": "passed",
+  "reason": "integer leverage alpha_v2 top40 wider search",
+  "started_at": "2026-05-09T12:58:32Z",
+  "status": "completed"
+}

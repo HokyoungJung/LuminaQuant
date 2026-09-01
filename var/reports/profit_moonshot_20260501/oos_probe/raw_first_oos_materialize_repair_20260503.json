@@ -1,0 +1,976 @@
+{
+  "artifact_kind": "live_equivalent_raw_first_backfill",
+  "generated_at_utc": "2026-05-03T04:36:00.526960+00:00",
+  "db_path": "data/market_parquet",
+  "exchange_id": "binance",
+  "start": "2026-03-01",
+  "end": "2026-05-02",
+  "chunk_days": 3,
+  "raw_chunk_days": 3,
+  "max_rss_mb": 6500,
+  "symbols": [
+    {
+      "symbol": "BTC/USDT",
+      "required_days": 63,
+      "raw_present_before": 63,
+      "raw_missing_before": 0,
+      "raw_present_after": 63,
+      "raw_missing_after": 0,
+      "materialized_present_before": 17,
+      "materialized_missing_before": 46,
+      "materialized_present_after": 61,
+      "materialized_missing_after": 2,
+      "first_raw_missing_after": [],
+      "first_materialized_missing_after": [
+        "2026-03-19",
+        "2026-03-20"
+      ],
+      "raw_runs": [],
+      "materialize_runs": [
+        {
+          "start": "2026-03-18",
+          "end": "2026-03-20",
+          "days": 3,
+          "elapsed_sec": 4.044,
+          "peak_rss_mb": 2475.711,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:31:49.990356+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"BTC/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043146Z-BTC-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-03-18\", \"commit_id\": \"20260318-8e933bb149c1cf44\", \"row_count\": 86400, \"canonical_row_checksum\": \"8e933bb149c1cf44ee3ef4529638071699584d97cd336d67f8087843c08cc987\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-03-18/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-03-21",
+          "end": "2026-03-23",
+          "days": 3,
+          "elapsed_sec": 4.044,
+          "peak_rss_mb": 2557.984,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:31:53.800455+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"BTC/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043150Z-BTC-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-03-21\", \"commit_id\": \"20260321-95c1b0319d1bc477\", \"row_count\": 86400, \"canonical_row_checksum\": \"95c1b0319d1bc4773d858e61664ffd5df9b8d9f89055ee583c017bc87995ce7a\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-03-21/manifest.json\"}, {\"partition\": \"2026-03-22\", \"commit_id\": \"20260322-1a9abb5913f81bb6\", \"row_count\": 86400, \"canonical_row_checksum\": \"1a9abb5913f81bb60f1f5eb00adf535841cab38978573c0ce51980ab28f155da\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-03-22/manifest.json\"}, {\"partition\": \"2026-03-23\", \"commit_id\": \"20260323-8dbe2fc1e618d6a3\", \"row_count\": 86398, \"canonical_row_checksum\": \"8dbe2fc1e618d6a316a4de93a3b721798884b4f1dfeeedf755762ccf8d2b5a38\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-03-23/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-03-24",
+          "end": "2026-03-26",
+          "days": 3,
+          "elapsed_sec": 4.556,
+          "peak_rss_mb": 2468.59,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:31:58.163605+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"BTC/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043154Z-BTC-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-03-24\", \"commit_id\": \"20260324-b297cba387aefed4\", \"row_count\": 86400, \"canonical_row_checksum\": \"b297cba387aefed44ff954cfdae1abc8054f9c0a5b10a2b51d4f71db2fd7f38e\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-03-24/manifest.json\"}, {\"partition\": \"2026-03-25\", \"commit_id\": \"20260325-61fe7309dd77b01c\", \"row_count\": 86400, \"canonical_row_checksum\": \"61fe7309dd77b01c832ef4a0d288e3b917c8bf0f32da414c445000f591112c32\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-03-25/manifest.json\"}, {\"partition\": \"2026-03-26\", \"commit_id\": \"20260326-333436595cfcf6c5\", \"row_count\": 86399, \"canonical_row_checksum\": \"333436595cfcf6c57cce3f48f3c243510f90838aba7ec6148f9bf3b5a13fcb6a\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-03-26/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-03-27",
+          "end": "2026-03-29",
+          "days": 3,
+          "elapsed_sec": 3.042,
+          "peak_rss_mb": 1535.043,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:32:01.771108+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"BTC/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043159Z-BTC-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-03-27\", \"commit_id\": \"20260327-3757c09b6df49ff4\", \"row_count\": 86391, \"canonical_row_checksum\": \"3757c09b6df49ff4501a97ac490c0d298d0256a2d54f7648b6282e7e41afd59d\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-03-27/manifest.json\"}, {\"partition\": \"2026-03-28\", \"commit_id\": \"20260328-5f7c072407c6f254\", \"row_count\": 86400, \"canonical_row_checksum\": \"5f7c072407c6f254226dc05c88d1bb621ea6b13dff3a5367e8771abb3e63a222\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-03-28/manifest.json\"}, {\"partition\": \"2026-03-29\", \"commit_id\": \"20260329-cdc36d376011f4d8\", \"row_count\": 86398, \"canonical_row_checksum\": \"cdc36d376011f4d86e84b489ae712c1c2a9e3ace7d5732fd23003f0fad8a3144\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-03-29/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-03-30",
+          "end": "2026-04-01",
+          "days": 3,
+          "elapsed_sec": 4.529,
+          "peak_rss_mb": 2395.199,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:32:05.870865+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"BTC/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043202Z-BTC-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-03-30\", \"commit_id\": \"20260330-c173dc2cd041b6cf\", \"row_count\": 86400, \"canonical_row_checksum\": \"c173dc2cd041b6cf995f8d990e0da9f44672dbcb64d375ccb4a201ea5204ac2d\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-03-30/manifest.json\"}, {\"partition\": \"2026-03-31\", \"commit_id\": \"20260331-67f2b0c31aad49e6\", \"row_count\": 86400, \"canonical_row_checksum\": \"67f2b0c31aad49e627b33ed775407782abaab762aa56778e765d9311f336be42\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-03-31/manifest.json\"}, {\"partition\": \"2026-04-01\", \"commit_id\": \"20260401-172bd9e4770ec26d\", \"row_count\": 86398, \"canonical_row_checksum\": \"172bd9e4770ec26d89eed928c61732f1ec4575ff555cfd5120c19d403c390a17\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-04-01/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-02",
+          "end": "2026-04-04",
+          "days": 3,
+          "elapsed_sec": 3.528,
+          "peak_rss_mb": 1619.801,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:32:09.731427+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"BTC/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043206Z-BTC-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-04-02\", \"commit_id\": \"20260402-97b9142980068519\", \"row_count\": 86400, \"canonical_row_checksum\": \"97b9142980068519710f97ccbb229a821d43fcecc0bf097caeeddb273a320b49\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-04-02/manifest.json\"}, {\"partition\": \"2026-04-03\", \"commit_id\": \"20260403-b3242ed5a8b723a3\", \"row_count\": 86400, \"canonical_row_checksum\": \"b3242ed5a8b723a3063c7ab91a0d6327621f20ee98d8cf7208ad00fd2dccff3b\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-04-03/manifest.json\"}, {\"partition\": \"2026-04-04\", \"commit_id\": \"20260404-acc0628bdfdb669f\", \"row_count\": 86398, \"canonical_row_checksum\": \"acc0628bdfdb669fe6670466e5aa563ae61ffa9c0a1b6964c009a76c6c9fb8aa\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-04-04/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-05",
+          "end": "2026-04-07",
+          "days": 3,
+          "elapsed_sec": 4.517,
+          "peak_rss_mb": 2328.719,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:32:14.186612+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"BTC/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043210Z-BTC-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-04-05\", \"commit_id\": \"20260405-b73f5c4320eb82df\", \"row_count\": 86398, \"canonical_row_checksum\": \"b73f5c4320eb82dfa4b7a57662a92b44bc0916d69c087f9d3dbcec031ac0431c\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-04-05/manifest.json\"}, {\"partition\": \"2026-04-06\", \"commit_id\": \"20260406-85a462dc484552e8\", \"row_count\": 86400, \"canonical_row_checksum\": \"85a462dc484552e89b288875a8ea2c7559898b5a3aa3c74f8c2915b984bfca26\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-04-06/manifest.json\"}, {\"partition\": \"2026-04-07\", \"commit_id\": \"20260407-27adebef8e247226\", \"row_count\": 86398, \"canonical_row_checksum\": \"27adebef8e2472269123163575bf5d70e77546889542f3b080d236f56c15934f\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-04-07/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-08",
+          "end": "2026-04-10",
+          "days": 3,
+          "elapsed_sec": 4.53,
+          "peak_rss_mb": 2222.887,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:32:18.713800+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"BTC/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043214Z-BTC-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-04-08\", \"commit_id\": \"20260408-44dd8ed9fb6a5e94\", \"row_count\": 86400, \"canonical_row_checksum\": \"44dd8ed9fb6a5e9442c148f4ba662bbcc31952c5d159791a52f7203b107b5c59\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-04-08/manifest.json\"}, {\"partition\": \"2026-04-09\", \"commit_id\": \"20260409-94fc88457b49ceda\", \"row_count\": 86400, \"canonical_row_checksum\": \"94fc88457b49ceda51633225ca6c2f6f29df43f69991188274dde37bea3b4fa6\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-04-09/manifest.json\"}, {\"partition\": \"2026-04-10\", \"commit_id\": \"20260410-26dd4cd5bdbdfef3\", \"row_count\": 86398, \"canonical_row_checksum\": \"26dd4cd5bdbdfef3c5d39bc254fa4a06de515de53a4db696ebe0831e92d36fbc\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-04-10/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-11",
+          "end": "2026-04-13",
+          "days": 3,
+          "elapsed_sec": 4.033,
+          "peak_rss_mb": 1734.246,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:32:19.912473+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"BTC/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043216Z-BTC-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-04-11\", \"commit_id\": \"20260411-2413c373e5bcd56e\", \"row_count\": 86400, \"canonical_row_checksum\": \"2413c373e5bcd56e7a96e84b01e016f1b31e810cd38994ef2ab694922511ef2c\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-04-11/manifest.json\"}, {\"partition\": \"2026-04-12\", \"commit_id\": \"20260412-6c949d3448a244ea\", \"row_count\": 86400, \"canonical_row_checksum\": \"6c949d3448a244eaadb5b4976b033ebfd4623b0c700b00fca7f6df5e67e5864a\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-04-12/manifest.json\"}, {\"partition\": \"2026-04-13\", \"commit_id\": \"20260413-d7f9d4eead3b1501\", \"row_count\": 86399, \"canonical_row_checksum\": \"d7f9d4eead3b1501faf4b9ff07296f04c8729623846e4e095215ce42a7efd389\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-04-13/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-14",
+          "end": "2026-04-16",
+          "days": 3,
+          "elapsed_sec": 4.51,
+          "peak_rss_mb": 2325.441,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:32:24.649424+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"BTC/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043220Z-BTC-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-04-14\", \"commit_id\": \"20260414-f86d7356dd097a68\", \"row_count\": 86400, \"canonical_row_checksum\": \"f86d7356dd097a68725f8dedd622b8148a67dd84b65349ee3dde91afd684d12d\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-04-14/manifest.json\"}, {\"partition\": \"2026-04-15\", \"commit_id\": \"20260415-729c10fc23e8386b\", \"row_count\": 86400, \"canonical_row_checksum\": \"729c10fc23e8386b45e78e6ccb3d02fb891299c1490f3c56f5f490552e97a6f8\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-04-15/manifest.json\"}, {\"partition\": \"2026-04-16\", \"commit_id\": \"20260416-d0707d63a83d9e0e\", \"row_count\": 86399, \"canonical_row_checksum\": \"d0707d63a83d9e0e4d85a163292335cc5b12f2b5c3ca4667d88b154b372567b3\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-04-16/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-17",
+          "end": "2026-04-19",
+          "days": 3,
+          "elapsed_sec": 4.015,
+          "peak_rss_mb": 2256.992,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:32:28.871103+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"BTC/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043225Z-BTC-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-04-17\", \"commit_id\": \"20260417-c38ea161cc89d1e5\", \"row_count\": 86400, \"canonical_row_checksum\": \"c38ea161cc89d1e58a3fed2d135c9315a641840df988b0d164facc1b038ef2e3\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-04-17/manifest.json\"}, {\"partition\": \"2026-04-18\", \"commit_id\": \"20260418-562d7fc022667504\", \"row_count\": 86400, \"canonical_row_checksum\": \"562d7fc02266750486fda6ac63ea0736967a60da83ede32c312ca136ce45ae32\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-04-18/manifest.json\"}, {\"partition\": \"2026-04-19\", \"commit_id\": \"20260419-3274f2e5a426c348\", \"row_count\": 86399, \"canonical_row_checksum\": \"3274f2e5a426c348705017a87ce37d2d7d75e84579c913b3914ab85c6de2bf58\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-04-19/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-20",
+          "end": "2026-04-22",
+          "days": 3,
+          "elapsed_sec": 4.026,
+          "peak_rss_mb": 2569.699,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:32:32.710482+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"BTC/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043229Z-BTC-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-04-20\", \"commit_id\": \"20260420-473ff1969a3666cc\", \"row_count\": 86400, \"canonical_row_checksum\": \"473ff1969a3666cc5d38db983452b5b85ac55f9c518cdf5dddf88085ad53888f\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-04-20/manifest.json\"}, {\"partition\": \"2026-04-21\", \"commit_id\": \"20260421-a584951bf67a1637\", \"row_count\": 86400, \"canonical_row_checksum\": \"a584951bf67a16373a05201c63d4ec5d4b97c9c10a3338c96f13e2f11e013268\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-04-21/manifest.json\"}, {\"partition\": \"2026-04-22\", \"commit_id\": \"20260422-44e232a0e5174fba\", \"row_count\": 86399, \"canonical_row_checksum\": \"44e232a0e5174fbaff242cf21eaaeac38c621e5b6cf90ac1467cfea754798822\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-04-22/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-23",
+          "end": "2026-04-25",
+          "days": 3,
+          "elapsed_sec": 4.013,
+          "peak_rss_mb": 1750.121,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:32:36.531635+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"BTC/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043233Z-BTC-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-04-23\", \"commit_id\": \"20260423-e713ab9891ab1aa6\", \"row_count\": 86400, \"canonical_row_checksum\": \"e713ab9891ab1aa6b47dad87d55e050747a50e1ce4a64577e09df4fd0c727deb\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-04-23/manifest.json\"}, {\"partition\": \"2026-04-24\", \"commit_id\": \"20260424-18f49a4009029ae7\", \"row_count\": 86400, \"canonical_row_checksum\": \"18f49a4009029ae77fabd84ef97bcff7b5ac996735bc68f45cd99d72507a1b65\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-04-24/manifest.json\"}, {\"partition\": \"2026-04-25\", \"commit_id\": \"20260425-0aac6d614b17cca5\", \"row_count\": 86398, \"canonical_row_checksum\": \"0aac6d614b17cca5c2a15416fd514d4f3352fa2da3568a17c7a1dc7b8af38895\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-04-25/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-26",
+          "end": "2026-04-28",
+          "days": 3,
+          "elapsed_sec": 4.069,
+          "peak_rss_mb": 1717.125,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:32:40.643652+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"BTC/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043237Z-BTC-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-04-26\", \"commit_id\": \"20260426-69aa41411c6b5578\", \"row_count\": 86400, \"canonical_row_checksum\": \"69aa41411c6b5578c08cd9e7a9fb57f7fcb09a93baf552985a1813e33981c743\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-04-26/manifest.json\"}, {\"partition\": \"2026-04-27\", \"commit_id\": \"20260427-6ab98524e33dbe97\", \"row_count\": 86400, \"canonical_row_checksum\": \"6ab98524e33dbe97268bd492e44cbed1fa7adf9a0fb05339f1f977f50f811712\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-04-27/manifest.json\"}, {\"partition\": \"2026-04-28\", \"commit_id\": \"20260428-790ca68011d7e791\", \"row_count\": 86397, \"canonical_row_checksum\": \"790ca68011d7e79175da9163b904fdc519bdab5645911844382aa56c1d53e999\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-04-28/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-29",
+          "end": "2026-05-01",
+          "days": 3,
+          "elapsed_sec": 4.052,
+          "peak_rss_mb": 1745.539,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:32:44.726323+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"BTC/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043241Z-BTC-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-04-29\", \"commit_id\": \"20260429-a5cd8c3c72b30233\", \"row_count\": 86400, \"canonical_row_checksum\": \"a5cd8c3c72b302335b92436a06c0eab011ad81432aa56b089bfb71863f95dee1\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-04-29/manifest.json\"}, {\"partition\": \"2026-04-30\", \"commit_id\": \"20260430-19d82e29096f8aeb\", \"row_count\": 86400, \"canonical_row_checksum\": \"19d82e29096f8aeb2475913ac61610d36c388f9c1082a9384d289bcc386611d4\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-04-30/manifest.json\"}, {\"partition\": \"2026-05-01\", \"commit_id\": \"20260501-c0b08b131c6b6c04\", \"row_count\": 86399, \"canonical_row_checksum\": \"c0b08b131c6b6c04d8874ef24a343d79448974278667ccb08442b9791fbdb760\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-05-01/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-05-02",
+          "end": "2026-05-02",
+          "days": 1,
+          "elapsed_sec": 2.503,
+          "peak_rss_mb": 858.5,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:32:47.257154+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"BTC/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043245Z-BTC-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-05-02\", \"commit_id\": \"20260502-1cd93880146f9078\", \"row_count\": 86397, \"canonical_row_checksum\": \"1cd93880146f907801ab329d5c52591de66b61c6a7fb0d22e5472c7bc93ba1c8\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-05-02/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        }
+      ]
+    },
+    {
+      "symbol": "ETH/USDT",
+      "required_days": 63,
+      "raw_present_before": 63,
+      "raw_missing_before": 0,
+      "raw_present_after": 63,
+      "raw_missing_after": 0,
+      "materialized_present_before": 18,
+      "materialized_missing_before": 45,
+      "materialized_present_after": 63,
+      "materialized_missing_after": 0,
+      "first_raw_missing_after": [],
+      "first_materialized_missing_after": [],
+      "raw_runs": [],
+      "materialize_runs": [
+        {
+          "start": "2026-03-19",
+          "end": "2026-03-21",
+          "days": 3,
+          "elapsed_sec": 4.043,
+          "peak_rss_mb": 2140.445,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:32:49.003612+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"ETH/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043248Z-ETH-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-03-19\", \"commit_id\": \"20260319-46c282428d81bdea\", \"row_count\": 62972, \"canonical_row_checksum\": \"46c282428d81bdea04ab8b5cf369dd2d1494cb74a97759e857484d9b035a2ec0\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-03-19/manifest.json\"}, {\"partition\": \"2026-03-20\", \"commit_id\": \"20260320-9582a954d61e16cc\", \"row_count\": 86400, \"canonical_row_checksum\": \"9582a954d61e16cc0571e56253ff4937f9fab08ed1df71168b05d6cf825fdb9b\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-03-20/manifest.json\"}, {\"partition\": \"2026-03-21\", \"commit_id\": \"20260321-b49e2480ee6bd1e1\", \"row_count\": 86398, \"canonical_row_checksum\": \"b49e2480ee6bd1e1f710039780f24dbc37cf9a1990393e23ba5b8424bad0c21e\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-03-21/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-03-22",
+          "end": "2026-03-24",
+          "days": 3,
+          "elapsed_sec": 4.525,
+          "peak_rss_mb": 2641.258,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:32:53.518746+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"ETH/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043249Z-ETH-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-03-22\", \"commit_id\": \"20260322-7408de97a76f4c40\", \"row_count\": 86400, \"canonical_row_checksum\": \"7408de97a76f4c40ff3fee73b527aa6c803a30a0ed2a142cbf2764227cf9a0b0\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-03-22/manifest.json\"}, {\"partition\": \"2026-03-23\", \"commit_id\": \"20260323-7fa98ee6716ca82b\", \"row_count\": 86400, \"canonical_row_checksum\": \"7fa98ee6716ca82b1b0fa8fc3655af8b6fc818db385dd270c82c015373ee09fc\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-03-23/manifest.json\"}, {\"partition\": \"2026-03-24\", \"commit_id\": \"20260324-2290eb0b94c1407a\", \"row_count\": 86398, \"canonical_row_checksum\": \"2290eb0b94c1407a25e497309b095b6b2cd5b18c9bc8c95e96679800afd3daf6\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-03-24/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-03-25",
+          "end": "2026-03-27",
+          "days": 3,
+          "elapsed_sec": 4.044,
+          "peak_rss_mb": 2235.48,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:32:57.515831+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"ETH/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043254Z-ETH-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-03-25\", \"commit_id\": \"20260325-3c55c13e62c35dd0\", \"row_count\": 86400, \"canonical_row_checksum\": \"3c55c13e62c35dd09621f45317884d9cbcc6226577976eb22a3ef613925088ba\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-03-25/manifest.json\"}, {\"partition\": \"2026-03-26\", \"commit_id\": \"20260326-55844d6c245e8ce2\", \"row_count\": 86400, \"canonical_row_checksum\": \"55844d6c245e8ce2d8c3ecb76ed11b1995f0e3c42d3bba91b6d1da940c6427ab\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-03-26/manifest.json\"}, {\"partition\": \"2026-03-27\", \"commit_id\": \"20260327-668b0da7050a6af4\", \"row_count\": 86399, \"canonical_row_checksum\": \"668b0da7050a6af421fc88c3854d0070a2a1fc7a64a8fd8a0cd90bcc5a028ce2\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-03-27/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-03-28",
+          "end": "2026-03-30",
+          "days": 3,
+          "elapsed_sec": 3.514,
+          "peak_rss_mb": 1627.285,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:33:00.855360+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"ETH/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043258Z-ETH-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-03-28\", \"commit_id\": \"20260328-b6d85fc4af2acf6f\", \"row_count\": 86390, \"canonical_row_checksum\": \"b6d85fc4af2acf6fb1aadb95480f151d1cf6b6bae5611a80ae4641acd9608192\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-03-28/manifest.json\"}, {\"partition\": \"2026-03-29\", \"commit_id\": \"20260329-49fec9f904017afe\", \"row_count\": 86400, \"canonical_row_checksum\": \"49fec9f904017afec528127fb9f1e80f5bd6d205362d0bfcb22a5fffa341cd89\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-03-29/manifest.json\"}, {\"partition\": \"2026-03-30\", \"commit_id\": \"20260330-21c8b45b2913d715\", \"row_count\": 86398, \"canonical_row_checksum\": \"21c8b45b2913d715485c2973f07e4591104a9457a5be359e3fd5affd1cb5e8c0\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-03-30/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-03-31",
+          "end": "2026-04-02",
+          "days": 3,
+          "elapsed_sec": 4.537,
+          "peak_rss_mb": 2645.922,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:33:05.301646+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"ETH/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043301Z-ETH-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-03-31\", \"commit_id\": \"20260331-df773bbfa2d6135a\", \"row_count\": 86400, \"canonical_row_checksum\": \"df773bbfa2d6135a380943ecdd66a01cbc1a72166d8cef4d42b81abb29e6bb86\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-03-31/manifest.json\"}, {\"partition\": \"2026-04-01\", \"commit_id\": \"20260401-046bc5280d3c14e0\", \"row_count\": 86400, \"canonical_row_checksum\": \"046bc5280d3c14e09e7beac6f9918117c70d1d05e6af0f921477ba3eeaf74583\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-04-01/manifest.json\"}, {\"partition\": \"2026-04-02\", \"commit_id\": \"20260402-5ddc0995eeb11314\", \"row_count\": 86399, \"canonical_row_checksum\": \"5ddc0995eeb113141238dd81e119ab5c82dc5aaa80bbdb049741a82992d1a9f4\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-04-02/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-03",
+          "end": "2026-04-05",
+          "days": 3,
+          "elapsed_sec": 3.512,
+          "peak_rss_mb": 1463.66,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:33:09.109424+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"ETH/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043306Z-ETH-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-04-03\", \"commit_id\": \"20260403-420c46a5f7b16976\", \"row_count\": 86400, \"canonical_row_checksum\": \"420c46a5f7b16976732476ee5c97cd9d9adf8b04ea6bc0fafc591fedd861b103\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-04-03/manifest.json\"}, {\"partition\": \"2026-04-04\", \"commit_id\": \"20260404-891919121af9118f\", \"row_count\": 86400, \"canonical_row_checksum\": \"891919121af9118fd75718919c9322e67765b85f4e8abd688fad1d7c9f16f481\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-04-04/manifest.json\"}, {\"partition\": \"2026-04-05\", \"commit_id\": \"20260405-b272a79243796884\", \"row_count\": 86398, \"canonical_row_checksum\": \"b272a792437968849363f3390de33dd04451a6e61088e7a04d42daba7c129171\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-04-05/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-06",
+          "end": "2026-04-08",
+          "days": 3,
+          "elapsed_sec": 4.555,
+          "peak_rss_mb": 2694.484,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:33:13.289644+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"ETH/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043309Z-ETH-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-04-06\", \"commit_id\": \"20260406-ef4821dc031b88c4\", \"row_count\": 86400, \"canonical_row_checksum\": \"ef4821dc031b88c4aa6b8cb1cbba94cefeae28c3901e2431a53e8c8cd29b5072\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-04-06/manifest.json\"}, {\"partition\": \"2026-04-07\", \"commit_id\": \"20260407-34966e8cd77f49b1\", \"row_count\": 86400, \"canonical_row_checksum\": \"34966e8cd77f49b10f2ed16959436215f923856d94365aaf83663c7dcd609fb2\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-04-07/manifest.json\"}, {\"partition\": \"2026-04-08\", \"commit_id\": \"20260408-39284f613aebfefb\", \"row_count\": 86398, \"canonical_row_checksum\": \"39284f613aebfefb416e56655d10e1f4d72748ef49091c49633891cfd800e095\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-04-08/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-09",
+          "end": "2026-04-11",
+          "days": 3,
+          "elapsed_sec": 3.506,
+          "peak_rss_mb": 1778.586,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:33:17.298911+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"ETH/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043314Z-ETH-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-04-09\", \"commit_id\": \"20260409-ec2faa69036f555e\", \"row_count\": 86400, \"canonical_row_checksum\": \"ec2faa69036f555e4cb1317f7837d7444a28444f2b7fc577c511c30c60f61255\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-04-09/manifest.json\"}, {\"partition\": \"2026-04-10\", \"commit_id\": \"20260410-0e2694bffb457db8\", \"row_count\": 86400, \"canonical_row_checksum\": \"0e2694bffb457db88be9c6f76c6f733003caf849b1a81f910be186c5f3706693\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-04-10/manifest.json\"}, {\"partition\": \"2026-04-11\", \"commit_id\": \"20260411-9a4c8e1c71f45b1b\", \"row_count\": 86398, \"canonical_row_checksum\": \"9a4c8e1c71f45b1b18682f0d7664c088dd4662413c1e44aaab08b9c71eb309f7\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-04-11/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-12",
+          "end": "2026-04-14",
+          "days": 3,
+          "elapsed_sec": 4.022,
+          "peak_rss_mb": 2285.16,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:33:18.633341+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"ETH/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043317Z-ETH-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-04-12\", \"commit_id\": \"20260412-d68953ac1a852f7c\", \"row_count\": 86400, \"canonical_row_checksum\": \"d68953ac1a852f7c10a2f9a69f3ada0dfc5c0e43553300c1fd2ccfa62c645e97\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-04-12/manifest.json\"}, {\"partition\": \"2026-04-13\", \"commit_id\": \"20260413-64702cb53f49f1eb\", \"row_count\": 86400, \"canonical_row_checksum\": \"64702cb53f49f1eb326947142b8b933fa5c328e5ab98851c0b85ed9098e2324f\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-04-13/manifest.json\"}, {\"partition\": \"2026-04-14\", \"commit_id\": \"20260414-3671a2ac29e746ad\", \"row_count\": 86398, \"canonical_row_checksum\": \"3671a2ac29e746ad6ad2dede6a60443e31ab1783129a2f4869ff0a3a4ca12757\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-04-14/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-15",
+          "end": "2026-04-17",
+          "days": 3,
+          "elapsed_sec": 4.54,
+          "peak_rss_mb": 2270.59,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:33:22.847083+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"ETH/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043319Z-ETH-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-04-15\", \"commit_id\": \"20260415-fd6a18c87c8ba1b4\", \"row_count\": 86400, \"canonical_row_checksum\": \"fd6a18c87c8ba1b431de847bc759e2821b41fdc3dd2fac8116380942706dd6d4\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-04-15/manifest.json\"}, {\"partition\": \"2026-04-16\", \"commit_id\": \"20260416-a90ab4d2970d0300\", \"row_count\": 86400, \"canonical_row_checksum\": \"a90ab4d2970d03008662790abf93aad8e6486dca6fb769443369d481cfc749d9\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-04-16/manifest.json\"}, {\"partition\": \"2026-04-17\", \"commit_id\": \"20260417-a8456078af778390\", \"row_count\": 86398, \"canonical_row_checksum\": \"a8456078af7783901c41a1b3f5ca88c65ca6bb44dd4536bfaa0d11cbbe1cdc48\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-04-17/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-18",
+          "end": "2026-04-20",
+          "days": 3,
+          "elapsed_sec": 5.032,
+          "peak_rss_mb": 2144.883,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:33:28.012336+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"ETH/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043324Z-ETH-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-04-18\", \"commit_id\": \"20260418-ae79f3d3cdbc4059\", \"row_count\": 86400, \"canonical_row_checksum\": \"ae79f3d3cdbc4059150b624c82ec0e65235609336e81f618de3d716577aa3efc\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-04-18/manifest.json\"}, {\"partition\": \"2026-04-19\", \"commit_id\": \"20260419-50defa855dc9c4ae\", \"row_count\": 86400, \"canonical_row_checksum\": \"50defa855dc9c4ae8217437e71b83f7ad2958933a09d3ec0794d0836e7b6cf85\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-04-19/manifest.json\"}, {\"partition\": \"2026-04-20\", \"commit_id\": \"20260420-690f317937c8126d\", \"row_count\": 86398, \"canonical_row_checksum\": \"690f317937c8126dbc231efb3086693f09d6cf05fe4197b8445c93de23fd604f\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-04-20/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-21",
+          "end": "2026-04-23",
+          "days": 3,
+          "elapsed_sec": 4.567,
+          "peak_rss_mb": 2265.074,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:33:32.551456+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"ETH/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043329Z-ETH-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-04-21\", \"commit_id\": \"20260421-9e34ad72dcd3fb94\", \"row_count\": 86400, \"canonical_row_checksum\": \"9e34ad72dcd3fb9416a67b4e6779e42ae8c53fd030648f876219183de49c1d9c\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-04-21/manifest.json\"}, {\"partition\": \"2026-04-22\", \"commit_id\": \"20260422-e0024990d82ac3ec\", \"row_count\": 86400, \"canonical_row_checksum\": \"e0024990d82ac3ec115b5026adc4009190acda2f61e2ba5007fbfa1966d0e5a0\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-04-22/manifest.json\"}, {\"partition\": \"2026-04-23\", \"commit_id\": \"20260423-38b08d9122c6456e\", \"row_count\": 86398, \"canonical_row_checksum\": \"38b08d9122c6456e2df1b369eb59ca5a0b74d64bcf017b1db2e81e4db7bfb108\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-04-23/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-24",
+          "end": "2026-04-26",
+          "days": 3,
+          "elapsed_sec": 4.534,
+          "peak_rss_mb": 1423.41,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:33:36.911417+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"ETH/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043333Z-ETH-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-04-24\", \"commit_id\": \"20260424-daa264405ab433f1\", \"row_count\": 86400, \"canonical_row_checksum\": \"daa264405ab433f1bcacf4dbf60681a8dd8b2ab500b83bb3c05bca5fee1a90b6\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-04-24/manifest.json\"}, {\"partition\": \"2026-04-25\", \"commit_id\": \"20260425-90f9c33fa7978dee\", \"row_count\": 86400, \"canonical_row_checksum\": \"90f9c33fa7978deec9566b4f0497cc40921b981c7f227a5a122438b5f3af4537\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-04-25/manifest.json\"}, {\"partition\": \"2026-04-26\", \"commit_id\": \"20260426-aef1b2f93d73b0c7\", \"row_count\": 86398, \"canonical_row_checksum\": \"aef1b2f93d73b0c79d951df08bb4711284c89e8471880a49203712151e46480f\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-04-26/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-27",
+          "end": "2026-04-29",
+          "days": 3,
+          "elapsed_sec": 4.014,
+          "peak_rss_mb": 1758.586,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:33:41.243073+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"ETH/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043338Z-ETH-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-04-27\", \"commit_id\": \"20260427-0963b58f259337f0\", \"row_count\": 86400, \"canonical_row_checksum\": \"0963b58f259337f0b1c2afadddda99f2236d4fb9d8ddbd5a4a9c95d90682293c\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-04-27/manifest.json\"}, {\"partition\": \"2026-04-28\", \"commit_id\": \"20260428-f8805c7b5387dde3\", \"row_count\": 86400, \"canonical_row_checksum\": \"f8805c7b5387dde34001571efcf663f077a52a247463beb16339e59d7c348fd0\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-04-28/manifest.json\"}, {\"partition\": \"2026-04-29\", \"commit_id\": \"20260429-413a1aa58972acea\", \"row_count\": 86398, \"canonical_row_checksum\": \"413a1aa58972acea41bb565e02e26bb4cf976809f4ff5bb8bc5b827065af8033\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-04-29/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-30",
+          "end": "2026-05-02",
+          "days": 3,
+          "elapsed_sec": 4.516,
+          "peak_rss_mb": 1444.336,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:33:45.737757+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"ETH/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043342Z-ETH-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-04-30\", \"commit_id\": \"20260430-3f346e74088b6d86\", \"row_count\": 86400, \"canonical_row_checksum\": \"3f346e74088b6d8677e6dafeaa0c019d2ff889ba800d450f020d551fe29a6443\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-04-30/manifest.json\"}, {\"partition\": \"2026-05-01\", \"commit_id\": \"20260501-844d593a0d0f48a3\", \"row_count\": 86400, \"canonical_row_checksum\": \"844d593a0d0f48a312fce1bcc8cf2b3191b6a484e8afe49e57aac1c19776201f\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-05-01/manifest.json\"}, {\"partition\": \"2026-05-02\", \"commit_id\": \"20260502-c27971c5185084ea\", \"row_count\": 86399, \"canonical_row_checksum\": \"c27971c5185084ea237bdcf15a44ac2656398348c4aa79463b0736bae4b6f73b\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-05-02/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        }
+      ]
+    },
+    {
+      "symbol": "BNB/USDT",
+      "required_days": 63,
+      "raw_present_before": 63,
+      "raw_missing_before": 0,
+      "raw_present_after": 63,
+      "raw_missing_after": 0,
+      "materialized_present_before": 34,
+      "materialized_missing_before": 29,
+      "materialized_present_after": 63,
+      "materialized_missing_after": 0,
+      "first_raw_missing_after": [],
+      "first_materialized_missing_after": [],
+      "raw_runs": [],
+      "materialize_runs": [
+        {
+          "start": "2026-04-04",
+          "end": "2026-04-06",
+          "days": 3,
+          "elapsed_sec": 3.521,
+          "peak_rss_mb": 908.621,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:33:49.194840+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"BNB/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043346Z-BNB-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-04-04\", \"commit_id\": \"20260404-aeffb3de93c45295\", \"row_count\": 86397, \"canonical_row_checksum\": \"aeffb3de93c452956900ed7cc22ff608cb742848d45122492f6098f0dd10a9aa\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BNBUSDT/timeframe=1s/date=2026-04-04/manifest.json\"}, {\"partition\": \"2026-04-05\", \"commit_id\": \"20260405-472ac1c7cce52233\", \"row_count\": 86400, \"canonical_row_checksum\": \"472ac1c7cce52233513e38567e7cae01208532d14cecaac439b74ce326f2cf26\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BNBUSDT/timeframe=1s/date=2026-04-05/manifest.json\"}, {\"partition\": \"2026-04-06\", \"commit_id\": \"20260406-4a1be45adef5ffa3\", \"row_count\": 86398, \"canonical_row_checksum\": \"4a1be45adef5ffa370dd42f06b10d9498f556d46d2738a3b09b8642f9029aa34\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BNBUSDT/timeframe=1s/date=2026-04-06/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-07",
+          "end": "2026-04-09",
+          "days": 3,
+          "elapsed_sec": 3.52,
+          "peak_rss_mb": 978.148,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:33:50.368682+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"BNB/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043347Z-BNB-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-04-07\", \"commit_id\": \"20260407-afbad9b5fb0dbc21\", \"row_count\": 86400, \"canonical_row_checksum\": \"afbad9b5fb0dbc2121194c82e27fa1f1933067359a846e09e9fa1b017ec7ff3d\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BNBUSDT/timeframe=1s/date=2026-04-07/manifest.json\"}, {\"partition\": \"2026-04-08\", \"commit_id\": \"20260408-f497bb6b1db12e1b\", \"row_count\": 86400, \"canonical_row_checksum\": \"f497bb6b1db12e1bf57ce5d807ec6335ebb4a94f46c54a1df47127af88a69121\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BNBUSDT/timeframe=1s/date=2026-04-08/manifest.json\"}, {\"partition\": \"2026-04-09\", \"commit_id\": \"20260409-84fe2adc999ccd61\", \"row_count\": 86398, \"canonical_row_checksum\": \"84fe2adc999ccd619da586dc837797f19711654790b783591d3cfc2e2b70e8e7\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BNBUSDT/timeframe=1s/date=2026-04-09/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-10",
+          "end": "2026-04-12",
+          "days": 3,
+          "elapsed_sec": 3.527,
+          "peak_rss_mb": 918.508,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:33:53.874725+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"BNB/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043351Z-BNB-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-04-10\", \"commit_id\": \"20260410-dcecdf231075a01f\", \"row_count\": 86400, \"canonical_row_checksum\": \"dcecdf231075a01ff2d0a6a7c3253feae6fcfdd0d0769cdbe5e3da50c7057ddc\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BNBUSDT/timeframe=1s/date=2026-04-10/manifest.json\"}, {\"partition\": \"2026-04-11\", \"commit_id\": \"20260411-5471e601923be212\", \"row_count\": 86400, \"canonical_row_checksum\": \"5471e601923be2125ebe7688570f66c47ff6537fff8db38fcf779c19fb277850\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BNBUSDT/timeframe=1s/date=2026-04-11/manifest.json\"}, {\"partition\": \"2026-04-12\", \"commit_id\": \"20260412-6264af8601813569\", \"row_count\": 86399, \"canonical_row_checksum\": \"6264af8601813569f00ab6e1312bd3f34ad583fdd59c9230d96e7429d429d538\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BNBUSDT/timeframe=1s/date=2026-04-12/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-13",
+          "end": "2026-04-15",
+          "days": 3,
+          "elapsed_sec": 3.516,
+          "peak_rss_mb": 970.457,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:33:57.550301+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"BNB/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043354Z-BNB-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-04-13\", \"commit_id\": \"20260413-5ddd478971f126f9\", \"row_count\": 86399, \"canonical_row_checksum\": \"5ddd478971f126f99f2b46dfa9678a7050a810ce8a63225814e7b358b3526a02\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BNBUSDT/timeframe=1s/date=2026-04-13/manifest.json\"}, {\"partition\": \"2026-04-14\", \"commit_id\": \"20260414-c5f2d528fe2a75eb\", \"row_count\": 86400, \"canonical_row_checksum\": \"c5f2d528fe2a75ebdb191106eb3e749c43e3748943529965c225a765432fd778\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BNBUSDT/timeframe=1s/date=2026-04-14/manifest.json\"}, {\"partition\": \"2026-04-15\", \"commit_id\": \"20260415-95c5ac1a9947877f\", \"row_count\": 86398, \"canonical_row_checksum\": \"95c5ac1a9947877f2d52e8af07017dff550bd849c8e7d27d15f120bb494b4fad\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BNBUSDT/timeframe=1s/date=2026-04-15/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-16",
+          "end": "2026-04-18",
+          "days": 3,
+          "elapsed_sec": 3.52,
+          "peak_rss_mb": 968.914,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:34:00.894610+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"BNB/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043358Z-BNB-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-04-16\", \"commit_id\": \"20260416-658e0c8c2c96e670\", \"row_count\": 86398, \"canonical_row_checksum\": \"658e0c8c2c96e67031b5948c91f75223129e37f8047f325fd35bd3a1fe641c74\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BNBUSDT/timeframe=1s/date=2026-04-16/manifest.json\"}, {\"partition\": \"2026-04-17\", \"commit_id\": \"20260417-246f5e34f992db80\", \"row_count\": 86400, \"canonical_row_checksum\": \"246f5e34f992db8048e93f99073d89a2ea8daa56bb0d4f73740084728330d65f\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BNBUSDT/timeframe=1s/date=2026-04-17/manifest.json\"}, {\"partition\": \"2026-04-18\", \"commit_id\": \"20260418-5ad64581f8c7f91d\", \"row_count\": 86398, \"canonical_row_checksum\": \"5ad64581f8c7f91d250316cb47b272e81b2b7ddae398199c5b2f95123d365d2c\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BNBUSDT/timeframe=1s/date=2026-04-18/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-19",
+          "end": "2026-04-21",
+          "days": 3,
+          "elapsed_sec": 3.004,
+          "peak_rss_mb": 947.406,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:34:04.091598+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"BNB/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043401Z-BNB-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-04-19\", \"commit_id\": \"20260419-b1d8b03c6c90f8d5\", \"row_count\": 86397, \"canonical_row_checksum\": \"b1d8b03c6c90f8d587bc09958489507249a187304889d2862e99c6957086590f\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BNBUSDT/timeframe=1s/date=2026-04-19/manifest.json\"}, {\"partition\": \"2026-04-20\", \"commit_id\": \"20260420-9890f59d7dc269ac\", \"row_count\": 86400, \"canonical_row_checksum\": \"9890f59d7dc269acfafc9502947916fff12a8afabe116a88953c0d96984254a1\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BNBUSDT/timeframe=1s/date=2026-04-20/manifest.json\"}, {\"partition\": \"2026-04-21\", \"commit_id\": \"20260421-1e34e8574b62b6f3\", \"row_count\": 86399, \"canonical_row_checksum\": \"1e34e8574b62b6f3efff70b4fce7330921335df8eff567e484387f33ea37d966\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BNBUSDT/timeframe=1s/date=2026-04-21/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-22",
+          "end": "2026-04-24",
+          "days": 3,
+          "elapsed_sec": 3.573,
+          "peak_rss_mb": 943.918,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:34:07.296879+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"BNB/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043404Z-BNB-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-04-22\", \"commit_id\": \"20260422-7263d5b7b6707c61\", \"row_count\": 86400, \"canonical_row_checksum\": \"7263d5b7b6707c6136483ac6c54b9247e83037360fcfbad03b22109b3e945885\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BNBUSDT/timeframe=1s/date=2026-04-22/manifest.json\"}, {\"partition\": \"2026-04-23\", \"commit_id\": \"20260423-caf00a8f1cbc197a\", \"row_count\": 86400, \"canonical_row_checksum\": \"caf00a8f1cbc197a5c559eac6350f0f8f5a4c75cb422942d395123b57a1e0cb9\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BNBUSDT/timeframe=1s/date=2026-04-23/manifest.json\"}, {\"partition\": \"2026-04-24\", \"commit_id\": \"20260424-f2f686bda66cf4d7\", \"row_count\": 86397, \"canonical_row_checksum\": \"f2f686bda66cf4d73d7eea409ff5534fccdeb8eb19d2b3b456b47dc496b35b01\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BNBUSDT/timeframe=1s/date=2026-04-24/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-25",
+          "end": "2026-04-27",
+          "days": 3,
+          "elapsed_sec": 3.01,
+          "peak_rss_mb": 914.102,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:34:10.464132+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"BNB/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043408Z-BNB-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-04-25\", \"commit_id\": \"20260425-b697e72a17bb99db\", \"row_count\": 86400, \"canonical_row_checksum\": \"b697e72a17bb99db2a253daf3c793c9ab267386a079949b9568f71b94420f8d1\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BNBUSDT/timeframe=1s/date=2026-04-25/manifest.json\"}, {\"partition\": \"2026-04-26\", \"commit_id\": \"20260426-c5c42d300d32ea84\", \"row_count\": 86400, \"canonical_row_checksum\": \"c5c42d300d32ea841dff6c8914869b33252268fbb7e3282aab3c1f985c7c7341\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BNBUSDT/timeframe=1s/date=2026-04-26/manifest.json\"}, {\"partition\": \"2026-04-27\", \"commit_id\": \"20260427-b0ee466fb9343179\", \"row_count\": 86398, \"canonical_row_checksum\": \"b0ee466fb9343179fa3031626638bb16dcadc3ef63d285f3ec1efe42676a4fb5\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BNBUSDT/timeframe=1s/date=2026-04-27/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-28",
+          "end": "2026-04-30",
+          "days": 3,
+          "elapsed_sec": 3.008,
+          "peak_rss_mb": 863.785,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:34:13.487786+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"BNB/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043411Z-BNB-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-04-28\", \"commit_id\": \"20260428-38c4831a8788c2ee\", \"row_count\": 86400, \"canonical_row_checksum\": \"38c4831a8788c2ee7acacc66d6c2ef1b5d9b279958236d3a93c6796b9cc78d15\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BNBUSDT/timeframe=1s/date=2026-04-28/manifest.json\"}, {\"partition\": \"2026-04-29\", \"commit_id\": \"20260429-fd226135b1dcf1a7\", \"row_count\": 86400, \"canonical_row_checksum\": \"fd226135b1dcf1a75ec43ccf5042b02b572d0ee80e805bc68dcacf1d63e5196c\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BNBUSDT/timeframe=1s/date=2026-04-29/manifest.json\"}, {\"partition\": \"2026-04-30\", \"commit_id\": \"20260430-28880b2429b13f8b\", \"row_count\": 86398, \"canonical_row_checksum\": \"28880b2429b13f8be4ba8b2a544e8428462bf69dbd1fe5d7f207be543acbe9e4\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BNBUSDT/timeframe=1s/date=2026-04-30/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-05-01",
+          "end": "2026-05-02",
+          "days": 2,
+          "elapsed_sec": 2.513,
+          "peak_rss_mb": 760.895,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:34:16.112733+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"BNB/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043414Z-BNB-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-05-01\", \"commit_id\": \"20260501-bceb0303c81732f8\", \"row_count\": 86400, \"canonical_row_checksum\": \"bceb0303c81732f8a0906037af76db31ca2670993deb6e8c20416a705cb95b79\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BNBUSDT/timeframe=1s/date=2026-05-01/manifest.json\"}, {\"partition\": \"2026-05-02\", \"commit_id\": \"20260502-c55656a9c38537db\", \"row_count\": 86398, \"canonical_row_checksum\": \"c55656a9c38537dbe6988416b72c8bbcd0cad7f89929200286d96a51bea3dba0\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BNBUSDT/timeframe=1s/date=2026-05-02/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        }
+      ]
+    },
+    {
+      "symbol": "SOL/USDT",
+      "required_days": 63,
+      "raw_present_before": 63,
+      "raw_missing_before": 0,
+      "raw_present_after": 63,
+      "raw_missing_after": 0,
+      "materialized_present_before": 17,
+      "materialized_missing_before": 46,
+      "materialized_present_after": 61,
+      "materialized_missing_after": 2,
+      "first_raw_missing_after": [],
+      "first_materialized_missing_after": [
+        "2026-03-19",
+        "2026-03-20"
+      ],
+      "raw_runs": [],
+      "materialize_runs": [
+        {
+          "start": "2026-03-18",
+          "end": "2026-03-20",
+          "days": 3,
+          "elapsed_sec": 2.505,
+          "peak_rss_mb": 1101.703,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:34:18.754833+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"SOL/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043417Z-SOL-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-03-18\", \"commit_id\": \"20260318-cc289010838e256a\", \"row_count\": 86400, \"canonical_row_checksum\": \"cc289010838e256a878bcf50f680fa8d65231bb95789f59ec8d45890e6c9d36a\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-03-18/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-03-21",
+          "end": "2026-03-23",
+          "days": 3,
+          "elapsed_sec": 3.506,
+          "peak_rss_mb": 1097.578,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:34:19.565765+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"SOL/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043416Z-SOL-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-03-21\", \"commit_id\": \"20260321-45dc042de90347b7\", \"row_count\": 86400, \"canonical_row_checksum\": \"45dc042de90347b7990effce723b8110e4acf565f686f4ff60235a8242fcfc2a\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-03-21/manifest.json\"}, {\"partition\": \"2026-03-22\", \"commit_id\": \"20260322-7232db4d29340f8e\", \"row_count\": 86400, \"canonical_row_checksum\": \"7232db4d29340f8e4ed9a0d6336c08c3795b46d7c00d59f83223c599b0d3e817\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-03-22/manifest.json\"}, {\"partition\": \"2026-03-23\", \"commit_id\": \"20260323-80456a0e0e159741\", \"row_count\": 86398, \"canonical_row_checksum\": \"80456a0e0e159741ce754d212be20d9fb1ad1c9f2efc40b226e2dd3d06710958\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-03-23/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-03-24",
+          "end": "2026-03-26",
+          "days": 3,
+          "elapsed_sec": 3.035,
+          "peak_rss_mb": 1164.977,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:34:22.734249+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"SOL/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043420Z-SOL-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-03-24\", \"commit_id\": \"20260324-12622de7e425fef5\", \"row_count\": 86400, \"canonical_row_checksum\": \"12622de7e425fef5ca00358075f5e07738022ac8e21238ac6820d3f14a8d18fa\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-03-24/manifest.json\"}, {\"partition\": \"2026-03-25\", \"commit_id\": \"20260325-b569676785fa54ec\", \"row_count\": 86400, \"canonical_row_checksum\": \"b569676785fa54ec195ca7732f6f2f29162bbf7a04ae4d0e54161ae7e4d242b8\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-03-25/manifest.json\"}, {\"partition\": \"2026-03-26\", \"commit_id\": \"20260326-1e64f98cc25f0aaa\", \"row_count\": 86399, \"canonical_row_checksum\": \"1e64f98cc25f0aaae976ce1130708b09b32649c55df85754ecd47c828f9c5066\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-03-26/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-03-27",
+          "end": "2026-03-29",
+          "days": 3,
+          "elapsed_sec": 3.573,
+          "peak_rss_mb": 979.152,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:34:26.168646+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"SOL/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043423Z-SOL-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-03-27\", \"commit_id\": \"20260327-081efd2e4aabf1fe\", \"row_count\": 86400, \"canonical_row_checksum\": \"081efd2e4aabf1fe30e4021da148d257047775e01e04c7045cd3f71bbc3ff065\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-03-27/manifest.json\"}, {\"partition\": \"2026-03-28\", \"commit_id\": \"20260328-fba80471daa8181b\", \"row_count\": 86400, \"canonical_row_checksum\": \"fba80471daa8181b13d6507c8151754afef90f01f9b7aa205dd6bb3f1a89061a\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-03-28/manifest.json\"}, {\"partition\": \"2026-03-29\", \"commit_id\": \"20260329-7fef47096d491467\", \"row_count\": 86398, \"canonical_row_checksum\": \"7fef47096d4914678a22d468fce85423e8cc8eb60fb8355d5df5e431bff5a56c\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-03-29/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-03-30",
+          "end": "2026-04-01",
+          "days": 3,
+          "elapsed_sec": 4.05,
+          "peak_rss_mb": 1172.012,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:34:30.148770+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"SOL/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043427Z-SOL-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-03-30\", \"commit_id\": \"20260330-fa7e479f03c0423a\", \"row_count\": 86400, \"canonical_row_checksum\": \"fa7e479f03c0423ab35c453c7f91ec275047d52d760355bfb0d0d554c54335b7\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-03-30/manifest.json\"}, {\"partition\": \"2026-03-31\", \"commit_id\": \"20260331-7f85b2a30fa2e116\", \"row_count\": 86400, \"canonical_row_checksum\": \"7f85b2a30fa2e1169ce82655554eee9d9feb2175ae4b6b5738e24efff7bbd837\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-03-31/manifest.json\"}, {\"partition\": \"2026-04-01\", \"commit_id\": \"20260401-c1599304c10e2d2d\", \"row_count\": 86398, \"canonical_row_checksum\": \"c1599304c10e2d2d18f932e82ff3acaaacd15b4c7e859a54ccaa27effec52c5d\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-04-01/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-02",
+          "end": "2026-04-04",
+          "days": 3,
+          "elapsed_sec": 4.022,
+          "peak_rss_mb": 985.797,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:34:34.200427+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"SOL/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043431Z-SOL-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-04-02\", \"commit_id\": \"20260402-5aa09589398b0e96\", \"row_count\": 86400, \"canonical_row_checksum\": \"5aa09589398b0e96a36739720d3f10d93ea3c09c238e3e5d1e50722d2cc0b93b\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-04-02/manifest.json\"}, {\"partition\": \"2026-04-03\", \"commit_id\": \"20260403-e4900c942e83ff2d\", \"row_count\": 86400, \"canonical_row_checksum\": \"e4900c942e83ff2dceb1a5fee08d50114720126e1d3ca1b932b26c3d3fe6da3d\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-04-03/manifest.json\"}, {\"partition\": \"2026-04-04\", \"commit_id\": \"20260404-22dd204340f916a9\", \"row_count\": 86396, \"canonical_row_checksum\": \"22dd204340f916a928c6478484a315a651fb742d10bfe601ecabbf553603dbaf\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-04-04/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-05",
+          "end": "2026-04-07",
+          "days": 3,
+          "elapsed_sec": 4.019,
+          "peak_rss_mb": 1138.824,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:34:38.067429+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"SOL/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043435Z-SOL-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-04-05\", \"commit_id\": \"20260405-c42f7eb55473a3ce\", \"row_count\": 86400, \"canonical_row_checksum\": \"c42f7eb55473a3ce0a1e69990cdf03c8030a4d60898e3e1fc11f3fa1779f50eb\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-04-05/manifest.json\"}, {\"partition\": \"2026-04-06\", \"commit_id\": \"20260406-1819ae8d8665144c\", \"row_count\": 86400, \"canonical_row_checksum\": \"1819ae8d8665144cfeea5dc56ddf20dc65d762433db1d9df6eed9160ad180489\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-04-06/manifest.json\"}, {\"partition\": \"2026-04-07\", \"commit_id\": \"20260407-cff8277afa8911f4\", \"row_count\": 86398, \"canonical_row_checksum\": \"cff8277afa8911f4cde84db437a39efe2530a1451fd5363187f31101063cd06a\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-04-07/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-08",
+          "end": "2026-04-10",
+          "days": 3,
+          "elapsed_sec": 3.506,
+          "peak_rss_mb": 983.609,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:34:41.562742+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"SOL/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043439Z-SOL-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-04-08\", \"commit_id\": \"20260408-835f16d72352871c\", \"row_count\": 86400, \"canonical_row_checksum\": \"835f16d72352871c420709ad49bf166fa8396a173cee1dbac98e390de02249a9\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-04-08/manifest.json\"}, {\"partition\": \"2026-04-09\", \"commit_id\": \"20260409-74c43c5702d2304e\", \"row_count\": 86400, \"canonical_row_checksum\": \"74c43c5702d2304ed44b85e296071167946e3126378ff5c54b84a57294cc8c89\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-04-09/manifest.json\"}, {\"partition\": \"2026-04-10\", \"commit_id\": \"20260410-6a423253b3785cae\", \"row_count\": 86397, \"canonical_row_checksum\": \"6a423253b3785cae08c87e4c25603bf99b612dbb257ceaa5ef0adc4995d59030\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-04-10/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-11",
+          "end": "2026-04-13",
+          "days": 3,
+          "elapsed_sec": 3.514,
+          "peak_rss_mb": 976.453,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:34:45.089467+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"SOL/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043442Z-SOL-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-04-11\", \"commit_id\": \"20260411-095f76b7988524b5\", \"row_count\": 86400, \"canonical_row_checksum\": \"095f76b7988524b59ee9f54d8edd247441ebb0551606c58832f7fba7e628c4d1\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-04-11/manifest.json\"}, {\"partition\": \"2026-04-12\", \"commit_id\": \"20260412-9ccfd13e85022ced\", \"row_count\": 86400, \"canonical_row_checksum\": \"9ccfd13e85022ced518827ae5988311189deaaaae3be71bc287fd89e570c21c7\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-04-12/manifest.json\"}, {\"partition\": \"2026-04-13\", \"commit_id\": \"20260413-50aead1ac98e4e02\", \"row_count\": 86399, \"canonical_row_checksum\": \"50aead1ac98e4e0253dfdf415223127dee83dc032ff44a6e5639aecf53de1ba8\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-04-13/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-14",
+          "end": "2026-04-16",
+          "days": 3,
+          "elapsed_sec": 4.017,
+          "peak_rss_mb": 1140.848,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:34:49.172833+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"SOL/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043446Z-SOL-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-04-14\", \"commit_id\": \"20260414-058699fbf0b5dd79\", \"row_count\": 86400, \"canonical_row_checksum\": \"058699fbf0b5dd791840725002668008b950cb9bbd8cf594dbe8f062afe673e6\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-04-14/manifest.json\"}, {\"partition\": \"2026-04-15\", \"commit_id\": \"20260415-b8a6e07dce1b6d6b\", \"row_count\": 86400, \"canonical_row_checksum\": \"b8a6e07dce1b6d6b6dc78196c4fad7dfa1a8df727e978c05b92a25331a875464\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-04-15/manifest.json\"}, {\"partition\": \"2026-04-16\", \"commit_id\": \"20260416-399048b0f272dfa4\", \"row_count\": 86398, \"canonical_row_checksum\": \"399048b0f272dfa4aa6e04394e0528661c2720085e3b2759cf42bb8eaeabd259\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-04-16/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-17",
+          "end": "2026-04-19",
+          "days": 3,
+          "elapsed_sec": 3.513,
+          "peak_rss_mb": 1123.824,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:34:50.223216+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"SOL/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043447Z-SOL-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-04-17\", \"commit_id\": \"20260417-24ed9a99d8604be7\", \"row_count\": 86400, \"canonical_row_checksum\": \"24ed9a99d8604be7bd6526eb5c073cb246bb8f9314f530c1012ddf2a9916661e\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-04-17/manifest.json\"}, {\"partition\": \"2026-04-18\", \"commit_id\": \"20260418-fcb6e9d64fd5b4ad\", \"row_count\": 86400, \"canonical_row_checksum\": \"fcb6e9d64fd5b4ad43c2e9d9b3e3cfefd19e90b04a8d728ebc94df5dcfcb7912\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-04-18/manifest.json\"}, {\"partition\": \"2026-04-19\", \"commit_id\": \"20260419-b99675a6fa97b7f1\", \"row_count\": 86399, \"canonical_row_checksum\": \"b99675a6fa97b7f1374803e81cf1a1f9bf23da0ae5e75c9b5ef1460c752041a9\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-04-19/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-20",
+          "end": "2026-04-22",
+          "days": 3,
+          "elapsed_sec": 3.527,
+          "peak_rss_mb": 959.555,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:34:54.015790+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"SOL/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043451Z-SOL-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-04-20\", \"commit_id\": \"20260420-475f9fbf1446bec8\", \"row_count\": 86400, \"canonical_row_checksum\": \"475f9fbf1446bec82fe662986c61d6804bc6ba7c6bdef29d220a5828c244159c\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-04-20/manifest.json\"}, {\"partition\": \"2026-04-21\", \"commit_id\": \"20260421-bb801b75a9e05e7e\", \"row_count\": 86400, \"canonical_row_checksum\": \"bb801b75a9e05e7eec78459a7574583e460a769c6f9adfcafd441cb9a9c455c0\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-04-21/manifest.json\"}, {\"partition\": \"2026-04-22\", \"commit_id\": \"20260422-9071019b2fda904d\", \"row_count\": 86399, \"canonical_row_checksum\": \"9071019b2fda904dda416171b75f75bc687dfed4c5957f312f915a1c54aa908d\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-04-22/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-23",
+          "end": "2026-04-25",
+          "days": 3,
+          "elapsed_sec": 3.528,
+          "peak_rss_mb": 921.504,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:34:57.112237+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"SOL/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043454Z-SOL-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-04-23\", \"commit_id\": \"20260423-eb371bcf051445e9\", \"row_count\": 86400, \"canonical_row_checksum\": \"eb371bcf051445e9d8e9d9db4bb6042101d935ac3029aa20e43343f15fc08260\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-04-23/manifest.json\"}, {\"partition\": \"2026-04-24\", \"commit_id\": \"20260424-b07d1f58435d80e0\", \"row_count\": 86400, \"canonical_row_checksum\": \"b07d1f58435d80e0fde196d174da1a60fecb5b41f2519c3d785c6049b5fb2c4d\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-04-24/manifest.json\"}, {\"partition\": \"2026-04-25\", \"commit_id\": \"20260425-fec3c765ab5bd55e\", \"row_count\": 86398, \"canonical_row_checksum\": \"fec3c765ab5bd55eb67dc7792407dfe3a7069f828134dd66cd41472fbc69d052\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-04-25/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-26",
+          "end": "2026-04-28",
+          "days": 3,
+          "elapsed_sec": 3.551,
+          "peak_rss_mb": 957.289,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:35:01.012715+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"SOL/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043458Z-SOL-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-04-26\", \"commit_id\": \"20260426-7ebf5ddcb6fa5c1f\", \"row_count\": 86398, \"canonical_row_checksum\": \"7ebf5ddcb6fa5c1f43c819b43e4a1f7356d0a87ee184d061880fdd3f6be7e97f\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-04-26/manifest.json\"}, {\"partition\": \"2026-04-27\", \"commit_id\": \"20260427-7263d11618f258a2\", \"row_count\": 86400, \"canonical_row_checksum\": \"7263d11618f258a2de97bbd6cdc242e17c67cc1078fb495a694b6bced6b36361\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-04-27/manifest.json\"}, {\"partition\": \"2026-04-28\", \"commit_id\": \"20260428-508f02e7713a31bb\", \"row_count\": 86398, \"canonical_row_checksum\": \"508f02e7713a31bb22bed43191a487bb750f56c720f869ca4387fd70589823e6\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-04-28/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-29",
+          "end": "2026-05-01",
+          "days": 3,
+          "elapsed_sec": 3.511,
+          "peak_rss_mb": 1013.148,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:35:04.552911+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"SOL/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043501Z-SOL-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-04-29\", \"commit_id\": \"20260429-86473c88d34ca757\", \"row_count\": 86400, \"canonical_row_checksum\": \"86473c88d34ca7570f21f0e928465497a67827a06c088144398aba913428eaf0\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-04-29/manifest.json\"}, {\"partition\": \"2026-04-30\", \"commit_id\": \"20260430-858063c1260fc6af\", \"row_count\": 86400, \"canonical_row_checksum\": \"858063c1260fc6af1a4a41650b12e08dc1156387a801fc1ee8754462fe1cb0b8\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-04-30/manifest.json\"}, {\"partition\": \"2026-05-01\", \"commit_id\": \"20260501-98f910cca5e893eb\", \"row_count\": 86399, \"canonical_row_checksum\": \"98f910cca5e893eba1fc3bf4c27aedadf1d23b7e944cf04aa4b1cabdfc35b410\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-05-01/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-05-02",
+          "end": "2026-05-02",
+          "days": 1,
+          "elapsed_sec": 3.01,
+          "peak_rss_mb": 707.977,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:35:07.254530+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"SOL/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043505Z-SOL-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-05-02\", \"commit_id\": \"20260502-3eb97ea4bc110ba8\", \"row_count\": 86399, \"canonical_row_checksum\": \"3eb97ea4bc110ba8897e5b461e0a2d0f1f7cd9d72a489e0a437f78f92bb7dfe9\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-05-02/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        }
+      ]
+    },
+    {
+      "symbol": "TRX/USDT",
+      "required_days": 63,
+      "raw_present_before": 63,
+      "raw_missing_before": 0,
+      "raw_present_after": 63,
+      "raw_missing_after": 0,
+      "materialized_present_before": 34,
+      "materialized_missing_before": 29,
+      "materialized_present_after": 63,
+      "materialized_missing_after": 0,
+      "first_raw_missing_after": [],
+      "first_materialized_missing_after": [],
+      "raw_runs": [],
+      "materialize_runs": [
+        {
+          "start": "2026-04-04",
+          "end": "2026-04-06",
+          "days": 3,
+          "elapsed_sec": 3.013,
+          "peak_rss_mb": 755.691,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:35:10.578223+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"TRX/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043508Z-TRX-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-04-04\", \"commit_id\": \"20260404-c5d0ef0fe214a8be\", \"row_count\": 86399, \"canonical_row_checksum\": \"c5d0ef0fe214a8be49dd01a1ce8096cf3d5c26e7ac406363467e90b515a71f47\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/TRXUSDT/timeframe=1s/date=2026-04-04/manifest.json\"}, {\"partition\": \"2026-04-05\", \"commit_id\": \"20260405-0cdff87be7f5e1a8\", \"row_count\": 86400, \"canonical_row_checksum\": \"0cdff87be7f5e1a87cc77dcff880a1c74ad09210d0d924cae4ce11b927197f4c\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/TRXUSDT/timeframe=1s/date=2026-04-05/manifest.json\"}, {\"partition\": \"2026-04-06\", \"commit_id\": \"20260406-23bcb90477e8b3d8\", \"row_count\": 86395, \"canonical_row_checksum\": \"23bcb90477e8b3d8b2d3b2db341daee3effa5ae2c67adadbc8fe2f8a0c6c0f17\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/TRXUSDT/timeframe=1s/date=2026-04-06/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-07",
+          "end": "2026-04-09",
+          "days": 3,
+          "elapsed_sec": 3.544,
+          "peak_rss_mb": 835.051,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:35:13.754045+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"TRX/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043511Z-TRX-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-04-07\", \"commit_id\": \"20260407-d5260caef8f38510\", \"row_count\": 86400, \"canonical_row_checksum\": \"d5260caef8f38510c3cf4c08fb4a7c1f13c9ecc2d18b4c87571e97d2f2dc5cbb\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/TRXUSDT/timeframe=1s/date=2026-04-07/manifest.json\"}, {\"partition\": \"2026-04-08\", \"commit_id\": \"20260408-21d242ff636faae8\", \"row_count\": 86400, \"canonical_row_checksum\": \"21d242ff636faae807ee2fac23ad4000629a3968701f24b10a7c696248512670\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/TRXUSDT/timeframe=1s/date=2026-04-08/manifest.json\"}, {\"partition\": \"2026-04-09\", \"commit_id\": \"20260409-912f802187dc9767\", \"row_count\": 86398, \"canonical_row_checksum\": \"912f802187dc976753b1de4efb9048635a2263068d582f545df7fc8204337b71\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/TRXUSDT/timeframe=1s/date=2026-04-09/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-10",
+          "end": "2026-04-12",
+          "days": 3,
+          "elapsed_sec": 3.518,
+          "peak_rss_mb": 765.633,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:35:17.510518+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"TRX/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043514Z-TRX-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-04-10\", \"commit_id\": \"20260410-971a532f19ec65fe\", \"row_count\": 86400, \"canonical_row_checksum\": \"971a532f19ec65fe75bb47d0aa9fe214b7feefaac59afcbbe058f7bc09a48bef\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/TRXUSDT/timeframe=1s/date=2026-04-10/manifest.json\"}, {\"partition\": \"2026-04-11\", \"commit_id\": \"20260411-386231317e087597\", \"row_count\": 86400, \"canonical_row_checksum\": \"386231317e0875970dceea63bd2385bd41606806378cd93a7e03c3301a0787b5\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/TRXUSDT/timeframe=1s/date=2026-04-11/manifest.json\"}, {\"partition\": \"2026-04-12\", \"commit_id\": \"20260412-7a92ff78430bbe56\", \"row_count\": 86398, \"canonical_row_checksum\": \"7a92ff78430bbe56a3ed3b5cebf5cb180adadeea9df1b1e55e4b55acd0390ed0\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/TRXUSDT/timeframe=1s/date=2026-04-12/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-13",
+          "end": "2026-04-15",
+          "days": 3,
+          "elapsed_sec": 3.518,
+          "peak_rss_mb": 797.133,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:35:18.385210+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"TRX/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043518Z-TRX-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-04-13\", \"commit_id\": \"20260413-49a7f958f617d1a2\", \"row_count\": 86398, \"canonical_row_checksum\": \"49a7f958f617d1a22917331cf14e9f8fac1e0056f4819cf42dad6f93738793b7\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/TRXUSDT/timeframe=1s/date=2026-04-13/manifest.json\"}, {\"partition\": \"2026-04-14\", \"commit_id\": \"20260414-6b4c3495562d3d48\", \"row_count\": 86400, \"canonical_row_checksum\": \"6b4c3495562d3d48cff3833e975c4012d6fa641514c5fa9a667065f5cec04ae9\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/TRXUSDT/timeframe=1s/date=2026-04-14/manifest.json\"}, {\"partition\": \"2026-04-15\", \"commit_id\": \"20260415-256dbd7a276af4fd\", \"row_count\": 86396, \"canonical_row_checksum\": \"256dbd7a276af4fd83991844c12b6582f560985752911f75462371bc908bed01\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/TRXUSDT/timeframe=1s/date=2026-04-15/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-16",
+          "end": "2026-04-18",
+          "days": 3,
+          "elapsed_sec": 3.527,
+          "peak_rss_mb": 808.977,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:35:22.147875+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"TRX/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043519Z-TRX-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-04-16\", \"commit_id\": \"20260416-d7e8bc6b8ef40427\", \"row_count\": 86400, \"canonical_row_checksum\": \"d7e8bc6b8ef40427cc78f15ae6a6c9457d03d04e912b8de2227711c5f454a42d\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/TRXUSDT/timeframe=1s/date=2026-04-16/manifest.json\"}, {\"partition\": \"2026-04-17\", \"commit_id\": \"20260417-11ac25f9063c4e7b\", \"row_count\": 86400, \"canonical_row_checksum\": \"11ac25f9063c4e7b40b96dcfcfa1b23767c5286192d0ebc54546c14a2ebd2402\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/TRXUSDT/timeframe=1s/date=2026-04-17/manifest.json\"}, {\"partition\": \"2026-04-18\", \"commit_id\": \"20260418-b7c47f4f39ce618b\", \"row_count\": 86395, \"canonical_row_checksum\": \"b7c47f4f39ce618b8a50308fe573785bf02b7f8e913eaa73b79aeb73d0f27cf7\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/TRXUSDT/timeframe=1s/date=2026-04-18/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-19",
+          "end": "2026-04-21",
+          "days": 3,
+          "elapsed_sec": 16.746,
+          "peak_rss_mb": 817.809,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:35:38.493902+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"TRX/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043523Z-TRX-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-04-19\", \"commit_id\": \"20260419-9b6fc816b2aa2887\", \"row_count\": 86400, \"canonical_row_checksum\": \"9b6fc816b2aa288733e19ad6da50c204d4582ebb9cc214b240305e883fc23ae4\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/TRXUSDT/timeframe=1s/date=2026-04-19/manifest.json\"}, {\"partition\": \"2026-04-20\", \"commit_id\": \"20260420-49e3325bf9dd2d33\", \"row_count\": 86400, \"canonical_row_checksum\": \"49e3325bf9dd2d33caf504426e961124875c4905f2b03c86febacdbb5e11f260\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/TRXUSDT/timeframe=1s/date=2026-04-20/manifest.json\"}, {\"partition\": \"2026-04-21\", \"commit_id\": \"20260421-24ff5ce374ede86e\", \"row_count\": 86398, \"canonical_row_checksum\": \"24ff5ce374ede86e109d2bc816af28ead412ee77f9a2a76a9807180defcdbd56\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/TRXUSDT/timeframe=1s/date=2026-04-21/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-22",
+          "end": "2026-04-24",
+          "days": 3,
+          "elapsed_sec": 5.517,
+          "peak_rss_mb": 810.477,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:35:44.266467+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"TRX/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043540Z-TRX-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-04-22\", \"commit_id\": \"20260422-3fc761214ac713ea\", \"row_count\": 86397, \"canonical_row_checksum\": \"3fc761214ac713ea522368a452d1d0d7ae86b830ae4bd8bd547f720ed8d4f293\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/TRXUSDT/timeframe=1s/date=2026-04-22/manifest.json\"}, {\"partition\": \"2026-04-23\", \"commit_id\": \"20260423-fc283649cd557cf1\", \"row_count\": 86400, \"canonical_row_checksum\": \"fc283649cd557cf1e490aca430ba234ff1e275ea47cd0a46d6ec92d424a84daa\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/TRXUSDT/timeframe=1s/date=2026-04-23/manifest.json\"}, {\"partition\": \"2026-04-24\", \"commit_id\": \"20260424-6ba3bf43f968de73\", \"row_count\": 86395, \"canonical_row_checksum\": \"6ba3bf43f968de73a15becde101b00f01f55aefcb9a1b4054a95e93657661652\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/TRXUSDT/timeframe=1s/date=2026-04-24/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-25",
+          "end": "2026-04-27",
+          "days": 3,
+          "elapsed_sec": 6.526,
+          "peak_rss_mb": 788.848,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:35:47.953809+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"TRX/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043545Z-TRX-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-04-25\", \"commit_id\": \"20260425-15a77f5fdac49333\", \"row_count\": 86400, \"canonical_row_checksum\": \"15a77f5fdac4933394619c2738d289f02e162f1d674c15ccfd79b5ba600a67a0\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/TRXUSDT/timeframe=1s/date=2026-04-25/manifest.json\"}, {\"partition\": \"2026-04-26\", \"commit_id\": \"20260426-41d6dd43b0b34af9\", \"row_count\": 86400, \"canonical_row_checksum\": \"41d6dd43b0b34af9511db1feb8fc65f7ed6b230a148d434d82d3482d9392dddf\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/TRXUSDT/timeframe=1s/date=2026-04-26/manifest.json\"}, {\"partition\": \"2026-04-27\", \"commit_id\": \"20260427-237eee618a24b16c\", \"row_count\": 86398, \"canonical_row_checksum\": \"237eee618a24b16c8f8e98b3fd3d161135c7d631cca604667fe212dd6e398719\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/TRXUSDT/timeframe=1s/date=2026-04-27/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-28",
+          "end": "2026-04-30",
+          "days": 3,
+          "elapsed_sec": 5.519,
+          "peak_rss_mb": 799.301,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:35:53.658510+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"TRX/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043549Z-TRX-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-04-28\", \"commit_id\": \"20260428-07ebc5081afd082e\", \"row_count\": 86398, \"canonical_row_checksum\": \"07ebc5081afd082e26539d97063a6b3a42d14cbc0495c1d34654ff0c31863728\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/TRXUSDT/timeframe=1s/date=2026-04-28/manifest.json\"}, {\"partition\": \"2026-04-29\", \"commit_id\": \"20260429-ebfb6d7d64228ecf\", \"row_count\": 86400, \"canonical_row_checksum\": \"ebfb6d7d64228ecf87fce63093279a991d52b7e543758025b82cd88135625b27\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/TRXUSDT/timeframe=1s/date=2026-04-29/manifest.json\"}, {\"partition\": \"2026-04-30\", \"commit_id\": \"20260430-78ea05189624825f\", \"row_count\": 86398, \"canonical_row_checksum\": \"78ea05189624825fdbeeec7a654993ed833bfdf2edfbb4bbbb0fd180b90eb2b0\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/TRXUSDT/timeframe=1s/date=2026-04-30/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-05-01",
+          "end": "2026-05-02",
+          "days": 2,
+          "elapsed_sec": 6.068,
+          "peak_rss_mb": 736.957,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:35:59.482658+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"TRX/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043555Z-TRX-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-05-01\", \"commit_id\": \"20260501-2af75869db82f80e\", \"row_count\": 86397, \"canonical_row_checksum\": \"2af75869db82f80ebd0e392fdcc035a40507809d537f0cce52f6c3b433612183\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/TRXUSDT/timeframe=1s/date=2026-05-01/manifest.json\"}, {\"partition\": \"2026-05-02\", \"commit_id\": \"20260502-3493ca0ede03ddf9\", \"row_count\": 86399, \"canonical_row_checksum\": \"3493ca0ede03ddf9022ffe38831e4ad60d5121368e96c276a3e79255c2fdb655\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/TRXUSDT/timeframe=1s/date=2026-05-02/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        }
+      ]
+    }
+  ],
+  "success": false
+}

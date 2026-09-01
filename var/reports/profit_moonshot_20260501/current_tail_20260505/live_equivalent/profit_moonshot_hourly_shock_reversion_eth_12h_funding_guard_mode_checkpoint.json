@@ -1,0 +1,65 @@
+{
+  "artifact_kind": "live_equivalent_backtest_checkpoint",
+  "split_results": {
+    "profit_moonshot_hourly_shock_reversion_eth_12h_funding_guard_mode": {
+      "oos": {
+        "equivalence_key": "6125e2cff2226cfca87f34ec4f21009142ec741fd44866d62b30d6f7b88b6d07",
+        "final_equity": 10072.072886264728,
+        "liquidation_count": 0,
+        "metrics": {
+          "cagr": 1.9413828565628677e-05,
+          "calmar": 0.010918215763708574,
+          "max_drawdown": 0.0017781136575592284,
+          "sharpe": 0.11122460571327704,
+          "sortino": 0.13583082076772565,
+          "total_return": 0.007206268626472667,
+          "volatility": 0.00017468164772302416
+        },
+        "mode": "profit_moonshot_hourly_shock_reversion_eth_12h_funding_guard_mode",
+        "source_mode": "profit_moonshot_hourly_shock_reversion_eth_12h_funding_guard_mode",
+        "split": "oos",
+        "status": "completed",
+        "trade_count": 34
+      },
+      "train": {
+        "equivalence_key": "6125e2cff2226cfca87f34ec4f21009142ec741fd44866d62b30d6f7b88b6d07",
+        "final_equity": 10139.462393707918,
+        "liquidation_count": 0,
+        "metrics": {
+          "cagr": 6.654963879748621e-06,
+          "calmar": 0.0003023024614948364,
+          "max_drawdown": 0.02201425634062293,
+          "sharpe": 0.024520188999535644,
+          "sortino": 0.02793272159664743,
+          "total_return": 0.013944685370791632,
+          "volatility": 0.0002729255680919415
+        },
+        "mode": "profit_moonshot_hourly_shock_reversion_eth_12h_funding_guard_mode",
+        "source_mode": "profit_moonshot_hourly_shock_reversion_eth_12h_funding_guard_mode",
+        "split": "train",
+        "status": "completed",
+        "trade_count": 254
+      },
+      "val": {
+        "equivalence_key": "6125e2cff2226cfca87f34ec4f21009142ec741fd44866d62b30d6f7b88b6d07",
+        "final_equity": 10050.234728824056,
+        "liquidation_count": 0,
+        "metrics": {
+          "cagr": 1.4863706618406525e-05,
+          "calmar": 0.005542724328712168,
+          "max_drawdown": 0.0026816608109860754,
+          "sharpe": 0.06301931052712983,
+          "sortino": 0.07198879570642576,
+          "total_return": 0.005023257882405652,
+          "volatility": 0.00023630082955197756
+        },
+        "mode": "profit_moonshot_hourly_shock_reversion_eth_12h_funding_guard_mode",
+        "source_mode": "profit_moonshot_hourly_shock_reversion_eth_12h_funding_guard_mode",
+        "split": "val",
+        "status": "completed",
+        "trade_count": 47
+      }
+    }
+  },
+  "updated_at": "2026-05-05T10:58:19.961272Z"
+}

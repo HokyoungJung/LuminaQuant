@@ -1,0 +1,65 @@
+{
+  "generated_at_utc": "2026-05-09T05:15:30Z",
+  "objective": "Inspect scripts/data artifacts/tests and propose minimal implementable specs, expected touchpoints, and gate risks.",
+  "subagent_skip_reason": "Scientist role-local guidance requires working alone/no delegation; Task 7 was bounded to repository/artifact inspection and serial synthesis was safer than spawning helpers.",
+  "evidence": {
+    "core_scripts_inspected": 8,
+    "test_files_inspected": 4,
+    "focused_test_count": 102,
+    "targeted_pytest_previous": "86 passed, 1 skipped for research feature/fresh replay/portfolio subset",
+    "all_family_replay_specs": 6805,
+    "all_family_replay_successes": 300,
+    "all_family_portfolio_specs": 58224,
+    "all_family_portfolio_successes": 6129,
+    "funding_related_replay_specs": 96,
+    "funding_related_successes": 0,
+    "h1_h2_improved_candidates": 0,
+    "h3_h4_h5_replay_survivors": 0,
+    "h3_h4_h5_portfolio_improved_candidates": 0,
+    "support_inventory_symbols": 5,
+    "support_inventory_total_oi_rows": 81052,
+    "support_inventory_first_true_oi": "2026-03-07/2026-03-08",
+    "support_inventory_liquidation_rows": 0
+  },
+  "minimal_specs": [
+    {
+      "name": "funding_oi_regime_transition_gate",
+      "implementation_type": "diagnostic/calendar-veto gate",
+      "primary_touchpoints": [
+        "scripts/research/replay_profit_moonshot_fresh_start.py: FreshSpec fields, _candidate_signal funding_oi branch, _candidate_specs funding grid",
+        "src/lumina_quant/data/support_inventory.py: OI coverage gating",
+        "tests/test_profit_moonshot_fresh_start_replay.py: funding/OI signal and missing-OI regression"
+      ],
+      "gate_risks": ["true OI starts after train/val", "proxy-only derivatives flow has negative train/val evidence", "locked-OOS must remain report-only"]
+    },
+    {
+      "name": "calendar_veto_regime_label_extension",
+      "implementation_type": "small H3-style veto extension",
+      "primary_touchpoints": [
+        "scripts/research/replay_profit_moonshot_fresh_start.py: _calendar_veto_reason and H3 candidate grid",
+        "tests/test_profit_moonshot_fresh_start_replay.py: calendar veto/day-window tests"
+      ],
+      "gate_risks": ["H3/H4/H5 produced 0 replay survivors", "veto can starve trips", "must retain train/val return while reducing MDD"]
+    },
+    {
+      "name": "support_inventory_promotion_precheck",
+      "implementation_type": "preflight guard/report",
+      "primary_touchpoints": [
+        "scripts/collect_all_strategy_support_data.py",
+        "scripts/build_strategy_support_inventory.py",
+        "src/lumina_quant/data/support_inventory.py",
+        "tests/test_strategy_support_collection_profiles.py"
+      ],
+      "gate_risks": ["liquidation rows are currently zero", "BNB/TRX taker-flow rows are zero", "endpoint availability changes"]
+    },
+    {
+      "name": "diagnostic_quarantine_regression",
+      "implementation_type": "report/test safety lock",
+      "primary_touchpoints": [
+        "scripts/research/tune_profit_moonshot_fresh_portfolio.py: LOCKBOX_POLICY and _label_improvement",
+        "tests/test_profit_moonshot_fresh_portfolio_tuning.py: diagnostic quarantine/order tests"
+      ],
+      "gate_risks": ["OOS-ranked high-return rows can fail MDD", "selection must remain train/validation-only"]
+    }
+  ]
+}

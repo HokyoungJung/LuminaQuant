@@ -1,0 +1,11 @@
+[INFO] Optimized params not found at best_optimized_parameters/RsiStrategy/best_params.json. Using Defaults.
+------------------------------------------------
+Running Backtest for ['BTC/USDT', 'ETH/USDT']
+Strategy: RsiStrategy
+Params: {'rsi_period': 14, 'oversold': 30.0, 'overbought': 70.0, 'allow_short': True}
+------------------------------------------------
+[INFO] Low-memory mode enabled (history/trade logs disabled).
+[INFO] Backtest summary: final_equity=9995.2880, trade_count=1, sharpe=-0.1880, cagr=-0.003951, max_drawdown=0.006461
+[INFO] Generated synthetic sample data: /home/hoky/Quants-agent/LuminaQuant/.omx/team/execute-the-approved-56afab4e/worktrees/worker-2/data/BTCUSDT.csv
+[INFO] Generated synthetic sample data: /home/hoky/Quants-agent/LuminaQuant/.omx/team/execute-the-approved-56afab4e/worktrees/worker-2/data/ETHUSDT.csv
+[INFO] Running minimum viable backtest: /home/hoky/Quants-agent/LuminaQuant/.omx/team/execute-the-approved-56afab4e/worktrees/worker-2/.venv/bin/python3 -m lumina_quant.cli.main backtest --data-mode legacy --data-source csv --backtest-mode legacy_batch --no-auto-collect-db --run-id minimum-viable-run

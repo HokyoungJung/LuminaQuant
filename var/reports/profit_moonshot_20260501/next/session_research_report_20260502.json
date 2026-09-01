@@ -1,0 +1,58 @@
+{
+  "artifact_kind": "profit_moonshot_session_research_report",
+  "best_conservative_summary_candidate": "profit_moonshot_adaptive_momentum_mode",
+  "best_robust_session_candidate": "profit_moonshot_adaptive_momentum_120_mode",
+  "best_validation_return_candidate": "profit_moonshot_adaptive_momentum_boost_mode",
+  "candidates": {
+    "profit_moonshot_adaptive_momentum_120_mode": {
+      "liquidations": 0,
+      "max_rss_kb": 4567432,
+      "outcome": "beats_baseline_and_safer_than_boost",
+      "train_max_drawdown": 0.14457369593340472,
+      "train_total_return": -0.022339168195988912,
+      "train_trades": 359,
+      "val_max_drawdown": 0.009255563131348048,
+      "val_sharpe": 0.012556757769611515,
+      "val_sortino": 0.012179098934625808,
+      "val_total_return": 0.0032916355775012285,
+      "val_trades": 52
+    },
+    "profit_moonshot_adaptive_momentum_130_mode": {
+      "liquidations": 0,
+      "max_rss_kb": 5787492,
+      "outcome": "beats_baseline_but_train_mdd_above_strict_cap",
+      "train_max_drawdown": 0.15676295344164706,
+      "train_total_return": -0.024063860859136144,
+      "train_trades": 360,
+      "val_max_drawdown": 0.010621922547171175,
+      "val_sharpe": 0.011466575559780947,
+      "val_sortino": 0.01116496239437976,
+      "val_total_return": 0.0033209910066693826,
+      "val_trades": 53
+    },
+    "profit_moonshot_adaptive_momentum_governed_mode": {
+      "liquidations": 0,
+      "max_rss_kb": 5799048,
+      "outcome": "train_robust_but_fails_baseline_val_return",
+      "train_max_drawdown": 0.14847093891676402,
+      "train_total_return": 0.019279708685379537,
+      "train_trades": 278,
+      "val_max_drawdown": 0.011606250613455346,
+      "val_sharpe": 0.006028569126427771,
+      "val_sortino": 0.0058976557549377286,
+      "val_total_return": 0.0016946051530455364,
+      "val_trades": 51
+    }
+  },
+  "deployment_ready": false,
+  "generated_at": "2026-05-02T06:29:00Z",
+  "source_urls": [
+    "https://www.nber.org/papers/w22208",
+    "https://www.sciencedirect.com/science/article/pii/S1062940821000590",
+    "https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4138685",
+    "https://developers.binance.com/docs/derivatives/usds-margined-futures/market-data/rest-api/Get-Funding-Rate-History",
+    "https://developers.binance.com/docs/derivatives/usds-margined-futures/market-data/rest-api/Open-Interest-Statistics",
+    "https://developers.binance.com/docs/derivatives/usds-margined-futures/market-data/rest-api/All-Force-Orders",
+    "https://arxiv.org/abs/2310.14973"
+  ]
+}

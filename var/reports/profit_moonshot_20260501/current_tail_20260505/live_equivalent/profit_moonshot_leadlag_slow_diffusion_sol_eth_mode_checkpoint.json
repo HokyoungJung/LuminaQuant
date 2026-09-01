@@ -1,0 +1,65 @@
+{
+  "artifact_kind": "live_equivalent_backtest_checkpoint",
+  "split_results": {
+    "profit_moonshot_leadlag_slow_diffusion_sol_eth_mode": {
+      "oos": {
+        "equivalence_key": "295fe75125c601f6f7a93680658fb3dfde66f087a8c0f3bb41b22ecdfa1fa9b3",
+        "final_equity": 9963.703585061412,
+        "liquidation_count": 0,
+        "metrics": {
+          "cagr": -9.78774112092573e-06,
+          "calmar": -0.0010199708545749887,
+          "max_drawdown": 0.009596098826769105,
+          "sharpe": -0.024121778891976798,
+          "sortino": -0.025617787062131286,
+          "total_return": -0.0036288254938589004,
+          "volatility": 0.000402409119068304
+        },
+        "mode": "profit_moonshot_leadlag_slow_diffusion_sol_eth_mode",
+        "source_mode": "profit_moonshot_leadlag_slow_diffusion_sol_eth_mode",
+        "split": "oos",
+        "status": "completed",
+        "trade_count": 34
+      },
+      "train": {
+        "equivalence_key": "295fe75125c601f6f7a93680658fb3dfde66f087a8c0f3bb41b22ecdfa1fa9b3",
+        "final_equity": 10880.689782295123,
+        "liquidation_count": 0,
+        "metrics": {
+          "cagr": 4.058067766110618e-05,
+          "calmar": 0.00020656737160926528,
+          "max_drawdown": 0.19645250527690789,
+          "sharpe": 0.009018835160124304,
+          "sortino": 0.009648387494059106,
+          "total_return": 0.08807557222951234,
+          "volatility": 0.00811568299822643
+        },
+        "mode": "profit_moonshot_leadlag_slow_diffusion_sol_eth_mode",
+        "source_mode": "profit_moonshot_leadlag_slow_diffusion_sol_eth_mode",
+        "split": "train",
+        "status": "completed",
+        "trade_count": 354
+      },
+      "val": {
+        "equivalence_key": "295fe75125c601f6f7a93680658fb3dfde66f087a8c0f3bb41b22ecdfa1fa9b3",
+        "final_equity": 10044.798188271217,
+        "liquidation_count": 0,
+        "metrics": {
+          "cagr": 1.3191250867850002e-05,
+          "calmar": 0.0005215378425535267,
+          "max_drawdown": 0.025292988909996785,
+          "sharpe": 0.007668301285830219,
+          "sortino": 0.007818244330184555,
+          "total_return": 0.004456684827121693,
+          "volatility": 0.00197433211098783
+        },
+        "mode": "profit_moonshot_leadlag_slow_diffusion_sol_eth_mode",
+        "source_mode": "profit_moonshot_leadlag_slow_diffusion_sol_eth_mode",
+        "split": "val",
+        "status": "completed",
+        "trade_count": 54
+      }
+    }
+  },
+  "updated_at": "2026-05-05T08:51:44.706555Z"
+}

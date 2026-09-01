@@ -1,0 +1,81 @@
+{
+  "artifact_kind": "precious_metal_pair_available_window_backtest",
+  "mode": "profit_moonshot_precious_metal_pair_aggressive_mode",
+  "symbols": [
+    "XAU/USDT",
+    "XAG/USDT",
+    "XPT/USDT",
+    "XPD/USDT"
+  ],
+  "data_contract": "legacy-windowed common-overlap evidence; raw-first live-equivalent train/val gate is handled separately",
+  "window": {
+    "start": "2026-01-30T10:15:00+00:00",
+    "end": "2026-03-07T11:00:00+00:00"
+  },
+  "splits": {
+    "train": {
+      "start": "2026-01-30T10:15:00+00:00",
+      "end": "2026-02-15T00:00:00+00:00",
+      "history_points": 1,
+      "metrics": {
+        "total_return": 0.0,
+        "sharpe": 0.0,
+        "sortino": 0.0,
+        "max_drawdown": 0.0,
+        "volatility": 0.0,
+        "cagr": 0.0,
+        "calmar": 0.0
+      },
+      "trade_count": 0
+    },
+    "val": {
+      "start": "2026-02-15T00:00:00+00:00",
+      "end": "2026-03-01T00:00:00+00:00",
+      "history_points": 0,
+      "metrics": {
+        "total_return": 0.0,
+        "sharpe": 0.0,
+        "sortino": 0.0,
+        "max_drawdown": 0.0,
+        "volatility": 0.0,
+        "cagr": 0.0,
+        "calmar": 0.0
+      },
+      "trade_count": 0
+    },
+    "oos": {
+      "start": "2026-03-01T00:00:00+00:00",
+      "end": "2026-03-07T11:00:00+00:00",
+      "history_points": 0,
+      "metrics": {
+        "total_return": 0.0,
+        "sharpe": 0.0,
+        "sortino": 0.0,
+        "max_drawdown": 0.0,
+        "volatility": 0.0,
+        "cagr": 0.0,
+        "calmar": 0.0
+      },
+      "trade_count": 0
+    }
+  },
+  "full_window": {
+    "history_points": 1828,
+    "metrics": {
+      "total_return": -0.007472576595907832,
+      "sharpe": -0.5395979249664958,
+      "sortino": -0.3528510305780931,
+      "max_drawdown": 0.00819284801495779,
+      "volatility": 0.0019138934308091118,
+      "cagr": -0.001034035522465393,
+      "calmar": -0.12621197422160657
+    },
+    "trade_count": 245,
+    "final_equity": 9878.177680382663,
+    "liquidation_count": 0
+  },
+  "notes": [
+    "Runs one portfolio mode only, all four metals included via XAU/XAG and XPT/XPD components.",
+    "Split metrics are computed from a continuous warm-up run and sliced by timestamp to avoid OOS warm-up starvation on the short metals overlap."
+  ]
+}

@@ -1,0 +1,304 @@
+{
+  "artifact_kind": "worker3_manifest_feasibility",
+  "example_manifest_minimal_instance": {
+    "classification_target": "eligible_control_candidate",
+    "locked_oos_role": "gate_report_only_after_candidate_freeze",
+    "manifest_kind": "immutable_alpha_research_preflight",
+    "manifest_version": 1,
+    "objective_inputs": [
+      "train",
+      "validation"
+    ],
+    "one_hundred_pct_threshold_in_objective": false,
+    "paper_testnet_only": true,
+    "ready_for_real": false,
+    "real_money_execution": false,
+    "run_id": "<iso8601>-<hypothesis_id>-<short_git_sha>",
+    "selection_inputs": [
+      "train",
+      "validation"
+    ],
+    "split_contract": "train_validation_fit_selection_locked_oos_post_freeze_gate_only",
+    "uses_locked_oos_for_objective": false,
+    "uses_locked_oos_for_parameter_fitting": false,
+    "uses_locked_oos_for_pruning": false,
+    "uses_locked_oos_for_selection": false
+  },
+  "feasibility_decision": {
+    "existing_supporting_surfaces": [
+      {
+        "evidence": "Lines 14-16 and 1379-1405 already encode train/validation-only selection plus locked-OOS false flags.",
+        "path": "scripts/research/run_alpha_zoo_integer_leverage_optuna_hybrid_decision.py"
+      },
+      {
+        "evidence": "Lines 13-15 and 1326-1330 preserve fixed inputs and locked-OOS exclusion from selection/pruning.",
+        "path": "scripts/research/run_profit_moonshot_hybrid_v35_v36_fixed_inputs.py"
+      },
+      {
+        "evidence": "Lines 2-7 define post-freeze locked-OOS replay and overlap failure behavior.",
+        "path": "scripts/research/run_alpha_zoo_69_asset_clean_oos_gate.py"
+      },
+      {
+        "evidence": "Lines 17-22 centralize locked-OOS search flags as false.",
+        "path": "src/lumina_quant/optimization/search_policy.py"
+      },
+      {
+        "evidence": "Lines 280-300 reject Optuna artifacts with any locked-OOS policy flag set true.",
+        "path": "src/lumina_quant/alpha_zoo/optuna_hybrid_config.py"
+      },
+      {
+        "evidence": "Lines 141-159 surface validation-only parameter provenance or warn when metadata is absent.",
+        "path": "src/lumina_quant/cli/backtest.py"
+      }
+    ],
+    "feasibility_label": "feasible_with_manifest_gate_before_any_eligible_control_claim",
+    "implementation_needed": true,
+    "implementation_needed_before": "any new candidate can be classified eligible_control or live-promotable",
+    "implementation_not_needed_for": "current audit artifact delivery and report-only/static feasibility classification",
+    "minimum_implementation": [
+      "Add a small immutable manifest writer/validator to the selected runner entrypoint or wrapper.",
+      "Write the manifest before optimization starts and freeze its canonical JSON sha256 in the result payload.",
+      "Fail closed if locked_oos/test fields enter discovery, objective, pruning, warmup, fitting, selection, or tie-break inputs.",
+      "Fail closed if a 100pct annualized-return threshold appears in objective, pruning, Optuna sampler/search constraints, promotion gates, or tie-breaks."
+    ],
+    "runner_backtest_feasible": true
+  },
+  "generated_at_utc": "2026-06-07T07:02:00Z",
+  "goal_reference": ".omx/ultragoal G002-contamination-and-eligibility-audit",
+  "hard_search_constraints": {
+    "allowed_optimization_input_splits": [
+      "train",
+      "validation"
+    ],
+    "forbidden_field_patterns": [
+      "locked_oos.*(objective|score|rank|select|tie|prun|fit|warmup|discover)",
+      "oos.*(objective|score|rank|select|tie|prun|fit|warmup|discover)",
+      "test.*(objective|score|rank|select|tie|prun|fit|warmup|discover)"
+    ],
+    "forbidden_locked_oos_uses": [
+      "candidate_discovery",
+      "objective",
+      "pruning",
+      "warmup_or_initial_state_learning",
+      "parameter_fitting_before_selection",
+      "selection",
+      "tie_break",
+      "search_space_expansion",
+      "promotion_threshold_design"
+    ],
+    "hybrid_optuna_policy": {
+      "fit_inputs": [
+        "train",
+        "validation"
+      ],
+      "locked_oos_metrics_available_to_pruner": false,
+      "locked_oos_metrics_available_to_sampler": false,
+      "locked_oos_metrics_available_to_selector": false,
+      "post_freeze_clean_oos_gate_required": true,
+      "score_inputs": [
+        "train",
+        "validation"
+      ]
+    },
+    "locked_oos_allowed_only_for": [
+      "post_freeze_gate",
+      "post_freeze_report",
+      "shadow_monitoring"
+    ],
+    "one_hundred_pct_threshold_policy": {
+      "optuna_objective": "forbidden",
+      "promotion_gate": "forbidden_for_current_audit",
+      "reporting_context": "allowed_only_as_non_decision_context_if_labeled_report_only",
+      "selector_objective": "forbidden",
+      "tie_break": "forbidden"
+    },
+    "required_false_flags": {
+      "uses_locked_oos_for_discovery": false,
+      "uses_locked_oos_for_objective": false,
+      "uses_locked_oos_for_parameter_fitting": false,
+      "uses_locked_oos_for_pruning": false,
+      "uses_locked_oos_for_selection": false
+    }
+  },
+  "immutable_manifest_required_fields": {
+    "code_and_source_freeze": [
+      "git_commit",
+      "git_dirty_status",
+      "repo_root",
+      "source_file_hashes_sha256",
+      "external_reference_hashes_sha256_or_unavailable_reason",
+      "dependency_lock_hashes",
+      "config_file_hashes_sha256",
+      "container_or_python_env_fingerprint"
+    ],
+    "command_and_output_ledger": [
+      "cwd",
+      "commands_ordered",
+      "environment_overrides",
+      "input_artifact_paths",
+      "output_artifact_paths",
+      "trial_ledger_paths",
+      "memory_guard_paths",
+      "stdout_stderr_log_paths",
+      "output_hashes_sha256",
+      "manifest_payload_sha256"
+    ],
+    "cost_metric_and_label_contract": [
+      "primary_cost_bps",
+      "sensitivity_cost_bps",
+      "fee_model",
+      "slippage_model",
+      "turnover_definition",
+      "return_per_turnover_definition",
+      "liquidation_model",
+      "margin_mode",
+      "metrics_required_by_split",
+      "promotion_gate_inputs",
+      "labels_allowed",
+      "ready_for_real",
+      "real_money_execution",
+      "paper_testnet_only"
+    ],
+    "hypothesis_freeze": [
+      "hypothesis_id",
+      "thesis_text",
+      "strategy_family",
+      "research_question",
+      "admissibility_label_at_start",
+      "allowed_decision_use",
+      "forbidden_decision_use",
+      "prior_artifact_dependencies_with_roles"
+    ],
+    "identity": [
+      "manifest_version",
+      "manifest_kind",
+      "manifest_id",
+      "created_at_utc",
+      "created_by",
+      "team_task_id",
+      "goal_reference",
+      "run_id",
+      "parent_manifest_id_or_null",
+      "classification_target"
+    ],
+    "search_and_selection_contract": [
+      "search_method",
+      "optimizer",
+      "search_space_name",
+      "search_space_hash",
+      "parameter_bounds",
+      "max_trials_or_candidate_count",
+      "sampler_seed",
+      "all_random_seeds",
+      "n_jobs_or_parallelism",
+      "objective_formula",
+      "objective_inputs",
+      "warmup_fit_inputs",
+      "parameter_fit_inputs",
+      "selection_inputs",
+      "tie_break_inputs",
+      "pruning_inputs",
+      "forbidden_input_fields",
+      "bounded_grid_justification",
+      "locked_oos_search_flags",
+      "one_hundred_pct_threshold_policy"
+    ],
+    "split_freeze": [
+      "split_contract",
+      "train_start_utc",
+      "train_end_utc",
+      "validation_start_utc",
+      "validation_end_utc",
+      "locked_oos_start_utc",
+      "locked_oos_end_utc",
+      "split_timezone",
+      "split_generator_code_hash",
+      "split_overlap_checks",
+      "locked_oos_role"
+    ],
+    "universe_freeze": [
+      "universe_id",
+      "symbol_list_ordered",
+      "symbol_count",
+      "inclusion_rules",
+      "exclusion_rules",
+      "exchange_or_market_scope",
+      "timeframes",
+      "data_source_manifests",
+      "data_cutoff_utc",
+      "data_coverage_summary",
+      "timestamp_index_hash"
+    ],
+    "validation_contract": [
+      "static_scan_results",
+      "artifact_assertion_results",
+      "targeted_tests",
+      "typecheck_or_compile_results",
+      "lint_results",
+      "regression_checks",
+      "known_gaps"
+    ]
+  },
+  "repository_state": {
+    "dirty_before_lane_outputs": false,
+    "dirty_status_before_lane_outputs": [],
+    "git_commit": "f9da35e126234f05f5fc223a99b1f1b5fa4c5845",
+    "manifest_payload_sha256": "bcd9d6d9b0a0c916f37c3be843583fa6e0b425e66f2c2bfcafcacce98577dfc9",
+    "source_hashes_sha256": {
+      "scripts/research/run_alpha_zoo_69_asset_clean_oos_gate.py": "b2c51ae3b7af6f4e6871b3645297728049b4b39590b069f56bd33e706bbd1da7",
+      "scripts/research/run_alpha_zoo_69_asset_monthly_refit_walkforward.py": "73c6211004d93082d96c1504e599fb959197fb4129f841c855f3d3022a11936b",
+      "scripts/research/run_alpha_zoo_integer_leverage_optuna_hybrid_decision.py": "e87fc87e97638a5f610ad1c6fe17ad72b5bc57851e81dcfde7f0e1897670b7bb",
+      "scripts/research/run_profit_moonshot_hybrid_v35_v36_fixed_inputs.py": "1e617e0372a0bfbd3dc67c4637514af553000fd5e3482143255e67103c5c2234",
+      "src/lumina_quant/alpha_zoo/optuna_hybrid_config.py": "cb73a2f56290758fa4d4ce4502884bafa996c444c31b45ab380bdc80da76f08b",
+      "src/lumina_quant/cli/backtest.py": "97965f519df5dc48f2fa05a9060fd5ab0610df9434f8d109e405992fe199d81a",
+      "src/lumina_quant/optimization/search_policy.py": "8875f3348ef29b91ab8f7ef0c98f9db2e3072c9fe36d0cf09a2382a327ce7d80",
+      "tests/test_alpha_zoo_10bps_full_retune_artifact_assertions.py": "aec0cc181d662106ac1e854fde808e65aaa279b8229c5c4c8e5cdacec43d8d19",
+      "tests/test_optimization_search_policy.py": "1c61bd29ddb7ca5e07352a0e047d076177fbea218259d0fc6d22337059a6857e"
+    }
+  },
+  "runner_backtest_feasibility": {
+    "backtest_candidate": "existing post-freeze clean OOS gate/backtest replay surfaces",
+    "can_run_without_new_heavy_architecture": true,
+    "contamination_risk": "medium until manifest validator is wired into runner output; low after fail-closed validator checks false flags and field patterns",
+    "data_risk": "must freeze universe/source manifests and timestamp_index_hash before search",
+    "memory_risk": "bounded if existing runner memory guards and one-heavy-process discipline are preserved",
+    "recommended_followup_patch_scope": [
+      "Add lumina_quant research manifest utility with canonical JSON hashing.",
+      "Add runner option --immutable-manifest-out and write preflight manifest before Optuna starts.",
+      "Add artifact assertion test that corrupts locked_oos/100pct fields and expects fail-closed validation."
+    ],
+    "runner_candidate": "existing Optuna/hybrid research runner plus immutable-manifest preflight wrapper"
+  },
+  "schema_version": "1.0",
+  "scope": {
+    "core_code_changes_made": false,
+    "deliverables": [
+      "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/clean_100pct_live_strategy_search_20260607/team_lanes/worker3_manifest_feasibility.md",
+      "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/clean_100pct_live_strategy_search_20260607/team_lanes/worker3_manifest_feasibility.json"
+    ],
+    "lane": "Lane 3 immutable manifest and runner feasibility",
+    "leader_clarification_applied": {
+      "instruction": "Write artifacts only under var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/clean_100pct_live_strategy_search_20260607/team_lanes/.",
+      "message_id": "587f766f-d0a5-45a3-ab3d-e192c2ccb6e0"
+    },
+    "reason_core_code_not_changed": "Task scope asks for manifest/runner feasibility artifacts. Core runner changes would touch shared scripts outside the lane output scope and should be scheduled only after leader review.",
+    "supersedes_wrong_initial_paths": [
+      "team_lanes/worker3_manifest_feasibility.md",
+      "team_lanes/worker3_manifest_feasibility.json"
+    ]
+  },
+  "subagent_delegation": {
+    "serial_searches_before_skip": 2,
+    "skip_reason": "Available native subagent tool surface did not expose required agent_type/model fields; using it would violate the OMX instruction to set agent_type and the task request for gpt-5.4-mini. Local scoped probe was safer.",
+    "subagent_model_requested_by_task": "gpt-5.4-mini",
+    "subagents_spawned": 0
+  },
+  "task_id": "5",
+  "team": "clean-100pct-live-tar-4a549153",
+  "verification_plan_for_future_implementation": [
+    "Run static scan for forbidden locked_oos/oos/test decision-field patterns in emitted manifest and result payload.",
+    "Mutate emitted manifest to set uses_locked_oos_for_selection=true and require validator failure.",
+    "Mutate objective formula to include annualized_return >= 1.0 and require validator failure.",
+    "Run targeted artifact assertion tests plus py_compile for changed runner/utility files."
+  ]
+}

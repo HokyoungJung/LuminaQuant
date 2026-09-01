@@ -1,0 +1,2025 @@
+{
+  "artifact_kind": "g005_walkforward_evaluation_candidate_manifest_1h_chunk",
+  "candidate_count": 40,
+  "candidate_manifest_sha256": "1292498b3b729038c74932175a12d910fc4351b2feb3bbfc95f827517e423efe",
+  "candidate_offset_end": 200,
+  "candidate_offset_start": 161,
+  "candidate_set_sha256": "01ca7a5c04b490b5472a62b49d0fcc7d432f0e2045c0e6fae9b1bfcb079a0564",
+  "candidates": [
+    {
+      "candidate_id": "799259957d656a7a",
+      "family": "trend",
+      "metadata": {
+        "allow_short": true,
+        "decision_cadence_seconds": 3600,
+        "family": "trend",
+        "retune_profile": "core_ls",
+        "symbol_scope": "BNB/USDT",
+        "timeframe": "1h"
+      },
+      "name": "adaptive_trend_rider_1h_core_ls_bnbusdt_3.2",
+      "notes": "Per-symbol KAMA/efficiency-confirmed adaptive-trend rider that rides winners with an ATR trailing stop and pyramids into continuation for high compound return on BNB/USDT at 1h (core_ls).",
+      "params": {
+        "add_alloc_fraction": 0.5,
+        "add_step_atr": 1.0,
+        "allow_short": true,
+        "atr_period": 14,
+        "kama_fast": 2,
+        "kama_period": 12,
+        "kama_slow": 30,
+        "max_adds": 3,
+        "max_hold_bars": 180,
+        "min_efficiency": 0.3,
+        "slope_lookback": 3,
+        "target_vol": 0.02,
+        "trail_atr_mult": 3.2,
+        "vol_window": 48
+      },
+      "strategy": "AdaptiveTrendRiderStrategy",
+      "strategy_class": "AdaptiveTrendRiderStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "BNB/USDT"
+      ],
+      "tags": [
+        "trend",
+        "return_rider",
+        "trailing_stop",
+        "pyramiding",
+        "single_asset",
+        "crypto"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "c73225e23215aa7c",
+      "family": "trend",
+      "metadata": {
+        "allow_short": true,
+        "decision_cadence_seconds": 3600,
+        "family": "trend",
+        "retune_profile": "core_ls",
+        "symbol_scope": "TRX/USDT",
+        "timeframe": "1h"
+      },
+      "name": "adaptive_trend_rider_1h_core_ls_trxusdt_3.2",
+      "notes": "Per-symbol KAMA/efficiency-confirmed adaptive-trend rider that rides winners with an ATR trailing stop and pyramids into continuation for high compound return on TRX/USDT at 1h (core_ls).",
+      "params": {
+        "add_alloc_fraction": 0.5,
+        "add_step_atr": 1.0,
+        "allow_short": true,
+        "atr_period": 14,
+        "kama_fast": 2,
+        "kama_period": 12,
+        "kama_slow": 30,
+        "max_adds": 3,
+        "max_hold_bars": 180,
+        "min_efficiency": 0.3,
+        "slope_lookback": 3,
+        "target_vol": 0.02,
+        "trail_atr_mult": 3.2,
+        "vol_window": 48
+      },
+      "strategy": "AdaptiveTrendRiderStrategy",
+      "strategy_class": "AdaptiveTrendRiderStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "TRX/USDT"
+      ],
+      "tags": [
+        "trend",
+        "return_rider",
+        "trailing_stop",
+        "pyramiding",
+        "single_asset",
+        "crypto"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "79c0eb2d81851568",
+      "family": "trend",
+      "metadata": {
+        "allow_short": true,
+        "decision_cadence_seconds": 3600,
+        "family": "trend",
+        "retune_profile": "core_ls",
+        "symbol_scope": "XRP/USDT",
+        "timeframe": "1h"
+      },
+      "name": "adaptive_trend_rider_1h_core_ls_xrpusdt_3.2",
+      "notes": "Per-symbol KAMA/efficiency-confirmed adaptive-trend rider that rides winners with an ATR trailing stop and pyramids into continuation for high compound return on XRP/USDT at 1h (core_ls).",
+      "params": {
+        "add_alloc_fraction": 0.5,
+        "add_step_atr": 1.0,
+        "allow_short": true,
+        "atr_period": 14,
+        "kama_fast": 2,
+        "kama_period": 12,
+        "kama_slow": 30,
+        "max_adds": 3,
+        "max_hold_bars": 180,
+        "min_efficiency": 0.3,
+        "slope_lookback": 3,
+        "target_vol": 0.02,
+        "trail_atr_mult": 3.2,
+        "vol_window": 48
+      },
+      "strategy": "AdaptiveTrendRiderStrategy",
+      "strategy_class": "AdaptiveTrendRiderStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "XRP/USDT"
+      ],
+      "tags": [
+        "trend",
+        "return_rider",
+        "trailing_stop",
+        "pyramiding",
+        "single_asset",
+        "crypto"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "57b735839ad67bd6",
+      "family": "trend",
+      "metadata": {
+        "allow_short": true,
+        "decision_cadence_seconds": 3600,
+        "family": "trend",
+        "retune_profile": "core_ls",
+        "symbol_scope": "DOGE/USDT",
+        "timeframe": "1h"
+      },
+      "name": "adaptive_trend_rider_1h_core_ls_dogeusdt_3.2",
+      "notes": "Per-symbol KAMA/efficiency-confirmed adaptive-trend rider that rides winners with an ATR trailing stop and pyramids into continuation for high compound return on DOGE/USDT at 1h (core_ls).",
+      "params": {
+        "add_alloc_fraction": 0.5,
+        "add_step_atr": 1.0,
+        "allow_short": true,
+        "atr_period": 14,
+        "kama_fast": 2,
+        "kama_period": 12,
+        "kama_slow": 30,
+        "max_adds": 3,
+        "max_hold_bars": 180,
+        "min_efficiency": 0.3,
+        "slope_lookback": 3,
+        "target_vol": 0.02,
+        "trail_atr_mult": 3.2,
+        "vol_window": 48
+      },
+      "strategy": "AdaptiveTrendRiderStrategy",
+      "strategy_class": "AdaptiveTrendRiderStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "DOGE/USDT"
+      ],
+      "tags": [
+        "trend",
+        "return_rider",
+        "trailing_stop",
+        "pyramiding",
+        "single_asset",
+        "crypto"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "0a83eefdbcef25d9",
+      "family": "trend",
+      "metadata": {
+        "allow_short": true,
+        "decision_cadence_seconds": 3600,
+        "family": "trend",
+        "retune_profile": "core_ls",
+        "symbol_scope": "ADA/USDT",
+        "timeframe": "1h"
+      },
+      "name": "adaptive_trend_rider_1h_core_ls_adausdt_3.2",
+      "notes": "Per-symbol KAMA/efficiency-confirmed adaptive-trend rider that rides winners with an ATR trailing stop and pyramids into continuation for high compound return on ADA/USDT at 1h (core_ls).",
+      "params": {
+        "add_alloc_fraction": 0.5,
+        "add_step_atr": 1.0,
+        "allow_short": true,
+        "atr_period": 14,
+        "kama_fast": 2,
+        "kama_period": 12,
+        "kama_slow": 30,
+        "max_adds": 3,
+        "max_hold_bars": 180,
+        "min_efficiency": 0.3,
+        "slope_lookback": 3,
+        "target_vol": 0.02,
+        "trail_atr_mult": 3.2,
+        "vol_window": 48
+      },
+      "strategy": "AdaptiveTrendRiderStrategy",
+      "strategy_class": "AdaptiveTrendRiderStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "ADA/USDT"
+      ],
+      "tags": [
+        "trend",
+        "return_rider",
+        "trailing_stop",
+        "pyramiding",
+        "single_asset",
+        "crypto"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "a265bfc797431189",
+      "family": "trend",
+      "metadata": {
+        "allow_short": true,
+        "decision_cadence_seconds": 3600,
+        "family": "trend",
+        "retune_profile": "core_ls",
+        "symbol_scope": "AVAX/USDT",
+        "timeframe": "1h"
+      },
+      "name": "adaptive_trend_rider_1h_core_ls_avaxusdt_3.2",
+      "notes": "Per-symbol KAMA/efficiency-confirmed adaptive-trend rider that rides winners with an ATR trailing stop and pyramids into continuation for high compound return on AVAX/USDT at 1h (core_ls).",
+      "params": {
+        "add_alloc_fraction": 0.5,
+        "add_step_atr": 1.0,
+        "allow_short": true,
+        "atr_period": 14,
+        "kama_fast": 2,
+        "kama_period": 12,
+        "kama_slow": 30,
+        "max_adds": 3,
+        "max_hold_bars": 180,
+        "min_efficiency": 0.3,
+        "slope_lookback": 3,
+        "target_vol": 0.02,
+        "trail_atr_mult": 3.2,
+        "vol_window": 48
+      },
+      "strategy": "AdaptiveTrendRiderStrategy",
+      "strategy_class": "AdaptiveTrendRiderStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "AVAX/USDT"
+      ],
+      "tags": [
+        "trend",
+        "return_rider",
+        "trailing_stop",
+        "pyramiding",
+        "single_asset",
+        "crypto"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "68783ab9621f62f4",
+      "family": "breakout",
+      "metadata": {
+        "allow_short": true,
+        "decision_cadence_seconds": 3600,
+        "family": "breakout",
+        "retune_profile": "core_ls",
+        "symbol_scope": "BTC/USDT",
+        "timeframe": "1h"
+      },
+      "name": "volatility_breakout_rider_1h_core_ls_btcusdt_24",
+      "notes": "Per-symbol Donchian breakout rider confirmed by ATR expansion that rides the move with an ATR trailing stop and pyramids on follow-through to capture explosive range expansions on BTC/USDT at 1h (core_ls).",
+      "params": {
+        "add_alloc_fraction": 0.5,
+        "add_step_atr": 1.0,
+        "allow_short": true,
+        "atr_baseline_window": 60,
+        "atr_expansion_mult": 1.1,
+        "atr_period": 14,
+        "donchian_window": 24,
+        "max_adds": 3,
+        "max_hold_bars": 180,
+        "target_vol": 0.02,
+        "trail_atr_mult": 3.5,
+        "vol_window": 48
+      },
+      "strategy": "VolatilityBreakoutRiderStrategy",
+      "strategy_class": "VolatilityBreakoutRiderStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "BTC/USDT"
+      ],
+      "tags": [
+        "breakout",
+        "return_rider",
+        "trailing_stop",
+        "pyramiding",
+        "single_asset",
+        "crypto"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "68b501ff925ec29f",
+      "family": "breakout",
+      "metadata": {
+        "allow_short": true,
+        "decision_cadence_seconds": 3600,
+        "family": "breakout",
+        "retune_profile": "core_ls",
+        "symbol_scope": "ETH/USDT",
+        "timeframe": "1h"
+      },
+      "name": "volatility_breakout_rider_1h_core_ls_ethusdt_24",
+      "notes": "Per-symbol Donchian breakout rider confirmed by ATR expansion that rides the move with an ATR trailing stop and pyramids on follow-through to capture explosive range expansions on ETH/USDT at 1h (core_ls).",
+      "params": {
+        "add_alloc_fraction": 0.5,
+        "add_step_atr": 1.0,
+        "allow_short": true,
+        "atr_baseline_window": 60,
+        "atr_expansion_mult": 1.1,
+        "atr_period": 14,
+        "donchian_window": 24,
+        "max_adds": 3,
+        "max_hold_bars": 180,
+        "target_vol": 0.02,
+        "trail_atr_mult": 3.5,
+        "vol_window": 48
+      },
+      "strategy": "VolatilityBreakoutRiderStrategy",
+      "strategy_class": "VolatilityBreakoutRiderStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "ETH/USDT"
+      ],
+      "tags": [
+        "breakout",
+        "return_rider",
+        "trailing_stop",
+        "pyramiding",
+        "single_asset",
+        "crypto"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "46e8aeea16fb2845",
+      "family": "breakout",
+      "metadata": {
+        "allow_short": true,
+        "decision_cadence_seconds": 3600,
+        "family": "breakout",
+        "retune_profile": "core_ls",
+        "symbol_scope": "SOL/USDT",
+        "timeframe": "1h"
+      },
+      "name": "volatility_breakout_rider_1h_core_ls_solusdt_24",
+      "notes": "Per-symbol Donchian breakout rider confirmed by ATR expansion that rides the move with an ATR trailing stop and pyramids on follow-through to capture explosive range expansions on SOL/USDT at 1h (core_ls).",
+      "params": {
+        "add_alloc_fraction": 0.5,
+        "add_step_atr": 1.0,
+        "allow_short": true,
+        "atr_baseline_window": 60,
+        "atr_expansion_mult": 1.1,
+        "atr_period": 14,
+        "donchian_window": 24,
+        "max_adds": 3,
+        "max_hold_bars": 180,
+        "target_vol": 0.02,
+        "trail_atr_mult": 3.5,
+        "vol_window": 48
+      },
+      "strategy": "VolatilityBreakoutRiderStrategy",
+      "strategy_class": "VolatilityBreakoutRiderStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "SOL/USDT"
+      ],
+      "tags": [
+        "breakout",
+        "return_rider",
+        "trailing_stop",
+        "pyramiding",
+        "single_asset",
+        "crypto"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "ee540f9a6f0d9a91",
+      "family": "breakout",
+      "metadata": {
+        "allow_short": true,
+        "decision_cadence_seconds": 3600,
+        "family": "breakout",
+        "retune_profile": "core_ls",
+        "symbol_scope": "BNB/USDT",
+        "timeframe": "1h"
+      },
+      "name": "volatility_breakout_rider_1h_core_ls_bnbusdt_24",
+      "notes": "Per-symbol Donchian breakout rider confirmed by ATR expansion that rides the move with an ATR trailing stop and pyramids on follow-through to capture explosive range expansions on BNB/USDT at 1h (core_ls).",
+      "params": {
+        "add_alloc_fraction": 0.5,
+        "add_step_atr": 1.0,
+        "allow_short": true,
+        "atr_baseline_window": 60,
+        "atr_expansion_mult": 1.1,
+        "atr_period": 14,
+        "donchian_window": 24,
+        "max_adds": 3,
+        "max_hold_bars": 180,
+        "target_vol": 0.02,
+        "trail_atr_mult": 3.5,
+        "vol_window": 48
+      },
+      "strategy": "VolatilityBreakoutRiderStrategy",
+      "strategy_class": "VolatilityBreakoutRiderStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "BNB/USDT"
+      ],
+      "tags": [
+        "breakout",
+        "return_rider",
+        "trailing_stop",
+        "pyramiding",
+        "single_asset",
+        "crypto"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "5230968c056c870e",
+      "family": "breakout",
+      "metadata": {
+        "allow_short": true,
+        "decision_cadence_seconds": 3600,
+        "family": "breakout",
+        "retune_profile": "core_ls",
+        "symbol_scope": "TRX/USDT",
+        "timeframe": "1h"
+      },
+      "name": "volatility_breakout_rider_1h_core_ls_trxusdt_24",
+      "notes": "Per-symbol Donchian breakout rider confirmed by ATR expansion that rides the move with an ATR trailing stop and pyramids on follow-through to capture explosive range expansions on TRX/USDT at 1h (core_ls).",
+      "params": {
+        "add_alloc_fraction": 0.5,
+        "add_step_atr": 1.0,
+        "allow_short": true,
+        "atr_baseline_window": 60,
+        "atr_expansion_mult": 1.1,
+        "atr_period": 14,
+        "donchian_window": 24,
+        "max_adds": 3,
+        "max_hold_bars": 180,
+        "target_vol": 0.02,
+        "trail_atr_mult": 3.5,
+        "vol_window": 48
+      },
+      "strategy": "VolatilityBreakoutRiderStrategy",
+      "strategy_class": "VolatilityBreakoutRiderStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "TRX/USDT"
+      ],
+      "tags": [
+        "breakout",
+        "return_rider",
+        "trailing_stop",
+        "pyramiding",
+        "single_asset",
+        "crypto"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "26eab553b7caa050",
+      "family": "breakout",
+      "metadata": {
+        "allow_short": true,
+        "decision_cadence_seconds": 3600,
+        "family": "breakout",
+        "retune_profile": "core_ls",
+        "symbol_scope": "XRP/USDT",
+        "timeframe": "1h"
+      },
+      "name": "volatility_breakout_rider_1h_core_ls_xrpusdt_24",
+      "notes": "Per-symbol Donchian breakout rider confirmed by ATR expansion that rides the move with an ATR trailing stop and pyramids on follow-through to capture explosive range expansions on XRP/USDT at 1h (core_ls).",
+      "params": {
+        "add_alloc_fraction": 0.5,
+        "add_step_atr": 1.0,
+        "allow_short": true,
+        "atr_baseline_window": 60,
+        "atr_expansion_mult": 1.1,
+        "atr_period": 14,
+        "donchian_window": 24,
+        "max_adds": 3,
+        "max_hold_bars": 180,
+        "target_vol": 0.02,
+        "trail_atr_mult": 3.5,
+        "vol_window": 48
+      },
+      "strategy": "VolatilityBreakoutRiderStrategy",
+      "strategy_class": "VolatilityBreakoutRiderStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "XRP/USDT"
+      ],
+      "tags": [
+        "breakout",
+        "return_rider",
+        "trailing_stop",
+        "pyramiding",
+        "single_asset",
+        "crypto"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "86c854386f247599",
+      "family": "breakout",
+      "metadata": {
+        "allow_short": true,
+        "decision_cadence_seconds": 3600,
+        "family": "breakout",
+        "retune_profile": "core_ls",
+        "symbol_scope": "DOGE/USDT",
+        "timeframe": "1h"
+      },
+      "name": "volatility_breakout_rider_1h_core_ls_dogeusdt_24",
+      "notes": "Per-symbol Donchian breakout rider confirmed by ATR expansion that rides the move with an ATR trailing stop and pyramids on follow-through to capture explosive range expansions on DOGE/USDT at 1h (core_ls).",
+      "params": {
+        "add_alloc_fraction": 0.5,
+        "add_step_atr": 1.0,
+        "allow_short": true,
+        "atr_baseline_window": 60,
+        "atr_expansion_mult": 1.1,
+        "atr_period": 14,
+        "donchian_window": 24,
+        "max_adds": 3,
+        "max_hold_bars": 180,
+        "target_vol": 0.02,
+        "trail_atr_mult": 3.5,
+        "vol_window": 48
+      },
+      "strategy": "VolatilityBreakoutRiderStrategy",
+      "strategy_class": "VolatilityBreakoutRiderStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "DOGE/USDT"
+      ],
+      "tags": [
+        "breakout",
+        "return_rider",
+        "trailing_stop",
+        "pyramiding",
+        "single_asset",
+        "crypto"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "9cbf55c69e4a6cf0",
+      "family": "breakout",
+      "metadata": {
+        "allow_short": true,
+        "decision_cadence_seconds": 3600,
+        "family": "breakout",
+        "retune_profile": "core_ls",
+        "symbol_scope": "ADA/USDT",
+        "timeframe": "1h"
+      },
+      "name": "volatility_breakout_rider_1h_core_ls_adausdt_24",
+      "notes": "Per-symbol Donchian breakout rider confirmed by ATR expansion that rides the move with an ATR trailing stop and pyramids on follow-through to capture explosive range expansions on ADA/USDT at 1h (core_ls).",
+      "params": {
+        "add_alloc_fraction": 0.5,
+        "add_step_atr": 1.0,
+        "allow_short": true,
+        "atr_baseline_window": 60,
+        "atr_expansion_mult": 1.1,
+        "atr_period": 14,
+        "donchian_window": 24,
+        "max_adds": 3,
+        "max_hold_bars": 180,
+        "target_vol": 0.02,
+        "trail_atr_mult": 3.5,
+        "vol_window": 48
+      },
+      "strategy": "VolatilityBreakoutRiderStrategy",
+      "strategy_class": "VolatilityBreakoutRiderStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "ADA/USDT"
+      ],
+      "tags": [
+        "breakout",
+        "return_rider",
+        "trailing_stop",
+        "pyramiding",
+        "single_asset",
+        "crypto"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "d6eb6edbf99d9f2c",
+      "family": "breakout",
+      "metadata": {
+        "allow_short": true,
+        "decision_cadence_seconds": 3600,
+        "family": "breakout",
+        "retune_profile": "core_ls",
+        "symbol_scope": "AVAX/USDT",
+        "timeframe": "1h"
+      },
+      "name": "volatility_breakout_rider_1h_core_ls_avaxusdt_24",
+      "notes": "Per-symbol Donchian breakout rider confirmed by ATR expansion that rides the move with an ATR trailing stop and pyramids on follow-through to capture explosive range expansions on AVAX/USDT at 1h (core_ls).",
+      "params": {
+        "add_alloc_fraction": 0.5,
+        "add_step_atr": 1.0,
+        "allow_short": true,
+        "atr_baseline_window": 60,
+        "atr_expansion_mult": 1.1,
+        "atr_period": 14,
+        "donchian_window": 24,
+        "max_adds": 3,
+        "max_hold_bars": 180,
+        "target_vol": 0.02,
+        "trail_atr_mult": 3.5,
+        "vol_window": 48
+      },
+      "strategy": "VolatilityBreakoutRiderStrategy",
+      "strategy_class": "VolatilityBreakoutRiderStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "AVAX/USDT"
+      ],
+      "tags": [
+        "breakout",
+        "return_rider",
+        "trailing_stop",
+        "pyramiding",
+        "single_asset",
+        "crypto"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "38b31135091d20ce",
+      "family": "momentum",
+      "metadata": {
+        "allow_short": true,
+        "decision_cadence_seconds": 3600,
+        "family": "momentum",
+        "retune_profile": "core_ls",
+        "symbol_scope": "BTC/USDT",
+        "timeframe": "1h"
+      },
+      "name": "acceleration_rider_1h_core_ls_btcusdt_10",
+      "notes": "Per-symbol accelerating-momentum rider that enters when rate-of-change is positive and rising (or negative and falling), rides with an ATR trailing stop, and pyramids while acceleration persists to capture parabolic moves on BTC/USDT at 1h (core_ls).",
+      "params": {
+        "add_alloc_fraction": 0.6,
+        "add_step_atr": 0.75,
+        "allow_short": true,
+        "atr_period": 14,
+        "decel_tolerance": 0.0,
+        "max_adds": 4,
+        "max_hold_bars": 150,
+        "min_roc": 0.0,
+        "roc_period": 10,
+        "target_vol": 0.025,
+        "trail_atr_mult": 2.8,
+        "vol_window": 48
+      },
+      "strategy": "AccelerationRiderStrategy",
+      "strategy_class": "AccelerationRiderStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "BTC/USDT"
+      ],
+      "tags": [
+        "momentum",
+        "return_rider",
+        "trailing_stop",
+        "pyramiding",
+        "single_asset",
+        "crypto"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "bf1c7f5a875a104a",
+      "family": "momentum",
+      "metadata": {
+        "allow_short": true,
+        "decision_cadence_seconds": 3600,
+        "family": "momentum",
+        "retune_profile": "core_ls",
+        "symbol_scope": "ETH/USDT",
+        "timeframe": "1h"
+      },
+      "name": "acceleration_rider_1h_core_ls_ethusdt_10",
+      "notes": "Per-symbol accelerating-momentum rider that enters when rate-of-change is positive and rising (or negative and falling), rides with an ATR trailing stop, and pyramids while acceleration persists to capture parabolic moves on ETH/USDT at 1h (core_ls).",
+      "params": {
+        "add_alloc_fraction": 0.6,
+        "add_step_atr": 0.75,
+        "allow_short": true,
+        "atr_period": 14,
+        "decel_tolerance": 0.0,
+        "max_adds": 4,
+        "max_hold_bars": 150,
+        "min_roc": 0.0,
+        "roc_period": 10,
+        "target_vol": 0.025,
+        "trail_atr_mult": 2.8,
+        "vol_window": 48
+      },
+      "strategy": "AccelerationRiderStrategy",
+      "strategy_class": "AccelerationRiderStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "ETH/USDT"
+      ],
+      "tags": [
+        "momentum",
+        "return_rider",
+        "trailing_stop",
+        "pyramiding",
+        "single_asset",
+        "crypto"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "21542487bc43b3f9",
+      "family": "momentum",
+      "metadata": {
+        "allow_short": true,
+        "decision_cadence_seconds": 3600,
+        "family": "momentum",
+        "retune_profile": "core_ls",
+        "symbol_scope": "SOL/USDT",
+        "timeframe": "1h"
+      },
+      "name": "acceleration_rider_1h_core_ls_solusdt_10",
+      "notes": "Per-symbol accelerating-momentum rider that enters when rate-of-change is positive and rising (or negative and falling), rides with an ATR trailing stop, and pyramids while acceleration persists to capture parabolic moves on SOL/USDT at 1h (core_ls).",
+      "params": {
+        "add_alloc_fraction": 0.6,
+        "add_step_atr": 0.75,
+        "allow_short": true,
+        "atr_period": 14,
+        "decel_tolerance": 0.0,
+        "max_adds": 4,
+        "max_hold_bars": 150,
+        "min_roc": 0.0,
+        "roc_period": 10,
+        "target_vol": 0.025,
+        "trail_atr_mult": 2.8,
+        "vol_window": 48
+      },
+      "strategy": "AccelerationRiderStrategy",
+      "strategy_class": "AccelerationRiderStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "SOL/USDT"
+      ],
+      "tags": [
+        "momentum",
+        "return_rider",
+        "trailing_stop",
+        "pyramiding",
+        "single_asset",
+        "crypto"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "ec87a98d0dd35513",
+      "family": "momentum",
+      "metadata": {
+        "allow_short": true,
+        "decision_cadence_seconds": 3600,
+        "family": "momentum",
+        "retune_profile": "core_ls",
+        "symbol_scope": "BNB/USDT",
+        "timeframe": "1h"
+      },
+      "name": "acceleration_rider_1h_core_ls_bnbusdt_10",
+      "notes": "Per-symbol accelerating-momentum rider that enters when rate-of-change is positive and rising (or negative and falling), rides with an ATR trailing stop, and pyramids while acceleration persists to capture parabolic moves on BNB/USDT at 1h (core_ls).",
+      "params": {
+        "add_alloc_fraction": 0.6,
+        "add_step_atr": 0.75,
+        "allow_short": true,
+        "atr_period": 14,
+        "decel_tolerance": 0.0,
+        "max_adds": 4,
+        "max_hold_bars": 150,
+        "min_roc": 0.0,
+        "roc_period": 10,
+        "target_vol": 0.025,
+        "trail_atr_mult": 2.8,
+        "vol_window": 48
+      },
+      "strategy": "AccelerationRiderStrategy",
+      "strategy_class": "AccelerationRiderStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "BNB/USDT"
+      ],
+      "tags": [
+        "momentum",
+        "return_rider",
+        "trailing_stop",
+        "pyramiding",
+        "single_asset",
+        "crypto"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "d63a156af7882d24",
+      "family": "momentum",
+      "metadata": {
+        "allow_short": true,
+        "decision_cadence_seconds": 3600,
+        "family": "momentum",
+        "retune_profile": "core_ls",
+        "symbol_scope": "TRX/USDT",
+        "timeframe": "1h"
+      },
+      "name": "acceleration_rider_1h_core_ls_trxusdt_10",
+      "notes": "Per-symbol accelerating-momentum rider that enters when rate-of-change is positive and rising (or negative and falling), rides with an ATR trailing stop, and pyramids while acceleration persists to capture parabolic moves on TRX/USDT at 1h (core_ls).",
+      "params": {
+        "add_alloc_fraction": 0.6,
+        "add_step_atr": 0.75,
+        "allow_short": true,
+        "atr_period": 14,
+        "decel_tolerance": 0.0,
+        "max_adds": 4,
+        "max_hold_bars": 150,
+        "min_roc": 0.0,
+        "roc_period": 10,
+        "target_vol": 0.025,
+        "trail_atr_mult": 2.8,
+        "vol_window": 48
+      },
+      "strategy": "AccelerationRiderStrategy",
+      "strategy_class": "AccelerationRiderStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "TRX/USDT"
+      ],
+      "tags": [
+        "momentum",
+        "return_rider",
+        "trailing_stop",
+        "pyramiding",
+        "single_asset",
+        "crypto"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "8eb6ae1355e391ad",
+      "family": "momentum",
+      "metadata": {
+        "allow_short": true,
+        "decision_cadence_seconds": 3600,
+        "family": "momentum",
+        "retune_profile": "core_ls",
+        "symbol_scope": "XRP/USDT",
+        "timeframe": "1h"
+      },
+      "name": "acceleration_rider_1h_core_ls_xrpusdt_10",
+      "notes": "Per-symbol accelerating-momentum rider that enters when rate-of-change is positive and rising (or negative and falling), rides with an ATR trailing stop, and pyramids while acceleration persists to capture parabolic moves on XRP/USDT at 1h (core_ls).",
+      "params": {
+        "add_alloc_fraction": 0.6,
+        "add_step_atr": 0.75,
+        "allow_short": true,
+        "atr_period": 14,
+        "decel_tolerance": 0.0,
+        "max_adds": 4,
+        "max_hold_bars": 150,
+        "min_roc": 0.0,
+        "roc_period": 10,
+        "target_vol": 0.025,
+        "trail_atr_mult": 2.8,
+        "vol_window": 48
+      },
+      "strategy": "AccelerationRiderStrategy",
+      "strategy_class": "AccelerationRiderStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "XRP/USDT"
+      ],
+      "tags": [
+        "momentum",
+        "return_rider",
+        "trailing_stop",
+        "pyramiding",
+        "single_asset",
+        "crypto"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "7d2da9119fab1806",
+      "family": "momentum",
+      "metadata": {
+        "allow_short": true,
+        "decision_cadence_seconds": 3600,
+        "family": "momentum",
+        "retune_profile": "core_ls",
+        "symbol_scope": "DOGE/USDT",
+        "timeframe": "1h"
+      },
+      "name": "acceleration_rider_1h_core_ls_dogeusdt_10",
+      "notes": "Per-symbol accelerating-momentum rider that enters when rate-of-change is positive and rising (or negative and falling), rides with an ATR trailing stop, and pyramids while acceleration persists to capture parabolic moves on DOGE/USDT at 1h (core_ls).",
+      "params": {
+        "add_alloc_fraction": 0.6,
+        "add_step_atr": 0.75,
+        "allow_short": true,
+        "atr_period": 14,
+        "decel_tolerance": 0.0,
+        "max_adds": 4,
+        "max_hold_bars": 150,
+        "min_roc": 0.0,
+        "roc_period": 10,
+        "target_vol": 0.025,
+        "trail_atr_mult": 2.8,
+        "vol_window": 48
+      },
+      "strategy": "AccelerationRiderStrategy",
+      "strategy_class": "AccelerationRiderStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "DOGE/USDT"
+      ],
+      "tags": [
+        "momentum",
+        "return_rider",
+        "trailing_stop",
+        "pyramiding",
+        "single_asset",
+        "crypto"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "77b77b7c5692ee6a",
+      "family": "momentum",
+      "metadata": {
+        "allow_short": true,
+        "decision_cadence_seconds": 3600,
+        "family": "momentum",
+        "retune_profile": "core_ls",
+        "symbol_scope": "ADA/USDT",
+        "timeframe": "1h"
+      },
+      "name": "acceleration_rider_1h_core_ls_adausdt_10",
+      "notes": "Per-symbol accelerating-momentum rider that enters when rate-of-change is positive and rising (or negative and falling), rides with an ATR trailing stop, and pyramids while acceleration persists to capture parabolic moves on ADA/USDT at 1h (core_ls).",
+      "params": {
+        "add_alloc_fraction": 0.6,
+        "add_step_atr": 0.75,
+        "allow_short": true,
+        "atr_period": 14,
+        "decel_tolerance": 0.0,
+        "max_adds": 4,
+        "max_hold_bars": 150,
+        "min_roc": 0.0,
+        "roc_period": 10,
+        "target_vol": 0.025,
+        "trail_atr_mult": 2.8,
+        "vol_window": 48
+      },
+      "strategy": "AccelerationRiderStrategy",
+      "strategy_class": "AccelerationRiderStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "ADA/USDT"
+      ],
+      "tags": [
+        "momentum",
+        "return_rider",
+        "trailing_stop",
+        "pyramiding",
+        "single_asset",
+        "crypto"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "bf31be43c2ec7ae6",
+      "family": "momentum",
+      "metadata": {
+        "allow_short": true,
+        "decision_cadence_seconds": 3600,
+        "family": "momentum",
+        "retune_profile": "core_ls",
+        "symbol_scope": "AVAX/USDT",
+        "timeframe": "1h"
+      },
+      "name": "acceleration_rider_1h_core_ls_avaxusdt_10",
+      "notes": "Per-symbol accelerating-momentum rider that enters when rate-of-change is positive and rising (or negative and falling), rides with an ATR trailing stop, and pyramids while acceleration persists to capture parabolic moves on AVAX/USDT at 1h (core_ls).",
+      "params": {
+        "add_alloc_fraction": 0.6,
+        "add_step_atr": 0.75,
+        "allow_short": true,
+        "atr_period": 14,
+        "decel_tolerance": 0.0,
+        "max_adds": 4,
+        "max_hold_bars": 150,
+        "min_roc": 0.0,
+        "roc_period": 10,
+        "target_vol": 0.025,
+        "trail_atr_mult": 2.8,
+        "vol_window": 48
+      },
+      "strategy": "AccelerationRiderStrategy",
+      "strategy_class": "AccelerationRiderStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "AVAX/USDT"
+      ],
+      "tags": [
+        "momentum",
+        "return_rider",
+        "trailing_stop",
+        "pyramiding",
+        "single_asset",
+        "crypto"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "08a86de82794e037",
+      "family": "flow",
+      "metadata": {
+        "allow_short": true,
+        "data_dependent": true,
+        "decision_cadence_seconds": 1800,
+        "family": "flow",
+        "retune_profile": "core_ls",
+        "symbol_scope": "BTC/USDT",
+        "timeframe": "1h"
+      },
+      "name": "intraday_flow_pressure_rider_1h_core_ls_btcusdt_1.5",
+      "notes": "Per-symbol taker-flow PRESSURE continuation rider: a 30m decision-bar flow-imbalance z-score gate confirmed by the latest 1s tick-agreement, ridden with an ATR trailing stop and pyramided on flow extension. Looks intrabar, decides at 30m on BTC/USDT at 1h (core_ls).",
+      "params": {
+        "add_alloc_fraction": 0.5,
+        "add_step_atr": 1.0,
+        "allow_short": true,
+        "atr_period": 14,
+        "entry_z": 1.5,
+        "flow_z_window": 8,
+        "max_adds": 3,
+        "max_hold_bars": 180,
+        "pyramid_z": 2.0,
+        "target_vol": 0.02,
+        "tick_agree_frac": 0.55,
+        "trail_atr_mult": 3.2,
+        "vol_window": 48
+      },
+      "strategy": "IntradayFlowPressureRiderStrategy",
+      "strategy_class": "IntradayFlowPressureRiderStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "BTC/USDT"
+      ],
+      "tags": [
+        "flow",
+        "taker_flow",
+        "continuation",
+        "return_rider",
+        "trailing_stop",
+        "pyramiding",
+        "single_asset",
+        "crypto",
+        "micro_signal"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "429e55e136e468e9",
+      "family": "flow",
+      "metadata": {
+        "allow_short": true,
+        "data_dependent": true,
+        "decision_cadence_seconds": 1800,
+        "family": "flow",
+        "retune_profile": "core_ls",
+        "symbol_scope": "ETH/USDT",
+        "timeframe": "1h"
+      },
+      "name": "intraday_flow_pressure_rider_1h_core_ls_ethusdt_1.5",
+      "notes": "Per-symbol taker-flow PRESSURE continuation rider: a 30m decision-bar flow-imbalance z-score gate confirmed by the latest 1s tick-agreement, ridden with an ATR trailing stop and pyramided on flow extension. Looks intrabar, decides at 30m on ETH/USDT at 1h (core_ls).",
+      "params": {
+        "add_alloc_fraction": 0.5,
+        "add_step_atr": 1.0,
+        "allow_short": true,
+        "atr_period": 14,
+        "entry_z": 1.5,
+        "flow_z_window": 8,
+        "max_adds": 3,
+        "max_hold_bars": 180,
+        "pyramid_z": 2.0,
+        "target_vol": 0.02,
+        "tick_agree_frac": 0.55,
+        "trail_atr_mult": 3.2,
+        "vol_window": 48
+      },
+      "strategy": "IntradayFlowPressureRiderStrategy",
+      "strategy_class": "IntradayFlowPressureRiderStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "ETH/USDT"
+      ],
+      "tags": [
+        "flow",
+        "taker_flow",
+        "continuation",
+        "return_rider",
+        "trailing_stop",
+        "pyramiding",
+        "single_asset",
+        "crypto",
+        "micro_signal"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "7611c2fe3667b0e2",
+      "family": "flow",
+      "metadata": {
+        "allow_short": true,
+        "data_dependent": true,
+        "decision_cadence_seconds": 1800,
+        "family": "flow",
+        "retune_profile": "core_ls",
+        "symbol_scope": "SOL/USDT",
+        "timeframe": "1h"
+      },
+      "name": "intraday_flow_pressure_rider_1h_core_ls_solusdt_1.5",
+      "notes": "Per-symbol taker-flow PRESSURE continuation rider: a 30m decision-bar flow-imbalance z-score gate confirmed by the latest 1s tick-agreement, ridden with an ATR trailing stop and pyramided on flow extension. Looks intrabar, decides at 30m on SOL/USDT at 1h (core_ls).",
+      "params": {
+        "add_alloc_fraction": 0.5,
+        "add_step_atr": 1.0,
+        "allow_short": true,
+        "atr_period": 14,
+        "entry_z": 1.5,
+        "flow_z_window": 8,
+        "max_adds": 3,
+        "max_hold_bars": 180,
+        "pyramid_z": 2.0,
+        "target_vol": 0.02,
+        "tick_agree_frac": 0.55,
+        "trail_atr_mult": 3.2,
+        "vol_window": 48
+      },
+      "strategy": "IntradayFlowPressureRiderStrategy",
+      "strategy_class": "IntradayFlowPressureRiderStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "SOL/USDT"
+      ],
+      "tags": [
+        "flow",
+        "taker_flow",
+        "continuation",
+        "return_rider",
+        "trailing_stop",
+        "pyramiding",
+        "single_asset",
+        "crypto",
+        "micro_signal"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "91988b2a0edbf5f9",
+      "family": "flow",
+      "metadata": {
+        "allow_short": true,
+        "data_dependent": true,
+        "decision_cadence_seconds": 1800,
+        "family": "flow",
+        "retune_profile": "core_ls",
+        "symbol_scope": "BNB/USDT",
+        "timeframe": "1h"
+      },
+      "name": "intraday_flow_pressure_rider_1h_core_ls_bnbusdt_1.5",
+      "notes": "Per-symbol taker-flow PRESSURE continuation rider: a 30m decision-bar flow-imbalance z-score gate confirmed by the latest 1s tick-agreement, ridden with an ATR trailing stop and pyramided on flow extension. Looks intrabar, decides at 30m on BNB/USDT at 1h (core_ls).",
+      "params": {
+        "add_alloc_fraction": 0.5,
+        "add_step_atr": 1.0,
+        "allow_short": true,
+        "atr_period": 14,
+        "entry_z": 1.5,
+        "flow_z_window": 8,
+        "max_adds": 3,
+        "max_hold_bars": 180,
+        "pyramid_z": 2.0,
+        "target_vol": 0.02,
+        "tick_agree_frac": 0.55,
+        "trail_atr_mult": 3.2,
+        "vol_window": 48
+      },
+      "strategy": "IntradayFlowPressureRiderStrategy",
+      "strategy_class": "IntradayFlowPressureRiderStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "BNB/USDT"
+      ],
+      "tags": [
+        "flow",
+        "taker_flow",
+        "continuation",
+        "return_rider",
+        "trailing_stop",
+        "pyramiding",
+        "single_asset",
+        "crypto",
+        "micro_signal"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "08e18b589d6ded70",
+      "family": "flow",
+      "metadata": {
+        "allow_short": true,
+        "data_dependent": true,
+        "decision_cadence_seconds": 1800,
+        "family": "flow",
+        "retune_profile": "core_ls",
+        "symbol_scope": "TRX/USDT",
+        "timeframe": "1h"
+      },
+      "name": "intraday_flow_pressure_rider_1h_core_ls_trxusdt_1.5",
+      "notes": "Per-symbol taker-flow PRESSURE continuation rider: a 30m decision-bar flow-imbalance z-score gate confirmed by the latest 1s tick-agreement, ridden with an ATR trailing stop and pyramided on flow extension. Looks intrabar, decides at 30m on TRX/USDT at 1h (core_ls).",
+      "params": {
+        "add_alloc_fraction": 0.5,
+        "add_step_atr": 1.0,
+        "allow_short": true,
+        "atr_period": 14,
+        "entry_z": 1.5,
+        "flow_z_window": 8,
+        "max_adds": 3,
+        "max_hold_bars": 180,
+        "pyramid_z": 2.0,
+        "target_vol": 0.02,
+        "tick_agree_frac": 0.55,
+        "trail_atr_mult": 3.2,
+        "vol_window": 48
+      },
+      "strategy": "IntradayFlowPressureRiderStrategy",
+      "strategy_class": "IntradayFlowPressureRiderStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "TRX/USDT"
+      ],
+      "tags": [
+        "flow",
+        "taker_flow",
+        "continuation",
+        "return_rider",
+        "trailing_stop",
+        "pyramiding",
+        "single_asset",
+        "crypto",
+        "micro_signal"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "a0781419d4bec8a8",
+      "family": "flow",
+      "metadata": {
+        "allow_short": true,
+        "data_dependent": true,
+        "decision_cadence_seconds": 1800,
+        "family": "flow",
+        "retune_profile": "core_ls",
+        "symbol_scope": "XRP/USDT",
+        "timeframe": "1h"
+      },
+      "name": "intraday_flow_pressure_rider_1h_core_ls_xrpusdt_1.5",
+      "notes": "Per-symbol taker-flow PRESSURE continuation rider: a 30m decision-bar flow-imbalance z-score gate confirmed by the latest 1s tick-agreement, ridden with an ATR trailing stop and pyramided on flow extension. Looks intrabar, decides at 30m on XRP/USDT at 1h (core_ls).",
+      "params": {
+        "add_alloc_fraction": 0.5,
+        "add_step_atr": 1.0,
+        "allow_short": true,
+        "atr_period": 14,
+        "entry_z": 1.5,
+        "flow_z_window": 8,
+        "max_adds": 3,
+        "max_hold_bars": 180,
+        "pyramid_z": 2.0,
+        "target_vol": 0.02,
+        "tick_agree_frac": 0.55,
+        "trail_atr_mult": 3.2,
+        "vol_window": 48
+      },
+      "strategy": "IntradayFlowPressureRiderStrategy",
+      "strategy_class": "IntradayFlowPressureRiderStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "XRP/USDT"
+      ],
+      "tags": [
+        "flow",
+        "taker_flow",
+        "continuation",
+        "return_rider",
+        "trailing_stop",
+        "pyramiding",
+        "single_asset",
+        "crypto",
+        "micro_signal"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "49e1fa5f84ba7784",
+      "family": "flow",
+      "metadata": {
+        "allow_short": true,
+        "data_dependent": true,
+        "decision_cadence_seconds": 1800,
+        "family": "flow",
+        "retune_profile": "core_ls",
+        "symbol_scope": "DOGE/USDT",
+        "timeframe": "1h"
+      },
+      "name": "intraday_flow_pressure_rider_1h_core_ls_dogeusdt_1.5",
+      "notes": "Per-symbol taker-flow PRESSURE continuation rider: a 30m decision-bar flow-imbalance z-score gate confirmed by the latest 1s tick-agreement, ridden with an ATR trailing stop and pyramided on flow extension. Looks intrabar, decides at 30m on DOGE/USDT at 1h (core_ls).",
+      "params": {
+        "add_alloc_fraction": 0.5,
+        "add_step_atr": 1.0,
+        "allow_short": true,
+        "atr_period": 14,
+        "entry_z": 1.5,
+        "flow_z_window": 8,
+        "max_adds": 3,
+        "max_hold_bars": 180,
+        "pyramid_z": 2.0,
+        "target_vol": 0.02,
+        "tick_agree_frac": 0.55,
+        "trail_atr_mult": 3.2,
+        "vol_window": 48
+      },
+      "strategy": "IntradayFlowPressureRiderStrategy",
+      "strategy_class": "IntradayFlowPressureRiderStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "DOGE/USDT"
+      ],
+      "tags": [
+        "flow",
+        "taker_flow",
+        "continuation",
+        "return_rider",
+        "trailing_stop",
+        "pyramiding",
+        "single_asset",
+        "crypto",
+        "micro_signal"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "57d536f4983d3bf0",
+      "family": "flow",
+      "metadata": {
+        "allow_short": true,
+        "data_dependent": true,
+        "decision_cadence_seconds": 1800,
+        "family": "flow",
+        "retune_profile": "core_ls",
+        "symbol_scope": "ADA/USDT",
+        "timeframe": "1h"
+      },
+      "name": "intraday_flow_pressure_rider_1h_core_ls_adausdt_1.5",
+      "notes": "Per-symbol taker-flow PRESSURE continuation rider: a 30m decision-bar flow-imbalance z-score gate confirmed by the latest 1s tick-agreement, ridden with an ATR trailing stop and pyramided on flow extension. Looks intrabar, decides at 30m on ADA/USDT at 1h (core_ls).",
+      "params": {
+        "add_alloc_fraction": 0.5,
+        "add_step_atr": 1.0,
+        "allow_short": true,
+        "atr_period": 14,
+        "entry_z": 1.5,
+        "flow_z_window": 8,
+        "max_adds": 3,
+        "max_hold_bars": 180,
+        "pyramid_z": 2.0,
+        "target_vol": 0.02,
+        "tick_agree_frac": 0.55,
+        "trail_atr_mult": 3.2,
+        "vol_window": 48
+      },
+      "strategy": "IntradayFlowPressureRiderStrategy",
+      "strategy_class": "IntradayFlowPressureRiderStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "ADA/USDT"
+      ],
+      "tags": [
+        "flow",
+        "taker_flow",
+        "continuation",
+        "return_rider",
+        "trailing_stop",
+        "pyramiding",
+        "single_asset",
+        "crypto",
+        "micro_signal"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "9b9d151e98788e14",
+      "family": "flow",
+      "metadata": {
+        "allow_short": true,
+        "data_dependent": true,
+        "decision_cadence_seconds": 1800,
+        "family": "flow",
+        "retune_profile": "core_ls",
+        "symbol_scope": "AVAX/USDT",
+        "timeframe": "1h"
+      },
+      "name": "intraday_flow_pressure_rider_1h_core_ls_avaxusdt_1.5",
+      "notes": "Per-symbol taker-flow PRESSURE continuation rider: a 30m decision-bar flow-imbalance z-score gate confirmed by the latest 1s tick-agreement, ridden with an ATR trailing stop and pyramided on flow extension. Looks intrabar, decides at 30m on AVAX/USDT at 1h (core_ls).",
+      "params": {
+        "add_alloc_fraction": 0.5,
+        "add_step_atr": 1.0,
+        "allow_short": true,
+        "atr_period": 14,
+        "entry_z": 1.5,
+        "flow_z_window": 8,
+        "max_adds": 3,
+        "max_hold_bars": 180,
+        "pyramid_z": 2.0,
+        "target_vol": 0.02,
+        "tick_agree_frac": 0.55,
+        "trail_atr_mult": 3.2,
+        "vol_window": 48
+      },
+      "strategy": "IntradayFlowPressureRiderStrategy",
+      "strategy_class": "IntradayFlowPressureRiderStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "AVAX/USDT"
+      ],
+      "tags": [
+        "flow",
+        "taker_flow",
+        "continuation",
+        "return_rider",
+        "trailing_stop",
+        "pyramiding",
+        "single_asset",
+        "crypto",
+        "micro_signal"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "6cb44b0c297684d9",
+      "family": "trend",
+      "metadata": {
+        "allow_short": true,
+        "decision_cadence_seconds": 1800,
+        "family": "trend",
+        "retune_profile": "core_ls",
+        "symbol_scope": "BTC/USDT",
+        "timeframe": "1h"
+      },
+      "name": "vol_of_vol_regime_trend_gate_1h_core_ls_btcusdt_1.6",
+      "notes": "Per-symbol directional trend (pv_trend_score) whose SIZE is governed by a Garman-Klass-vs-realized vol-of-vol read plus a Kaufman-efficiency cleanliness gate: hidden intrabar stress down-sizes/vetoes, clean efficient trends up-size. Decides at 30m on BTC/USDT at 1h (core_ls).",
+      "params": {
+        "add_alloc_fraction": 0.5,
+        "add_step_atr": 1.0,
+        "allow_short": true,
+        "atr_period": 14,
+        "choppy_threshold": 0.22,
+        "clean_threshold": 0.42,
+        "downsize_floor": 0.4,
+        "gk_rv_clean_rel": 1.0,
+        "gk_rv_history_window": 32,
+        "gk_rv_veto_rel": 1.6,
+        "gk_window": 20,
+        "ker_period": 12,
+        "max_adds": 2,
+        "max_hold_bars": 180,
+        "rv_window": 20,
+        "target_vol": 0.02,
+        "trail_atr_mult": 3.2,
+        "trend_score_min": 0.12,
+        "trend_z_window": 48,
+        "upsize_cap": 1.5,
+        "vol_window": 48
+      },
+      "strategy": "VolOfVolRegimeTrendGateStrategy",
+      "strategy_class": "VolOfVolRegimeTrendGateStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "BTC/USDT"
+      ],
+      "tags": [
+        "trend",
+        "vol_of_vol",
+        "regime_gate",
+        "return_rider",
+        "trailing_stop",
+        "single_asset",
+        "crypto",
+        "micro_signal"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "476422642cdf811b",
+      "family": "trend",
+      "metadata": {
+        "allow_short": true,
+        "decision_cadence_seconds": 1800,
+        "family": "trend",
+        "retune_profile": "core_ls",
+        "symbol_scope": "ETH/USDT",
+        "timeframe": "1h"
+      },
+      "name": "vol_of_vol_regime_trend_gate_1h_core_ls_ethusdt_1.6",
+      "notes": "Per-symbol directional trend (pv_trend_score) whose SIZE is governed by a Garman-Klass-vs-realized vol-of-vol read plus a Kaufman-efficiency cleanliness gate: hidden intrabar stress down-sizes/vetoes, clean efficient trends up-size. Decides at 30m on ETH/USDT at 1h (core_ls).",
+      "params": {
+        "add_alloc_fraction": 0.5,
+        "add_step_atr": 1.0,
+        "allow_short": true,
+        "atr_period": 14,
+        "choppy_threshold": 0.22,
+        "clean_threshold": 0.42,
+        "downsize_floor": 0.4,
+        "gk_rv_clean_rel": 1.0,
+        "gk_rv_history_window": 32,
+        "gk_rv_veto_rel": 1.6,
+        "gk_window": 20,
+        "ker_period": 12,
+        "max_adds": 2,
+        "max_hold_bars": 180,
+        "rv_window": 20,
+        "target_vol": 0.02,
+        "trail_atr_mult": 3.2,
+        "trend_score_min": 0.12,
+        "trend_z_window": 48,
+        "upsize_cap": 1.5,
+        "vol_window": 48
+      },
+      "strategy": "VolOfVolRegimeTrendGateStrategy",
+      "strategy_class": "VolOfVolRegimeTrendGateStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "ETH/USDT"
+      ],
+      "tags": [
+        "trend",
+        "vol_of_vol",
+        "regime_gate",
+        "return_rider",
+        "trailing_stop",
+        "single_asset",
+        "crypto",
+        "micro_signal"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "548a4b3314482b1b",
+      "family": "trend",
+      "metadata": {
+        "allow_short": true,
+        "decision_cadence_seconds": 1800,
+        "family": "trend",
+        "retune_profile": "core_ls",
+        "symbol_scope": "SOL/USDT",
+        "timeframe": "1h"
+      },
+      "name": "vol_of_vol_regime_trend_gate_1h_core_ls_solusdt_1.6",
+      "notes": "Per-symbol directional trend (pv_trend_score) whose SIZE is governed by a Garman-Klass-vs-realized vol-of-vol read plus a Kaufman-efficiency cleanliness gate: hidden intrabar stress down-sizes/vetoes, clean efficient trends up-size. Decides at 30m on SOL/USDT at 1h (core_ls).",
+      "params": {
+        "add_alloc_fraction": 0.5,
+        "add_step_atr": 1.0,
+        "allow_short": true,
+        "atr_period": 14,
+        "choppy_threshold": 0.22,
+        "clean_threshold": 0.42,
+        "downsize_floor": 0.4,
+        "gk_rv_clean_rel": 1.0,
+        "gk_rv_history_window": 32,
+        "gk_rv_veto_rel": 1.6,
+        "gk_window": 20,
+        "ker_period": 12,
+        "max_adds": 2,
+        "max_hold_bars": 180,
+        "rv_window": 20,
+        "target_vol": 0.02,
+        "trail_atr_mult": 3.2,
+        "trend_score_min": 0.12,
+        "trend_z_window": 48,
+        "upsize_cap": 1.5,
+        "vol_window": 48
+      },
+      "strategy": "VolOfVolRegimeTrendGateStrategy",
+      "strategy_class": "VolOfVolRegimeTrendGateStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "SOL/USDT"
+      ],
+      "tags": [
+        "trend",
+        "vol_of_vol",
+        "regime_gate",
+        "return_rider",
+        "trailing_stop",
+        "single_asset",
+        "crypto",
+        "micro_signal"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "ad41e90f40760124",
+      "family": "trend",
+      "metadata": {
+        "allow_short": true,
+        "decision_cadence_seconds": 1800,
+        "family": "trend",
+        "retune_profile": "core_ls",
+        "symbol_scope": "BNB/USDT",
+        "timeframe": "1h"
+      },
+      "name": "vol_of_vol_regime_trend_gate_1h_core_ls_bnbusdt_1.6",
+      "notes": "Per-symbol directional trend (pv_trend_score) whose SIZE is governed by a Garman-Klass-vs-realized vol-of-vol read plus a Kaufman-efficiency cleanliness gate: hidden intrabar stress down-sizes/vetoes, clean efficient trends up-size. Decides at 30m on BNB/USDT at 1h (core_ls).",
+      "params": {
+        "add_alloc_fraction": 0.5,
+        "add_step_atr": 1.0,
+        "allow_short": true,
+        "atr_period": 14,
+        "choppy_threshold": 0.22,
+        "clean_threshold": 0.42,
+        "downsize_floor": 0.4,
+        "gk_rv_clean_rel": 1.0,
+        "gk_rv_history_window": 32,
+        "gk_rv_veto_rel": 1.6,
+        "gk_window": 20,
+        "ker_period": 12,
+        "max_adds": 2,
+        "max_hold_bars": 180,
+        "rv_window": 20,
+        "target_vol": 0.02,
+        "trail_atr_mult": 3.2,
+        "trend_score_min": 0.12,
+        "trend_z_window": 48,
+        "upsize_cap": 1.5,
+        "vol_window": 48
+      },
+      "strategy": "VolOfVolRegimeTrendGateStrategy",
+      "strategy_class": "VolOfVolRegimeTrendGateStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "BNB/USDT"
+      ],
+      "tags": [
+        "trend",
+        "vol_of_vol",
+        "regime_gate",
+        "return_rider",
+        "trailing_stop",
+        "single_asset",
+        "crypto",
+        "micro_signal"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "5c69093668d48c6a",
+      "family": "trend",
+      "metadata": {
+        "allow_short": true,
+        "decision_cadence_seconds": 1800,
+        "family": "trend",
+        "retune_profile": "core_ls",
+        "symbol_scope": "TRX/USDT",
+        "timeframe": "1h"
+      },
+      "name": "vol_of_vol_regime_trend_gate_1h_core_ls_trxusdt_1.6",
+      "notes": "Per-symbol directional trend (pv_trend_score) whose SIZE is governed by a Garman-Klass-vs-realized vol-of-vol read plus a Kaufman-efficiency cleanliness gate: hidden intrabar stress down-sizes/vetoes, clean efficient trends up-size. Decides at 30m on TRX/USDT at 1h (core_ls).",
+      "params": {
+        "add_alloc_fraction": 0.5,
+        "add_step_atr": 1.0,
+        "allow_short": true,
+        "atr_period": 14,
+        "choppy_threshold": 0.22,
+        "clean_threshold": 0.42,
+        "downsize_floor": 0.4,
+        "gk_rv_clean_rel": 1.0,
+        "gk_rv_history_window": 32,
+        "gk_rv_veto_rel": 1.6,
+        "gk_window": 20,
+        "ker_period": 12,
+        "max_adds": 2,
+        "max_hold_bars": 180,
+        "rv_window": 20,
+        "target_vol": 0.02,
+        "trail_atr_mult": 3.2,
+        "trend_score_min": 0.12,
+        "trend_z_window": 48,
+        "upsize_cap": 1.5,
+        "vol_window": 48
+      },
+      "strategy": "VolOfVolRegimeTrendGateStrategy",
+      "strategy_class": "VolOfVolRegimeTrendGateStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "TRX/USDT"
+      ],
+      "tags": [
+        "trend",
+        "vol_of_vol",
+        "regime_gate",
+        "return_rider",
+        "trailing_stop",
+        "single_asset",
+        "crypto",
+        "micro_signal"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "e511a7ad581f1a89",
+      "family": "trend",
+      "metadata": {
+        "allow_short": true,
+        "decision_cadence_seconds": 1800,
+        "family": "trend",
+        "retune_profile": "core_ls",
+        "symbol_scope": "XRP/USDT",
+        "timeframe": "1h"
+      },
+      "name": "vol_of_vol_regime_trend_gate_1h_core_ls_xrpusdt_1.6",
+      "notes": "Per-symbol directional trend (pv_trend_score) whose SIZE is governed by a Garman-Klass-vs-realized vol-of-vol read plus a Kaufman-efficiency cleanliness gate: hidden intrabar stress down-sizes/vetoes, clean efficient trends up-size. Decides at 30m on XRP/USDT at 1h (core_ls).",
+      "params": {
+        "add_alloc_fraction": 0.5,
+        "add_step_atr": 1.0,
+        "allow_short": true,
+        "atr_period": 14,
+        "choppy_threshold": 0.22,
+        "clean_threshold": 0.42,
+        "downsize_floor": 0.4,
+        "gk_rv_clean_rel": 1.0,
+        "gk_rv_history_window": 32,
+        "gk_rv_veto_rel": 1.6,
+        "gk_window": 20,
+        "ker_period": 12,
+        "max_adds": 2,
+        "max_hold_bars": 180,
+        "rv_window": 20,
+        "target_vol": 0.02,
+        "trail_atr_mult": 3.2,
+        "trend_score_min": 0.12,
+        "trend_z_window": 48,
+        "upsize_cap": 1.5,
+        "vol_window": 48
+      },
+      "strategy": "VolOfVolRegimeTrendGateStrategy",
+      "strategy_class": "VolOfVolRegimeTrendGateStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "XRP/USDT"
+      ],
+      "tags": [
+        "trend",
+        "vol_of_vol",
+        "regime_gate",
+        "return_rider",
+        "trailing_stop",
+        "single_asset",
+        "crypto",
+        "micro_signal"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "d08acd208ccb46c0",
+      "family": "trend",
+      "metadata": {
+        "allow_short": true,
+        "decision_cadence_seconds": 1800,
+        "family": "trend",
+        "retune_profile": "core_ls",
+        "symbol_scope": "DOGE/USDT",
+        "timeframe": "1h"
+      },
+      "name": "vol_of_vol_regime_trend_gate_1h_core_ls_dogeusdt_1.6",
+      "notes": "Per-symbol directional trend (pv_trend_score) whose SIZE is governed by a Garman-Klass-vs-realized vol-of-vol read plus a Kaufman-efficiency cleanliness gate: hidden intrabar stress down-sizes/vetoes, clean efficient trends up-size. Decides at 30m on DOGE/USDT at 1h (core_ls).",
+      "params": {
+        "add_alloc_fraction": 0.5,
+        "add_step_atr": 1.0,
+        "allow_short": true,
+        "atr_period": 14,
+        "choppy_threshold": 0.22,
+        "clean_threshold": 0.42,
+        "downsize_floor": 0.4,
+        "gk_rv_clean_rel": 1.0,
+        "gk_rv_history_window": 32,
+        "gk_rv_veto_rel": 1.6,
+        "gk_window": 20,
+        "ker_period": 12,
+        "max_adds": 2,
+        "max_hold_bars": 180,
+        "rv_window": 20,
+        "target_vol": 0.02,
+        "trail_atr_mult": 3.2,
+        "trend_score_min": 0.12,
+        "trend_z_window": 48,
+        "upsize_cap": 1.5,
+        "vol_window": 48
+      },
+      "strategy": "VolOfVolRegimeTrendGateStrategy",
+      "strategy_class": "VolOfVolRegimeTrendGateStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "DOGE/USDT"
+      ],
+      "tags": [
+        "trend",
+        "vol_of_vol",
+        "regime_gate",
+        "return_rider",
+        "trailing_stop",
+        "single_asset",
+        "crypto",
+        "micro_signal"
+      ],
+      "timeframe": "1h"
+    }
+  ],
+  "chunk_count": 11,
+  "chunk_id": "1h_chunk_05",
+  "chunk_index": 5,
+  "chunk_size": 40,
+  "excluded_candidate_count": 62,
+  "family_counts": {
+    "breakout": 162,
+    "carry": 81,
+    "cross_sectional": 77,
+    "deep_research_leaf": 9,
+    "event_alpha": 18,
+    "flow": 36,
+    "formulaic_alpha": 6,
+    "intraday_alpha": 18,
+    "market_neutral": 209,
+    "mean_reversion": 138,
+    "micro": 3,
+    "momentum": 135,
+    "profit_moonshot_breakout": 2,
+    "profit_moonshot_cross_sectional": 3,
+    "profit_moonshot_reversion": 2,
+    "profit_reboot_cross_sectional": 4,
+    "profit_reboot_mean_reversion": 3,
+    "profit_reboot_pair_carry": 3,
+    "seasonality": 63,
+    "trend": 494
+  },
+  "g005_1h_chunk_manifest_sha256": "c4fcb41510427f04a0a3af29198e408054382f81018e0b3eb925150c29e92423",
+  "g005_manifest_sha256": "f2aee8ccf17f9775b5d0583d90c085919bc9d98780882777267cc34778613cfc",
+  "g005_shard_manifest_sha256": "9ab4087b298140f50c014d7c339ec25ab2db75c40c7c3e2b2caba57ba82e2262",
+  "g005_supported_timeframes": [
+    "1d",
+    "1h",
+    "30m",
+    "4h"
+  ],
+  "generated_at_utc": "2026-07-03T14:00:35.611885+00:00",
+  "goal_id": "G004",
+  "immutable_after_checkpoint": true,
+  "input_symbols_source": "G002 eligible_for_frozen_historical_candidate_search symbols after fail-closed exclusion of any quarantine_reasons",
+  "policy": "G005 latest-fold walk-forward evaluates frozen candidates at supported completed-bar cadences 30m/1h/4h/1d; lower-latency 1s/5m/15m definitions remain frozen by G004 but are excluded from this G005 walk-forward run because the runner/data contract is completed-bar >=30m.",
+  "saved_artifact_commit": "e4e4f282",
+  "schema_version": 1,
+  "shard_key": "1h",
+  "shard_policy": "timeframe shard for parallel G005 frozen-candidate evaluation; union of shards equals g005_walkforward_candidate_manifest candidates",
+  "source_candidate_count": 1466,
+  "source_g004_candidate_manifest": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g004_frozen_candidate_manifest.json",
+  "source_g005_1h_manifest": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g005_walkforward_candidate_manifest_1h.json",
+  "source_g005_manifest": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g005_walkforward_candidate_manifest.json",
+  "strategy_counts": {
+    "AbnormalReturnContinuationStrategy": 18,
+    "AccelerationRiderStrategy": 36,
+    "AdaptiveRegimeMomentumStrategy": 4,
+    "AdaptiveTrendRiderStrategy": 36,
+    "AdfGatedReversionRiderStrategy": 36,
+    "Alpha101FormulaStrategy": 6,
+    "AmihudIlliquidityMomentumRiderStrategy": 36,
+    "BasisSnapbackReversionStrategy": 2,
+    "BreadthRegimeTrendTimerStrategy": 3,
+    "BreadthThrustFailureReversalStrategy": 2,
+    "BullBearRegimeRotationStrategy": 4,
+    "CarryTrendConfluenceRiderStrategy": 36,
+    "CarryTrendFactorRotationStrategy": 6,
+    "CompositeTrendStrategy": 9,
+    "ConfidenceGatedTrendStrategy": 18,
+    "CrossAssetDiversifiedTrendStrategy": 3,
+    "CrossAssetLiquidationContagionFadeStrategy": 2,
+    "CrossSectionalFlowShareRotationStrategy": 8,
+    "CusumChangePointTrendRiderStrategy": 36,
+    "DisagreementGatedEnsembleStrategy": 36,
+    "DispersionConditionedReversionStrategy": 2,
+    "FlowImbalanceLiquidationSweepStrategy": 3,
+    "FundingDislocationTrendCarryStrategy": 3,
+    "FundingHarvestCarryStrategy": 36,
+    "FundingLiquidationCrowdingFadeStrategy": 2,
+    "GarchInnovationRiderStrategy": 36,
+    "HurstRegimeGatedStrategy": 3,
+    "IdiosyncraticVolatilityStrategy": 2,
+    "IntradayFlowPressureRiderStrategy": 36,
+    "IntradaySeasonalMomentumRiderStrategy": 27,
+    "KalmanTrendRiderStrategy": 36,
+    "LastDayLiquidityRegimeStrategy": 4,
+    "LeadLagSpilloverStrategy": 18,
+    "LiquidationCascadeReversionStrategy": 3,
+    "LiquidityShockReversionStrategy": 4,
+    "LotterySkewnessStrategy": 2,
+    "MeanReversionStdStrategy": 6,
+    "MicroRangeExpansion1sStrategy": 3,
+    "MultiHorizonTrendExhaustionFadeStrategy": 2,
+    "MultiTimeframeTrendEnsembleStrategy": 36,
+    "OpenInterestTrendConfirmationRiderStrategy": 36,
+    "OpeningRangeBreakoutRiderStrategy": 27,
+    "OrderBookImbalanceReversionStrategy": 3,
+    "OvernightSessionReturnRiderStrategy": 27,
+    "PairSpreadZScoreStrategy": 209,
+    "PanicReboundMeanReversionStrategy": 3,
+    "PermutationEntropyTrendRiderStrategy": 36,
+    "PerpCrowdingCarryStrategy": 9,
+    "ProfitMoonshotBreakoutStrategy": 2,
+    "ProfitMoonshotReversionStrategy": 2,
+    "ProfitMoonshotTrendStrategy": 3,
+    "PullbackTrendContinuationStrategy": 36,
+    "RealizedSemivarianceTrendRiderStrategy": 27,
+    "RealizedVolTermStructureStrategy": 36,
+    "RegimeBreakoutCandidateStrategy": 4,
+    "RegimeRouterConfirmedRotationStrategy": 4,
+    "ResidualBasketReversionStrategy": 2,
+    "RollingBreakoutStrategy": 4,
+    "SeasonalMicroBreakoutRiderStrategy": 27,
+    "SelectionGatedMomentumStrategy": 3,
+    "SelectionGatedReversionStrategy": 3,
+    "SessionFilteredPairCarryStrategy": 3,
+    "SessionGatedResidualBasketReversionStrategy": 2,
+    "SessionLiquidityVacuumFadeStrategy": 2,
+    "SpectralCycleRiderStrategy": 36,
+    "TailIndexRegimeRiderStrategy": 36,
+    "TopCapTimeSeriesMomentumStrategy": 14,
+    "TrendEfficiencyMomentumStrategy": 2,
+    "VWAPCompressionReversionStrategy": 36,
+    "VarianceRatioTrendRiderStrategy": 36,
+    "VolCompressionVWAPReversionStrategy": 4,
+    "VolManagedMomentumCrashGateStrategy": 3,
+    "VolOfVolExhaustionFadeStrategy": 2,
+    "VolOfVolRegimeTrendGateStrategy": 36,
+    "VolatilityBreakoutRiderStrategy": 36,
+    "VolatilityRegimeResidualBasketReversionStrategy": 2,
+    "VolatilitySqueezeBreakoutRiderStrategy": 36,
+    "VolumeClockMomentumRiderStrategy": 36,
+    "VpinToxicityRiderStrategy": 36,
+    "VwapReversionStrategy": 4
+  },
+  "symbol_universe": [
+    "BTC/USDT",
+    "ETH/USDT",
+    "SOL/USDT",
+    "BNB/USDT",
+    "TRX/USDT",
+    "XRP/USDT",
+    "DOGE/USDT",
+    "ADA/USDT",
+    "AVAX/USDT"
+  ],
+  "timeframe_counts": {
+    "15m": 32,
+    "1d": 299,
+    "1h": 440,
+    "1s": 3,
+    "30m": 305,
+    "4h": 360,
+    "5m": 27
+  },
+  "timeframes": [
+    "1s",
+    "1m",
+    "5m",
+    "15m",
+    "30m",
+    "1h",
+    "4h",
+    "1d"
+  ]
+}

@@ -1,0 +1,1148 @@
+{
+  "artifact_kind": "hybrid_online_portfolio_tuning",
+  "best": {
+    "config": {
+      "default_boost": 0.2335751227788591,
+      "disagreement_cash_scale": 0.856739550695035,
+      "disagreement_threshold": 0.22293874953018045,
+      "diversified_weight_cap": 0.8757254013166067,
+      "lookback_days": 13,
+      "min_positive_score": 0.14655939990705838,
+      "mixed_health_floor": 0.5897144969917639,
+      "negative_health_floor": 0.09432330421001382,
+      "pair_pbo_penalty_scale": 1.8475128599670687,
+      "pair_score_boost": 0.00015054198515658535,
+      "pair_sparsity_penalty_scale": 2.732355465712022,
+      "pair_weight_cap": 0.17534288208655102,
+      "score_temperature": 0.9070667959024572,
+      "sticky_default_bonus": 0.09538352712472187,
+      "switch_margin": 0.09865009243733545,
+      "use_current_health_priors": true,
+      "variant": "fixed_default",
+      "warmup_days": null,
+      "warmup_ratio": 0.6
+    },
+    "config_name": "baseline",
+    "objective": 65.68096814777863,
+    "objective_policy": {
+      "locked_oos_label": "locked_oos_report_only",
+      "objective_policy": "train_val_only_locked_oos_report",
+      "objective_profile": "locked_train_val",
+      "oos_is_objective_input": false,
+      "selection_label": "train_val_validation_only"
+    },
+    "objective_profile": "locked_train_val",
+    "readiness": {
+      "beats_cash_refreshed": true,
+      "beats_pair_tactical_refreshed": false,
+      "pair_cap_respected": true
+    },
+    "scenarios": {
+      "historical_saved_baseline": {
+        "split_metrics": {
+          "oos": {
+            "cagr": 0.07963160763960753,
+            "calmar": 14.040364456997649,
+            "max_drawdown": 0.005671619699296304,
+            "sharpe": 2.2581613861496113,
+            "sortino": 3.079683386862322,
+            "total_return": 0.007162724672818532,
+            "volatility": 0.034183861408638855
+          },
+          "train": {
+            "cagr": 0.05886934928817711,
+            "calmar": 1.1236650010605196,
+            "max_drawdown": 0.052390480465811406,
+            "sharpe": 0.8269557285328427,
+            "sortino": 1.3493768683039162,
+            "total_return": 0.05886934928817711,
+            "volatility": 0.07231036939884057
+          },
+          "val": {
+            "cagr": 0.5390521349295081,
+            "calmar": 42.13783484169822,
+            "max_drawdown": 0.012792592143250792,
+            "sharpe": 3.491136959531074,
+            "sortino": 9.482069170812208,
+            "total_return": 0.07218159223943044,
+            "volatility": 0.12575889937426746
+          }
+        }
+      },
+      "refreshed_latest_tail": {
+        "split_metrics": {
+          "oos": {
+            "cagr": 0.017506928297035262,
+            "calmar": 3.575246760792684,
+            "max_drawdown": 0.004896704890141268,
+            "sharpe": 0.7763172405928882,
+            "sortino": 0.8998624362864446,
+            "total_return": 0.001617979335523323,
+            "volatility": 0.022677674055641042
+          },
+          "train": {
+            "cagr": 0.06964170970228722,
+            "calmar": 1.394125428183764,
+            "max_drawdown": 0.049953690173354715,
+            "sharpe": 0.8957917111788695,
+            "sortino": 1.5082663105733576,
+            "total_return": 0.06964170970228722,
+            "volatility": 0.0785758083482393
+          },
+          "val": {
+            "cagr": 0.49167518325202186,
+            "calmar": 38.66709022525689,
+            "max_drawdown": 0.012715598209944057,
+            "sharpe": 3.305313347521935,
+            "sortino": 8.940229070146314,
+            "total_return": 0.06677633838335151,
+            "volatility": 0.12326980391207122
+          }
+        }
+      }
+    }
+  },
+  "fixed_warmup_days": null,
+  "generated_at": "2026-05-10T06:14:25.562239Z",
+  "leaderboard": [
+    {
+      "config": {
+        "default_boost": 0.2335751227788591,
+        "disagreement_cash_scale": 0.856739550695035,
+        "disagreement_threshold": 0.22293874953018045,
+        "diversified_weight_cap": 0.8757254013166067,
+        "lookback_days": 13,
+        "min_positive_score": 0.14655939990705838,
+        "mixed_health_floor": 0.5897144969917639,
+        "negative_health_floor": 0.09432330421001382,
+        "pair_pbo_penalty_scale": 1.8475128599670687,
+        "pair_score_boost": 0.00015054198515658535,
+        "pair_sparsity_penalty_scale": 2.732355465712022,
+        "pair_weight_cap": 0.17534288208655102,
+        "score_temperature": 0.9070667959024572,
+        "sticky_default_bonus": 0.09538352712472187,
+        "switch_margin": 0.09865009243733545,
+        "use_current_health_priors": true,
+        "variant": "fixed_default",
+        "warmup_days": null,
+        "warmup_ratio": 0.6
+      },
+      "config_name": "baseline",
+      "objective": 65.68096814777863,
+      "objective_policy": {
+        "locked_oos_label": "locked_oos_report_only",
+        "objective_policy": "train_val_only_locked_oos_report",
+        "objective_profile": "locked_train_val",
+        "oos_is_objective_input": false,
+        "selection_label": "train_val_validation_only"
+      },
+      "objective_profile": "locked_train_val",
+      "readiness": {
+        "beats_cash_refreshed": true,
+        "beats_pair_tactical_refreshed": false,
+        "pair_cap_respected": true
+      },
+      "scenarios": {
+        "historical_saved_baseline": {
+          "split_metrics": {
+            "oos": {
+              "cagr": 0.07963160763960753,
+              "calmar": 14.040364456997649,
+              "max_drawdown": 0.005671619699296304,
+              "sharpe": 2.2581613861496113,
+              "sortino": 3.079683386862322,
+              "total_return": 0.007162724672818532,
+              "volatility": 0.034183861408638855
+            },
+            "train": {
+              "cagr": 0.05886934928817711,
+              "calmar": 1.1236650010605196,
+              "max_drawdown": 0.052390480465811406,
+              "sharpe": 0.8269557285328427,
+              "sortino": 1.3493768683039162,
+              "total_return": 0.05886934928817711,
+              "volatility": 0.07231036939884057
+            },
+            "val": {
+              "cagr": 0.5390521349295081,
+              "calmar": 42.13783484169822,
+              "max_drawdown": 0.012792592143250792,
+              "sharpe": 3.491136959531074,
+              "sortino": 9.482069170812208,
+              "total_return": 0.07218159223943044,
+              "volatility": 0.12575889937426746
+            }
+          }
+        },
+        "refreshed_latest_tail": {
+          "split_metrics": {
+            "oos": {
+              "cagr": 0.017506928297035262,
+              "calmar": 3.575246760792684,
+              "max_drawdown": 0.004896704890141268,
+              "sharpe": 0.7763172405928882,
+              "sortino": 0.8998624362864446,
+              "total_return": 0.001617979335523323,
+              "volatility": 0.022677674055641042
+            },
+            "train": {
+              "cagr": 0.06964170970228722,
+              "calmar": 1.394125428183764,
+              "max_drawdown": 0.049953690173354715,
+              "sharpe": 0.8957917111788695,
+              "sortino": 1.5082663105733576,
+              "total_return": 0.06964170970228722,
+              "volatility": 0.0785758083482393
+            },
+            "val": {
+              "cagr": 0.49167518325202186,
+              "calmar": 38.66709022525689,
+              "max_drawdown": 0.012715598209944057,
+              "sharpe": 3.305313347521935,
+              "sortino": 8.940229070146314,
+              "total_return": 0.06677633838335151,
+              "volatility": 0.12326980391207122
+            }
+          }
+        }
+      }
+    },
+    {
+      "config": {
+        "default_boost": 0.3,
+        "disagreement_cash_scale": 0.856739550695035,
+        "disagreement_threshold": 0.22293874953018045,
+        "diversified_weight_cap": 0.8757254013166067,
+        "lookback_days": 14,
+        "min_positive_score": 0.0,
+        "mixed_health_floor": 0.6,
+        "negative_health_floor": 0.2,
+        "pair_pbo_penalty_scale": 1.8475128599670687,
+        "pair_score_boost": 0.00015054198515658535,
+        "pair_sparsity_penalty_scale": 2.732355465712022,
+        "pair_weight_cap": 0.3,
+        "score_temperature": 0.8,
+        "sticky_default_bonus": 0.05,
+        "switch_margin": 0.05,
+        "use_current_health_priors": true,
+        "variant": "fixed_default",
+        "warmup_days": null,
+        "warmup_ratio": 0.6
+      },
+      "config_name": "responsive_pair",
+      "objective": 64.81979610622928,
+      "objective_policy": {
+        "locked_oos_label": "locked_oos_report_only",
+        "objective_policy": "train_val_only_locked_oos_report",
+        "objective_profile": "locked_train_val",
+        "oos_is_objective_input": false,
+        "selection_label": "train_val_validation_only"
+      },
+      "objective_profile": "locked_train_val",
+      "readiness": {
+        "beats_cash_refreshed": true,
+        "beats_pair_tactical_refreshed": false,
+        "pair_cap_respected": true
+      },
+      "scenarios": {
+        "historical_saved_baseline": {
+          "split_metrics": {
+            "oos": {
+              "cagr": 0.0736680810661321,
+              "calmar": 12.94185680940792,
+              "max_drawdown": 0.005692234286859055,
+              "sharpe": 2.136953551672781,
+              "sortino": 2.901397602501527,
+              "total_return": 0.006643203263463793,
+              "volatility": 0.0335201311615549
+            },
+            "train": {
+              "cagr": 0.06228200058181921,
+              "calmar": 1.1736958726504554,
+              "max_drawdown": 0.053064854391259964,
+              "sharpe": 0.862052951546135,
+              "sortino": 1.4053671635348164,
+              "total_return": 0.06228200058181921,
+              "volatility": 0.07317191293532428
+            },
+            "val": {
+              "cagr": 0.48520886849556,
+              "calmar": 36.27291950619168,
+              "max_drawdown": 0.013376614705985723,
+              "sharpe": 3.191839042544387,
+              "sortino": 8.247967070772166,
+              "total_return": 0.06602746974868623,
+              "volatility": 0.12640541594097504
+            }
+          }
+        },
+        "refreshed_latest_tail": {
+          "split_metrics": {
+            "oos": {
+              "cagr": 0.01931282840355042,
+              "calmar": 4.016174722990757,
+              "max_drawdown": 0.004808762002557643,
+              "sharpe": 0.8445929520389027,
+              "sortino": 1.0134393931131727,
+              "total_return": 0.001783440191711838,
+              "volatility": 0.022951214740692314
+            },
+            "train": {
+              "cagr": 0.05185383950888478,
+              "calmar": 0.9168322560990628,
+              "max_drawdown": 0.056557608181798114,
+              "sharpe": 0.708235874421962,
+              "sortino": 1.1406993293266718,
+              "total_return": 0.05185383950888478,
+              "volatility": 0.07536132511967716
+            },
+            "val": {
+              "cagr": 0.521144517609224,
+              "calmar": 40.75478771832133,
+              "max_drawdown": 0.01278732013551731,
+              "sharpe": 3.4865003983080025,
+              "sortino": 9.452766137416283,
+              "total_return": 0.07015512225751919,
+              "volatility": 0.12245326556811047
+            }
+          }
+        }
+      }
+    },
+    {
+      "config": {
+        "default_boost": 0.3,
+        "disagreement_cash_scale": 0.856739550695035,
+        "disagreement_threshold": 0.22293874953018045,
+        "diversified_weight_cap": 0.8757254013166067,
+        "lookback_days": 35,
+        "min_positive_score": 0.1,
+        "mixed_health_floor": 0.5,
+        "negative_health_floor": 0.1,
+        "pair_pbo_penalty_scale": 1.8475128599670687,
+        "pair_score_boost": 0.00015054198515658535,
+        "pair_sparsity_penalty_scale": 2.732355465712022,
+        "pair_weight_cap": 0.2,
+        "score_temperature": 1.1,
+        "sticky_default_bonus": 0.2,
+        "switch_margin": 0.2,
+        "use_current_health_priors": true,
+        "variant": "fixed_default",
+        "warmup_days": null,
+        "warmup_ratio": 0.6
+      },
+      "config_name": "long_memory",
+      "objective": 60.676049413163405,
+      "objective_policy": {
+        "locked_oos_label": "locked_oos_report_only",
+        "objective_policy": "train_val_only_locked_oos_report",
+        "objective_profile": "locked_train_val",
+        "oos_is_objective_input": false,
+        "selection_label": "train_val_validation_only"
+      },
+      "objective_profile": "locked_train_val",
+      "readiness": {
+        "beats_cash_refreshed": true,
+        "beats_pair_tactical_refreshed": false,
+        "pair_cap_respected": true
+      },
+      "scenarios": {
+        "historical_saved_baseline": {
+          "split_metrics": {
+            "oos": {
+              "cagr": 0.09808145843644134,
+              "calmar": 18.85911246605885,
+              "max_drawdown": 0.005200746250013655,
+              "sharpe": 2.934521924269096,
+              "sortino": 3.583290831872329,
+              "total_return": 0.008753691324401514,
+              "volatility": 0.03205745973606109
+            },
+            "train": {
+              "cagr": 0.07199591647488446,
+              "calmar": 1.579187415754454,
+              "max_drawdown": 0.0455904826473611,
+              "sharpe": 1.0021042088742491,
+              "sortino": 1.6078310652044763,
+              "total_return": 0.07199591647488446,
+              "volatility": 0.07194240260001954
+            },
+            "val": {
+              "cagr": 0.5519116011403984,
+              "calmar": 42.98603050876141,
+              "max_drawdown": 0.012839324650549155,
+              "sharpe": 3.5559349518866137,
+              "sortino": 9.237479091353896,
+              "total_return": 0.07362464138425806,
+              "volatility": 0.12581160035645989
+            }
+          }
+        },
+        "refreshed_latest_tail": {
+          "split_metrics": {
+            "oos": {
+              "cagr": 0.0004365666406305202,
+              "calmar": 78.00833861288653,
+              "max_drawdown": 5.59640992736643e-06,
+              "sharpe": 2.8412363144711694,
+              "sortino": 19.432501176177958,
+              "total_return": 4.065843389278179e-05,
+              "volatility": 0.000153624351728913
+            },
+            "train": {
+              "cagr": 0.07350529588468735,
+              "calmar": 1.6279311301788348,
+              "max_drawdown": 0.04515258325246996,
+              "sharpe": 0.9584680418024273,
+              "sortino": 1.5744544222451267,
+              "total_return": 0.07350529588468735,
+              "volatility": 0.07708277158789499
+            },
+            "val": {
+              "cagr": 0.30688571949434107,
+              "calmar": 31.111535414082145,
+              "max_drawdown": 0.009864049311929302,
+              "sharpe": 3.117751369304172,
+              "sortino": 11.286217372026165,
+              "total_return": 0.04421299476868312,
+              "volatility": 0.08705183200048391
+            }
+          }
+        }
+      }
+    },
+    {
+      "config": {
+        "default_boost": 0.3,
+        "disagreement_cash_scale": 0.856739550695035,
+        "disagreement_threshold": 0.22293874953018045,
+        "diversified_weight_cap": 0.8757254013166067,
+        "lookback_days": 21,
+        "min_positive_score": 0.05,
+        "mixed_health_floor": 0.7,
+        "negative_health_floor": 0.25,
+        "pair_pbo_penalty_scale": 1.8475128599670687,
+        "pair_score_boost": 0.00015054198515658535,
+        "pair_sparsity_penalty_scale": 2.732355465712022,
+        "pair_weight_cap": 0.3,
+        "score_temperature": 0.9,
+        "sticky_default_bonus": 0.1,
+        "switch_margin": 0.08,
+        "use_current_health_priors": true,
+        "variant": "fixed_default",
+        "warmup_days": null,
+        "warmup_ratio": 0.6
+      },
+      "config_name": "soft_health",
+      "objective": 58.66530360152085,
+      "objective_policy": {
+        "locked_oos_label": "locked_oos_report_only",
+        "objective_policy": "train_val_only_locked_oos_report",
+        "objective_profile": "locked_train_val",
+        "oos_is_objective_input": false,
+        "selection_label": "train_val_validation_only"
+      },
+      "objective_profile": "locked_train_val",
+      "readiness": {
+        "beats_cash_refreshed": true,
+        "beats_pair_tactical_refreshed": false,
+        "pair_cap_respected": true
+      },
+      "scenarios": {
+        "historical_saved_baseline": {
+          "split_metrics": {
+            "oos": {
+              "cagr": 0.15036459825706205,
+              "calmar": 37.40981231800996,
+              "max_drawdown": 0.004019389270891183,
+              "sharpe": 3.830548167275522,
+              "sortino": 7.317468989166907,
+              "total_return": 0.013133951148064371,
+              "volatility": 0.036746070578440634
+            },
+            "train": {
+              "cagr": 0.06728836520250492,
+              "calmar": 1.4689641288057869,
+              "max_drawdown": 0.045806676884076025,
+              "sharpe": 0.9375796411038758,
+              "sortino": 1.510173366471847,
+              "total_return": 0.06728836520250492,
+              "volatility": 0.07221972481540084
+            },
+            "val": {
+              "cagr": 0.598988615163371,
+              "calmar": 76.4311638052005,
+              "max_drawdown": 0.00783696839537873,
+              "sharpe": 3.8671413023840846,
+              "sortino": 19.983197006077955,
+              "total_return": 0.07882337484605251,
+              "volatility": 0.12334414767885311
+            }
+          }
+        },
+        "refreshed_latest_tail": {
+          "split_metrics": {
+            "oos": {
+              "cagr": 0.007017585599353948,
+              "calmar": 1.5296353744801026,
+              "max_drawdown": 0.004587750594967188,
+              "sharpe": 0.35098867631137987,
+              "sortino": 0.3887176984203787,
+              "total_return": 0.0006516221202317318,
+              "volatility": 0.02050489313208127
+            },
+            "train": {
+              "cagr": 0.059869800050150745,
+              "calmar": 1.1683392655309326,
+              "max_drawdown": 0.0512435059031795,
+              "sharpe": 0.8092790809878119,
+              "sortino": 1.2896775111195495,
+              "total_return": 0.059869800050150745,
+              "volatility": 0.07533170922009991
+            },
+            "val": {
+              "cagr": 0.3385910312275453,
+              "calmar": 33.11793493171684,
+              "max_drawdown": 0.010223796620340564,
+              "sharpe": 3.128793054887043,
+              "sortino": 9.249709041962246,
+              "total_return": 0.04826685490775895,
+              "volatility": 0.09462627498578843
+            }
+          }
+        }
+      }
+    },
+    {
+      "config": {
+        "default_boost": 0.35,
+        "disagreement_cash_scale": 0.856739550695035,
+        "disagreement_threshold": 0.22293874953018045,
+        "diversified_weight_cap": 0.8757254013166067,
+        "lookback_days": 21,
+        "min_positive_score": 0.05,
+        "mixed_health_floor": 0.55,
+        "negative_health_floor": 0.2,
+        "pair_pbo_penalty_scale": 1.5,
+        "pair_score_boost": 0.00015054198515658535,
+        "pair_sparsity_penalty_scale": 1.0,
+        "pair_weight_cap": 0.3,
+        "score_temperature": 1.0,
+        "sticky_default_bonus": 0.15,
+        "switch_margin": 0.1,
+        "use_current_health_priors": true,
+        "variant": "fixed_default",
+        "warmup_days": null,
+        "warmup_ratio": 0.6
+      },
+      "config_name": "pair_penalty_relaxed",
+      "objective": 58.125781052511755,
+      "objective_policy": {
+        "locked_oos_label": "locked_oos_report_only",
+        "objective_policy": "train_val_only_locked_oos_report",
+        "objective_profile": "locked_train_val",
+        "oos_is_objective_input": false,
+        "selection_label": "train_val_validation_only"
+      },
+      "objective_profile": "locked_train_val",
+      "readiness": {
+        "beats_cash_refreshed": true,
+        "beats_pair_tactical_refreshed": false,
+        "pair_cap_respected": true
+      },
+      "scenarios": {
+        "historical_saved_baseline": {
+          "split_metrics": {
+            "oos": {
+              "cagr": 0.15837763776237623,
+              "calmar": 40.75423331983436,
+              "max_drawdown": 0.003886164083113708,
+              "sharpe": 3.9589368575849484,
+              "sortino": 8.01116335490814,
+              "total_return": 0.013789261326363267,
+              "volatility": 0.037313564125410675
+            },
+            "train": {
+              "cagr": 0.06726275632687839,
+              "calmar": 1.4680115616925795,
+              "max_drawdown": 0.045818955437466835,
+              "sharpe": 0.9372374963612783,
+              "sortino": 1.509633150203868,
+              "total_return": 0.06726275632687839,
+              "volatility": 0.07222054623763814
+            },
+            "val": {
+              "cagr": 0.5907367084596835,
+              "calmar": 78.19436974885393,
+              "max_drawdown": 0.0075547217831286595,
+              "sharpe": 3.907937631442867,
+              "sortino": 20.219654138464826,
+              "total_return": 0.07792147174000341,
+              "volatility": 0.12065145915031551
+            }
+          }
+        },
+        "refreshed_latest_tail": {
+          "split_metrics": {
+            "oos": {
+              "cagr": 0.008926440340633501,
+              "calmar": 1.8941445699400843,
+              "max_drawdown": 0.004712649964683457,
+              "sharpe": 0.4258791428563681,
+              "sortino": 0.4831092728434546,
+              "total_return": 0.0008281575176991574,
+              "volatility": 0.021387983445501215
+            },
+            "train": {
+              "cagr": 0.06044180334857807,
+              "calmar": 1.1916676950721319,
+              "max_drawdown": 0.05072035064684666,
+              "sharpe": 0.8157036633784428,
+              "sortino": 1.3015602233842785,
+              "total_return": 0.06044180334857807,
+              "volatility": 0.07540676768534804
+            },
+            "val": {
+              "cagr": 0.3228026890989961,
+              "calmar": 32.89747602001374,
+              "max_drawdown": 0.00981238466144374,
+              "sharpe": 3.099843499911315,
+              "sortino": 8.931598968706355,
+              "total_return": 0.04625833057829065,
+              "volatility": 0.09159202584240712
+            }
+          }
+        }
+      }
+    },
+    {
+      "config": {
+        "default_boost": 0.35,
+        "disagreement_cash_scale": 0.856739550695035,
+        "disagreement_threshold": 0.22293874953018045,
+        "diversified_weight_cap": 0.8757254013166067,
+        "lookback_days": 21,
+        "min_positive_score": 0.08,
+        "mixed_health_floor": 0.5,
+        "negative_health_floor": 0.15,
+        "pair_pbo_penalty_scale": 3.5,
+        "pair_score_boost": 0.00015054198515658535,
+        "pair_sparsity_penalty_scale": 3.0,
+        "pair_weight_cap": 0.2,
+        "score_temperature": 1.0,
+        "sticky_default_bonus": 0.15,
+        "switch_margin": 0.1,
+        "use_current_health_priors": true,
+        "variant": "fixed_default",
+        "warmup_days": null,
+        "warmup_ratio": 0.6
+      },
+      "config_name": "pair_penalty_strict",
+      "objective": 57.907597387203694,
+      "objective_policy": {
+        "locked_oos_label": "locked_oos_report_only",
+        "objective_policy": "train_val_only_locked_oos_report",
+        "objective_profile": "locked_train_val",
+        "oos_is_objective_input": false,
+        "selection_label": "train_val_validation_only"
+      },
+      "objective_profile": "locked_train_val",
+      "readiness": {
+        "beats_cash_refreshed": true,
+        "beats_pair_tactical_refreshed": false,
+        "pair_cap_respected": true
+      },
+      "scenarios": {
+        "historical_saved_baseline": {
+          "split_metrics": {
+            "oos": {
+              "cagr": 0.13296772175220228,
+              "calmar": 34.215673581560324,
+              "max_drawdown": 0.003886164083113708,
+              "sharpe": 3.6929083135217997,
+              "sortino": 6.695070397987992,
+              "total_return": 0.011696856804300992,
+              "volatility": 0.03396207582154477
+            },
+            "train": {
+              "cagr": 0.06602793123437412,
+              "calmar": 1.4528350880627987,
+              "max_drawdown": 0.04544764356043696,
+              "sharpe": 0.9243434995163357,
+              "sortino": 1.4831336098974313,
+              "total_return": 0.06602793123437412,
+              "volatility": 0.0719547405856298
+            },
+            "val": {
+              "cagr": 0.5183650587289677,
+              "calmar": 68.61471191256804,
+              "max_drawdown": 0.0075547217831285485,
+              "sharpe": 3.9114368428280084,
+              "sortino": 20.344710385284436,
+              "total_return": 0.06983880088049754,
+              "volatility": 0.10827936534757991
+            }
+          }
+        },
+        "refreshed_latest_tail": {
+          "split_metrics": {
+            "oos": {
+              "cagr": 0.008926440340633501,
+              "calmar": 1.8941445699400843,
+              "max_drawdown": 0.004712649964683457,
+              "sharpe": 0.4258791428563681,
+              "sortino": 0.4831092728434546,
+              "total_return": 0.0008281575176991574,
+              "volatility": 0.021387983445501215
+            },
+            "train": {
+              "cagr": 0.06028924344419195,
+              "calmar": 1.1843517003857504,
+              "max_drawdown": 0.050904848132995784,
+              "sharpe": 0.8138999812828803,
+              "sortino": 1.2977342224505741,
+              "total_return": 0.06028924344419195,
+              "volatility": 0.07539608762966622
+            },
+            "val": {
+              "cagr": 0.3195885383638708,
+              "calmar": 32.56991540696945,
+              "max_drawdown": 0.009812384661443851,
+              "sharpe": 3.0905598389266777,
+              "sortino": 8.853564717208084,
+              "total_return": 0.04584698008828192,
+              "volatility": 0.09106452526203594
+            }
+          }
+        }
+      }
+    },
+    {
+      "config": {
+        "default_boost": 0.35,
+        "disagreement_cash_scale": 0.856739550695035,
+        "disagreement_threshold": 0.22293874953018045,
+        "diversified_weight_cap": 0.8757254013166067,
+        "lookback_days": 21,
+        "min_positive_score": 0.2,
+        "mixed_health_floor": 0.4,
+        "negative_health_floor": 0.05,
+        "pair_pbo_penalty_scale": 1.8475128599670687,
+        "pair_score_boost": 0.00015054198515658535,
+        "pair_sparsity_penalty_scale": 2.732355465712022,
+        "pair_weight_cap": 0.2,
+        "score_temperature": 1.0,
+        "sticky_default_bonus": 0.15,
+        "switch_margin": 0.1,
+        "use_current_health_priors": true,
+        "variant": "fixed_default",
+        "warmup_days": null,
+        "warmup_ratio": 0.6
+      },
+      "config_name": "strict_health",
+      "objective": 57.905686722473334,
+      "objective_policy": {
+        "locked_oos_label": "locked_oos_report_only",
+        "objective_policy": "train_val_only_locked_oos_report",
+        "objective_profile": "locked_train_val",
+        "oos_is_objective_input": false,
+        "selection_label": "train_val_validation_only"
+      },
+      "objective_profile": "locked_train_val",
+      "readiness": {
+        "beats_cash_refreshed": true,
+        "beats_pair_tactical_refreshed": false,
+        "pair_cap_respected": true
+      },
+      "scenarios": {
+        "historical_saved_baseline": {
+          "split_metrics": {
+            "oos": {
+              "cagr": 0.13296772175220228,
+              "calmar": 34.215673581560324,
+              "max_drawdown": 0.003886164083113708,
+              "sharpe": 3.6929083135217997,
+              "sortino": 6.695070397987992,
+              "total_return": 0.011696856804300992,
+              "volatility": 0.03396207582154477
+            },
+            "train": {
+              "cagr": 0.06602793123437412,
+              "calmar": 1.4528350880627987,
+              "max_drawdown": 0.04544764356043696,
+              "sharpe": 0.9243434995163357,
+              "sortino": 1.4831336098974313,
+              "total_return": 0.06602793123437412,
+              "volatility": 0.0719547405856298
+            },
+            "val": {
+              "cagr": 0.5183650587289677,
+              "calmar": 68.61471191256804,
+              "max_drawdown": 0.0075547217831285485,
+              "sharpe": 3.9114368428280084,
+              "sortino": 20.344710385284436,
+              "total_return": 0.06983880088049754,
+              "volatility": 0.10827936534757991
+            }
+          }
+        },
+        "refreshed_latest_tail": {
+          "split_metrics": {
+            "oos": {
+              "cagr": 0.008926440340633501,
+              "calmar": 1.8941445699400843,
+              "max_drawdown": 0.004712649964683457,
+              "sharpe": 0.4258791428563681,
+              "sortino": 0.4831092728434546,
+              "total_return": 0.0008281575176991574,
+              "volatility": 0.021387983445501215
+            },
+            "train": {
+              "cagr": 0.06028924344419195,
+              "calmar": 1.1843517003857504,
+              "max_drawdown": 0.050904848132995784,
+              "sharpe": 0.8138999812828803,
+              "sortino": 1.2977342224505741,
+              "total_return": 0.06028924344419195,
+              "volatility": 0.07539608762966622
+            },
+            "val": {
+              "cagr": 0.319573421148311,
+              "calmar": 32.56837478090541,
+              "max_drawdown": 0.009812384661443851,
+              "sharpe": 3.090429667385748,
+              "sortino": 8.853472534670248,
+              "total_return": 0.045845043386953055,
+              "volatility": 0.09106465492493514
+            }
+          }
+        }
+      }
+    },
+    {
+      "config": {
+        "default_boost": 0.4,
+        "disagreement_cash_scale": 0.856739550695035,
+        "disagreement_threshold": 0.22293874953018045,
+        "diversified_weight_cap": 0.8757254013166067,
+        "lookback_days": 21,
+        "min_positive_score": 0.05,
+        "mixed_health_floor": 0.55,
+        "negative_health_floor": 0.15,
+        "pair_pbo_penalty_scale": 1.8475128599670687,
+        "pair_score_boost": 0.00015054198515658535,
+        "pair_sparsity_penalty_scale": 2.732355465712022,
+        "pair_weight_cap": 0.25,
+        "score_temperature": 1.0,
+        "sticky_default_bonus": 0.2,
+        "switch_margin": 0.15,
+        "use_current_health_priors": true,
+        "variant": "fixed_default",
+        "warmup_days": null,
+        "warmup_ratio": 0.6
+      },
+      "config_name": "balanced_sticky",
+      "objective": 57.53801550589116,
+      "objective_policy": {
+        "locked_oos_label": "locked_oos_report_only",
+        "objective_policy": "train_val_only_locked_oos_report",
+        "objective_profile": "locked_train_val",
+        "oos_is_objective_input": false,
+        "selection_label": "train_val_validation_only"
+      },
+      "objective_profile": "locked_train_val",
+      "readiness": {
+        "beats_cash_refreshed": true,
+        "beats_pair_tactical_refreshed": false,
+        "pair_cap_respected": true
+      },
+      "scenarios": {
+        "historical_saved_baseline": {
+          "split_metrics": {
+            "oos": {
+              "cagr": 0.1503499125882839,
+              "calmar": 40.12002735466295,
+              "max_drawdown": 0.0037475027436841835,
+              "sharpe": 3.932594223363065,
+              "sortino": 7.892472994704711,
+              "total_return": 0.013132746351677271,
+              "volatility": 0.03578072866268079
+            },
+            "train": {
+              "cagr": 0.06666431509135018,
+              "calmar": 1.4609145545482514,
+              "max_drawdown": 0.04563190563322461,
+              "sharpe": 0.9312144196782374,
+              "sortino": 1.4969822183320454,
+              "total_return": 0.06666431509135018,
+              "volatility": 0.07207397381634106
+            },
+            "val": {
+              "cagr": 0.5423858848114249,
+              "calmar": 74.44702203087394,
+              "max_drawdown": 0.0072855282859600745,
+              "sharpe": 3.926415175504031,
+              "sortino": 20.546585968736643,
+              "total_return": 0.07255666298093955,
+              "volatility": 0.11196753540518638
+            }
+          }
+        },
+        "refreshed_latest_tail": {
+          "split_metrics": {
+            "oos": {
+              "cagr": 0.009907489226105515,
+              "calmar": 2.0755968874278565,
+              "max_drawdown": 0.004773320525828684,
+              "sharpe": 0.45980889858778173,
+              "sortino": 0.5288537702992773,
+              "total_return": 0.0009187694330414775,
+              "volatility": 0.02194909251429951
+            },
+            "train": {
+              "cagr": 0.06044188863774802,
+              "calmar": 1.1912835641769641,
+              "max_drawdown": 0.050736777082546425,
+              "sharpe": 0.815974671398343,
+              "sortino": 1.3011814344461123,
+              "total_return": 0.06044188863774802,
+              "volatility": 0.07537930715276248
+            },
+            "val": {
+              "cagr": 0.30765424175058076,
+              "calmar": 32.51108537789918,
+              "max_drawdown": 0.009463056621287769,
+              "sharpe": 3.0763797610678045,
+              "sortino": 8.73582166195818,
+              "total_return": 0.04431222866619744,
+              "volatility": 0.08845569440009374
+            }
+          }
+        }
+      }
+    },
+    {
+      "config": {
+        "default_boost": 0.45,
+        "disagreement_cash_scale": 0.856739550695035,
+        "disagreement_threshold": 0.22293874953018045,
+        "diversified_weight_cap": 0.8757254013166067,
+        "lookback_days": 21,
+        "min_positive_score": 0.12,
+        "mixed_health_floor": 0.55,
+        "negative_health_floor": 0.15,
+        "pair_pbo_penalty_scale": 1.8475128599670687,
+        "pair_score_boost": 0.00015054198515658535,
+        "pair_sparsity_penalty_scale": 2.732355465712022,
+        "pair_weight_cap": 0.25,
+        "score_temperature": 0.85,
+        "sticky_default_bonus": 0.05,
+        "switch_margin": 0.2,
+        "use_current_health_priors": true,
+        "variant": "fixed_default",
+        "warmup_days": null,
+        "warmup_ratio": 0.6
+      },
+      "config_name": "high_conviction_switch",
+      "objective": 57.1398881980825,
+      "objective_policy": {
+        "locked_oos_label": "locked_oos_report_only",
+        "objective_policy": "train_val_only_locked_oos_report",
+        "objective_profile": "locked_train_val",
+        "oos_is_objective_input": false,
+        "selection_label": "train_val_validation_only"
+      },
+      "objective_profile": "locked_train_val",
+      "readiness": {
+        "beats_cash_refreshed": true,
+        "beats_pair_tactical_refreshed": false,
+        "pair_cap_respected": true
+      },
+      "scenarios": {
+        "historical_saved_baseline": {
+          "split_metrics": {
+            "oos": {
+              "cagr": 0.15022666081180658,
+              "calmar": 41.7855249369812,
+              "max_drawdown": 0.003595184242351168,
+              "sharpe": 3.9960592191526327,
+              "sortino": 8.244016506300852,
+              "total_return": 0.013122634359413299,
+              "volatility": 0.035180505228957576
+            },
+            "train": {
+              "cagr": 0.06674359122866513,
+              "calmar": 1.4632548730504182,
+              "max_drawdown": 0.04561310025882648,
+              "sharpe": 0.9322768239781568,
+              "sortino": 1.4986886746004209,
+              "total_return": 0.06674359122866513,
+              "volatility": 0.07207137067686689
+            },
+            "val": {
+              "cagr": 0.5344191807933474,
+              "calmar": 76.09169339481952,
+              "max_drawdown": 0.007023357701088195,
+              "sharpe": 3.912010605559702,
+              "sortino": 20.815529886258883,
+              "total_return": 0.07165921909875284,
+              "volatility": 0.11102877096889079
+            }
+          }
+        },
+        "refreshed_latest_tail": {
+          "split_metrics": {
+            "oos": {
+              "cagr": 0.009707365383832434,
+              "calmar": 2.0452784216945754,
+              "max_drawdown": 0.00474623175058464,
+              "sharpe": 0.4479355883249398,
+              "sortino": 0.5171463974738454,
+              "total_return": 0.0009002920207059617,
+              "volatility": 0.022095404262593203
+            },
+            "train": {
+              "cagr": 0.05986640453534431,
+              "calmar": 1.1681440983262812,
+              "max_drawdown": 0.051249160631056556,
+              "sharpe": 0.8102156923616883,
+              "sortino": 1.2890342045924845,
+              "total_return": 0.05986640453534431,
+              "volatility": 0.07523145994805307
+            },
+            "val": {
+              "cagr": 0.2960889111444873,
+              "calmar": 32.232026054300334,
+              "max_drawdown": 0.009186171252333786,
+              "sharpe": 3.072506003361478,
+              "sortino": 8.803113002669651,
+              "total_return": 0.04281368124938889,
+              "volatility": 0.08559579032925528
+            }
+          }
+        }
+      }
+    },
+    {
+      "config": {
+        "default_boost": 0.25,
+        "disagreement_cash_scale": 0.856739550695035,
+        "disagreement_threshold": 0.22293874953018045,
+        "diversified_weight_cap": 0.8757254013166067,
+        "lookback_days": 28,
+        "min_positive_score": 0.15,
+        "mixed_health_floor": 0.45,
+        "negative_health_floor": 0.1,
+        "pair_pbo_penalty_scale": 1.8475128599670687,
+        "pair_score_boost": 0.00015054198515658535,
+        "pair_sparsity_penalty_scale": 2.732355465712022,
+        "pair_weight_cap": 0.2,
+        "score_temperature": 1.1,
+        "sticky_default_bonus": 0.2,
+        "switch_margin": 0.15,
+        "use_current_health_priors": true,
+        "variant": "fixed_default",
+        "warmup_days": null,
+        "warmup_ratio": 0.6
+      },
+      "config_name": "conservative_cash_bias",
+      "objective": -934.2265176389396,
+      "objective_policy": {
+        "locked_oos_label": "locked_oos_report_only",
+        "objective_policy": "train_val_only_locked_oos_report",
+        "objective_profile": "locked_train_val",
+        "oos_is_objective_input": false,
+        "selection_label": "train_val_validation_only"
+      },
+      "objective_profile": "locked_train_val",
+      "readiness": {
+        "beats_cash_refreshed": false,
+        "beats_pair_tactical_refreshed": false,
+        "pair_cap_respected": true
+      },
+      "scenarios": {
+        "historical_saved_baseline": {
+          "split_metrics": {
+            "oos": {
+              "cagr": 0.06508769660465386,
+              "calmar": 16.45665151778363,
+              "max_drawdown": 0.003955099646748783,
+              "sharpe": 3.386170035971532,
+              "sortino": 3.163912072665038,
+              "total_return": 0.00589110046260366,
+              "volatility": 0.01867350248058199
+            },
+            "train": {
+              "cagr": 0.06891072204237658,
+              "calmar": 1.4952617172487919,
+              "max_drawdown": 0.046086060552107844,
+              "sharpe": 0.9625698737188593,
+              "sortino": 1.5393576596044252,
+              "total_return": 0.06891072204237658,
+              "volatility": 0.0718991894808681
+            },
+            "val": {
+              "cagr": 0.4829089700160698,
+              "calmar": 69.15933817750205,
+              "max_drawdown": 0.006982556264154116,
+              "sharpe": 3.7491344045077164,
+              "sortino": 15.737530446896463,
+              "total_return": 0.06576045776249018,
+              "volatility": 0.1066137731816642
+            }
+          }
+        },
+        "refreshed_latest_tail": {
+          "split_metrics": {
+            "oos": {
+              "cagr": -0.014570572720341901,
+              "calmar": -10.218036345152846,
+              "max_drawdown": 0.0014259660298873156,
+              "sharpe": -3.1364744618424134,
+              "sortino": -1.0785423342320024,
+              "total_return": -0.0013663097071948682,
+              "volatility": 0.004676221418726168
+            },
+            "train": {
+              "cagr": 0.07041794682195768,
+              "calmar": 1.5616783489611534,
+              "max_drawdown": 0.04509119747277057,
+              "sharpe": 0.9273485409026214,
+              "sortino": 1.503094267909341,
+              "total_return": 0.07041794682195768,
+              "volatility": 0.07651722468027011
+            },
+            "val": {
+              "cagr": 0.3838020260785664,
+              "calmar": 36.880448064265046,
+              "max_drawdown": 0.010406653015976985,
+              "sharpe": 3.4541205500972914,
+              "sortino": 10.031625057397862,
+              "total_return": 0.05391051208863429,
+              "volatility": 0.09535720720408851
+            }
+          }
+        }
+      }
+    }
+  ],
+  "objective_policy": {
+    "locked_oos_label": "locked_oos_report_only",
+    "objective_policy": "train_val_only_locked_oos_report",
+    "objective_profile": "locked_train_val",
+    "oos_is_objective_input": false,
+    "selection_label": "train_val_validation_only"
+  },
+  "objective_profile": "locked_train_val",
+  "resolved_warmup_days": 255,
+  "split_windows": {
+    "oos_end_inclusive": "2026-05-09",
+    "oos_start": "2026-03-01",
+    "pre_oos_days": 424,
+    "train_end_inclusive": "2025-12-31",
+    "train_start": "2025-01-01",
+    "val_end_inclusive": "2026-02-28",
+    "val_start": "2026-01-01"
+  },
+  "warmup_ratio": 0.6
+}

@@ -1,0 +1,4094 @@
+{
+  "artifact_kind": "profit_moonshot_calendar_optuna",
+  "best_trial": {
+    "objective": 2.325916949391713,
+    "params": {
+      "hold_bars": 168,
+      "long_scale": 5.9,
+      "short_scale": 10.0,
+      "short_symbol": "ETHUSDT",
+      "take_profit_pct": 0.018,
+      "threshold": 0.015
+    },
+    "result": {
+      "failed_gates": [],
+      "family": "calendar_rotation",
+      "filters": {
+        "adaptive_lookback_bars": 12,
+        "allow_long": true,
+        "allow_short": true,
+        "broad_min_abs": 0.0,
+        "calendar_long_months": [
+          3,
+          4,
+          5
+        ],
+        "calendar_long_symbol": "TRXUSDT",
+        "calendar_short_months": [
+          1,
+          2
+        ],
+        "calendar_short_symbol": "ETHUSDT",
+        "compression_lookback_bars": 24,
+        "compression_quantile": 0.0,
+        "cooldown_bars": 42,
+        "entry_hours": [],
+        "family": "calendar_rotation",
+        "flow_lookback_bars": 0,
+        "flow_persistence_bars": 0,
+        "flow_persistence_threshold": 0.0,
+        "flow_threshold": 0.0,
+        "funding_abs_cap": 0.0,
+        "funding_rank_min": 0.0,
+        "hold_bars": 168,
+        "long_allocation_scale": 5.9,
+        "lookback_bars": 168,
+        "max_order_value": 175.0,
+        "max_rv": 0.0,
+        "min_abs_return": 0.015,
+        "name": "optuna_calendar_trx_sethusdt_t47_thr150_h168_ls590_ss100_tp180",
+        "oi_rank_min": 0.0,
+        "rv_lookback_bars": 24,
+        "sharpe_lookback_bars": 0,
+        "sharpe_rank_min": 0.0,
+        "short_allocation_scale": 10.0,
+        "stop_loss_pct": 0.0,
+        "take_profit_pct": 0.018,
+        "target_allocation": 0.008,
+        "threshold": 0.015,
+        "trailing_stop_cap_pct": 0.0,
+        "trailing_stop_floor_pct": 0.0,
+        "trailing_stop_rv_multiple": 0.0
+      },
+      "gates": {
+        "liquidations_zero": true,
+        "oos_mdd_beats_shadow": true,
+        "oos_return_beats_incumbent": true,
+        "oos_sharpe_gt_1": true,
+        "oos_trades_not_starved": true,
+        "train_positive": true,
+        "val_positive": true
+      },
+      "name": "optuna_calendar_trx_sethusdt_t47_thr150_h168_ls590_ss100_tp180",
+      "replay_survivor": true,
+      "split_results": {
+        "oos": {
+          "fills": 28,
+          "final_equity": 10100.906764148092,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.05680035102115166,
+            "calmar": 70.6507661149127,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0008039594493393958,
+            "min_equity": 9999.24451710008,
+            "raw_final_equity": 10100.906764148092,
+            "raw_max_drawdown": 0.0008039594493393958,
+            "raw_total_return": 0.010090676414809208,
+            "sharpe": 9.140601095309947,
+            "sortino": 9.001472046845954,
+            "total_return": 0.010090676414809208,
+            "volatility": 0.0060460187119756965
+          },
+          "reject_counts": {
+            "cooldown": 554,
+            "signal_missing": 454
+          },
+          "round_trips": 14
+        },
+        "train": {
+          "fills": 66,
+          "final_equity": 10269.100514047617,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.026913164655516075,
+            "calmar": 1.6889478500030806,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.01593487013555036,
+            "min_equity": 9949.427160325462,
+            "raw_final_equity": 10269.100514047617,
+            "raw_max_drawdown": 0.01593487013555036,
+            "raw_total_return": 0.02691005140476177,
+            "sharpe": 1.2554248224519482,
+            "sortino": 0.6522968095088872,
+            "total_return": 0.02691005140476177,
+            "volatility": 0.02133548963167455
+          },
+          "reject_counts": {
+            "cooldown": 1386,
+            "signal_missing": 5590
+          },
+          "round_trips": 33
+        },
+        "val": {
+          "fills": 26,
+          "final_equity": 10023.447731751718,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.01460468095099765,
+            "calmar": 1.3483571029822696,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.010831463652095802,
+            "min_equity": 9921.871496702526,
+            "raw_final_equity": 10023.447731751718,
+            "raw_max_drawdown": 0.010831463652095802,
+            "raw_total_return": 0.002344773175171788,
+            "sharpe": 0.4326520200493,
+            "sortino": 0.38159222533406106,
+            "total_return": 0.002344773175171788,
+            "volatility": 0.034920319278571324
+          },
+          "reject_counts": {
+            "cooldown": 504,
+            "signal_missing": 291
+          },
+          "round_trips": 13
+        }
+      },
+      "success_candidate": true
+    },
+    "state": "TrialState.COMPLETE",
+    "trial_number": 47
+  },
+  "csv_path": "var/reports/profit_moonshot_20260501/current_tail_20260508/all_family_expansion/calendar_optuna_trials.csv",
+  "data_metadata": {
+    "feature_points": [
+      {
+        "funding_rows": 1477,
+        "open_interest_rows": 17699,
+        "rows": 2110280,
+        "symbol": "BTC/USDT",
+        "taker_flow_rows": 2101668
+      },
+      {
+        "funding_rows": 1478,
+        "open_interest_rows": 17987,
+        "rows": 2111552,
+        "symbol": "ETH/USDT",
+        "taker_flow_rows": 2102583
+      },
+      {
+        "funding_rows": 1478,
+        "open_interest_rows": 17987,
+        "rows": 2109455,
+        "symbol": "SOL/USDT",
+        "taker_flow_rows": 2099436
+      },
+      {
+        "funding_rows": 1478,
+        "open_interest_rows": 17987,
+        "rows": 709829,
+        "symbol": "BNB/USDT",
+        "taker_flow_rows": 0
+      },
+      {
+        "funding_rows": 1478,
+        "open_interest_rows": 17987,
+        "rows": 709829,
+        "symbol": "TRX/USDT",
+        "taker_flow_rows": 0
+      }
+    ],
+    "panel_cache": {
+      "cache_hit": true,
+      "cache_key": "de62df511cec53df6ad395217f0d95a3a5112da1273a1476664afe660902ce54",
+      "end": "2026-05-08",
+      "exchange": "binance",
+      "market_root": "/home/hoky/Quants-agent/LuminaQuant/data/market_parquet",
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/cache/profit_moonshot_fresh_start/joined_panel_de62df511cec53df6ad39521.parquet",
+      "schema": 2,
+      "source_count": 7455,
+      "source_latest_mtime_ns": 1778238134877040199,
+      "source_total_bytes": 3564742549,
+      "start": "2025-01-01",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT"
+      ]
+    },
+    "rows": 11769
+  },
+  "generated_at_utc": "2026-05-08T12:22:46.885347Z",
+  "n_trials": 128,
+  "objective_policy": "train_val_only_locked_oos_report",
+  "peak_rss_mib": 242.7578125,
+  "seed": 44,
+  "success_candidate_count": 8,
+  "top_trials": [
+    {
+      "objective": 2.325916949391713,
+      "params": {
+        "hold_bars": 168,
+        "long_scale": 5.9,
+        "short_scale": 10.0,
+        "short_symbol": "ETHUSDT",
+        "take_profit_pct": 0.018,
+        "threshold": 0.015
+      },
+      "result": {
+        "failed_gates": [],
+        "family": "calendar_rotation",
+        "filters": {
+          "adaptive_lookback_bars": 12,
+          "allow_long": true,
+          "allow_short": true,
+          "broad_min_abs": 0.0,
+          "calendar_long_months": [
+            3,
+            4,
+            5
+          ],
+          "calendar_long_symbol": "TRXUSDT",
+          "calendar_short_months": [
+            1,
+            2
+          ],
+          "calendar_short_symbol": "ETHUSDT",
+          "compression_lookback_bars": 24,
+          "compression_quantile": 0.0,
+          "cooldown_bars": 42,
+          "entry_hours": [],
+          "family": "calendar_rotation",
+          "flow_lookback_bars": 0,
+          "flow_persistence_bars": 0,
+          "flow_persistence_threshold": 0.0,
+          "flow_threshold": 0.0,
+          "funding_abs_cap": 0.0,
+          "funding_rank_min": 0.0,
+          "hold_bars": 168,
+          "long_allocation_scale": 5.9,
+          "lookback_bars": 168,
+          "max_order_value": 175.0,
+          "max_rv": 0.0,
+          "min_abs_return": 0.015,
+          "name": "optuna_calendar_trx_sethusdt_t47_thr150_h168_ls590_ss100_tp180",
+          "oi_rank_min": 0.0,
+          "rv_lookback_bars": 24,
+          "sharpe_lookback_bars": 0,
+          "sharpe_rank_min": 0.0,
+          "short_allocation_scale": 10.0,
+          "stop_loss_pct": 0.0,
+          "take_profit_pct": 0.018,
+          "target_allocation": 0.008,
+          "threshold": 0.015,
+          "trailing_stop_cap_pct": 0.0,
+          "trailing_stop_floor_pct": 0.0,
+          "trailing_stop_rv_multiple": 0.0
+        },
+        "gates": {
+          "liquidations_zero": true,
+          "oos_mdd_beats_shadow": true,
+          "oos_return_beats_incumbent": true,
+          "oos_sharpe_gt_1": true,
+          "oos_trades_not_starved": true,
+          "train_positive": true,
+          "val_positive": true
+        },
+        "name": "optuna_calendar_trx_sethusdt_t47_thr150_h168_ls590_ss100_tp180",
+        "replay_survivor": true,
+        "split_results": {
+          "oos": {
+            "fills": 28,
+            "final_equity": 10100.906764148092,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.05680035102115166,
+              "calmar": 70.6507661149127,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.0008039594493393958,
+              "min_equity": 9999.24451710008,
+              "raw_final_equity": 10100.906764148092,
+              "raw_max_drawdown": 0.0008039594493393958,
+              "raw_total_return": 0.010090676414809208,
+              "sharpe": 9.140601095309947,
+              "sortino": 9.001472046845954,
+              "total_return": 0.010090676414809208,
+              "volatility": 0.0060460187119756965
+            },
+            "reject_counts": {
+              "cooldown": 554,
+              "signal_missing": 454
+            },
+            "round_trips": 14
+          },
+          "train": {
+            "fills": 66,
+            "final_equity": 10269.100514047617,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.026913164655516075,
+              "calmar": 1.6889478500030806,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.01593487013555036,
+              "min_equity": 9949.427160325462,
+              "raw_final_equity": 10269.100514047617,
+              "raw_max_drawdown": 0.01593487013555036,
+              "raw_total_return": 0.02691005140476177,
+              "sharpe": 1.2554248224519482,
+              "sortino": 0.6522968095088872,
+              "total_return": 0.02691005140476177,
+              "volatility": 0.02133548963167455
+            },
+            "reject_counts": {
+              "cooldown": 1386,
+              "signal_missing": 5590
+            },
+            "round_trips": 33
+          },
+          "val": {
+            "fills": 26,
+            "final_equity": 10023.447731751718,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.01460468095099765,
+              "calmar": 1.3483571029822696,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.010831463652095802,
+              "min_equity": 9921.871496702526,
+              "raw_final_equity": 10023.447731751718,
+              "raw_max_drawdown": 0.010831463652095802,
+              "raw_total_return": 0.002344773175171788,
+              "sharpe": 0.4326520200493,
+              "sortino": 0.38159222533406106,
+              "total_return": 0.002344773175171788,
+              "volatility": 0.034920319278571324
+            },
+            "reject_counts": {
+              "cooldown": 504,
+              "signal_missing": 291
+            },
+            "round_trips": 13
+          }
+        },
+        "success_candidate": true
+      },
+      "state": "TrialState.COMPLETE",
+      "trial_number": 47
+    },
+    {
+      "objective": 6.40165343120691,
+      "params": {
+        "hold_bars": 120,
+        "long_scale": 6.2,
+        "short_scale": 10.0,
+        "short_symbol": "ETHUSDT",
+        "take_profit_pct": 0.018,
+        "threshold": 0.015
+      },
+      "result": {
+        "failed_gates": [],
+        "family": "calendar_rotation",
+        "filters": {
+          "adaptive_lookback_bars": 12,
+          "allow_long": true,
+          "allow_short": true,
+          "broad_min_abs": 0.0,
+          "calendar_long_months": [
+            3,
+            4,
+            5
+          ],
+          "calendar_long_symbol": "TRXUSDT",
+          "calendar_short_months": [
+            1,
+            2
+          ],
+          "calendar_short_symbol": "ETHUSDT",
+          "compression_lookback_bars": 24,
+          "compression_quantile": 0.0,
+          "cooldown_bars": 30,
+          "entry_hours": [],
+          "family": "calendar_rotation",
+          "flow_lookback_bars": 0,
+          "flow_persistence_bars": 0,
+          "flow_persistence_threshold": 0.0,
+          "flow_threshold": 0.0,
+          "funding_abs_cap": 0.0,
+          "funding_rank_min": 0.0,
+          "hold_bars": 120,
+          "long_allocation_scale": 6.2,
+          "lookback_bars": 168,
+          "max_order_value": 175.0,
+          "max_rv": 0.0,
+          "min_abs_return": 0.015,
+          "name": "optuna_calendar_trx_sethusdt_t0_thr150_h120_ls620_ss100_tp180",
+          "oi_rank_min": 0.0,
+          "rv_lookback_bars": 24,
+          "sharpe_lookback_bars": 0,
+          "sharpe_rank_min": 0.0,
+          "short_allocation_scale": 10.0,
+          "stop_loss_pct": 0.0,
+          "take_profit_pct": 0.018,
+          "target_allocation": 0.008,
+          "threshold": 0.015,
+          "trailing_stop_cap_pct": 0.0,
+          "trailing_stop_floor_pct": 0.0,
+          "trailing_stop_rv_multiple": 0.0
+        },
+        "gates": {
+          "liquidations_zero": true,
+          "oos_mdd_beats_shadow": true,
+          "oos_return_beats_incumbent": true,
+          "oos_sharpe_gt_1": true,
+          "oos_trades_not_starved": true,
+          "train_positive": true,
+          "val_positive": true
+        },
+        "name": "optuna_calendar_trx_sethusdt_t0_thr150_h120_ls620_ss100_tp180",
+        "replay_survivor": true,
+        "split_results": {
+          "oos": {
+            "fills": 30,
+            "final_equity": 10100.73529587426,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.05670164109932507,
+              "calmar": 37.01156944153708,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.001531997749754712,
+              "min_equity": 9999.206102546423,
+              "raw_final_equity": 10100.73529587426,
+              "raw_max_drawdown": 0.001531997749754712,
+              "raw_total_return": 0.010073529587425911,
+              "sharpe": 7.949855447013018,
+              "sortino": 8.133893979846018,
+              "total_return": 0.010073529587425911,
+              "volatility": 0.006940584185714629
+            },
+            "reject_counts": {
+              "cooldown": 428,
+              "signal_missing": 458
+            },
+            "round_trips": 15
+          },
+          "train": {
+            "fills": 84,
+            "final_equity": 10225.57742245568,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.02256034645898941,
+              "calmar": 2.3105858667212846,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.009763907407173093,
+              "min_equity": 9938.943557606754,
+              "raw_final_equity": 10225.57742245568,
+              "raw_max_drawdown": 0.009763907407173093,
+              "raw_total_return": 0.022557742245568058,
+              "sharpe": 1.2968327340236367,
+              "sortino": 0.7017451991288494,
+              "total_return": 0.022557742245568058,
+              "volatility": 0.017318814320541706
+            },
+            "reject_counts": {
+              "cooldown": 1260,
+              "signal_missing": 5894
+            },
+            "round_trips": 42
+          },
+          "val": {
+            "fills": 38,
+            "final_equity": 10068.237387164612,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.04299982488064891,
+              "calmar": 3.4459384422834125,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.01247840772575019,
+              "min_equity": 9921.871496702526,
+              "raw_final_equity": 10068.237387164612,
+              "raw_max_drawdown": 0.01247840772575019,
+              "raw_total_return": 0.006823738716461136,
+              "sharpe": 1.398135269164284,
+              "sortino": 1.1437377113933471,
+              "total_return": 0.006823738716461136,
+              "volatility": 0.03044352476775682
+            },
+            "reject_counts": {
+              "cooldown": 540,
+              "signal_missing": 362
+            },
+            "round_trips": 19
+          }
+        },
+        "success_candidate": true
+      },
+      "state": "TrialState.COMPLETE",
+      "trial_number": 0
+    },
+    {
+      "objective": 6.40165343120691,
+      "params": {
+        "hold_bars": 120,
+        "long_scale": 6.2,
+        "short_scale": 10.0,
+        "short_symbol": "ETHUSDT",
+        "take_profit_pct": 0.018,
+        "threshold": 0.015
+      },
+      "result": {
+        "failed_gates": [],
+        "family": "calendar_rotation",
+        "filters": {
+          "adaptive_lookback_bars": 12,
+          "allow_long": true,
+          "allow_short": true,
+          "broad_min_abs": 0.0,
+          "calendar_long_months": [
+            3,
+            4,
+            5
+          ],
+          "calendar_long_symbol": "TRXUSDT",
+          "calendar_short_months": [
+            1,
+            2
+          ],
+          "calendar_short_symbol": "ETHUSDT",
+          "compression_lookback_bars": 24,
+          "compression_quantile": 0.0,
+          "cooldown_bars": 30,
+          "entry_hours": [],
+          "family": "calendar_rotation",
+          "flow_lookback_bars": 0,
+          "flow_persistence_bars": 0,
+          "flow_persistence_threshold": 0.0,
+          "flow_threshold": 0.0,
+          "funding_abs_cap": 0.0,
+          "funding_rank_min": 0.0,
+          "hold_bars": 120,
+          "long_allocation_scale": 6.2,
+          "lookback_bars": 168,
+          "max_order_value": 175.0,
+          "max_rv": 0.0,
+          "min_abs_return": 0.015,
+          "name": "optuna_calendar_trx_sethusdt_t39_thr150_h120_ls620_ss100_tp180",
+          "oi_rank_min": 0.0,
+          "rv_lookback_bars": 24,
+          "sharpe_lookback_bars": 0,
+          "sharpe_rank_min": 0.0,
+          "short_allocation_scale": 10.0,
+          "stop_loss_pct": 0.0,
+          "take_profit_pct": 0.018,
+          "target_allocation": 0.008,
+          "threshold": 0.015,
+          "trailing_stop_cap_pct": 0.0,
+          "trailing_stop_floor_pct": 0.0,
+          "trailing_stop_rv_multiple": 0.0
+        },
+        "gates": {
+          "liquidations_zero": true,
+          "oos_mdd_beats_shadow": true,
+          "oos_return_beats_incumbent": true,
+          "oos_sharpe_gt_1": true,
+          "oos_trades_not_starved": true,
+          "train_positive": true,
+          "val_positive": true
+        },
+        "name": "optuna_calendar_trx_sethusdt_t39_thr150_h120_ls620_ss100_tp180",
+        "replay_survivor": true,
+        "split_results": {
+          "oos": {
+            "fills": 30,
+            "final_equity": 10100.73529587426,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.05670164109932507,
+              "calmar": 37.01156944153708,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.001531997749754712,
+              "min_equity": 9999.206102546423,
+              "raw_final_equity": 10100.73529587426,
+              "raw_max_drawdown": 0.001531997749754712,
+              "raw_total_return": 0.010073529587425911,
+              "sharpe": 7.949855447013018,
+              "sortino": 8.133893979846018,
+              "total_return": 0.010073529587425911,
+              "volatility": 0.006940584185714629
+            },
+            "reject_counts": {
+              "cooldown": 428,
+              "signal_missing": 458
+            },
+            "round_trips": 15
+          },
+          "train": {
+            "fills": 84,
+            "final_equity": 10225.57742245568,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.02256034645898941,
+              "calmar": 2.3105858667212846,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.009763907407173093,
+              "min_equity": 9938.943557606754,
+              "raw_final_equity": 10225.57742245568,
+              "raw_max_drawdown": 0.009763907407173093,
+              "raw_total_return": 0.022557742245568058,
+              "sharpe": 1.2968327340236367,
+              "sortino": 0.7017451991288494,
+              "total_return": 0.022557742245568058,
+              "volatility": 0.017318814320541706
+            },
+            "reject_counts": {
+              "cooldown": 1260,
+              "signal_missing": 5894
+            },
+            "round_trips": 42
+          },
+          "val": {
+            "fills": 38,
+            "final_equity": 10068.237387164612,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.04299982488064891,
+              "calmar": 3.4459384422834125,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.01247840772575019,
+              "min_equity": 9921.871496702526,
+              "raw_final_equity": 10068.237387164612,
+              "raw_max_drawdown": 0.01247840772575019,
+              "raw_total_return": 0.006823738716461136,
+              "sharpe": 1.398135269164284,
+              "sortino": 1.1437377113933471,
+              "total_return": 0.006823738716461136,
+              "volatility": 0.03044352476775682
+            },
+            "reject_counts": {
+              "cooldown": 540,
+              "signal_missing": 362
+            },
+            "round_trips": 19
+          }
+        },
+        "success_candidate": true
+      },
+      "state": "TrialState.COMPLETE",
+      "trial_number": 39
+    },
+    {
+      "objective": 7.527503178612968,
+      "params": {
+        "hold_bars": 120,
+        "long_scale": 5.9,
+        "short_scale": 10.0,
+        "short_symbol": "ETHUSDT",
+        "take_profit_pct": 0.018,
+        "threshold": 0.018
+      },
+      "result": {
+        "failed_gates": [],
+        "family": "calendar_rotation",
+        "filters": {
+          "adaptive_lookback_bars": 12,
+          "allow_long": true,
+          "allow_short": true,
+          "broad_min_abs": 0.0,
+          "calendar_long_months": [
+            3,
+            4,
+            5
+          ],
+          "calendar_long_symbol": "TRXUSDT",
+          "calendar_short_months": [
+            1,
+            2
+          ],
+          "calendar_short_symbol": "ETHUSDT",
+          "compression_lookback_bars": 24,
+          "compression_quantile": 0.0,
+          "cooldown_bars": 30,
+          "entry_hours": [],
+          "family": "calendar_rotation",
+          "flow_lookback_bars": 0,
+          "flow_persistence_bars": 0,
+          "flow_persistence_threshold": 0.0,
+          "flow_threshold": 0.0,
+          "funding_abs_cap": 0.0,
+          "funding_rank_min": 0.0,
+          "hold_bars": 120,
+          "long_allocation_scale": 5.9,
+          "lookback_bars": 168,
+          "max_order_value": 175.0,
+          "max_rv": 0.0,
+          "min_abs_return": 0.018,
+          "name": "optuna_calendar_trx_sethusdt_t85_thr180_h120_ls590_ss100_tp180",
+          "oi_rank_min": 0.0,
+          "rv_lookback_bars": 24,
+          "sharpe_lookback_bars": 0,
+          "sharpe_rank_min": 0.0,
+          "short_allocation_scale": 10.0,
+          "stop_loss_pct": 0.0,
+          "take_profit_pct": 0.018,
+          "target_allocation": 0.008,
+          "threshold": 0.018,
+          "trailing_stop_cap_pct": 0.0,
+          "trailing_stop_floor_pct": 0.0,
+          "trailing_stop_rv_multiple": 0.0
+        },
+        "gates": {
+          "liquidations_zero": true,
+          "oos_mdd_beats_shadow": true,
+          "oos_return_beats_incumbent": true,
+          "oos_sharpe_gt_1": true,
+          "oos_trades_not_starved": true,
+          "train_positive": true,
+          "val_positive": true
+        },
+        "name": "optuna_calendar_trx_sethusdt_t85_thr180_h120_ls590_ss100_tp180",
+        "replay_survivor": true,
+        "split_results": {
+          "oos": {
+            "fills": 28,
+            "final_equity": 10089.999820273537,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.05053650565695467,
+              "calmar": 34.66422020297938,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.0014578867016489547,
+              "min_equity": 9994.632247819185,
+              "raw_final_equity": 10089.999820273537,
+              "raw_max_drawdown": 0.0014578867016489547,
+              "raw_total_return": 0.008999982027353637,
+              "sharpe": 7.186583242655796,
+              "sortino": 7.23144298033442,
+              "total_return": 0.008999982027353637,
+              "volatility": 0.00686343788159231
+            },
+            "reject_counts": {
+              "cooldown": 398,
+              "signal_missing": 491
+            },
+            "round_trips": 14
+          },
+          "train": {
+            "fills": 84,
+            "final_equity": 10229.005742923375,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.022903218526078684,
+              "calmar": 2.345705344685374,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.0097638940790113,
+              "min_equity": 9938.943557606754,
+              "raw_final_equity": 10229.005742923375,
+              "raw_max_drawdown": 0.0097638940790113,
+              "raw_total_return": 0.022900574292337383,
+              "sharpe": 1.3268577082976476,
+              "sortino": 0.7090518666066746,
+              "total_return": 0.022900574292337383,
+              "volatility": 0.01717774576555891
+            },
+            "reject_counts": {
+              "cooldown": 1260,
+              "signal_missing": 5910
+            },
+            "round_trips": 42
+          },
+          "val": {
+            "fills": 38,
+            "final_equity": 10078.475087697967,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.04958287459318922,
+              "calmar": 3.9775071756044484,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.012465816503688464,
+              "min_equity": 9923.610488595197,
+              "raw_final_equity": 10078.475087697967,
+              "raw_max_drawdown": 0.012465816503688464,
+              "raw_total_return": 0.007847508769796674,
+              "sharpe": 1.6220633730243874,
+              "sortino": 1.304639444413123,
+              "total_return": 0.007847508769796674,
+              "volatility": 0.030113516667178444
+            },
+            "reject_counts": {
+              "cooldown": 540,
+              "signal_missing": 390
+            },
+            "round_trips": 19
+          }
+        },
+        "success_candidate": true
+      },
+      "state": "TrialState.COMPLETE",
+      "trial_number": 85
+    },
+    {
+      "objective": 11.845919850400861,
+      "params": {
+        "hold_bars": 120,
+        "long_scale": 5.8,
+        "short_scale": 10.0,
+        "short_symbol": "ETHUSDT",
+        "take_profit_pct": 0.024,
+        "threshold": 0.015
+      },
+      "result": {
+        "failed_gates": [],
+        "family": "calendar_rotation",
+        "filters": {
+          "adaptive_lookback_bars": 12,
+          "allow_long": true,
+          "allow_short": true,
+          "broad_min_abs": 0.0,
+          "calendar_long_months": [
+            3,
+            4,
+            5
+          ],
+          "calendar_long_symbol": "TRXUSDT",
+          "calendar_short_months": [
+            1,
+            2
+          ],
+          "calendar_short_symbol": "ETHUSDT",
+          "compression_lookback_bars": 24,
+          "compression_quantile": 0.0,
+          "cooldown_bars": 30,
+          "entry_hours": [],
+          "family": "calendar_rotation",
+          "flow_lookback_bars": 0,
+          "flow_persistence_bars": 0,
+          "flow_persistence_threshold": 0.0,
+          "flow_threshold": 0.0,
+          "funding_abs_cap": 0.0,
+          "funding_rank_min": 0.0,
+          "hold_bars": 120,
+          "long_allocation_scale": 5.8,
+          "lookback_bars": 168,
+          "max_order_value": 175.0,
+          "max_rv": 0.0,
+          "min_abs_return": 0.015,
+          "name": "optuna_calendar_trx_sethusdt_t55_thr150_h120_ls580_ss100_tp240",
+          "oi_rank_min": 0.0,
+          "rv_lookback_bars": 24,
+          "sharpe_lookback_bars": 0,
+          "sharpe_rank_min": 0.0,
+          "short_allocation_scale": 10.0,
+          "stop_loss_pct": 0.0,
+          "take_profit_pct": 0.024,
+          "target_allocation": 0.008,
+          "threshold": 0.015,
+          "trailing_stop_cap_pct": 0.0,
+          "trailing_stop_floor_pct": 0.0,
+          "trailing_stop_rv_multiple": 0.0
+        },
+        "gates": {
+          "liquidations_zero": true,
+          "oos_mdd_beats_shadow": true,
+          "oos_return_beats_incumbent": true,
+          "oos_sharpe_gt_1": true,
+          "oos_trades_not_starved": true,
+          "train_positive": true,
+          "val_positive": true
+        },
+        "name": "optuna_calendar_trx_sethusdt_t55_thr150_h120_ls580_ss100_tp240",
+        "replay_survivor": true,
+        "split_results": {
+          "oos": {
+            "fills": 26,
+            "final_equity": 10089.742041526244,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.05038883195461641,
+              "calmar": 28.526481635641787,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.0017663878987326355,
+              "min_equity": 9999.257321649298,
+              "raw_final_equity": 10089.742041526244,
+              "raw_max_drawdown": 0.0017663878987326355,
+              "raw_total_return": 0.008974204152624399,
+              "sharpe": 6.589389659991987,
+              "sortino": 7.615125577546743,
+              "total_return": 0.008974204152624399,
+              "volatility": 0.007464787261808369
+            },
+            "reject_counts": {
+              "cooldown": 360,
+              "signal_missing": 377
+            },
+            "round_trips": 13
+          },
+          "train": {
+            "fills": 74,
+            "final_equity": 10198.896217731442,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.01989191497378262,
+              "calmar": 2.0355052534561615,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.009772470466488546,
+              "min_equity": 9950.636897394865,
+              "raw_final_equity": 10198.896217731442,
+              "raw_max_drawdown": 0.009772470466488546,
+              "raw_total_return": 0.01988962177314435,
+              "sharpe": 1.0969492341552722,
+              "sortino": 0.6297551074048096,
+              "total_return": 0.01988962177314435,
+              "volatility": 0.018105269162817204
+            },
+            "reject_counts": {
+              "cooldown": 1110,
+              "signal_missing": 5802
+            },
+            "round_trips": 37
+          },
+          "val": {
+            "fills": 36,
+            "final_equity": 10133.638295364119,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.08565666766347779,
+              "calmar": 6.862623165647163,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.012481621909863405,
+              "min_equity": 9921.871496702526,
+              "raw_final_equity": 10133.638295364119,
+              "raw_max_drawdown": 0.012481621909863405,
+              "raw_total_return": 0.013363829536411798,
+              "sharpe": 2.542574530502893,
+              "sortino": 2.286493999740527,
+              "total_return": 0.013363829536411798,
+              "volatility": 0.032531639157872966
+            },
+            "reject_counts": {
+              "cooldown": 510,
+              "signal_missing": 337
+            },
+            "round_trips": 18
+          }
+        },
+        "success_candidate": true
+      },
+      "state": "TrialState.COMPLETE",
+      "trial_number": 55
+    },
+    {
+      "objective": 20.69640835317386,
+      "params": {
+        "hold_bars": 168,
+        "long_scale": 5.8,
+        "short_scale": 8.0,
+        "short_symbol": "ETHUSDT",
+        "take_profit_pct": 0.06,
+        "threshold": 0.018
+      },
+      "result": {
+        "failed_gates": [],
+        "family": "calendar_rotation",
+        "filters": {
+          "adaptive_lookback_bars": 12,
+          "allow_long": true,
+          "allow_short": true,
+          "broad_min_abs": 0.0,
+          "calendar_long_months": [
+            3,
+            4,
+            5
+          ],
+          "calendar_long_symbol": "TRXUSDT",
+          "calendar_short_months": [
+            1,
+            2
+          ],
+          "calendar_short_symbol": "ETHUSDT",
+          "compression_lookback_bars": 24,
+          "compression_quantile": 0.0,
+          "cooldown_bars": 42,
+          "entry_hours": [],
+          "family": "calendar_rotation",
+          "flow_lookback_bars": 0,
+          "flow_persistence_bars": 0,
+          "flow_persistence_threshold": 0.0,
+          "flow_threshold": 0.0,
+          "funding_abs_cap": 0.0,
+          "funding_rank_min": 0.0,
+          "hold_bars": 168,
+          "long_allocation_scale": 5.8,
+          "lookback_bars": 168,
+          "max_order_value": 175.0,
+          "max_rv": 0.0,
+          "min_abs_return": 0.018,
+          "name": "optuna_calendar_trx_sethusdt_t80_thr180_h168_ls580_ss80_tp600",
+          "oi_rank_min": 0.0,
+          "rv_lookback_bars": 24,
+          "sharpe_lookback_bars": 0,
+          "sharpe_rank_min": 0.0,
+          "short_allocation_scale": 8.0,
+          "stop_loss_pct": 0.0,
+          "take_profit_pct": 0.06,
+          "target_allocation": 0.008,
+          "threshold": 0.018,
+          "trailing_stop_cap_pct": 0.0,
+          "trailing_stop_floor_pct": 0.0,
+          "trailing_stop_rv_multiple": 0.0
+        },
+        "gates": {
+          "liquidations_zero": true,
+          "oos_mdd_beats_shadow": true,
+          "oos_return_beats_incumbent": true,
+          "oos_sharpe_gt_1": true,
+          "oos_trades_not_starved": true,
+          "train_positive": true,
+          "val_positive": true
+        },
+        "name": "optuna_calendar_trx_sethusdt_t80_thr180_h168_ls580_ss80_tp600",
+        "replay_survivor": true,
+        "split_results": {
+          "oos": {
+            "fills": 12,
+            "final_equity": 10089.361073389375,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.05017061785271304,
+              "calmar": 34.32464443079862,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.0014616500384690434,
+              "min_equity": 9994.723225675549,
+              "raw_final_equity": 10089.361073389375,
+              "raw_max_drawdown": 0.0014616500384690434,
+              "raw_total_return": 0.008936107338937571,
+              "sharpe": 5.14343711534544,
+              "sortino": 5.767619243141747,
+              "total_return": 0.008936107338937571,
+              "volatility": 0.0095263383317136
+            },
+            "reject_counts": {
+              "cooldown": 210,
+              "signal_missing": 471
+            },
+            "round_trips": 6
+          },
+          "train": {
+            "fills": 38,
+            "final_equity": 10312.802717723396,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.03128389827451805,
+              "calmar": 4.4746830347391935,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.006991310452974114,
+              "min_equity": 9978.894461817343,
+              "raw_final_equity": 10312.802717723396,
+              "raw_max_drawdown": 0.006991310452974114,
+              "raw_total_return": 0.03128027177233972,
+              "sharpe": 1.8679877253265418,
+              "sortino": 1.3266429119350662,
+              "total_return": 0.03128027177233972,
+              "volatility": 0.016564205566137132
+            },
+            "reject_counts": {
+              "cooldown": 798,
+              "signal_missing": 5665
+            },
+            "round_trips": 19
+          },
+          "val": {
+            "fills": 18,
+            "final_equity": 10195.119552624354,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.12708144274775202,
+              "calmar": 20.734700420504783,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.006128925915036598,
+              "min_equity": 9938.710740849634,
+              "raw_final_equity": 10195.119552624354,
+              "raw_max_drawdown": 0.006128925915036598,
+              "raw_total_return": 0.019511955262435432,
+              "sharpe": 3.8137032517270617,
+              "sortino": 3.7501333457396604,
+              "total_return": 0.019511955262435432,
+              "volatility": 0.03149904414072064
+            },
+            "reject_counts": {
+              "cooldown": 336,
+              "signal_missing": 361
+            },
+            "round_trips": 9
+          }
+        },
+        "success_candidate": true
+      },
+      "state": "TrialState.COMPLETE",
+      "trial_number": 80
+    },
+    {
+      "objective": 18.283502983337,
+      "params": {
+        "hold_bars": 120,
+        "long_scale": 5.4,
+        "short_scale": 12.0,
+        "short_symbol": "",
+        "take_profit_pct": 0.045,
+        "threshold": 0.012
+      },
+      "result": {
+        "failed_gates": [],
+        "family": "calendar_rotation",
+        "filters": {
+          "adaptive_lookback_bars": 12,
+          "allow_long": true,
+          "allow_short": true,
+          "broad_min_abs": 0.0,
+          "calendar_long_months": [
+            3,
+            4,
+            5
+          ],
+          "calendar_long_symbol": "TRXUSDT",
+          "calendar_short_months": [
+            1,
+            2
+          ],
+          "calendar_short_symbol": "",
+          "compression_lookback_bars": 24,
+          "compression_quantile": 0.0,
+          "cooldown_bars": 30,
+          "entry_hours": [],
+          "family": "calendar_rotation",
+          "flow_lookback_bars": 0,
+          "flow_persistence_bars": 0,
+          "flow_persistence_threshold": 0.0,
+          "flow_threshold": 0.0,
+          "funding_abs_cap": 0.0,
+          "funding_rank_min": 0.0,
+          "hold_bars": 120,
+          "long_allocation_scale": 5.4,
+          "lookback_bars": 168,
+          "max_order_value": 175.0,
+          "max_rv": 0.0,
+          "min_abs_return": 0.012,
+          "name": "optuna_calendar_trx_sweakest_t1_thr120_h120_ls540_ss120_tp450",
+          "oi_rank_min": 0.0,
+          "rv_lookback_bars": 24,
+          "sharpe_lookback_bars": 0,
+          "sharpe_rank_min": 0.0,
+          "short_allocation_scale": 12.0,
+          "stop_loss_pct": 0.0,
+          "take_profit_pct": 0.045,
+          "target_allocation": 0.008,
+          "threshold": 0.012,
+          "trailing_stop_cap_pct": 0.0,
+          "trailing_stop_floor_pct": 0.0,
+          "trailing_stop_rv_multiple": 0.0
+        },
+        "gates": {
+          "liquidations_zero": true,
+          "oos_mdd_beats_shadow": true,
+          "oos_return_beats_incumbent": true,
+          "oos_sharpe_gt_1": true,
+          "oos_trades_not_starved": true,
+          "train_positive": true,
+          "val_positive": true
+        },
+        "name": "optuna_calendar_trx_sweakest_t1_thr120_h120_ls540_ss120_tp450",
+        "replay_survivor": true,
+        "split_results": {
+          "oos": {
+            "fills": 20,
+            "final_equity": 10088.713430197287,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.049799740523854386,
+              "calmar": 28.041170714362462,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.0017759508342619719,
+              "min_equity": 9999.308541205175,
+              "raw_final_equity": 10088.713430197287,
+              "raw_max_drawdown": 0.0017759508342619719,
+              "raw_total_return": 0.008871343019728695,
+              "sharpe": 5.6177342326390045,
+              "sortino": 6.620969107504803,
+              "total_return": 0.008871343019728695,
+              "volatility": 0.008657762088338752
+            },
+            "reject_counts": {
+              "cooldown": 270,
+              "signal_missing": 328
+            },
+            "round_trips": 10
+          },
+          "train": {
+            "fills": 56,
+            "final_equity": 10069.784734574416,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.0069792729516007235,
+              "calmar": 0.3696357878871559,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.018881485993264776,
+              "min_equity": 9836.319740487492,
+              "raw_final_equity": 10069.784734574416,
+              "raw_max_drawdown": 0.018881485993264776,
+              "raw_total_return": 0.006978473457441625,
+              "sharpe": 0.2971431673300631,
+              "sortino": 0.19407472205033358,
+              "total_return": 0.006978473457441625,
+              "volatility": 0.02440872803597189
+            },
+            "reject_counts": {
+              "cooldown": 840,
+              "signal_missing": 5574
+            },
+            "round_trips": 28
+          },
+          "val": {
+            "fills": 28,
+            "final_equity": 10303.697273929769,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.20347698642926426,
+              "calmar": 15.099459305495754,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.01347577964961995,
+              "min_equity": 9904.86315815741,
+              "raw_final_equity": 10303.697273929769,
+              "raw_max_drawdown": 0.01347577964961995,
+              "raw_total_return": 0.03036972739297683,
+              "sharpe": 3.7850144481433796,
+              "sortino": 3.978151916840971,
+              "total_return": 0.03036972739297683,
+              "volatility": 0.049254380425406905
+            },
+            "reject_counts": {
+              "cooldown": 390,
+              "signal_missing": 286
+            },
+            "round_trips": 14
+          }
+        },
+        "success_candidate": true
+      },
+      "state": "TrialState.COMPLETE",
+      "trial_number": 1
+    },
+    {
+      "objective": 7.603401463802588,
+      "params": {
+        "hold_bars": 120,
+        "long_scale": 5.7,
+        "short_scale": 8.0,
+        "short_symbol": "ETHUSDT",
+        "take_profit_pct": 0.018,
+        "threshold": 0.018
+      },
+      "result": {
+        "failed_gates": [],
+        "family": "calendar_rotation",
+        "filters": {
+          "adaptive_lookback_bars": 12,
+          "allow_long": true,
+          "allow_short": true,
+          "broad_min_abs": 0.0,
+          "calendar_long_months": [
+            3,
+            4,
+            5
+          ],
+          "calendar_long_symbol": "TRXUSDT",
+          "calendar_short_months": [
+            1,
+            2
+          ],
+          "calendar_short_symbol": "ETHUSDT",
+          "compression_lookback_bars": 24,
+          "compression_quantile": 0.0,
+          "cooldown_bars": 30,
+          "entry_hours": [],
+          "family": "calendar_rotation",
+          "flow_lookback_bars": 0,
+          "flow_persistence_bars": 0,
+          "flow_persistence_threshold": 0.0,
+          "flow_threshold": 0.0,
+          "funding_abs_cap": 0.0,
+          "funding_rank_min": 0.0,
+          "hold_bars": 120,
+          "long_allocation_scale": 5.7,
+          "lookback_bars": 168,
+          "max_order_value": 175.0,
+          "max_rv": 0.0,
+          "min_abs_return": 0.018,
+          "name": "optuna_calendar_trx_sethusdt_t59_thr180_h120_ls570_ss80_tp180",
+          "oi_rank_min": 0.0,
+          "rv_lookback_bars": 24,
+          "sharpe_lookback_bars": 0,
+          "sharpe_rank_min": 0.0,
+          "short_allocation_scale": 8.0,
+          "stop_loss_pct": 0.0,
+          "take_profit_pct": 0.018,
+          "target_allocation": 0.008,
+          "threshold": 0.018,
+          "trailing_stop_cap_pct": 0.0,
+          "trailing_stop_floor_pct": 0.0,
+          "trailing_stop_rv_multiple": 0.0
+        },
+        "gates": {
+          "liquidations_zero": true,
+          "oos_mdd_beats_shadow": true,
+          "oos_return_beats_incumbent": true,
+          "oos_sharpe_gt_1": true,
+          "oos_trades_not_starved": true,
+          "train_positive": true,
+          "val_positive": true
+        },
+        "name": "optuna_calendar_trx_sethusdt_t59_thr180_h120_ls570_ss80_tp180",
+        "replay_survivor": true,
+        "split_results": {
+          "oos": {
+            "fills": 28,
+            "final_equity": 10086.936819537355,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.0487829024263835,
+              "calmar": 34.63515990584157,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.0014084792031855402,
+              "min_equity": 9994.814206790546,
+              "raw_final_equity": 10086.936819537355,
+              "raw_max_drawdown": 0.0014084792031855402,
+              "raw_total_return": 0.008693681953735544,
+              "sharpe": 7.186563653702057,
+              "sortino": 7.2314131141070614,
+              "total_return": 0.008693681953735544,
+              "volatility": 0.0066307698415870005
+            },
+            "reject_counts": {
+              "cooldown": 398,
+              "signal_missing": 491
+            },
+            "round_trips": 14
+          },
+          "train": {
+            "fills": 84,
+            "final_equity": 10195.347312746786,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.01953698316707353,
+              "calmar": 2.5014324120479823,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.007810318229257346,
+              "min_equity": 9951.096886863457,
+              "raw_final_equity": 10195.347312746786,
+              "raw_max_drawdown": 0.007810318229257346,
+              "raw_total_return": 0.01953473127467853,
+              "sharpe": 1.3720032672371212,
+              "sortino": 0.7491266989384103,
+              "total_return": 0.01953473127467853,
+              "volatility": 0.014175673151189677
+            },
+            "reject_counts": {
+              "cooldown": 1260,
+              "signal_missing": 5910
+            },
+            "round_trips": 42
+          },
+          "val": {
+            "fills": 38,
+            "final_equity": 10062.608731771095,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.03939525868948657,
+              "calmar": 3.952176045383501,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.009967991870074662,
+              "min_equity": 9938.710740849634,
+              "raw_final_equity": 10062.608731771095,
+              "raw_max_drawdown": 0.009967991870074662,
+              "raw_total_return": 0.006260873177109438,
+              "sharpe": 1.6170790441076903,
+              "sortino": 1.3001306511857975,
+              "total_return": 0.006260873177109438,
+              "volatility": 0.024073468048239777
+            },
+            "reject_counts": {
+              "cooldown": 540,
+              "signal_missing": 390
+            },
+            "round_trips": 19
+          }
+        },
+        "success_candidate": true
+      },
+      "state": "TrialState.COMPLETE",
+      "trial_number": 59
+    },
+    {
+      "objective": 17.57840765146191,
+      "params": {
+        "hold_bars": 120,
+        "long_scale": 6.1,
+        "short_scale": 10.0,
+        "short_symbol": "ETHUSDT",
+        "take_profit_pct": 0.06,
+        "threshold": 0.01
+      },
+      "result": {
+        "failed_gates": [
+          "oos_mdd_beats_shadow"
+        ],
+        "family": "calendar_rotation",
+        "filters": {
+          "adaptive_lookback_bars": 12,
+          "allow_long": true,
+          "allow_short": true,
+          "broad_min_abs": 0.0,
+          "calendar_long_months": [
+            3,
+            4,
+            5
+          ],
+          "calendar_long_symbol": "TRXUSDT",
+          "calendar_short_months": [
+            1,
+            2
+          ],
+          "calendar_short_symbol": "ETHUSDT",
+          "compression_lookback_bars": 24,
+          "compression_quantile": 0.0,
+          "cooldown_bars": 30,
+          "entry_hours": [],
+          "family": "calendar_rotation",
+          "flow_lookback_bars": 0,
+          "flow_persistence_bars": 0,
+          "flow_persistence_threshold": 0.0,
+          "flow_threshold": 0.0,
+          "funding_abs_cap": 0.0,
+          "funding_rank_min": 0.0,
+          "hold_bars": 120,
+          "long_allocation_scale": 6.1,
+          "lookback_bars": 168,
+          "max_order_value": 175.0,
+          "max_rv": 0.0,
+          "min_abs_return": 0.01,
+          "name": "optuna_calendar_trx_sethusdt_t43_thr100_h120_ls610_ss100_tp600",
+          "oi_rank_min": 0.0,
+          "rv_lookback_bars": 24,
+          "sharpe_lookback_bars": 0,
+          "sharpe_rank_min": 0.0,
+          "short_allocation_scale": 10.0,
+          "stop_loss_pct": 0.0,
+          "take_profit_pct": 0.06,
+          "target_allocation": 0.008,
+          "threshold": 0.01,
+          "trailing_stop_cap_pct": 0.0,
+          "trailing_stop_floor_pct": 0.0,
+          "trailing_stop_rv_multiple": 0.0
+        },
+        "gates": {
+          "liquidations_zero": true,
+          "oos_mdd_beats_shadow": false,
+          "oos_return_beats_incumbent": true,
+          "oos_sharpe_gt_1": true,
+          "oos_trades_not_starved": true,
+          "train_positive": true,
+          "val_positive": true
+        },
+        "name": "optuna_calendar_trx_sethusdt_t43_thr100_h120_ls610_ss100_tp600",
+        "replay_survivor": false,
+        "split_results": {
+          "oos": {
+            "fills": 18,
+            "final_equity": 10105.070971308916,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.05919989676478665,
+              "calmar": 26.111079052894688,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.0022672328724853566,
+              "min_equity": 9992.535376606844,
+              "raw_final_equity": 10105.070971308916,
+              "raw_max_drawdown": 0.0022672328724853566,
+              "raw_total_return": 0.010507097130891596,
+              "sharpe": 5.6713411716992645,
+              "sortino": 7.01204397952331,
+              "total_return": 0.010507097130891596,
+              "volatility": 0.010150239476726254
+            },
+            "reject_counts": {
+              "cooldown": 248,
+              "signal_missing": 269
+            },
+            "round_trips": 9
+          },
+          "train": {
+            "fills": 46,
+            "final_equity": 10258.036949181604,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.025806678571677955,
+              "calmar": 2.7422098956241543,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.009410905639593316,
+              "min_equity": 9939.819357186267,
+              "raw_final_equity": 10258.036949181604,
+              "raw_max_drawdown": 0.009410905639593316,
+              "raw_total_return": 0.02580369491816037,
+              "sharpe": 1.2397354222025807,
+              "sortino": 0.8811600013207235,
+              "total_return": 0.02580369491816037,
+              "volatility": 0.020725430175372928
+            },
+            "reject_counts": {
+              "cooldown": 690,
+              "signal_missing": 5729
+            },
+            "round_trips": 23
+          },
+          "val": {
+            "fills": 24,
+            "final_equity": 10212.571216005266,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.1390785695540333,
+              "calmar": 15.661259731385114,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.008880420345454096,
+              "min_equity": 9916.980558720441,
+              "raw_final_equity": 10212.571216005266,
+              "raw_max_drawdown": 0.008880420345454096,
+              "raw_total_return": 0.02125712160052662,
+              "sharpe": 3.306948744406365,
+              "sortino": 3.7039251302302336,
+              "total_return": 0.02125712160052662,
+              "volatility": 0.03961492308586518
+            },
+            "reject_counts": {
+              "cooldown": 330,
+              "signal_missing": 324
+            },
+            "round_trips": 12
+          }
+        },
+        "success_candidate": false
+      },
+      "state": "TrialState.COMPLETE",
+      "trial_number": 43
+    },
+    {
+      "objective": 17.258868103892056,
+      "params": {
+        "hold_bars": 120,
+        "long_scale": 6.0,
+        "short_scale": 10.0,
+        "short_symbol": "ETHUSDT",
+        "take_profit_pct": 0.06,
+        "threshold": 0.012
+      },
+      "result": {
+        "failed_gates": [
+          "oos_mdd_beats_shadow"
+        ],
+        "family": "calendar_rotation",
+        "filters": {
+          "adaptive_lookback_bars": 12,
+          "allow_long": true,
+          "allow_short": true,
+          "broad_min_abs": 0.0,
+          "calendar_long_months": [
+            3,
+            4,
+            5
+          ],
+          "calendar_long_symbol": "TRXUSDT",
+          "calendar_short_months": [
+            1,
+            2
+          ],
+          "calendar_short_symbol": "ETHUSDT",
+          "compression_lookback_bars": 24,
+          "compression_quantile": 0.0,
+          "cooldown_bars": 30,
+          "entry_hours": [],
+          "family": "calendar_rotation",
+          "flow_lookback_bars": 0,
+          "flow_persistence_bars": 0,
+          "flow_persistence_threshold": 0.0,
+          "flow_threshold": 0.0,
+          "funding_abs_cap": 0.0,
+          "funding_rank_min": 0.0,
+          "hold_bars": 120,
+          "long_allocation_scale": 6.0,
+          "lookback_bars": 168,
+          "max_order_value": 175.0,
+          "max_rv": 0.0,
+          "min_abs_return": 0.012,
+          "name": "optuna_calendar_trx_sethusdt_t94_thr120_h120_ls600_ss100_tp600",
+          "oi_rank_min": 0.0,
+          "rv_lookback_bars": 24,
+          "sharpe_lookback_bars": 0,
+          "sharpe_rank_min": 0.0,
+          "short_allocation_scale": 10.0,
+          "stop_loss_pct": 0.0,
+          "take_profit_pct": 0.06,
+          "target_allocation": 0.008,
+          "threshold": 0.012,
+          "trailing_stop_cap_pct": 0.0,
+          "trailing_stop_floor_pct": 0.0,
+          "trailing_stop_rv_multiple": 0.0
+        },
+        "gates": {
+          "liquidations_zero": true,
+          "oos_mdd_beats_shadow": false,
+          "oos_return_beats_incumbent": true,
+          "oos_sharpe_gt_1": true,
+          "oos_trades_not_starved": true,
+          "train_positive": true,
+          "val_positive": true
+        },
+        "name": "optuna_calendar_trx_sethusdt_t94_thr120_h120_ls600_ss100_tp600",
+        "replay_survivor": false,
+        "split_results": {
+          "oos": {
+            "fills": 18,
+            "final_equity": 10104.564922111716,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.05890805772857166,
+              "calmar": 26.242586125899944,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.0022447504771807817,
+              "min_equity": 9999.231712097862,
+              "raw_final_equity": 10104.564922111716,
+              "raw_max_drawdown": 0.0022447504771807817,
+              "raw_total_return": 0.01045649221117162,
+              "sharpe": 5.593022980156314,
+              "sortino": 6.4288807183549865,
+              "total_return": 0.01045649221117162,
+              "volatility": 0.010243271569130602
+            },
+            "reject_counts": {
+              "cooldown": 248,
+              "signal_missing": 288
+            },
+            "round_trips": 9
+          },
+          "train": {
+            "fills": 46,
+            "final_equity": 10224.158466586874,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.02241843431184143,
+              "calmar": 2.0581815599092925,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.01089235019325965,
+              "min_equity": 9950.122331905688,
+              "raw_final_equity": 10224.158466586874,
+              "raw_max_drawdown": 0.01089235019325965,
+              "raw_total_return": 0.022415846658687455,
+              "sharpe": 1.0720044287034662,
+              "sortino": 0.7462411623440209,
+              "total_return": 0.022415846658687455,
+              "volatility": 0.020885078285695597
+            },
+            "reject_counts": {
+              "cooldown": 690,
+              "signal_missing": 5738
+            },
+            "round_trips": 23
+          },
+          "val": {
+            "fills": 24,
+            "final_equity": 10212.598051260558,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.13909709953368843,
+              "calmar": 15.66338736567018,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.008880397086938606,
+              "min_equity": 9916.980558720441,
+              "raw_final_equity": 10212.598051260558,
+              "raw_max_drawdown": 0.008880397086938606,
+              "raw_total_return": 0.021259805126055742,
+              "sharpe": 3.3092091048199177,
+              "sortino": 3.705756775313302,
+              "total_return": 0.021259805126055742,
+              "volatility": 0.039592513015185335
+            },
+            "reject_counts": {
+              "cooldown": 330,
+              "signal_missing": 325
+            },
+            "round_trips": 12
+          }
+        },
+        "success_candidate": false
+      },
+      "state": "TrialState.COMPLETE",
+      "trial_number": 94
+    },
+    {
+      "objective": 11.267768907495178,
+      "params": {
+        "hold_bars": 120,
+        "long_scale": 5.4,
+        "short_scale": 12.0,
+        "short_symbol": "",
+        "take_profit_pct": 0.06,
+        "threshold": 0.012
+      },
+      "result": {
+        "failed_gates": [
+          "oos_mdd_beats_shadow"
+        ],
+        "family": "calendar_rotation",
+        "filters": {
+          "adaptive_lookback_bars": 12,
+          "allow_long": true,
+          "allow_short": true,
+          "broad_min_abs": 0.0,
+          "calendar_long_months": [
+            3,
+            4,
+            5
+          ],
+          "calendar_long_symbol": "TRXUSDT",
+          "calendar_short_months": [
+            1,
+            2
+          ],
+          "calendar_short_symbol": "",
+          "compression_lookback_bars": 24,
+          "compression_quantile": 0.0,
+          "cooldown_bars": 30,
+          "entry_hours": [],
+          "family": "calendar_rotation",
+          "flow_lookback_bars": 0,
+          "flow_persistence_bars": 0,
+          "flow_persistence_threshold": 0.0,
+          "flow_threshold": 0.0,
+          "funding_abs_cap": 0.0,
+          "funding_rank_min": 0.0,
+          "hold_bars": 120,
+          "long_allocation_scale": 5.4,
+          "lookback_bars": 168,
+          "max_order_value": 175.0,
+          "max_rv": 0.0,
+          "min_abs_return": 0.012,
+          "name": "optuna_calendar_trx_sweakest_t15_thr120_h120_ls540_ss120_tp600",
+          "oi_rank_min": 0.0,
+          "rv_lookback_bars": 24,
+          "sharpe_lookback_bars": 0,
+          "sharpe_rank_min": 0.0,
+          "short_allocation_scale": 12.0,
+          "stop_loss_pct": 0.0,
+          "take_profit_pct": 0.06,
+          "target_allocation": 0.008,
+          "threshold": 0.012,
+          "trailing_stop_cap_pct": 0.0,
+          "trailing_stop_floor_pct": 0.0,
+          "trailing_stop_rv_multiple": 0.0
+        },
+        "gates": {
+          "liquidations_zero": true,
+          "oos_mdd_beats_shadow": false,
+          "oos_return_beats_incumbent": true,
+          "oos_sharpe_gt_1": true,
+          "oos_trades_not_starved": true,
+          "train_positive": true,
+          "val_positive": true
+        },
+        "name": "optuna_calendar_trx_sweakest_t15_thr120_h120_ls540_ss120_tp600",
+        "replay_survivor": false,
+        "split_results": {
+          "oos": {
+            "fills": 18,
+            "final_equity": 10094.069303524999,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.05287004234148407,
+              "calmar": 26.16315691806661,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.002020782220855595,
+              "min_equity": 9999.308541205175,
+              "raw_final_equity": 10094.069303524999,
+              "raw_max_drawdown": 0.002020782220855595,
+              "raw_total_return": 0.009406930352499954,
+              "sharpe": 5.592613112177571,
+              "sortino": 6.428136182700389,
+              "total_return": 0.009406930352499954,
+              "volatility": 0.009219738630540951
+            },
+            "reject_counts": {
+              "cooldown": 248,
+              "signal_missing": 288
+            },
+            "round_trips": 9
+          },
+          "train": {
+            "fills": 48,
+            "final_equity": 10163.57041903595,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.016358924551168608,
+              "calmar": 0.8664002693963816,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.018881485993264776,
+              "min_equity": 9836.319740487492,
+              "raw_final_equity": 10163.57041903595,
+              "raw_max_drawdown": 0.018881485993264776,
+              "raw_total_return": 0.016357041903594993,
+              "sharpe": 0.6616011129825337,
+              "sortino": 0.44235052814516296,
+              "total_return": 0.016357041903594993,
+              "volatility": 0.02499842548039681
+            },
+            "reject_counts": {
+              "cooldown": 720,
+              "signal_missing": 5624
+            },
+            "round_trips": 24
+          },
+          "val": {
+            "fills": 24,
+            "final_equity": 10226.02903337866,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.14840308826785753,
+              "calmar": 6.681789598801471,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.022210081008009735,
+              "min_equity": 9904.86315815741,
+              "raw_final_equity": 10226.02903337866,
+              "raw_max_drawdown": 0.022210081008009735,
+              "raw_total_return": 0.022602903337866076,
+              "sharpe": 2.6519601948722062,
+              "sortino": 2.929772586341249,
+              "total_return": 0.022602903337866076,
+              "volatility": 0.05270088623832193
+            },
+            "reject_counts": {
+              "cooldown": 330,
+              "signal_missing": 292
+            },
+            "round_trips": 12
+          }
+        },
+        "success_candidate": false
+      },
+      "state": "TrialState.COMPLETE",
+      "trial_number": 15
+    },
+    {
+      "objective": 11.264572450037278,
+      "params": {
+        "hold_bars": 120,
+        "long_scale": 5.3,
+        "short_scale": 12.0,
+        "short_symbol": "",
+        "take_profit_pct": 0.06,
+        "threshold": 0.012
+      },
+      "result": {
+        "failed_gates": [
+          "oos_mdd_beats_shadow"
+        ],
+        "family": "calendar_rotation",
+        "filters": {
+          "adaptive_lookback_bars": 12,
+          "allow_long": true,
+          "allow_short": true,
+          "broad_min_abs": 0.0,
+          "calendar_long_months": [
+            3,
+            4,
+            5
+          ],
+          "calendar_long_symbol": "TRXUSDT",
+          "calendar_short_months": [
+            1,
+            2
+          ],
+          "calendar_short_symbol": "",
+          "compression_lookback_bars": 24,
+          "compression_quantile": 0.0,
+          "cooldown_bars": 30,
+          "entry_hours": [],
+          "family": "calendar_rotation",
+          "flow_lookback_bars": 0,
+          "flow_persistence_bars": 0,
+          "flow_persistence_threshold": 0.0,
+          "flow_threshold": 0.0,
+          "funding_abs_cap": 0.0,
+          "funding_rank_min": 0.0,
+          "hold_bars": 120,
+          "long_allocation_scale": 5.3,
+          "lookback_bars": 168,
+          "max_order_value": 175.0,
+          "max_rv": 0.0,
+          "min_abs_return": 0.012,
+          "name": "optuna_calendar_trx_sweakest_t25_thr120_h120_ls530_ss120_tp600",
+          "oi_rank_min": 0.0,
+          "rv_lookback_bars": 24,
+          "sharpe_lookback_bars": 0,
+          "sharpe_rank_min": 0.0,
+          "short_allocation_scale": 12.0,
+          "stop_loss_pct": 0.0,
+          "take_profit_pct": 0.06,
+          "target_allocation": 0.008,
+          "threshold": 0.012,
+          "trailing_stop_cap_pct": 0.0,
+          "trailing_stop_floor_pct": 0.0,
+          "trailing_stop_rv_multiple": 0.0
+        },
+        "gates": {
+          "liquidations_zero": true,
+          "oos_mdd_beats_shadow": false,
+          "oos_return_beats_incumbent": true,
+          "oos_sharpe_gt_1": true,
+          "oos_trades_not_starved": true,
+          "train_positive": true,
+          "val_positive": true
+        },
+        "name": "optuna_calendar_trx_sweakest_t25_thr120_h120_ls530_ss120_tp600",
+        "replay_survivor": false,
+        "split_results": {
+          "oos": {
+            "fills": 18,
+            "final_equity": 10092.320879693129,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.05186693618396143,
+              "calmar": 26.149958352085797,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.0019834424011548903,
+              "min_equity": 9999.321345754393,
+              "raw_final_equity": 10092.320879693129,
+              "raw_max_drawdown": 0.0019834424011548903,
+              "raw_total_return": 0.009232087969312852,
+              "sharpe": 5.592545033320025,
+              "sortino": 6.428012668679983,
+              "total_return": 0.009232087969312852,
+              "volatility": 0.009049132187212287
+            },
+            "reject_counts": {
+              "cooldown": 248,
+              "signal_missing": 288
+            },
+            "round_trips": 9
+          },
+          "train": {
+            "fills": 48,
+            "final_equity": 10163.121026239707,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.016313980057764743,
+              "calmar": 0.8640199221387612,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.018881485993264776,
+              "min_equity": 9836.319740487492,
+              "raw_final_equity": 10163.121026239707,
+              "raw_max_drawdown": 0.018881485993264776,
+              "raw_total_return": 0.01631210262397076,
+              "sharpe": 0.6609343120752758,
+              "sortino": 0.4411633609856514,
+              "total_return": 0.01631210262397076,
+              "volatility": 0.02495510003999324
+            },
+            "reject_counts": {
+              "cooldown": 720,
+              "signal_missing": 5624
+            },
+            "round_trips": 24
+          },
+          "val": {
+            "fills": 24,
+            "final_equity": 10226.02903337866,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.14840308826785753,
+              "calmar": 6.681789598801471,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.022210081008009735,
+              "min_equity": 9904.86315815741,
+              "raw_final_equity": 10226.02903337866,
+              "raw_max_drawdown": 0.022210081008009735,
+              "raw_total_return": 0.022602903337866076,
+              "sharpe": 2.6519601948722062,
+              "sortino": 2.929772586341249,
+              "total_return": 0.022602903337866076,
+              "volatility": 0.05270088623832193
+            },
+            "reject_counts": {
+              "cooldown": 330,
+              "signal_missing": 292
+            },
+            "round_trips": 12
+          }
+        },
+        "success_candidate": false
+      },
+      "state": "TrialState.COMPLETE",
+      "trial_number": 25
+    },
+    {
+      "objective": -76.42113752529664,
+      "params": {
+        "hold_bars": 144,
+        "long_scale": 5.8,
+        "short_scale": 12.0,
+        "short_symbol": "ETHUSDT",
+        "take_profit_pct": 0.018,
+        "threshold": 0.012
+      },
+      "result": {
+        "failed_gates": [
+          "val_positive",
+          "oos_mdd_beats_shadow"
+        ],
+        "family": "calendar_rotation",
+        "filters": {
+          "adaptive_lookback_bars": 12,
+          "allow_long": true,
+          "allow_short": true,
+          "broad_min_abs": 0.0,
+          "calendar_long_months": [
+            3,
+            4,
+            5
+          ],
+          "calendar_long_symbol": "TRXUSDT",
+          "calendar_short_months": [
+            1,
+            2
+          ],
+          "calendar_short_symbol": "ETHUSDT",
+          "compression_lookback_bars": 24,
+          "compression_quantile": 0.0,
+          "cooldown_bars": 36,
+          "entry_hours": [],
+          "family": "calendar_rotation",
+          "flow_lookback_bars": 0,
+          "flow_persistence_bars": 0,
+          "flow_persistence_threshold": 0.0,
+          "flow_threshold": 0.0,
+          "funding_abs_cap": 0.0,
+          "funding_rank_min": 0.0,
+          "hold_bars": 144,
+          "long_allocation_scale": 5.8,
+          "lookback_bars": 168,
+          "max_order_value": 175.0,
+          "max_rv": 0.0,
+          "min_abs_return": 0.012,
+          "name": "optuna_calendar_trx_sethusdt_t6_thr120_h144_ls580_ss120_tp180",
+          "oi_rank_min": 0.0,
+          "rv_lookback_bars": 24,
+          "sharpe_lookback_bars": 0,
+          "sharpe_rank_min": 0.0,
+          "short_allocation_scale": 12.0,
+          "stop_loss_pct": 0.0,
+          "take_profit_pct": 0.018,
+          "target_allocation": 0.008,
+          "threshold": 0.012,
+          "trailing_stop_cap_pct": 0.0,
+          "trailing_stop_floor_pct": 0.0,
+          "trailing_stop_rv_multiple": 0.0
+        },
+        "gates": {
+          "liquidations_zero": true,
+          "oos_mdd_beats_shadow": false,
+          "oos_return_beats_incumbent": true,
+          "oos_sharpe_gt_1": true,
+          "oos_trades_not_starved": true,
+          "train_positive": true,
+          "val_positive": false
+        },
+        "name": "optuna_calendar_trx_sethusdt_t6_thr120_h144_ls580_ss120_tp180",
+        "replay_survivor": false,
+        "split_results": {
+          "oos": {
+            "fills": 32,
+            "final_equity": 10089.719894247017,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.05037614523591971,
+              "calmar": 27.879736514113745,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.0018069089430030108,
+              "min_equity": 9999.257321649298,
+              "raw_final_equity": 10089.719894247017,
+              "raw_max_drawdown": 0.0018069089430030108,
+              "raw_total_return": 0.008971989424701787,
+              "sharpe": 7.090385349764564,
+              "sortino": 6.874445094100743,
+              "total_return": 0.008971989424701787,
+              "volatility": 0.0069350961813873
+            },
+            "reject_counts": {
+              "cooldown": 572,
+              "signal_missing": 202
+            },
+            "round_trips": 16
+          },
+          "train": {
+            "fills": 80,
+            "final_equity": 10341.728389246227,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.034176806301872364,
+              "calmar": 3.6443499260603334,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.009378025435339755,
+              "min_equity": 9939.938157918908,
+              "raw_final_equity": 10341.728389246227,
+              "raw_max_drawdown": 0.009378025435339755,
+              "raw_total_return": 0.03417283892462275,
+              "sharpe": 2.1499433718462244,
+              "sortino": 1.1114914464930392,
+              "total_return": 0.03417283892462275,
+              "volatility": 0.015688255811173064
+            },
+            "reject_counts": {
+              "cooldown": 1440,
+              "signal_missing": 5855
+            },
+            "round_trips": 40
+          },
+          "val": {
+            "fills": 30,
+            "final_equity": 9982.84115611645,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": -0.010575524739245945,
+              "calmar": -0.6088268656469036,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.01737033192188228,
+              "min_equity": 9904.2634541414,
+              "raw_final_equity": 9982.84115611645,
+              "raw_max_drawdown": 0.01737033192188228,
+              "raw_total_return": -0.0017158843883550157,
+              "sharpe": -0.2384082942351665,
+              "sortino": -0.21815747939506422,
+              "total_return": -0.0017158843883550157,
+              "volatility": 0.04106176286876446
+            },
+            "reject_counts": {
+              "cooldown": 504,
+              "signal_missing": 294
+            },
+            "round_trips": 15
+          }
+        },
+        "success_candidate": false
+      },
+      "state": "TrialState.COMPLETE",
+      "trial_number": 6
+    },
+    {
+      "objective": 22.305191835536277,
+      "params": {
+        "hold_bars": 120,
+        "long_scale": 6.4,
+        "short_scale": 10.0,
+        "short_symbol": "ETHUSDT",
+        "take_profit_pct": 0.06,
+        "threshold": 0.015
+      },
+      "result": {
+        "failed_gates": [
+          "oos_mdd_beats_shadow"
+        ],
+        "family": "calendar_rotation",
+        "filters": {
+          "adaptive_lookback_bars": 12,
+          "allow_long": true,
+          "allow_short": true,
+          "broad_min_abs": 0.0,
+          "calendar_long_months": [
+            3,
+            4,
+            5
+          ],
+          "calendar_long_symbol": "TRXUSDT",
+          "calendar_short_months": [
+            1,
+            2
+          ],
+          "calendar_short_symbol": "ETHUSDT",
+          "compression_lookback_bars": 24,
+          "compression_quantile": 0.0,
+          "cooldown_bars": 30,
+          "entry_hours": [],
+          "family": "calendar_rotation",
+          "flow_lookback_bars": 0,
+          "flow_persistence_bars": 0,
+          "flow_persistence_threshold": 0.0,
+          "flow_threshold": 0.0,
+          "funding_abs_cap": 0.0,
+          "funding_rank_min": 0.0,
+          "hold_bars": 120,
+          "long_allocation_scale": 6.4,
+          "lookback_bars": 168,
+          "max_order_value": 175.0,
+          "max_rv": 0.0,
+          "min_abs_return": 0.015,
+          "name": "optuna_calendar_trx_sethusdt_t34_thr150_h120_ls640_ss100_tp600",
+          "oi_rank_min": 0.0,
+          "rv_lookback_bars": 24,
+          "sharpe_lookback_bars": 0,
+          "sharpe_rank_min": 0.0,
+          "short_allocation_scale": 10.0,
+          "stop_loss_pct": 0.0,
+          "take_profit_pct": 0.06,
+          "target_allocation": 0.008,
+          "threshold": 0.015,
+          "trailing_stop_cap_pct": 0.0,
+          "trailing_stop_floor_pct": 0.0,
+          "trailing_stop_rv_multiple": 0.0
+        },
+        "gates": {
+          "liquidations_zero": true,
+          "oos_mdd_beats_shadow": false,
+          "oos_return_beats_incumbent": true,
+          "oos_sharpe_gt_1": true,
+          "oos_trades_not_starved": true,
+          "train_positive": true,
+          "val_positive": true
+        },
+        "name": "optuna_calendar_trx_sethusdt_t34_thr150_h120_ls640_ss100_tp600",
+        "replay_survivor": false,
+        "split_results": {
+          "oos": {
+            "fills": 18,
+            "final_equity": 10083.126155406615,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.04660459757770696,
+              "calmar": 16.453798353567446,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.002832452214148008,
+              "min_equity": 9999.180492994985,
+              "raw_final_equity": 10083.126155406615,
+              "raw_max_drawdown": 0.002832452214148008,
+              "raw_total_return": 0.008312615540661428,
+              "sharpe": 4.220731633200482,
+              "sortino": 4.809505166112453,
+              "total_return": 0.008312615540661428,
+              "volatility": 0.010806105024755815
+            },
+            "reject_counts": {
+              "cooldown": 240,
+              "signal_missing": 296
+            },
+            "round_trips": 9
+          },
+          "train": {
+            "fills": 46,
+            "final_equity": 10193.480311573583,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.019350261324053264,
+              "calmar": 1.776500110694889,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.01089235019325965,
+              "min_equity": 9950.122331905688,
+              "raw_final_equity": 10193.480311573583,
+              "raw_max_drawdown": 0.01089235019325965,
+              "raw_total_return": 0.019348031157358392,
+              "sharpe": 0.914975231889266,
+              "sortino": 0.6439410184772403,
+              "total_return": 0.019348031157358392,
+              "volatility": 0.021191752337271136
+            },
+            "reject_counts": {
+              "cooldown": 690,
+              "signal_missing": 5740
+            },
+            "round_trips": 23
+          },
+          "val": {
+            "fills": 24,
+            "final_equity": 10283.832622391437,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.18918473506868616,
+              "calmar": 15.701052150216617,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.012049175638594138,
+              "min_equity": 9921.871496702526,
+              "raw_final_equity": 10283.832622391437,
+              "raw_max_drawdown": 0.012049175638594138,
+              "raw_total_return": 0.02838326223914378,
+              "sharpe": 4.499977494905663,
+              "sortino": 4.71826043626938,
+              "total_return": 0.02838326223914378,
+              "volatility": 0.03867056991237888
+            },
+            "reject_counts": {
+              "cooldown": 347,
+              "signal_missing": 350
+            },
+            "round_trips": 12
+          }
+        },
+        "success_candidate": false
+      },
+      "state": "TrialState.COMPLETE",
+      "trial_number": 34
+    },
+    {
+      "objective": 22.306477858160974,
+      "params": {
+        "hold_bars": 120,
+        "long_scale": 6.3,
+        "short_scale": 10.0,
+        "short_symbol": "ETHUSDT",
+        "take_profit_pct": 0.06,
+        "threshold": 0.015
+      },
+      "result": {
+        "failed_gates": [
+          "oos_return_beats_incumbent",
+          "oos_mdd_beats_shadow"
+        ],
+        "family": "calendar_rotation",
+        "filters": {
+          "adaptive_lookback_bars": 12,
+          "allow_long": true,
+          "allow_short": true,
+          "broad_min_abs": 0.0,
+          "calendar_long_months": [
+            3,
+            4,
+            5
+          ],
+          "calendar_long_symbol": "TRXUSDT",
+          "calendar_short_months": [
+            1,
+            2
+          ],
+          "calendar_short_symbol": "ETHUSDT",
+          "compression_lookback_bars": 24,
+          "compression_quantile": 0.0,
+          "cooldown_bars": 30,
+          "entry_hours": [],
+          "family": "calendar_rotation",
+          "flow_lookback_bars": 0,
+          "flow_persistence_bars": 0,
+          "flow_persistence_threshold": 0.0,
+          "flow_threshold": 0.0,
+          "funding_abs_cap": 0.0,
+          "funding_rank_min": 0.0,
+          "hold_bars": 120,
+          "long_allocation_scale": 6.3,
+          "lookback_bars": 168,
+          "max_order_value": 175.0,
+          "max_rv": 0.0,
+          "min_abs_return": 0.015,
+          "name": "optuna_calendar_trx_sethusdt_t42_thr150_h120_ls630_ss100_tp600",
+          "oi_rank_min": 0.0,
+          "rv_lookback_bars": 24,
+          "sharpe_lookback_bars": 0,
+          "sharpe_rank_min": 0.0,
+          "short_allocation_scale": 10.0,
+          "stop_loss_pct": 0.0,
+          "take_profit_pct": 0.06,
+          "target_allocation": 0.008,
+          "threshold": 0.015,
+          "trailing_stop_cap_pct": 0.0,
+          "trailing_stop_floor_pct": 0.0,
+          "trailing_stop_rv_multiple": 0.0
+        },
+        "gates": {
+          "liquidations_zero": true,
+          "oos_mdd_beats_shadow": false,
+          "oos_return_beats_incumbent": false,
+          "oos_sharpe_gt_1": true,
+          "oos_trades_not_starved": true,
+          "train_positive": true,
+          "val_positive": true
+        },
+        "name": "optuna_calendar_trx_sethusdt_t42_thr150_h120_ls630_ss100_tp600",
+        "replay_survivor": false,
+        "split_results": {
+          "oos": {
+            "fills": 18,
+            "final_equity": 10081.823615189622,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.04586087096588032,
+              "calmar": 16.44790966516877,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.002788249200018314,
+              "min_equity": 9999.193297997204,
+              "raw_final_equity": 10081.823615189622,
+              "raw_max_drawdown": 0.002788249200018314,
+              "raw_total_return": 0.008182361518962233,
+              "sharpe": 4.220678037911025,
+              "sortino": 4.809408448195736,
+              "total_return": 0.008182361518962233,
+              "volatility": 0.01063738957779066
+            },
+            "reject_counts": {
+              "cooldown": 240,
+              "signal_missing": 296
+            },
+            "round_trips": 9
+          },
+          "train": {
+            "fills": 46,
+            "final_equity": 10193.41116971041,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.019343346333229094,
+              "calmar": 1.7758652623195175,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.01089235019325965,
+              "min_equity": 9950.122331905688,
+              "raw_final_equity": 10193.41116971041,
+              "raw_max_drawdown": 0.01089235019325965,
+              "raw_total_return": 0.019341116971041128,
+              "sharpe": 0.9172430636275856,
+              "sortino": 0.6446056782752306,
+              "total_return": 0.019341116971041128,
+              "volatility": 0.02113054913622489
+            },
+            "reject_counts": {
+              "cooldown": 690,
+              "signal_missing": 5740
+            },
+            "round_trips": 23
+          },
+          "val": {
+            "fills": 24,
+            "final_equity": 10283.832622391437,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.18918473506868616,
+              "calmar": 15.701052150216617,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.012049175638594138,
+              "min_equity": 9921.871496702526,
+              "raw_final_equity": 10283.832622391437,
+              "raw_max_drawdown": 0.012049175638594138,
+              "raw_total_return": 0.02838326223914378,
+              "sharpe": 4.499977494905663,
+              "sortino": 4.71826043626938,
+              "total_return": 0.02838326223914378,
+              "volatility": 0.03867056991237888
+            },
+            "reject_counts": {
+              "cooldown": 347,
+              "signal_missing": 350
+            },
+            "round_trips": 12
+          }
+        },
+        "success_candidate": false
+      },
+      "state": "TrialState.COMPLETE",
+      "trial_number": 42
+    },
+    {
+      "objective": 11.419660224021579,
+      "params": {
+        "hold_bars": 120,
+        "long_scale": 5.3,
+        "short_scale": 12.0,
+        "short_symbol": "",
+        "take_profit_pct": 0.024,
+        "threshold": 0.012
+      },
+      "result": {
+        "failed_gates": [
+          "oos_return_beats_incumbent"
+        ],
+        "family": "calendar_rotation",
+        "filters": {
+          "adaptive_lookback_bars": 12,
+          "allow_long": true,
+          "allow_short": true,
+          "broad_min_abs": 0.0,
+          "calendar_long_months": [
+            3,
+            4,
+            5
+          ],
+          "calendar_long_symbol": "TRXUSDT",
+          "calendar_short_months": [
+            1,
+            2
+          ],
+          "calendar_short_symbol": "",
+          "compression_lookback_bars": 24,
+          "compression_quantile": 0.0,
+          "cooldown_bars": 30,
+          "entry_hours": [],
+          "family": "calendar_rotation",
+          "flow_lookback_bars": 0,
+          "flow_persistence_bars": 0,
+          "flow_persistence_threshold": 0.0,
+          "flow_threshold": 0.0,
+          "funding_abs_cap": 0.0,
+          "funding_rank_min": 0.0,
+          "hold_bars": 120,
+          "long_allocation_scale": 5.3,
+          "lookback_bars": 168,
+          "max_order_value": 175.0,
+          "max_rv": 0.0,
+          "min_abs_return": 0.012,
+          "name": "optuna_calendar_trx_sweakest_t16_thr120_h120_ls530_ss120_tp240",
+          "oi_rank_min": 0.0,
+          "rv_lookback_bars": 24,
+          "sharpe_lookback_bars": 0,
+          "sharpe_rank_min": 0.0,
+          "short_allocation_scale": 12.0,
+          "stop_loss_pct": 0.0,
+          "take_profit_pct": 0.024,
+          "target_allocation": 0.008,
+          "threshold": 0.012,
+          "trailing_stop_cap_pct": 0.0,
+          "trailing_stop_floor_pct": 0.0,
+          "trailing_stop_rv_multiple": 0.0
+        },
+        "gates": {
+          "liquidations_zero": true,
+          "oos_mdd_beats_shadow": true,
+          "oos_return_beats_incumbent": false,
+          "oos_sharpe_gt_1": true,
+          "oos_trades_not_starved": true,
+          "train_positive": true,
+          "val_positive": true
+        },
+        "name": "optuna_calendar_trx_sweakest_t16_thr120_h120_ls530_ss120_tp240",
+        "replay_survivor": false,
+        "split_results": {
+          "oos": {
+            "fills": 26,
+            "final_equity": 10081.293889231943,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.045558530870206004,
+              "calmar": 28.169356509252285,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.0016173081857671192,
+              "min_equity": 9999.321345754393,
+              "raw_final_equity": 10081.293889231943,
+              "raw_max_drawdown": 0.0016173081857671192,
+              "raw_total_return": 0.00812938892319437,
+              "sharpe": 6.51688207965216,
+              "sortino": 7.651700204906362,
+              "total_return": 0.00812938892319437,
+              "volatility": 0.006839883074572876
+            },
+            "reject_counts": {
+              "cooldown": 360,
+              "signal_missing": 343
+            },
+            "round_trips": 13
+          },
+          "train": {
+            "fills": 82,
+            "final_equity": 10319.196171992684,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.031923318965559,
+              "calmar": 2.14794020338239,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.014862294078433343,
+              "min_equity": 9945.249045043687,
+              "raw_final_equity": 10319.196171992684,
+              "raw_max_drawdown": 0.014862294078433343,
+              "raw_total_return": 0.03191961719926839,
+              "sharpe": 1.6647370892169473,
+              "sortino": 1.0890395742056078,
+              "total_return": 0.03191961719926839,
+              "volatility": 0.018984713070594093
+            },
+            "reject_counts": {
+              "cooldown": 1230,
+              "signal_missing": 5653
+            },
+            "round_trips": 41
+          },
+          "val": {
+            "fills": 38,
+            "final_equity": 10150.461075260684,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.09686249816563652,
+              "calmar": 5.83146572855387,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.01661031765844866,
+              "min_equity": 9904.86315815741,
+              "raw_final_equity": 10150.461075260684,
+              "raw_max_drawdown": 0.01661031765844866,
+              "raw_total_return": 0.015046107526068386,
+              "sharpe": 2.30047522632979,
+              "sortino": 2.0267899737689787,
+              "total_return": 0.015046107526068386,
+              "volatility": 0.04054623081782663
+            },
+            "reject_counts": {
+              "cooldown": 540,
+              "signal_missing": 281
+            },
+            "round_trips": 19
+          }
+        },
+        "success_candidate": false
+      },
+      "state": "TrialState.COMPLETE",
+      "trial_number": 16
+    },
+    {
+      "objective": 13.229643946649029,
+      "params": {
+        "hold_bars": 120,
+        "long_scale": 6.2,
+        "short_scale": 12.0,
+        "short_symbol": "ETHUSDT",
+        "take_profit_pct": 0.024,
+        "threshold": 0.018
+      },
+      "result": {
+        "failed_gates": [
+          "oos_return_beats_incumbent",
+          "oos_mdd_beats_shadow"
+        ],
+        "family": "calendar_rotation",
+        "filters": {
+          "adaptive_lookback_bars": 12,
+          "allow_long": true,
+          "allow_short": true,
+          "broad_min_abs": 0.0,
+          "calendar_long_months": [
+            3,
+            4,
+            5
+          ],
+          "calendar_long_symbol": "TRXUSDT",
+          "calendar_short_months": [
+            1,
+            2
+          ],
+          "calendar_short_symbol": "ETHUSDT",
+          "compression_lookback_bars": 24,
+          "compression_quantile": 0.0,
+          "cooldown_bars": 30,
+          "entry_hours": [],
+          "family": "calendar_rotation",
+          "flow_lookback_bars": 0,
+          "flow_persistence_bars": 0,
+          "flow_persistence_threshold": 0.0,
+          "flow_threshold": 0.0,
+          "funding_abs_cap": 0.0,
+          "funding_rank_min": 0.0,
+          "hold_bars": 120,
+          "long_allocation_scale": 6.2,
+          "lookback_bars": 168,
+          "max_order_value": 175.0,
+          "max_rv": 0.0,
+          "min_abs_return": 0.018,
+          "name": "optuna_calendar_trx_sethusdt_t116_thr180_h120_ls620_ss120_tp240",
+          "oi_rank_min": 0.0,
+          "rv_lookback_bars": 24,
+          "sharpe_lookback_bars": 0,
+          "sharpe_rank_min": 0.0,
+          "short_allocation_scale": 12.0,
+          "stop_loss_pct": 0.0,
+          "take_profit_pct": 0.024,
+          "target_allocation": 0.008,
+          "threshold": 0.018,
+          "trailing_stop_cap_pct": 0.0,
+          "trailing_stop_floor_pct": 0.0,
+          "trailing_stop_rv_multiple": 0.0
+        },
+        "gates": {
+          "liquidations_zero": true,
+          "oos_mdd_beats_shadow": false,
+          "oos_return_beats_incumbent": false,
+          "oos_sharpe_gt_1": true,
+          "oos_trades_not_starved": true,
+          "train_positive": true,
+          "val_positive": true
+        },
+        "name": "optuna_calendar_trx_sethusdt_t116_thr180_h120_ls620_ss120_tp240",
+        "replay_survivor": false,
+        "split_results": {
+          "oos": {
+            "fills": 24,
+            "final_equity": 10080.871646636508,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.045317587927872216,
+              "calmar": 24.139769855914427,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.0018772999162114657,
+              "min_equity": 9994.359310991464,
+              "raw_final_equity": 10080.871646636508,
+              "raw_max_drawdown": 0.0018772999162114657,
+              "raw_total_return": 0.00808716466365067,
+              "sharpe": 5.286373712919892,
+              "sortino": 6.101356217742779,
+              "total_return": 0.00808716466365067,
+              "volatility": 0.008390636318731404
+            },
+            "reject_counts": {
+              "cooldown": 330,
+              "signal_missing": 393
+            },
+            "round_trips": 12
+          },
+          "train": {
+            "fills": 74,
+            "final_equity": 10241.819073901177,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.02418470131572481,
+              "calmar": 2.062832432285729,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.0117240261192359,
+              "min_equity": 9940.554721891782,
+              "raw_final_equity": 10241.819073901177,
+              "raw_max_drawdown": 0.0117240261192359,
+              "raw_total_return": 0.02418190739011772,
+              "sharpe": 1.1260837247982343,
+              "sortino": 0.6379108173089317,
+              "total_return": 0.02418190739011772,
+              "volatility": 0.021425056763701242
+            },
+            "reject_counts": {
+              "cooldown": 1110,
+              "signal_missing": 5799
+            },
+            "round_trips": 37
+          },
+          "val": {
+            "fills": 36,
+            "final_equity": 10172.763628178225,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.11186783727454364,
+              "calmar": 7.471505684315422,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.014972596154130284,
+              "min_equity": 9908.21415296322,
+              "raw_final_equity": 10172.763628178225,
+              "raw_max_drawdown": 0.014972596154130284,
+              "raw_total_return": 0.01727636281782252,
+              "sharpe": 2.7795981390859748,
+              "sortino": 2.467428627144545,
+              "total_return": 0.01727636281782252,
+              "volatility": 0.03841534473168577
+            },
+            "reject_counts": {
+              "cooldown": 510,
+              "signal_missing": 353
+            },
+            "round_trips": 18
+          }
+        },
+        "success_candidate": false
+      },
+      "state": "TrialState.COMPLETE",
+      "trial_number": 116
+    },
+    {
+      "objective": 22.307747814780598,
+      "params": {
+        "hold_bars": 120,
+        "long_scale": 6.2,
+        "short_scale": 10.0,
+        "short_symbol": "ETHUSDT",
+        "take_profit_pct": 0.06,
+        "threshold": 0.015
+      },
+      "result": {
+        "failed_gates": [
+          "oos_return_beats_incumbent",
+          "oos_mdd_beats_shadow"
+        ],
+        "family": "calendar_rotation",
+        "filters": {
+          "adaptive_lookback_bars": 12,
+          "allow_long": true,
+          "allow_short": true,
+          "broad_min_abs": 0.0,
+          "calendar_long_months": [
+            3,
+            4,
+            5
+          ],
+          "calendar_long_symbol": "TRXUSDT",
+          "calendar_short_months": [
+            1,
+            2
+          ],
+          "calendar_short_symbol": "ETHUSDT",
+          "compression_lookback_bars": 24,
+          "compression_quantile": 0.0,
+          "cooldown_bars": 30,
+          "entry_hours": [],
+          "family": "calendar_rotation",
+          "flow_lookback_bars": 0,
+          "flow_persistence_bars": 0,
+          "flow_persistence_threshold": 0.0,
+          "flow_threshold": 0.0,
+          "funding_abs_cap": 0.0,
+          "funding_rank_min": 0.0,
+          "hold_bars": 120,
+          "long_allocation_scale": 6.2,
+          "lookback_bars": 168,
+          "max_order_value": 175.0,
+          "max_rv": 0.0,
+          "min_abs_return": 0.015,
+          "name": "optuna_calendar_trx_sethusdt_t35_thr150_h120_ls620_ss100_tp600",
+          "oi_rank_min": 0.0,
+          "rv_lookback_bars": 24,
+          "sharpe_lookback_bars": 0,
+          "sharpe_rank_min": 0.0,
+          "short_allocation_scale": 10.0,
+          "stop_loss_pct": 0.0,
+          "take_profit_pct": 0.06,
+          "target_allocation": 0.008,
+          "threshold": 0.015,
+          "trailing_stop_cap_pct": 0.0,
+          "trailing_stop_floor_pct": 0.0,
+          "trailing_stop_rv_multiple": 0.0
+        },
+        "gates": {
+          "liquidations_zero": true,
+          "oos_mdd_beats_shadow": false,
+          "oos_return_beats_incumbent": false,
+          "oos_sharpe_gt_1": true,
+          "oos_trades_not_starved": true,
+          "train_positive": true,
+          "val_positive": true
+        },
+        "name": "optuna_calendar_trx_sethusdt_t35_thr150_h120_ls620_ss100_tp600",
+        "replay_survivor": false,
+        "split_results": {
+          "oos": {
+            "fills": 18,
+            "final_equity": 10080.521210957075,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.045117654438804555,
+              "calmar": 16.442021652009075,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.0027440454339318766,
+              "min_equity": 9999.206102546423,
+              "raw_final_equity": 10080.521210957075,
+              "raw_max_drawdown": 0.0027440454339318766,
+              "raw_total_return": 0.00805212109570741,
+              "sharpe": 4.220624888684907,
+              "sortino": 4.809312212521635,
+              "total_return": 0.00805212109570741,
+              "volatility": 0.010468671309592751
+            },
+            "reject_counts": {
+              "cooldown": 240,
+              "signal_missing": 296
+            },
+            "round_trips": 9
+          },
+          "train": {
+            "fills": 46,
+            "final_equity": 10193.34194242947,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.01933642279963954,
+              "calmar": 1.775229629653774,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.01089235019325965,
+              "min_equity": 9950.122331905688,
+              "raw_final_equity": 10193.34194242947,
+              "raw_max_drawdown": 0.01089235019325965,
+              "raw_total_return": 0.019334194242947023,
+              "sharpe": 0.9194901573679384,
+              "sortino": 0.6452341844458885,
+              "total_return": 0.019334194242947023,
+              "volatility": 0.02107013604881906
+            },
+            "reject_counts": {
+              "cooldown": 690,
+              "signal_missing": 5740
+            },
+            "round_trips": 23
+          },
+          "val": {
+            "fills": 24,
+            "final_equity": 10283.832622391437,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.18918473506868616,
+              "calmar": 15.701052150216617,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.012049175638594138,
+              "min_equity": 9921.871496702526,
+              "raw_final_equity": 10283.832622391437,
+              "raw_max_drawdown": 0.012049175638594138,
+              "raw_total_return": 0.02838326223914378,
+              "sharpe": 4.499977494905663,
+              "sortino": 4.71826043626938,
+              "total_return": 0.02838326223914378,
+              "volatility": 0.03867056991237888
+            },
+            "reject_counts": {
+              "cooldown": 347,
+              "signal_missing": 350
+            },
+            "round_trips": 12
+          }
+        },
+        "success_candidate": false
+      },
+      "state": "TrialState.COMPLETE",
+      "trial_number": 35
+    },
+    {
+      "objective": 22.309000966621625,
+      "params": {
+        "hold_bars": 120,
+        "long_scale": 6.1,
+        "short_scale": 10.0,
+        "short_symbol": "ETHUSDT",
+        "take_profit_pct": 0.06,
+        "threshold": 0.015
+      },
+      "result": {
+        "failed_gates": [
+          "oos_return_beats_incumbent",
+          "oos_mdd_beats_shadow"
+        ],
+        "family": "calendar_rotation",
+        "filters": {
+          "adaptive_lookback_bars": 12,
+          "allow_long": true,
+          "allow_short": true,
+          "broad_min_abs": 0.0,
+          "calendar_long_months": [
+            3,
+            4,
+            5
+          ],
+          "calendar_long_symbol": "TRXUSDT",
+          "calendar_short_months": [
+            1,
+            2
+          ],
+          "calendar_short_symbol": "ETHUSDT",
+          "compression_lookback_bars": 24,
+          "compression_quantile": 0.0,
+          "cooldown_bars": 30,
+          "entry_hours": [],
+          "family": "calendar_rotation",
+          "flow_lookback_bars": 0,
+          "flow_persistence_bars": 0,
+          "flow_persistence_threshold": 0.0,
+          "flow_threshold": 0.0,
+          "funding_abs_cap": 0.0,
+          "funding_rank_min": 0.0,
+          "hold_bars": 120,
+          "long_allocation_scale": 6.1,
+          "lookback_bars": 168,
+          "max_order_value": 175.0,
+          "max_rv": 0.0,
+          "min_abs_return": 0.015,
+          "name": "optuna_calendar_trx_sethusdt_t31_thr150_h120_ls610_ss100_tp600",
+          "oi_rank_min": 0.0,
+          "rv_lookback_bars": 24,
+          "sharpe_lookback_bars": 0,
+          "sharpe_rank_min": 0.0,
+          "short_allocation_scale": 10.0,
+          "stop_loss_pct": 0.0,
+          "take_profit_pct": 0.06,
+          "target_allocation": 0.008,
+          "threshold": 0.015,
+          "trailing_stop_cap_pct": 0.0,
+          "trailing_stop_floor_pct": 0.0,
+          "trailing_stop_rv_multiple": 0.0
+        },
+        "gates": {
+          "liquidations_zero": true,
+          "oos_mdd_beats_shadow": false,
+          "oos_return_beats_incumbent": false,
+          "oos_sharpe_gt_1": true,
+          "oos_trades_not_starved": true,
+          "train_positive": true,
+          "val_positive": true
+        },
+        "name": "optuna_calendar_trx_sethusdt_t31_thr150_h120_ls610_ss100_tp600",
+        "replay_survivor": false,
+        "split_results": {
+          "oos": {
+            "fills": 18,
+            "final_equity": 10079.218931190699,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.04437494109827611,
+              "calmar": 16.436138389012996,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.002699839831473995,
+              "min_equity": 9999.218907548644,
+              "raw_final_equity": 10079.218931190699,
+              "raw_max_drawdown": 0.002699839831473995,
+              "raw_total_return": 0.007921893119069878,
+              "sharpe": 4.220572079689473,
+              "sortino": 4.809216805436443,
+              "total_return": 0.007921893119069878,
+              "volatility": 0.010299949040627428
+            },
+            "reject_counts": {
+              "cooldown": 240,
+              "signal_missing": 296
+            },
+            "round_trips": 9
+          },
+          "train": {
+            "fills": 46,
+            "final_equity": 10193.272606304476,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.01932948838038362,
+              "calmar": 1.7745929976016561,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.01089235019325965,
+              "min_equity": 9950.122331905688,
+              "raw_final_equity": 10193.272606304476,
+              "raw_max_drawdown": 0.01089235019325965,
+              "raw_total_return": 0.01932726063044754,
+              "sharpe": 0.9217157154892728,
+              "sortino": 0.6458260430925027,
+              "total_return": 0.01932726063044754,
+              "volatility": 0.021010518883386915
+            },
+            "reject_counts": {
+              "cooldown": 690,
+              "signal_missing": 5740
+            },
+            "round_trips": 23
+          },
+          "val": {
+            "fills": 24,
+            "final_equity": 10283.832622391437,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.18918473506868616,
+              "calmar": 15.701052150216617,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.012049175638594138,
+              "min_equity": 9921.871496702526,
+              "raw_final_equity": 10283.832622391437,
+              "raw_max_drawdown": 0.012049175638594138,
+              "raw_total_return": 0.02838326223914378,
+              "sharpe": 4.499977494905663,
+              "sortino": 4.71826043626938,
+              "total_return": 0.02838326223914378,
+              "volatility": 0.03867056991237888
+            },
+            "reject_counts": {
+              "cooldown": 347,
+              "signal_missing": 350
+            },
+            "round_trips": 12
+          }
+        },
+        "success_candidate": false
+      },
+      "state": "TrialState.COMPLETE",
+      "trial_number": 31
+    },
+    {
+      "objective": 22.309000966621625,
+      "params": {
+        "hold_bars": 120,
+        "long_scale": 6.1,
+        "short_scale": 10.0,
+        "short_symbol": "ETHUSDT",
+        "take_profit_pct": 0.06,
+        "threshold": 0.015
+      },
+      "result": {
+        "failed_gates": [
+          "oos_return_beats_incumbent",
+          "oos_mdd_beats_shadow"
+        ],
+        "family": "calendar_rotation",
+        "filters": {
+          "adaptive_lookback_bars": 12,
+          "allow_long": true,
+          "allow_short": true,
+          "broad_min_abs": 0.0,
+          "calendar_long_months": [
+            3,
+            4,
+            5
+          ],
+          "calendar_long_symbol": "TRXUSDT",
+          "calendar_short_months": [
+            1,
+            2
+          ],
+          "calendar_short_symbol": "ETHUSDT",
+          "compression_lookback_bars": 24,
+          "compression_quantile": 0.0,
+          "cooldown_bars": 30,
+          "entry_hours": [],
+          "family": "calendar_rotation",
+          "flow_lookback_bars": 0,
+          "flow_persistence_bars": 0,
+          "flow_persistence_threshold": 0.0,
+          "flow_threshold": 0.0,
+          "funding_abs_cap": 0.0,
+          "funding_rank_min": 0.0,
+          "hold_bars": 120,
+          "long_allocation_scale": 6.1,
+          "lookback_bars": 168,
+          "max_order_value": 175.0,
+          "max_rv": 0.0,
+          "min_abs_return": 0.015,
+          "name": "optuna_calendar_trx_sethusdt_t32_thr150_h120_ls610_ss100_tp600",
+          "oi_rank_min": 0.0,
+          "rv_lookback_bars": 24,
+          "sharpe_lookback_bars": 0,
+          "sharpe_rank_min": 0.0,
+          "short_allocation_scale": 10.0,
+          "stop_loss_pct": 0.0,
+          "take_profit_pct": 0.06,
+          "target_allocation": 0.008,
+          "threshold": 0.015,
+          "trailing_stop_cap_pct": 0.0,
+          "trailing_stop_floor_pct": 0.0,
+          "trailing_stop_rv_multiple": 0.0
+        },
+        "gates": {
+          "liquidations_zero": true,
+          "oos_mdd_beats_shadow": false,
+          "oos_return_beats_incumbent": false,
+          "oos_sharpe_gt_1": true,
+          "oos_trades_not_starved": true,
+          "train_positive": true,
+          "val_positive": true
+        },
+        "name": "optuna_calendar_trx_sethusdt_t32_thr150_h120_ls610_ss100_tp600",
+        "replay_survivor": false,
+        "split_results": {
+          "oos": {
+            "fills": 18,
+            "final_equity": 10079.218931190699,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.04437494109827611,
+              "calmar": 16.436138389012996,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.002699839831473995,
+              "min_equity": 9999.218907548644,
+              "raw_final_equity": 10079.218931190699,
+              "raw_max_drawdown": 0.002699839831473995,
+              "raw_total_return": 0.007921893119069878,
+              "sharpe": 4.220572079689473,
+              "sortino": 4.809216805436443,
+              "total_return": 0.007921893119069878,
+              "volatility": 0.010299949040627428
+            },
+            "reject_counts": {
+              "cooldown": 240,
+              "signal_missing": 296
+            },
+            "round_trips": 9
+          },
+          "train": {
+            "fills": 46,
+            "final_equity": 10193.272606304476,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.01932948838038362,
+              "calmar": 1.7745929976016561,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.01089235019325965,
+              "min_equity": 9950.122331905688,
+              "raw_final_equity": 10193.272606304476,
+              "raw_max_drawdown": 0.01089235019325965,
+              "raw_total_return": 0.01932726063044754,
+              "sharpe": 0.9217157154892728,
+              "sortino": 0.6458260430925027,
+              "total_return": 0.01932726063044754,
+              "volatility": 0.021010518883386915
+            },
+            "reject_counts": {
+              "cooldown": 690,
+              "signal_missing": 5740
+            },
+            "round_trips": 23
+          },
+          "val": {
+            "fills": 24,
+            "final_equity": 10283.832622391437,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.18918473506868616,
+              "calmar": 15.701052150216617,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.012049175638594138,
+              "min_equity": 9921.871496702526,
+              "raw_final_equity": 10283.832622391437,
+              "raw_max_drawdown": 0.012049175638594138,
+              "raw_total_return": 0.02838326223914378,
+              "sharpe": 4.499977494905663,
+              "sortino": 4.71826043626938,
+              "total_return": 0.02838326223914378,
+              "volatility": 0.03867056991237888
+            },
+            "reject_counts": {
+              "cooldown": 347,
+              "signal_missing": 350
+            },
+            "round_trips": 12
+          }
+        },
+        "success_candidate": false
+      },
+      "state": "TrialState.COMPLETE",
+      "trial_number": 32
+    },
+    {
+      "objective": 22.309000966621625,
+      "params": {
+        "hold_bars": 120,
+        "long_scale": 6.1,
+        "short_scale": 10.0,
+        "short_symbol": "ETHUSDT",
+        "take_profit_pct": 0.06,
+        "threshold": 0.015
+      },
+      "result": {
+        "failed_gates": [
+          "oos_return_beats_incumbent",
+          "oos_mdd_beats_shadow"
+        ],
+        "family": "calendar_rotation",
+        "filters": {
+          "adaptive_lookback_bars": 12,
+          "allow_long": true,
+          "allow_short": true,
+          "broad_min_abs": 0.0,
+          "calendar_long_months": [
+            3,
+            4,
+            5
+          ],
+          "calendar_long_symbol": "TRXUSDT",
+          "calendar_short_months": [
+            1,
+            2
+          ],
+          "calendar_short_symbol": "ETHUSDT",
+          "compression_lookback_bars": 24,
+          "compression_quantile": 0.0,
+          "cooldown_bars": 30,
+          "entry_hours": [],
+          "family": "calendar_rotation",
+          "flow_lookback_bars": 0,
+          "flow_persistence_bars": 0,
+          "flow_persistence_threshold": 0.0,
+          "flow_threshold": 0.0,
+          "funding_abs_cap": 0.0,
+          "funding_rank_min": 0.0,
+          "hold_bars": 120,
+          "long_allocation_scale": 6.1,
+          "lookback_bars": 168,
+          "max_order_value": 175.0,
+          "max_rv": 0.0,
+          "min_abs_return": 0.015,
+          "name": "optuna_calendar_trx_sethusdt_t33_thr150_h120_ls610_ss100_tp600",
+          "oi_rank_min": 0.0,
+          "rv_lookback_bars": 24,
+          "sharpe_lookback_bars": 0,
+          "sharpe_rank_min": 0.0,
+          "short_allocation_scale": 10.0,
+          "stop_loss_pct": 0.0,
+          "take_profit_pct": 0.06,
+          "target_allocation": 0.008,
+          "threshold": 0.015,
+          "trailing_stop_cap_pct": 0.0,
+          "trailing_stop_floor_pct": 0.0,
+          "trailing_stop_rv_multiple": 0.0
+        },
+        "gates": {
+          "liquidations_zero": true,
+          "oos_mdd_beats_shadow": false,
+          "oos_return_beats_incumbent": false,
+          "oos_sharpe_gt_1": true,
+          "oos_trades_not_starved": true,
+          "train_positive": true,
+          "val_positive": true
+        },
+        "name": "optuna_calendar_trx_sethusdt_t33_thr150_h120_ls610_ss100_tp600",
+        "replay_survivor": false,
+        "split_results": {
+          "oos": {
+            "fills": 18,
+            "final_equity": 10079.218931190699,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.04437494109827611,
+              "calmar": 16.436138389012996,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.002699839831473995,
+              "min_equity": 9999.218907548644,
+              "raw_final_equity": 10079.218931190699,
+              "raw_max_drawdown": 0.002699839831473995,
+              "raw_total_return": 0.007921893119069878,
+              "sharpe": 4.220572079689473,
+              "sortino": 4.809216805436443,
+              "total_return": 0.007921893119069878,
+              "volatility": 0.010299949040627428
+            },
+            "reject_counts": {
+              "cooldown": 240,
+              "signal_missing": 296
+            },
+            "round_trips": 9
+          },
+          "train": {
+            "fills": 46,
+            "final_equity": 10193.272606304476,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.01932948838038362,
+              "calmar": 1.7745929976016561,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.01089235019325965,
+              "min_equity": 9950.122331905688,
+              "raw_final_equity": 10193.272606304476,
+              "raw_max_drawdown": 0.01089235019325965,
+              "raw_total_return": 0.01932726063044754,
+              "sharpe": 0.9217157154892728,
+              "sortino": 0.6458260430925027,
+              "total_return": 0.01932726063044754,
+              "volatility": 0.021010518883386915
+            },
+            "reject_counts": {
+              "cooldown": 690,
+              "signal_missing": 5740
+            },
+            "round_trips": 23
+          },
+          "val": {
+            "fills": 24,
+            "final_equity": 10283.832622391437,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.18918473506868616,
+              "calmar": 15.701052150216617,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.012049175638594138,
+              "min_equity": 9921.871496702526,
+              "raw_final_equity": 10283.832622391437,
+              "raw_max_drawdown": 0.012049175638594138,
+              "raw_total_return": 0.02838326223914378,
+              "sharpe": 4.499977494905663,
+              "sortino": 4.71826043626938,
+              "total_return": 0.02838326223914378,
+              "volatility": 0.03867056991237888
+            },
+            "reject_counts": {
+              "cooldown": 347,
+              "signal_missing": 350
+            },
+            "round_trips": 12
+          }
+        },
+        "success_candidate": false
+      },
+      "state": "TrialState.COMPLETE",
+      "trial_number": 33
+    },
+    {
+      "objective": 22.309000966621625,
+      "params": {
+        "hold_bars": 120,
+        "long_scale": 6.1,
+        "short_scale": 10.0,
+        "short_symbol": "ETHUSDT",
+        "take_profit_pct": 0.06,
+        "threshold": 0.015
+      },
+      "result": {
+        "failed_gates": [
+          "oos_return_beats_incumbent",
+          "oos_mdd_beats_shadow"
+        ],
+        "family": "calendar_rotation",
+        "filters": {
+          "adaptive_lookback_bars": 12,
+          "allow_long": true,
+          "allow_short": true,
+          "broad_min_abs": 0.0,
+          "calendar_long_months": [
+            3,
+            4,
+            5
+          ],
+          "calendar_long_symbol": "TRXUSDT",
+          "calendar_short_months": [
+            1,
+            2
+          ],
+          "calendar_short_symbol": "ETHUSDT",
+          "compression_lookback_bars": 24,
+          "compression_quantile": 0.0,
+          "cooldown_bars": 30,
+          "entry_hours": [],
+          "family": "calendar_rotation",
+          "flow_lookback_bars": 0,
+          "flow_persistence_bars": 0,
+          "flow_persistence_threshold": 0.0,
+          "flow_threshold": 0.0,
+          "funding_abs_cap": 0.0,
+          "funding_rank_min": 0.0,
+          "hold_bars": 120,
+          "long_allocation_scale": 6.1,
+          "lookback_bars": 168,
+          "max_order_value": 175.0,
+          "max_rv": 0.0,
+          "min_abs_return": 0.015,
+          "name": "optuna_calendar_trx_sethusdt_t41_thr150_h120_ls610_ss100_tp600",
+          "oi_rank_min": 0.0,
+          "rv_lookback_bars": 24,
+          "sharpe_lookback_bars": 0,
+          "sharpe_rank_min": 0.0,
+          "short_allocation_scale": 10.0,
+          "stop_loss_pct": 0.0,
+          "take_profit_pct": 0.06,
+          "target_allocation": 0.008,
+          "threshold": 0.015,
+          "trailing_stop_cap_pct": 0.0,
+          "trailing_stop_floor_pct": 0.0,
+          "trailing_stop_rv_multiple": 0.0
+        },
+        "gates": {
+          "liquidations_zero": true,
+          "oos_mdd_beats_shadow": false,
+          "oos_return_beats_incumbent": false,
+          "oos_sharpe_gt_1": true,
+          "oos_trades_not_starved": true,
+          "train_positive": true,
+          "val_positive": true
+        },
+        "name": "optuna_calendar_trx_sethusdt_t41_thr150_h120_ls610_ss100_tp600",
+        "replay_survivor": false,
+        "split_results": {
+          "oos": {
+            "fills": 18,
+            "final_equity": 10079.218931190699,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.04437494109827611,
+              "calmar": 16.436138389012996,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.002699839831473995,
+              "min_equity": 9999.218907548644,
+              "raw_final_equity": 10079.218931190699,
+              "raw_max_drawdown": 0.002699839831473995,
+              "raw_total_return": 0.007921893119069878,
+              "sharpe": 4.220572079689473,
+              "sortino": 4.809216805436443,
+              "total_return": 0.007921893119069878,
+              "volatility": 0.010299949040627428
+            },
+            "reject_counts": {
+              "cooldown": 240,
+              "signal_missing": 296
+            },
+            "round_trips": 9
+          },
+          "train": {
+            "fills": 46,
+            "final_equity": 10193.272606304476,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.01932948838038362,
+              "calmar": 1.7745929976016561,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.01089235019325965,
+              "min_equity": 9950.122331905688,
+              "raw_final_equity": 10193.272606304476,
+              "raw_max_drawdown": 0.01089235019325965,
+              "raw_total_return": 0.01932726063044754,
+              "sharpe": 0.9217157154892728,
+              "sortino": 0.6458260430925027,
+              "total_return": 0.01932726063044754,
+              "volatility": 0.021010518883386915
+            },
+            "reject_counts": {
+              "cooldown": 690,
+              "signal_missing": 5740
+            },
+            "round_trips": 23
+          },
+          "val": {
+            "fills": 24,
+            "final_equity": 10283.832622391437,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.18918473506868616,
+              "calmar": 15.701052150216617,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.012049175638594138,
+              "min_equity": 9921.871496702526,
+              "raw_final_equity": 10283.832622391437,
+              "raw_max_drawdown": 0.012049175638594138,
+              "raw_total_return": 0.02838326223914378,
+              "sharpe": 4.499977494905663,
+              "sortino": 4.71826043626938,
+              "total_return": 0.02838326223914378,
+              "volatility": 0.03867056991237888
+            },
+            "reject_counts": {
+              "cooldown": 347,
+              "signal_missing": 350
+            },
+            "round_trips": 12
+          }
+        },
+        "success_candidate": false
+      },
+      "state": "TrialState.COMPLETE",
+      "trial_number": 41
+    },
+    {
+      "objective": 11.412860080259572,
+      "params": {
+        "hold_bars": 120,
+        "long_scale": 5.1,
+        "short_scale": 12.0,
+        "short_symbol": "",
+        "take_profit_pct": 0.024,
+        "threshold": 0.012
+      },
+      "result": {
+        "failed_gates": [
+          "oos_return_beats_incumbent"
+        ],
+        "family": "calendar_rotation",
+        "filters": {
+          "adaptive_lookback_bars": 12,
+          "allow_long": true,
+          "allow_short": true,
+          "broad_min_abs": 0.0,
+          "calendar_long_months": [
+            3,
+            4,
+            5
+          ],
+          "calendar_long_symbol": "TRXUSDT",
+          "calendar_short_months": [
+            1,
+            2
+          ],
+          "calendar_short_symbol": "",
+          "compression_lookback_bars": 24,
+          "compression_quantile": 0.0,
+          "cooldown_bars": 30,
+          "entry_hours": [],
+          "family": "calendar_rotation",
+          "flow_lookback_bars": 0,
+          "flow_persistence_bars": 0,
+          "flow_persistence_threshold": 0.0,
+          "flow_threshold": 0.0,
+          "funding_abs_cap": 0.0,
+          "funding_rank_min": 0.0,
+          "hold_bars": 120,
+          "long_allocation_scale": 5.1,
+          "lookback_bars": 168,
+          "max_order_value": 175.0,
+          "max_rv": 0.0,
+          "min_abs_return": 0.012,
+          "name": "optuna_calendar_trx_sweakest_t11_thr120_h120_ls509_ss120_tp240",
+          "oi_rank_min": 0.0,
+          "rv_lookback_bars": 24,
+          "sharpe_lookback_bars": 0,
+          "sharpe_rank_min": 0.0,
+          "short_allocation_scale": 12.0,
+          "stop_loss_pct": 0.0,
+          "take_profit_pct": 0.024,
+          "target_allocation": 0.008,
+          "threshold": 0.012,
+          "trailing_stop_cap_pct": 0.0,
+          "trailing_stop_floor_pct": 0.0,
+          "trailing_stop_rv_multiple": 0.0
+        },
+        "gates": {
+          "liquidations_zero": true,
+          "oos_mdd_beats_shadow": true,
+          "oos_return_beats_incumbent": false,
+          "oos_sharpe_gt_1": true,
+          "oos_trades_not_starved": true,
+          "train_positive": true,
+          "val_positive": true
+        },
+        "name": "optuna_calendar_trx_sweakest_t11_thr120_h120_ls509_ss120_tp240",
+        "replay_survivor": false,
+        "split_results": {
+          "oos": {
+            "fills": 26,
+            "final_equity": 10078.215894292272,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.04380318577086628,
+              "calmar": 28.14556097599093,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.0015563088548219669,
+              "min_equity": 9999.346955305833,
+              "raw_final_equity": 10078.215894292272,
+              "raw_max_drawdown": 0.0015563088548219669,
+              "raw_total_return": 0.007821589429227283,
+              "sharpe": 6.516860406726834,
+              "sortino": 7.651677386157995,
+              "total_return": 0.007821589429227283,
+              "volatility": 0.0065818047395071804
+            },
+            "reject_counts": {
+              "cooldown": 360,
+              "signal_missing": 343
+            },
+            "round_trips": 13
+          },
+          "train": {
+            "fills": 82,
+            "final_equity": 10318.006466988087,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.03180433445639763,
+              "calmar": 2.1399344063948287,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.014862294078433343,
+              "min_equity": 9945.249045043687,
+              "raw_final_equity": 10318.006466988087,
+              "raw_max_drawdown": 0.014862294078433343,
+              "raw_total_return": 0.03180064669880878,
+              "sharpe": 1.6651878709043728,
+              "sortino": 1.0857826983969472,
+              "total_return": 0.03180064669880878,
+              "volatility": 0.018909469779522466
+            },
+            "reject_counts": {
+              "cooldown": 1230,
+              "signal_missing": 5653
+            },
+            "round_trips": 41
+          },
+          "val": {
+            "fills": 38,
+            "final_equity": 10150.461075260684,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.09686249816563652,
+              "calmar": 5.83146572855387,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.01661031765844866,
+              "min_equity": 9904.86315815741,
+              "raw_final_equity": 10150.461075260684,
+              "raw_max_drawdown": 0.01661031765844866,
+              "raw_total_return": 0.015046107526068386,
+              "sharpe": 2.30047522632979,
+              "sortino": 2.0267899737689787,
+              "total_return": 0.015046107526068386,
+              "volatility": 0.04054623081782663
+            },
+            "reject_counts": {
+              "cooldown": 540,
+              "signal_missing": 281
+            },
+            "round_trips": 19
+          }
+        },
+        "success_candidate": false
+      },
+      "state": "TrialState.COMPLETE",
+      "trial_number": 11
+    },
+    {
+      "objective": 22.310236617797244,
+      "params": {
+        "hold_bars": 120,
+        "long_scale": 6.0,
+        "short_scale": 10.0,
+        "short_symbol": "ETHUSDT",
+        "take_profit_pct": 0.06,
+        "threshold": 0.015
+      },
+      "result": {
+        "failed_gates": [
+          "oos_return_beats_incumbent",
+          "oos_mdd_beats_shadow"
+        ],
+        "family": "calendar_rotation",
+        "filters": {
+          "adaptive_lookback_bars": 12,
+          "allow_long": true,
+          "allow_short": true,
+          "broad_min_abs": 0.0,
+          "calendar_long_months": [
+            3,
+            4,
+            5
+          ],
+          "calendar_long_symbol": "TRXUSDT",
+          "calendar_short_months": [
+            1,
+            2
+          ],
+          "calendar_short_symbol": "ETHUSDT",
+          "compression_lookback_bars": 24,
+          "compression_quantile": 0.0,
+          "cooldown_bars": 30,
+          "entry_hours": [],
+          "family": "calendar_rotation",
+          "flow_lookback_bars": 0,
+          "flow_persistence_bars": 0,
+          "flow_persistence_threshold": 0.0,
+          "flow_threshold": 0.0,
+          "funding_abs_cap": 0.0,
+          "funding_rank_min": 0.0,
+          "hold_bars": 120,
+          "long_allocation_scale": 6.0,
+          "lookback_bars": 168,
+          "max_order_value": 175.0,
+          "max_rv": 0.0,
+          "min_abs_return": 0.015,
+          "name": "optuna_calendar_trx_sethusdt_t30_thr150_h120_ls600_ss100_tp600",
+          "oi_rank_min": 0.0,
+          "rv_lookback_bars": 24,
+          "sharpe_lookback_bars": 0,
+          "sharpe_rank_min": 0.0,
+          "short_allocation_scale": 10.0,
+          "stop_loss_pct": 0.0,
+          "take_profit_pct": 0.06,
+          "target_allocation": 0.008,
+          "threshold": 0.015,
+          "trailing_stop_cap_pct": 0.0,
+          "trailing_stop_floor_pct": 0.0,
+          "trailing_stop_rv_multiple": 0.0
+        },
+        "gates": {
+          "liquidations_zero": true,
+          "oos_mdd_beats_shadow": false,
+          "oos_return_beats_incumbent": false,
+          "oos_sharpe_gt_1": true,
+          "oos_trades_not_starved": true,
+          "train_positive": true,
+          "val_positive": true
+        },
+        "name": "optuna_calendar_trx_sethusdt_t30_thr150_h120_ls600_ss100_tp600",
+        "replay_survivor": false,
+        "split_results": {
+          "oos": {
+            "fills": 18,
+            "final_equity": 10077.916776206175,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.04363273080479391,
+              "calmar": 16.430264453745508,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.00265563168064816,
+              "min_equity": 9999.231712097862,
+              "raw_final_equity": 10077.916776206175,
+              "raw_max_drawdown": 0.00265563168064816,
+              "raw_total_return": 0.007791677620617499,
+              "sharpe": 4.2205192759314,
+              "sortino": 4.809121331590345,
+              "total_return": 0.007791677620617499,
+              "volatility": 0.010131223659792837
+            },
+            "reject_counts": {
+              "cooldown": 240,
+              "signal_missing": 296
+            },
+            "round_trips": 9
+          },
+          "train": {
+            "fills": 46,
+            "final_equity": 10193.20314938462,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.019322541880241406,
+              "calmar": 1.7739552564329493,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.01089235019325965,
+              "min_equity": 9950.122331905688,
+              "raw_final_equity": 10193.20314938462,
+              "raw_max_drawdown": 0.01089235019325965,
+              "raw_total_return": 0.01932031493846198,
+              "sharpe": 0.9239189057489455,
+              "sortino": 0.6463807984734281,
+              "total_return": 0.01932031493846198,
+              "volatility": 0.02095170534331297
+            },
+            "reject_counts": {
+              "cooldown": 690,
+              "signal_missing": 5740
+            },
+            "round_trips": 23
+          },
+          "val": {
+            "fills": 24,
+            "final_equity": 10283.832622391437,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.18918473506868616,
+              "calmar": 15.701052150216617,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.012049175638594138,
+              "min_equity": 9921.871496702526,
+              "raw_final_equity": 10283.832622391437,
+              "raw_max_drawdown": 0.012049175638594138,
+              "raw_total_return": 0.02838326223914378,
+              "sharpe": 4.499977494905663,
+              "sortino": 4.71826043626938,
+              "total_return": 0.02838326223914378,
+              "volatility": 0.03867056991237888
+            },
+            "reject_counts": {
+              "cooldown": 347,
+              "signal_missing": 350
+            },
+            "round_trips": 12
+          }
+        },
+        "success_candidate": false
+      },
+      "state": "TrialState.COMPLETE",
+      "trial_number": 30
+    },
+    {
+      "objective": 22.310236617797244,
+      "params": {
+        "hold_bars": 120,
+        "long_scale": 6.0,
+        "short_scale": 10.0,
+        "short_symbol": "ETHUSDT",
+        "take_profit_pct": 0.06,
+        "threshold": 0.015
+      },
+      "result": {
+        "failed_gates": [
+          "oos_return_beats_incumbent",
+          "oos_mdd_beats_shadow"
+        ],
+        "family": "calendar_rotation",
+        "filters": {
+          "adaptive_lookback_bars": 12,
+          "allow_long": true,
+          "allow_short": true,
+          "broad_min_abs": 0.0,
+          "calendar_long_months": [
+            3,
+            4,
+            5
+          ],
+          "calendar_long_symbol": "TRXUSDT",
+          "calendar_short_months": [
+            1,
+            2
+          ],
+          "calendar_short_symbol": "ETHUSDT",
+          "compression_lookback_bars": 24,
+          "compression_quantile": 0.0,
+          "cooldown_bars": 30,
+          "entry_hours": [],
+          "family": "calendar_rotation",
+          "flow_lookback_bars": 0,
+          "flow_persistence_bars": 0,
+          "flow_persistence_threshold": 0.0,
+          "flow_threshold": 0.0,
+          "funding_abs_cap": 0.0,
+          "funding_rank_min": 0.0,
+          "hold_bars": 120,
+          "long_allocation_scale": 6.0,
+          "lookback_bars": 168,
+          "max_order_value": 175.0,
+          "max_rv": 0.0,
+          "min_abs_return": 0.015,
+          "name": "optuna_calendar_trx_sethusdt_t51_thr150_h120_ls600_ss100_tp600",
+          "oi_rank_min": 0.0,
+          "rv_lookback_bars": 24,
+          "sharpe_lookback_bars": 0,
+          "sharpe_rank_min": 0.0,
+          "short_allocation_scale": 10.0,
+          "stop_loss_pct": 0.0,
+          "take_profit_pct": 0.06,
+          "target_allocation": 0.008,
+          "threshold": 0.015,
+          "trailing_stop_cap_pct": 0.0,
+          "trailing_stop_floor_pct": 0.0,
+          "trailing_stop_rv_multiple": 0.0
+        },
+        "gates": {
+          "liquidations_zero": true,
+          "oos_mdd_beats_shadow": false,
+          "oos_return_beats_incumbent": false,
+          "oos_sharpe_gt_1": true,
+          "oos_trades_not_starved": true,
+          "train_positive": true,
+          "val_positive": true
+        },
+        "name": "optuna_calendar_trx_sethusdt_t51_thr150_h120_ls600_ss100_tp600",
+        "replay_survivor": false,
+        "split_results": {
+          "oos": {
+            "fills": 18,
+            "final_equity": 10077.916776206175,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.04363273080479391,
+              "calmar": 16.430264453745508,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.00265563168064816,
+              "min_equity": 9999.231712097862,
+              "raw_final_equity": 10077.916776206175,
+              "raw_max_drawdown": 0.00265563168064816,
+              "raw_total_return": 0.007791677620617499,
+              "sharpe": 4.2205192759314,
+              "sortino": 4.809121331590345,
+              "total_return": 0.007791677620617499,
+              "volatility": 0.010131223659792837
+            },
+            "reject_counts": {
+              "cooldown": 240,
+              "signal_missing": 296
+            },
+            "round_trips": 9
+          },
+          "train": {
+            "fills": 46,
+            "final_equity": 10193.20314938462,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.019322541880241406,
+              "calmar": 1.7739552564329493,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.01089235019325965,
+              "min_equity": 9950.122331905688,
+              "raw_final_equity": 10193.20314938462,
+              "raw_max_drawdown": 0.01089235019325965,
+              "raw_total_return": 0.01932031493846198,
+              "sharpe": 0.9239189057489455,
+              "sortino": 0.6463807984734281,
+              "total_return": 0.01932031493846198,
+              "volatility": 0.02095170534331297
+            },
+            "reject_counts": {
+              "cooldown": 690,
+              "signal_missing": 5740
+            },
+            "round_trips": 23
+          },
+          "val": {
+            "fills": 24,
+            "final_equity": 10283.832622391437,
+            "liquidations": 0,
+            "metrics": {
+              "cagr": 0.18918473506868616,
+              "calmar": 15.701052150216617,
+              "equity_breach_count": 0.0,
+              "equity_breach_observed": false,
+              "max_drawdown": 0.012049175638594138,
+              "min_equity": 9921.871496702526,
+              "raw_final_equity": 10283.832622391437,
+              "raw_max_drawdown": 0.012049175638594138,
+              "raw_total_return": 0.02838326223914378,
+              "sharpe": 4.499977494905663,
+              "sortino": 4.71826043626938,
+              "total_return": 0.02838326223914378,
+              "volatility": 0.03867056991237888
+            },
+            "reject_counts": {
+              "cooldown": 347,
+              "signal_missing": 350
+            },
+            "round_trips": 12
+          }
+        },
+        "success_candidate": false
+      },
+      "state": "TrialState.COMPLETE",
+      "trial_number": 51
+    }
+  ]
+}

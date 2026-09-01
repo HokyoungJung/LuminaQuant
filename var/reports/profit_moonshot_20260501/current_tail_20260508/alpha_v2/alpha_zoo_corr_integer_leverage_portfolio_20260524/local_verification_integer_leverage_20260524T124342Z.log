@@ -1,0 +1,80 @@
+verification_started_utc=2026-05-24T12:43:42Z
+artifact_invariant_ok {"cost_bps": 10.0, "integrity": "pass", "paper_profiles": ["aggressive_mdd30_gross10_shadow", "balanced_mdd12_gross5", "growth_mdd20_gross8"], "rss_mib": 6246.46484375}
+source_code_calendar_feature_grep
+calendar_feature_grep_ok
+hardcoded_model_id_grep
+hardcoded_model_id_grep_ok
+..............                                                           [100%]
+14 passed in 0.23s
+	Command being timed: ".venv/bin/python -m pytest tests/test_alpha_zoo_corr_integer_leverage_portfolio.py tests/test_alpha_zoo_pnl_correlation_decision.py tests/test_alpha_zoo_multi_asset_monitoring_slate.py -q"
+	User time (seconds): 1.90
+	System time (seconds): 0.13
+	Percent of CPU this job got: 186%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:01.09
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 175764
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 1
+	Minor (reclaiming a frame) page faults: 27433
+	Voluntary context switches: 62
+	Involuntary context switches: 70
+	Swaps: 0
+	File system inputs: 7632
+	File system outputs: 592
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+All checks passed!
+Hardcoded parameter audit: total=567 new=0 baselined=567
+JSON report: reports/quality/hardcoded_params_report.json
+Markdown report: reports/quality/hardcoded_params_report.md
+........................................................................ [  5%]
+........................................................................ [ 10%]
+........................................................................ [ 15%]
+........................................................................ [ 20%]
+........................................................................ [ 25%]
+........................................................................ [ 30%]
+........................................................................ [ 35%]
+........................................................................ [ 40%]
+........................................................................ [ 45%]
+........................................................................ [ 50%]
+........................................................................ [ 55%]
+........................................................................ [ 60%]
+........................................................................ [ 65%]
+........................................................................ [ 70%]
+........................................................................ [ 75%]
+........................................................................ [ 80%]
+........................................................................ [ 85%]
+........................................................................ [ 90%]
+........................................................................ [ 95%]
+....................................................................     [100%]
+1436 passed in 67.59s (0:01:07)
+	Command being timed: ".venv/bin/python -m pytest -q"
+	User time (seconds): 66.90
+	System time (seconds): 15.05
+	Percent of CPU this job got: 126%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:04.65
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 2745132
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 1499
+	Minor (reclaiming a frame) page faults: 1879117
+	Voluntary context switches: 327656
+	Involuntary context switches: 3194
+	Swaps: 0
+	File system inputs: 235448
+	File system outputs: 210712
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+verification_finished_utc=2026-05-24T12:44:46Z

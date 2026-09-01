@@ -1,0 +1,91 @@
+{
+  "artifact_kind": "profit_moonshot_pass_under_8gb_mission_validation",
+  "budget_bytes": 8589934592,
+  "checks": [
+    {
+      "detail": "result has passed=true and status=passed",
+      "name": "declared_pass_status",
+      "passed": true
+    },
+    {
+      "detail": "var/reports/profit_moonshot_20260501/current_tail_20260507/external_overhaul/passing_candidate_latest.json",
+      "name": "passing_candidate_artifact_exists",
+      "passed": true
+    },
+    {
+      "detail": "research/live-equivalent success label present",
+      "name": "candidate_lifecycle_label",
+      "passed": true
+    },
+    {
+      "detail": "[{\"exists\": true, \"path\": \"var/reports/profit_moonshot_20260501/current_tail_20260507/external_overhaul/logs/fresh_start_overhaul_replay_perf2.time.log\", \"peak_rss_bytes\": 295038976, \"under_8gib\": true}, {\"exists\": true, \"path\": \"var/reports/profit_moonshot_20260501/current_tail_20260507/external_overhaul/logs/fresh_portfolio_tuning_perf4.time.log\", \"peak_rss_bytes\": 388091904, \"under_8gib\": true}, {\"exists\": true, \"path\": \"var/reports/profit_moonshot_20260501/current_tail_20260507/external_overhaul/_memory_guard/profit_moonshot_fresh_start_replay_memory_latest.json\", \"peak_rss_bytes\": 295038976, \"under_8gib\": true}, {\"exists\": true, \"path\": \"var/reports/profit_moonshot_20260501/current_tail_20260507/external_overhaul/_memory_guard/profit_moonshot_fresh_portfolio_tuning_memory_latest.json\", \"peak_rss_bytes\": 382947328, \"under_8gib\": true}, {\"exists\": true, \"path\": \"var/reports/profit_moonshot_20260501/current_tail_20260507/external_overhaul/_memory_guard/profit_moonshot_fresh_start_replay_rss_latest.jsonl\", \"peak_rss_bytes\": 2707296256, \"under_8gib\": true}, {\"exists\": true, \"path\": \"var/reports/profit_moonshot_20260501/current_tail_20260507/external_overhaul/_memory_guard/profit_moonshot_fresh_portfolio_tuning_rss_latest.jsonl\", \"peak_rss_bytes\": 2653155328, \"under_8gib\": true}, {\"exists\": true, \"path\": \"var/reports/profit_moonshot_20260501/current_tail_20260507/external_overhaul/logs/calendar_optuna_64.time.log\", \"peak_rss_bytes\": 264884224, \"under_8gib\": true}]",
+      "name": "rss_under_8gib_evidence",
+      "passed": true
+    },
+    {
+      "detail": "3 test evidence item(s)",
+      "name": "local_tests_evidence",
+      "passed": true
+    },
+    {
+      "detail": "2 CI evidence item(s)",
+      "name": "ci_success_evidence",
+      "passed": true
+    },
+    {
+      "detail": "source unchanged or push evidence present",
+      "name": "git_push_evidence_if_source_changed",
+      "passed": true
+    }
+  ],
+  "generated_at": "2026-05-08T11:09:20.288311Z",
+  "passed": true,
+  "result_path": ".omx/specs/autoresearch-profit-moonshot-pass-under-8gb/result.json",
+  "rss_evidence": [
+    {
+      "exists": true,
+      "path": "var/reports/profit_moonshot_20260501/current_tail_20260507/external_overhaul/logs/fresh_start_overhaul_replay_perf2.time.log",
+      "peak_rss_bytes": 295038976,
+      "under_8gib": true
+    },
+    {
+      "exists": true,
+      "path": "var/reports/profit_moonshot_20260501/current_tail_20260507/external_overhaul/logs/fresh_portfolio_tuning_perf4.time.log",
+      "peak_rss_bytes": 388091904,
+      "under_8gib": true
+    },
+    {
+      "exists": true,
+      "path": "var/reports/profit_moonshot_20260501/current_tail_20260507/external_overhaul/_memory_guard/profit_moonshot_fresh_start_replay_memory_latest.json",
+      "peak_rss_bytes": 295038976,
+      "under_8gib": true
+    },
+    {
+      "exists": true,
+      "path": "var/reports/profit_moonshot_20260501/current_tail_20260507/external_overhaul/_memory_guard/profit_moonshot_fresh_portfolio_tuning_memory_latest.json",
+      "peak_rss_bytes": 382947328,
+      "under_8gib": true
+    },
+    {
+      "exists": true,
+      "path": "var/reports/profit_moonshot_20260501/current_tail_20260507/external_overhaul/_memory_guard/profit_moonshot_fresh_start_replay_rss_latest.jsonl",
+      "peak_rss_bytes": 2707296256,
+      "under_8gib": true
+    },
+    {
+      "exists": true,
+      "path": "var/reports/profit_moonshot_20260501/current_tail_20260507/external_overhaul/_memory_guard/profit_moonshot_fresh_portfolio_tuning_rss_latest.jsonl",
+      "peak_rss_bytes": 2653155328,
+      "under_8gib": true
+    },
+    {
+      "exists": true,
+      "path": "var/reports/profit_moonshot_20260501/current_tail_20260507/external_overhaul/logs/calendar_optuna_64.time.log",
+      "peak_rss_bytes": 264884224,
+      "under_8gib": true
+    }
+  ],
+  "schema_version": "1.0",
+  "status": "passed",
+  "summary": "mission evidence complete"
+}

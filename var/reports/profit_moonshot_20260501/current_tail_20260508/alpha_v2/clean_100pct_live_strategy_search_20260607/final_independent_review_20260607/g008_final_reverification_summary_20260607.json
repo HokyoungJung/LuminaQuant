@@ -1,0 +1,359 @@
+{
+  "architect": "WATCH/no_safety_FAIL",
+  "artifact_kind": "g008_final_reverification_summary",
+  "checks": [
+    {
+      "evidence": "python3 -m compileall -q modified Python/test/BBO surfaces",
+      "name": "compileall",
+      "status": "pass"
+    },
+    {
+      "evidence": "uv run ruff check modified Python/test/BBO surfaces -> All checks passed",
+      "name": "ruff_check",
+      "status": "pass"
+    },
+    {
+      "evidence": "uv run ruff format --check modified Python/test/BBO surfaces -> 9 files already formatted",
+      "name": "ruff_format_check",
+      "status": "pass"
+    },
+    {
+      "evidence": "uv run pytest -q tests/test_alpha_zoo_clean_new_alpha_discovery.py tests/test_strategy_support_inventory.py tests/test_collect_binance_book_ticker_feature_points.py tests/test_optimization_search_policy.py tests/test_alpha_zoo_10bps_full_retune_artifact_assertions.py -> 34 passed in 0.76s",
+      "name": "pytest_core",
+      "status": "pass"
+    },
+    {
+      "evidence": "uv run pytest -q tests/test_live_binance_market_window_aggregation.py tests/test_collect_binance_book_ticker_feature_points.py -> 6 passed in 0.04s",
+      "name": "pytest_stream_bbo",
+      "status": "pass"
+    },
+    {
+      "evidence": "git diff --check -> no output",
+      "name": "git_diff_check",
+      "status": "pass"
+    },
+    {
+      "evidence": "25 target/review JSON files parsed; all six candidates real_money_allowed=false and small_sleeve_allowed=false; manifest sha matched; no true locked-OOS/live-promotion flags found",
+      "name": "artifact_assertions",
+      "status": "pass"
+    },
+    {
+      "evidence": "5/5 code-reviewer tasks completed; no no-live blocker; LOW stale dirty caveat fixed and de-hashed.",
+      "name": "code_reviewer_rereview_after_bbo",
+      "status": "comment_low_fixed_historical"
+    },
+    {
+      "evidence": "Latest BBO accumulation recheck (2026-06-07T10:32:06.564484Z) used inferred candidate_cap=500 and left feature-bounded OOS unchanged at -0.24% comp / -0.57% annualized; no promotion flags changed.",
+      "name": "latest_bbo_accumulation_recheck",
+      "status": "pass_no_promotion"
+    },
+    {
+      "evidence": "PYTHONPATH=src uv run python custom parser/assertions -> cap=500 latest BBO JSON parsed; candidate_rows=2500; all BBO rows >0; all final candidates real_money_allowed=false/small_sleeve_allowed=false; feature-bounded real_money_execution=false and clean_promotion_eligible=false.",
+      "name": "latest_bbo_json_artifact_assertions",
+      "status": "pass"
+    },
+    {
+      "evidence": "git diff --check -> no output.",
+      "name": "latest_bbo_diff_check",
+      "status": "pass"
+    },
+    {
+      "evidence": "PYTHONPATH=. uv run pytest -q tests/test_alpha_zoo_clean_new_alpha_discovery.py tests/test_strategy_support_inventory.py tests/test_collect_binance_book_ticker_feature_points.py -> 12 passed in 0.54s.",
+      "name": "latest_bbo_pytest",
+      "status": "pass"
+    },
+    {
+      "evidence": "PYTHONPATH=. uv run pytest -q tests/test_import_binance_book_ticker_history.py -> 3 passed in 0.08s; adapter supports approved csv/jsonl/ndjson/parquet BBO history ingest without changing no-deploy decision.",
+      "name": "historical_bbo_ingest_adapter",
+      "status": "pass_plumbing_only"
+    },
+    {
+      "name": "public_book_ticker_archive_backfill",
+      "status": "pass",
+      "evidence": "uv run ruff check import/backfill BBO scripts and tests -> All checks passed; uv run ruff format --check import/backfill BBO scripts and tests -> 4 files already formatted; PYTHONPATH=. uv run pytest -q tests/test_import_binance_book_ticker_history.py tests/test_backfill_binance_public_book_ticker_history.py -> 8 passed in 0.16s; curl -I official BTCUSDT 2024-03-30 archive URL -> HTTP/2 200 application/zip"
+    },
+    {
+      "name": "official_bbo_smoke_backfill_and_post_rerun",
+      "status": "pass_no_promotion",
+      "evidence": "Backfilled BTC/ETH/SOL/BNB/TRX 2024-03-30 official bookTicker archives with cadence_seconds=300 -> 1,440 persisted rows; support inventory BBO rows now BTC 1029, ETH 1043, SOL 1034, BNB 1004, TRX 988; post-backfill cap=500 clean discovery generated 2026-06-07T11:08:08.338686Z and remained -0.24% OOS comp / -0.57% annualized / promotion false; final focused verification: Ruff/pytest/docs pass (22 tests, 119 markdown files)."
+    },
+    {
+      "name": "official_bbo_coverage_window_audit",
+      "status": "blocked_for_current_window",
+      "evidence": "Official BTCUSDT daily bookTicker listing currently shows latest 2024-03-30 archive; 2025-12-01..2025-12-07 core5 probe returned 35 missing archives; current bounded folds need 2025-01-01..2026-05-31 train/validation BBO coverage."
+    }
+  ],
+  "code_reviewer": "APPROVE",
+  "code_reviewer_rereview_after_bbo": {
+    "low_findings_fixed": [
+      "[LOW] final_quality_gate_20260607.json:5 — Caveat says repository remains dirty with pre-existing changes, but post-review worktree status was clean. Why it matters: stale provenance wording can confuse final audit readers even though it is conservative and does not overstate promotion readiness. Fix: if regenerating final artifacts, update/remove this stale caveat or qualify it as historical generation context."
+    ],
+    "no_live_blockers": false,
+    "note": "Historical re-review artifact; stale dirty-workspace and commit-hash wording fixed in final quality gate.",
+    "status": "COMMENT_LOW_FIXED_HISTORICAL",
+    "team": "read-only-final-re-re-4a549153"
+  },
+  "deployment_conclusion": "no_real_money; no_small_sleeve; 0pct_allocation_or_paper_control_only",
+  "generated_at_utc": "2026-06-07T11:12:24Z",
+  "hidden_goal_snapshot": "wrong completed legacy latency objective; saved in fresh_get_goal_after_g008_review.json",
+  "latest_bbo_accumulation_recheck": {
+    "aggregate": {
+      "annualized_oos_return_approx": -0.005715372151040787,
+      "compounded_oos_return": -0.0023853868449449367,
+      "max_oos_mdd": 0.08315392481708694,
+      "monthly_equity_mdd": 0.08716671516123264,
+      "monthly_sharpe_approx": 0.0386242684900772,
+      "positive_oos_folds": 3,
+      "profit_factor": 1.032455916541698
+    },
+    "artifact_kind": "latest_bbo_accumulation_recheck",
+    "candidate_cap_inferred": 500,
+    "candidate_rows": 2500,
+    "checked_at_utc": "2026-06-07T11:09:51Z",
+    "clean_promotion_eligible": false,
+    "decision_impact": "unchanged_rejected; official one-day BBO archive smoke backfill plus rerun did not improve clean train/validation-first OOS result",
+    "fold_count": 5,
+    "historical_bbo_ingest_adapter": {
+      "decision_impact": "no_change_to_cap500_clean_oos_result; no vendor/source approved; no real_money_unlock_without_new_clean_walk_forward",
+      "script": "scripts/import_binance_book_ticker_history.py",
+      "status": "plumbing_ready_for_explicitly_approved_external_history_only",
+      "supported_formats": [
+        "csv",
+        "jsonl",
+        "ndjson",
+        "parquet"
+      ],
+      "test": "tests/test_import_binance_book_ticker_history.py",
+      "public_archive_followup": {
+        "script": "scripts/backfill_binance_public_book_ticker_history.py",
+        "status": "ready_for_explicit_public_binance_bookTicker_backfill_after manifest approval",
+        "decision_impact": "no_change_to_no_real_money/no_small_sleeve; use only to create fresh train/validation coverage before a new clean walk-forward"
+      }
+    },
+    "real_money_execution": false,
+    "source_generated_at_utc": "2026-06-07T11:08:08.338686Z",
+    "source_json": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_new_alpha_discovery_20260607_feature_bounded/clean_new_alpha_discovery_latest.json",
+    "source_markdown": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_new_alpha_discovery_20260607_feature_bounded/clean_new_alpha_discovery_latest.md",
+    "support_inventory_bbo_rows": {
+      "BTCUSDT": {
+        "bbo_rows": 1029,
+        "bbo_first_timestamp_utc": "2024-03-30T00:00:00.002000+00:00",
+        "bbo_last_timestamp_utc": "2026-06-07T10:31:00+00:00"
+      },
+      "ETHUSDT": {
+        "bbo_rows": 1043,
+        "bbo_first_timestamp_utc": "2024-03-30T00:00:00.019000+00:00",
+        "bbo_last_timestamp_utc": "2026-06-07T10:31:00+00:00"
+      },
+      "SOLUSDT": {
+        "bbo_rows": 1034,
+        "bbo_first_timestamp_utc": "2024-03-30T00:00:00.008000+00:00",
+        "bbo_last_timestamp_utc": "2026-06-07T10:31:00+00:00"
+      },
+      "BNBUSDT": {
+        "bbo_rows": 1004,
+        "bbo_first_timestamp_utc": "2024-03-30T00:00:00.024000+00:00",
+        "bbo_last_timestamp_utc": "2026-06-07T10:31:00+00:00"
+      },
+      "TRXUSDT": {
+        "bbo_rows": 988,
+        "bbo_first_timestamp_utc": "2024-03-30T00:00:00.007000+00:00",
+        "bbo_last_timestamp_utc": "2026-06-07T10:31:00+00:00"
+      }
+    },
+    "public_book_ticker_archive_backfill": {
+      "script": "scripts/backfill_binance_public_book_ticker_history.py",
+      "test": "tests/test_backfill_binance_public_book_ticker_history.py",
+      "source": "https://data.binance.vision/data/futures/um/daily/bookTicker/{SYMBOL}/{SYMBOL}-bookTicker-{YYYY-MM-DD}.zip",
+      "status": "official_public_archive_backfill_smoke_verified_but_coverage_insufficient_for_selection_change",
+      "column_shape": "update_id,best_bid_price,best_bid_qty,best_ask_price,best_ask_qty,transaction_time,event_time",
+      "controls": [
+        "requires explicit symbol/date manifest before broader research use",
+        "bounded cadence sampling used for smoke import",
+        "missing archives recorded fail-closed instead of fabricated",
+        "post-backfill cap=500 clean rerun remained rejected",
+        "does not unlock real-money without multi-date clean walk-forward and cost/fill telemetry"
+      ],
+      "verification": [
+        "uv run ruff check import/backfill BBO scripts and tests -> All checks passed",
+        "uv run ruff format --check import/backfill BBO scripts and tests -> 4 files already formatted",
+        "PYTHONPATH=. uv run pytest -q tests/test_import_binance_book_ticker_history.py tests/test_backfill_binance_public_book_ticker_history.py -> 8 passed in 0.16s",
+        "curl -I official BTCUSDT 2024-03-30 archive URL -> HTTP/2 200 application/zip"
+      ],
+      "smoke_backfill_2024_03_30_core5": {
+        "date": "2024-03-30",
+        "symbols": [
+          "BTC/USDT",
+          "ETH/USDT",
+          "SOL/USDT",
+          "BNB/USDT",
+          "TRX/USDT"
+        ],
+        "cadence_seconds": 300,
+        "total_persisted_rows": 1440,
+        "archive_rows_by_symbol": {
+          "BTC/USDT": 7398592,
+          "ETH/USDT": 5996993,
+          "SOL/USDT": 5458186,
+          "BNB/USDT": 2273856,
+          "TRX/USDT": 722198
+        },
+        "persisted_rows_by_symbol": {
+          "BTC/USDT": 288,
+          "ETH/USDT": 288,
+          "SOL/USDT": 288,
+          "BNB/USDT": 288,
+          "TRX/USDT": 288
+        },
+        "support_inventory_after_smoke": {
+          "BTCUSDT": {
+            "bbo_rows": 1029,
+            "bbo_first_timestamp_utc": "2024-03-30T00:00:00.002000+00:00",
+            "bbo_last_timestamp_utc": "2026-06-07T10:31:00+00:00"
+          },
+          "ETHUSDT": {
+            "bbo_rows": 1043,
+            "bbo_first_timestamp_utc": "2024-03-30T00:00:00.019000+00:00",
+            "bbo_last_timestamp_utc": "2026-06-07T10:31:00+00:00"
+          },
+          "SOLUSDT": {
+            "bbo_rows": 1034,
+            "bbo_first_timestamp_utc": "2024-03-30T00:00:00.008000+00:00",
+            "bbo_last_timestamp_utc": "2026-06-07T10:31:00+00:00"
+          },
+          "BNBUSDT": {
+            "bbo_rows": 1004,
+            "bbo_first_timestamp_utc": "2024-03-30T00:00:00.024000+00:00",
+            "bbo_last_timestamp_utc": "2026-06-07T10:31:00+00:00"
+          },
+          "TRXUSDT": {
+            "bbo_rows": 988,
+            "bbo_first_timestamp_utc": "2024-03-30T00:00:00.007000+00:00",
+            "bbo_last_timestamp_utc": "2026-06-07T10:31:00+00:00"
+          }
+        },
+        "post_backfill_rerun": {
+          "source_generated_at_utc": "2026-06-07T11:08:08.338686Z",
+          "compounded_oos_return": -0.0023853868449449367,
+          "annualized_oos_return_approx": -0.005715372151040787,
+          "monthly_equity_mdd": 0.08716671516123264,
+          "monthly_sharpe_approx": 0.0386242684900772,
+          "positive_oos_folds": 3,
+          "fold_count": 5,
+          "decision_impact": "unchanged_no_promotion; one historical day validates ingestion path but does not provide enough train/validation coverage to alter selection"
+        }
+      }
+    }
+  },
+  "remaining_blockers": [
+    "Formal .omx/ultragoal aggregate cannot be marked complete because fresh Codex get_goal points to a completed legacy latency objective.",
+    "G008 blocked checkpoint is intentionally non-terminal: ledger records goal_blocked while goals.json remains in_progress.",
+    "Architect verdict is WATCH, not CLEAR, due provenance/metric-lineage caveats now annotated."
+  ],
+  "status": "PASS_WITH_G008_WATCH_AND_HIDDEN_GOAL_BLOCKER",
+  "ultragoal_checkpoint": "ledger goal_blocked event recorded for G008, but goals.json status remains in_progress; treat as OMX state-transition caveat, not strategy approval.",
+  "public_book_ticker_archive_backfill": {
+    "script": "scripts/backfill_binance_public_book_ticker_history.py",
+    "test": "tests/test_backfill_binance_public_book_ticker_history.py",
+    "source": "https://data.binance.vision/data/futures/um/daily/bookTicker/{SYMBOL}/{SYMBOL}-bookTicker-{YYYY-MM-DD}.zip",
+    "status": "official_public_archive_backfill_ready_for_explicitly_manifested_symbols_dates_only",
+    "column_shape": "update_id,best_bid_price,best_bid_qty,best_ask_price,best_ask_qty,transaction_time,event_time",
+    "controls": [
+      "requires explicit symbol/date manifest before research use",
+      "optional cadence sampling before persistence",
+      "missing archives recorded fail-closed instead of fabricated",
+      "does not change cap=500 feature-bounded OOS result",
+      "does not unlock real-money without new clean walk-forward and cost/fill telemetry"
+    ],
+    "verification": [
+      "uv run ruff check import/backfill BBO scripts and tests -> All checks passed",
+      "uv run ruff format --check import/backfill BBO scripts and tests -> 4 files already formatted",
+      "PYTHONPATH=. uv run pytest -q tests/test_import_binance_book_ticker_history.py tests/test_backfill_binance_public_book_ticker_history.py -> 8 passed in 0.16s",
+      "curl -I official BTCUSDT 2024-03-30 archive URL -> HTTP/2 200 application/zip"
+    ]
+  },
+  "public_bbo_smoke_backfill_2024_03_30_core5": {
+    "date": "2024-03-30",
+    "symbols": [
+      "BTC/USDT",
+      "ETH/USDT",
+      "SOL/USDT",
+      "BNB/USDT",
+      "TRX/USDT"
+    ],
+    "cadence_seconds": 300,
+    "total_persisted_rows": 1440,
+    "archive_rows_by_symbol": {
+      "BTC/USDT": 7398592,
+      "ETH/USDT": 5996993,
+      "SOL/USDT": 5458186,
+      "BNB/USDT": 2273856,
+      "TRX/USDT": 722198
+    },
+    "persisted_rows_by_symbol": {
+      "BTC/USDT": 288,
+      "ETH/USDT": 288,
+      "SOL/USDT": 288,
+      "BNB/USDT": 288,
+      "TRX/USDT": 288
+    },
+    "support_inventory_after_smoke": {
+      "BTCUSDT": {
+        "bbo_rows": 1029,
+        "bbo_first_timestamp_utc": "2024-03-30T00:00:00.002000+00:00",
+        "bbo_last_timestamp_utc": "2026-06-07T10:31:00+00:00"
+      },
+      "ETHUSDT": {
+        "bbo_rows": 1043,
+        "bbo_first_timestamp_utc": "2024-03-30T00:00:00.019000+00:00",
+        "bbo_last_timestamp_utc": "2026-06-07T10:31:00+00:00"
+      },
+      "SOLUSDT": {
+        "bbo_rows": 1034,
+        "bbo_first_timestamp_utc": "2024-03-30T00:00:00.008000+00:00",
+        "bbo_last_timestamp_utc": "2026-06-07T10:31:00+00:00"
+      },
+      "BNBUSDT": {
+        "bbo_rows": 1004,
+        "bbo_first_timestamp_utc": "2024-03-30T00:00:00.024000+00:00",
+        "bbo_last_timestamp_utc": "2026-06-07T10:31:00+00:00"
+      },
+      "TRXUSDT": {
+        "bbo_rows": 988,
+        "bbo_first_timestamp_utc": "2024-03-30T00:00:00.007000+00:00",
+        "bbo_last_timestamp_utc": "2026-06-07T10:31:00+00:00"
+      }
+    },
+    "post_backfill_rerun": {
+      "source_generated_at_utc": "2026-06-07T11:08:08.338686Z",
+      "compounded_oos_return": -0.0023853868449449367,
+      "annualized_oos_return_approx": -0.005715372151040787,
+      "monthly_equity_mdd": 0.08716671516123264,
+      "monthly_sharpe_approx": 0.0386242684900772,
+      "positive_oos_folds": 3,
+      "fold_count": 5,
+      "decision_impact": "unchanged_no_promotion; one historical day validates ingestion path but does not provide enough train/validation coverage to alter selection"
+    }
+  },
+  "official_bbo_coverage_window_audit": {
+    "status": "coverage_mismatch_for_current_folds",
+    "checked_at_utc": "2026-06-07T11:12:24Z",
+    "official_prefix": "https://data.binance.vision/?prefix=data/futures/um/daily/bookTicker/BTCUSDT/",
+    "observed_latest_daily_btcusdt_listing": "BTCUSDT-bookTicker-2024-03-30.zip",
+    "failed_current_window_probe": {
+      "date_range": "2025-12-01..2025-12-07",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT"
+      ],
+      "requested_symbol_days": 35,
+      "imported_archive_count": 0,
+      "missing_archive_count": 35
+    },
+    "current_fold_window_requirement": "2025-01-01 through 2026-05-31 train/validation coverage for the bounded clean discovery windows",
+    "decision_impact": "official public archive proves ingestion path but cannot satisfy current fold BBO coverage; resolve post-2024 BBO source or define an earlier BBO-specific manifest before rerunning for promotion evidence"
+  }
+}

@@ -1,0 +1,118 @@
+{
+  "artifact_kind": "g003_external_prior_cache_manifest",
+  "cache_dir": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g003_external_prior_cache",
+  "file_count": 18,
+  "files": [
+    {
+      "bytes": 423,
+      "name": "arxiv_adaptivetrend_crypto.meta.json",
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g003_external_prior_cache/arxiv_adaptivetrend_crypto.meta.json",
+      "sha256": "e7ed9196f482690e94350016ee6176a0b80168bd8e8949e78f35e67b683188f2"
+    },
+    {
+      "bytes": 42030,
+      "name": "arxiv_adaptivetrend_crypto.source",
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g003_external_prior_cache/arxiv_adaptivetrend_crypto.source",
+      "sha256": "bbd3899cf0ab2113717d9078a697c1bd9ac30359334ebc9139e1f89b9cb3ecd3"
+    },
+    {
+      "bytes": 428,
+      "name": "arxiv_deepm_regime_robust_macro.meta.json",
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g003_external_prior_cache/arxiv_deepm_regime_robust_macro.meta.json",
+      "sha256": "20dcd633e813c1a3e30a8ec337685e3afc64ea26accca527ed8ba70e0232abf7"
+    },
+    {
+      "bytes": 43084,
+      "name": "arxiv_deepm_regime_robust_macro.source",
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g003_external_prior_cache/arxiv_deepm_regime_robust_macro.source",
+      "sha256": "873d18bbce8e661166501a1474937f4e7cf306ad699c54adf154f1bccbc7722e"
+    },
+    {
+      "bytes": 427,
+      "name": "arxiv_hmm_rl_regime_allocation.meta.json",
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g003_external_prior_cache/arxiv_hmm_rl_regime_allocation.meta.json",
+      "sha256": "873d6edddb14419d55044a0446bb68c23a02bfddebfa499adf08d9216e1a0ca5"
+    },
+    {
+      "bytes": 43811,
+      "name": "arxiv_hmm_rl_regime_allocation.source",
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g003_external_prior_cache/arxiv_hmm_rl_regime_allocation.source",
+      "sha256": "7f471e90e39aae810d91b3469b44bc2eaf26cc03ef012ac4ebafe5f7d82b2c8b"
+    },
+    {
+      "bytes": 432,
+      "name": "arxiv_trendfolios_multi_asset_trend.meta.json",
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g003_external_prior_cache/arxiv_trendfolios_multi_asset_trend.meta.json",
+      "sha256": "85e18f0e76b6409f79604e5409d52e63885904984db2179d025b6bd6d968c893"
+    },
+    {
+      "bytes": 39705,
+      "name": "arxiv_trendfolios_multi_asset_trend.source",
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g003_external_prior_cache/arxiv_trendfolios_multi_asset_trend.source",
+      "sha256": "9bcd5889b0b8e17385779121391b55e84347786006df278a6602721c90dde42a"
+    },
+    {
+      "bytes": 507,
+      "name": "binance_usdm_exchange_info_docs.meta.json",
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g003_external_prior_cache/binance_usdm_exchange_info_docs.meta.json",
+      "sha256": "a968df854267f1dce97fe5d276b9282df596b71ce0d27c4bafcecaa14238bd5e"
+    },
+    {
+      "bytes": 74325,
+      "name": "binance_usdm_exchange_info_docs.source",
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g003_external_prior_cache/binance_usdm_exchange_info_docs.source",
+      "sha256": "a8bcf3c0bff97a842a13a91984414a6586b957781bbc1f5e8424f1cd22140953"
+    },
+    {
+      "bytes": 510,
+      "name": "binance_usdm_funding_rate_docs.meta.json",
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g003_external_prior_cache/binance_usdm_funding_rate_docs.meta.json",
+      "sha256": "0e081843f828fea88d9ef8784667bf25dc5bd554f20d3c281c22b3156dc8cecc"
+    },
+    {
+      "bytes": 39311,
+      "name": "binance_usdm_funding_rate_docs.source",
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g003_external_prior_cache/binance_usdm_funding_rate_docs.source",
+      "sha256": "685cedd147266aff6efd6c25af3f066e3232fb50ee3caff1710ed98a8e4dfc7f"
+    },
+    {
+      "bytes": 447,
+      "name": "sec_companyfacts_aapl_probe.meta.json",
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g003_external_prior_cache/sec_companyfacts_aapl_probe.meta.json",
+      "sha256": "f831edcb13cb961e0f66aa40782a3ece52b8a933971c7beddf9552694f91a889"
+    },
+    {
+      "bytes": 3748682,
+      "name": "sec_companyfacts_aapl_probe.source",
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g003_external_prior_cache/sec_companyfacts_aapl_probe.source",
+      "sha256": "31f9ab4398402faabc733178497af89dbf94dd5038c6e36d4c894317de8a4647"
+    },
+    {
+      "bytes": 430,
+      "name": "stooq_spy_daily_research_probe.meta.json",
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g003_external_prior_cache/stooq_spy_daily_research_probe.meta.json",
+      "sha256": "68c04cbba77301336a7dd6bbe2d8bb765decbea85d7bf5a6ea6f0cfd39354e8d"
+    },
+    {
+      "bytes": 796,
+      "name": "stooq_spy_daily_research_probe.source",
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g003_external_prior_cache/stooq_spy_daily_research_probe.source",
+      "sha256": "9ae218e23f11a657558dac8ee054130cb991fbd1466725e7e22ef618676517c2"
+    },
+    {
+      "bytes": 474,
+      "name": "yahoo_chart_spy_research_probe.meta.json",
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g003_external_prior_cache/yahoo_chart_spy_research_probe.meta.json",
+      "sha256": "440f5117c7dbe9b194174ebdeea81bed0bbae415a155133f8d180f3c5f5f04a7"
+    },
+    {
+      "bytes": 1614,
+      "name": "yahoo_chart_spy_research_probe.source",
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g003_external_prior_cache/yahoo_chart_spy_research_probe.source",
+      "sha256": "a7297ef147d939f907816a0597fa96bf6ce4f4e542b493b996bed904c4b013e5"
+    }
+  ],
+  "generated_at_utc": "2026-07-02T14:29:08.604246Z",
+  "goal_id": "G003",
+  "manifest_sha256": "60fc1dbb1707f17994e12ec20d795d07da29460b618ca41008519bdc28f2e999"
+}

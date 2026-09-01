@@ -1,0 +1,121 @@
+{
+  "artifact_kind": "profit_moonshot_current_base_retained_candidate",
+  "base_candidate_artifact": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/passing_candidate_latest.json",
+  "current_base_retained": true,
+  "generated_at_utc": "2026-05-09T08:18:32.166596Z",
+  "heavy_mutex_evidence": [
+    {
+      "completed_at": "2026-05-09T08:17:28Z",
+      "exclusive": true,
+      "lock_path": "var/reports/exact_window_backtests/followup_status/portfolio_followup_heavy_run.lock",
+      "overlap_check": "passed",
+      "started_at": "2026-05-09T08:13:08Z",
+      "status": "completed"
+    }
+  ],
+  "improved_candidate": false,
+  "labels": {
+    "current_base_retained": true,
+    "improved_candidate": false,
+    "live_equivalent_selection_eligible": false,
+    "locked_oos_policy": "report_only_gate_only",
+    "no_improvement_current_base_retained": true,
+    "promotion_status": "no_improvement_current_base_retained",
+    "research_success_candidate": true,
+    "return_quality_contract_passed": true,
+    "selection_basis": "train_val_stability_only_locked_oos_gate_only"
+  },
+  "leverage": 2.3427334297703024,
+  "live_equivalent_selection_eligible": false,
+  "memory_evidence": {
+    "memory_summary_path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/continued_optimization_20260509/_memory_guard/profit_moonshot_fresh_portfolio_tuning_memory_latest.json",
+    "portfolio_peak_rss_mib": 1239.703125,
+    "rss_log_path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/continued_optimization_20260509/_memory_guard/profit_moonshot_fresh_portfolio_tuning_rss_latest.jsonl",
+    "time_log_path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/runner_evidence_20260509/leader_continued_optimization_time.log",
+    "time_max_rss_kb": 1269456,
+    "under_8gib": true
+  },
+  "metrics": {
+    "current_base_oos_return": 0.06858164444753312,
+    "current_base_oos_return_risk": 8.365932879057214,
+    "current_base_train_val_stability_score": 16.576134102067016,
+    "current_champion_oos_mdd": 0.001662,
+    "current_champion_oos_return": 0.012181,
+    "current_champion_oos_return_risk": 7.329121540312876,
+    "locked_oos_calmar": 53.73501485217365,
+    "locked_oos_max_drawdown": 0.008197728267604966,
+    "locked_oos_monthlyized_return": 0.030883445250837083,
+    "locked_oos_return_risk": 8.365932879057214,
+    "locked_oos_round_trips": 33,
+    "locked_oos_sharpe": 5.653697867183353,
+    "locked_oos_smart_sortino": 7.153592515941036,
+    "locked_oos_sortino": 7.396117977603192,
+    "locked_oos_total_return": 0.06858164444753312,
+    "oos_return_excess_vs_champion": 0.05640064444753312,
+    "return_quality_contract_passed": true,
+    "selection_outcome": "no_improvement_current_base_retained",
+    "train_calmar": 3.8842110332761934,
+    "train_max_drawdown": 0.06905953159200336,
+    "train_monthlyized_return": 0.020000000000000018,
+    "train_round_trips": 120,
+    "train_sharpe": 1.7212556285918195,
+    "train_sortino": 1.51511166991183,
+    "train_total_return": 0.26820739157769213,
+    "train_val_stability_score": 16.576134102067016,
+    "validation_calmar": 32.1417458698937,
+    "validation_max_drawdown": 0.06493479922326455,
+    "validation_monthlyized_return": 0.09848998131232078,
+    "validation_round_trips": 41,
+    "validation_sharpe": 4.09640969448007,
+    "validation_sortino": 4.885875261022447,
+    "validation_total_return": 0.19971302124703927
+  },
+  "mode": "train_val_monthly_return_budget",
+  "name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600__fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all__fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600",
+  "no_improvement_current_base_retained": true,
+  "notes": [
+    "Current base retained because no challenger passed train/validation stability, current-base OOS return, and current-base OOS return/risk gates together.",
+    "Locked-OOS remained report-only/gate-only; train/validation stability chose challengers before OOS gates were evaluated.",
+    "Large generated CSV was intentionally not retained/committed."
+  ],
+  "promotion_status": "no_improvement_current_base_retained",
+  "research_success_candidate": true,
+  "return_quality_contract": {
+    "current_base_train_val_stability_score": 16.576134102067016,
+    "locked_oos_use": [
+      "report",
+      "gate"
+    ],
+    "maximum_acceptable_oos_mdd": 0.25,
+    "minimum_oos_calmar": 1.0,
+    "minimum_oos_sharpe": 2.0,
+    "minimum_oos_smart_sortino": 3.0,
+    "minimum_oos_sortino": 3.0,
+    "minimum_stable_monthly_return": 0.02,
+    "minimum_train_calmar": 1.0,
+    "minimum_train_sharpe": 1.5,
+    "minimum_train_sortino": 1.5,
+    "minimum_val_calmar": 3.0,
+    "minimum_val_sharpe": 3.0,
+    "minimum_val_sortino": 3.0,
+    "requires_current_base_oos_return_gt_for_new_candidate": 0.06858164444753312,
+    "requires_current_base_oos_return_risk_gt_for_new_candidate": 8.365932879057214,
+    "requires_locked_oos_total_return_gt_current_champion": 0.012181,
+    "selection_inputs": [
+      "train",
+      "validation"
+    ]
+  },
+  "schema_version": "1.2",
+  "selection_outcome": "no_improvement_current_base_retained",
+  "sleeves": [
+    "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600",
+    "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+    "fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all",
+    "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600"
+  ],
+  "source_artifact": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/continued_optimization_20260509/fresh_portfolio_tuning_latest.json",
+  "source_markdown": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/continued_optimization_20260509/fresh_portfolio_tuning_latest.md",
+  "success_candidate": true,
+  "weights": []
+}

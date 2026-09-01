@@ -1,0 +1,311 @@
+{
+  "artifact_kind": "crypto_fx_alpha_zoo_state_replay_smoke",
+  "row_count": 720,
+  "signal_count": 21,
+  "signals": [
+    {
+      "datetime": "2026-01-02 00:00:00",
+      "metadata": {
+        "calendar_primary": false,
+        "calibrated_lower_bound_edge_bps": 1.0,
+        "factor_score": 1.4424275269066895,
+        "fx_risk_state": "neutral",
+        "strategy": "CryptoFxAlphaZooStateStrategy",
+        "uses_locked_oos_for_selection": false
+      },
+      "signal_type": "LONG",
+      "strength": 1.0,
+      "symbol": "BNB/USDT"
+    },
+    {
+      "datetime": "2026-01-02 00:00:00",
+      "metadata": {
+        "calendar_primary": false,
+        "calibrated_lower_bound_edge_bps": 1.0,
+        "factor_score": 1.0729594170981889,
+        "fx_risk_state": "neutral",
+        "strategy": "CryptoFxAlphaZooStateStrategy",
+        "uses_locked_oos_for_selection": false
+      },
+      "signal_type": "LONG",
+      "strength": 1.0,
+      "symbol": "TRX/USDT"
+    },
+    {
+      "datetime": "2026-01-02 01:00:00",
+      "metadata": {
+        "calendar_primary": false,
+        "calibrated_lower_bound_edge_bps": 1.0,
+        "factor_score": 0.9198506128987297,
+        "fx_risk_state": "neutral",
+        "strategy": "CryptoFxAlphaZooStateStrategy",
+        "uses_locked_oos_for_selection": false
+      },
+      "signal_type": "LONG",
+      "strength": 1.0,
+      "symbol": "SOL/USDT"
+    },
+    {
+      "datetime": "2026-01-02 08:00:00",
+      "metadata": {
+        "calendar_primary": false,
+        "calibrated_lower_bound_edge_bps": 1.0,
+        "factor_score": -0.2461268375485385,
+        "fx_risk_state": "neutral",
+        "strategy": "CryptoFxAlphaZooStateStrategy",
+        "uses_locked_oos_for_selection": false
+      },
+      "signal_type": "EXIT",
+      "strength": 0.32816911673138466,
+      "symbol": "SOL/USDT"
+    },
+    {
+      "datetime": "2026-01-02 09:00:00",
+      "metadata": {
+        "calendar_primary": false,
+        "calibrated_lower_bound_edge_bps": 1.0,
+        "factor_score": 0.027264002239429375,
+        "fx_risk_state": "neutral",
+        "strategy": "CryptoFxAlphaZooStateStrategy",
+        "uses_locked_oos_for_selection": false
+      },
+      "signal_type": "EXIT",
+      "strength": 0.1,
+      "symbol": "BNB/USDT"
+    },
+    {
+      "datetime": "2026-01-02 13:00:00",
+      "metadata": {
+        "calendar_primary": false,
+        "calibrated_lower_bound_edge_bps": 1.0,
+        "factor_score": 0.789616155099675,
+        "fx_risk_state": "neutral",
+        "strategy": "CryptoFxAlphaZooStateStrategy",
+        "uses_locked_oos_for_selection": false
+      },
+      "signal_type": "LONG",
+      "strength": 1.0,
+      "symbol": "ETH/USDT"
+    },
+    {
+      "datetime": "2026-01-02 14:00:00",
+      "metadata": {
+        "calendar_primary": false,
+        "calibrated_lower_bound_edge_bps": 1.0,
+        "factor_score": -0.7656023874505976,
+        "fx_risk_state": "neutral",
+        "strategy": "CryptoFxAlphaZooStateStrategy",
+        "uses_locked_oos_for_selection": false
+      },
+      "signal_type": "SHORT",
+      "strength": 1.0,
+      "symbol": "SOL/USDT"
+    },
+    {
+      "datetime": "2026-01-02 15:00:00",
+      "metadata": {
+        "calendar_primary": false,
+        "calibrated_lower_bound_edge_bps": 1.0,
+        "factor_score": -0.8307043742884007,
+        "fx_risk_state": "neutral",
+        "strategy": "CryptoFxAlphaZooStateStrategy",
+        "uses_locked_oos_for_selection": false
+      },
+      "signal_type": "SHORT",
+      "strength": 1.0,
+      "symbol": "BNB/USDT"
+    },
+    {
+      "datetime": "2026-01-02 16:00:00",
+      "metadata": {
+        "calendar_primary": false,
+        "calibrated_lower_bound_edge_bps": 1.0,
+        "factor_score": 0.15879625477697953,
+        "fx_risk_state": "neutral",
+        "strategy": "CryptoFxAlphaZooStateStrategy",
+        "uses_locked_oos_for_selection": false
+      },
+      "signal_type": "EXIT",
+      "strength": 0.21172833970263938,
+      "symbol": "TRX/USDT"
+    },
+    {
+      "datetime": "2026-01-02 18:00:00",
+      "metadata": {
+        "calendar_primary": false,
+        "calibrated_lower_bound_edge_bps": 1.0,
+        "factor_score": -0.1878349045341912,
+        "fx_risk_state": "neutral",
+        "strategy": "CryptoFxAlphaZooStateStrategy",
+        "uses_locked_oos_for_selection": false
+      },
+      "signal_type": "EXIT",
+      "strength": 0.2504465393789216,
+      "symbol": "BNB/USDT"
+    },
+    {
+      "datetime": "2026-01-02 20:00:00",
+      "metadata": {
+        "calendar_primary": false,
+        "calibrated_lower_bound_edge_bps": 1.0,
+        "factor_score": -0.19921927144923005,
+        "fx_risk_state": "neutral",
+        "strategy": "CryptoFxAlphaZooStateStrategy",
+        "uses_locked_oos_for_selection": false
+      },
+      "signal_type": "EXIT",
+      "strength": 0.26562569526564006,
+      "symbol": "SOL/USDT"
+    },
+    {
+      "datetime": "2026-01-02 23:00:00",
+      "metadata": {
+        "calendar_primary": false,
+        "calibrated_lower_bound_edge_bps": 1.0,
+        "factor_score": -0.1419208004106998,
+        "fx_risk_state": "neutral",
+        "strategy": "CryptoFxAlphaZooStateStrategy",
+        "uses_locked_oos_for_selection": false
+      },
+      "signal_type": "EXIT",
+      "strength": 0.18922773388093306,
+      "symbol": "ETH/USDT"
+    },
+    {
+      "datetime": "2026-01-03 00:00:00",
+      "metadata": {
+        "calendar_primary": false,
+        "calibrated_lower_bound_edge_bps": 1.0,
+        "factor_score": 1.3551707695636694,
+        "fx_risk_state": "neutral",
+        "strategy": "CryptoFxAlphaZooStateStrategy",
+        "uses_locked_oos_for_selection": false
+      },
+      "signal_type": "LONG",
+      "strength": 1.0,
+      "symbol": "BNB/USDT"
+    },
+    {
+      "datetime": "2026-01-03 06:00:00",
+      "metadata": {
+        "calendar_primary": false,
+        "calibrated_lower_bound_edge_bps": 1.0,
+        "factor_score": 0.7996805685508834,
+        "fx_risk_state": "neutral",
+        "strategy": "CryptoFxAlphaZooStateStrategy",
+        "uses_locked_oos_for_selection": false
+      },
+      "signal_type": "LONG",
+      "strength": 1.0,
+      "symbol": "SOL/USDT"
+    },
+    {
+      "datetime": "2026-01-03 10:00:00",
+      "metadata": {
+        "calendar_primary": false,
+        "calibrated_lower_bound_edge_bps": 1.0,
+        "factor_score": 0.06485714186656416,
+        "fx_risk_state": "neutral",
+        "strategy": "CryptoFxAlphaZooStateStrategy",
+        "uses_locked_oos_for_selection": false
+      },
+      "signal_type": "EXIT",
+      "strength": 0.1,
+      "symbol": "BNB/USDT"
+    },
+    {
+      "datetime": "2026-01-03 10:00:00",
+      "metadata": {
+        "calendar_primary": false,
+        "calibrated_lower_bound_edge_bps": 1.0,
+        "factor_score": -0.8417879363288375,
+        "fx_risk_state": "neutral",
+        "strategy": "CryptoFxAlphaZooStateStrategy",
+        "uses_locked_oos_for_selection": false
+      },
+      "signal_type": "SHORT",
+      "strength": 1.0,
+      "symbol": "ETH/USDT"
+    },
+    {
+      "datetime": "2026-01-03 13:00:00",
+      "metadata": {
+        "calendar_primary": false,
+        "calibrated_lower_bound_edge_bps": 1.0,
+        "factor_score": 0.11346892347064819,
+        "fx_risk_state": "neutral",
+        "strategy": "CryptoFxAlphaZooStateStrategy",
+        "uses_locked_oos_for_selection": false
+      },
+      "signal_type": "EXIT",
+      "strength": 0.15129189796086426,
+      "symbol": "SOL/USDT"
+    },
+    {
+      "datetime": "2026-01-03 14:00:00",
+      "metadata": {
+        "calendar_primary": false,
+        "calibrated_lower_bound_edge_bps": 1.0,
+        "factor_score": -0.049838313535227635,
+        "fx_risk_state": "neutral",
+        "strategy": "CryptoFxAlphaZooStateStrategy",
+        "uses_locked_oos_for_selection": false
+      },
+      "signal_type": "EXIT",
+      "strength": 0.1,
+      "symbol": "ETH/USDT"
+    },
+    {
+      "datetime": "2026-01-03 18:00:00",
+      "metadata": {
+        "calendar_primary": false,
+        "calibrated_lower_bound_edge_bps": 1.0,
+        "factor_score": -0.7982866406064101,
+        "fx_risk_state": "neutral",
+        "strategy": "CryptoFxAlphaZooStateStrategy",
+        "uses_locked_oos_for_selection": false
+      },
+      "signal_type": "SHORT",
+      "strength": 1.0,
+      "symbol": "BNB/USDT"
+    },
+    {
+      "datetime": "2026-01-03 20:00:00",
+      "metadata": {
+        "calendar_primary": false,
+        "calibrated_lower_bound_edge_bps": 1.0,
+        "factor_score": -0.13318059434059795,
+        "fx_risk_state": "neutral",
+        "strategy": "CryptoFxAlphaZooStateStrategy",
+        "uses_locked_oos_for_selection": false
+      },
+      "signal_type": "EXIT",
+      "strength": 0.17757412578746393,
+      "symbol": "BNB/USDT"
+    },
+    {
+      "datetime": "2026-01-03 22:00:00",
+      "metadata": {
+        "calendar_primary": false,
+        "calibrated_lower_bound_edge_bps": 1.0,
+        "factor_score": -0.84465506138453,
+        "fx_risk_state": "neutral",
+        "strategy": "CryptoFxAlphaZooStateStrategy",
+        "uses_locked_oos_for_selection": false
+      },
+      "signal_type": "SHORT",
+      "strength": 1.0,
+      "symbol": "SOL/USDT"
+    }
+  ],
+  "strategy_validity": {
+    "calendar_primary": false,
+    "causal_state_only": true,
+    "locked_oos_role": "gate_report_only",
+    "lookahead_safe": true,
+    "pass": true,
+    "primary_signal_type": "formulaic_state_factor",
+    "rejection_reasons": []
+  },
+  "uses_locked_oos_for_selection": false
+}

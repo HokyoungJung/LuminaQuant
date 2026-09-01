@@ -1,0 +1,114 @@
+{
+  "archives": [
+    {
+      "bytes": 14409358,
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g005_shard_eval_archives_20260703/30m_candidate_research_latest.json.gz",
+      "sha256": "7fecc6f2be44b56d361368a103a37c4109fc76dee45aec8029d0e3c23c171f58",
+      "source": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g005_shard_eval_30m/candidate_research_latest.json",
+      "source_bytes": 139414073,
+      "source_sha256": "4db24fbabdee4083bd7e993b770cab3f5b2fceb9563e205e52f724bf0077ca27",
+      "timeframe": "30m"
+    },
+    {
+      "bytes": 15213996,
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g005_shard_eval_archives_20260703/30m_strategy_factory_report_latest.json.gz",
+      "sha256": "84763c10fda5b04498627a4f16b2b084a51de951d7612df8f692244a5eafb10c",
+      "source": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g005_shard_eval_30m/strategy_factory_report_latest.json",
+      "source_bytes": 148311012,
+      "source_sha256": "5c6727bc2793d4b597ab8001d84649e454eb6db73ec9417a23d6afb5cebd5e2d",
+      "timeframe": "30m"
+    },
+    {
+      "bytes": 5450,
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g005_shard_eval_archives_20260703/30m_candidate_research_latest.csv.gz",
+      "sha256": "e40e32587c10cadda1bdc46b3c4c192cf3b83d99b7f41e62d4ee13a790f510bb",
+      "source": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g005_shard_eval_30m/candidate_research_latest.csv",
+      "source_bytes": 23993,
+      "source_sha256": "1e1c1c73529697dc825fd50e85f104c17c4e15e4cb4e73fd645922e90109f9f7",
+      "timeframe": "30m"
+    },
+    {
+      "bytes": 19641,
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g005_shard_eval_archives_20260703/30m_candidate_research_progress_latest.json.gz",
+      "sha256": "6374e7ef98ee082da136c9e129a6ce7eef93a614bc803ca0927ac6695d4882ad",
+      "source": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g005_shard_eval_30m/candidate_research_progress_latest.json",
+      "source_bytes": 244936,
+      "source_sha256": "0c23e558749f4eddeb1b8024df6f06e29353ad18c16a159a1ed0d39ac3078298",
+      "timeframe": "30m"
+    },
+    {
+      "bytes": 3043092,
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g005_shard_eval_archives_20260703/4h_candidate_research_latest.json.gz",
+      "sha256": "30ea0475a88e5834925c452392bce9ff57ea09dab5e74a408ebe5fdd5bd8ea92",
+      "source": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g005_shard_eval_4h/candidate_research_latest.json",
+      "source_bytes": 28619232,
+      "source_sha256": "519b700fb53330f565f1e8d07094dec43f6e6ff5faf33927e8e238821e49cff8",
+      "timeframe": "4h"
+    },
+    {
+      "bytes": 3150401,
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g005_shard_eval_archives_20260703/4h_strategy_factory_report_latest.json.gz",
+      "sha256": "fc05f59d1a14ea0e0e053f259c7ae2b99e8d6913e79820963d44268fe853b022",
+      "source": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g005_shard_eval_4h/strategy_factory_report_latest.json",
+      "source_bytes": 29755203,
+      "source_sha256": "3b2f1411f090491ceffb8dce824726461e420a2724f8a96016b7552bc9e6d07d",
+      "timeframe": "4h"
+    },
+    {
+      "bytes": 7451,
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g005_shard_eval_archives_20260703/4h_candidate_research_latest.csv.gz",
+      "sha256": "5c389fc95be756a654e3bc41b6095b12cf2a620ae81ab42dfd4e271d7dfb0b48",
+      "source": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g005_shard_eval_4h/candidate_research_latest.csv",
+      "source_bytes": 31171,
+      "source_sha256": "ac13b2eb04f0ef28a753995d00a6a37ee66007427bf5e0ec62a917c89ef5484f",
+      "timeframe": "4h"
+    },
+    {
+      "bytes": 26930,
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g005_shard_eval_archives_20260703/4h_candidate_research_progress_latest.json.gz",
+      "sha256": "c56ed06cb93149a0255fa0079058c179e0f76f77859d5759505f4e64ca9a5ffe",
+      "source": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g005_shard_eval_4h/candidate_research_progress_latest.json",
+      "source_bytes": 290241,
+      "source_sha256": "d6e35c59e953b1f05349a887ad7ba8529443e4b863941f98915a2897d57349a3",
+      "timeframe": "4h"
+    },
+    {
+      "bytes": 847195,
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g005_shard_eval_archives_20260703/1d_candidate_research_latest.json.gz",
+      "sha256": "f59930e28f635b832734f279151907668d644d0f8c039614b797f8966272060d",
+      "source": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g005_shard_eval_1d/candidate_research_latest.json",
+      "source_bytes": 5791847,
+      "source_sha256": "28c35af470c8d4ae240d35a12402b833267a78ed39e41d7e67c179ed7d754e05",
+      "timeframe": "1d"
+    },
+    {
+      "bytes": 862787,
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g005_shard_eval_archives_20260703/1d_strategy_factory_report_latest.json.gz",
+      "sha256": "5451249532859e1a44567ff616885ecb42c3c083852101c9fdff4e181028f4df",
+      "source": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g005_shard_eval_1d/strategy_factory_report_latest.json",
+      "source_bytes": 5901253,
+      "source_sha256": "290d41610280ac06710414103b4c20f7da07733fdf60131fe6d3299b16031920",
+      "timeframe": "1d"
+    },
+    {
+      "bytes": 3528,
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g005_shard_eval_archives_20260703/1d_candidate_research_latest.csv.gz",
+      "sha256": "63b36d359ba7834202e0124c2fff092184a2a394e7a517e2bdd1dee444d52134",
+      "source": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g005_shard_eval_1d/candidate_research_latest.csv",
+      "source_bytes": 28024,
+      "source_sha256": "9008271aeb3c2bb8d5a24e5b59e0602a53fc855dd0fb70c8fa32c6b466cf1870",
+      "timeframe": "1d"
+    },
+    {
+      "bytes": 13984,
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g005_shard_eval_archives_20260703/1d_candidate_research_progress_latest.json.gz",
+      "sha256": "22077f5d48a1d028eacd91101d17113bad810b1123cf836c3428a7a1d8896609",
+      "source": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g005_shard_eval_1d/candidate_research_progress_latest.json",
+      "source_bytes": 253103,
+      "source_sha256": "f355f834e18f01ed0db1041a7af8fd5bb10c6c2e65f56fb11dc6babd1f7b87d3",
+      "timeframe": "1d"
+    }
+  ],
+  "artifact_kind": "g005_shard_eval_archives",
+  "generated_at_utc": "2026-07-03T16:35:11.926978+00:00"
+}

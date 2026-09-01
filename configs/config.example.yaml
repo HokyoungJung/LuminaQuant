@@ -1,0 +1,142 @@
+# =============================================================================
+# LuminaQuant — example configuration reference
+# =============================================================================
+# Copy to ./config.yaml (repo root) and adjust. Everything a user touches is
+# controlled at this config level. Sections map 1:1 to the typed schema in
+# src/lumina_quant/configuration/schema.py; unspecified keys fall back to the
+# dataclass defaults documented there.
+#
+# Load order: .env -> this YAML (path from LQ_CONFIG_PATH, default config.yaml)
+# -> LQ__SECTION__KEY env overrides.
+
+system:
+  log_level: "INFO" # DEBUG|INFO|WARNING|ERROR
+
+# Shared trading universe + cadence (live & backtest).
+trading:
+  symbols:
+    - "BTC/USDT"
+    - "ETH/USDT"
+  timeframe: "1m"
+  initial_capital: 10000.0
+  target_allocation: 0.1 # fraction of capital per trade
+
+# Risk envelope (shared).
+risk:
+  risk_per_trade: 0.005 # 0.5%
+  max_daily_loss_pct: 0.03 # 3%
+  max_total_margin_pct: 0.50 # 50%
+  freeze_new_entries_on_breach: true
+
+# Execution model (single cost path: fees/slippage/funding).
+execution:
+  maker_fee_rate: 0.0002
+  taker_fee_rate: 0.0004
+  slippage_rate: 0.0005
+  funding_rate_per_8h: 0.0
+  compute_backend: "auto" # auto|cpu|gpu|forced-gpu
+
+# Storage / audit.
+storage:
+  backend: "parquet-postgres" # parquet|parquet-postgres
+  market_data_parquet_path: "data/market_parquet"
+  postgres_dsn_env: "LQ_POSTGRES_DSN"
+  collector_bootstrap_lookback_hours: 24
+
+# Backtest-specific knobs.
+backtest:
+  start_date: "2025-01-01"
+  end_date: null # null => up to end of data
+  mode: "windowed"
+  data_source: "auto" # auto|csv|db|external
+  random_seed: 42
+
+# Live-trading knobs. Limit-first; market orders disabled unless explicitly enabled.
+live:
+  mode: "paper" # paper|real
+  market_data_source: "committed" # committed|binance_futures|external|polymarket_live
+  default_order_type: "LMT" # LMT|MKT (must stay limit-first)
+  allow_market_orders: false
+  testnet: true
+  # --- Go-live stage pipeline (R7): testnet -> shadow -> canary -> full -------
+  go_live_stage: "testnet" # testnet|shadow|canary|full
+  kill_switch_enabled: true # always-on; validate.py REJECTS false
+  canary_position_fraction: 0.10 # position sizing during canary stage, (0, 1]
+  shadow_parity_min_ratio: 0.99 # min signal-agreement ratio to enter shadow
+  shadow_parity_window_bars: 1000 # bars the parity ratio is measured over
+
+# Strategy selection + hyperparameter optimization.
+# `strategy` is the class name; drop a @register-decorated file into
+# src/lumina_quant/strategies/ and reference it here — no registry edits needed.
+optimization:
+  method: "OPTUNA" # GRID|OPTUNA
+  strategy: "RsiStrategy"
+  walk_forward_folds: 3
+
+# Memory budget — hard RSS cap (GiB), enforced at engine start.
+memory:
+  cap_gb: 8.0
+
+# Validation / golden-record tolerance.
+validation:
+  golden_rtol: 1.0e-8
+
+# Data collection. aggtrades_tick is validation-only (testnet/paper/replay).
+data:
+  kinds: [ohlcv, funding, feature_points] # ohlcv|funding|feature_points|aggtrades_tick
+  tick_path: "" # "" => storage default
+
+# Existing-strategy quality overlays. Disabled by default until a profile is
+# backtest-qualified; enable per research/live profile after validation.
+strategy_quality:
+  enabled: false
+  edge_gate_enabled: true
+  min_expected_edge_bps: 8.0
+  edge_cost_buffer_bps: 3.0
+  regime_router_enabled: true
+  position_sizing_enabled: true
+  turnover_budget_enabled: true
+  max_daily_turnover_pct: 3.0
+  exit_overlay_enabled: true
+  strategy_health_enabled: true
+  pair_min_correlation: 0.35
+
+# External DeepLearning sidecar. This only defines artifact/command format;
+# `lq deep-learning plan` writes a manifest and never starts training.
+deep_learning:
+  enabled: false
+  repo_path: "../../DeepLearning"
+  config_path: "configs/config.yaml"
+  feature_matrix_path: "var/data/deeplearning/features"
+  prediction_path: "var/data/deeplearning/predictions"
+  manifest_path: "var/data/deeplearning/pipeline_manifest.json"
+  training_state_path: "var/data/deeplearning/training_state.json"
+  models: ["FITS", "CycleNet", "CMamba", "PatchTST"]
+  freq: "" # "" => trading.timeframe
+  target_suffix: "close"
+  seq_len: 120
+  pred_len: 30
+  total_pred: 120
+  gpus: "[]"
+  hpo_enabled: false
+  hpo_trials: 20
+  # GPU parallel training is allowed only when free VRAM is enough, GPU utilization is low,
+  # and the input pipeline is not the bottleneck. Model size alone is not the criterion.
+  gpu_parallel_jobs: 1
+  gpu_parallel_min_free_vram_gb: 2.0
+  gpu_parallel_max_utilization_pct: 85.0
+  # Treat shuffle train/val HPO as candidate search; select stable top trials, then run
+  # one chronological pre-test sanity check before final train+val refit and future test.
+  hpo_top_trial_fraction: 0.10
+  hpo_min_top_trials: 5
+  hpo_max_train_val_gap: 0.15
+  hpo_boundary_tolerance: 0.02
+  chronological_sanity_check: true
+  chronological_sanity_val_fraction: 0.20
+  chronological_sanity_max_relative_drop: 0.25
+  partial_hpo_trials: 5
+  min_model_coverage: 2
+  entry_threshold_bps: 10.0
+  min_model_agreement: 0.75
+  max_dispersion_bps: 80.0
+  target_allocation: 0.05

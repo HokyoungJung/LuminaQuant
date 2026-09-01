@@ -1,0 +1,37 @@
+{
+  "diagnostics": {
+    "auto_fallback_warning_count": 0,
+    "auto_fallback_warning_reasons": [],
+    "description": "rust:/home/hoky/Quants-agent/LuminaQuant/native/rust_live_signals/target/release/liblumina_live_signals.so",
+    "native_available": true,
+    "native_library_path": "/home/hoky/Quants-agent/LuminaQuant/native/rust_live_signals/target/release/liblumina_live_signals.so",
+    "native_load_error": null,
+    "requested_backend": "auto",
+    "resolved_backend": "rust"
+  },
+  "evals": 20,
+  "generated_at_utc": "2026-05-27T13:43:37.792515+00:00",
+  "parity": {
+    "debounced_exact": true,
+    "max_abs_diff": 0.0,
+    "passed": true,
+    "reason": null,
+    "tolerance": 0.0,
+    "trailing_exact": true
+  },
+  "python": {
+    "backend": "python",
+    "debounced_seconds_per_eval": 0.07770819574998314,
+    "total_seconds_per_eval": 0.13490699809999568,
+    "trailing_seconds_per_eval": 0.0565944570499596
+  },
+  "rows": 50000,
+  "rust": {
+    "backend": "rust",
+    "debounced_seconds_per_eval": 0.00019645644997581257,
+    "total_seconds_per_eval": 0.0005444135000288952,
+    "trailing_seconds_per_eval": 0.0003208319500117796
+  },
+  "speedup_total": 247.80244812598397,
+  "status": "pass"
+}

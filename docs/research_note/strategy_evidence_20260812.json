@@ -1,0 +1,1136 @@
+{
+  "schema_version": "lumina_quant.strategy_evidence.v1",
+  "as_of_date": "2026-08-13",
+  "scope": ">=1-minute strategies; papers and online material are design priors, never LuminaQuant performance evidence",
+  "principles": [
+    "Reuse existing strategy classes before adding another signal class.",
+    "Translate paper horizons into wall-clock time, not raw bar counts.",
+    "Rank and gate on purged validation; locked OOS is report-only and opened once.",
+    "Count every horizon, filter, overlay, allocator, cost scenario, and failed run in the trial ledger.",
+    "A single-leg funding or basis signal is directional derivatives alpha, not delta-neutral carry.",
+    "Missing metrics, CSCV/PBO, SPA, costs, capacity, or timestamp alignment fail closed; NA is never zero."
+  ],
+  "sources": [
+    {
+      "id": "liu-tsyvinski-2021-crypto-risks-returns",
+      "title": "Risks and Returns of Cryptocurrency",
+      "authors": "Yukun Liu; Aleh Tsyvinski",
+      "publication": "Review of Financial Studies 34(6)",
+      "date": "2021",
+      "type": "peer_reviewed",
+      "grade": "A",
+      "url": "https://doi.org/10.1093/rfs/hhaa113",
+      "supports": "Crypto market returns exhibit short weekly time-series momentum in the paper sample; the implementable design signs prior three-week own returns and holds one week.",
+      "limitations": "Sample ends in 2018; paper returns do not establish current, costed, short-feasible LuminaQuant performance."
+    },
+    {
+      "id": "liu-tsyvinski-wu-2022-common-risk-factors",
+      "title": "Common Risk Factors in Cryptocurrency",
+      "authors": "Yukun Liu; Aleh Tsyvinski; Xi Wu",
+      "publication": "Journal of Finance 77(2)",
+      "date": "2022",
+      "type": "peer_reviewed",
+      "grade": "A",
+      "url": "https://doi.org/10.1111/jofi.13119",
+      "supports": "Market, size, and short-horizon cross-sectional momentum explain much of the paper-sample crypto cross-section; one-to-four-week return sorts are the relevant observational and predictive benchmark.",
+      "limitations": "The working design does not prove feasible borrow, point-in-time universe construction, or current net profitability."
+    },
+    {
+      "id": "han-kang-ryu-2026-realistic-crypto-momentum",
+      "title": "Time-Series and Cross-Sectional Momentum in the Cryptocurrency Market under Realistic Assumptions",
+      "authors": "Chulwoo Han; Byeongguk Kang; Jehyeon Ryu",
+      "publication": "Auckland Centre for Financial Research working paper / SSRN 4675565",
+      "date": "2026-03-26 revision",
+      "type": "working_paper",
+      "grade": "B",
+      "url": "https://doi.org/10.2139/ssrn.4675565",
+      "supports": "A realistic-fee, liquidation-aware design prior for short-horizon time-series momentum and separate long/short attribution.",
+      "limitations": "Not peer reviewed; reported robustness cannot be transferred to repository strategies or venues."
+    },
+    {
+      "id": "fieberg-et-al-2025-crypto-trend-factor",
+      "title": "A Trend Factor for the Cross Section of Cryptocurrency Returns",
+      "authors": "Christian Fieberg; Gerrit Liedtke; Thorsten Poddig; Thomas Walker; Adam Zaremba",
+      "publication": "Journal of Financial and Quantitative Analysis 60(7)",
+      "date": "2025",
+      "type": "peer_reviewed",
+      "grade": "A",
+      "url": "https://doi.org/10.1017/S0022109024000747",
+      "supports": "Composite price, volume, and volatility forecasts can be tested as a preregistered cross-sectional trend factor.",
+      "limitations": "A trained 28-indicator elastic-net composite is not evidence for plain return momentum or arbitrary repository filters."
+    },
+    {
+      "id": "jia-et-al-2026-near-high-crypto",
+      "title": "Psychological Anchoring Effect and Cross Section of Cryptocurrency Returns",
+      "authors": "Yuecheng Jia; Betty Simkins; Shu Yan; Hongyu Zhang; Jiangyu Zhao",
+      "publication": "Journal of Banking & Finance 182, 107592",
+      "date": "2026-01",
+      "type": "peer_reviewed",
+      "grade": "A",
+      "url": "https://doi.org/10.1016/j.jbankfin.2025.107592",
+      "supports": "Weekly cross-sectional nearness-to-52-week-high is a testable crypto anchoring signal.",
+      "limitations": "Published paper-sample spreads do not validate 30-week fallbacks, young-coin shortcuts, inverse-vol sizing, or repository net returns."
+    },
+    {
+      "id": "moskowitz-ooi-pedersen-2012-tsmom",
+      "title": "Time Series Momentum",
+      "authors": "Tobias Moskowitz; Yao Hua Ooi; Lasse Heje Pedersen",
+      "publication": "Journal of Financial Economics 104(2)",
+      "date": "2012",
+      "type": "peer_reviewed",
+      "grade": "A",
+      "url": "https://doi.org/10.1016/j.jfineco.2011.11.003",
+      "supports": "Own-return sign and ex-ante inverse-volatility sizing are canonical diversified-futures trend design priors.",
+      "limitations": "Non-crypto futures evidence; it does not support arbitrary KER, ADX, multi-horizon agreement, or repository holding gates."
+    },
+    {
+      "id": "barroso-santa-clara-2015-momentum-vol",
+      "title": "Momentum Has Its Moments",
+      "authors": "Pedro Barroso; Pedro Santa-Clara",
+      "publication": "Journal of Financial Economics 116(1)",
+      "date": "2015",
+      "type": "peer_reviewed",
+      "grade": "A",
+      "url": "https://doi.org/10.1016/j.jfineco.2014.11.010",
+      "supports": "Lagged realized volatility of the momentum portfolio itself can be tested as a separately counted risk-scaling variant.",
+      "limitations": "Equity-factor evidence; it does not validate BTC benchmark-vol scaling or an always-on wrapper."
+    },
+    {
+      "id": "moreira-muir-2017-vol-managed",
+      "title": "Volatility-Managed Portfolios",
+      "authors": "Alan Moreira; Tyler Muir",
+      "publication": "Journal of Finance 72(4)",
+      "date": "2017",
+      "type": "peer_reviewed",
+      "grade": "A",
+      "url": "https://doi.org/10.1111/jofi.12513",
+      "supports": "Inverse lagged variance is a testable factor-risk scaling prior.",
+      "limitations": "Not crypto-specific; the rule uses the same factor's variance and may lever, unlike the current repository overlay."
+    },
+    {
+      "id": "daniel-moskowitz-2016-momentum-crashes",
+      "title": "Momentum Crashes",
+      "authors": "Kent Daniel; Tobias Moskowitz",
+      "publication": "Journal of Financial Economics 122(2)",
+      "date": "2016",
+      "type": "peer_reviewed",
+      "grade": "A",
+      "url": "https://doi.org/10.1016/j.jfineco.2015.12.002",
+      "supports": "Momentum risk is state-dependent and crash-risk scaling merits a preregistered challenger.",
+      "limitations": "The published continuous conditional mean/variance rule is not a hard repository drawdown/volatility-z gate."
+    },
+    {
+      "id": "cederburg-et-al-2020-vol-managed-counterevidence",
+      "title": "On the Performance of Volatility-Managed Portfolios",
+      "authors": "Scott Cederburg; Michael O'Doherty; Feifei Wang; Xuemin Yan",
+      "publication": "Journal of Financial Economics 138(1)",
+      "date": "2020",
+      "type": "peer_reviewed",
+      "grade": "A",
+      "url": "https://doi.org/10.1016/j.jfineco.2020.04.015",
+      "supports": "Volatility management must compete against unscaled controls rather than be assumed beneficial.",
+      "limitations": "Equity-strategy counterevidence, not crypto calibration."
+    },
+    {
+      "id": "bianchi-babiak-dickerson-2022-crypto-liquidity",
+      "title": "Trading Volume and Liquidity Provision in Cryptocurrency Markets",
+      "authors": "Daniele Bianchi; Mykola Babiak; Alexander Dickerson",
+      "publication": "Journal of Banking & Finance 142, 106547",
+      "date": "2022",
+      "type": "peer_reviewed",
+      "grade": "A",
+      "url": "https://doi.org/10.1016/j.jbankfin.2022.106547",
+      "supports": "Short-term crypto reversal is linked to liquidity provision and is strongest in less active, smaller, volatile, illiquid pairs.",
+      "limitations": "Gross reversal/liquidity premia can be compensation for spread, adverse selection, inventory, and capacity risk; OHLCV bars cannot prove executable profit."
+    },
+    {
+      "id": "zaremba-et-al-2021-crypto-reversal-momentum",
+      "title": "Up or Down? Short-Term Reversal, Momentum, and Liquidity Effects in Cryptocurrency Markets",
+      "authors": "Adam Zaremba; Mehmet Huseyin Bilgin; Huaigang Long; Aleksander Mercik; Jan J. Szczygielski",
+      "publication": "International Review of Financial Analysis 78, 101908",
+      "date": "2021",
+      "type": "peer_reviewed",
+      "grade": "A",
+      "url": "https://doi.org/10.1016/j.irfa.2021.101908",
+      "supports": "Reversal versus continuation is horizon- and liquidity-dependent and should be tested with separate legs and costs.",
+      "limitations": "Cross-sectional paper results do not validate a specific z-score, VWAP, shock, or intraday implementation."
+    },
+    {
+      "id": "fil-kristoufek-2020-crypto-pairs",
+      "title": "Pairs Trading in Cryptocurrency Markets",
+      "authors": "Milan Fil; Ladislav Kristoufek",
+      "publication": "IEEE Access 8",
+      "date": "2020",
+      "type": "peer_reviewed",
+      "grade": "A",
+      "url": "https://doi.org/10.1109/ACCESS.2020.3024619",
+      "supports": "Crypto pair mean reversion can be evaluated at five-minute, hourly, and daily horizons with explicit transaction-cost sensitivity.",
+      "limitations": "Historical pair results do not prove stationarity, borrow, synchronized fills, or current venue profitability."
+    },
+    {
+      "id": "silantyev-2019-crypto-order-flow",
+      "title": "Order Flow Analysis of Cryptocurrency Markets",
+      "authors": "Eduard Silantyev",
+      "publication": "Digital Finance 1",
+      "date": "2019",
+      "type": "peer_reviewed",
+      "grade": "A",
+      "url": "https://doi.org/10.1007/s42521-019-00007-w",
+      "supports": "Trade-flow/order-flow imbalance explains contemporaneous high-frequency crypto price changes and is a valid microstructure feature hypothesis.",
+      "limitations": "Contemporaneous explanatory power is not next-bar alpha; executable use needs point-in-time order-book/trade data and latency costs."
+    },
+    {
+      "id": "barucci-et-al-2023-crypto-market-impact",
+      "title": "Market Impact and Efficiency in Cryptoassets Markets",
+      "authors": "Emilio Barucci; Santiago Giuffra Moncayo; Daniele Marazzina",
+      "publication": "Digital Finance 5",
+      "date": "2023",
+      "type": "peer_reviewed",
+      "grade": "A",
+      "url": "https://doi.org/10.1007/s42521-023-00095-9",
+      "supports": "Lagged order flow and market impact should be studied by horizon with an explicit efficiency/execution test.",
+      "limitations": "A lagged association does not establish capacity- and latency-adjusted live returns."
+    },
+    {
+      "id": "jia-et-al-2023-crypto-seesaw",
+      "title": "A Seesaw Effect in the Cryptocurrency Market: Understanding the Return Cross Predictability of Cryptocurrencies",
+      "authors": "Yuecheng Jia; Yangru Wu; Shu Yan; Yuzheng Liu",
+      "publication": "Journal of Empirical Finance 74, 101428",
+      "date": "2023",
+      "type": "peer_reviewed",
+      "grade": "A",
+      "url": "https://doi.org/10.1016/j.jempfin.2023.101428",
+      "supports": "Negative intraday cross-predictability is an external benchmark for cross-asset lead-lag experiments.",
+      "limitations": "The paper's data, LASSO, timing, and cost setup are not equivalent to repository bar-level lead-lag classes."
+    },
+    {
+      "id": "dyhrberg-foley-svec-2018-bitcoin-costs",
+      "title": "How Investible Is Bitcoin? Analyzing the Liquidity and Transaction Costs of Bitcoin Markets",
+      "authors": "Anne H. Dyhrberg; Sean Foley; Jiri Svec",
+      "publication": "Economics Letters 171",
+      "date": "2018",
+      "type": "peer_reviewed",
+      "grade": "A",
+      "url": "https://doi.org/10.1016/j.econlet.2018.07.032",
+      "supports": "High-frequency crypto research must measure quoted/effective spreads and intraday liquidity rather than assume close-price execution.",
+      "limitations": "Older three-exchange Bitcoin evidence does not set current symbol-specific cost parameters."
+    },
+    {
+      "id": "kurihara-matsumoto-2026-btc-alt-price-transmission",
+      "title": "Price Transmission from Bitcoin to Altcoins: High-Frequency Evidence and Implications for Trading Strategy",
+      "authors": "Tomoki Kurihara; Takuji Matsumoto",
+      "publication": "Asia-Pacific Financial Markets",
+      "date": "2026-03-10",
+      "type": "peer_reviewed",
+      "grade": "A",
+      "url": "https://doi.org/10.1007/s10690-026-09589-z",
+      "supports": "Binance one-minute evidence supports BTC t-1 price transmission primarily toward lower-liquidity, low-trade-count altcoins.",
+      "limitations": "The paper's 2 bp fee and short OOS windows omit observed spread, impact, and capacity; it does not validate a fixed four-leader set."
+    },
+    {
+      "id": "de-nicola-2021-intraday-bitcoin",
+      "title": "On the Intraday Behavior of Bitcoin",
+      "authors": "Giacomo De Nicola",
+      "publication": "Ledger",
+      "date": "2021",
+      "type": "peer_reviewed",
+      "grade": "B",
+      "url": "https://doi.org/10.5195/ledger.2021.213",
+      "supports": "Negative first-order autocorrelation is visible from one-minute data, with economically more interpretable reversal at one-to-four-hour horizons.",
+      "limitations": "The paper attributes much of 1-15 minute reversal to bid-ask bounce and warns that fees plus spread likely erase the few-bps gross result."
+    },
+    {
+      "id": "wen-et-al-2022-intraday-momentum-reversal",
+      "title": "Intraday Return Predictability in the Cryptocurrency Markets: Momentum, Reversal, or Both",
+      "authors": "Zhuzhu Wen; Elie Bouri; Yahua Xu; Yang Zhao",
+      "publication": "North American Journal of Economics and Finance",
+      "date": "2022",
+      "type": "peer_reviewed",
+      "grade": "B",
+      "url": "https://doi.org/10.1016/j.najef.2022.101733",
+      "supports": "Five-minute inputs show state-dependent hourly momentum and reversal around jumps, liquidity, announcements, and regimes.",
+      "limitations": "It does not establish a universal VWAP or z-score rule and does not transfer its execution economics to LuminaQuant."
+    },
+    {
+      "id": "kitvanitphasu-et-al-2026-bitcoin-vpin-jumps",
+      "title": "Bitcoin Wild Moves: Evidence from Order Flow Toxicity and Price Jumps",
+      "authors": "Atiwat Kitvanitphasu; Khine Kyaw; Tanakorn Likitapiwat; Sirimon Treepongkaruna",
+      "publication": "Research in International Business and Finance",
+      "date": "2026-01",
+      "type": "peer_reviewed",
+      "grade": "A",
+      "url": "https://doi.org/10.1016/j.ribaf.2025.103163",
+      "supports": "Transaction-derived one-minute VPIN is persistent and predicts future Bitcoin jump occurrence as a risk variable.",
+      "limitations": "VPIN is unsigned and does not validate directional trend confirmation or net trading profit."
+    },
+    {
+      "id": "andersen-bondarenko-2015-vpin-counterevidence",
+      "title": "Assessing Measures of Order Flow Toxicity and Early Warning Signals for Market Turbulence",
+      "authors": "Torben G. Andersen; Oleg Bondarenko",
+      "publication": "Review of Finance 19(1)",
+      "date": "2015",
+      "type": "peer_reviewed",
+      "grade": "A",
+      "url": "https://doi.org/10.1093/rof/rfu041",
+      "supports": "A trade-classification benchmark is required before interpreting bar-derived VPIN.",
+      "limitations": "Non-crypto counterevidence finds bulk-volume classification inferior to tick classification and vulnerable to volatility-induced toxicity signals."
+    },
+    {
+      "id": "albers-et-al-2022-bitcoin-l2-cross-impact",
+      "title": "Fragmentation, Price Formation and Cross-Impact in Bitcoin Markets",
+      "authors": "Jakob Albers; Mihai Cucuringu; Sam Howison; Alexander Y. Shestopaloff",
+      "publication": "Applied Mathematical Finance",
+      "date": "2022",
+      "type": "peer_reviewed",
+      "grade": "A",
+      "url": "https://doi.org/10.1080/1350486X.2022.2080083",
+      "supports": "Synchronized trades and L2 depth explain sub-second future BTC moves; excess bid depth has an immediate positive, not contrarian, sign.",
+      "limitations": "The 500 ms L2 result cannot be transferred to five-minute imbalance fading without observed overshoot, normalization, queue, spread, and impact."
+    },
+    {
+      "id": "svogun-bazan-palomino-2022-crypto-technical-costs",
+      "title": "Technical Analysis in Cryptocurrency Markets: Do Transaction Costs and Bubbles Matter?",
+      "authors": "Daniel Svogun; Walter Bazán-Palomino",
+      "publication": "Journal of International Financial Markets, Institutions and Money",
+      "date": "2022",
+      "type": "peer_reviewed",
+      "grade": "A",
+      "url": "https://doi.org/10.1016/j.intfin.2022.101601",
+      "supports": "Moving-average and breakout rules must be compared at one-minute and daily horizons with explicit transaction costs.",
+      "limitations": "Generic technical-rule evidence does not validate a specific compression, VWAP, or breakout implementation."
+    },
+    {
+      "id": "binance-local-orderbook-official-2026",
+      "title": "How to Manage a Local Order Book Correctly",
+      "authors": "Binance",
+      "publication": "Official USDⓈ-M Futures WebSocket documentation",
+      "date": "current through 2026-08-12",
+      "type": "official_documentation",
+      "grade": "A",
+      "url": "https://developers.binance.com/docs/derivatives/usds-margined-futures/websocket-market-streams/How-to-manage-a-local-order-book-correctly",
+      "supports": "Executable BBO/depth research requires a REST snapshot, ordered WebSocket updates, sequence validation, and rebuild on gaps.",
+      "limitations": "One-minute OHLCV cannot reconstruct historical depth imbalance, queue position, or contemporaneous executable spread."
+    },
+    {
+      "id": "schmeling-schrimpf-todorov-2026-crypto-carry",
+      "title": "Crypto Carry",
+      "authors": "Maik Schmeling; Andreas Schrimpf; Karamfil Todorov",
+      "publication": "Management Science; BIS Working Paper 1087",
+      "date": "2026-05-06 publication",
+      "type": "peer_reviewed",
+      "grade": "A",
+      "url": "https://doi.org/10.1287/mnsc.2024.05069",
+      "supports": "Positive cash-and-carry is a paired long-spot/short-futures position, and unusually high carry predicts elevated subsequent spot-crash risk.",
+      "limitations": "The paired trade's documented loss channels are interim basis widening, short-futures variation margin/liquidation under separate collateral, financing, and intermediary failure. No inspected LuminaQuant strategy or execution contract models all of them."
+    },
+    {
+      "id": "he-et-al-2024-perpetual-futures",
+      "title": "Fundamentals of Perpetual Futures",
+      "authors": "Songrun He; Asaf Manela; Omri Ross; Victor von Wachter",
+      "publication": "arXiv 2212.06888 working paper",
+      "date": "2024-08-21 revision",
+      "type": "working_paper",
+      "grade": "B",
+      "url": "https://arxiv.org/abs/2212.06888",
+      "supports": "Perpetual funding arbitrage is random-maturity and spot-hedged; entry/exit must exceed two-leg cost bounds.",
+      "limitations": "Preprint/working-paper evidence; it does not support naked funding momentum."
+    },
+    {
+      "id": "makarov-schoar-2020-crypto-arbitrage",
+      "title": "Trading and Arbitrage in Cryptocurrency Markets",
+      "authors": "Igor Makarov; Antoinette Schoar",
+      "publication": "Journal of Financial Economics 135(2)",
+      "date": "2020",
+      "type": "peer_reviewed",
+      "grade": "A",
+      "url": "https://doi.org/10.1016/j.jfineco.2019.07.001",
+      "supports": "Cross-venue deviations coexist with segmentation, capital controls, trapped fiat, and limits to arbitrage.",
+      "limitations": "Close-price spread backtests without inventory, transfer latency, balances, withdrawal state, and venue default risk are not executable evidence."
+    },
+    {
+      "id": "binance-funding-official-2026",
+      "title": "USDⓈ-M Futures Funding Rate History API",
+      "authors": "Binance",
+      "publication": "Official exchange documentation",
+      "date": "accessed 2026-08-12",
+      "type": "official_documentation",
+      "grade": "A",
+      "url": "https://developers.binance.com/docs/derivatives/usds-margined-futures/market-data/rest-api/Get-Funding-Rate-History",
+      "supports": "The official historical endpoint defines symbol, fundingRate, fundingTime, and markPrice fields needed to reconstruct timestamped funding observations.",
+      "limitations": "An API field contract is not a payment-direction specification, execution model, or historical profitability result; funding intervals and economics require point-in-time contract metadata."
+    },
+    {
+      "id": "bailey-lopez-de-prado-2014-dsr",
+      "title": "The Deflated Sharpe Ratio",
+      "authors": "David H. Bailey; Marcos López de Prado",
+      "publication": "Journal of Portfolio Management 40(5)",
+      "date": "2014",
+      "type": "peer_reviewed",
+      "grade": "A",
+      "url": "https://doi.org/10.3905/jpm.2014.40.5.094",
+      "supports": "Sharpe evidence must be deflated for selection bias, non-normality, trial count, and cross-trial Sharpe dispersion.",
+      "limitations": "A per-candidate num_trials=1 calculation or survivor-only trial ledger is not the published protocol."
+    },
+    {
+      "id": "bailey-et-al-2017-pbo",
+      "title": "The Probability of Backtest Overfitting",
+      "authors": "David H. Bailey; Jonathan Borwein; Marcos López de Prado; Qiji Zhu",
+      "publication": "Journal of Computational Finance 20(4)",
+      "date": "2017",
+      "type": "peer_reviewed",
+      "grade": "A",
+      "url": "https://doi.org/10.21314/JCF.2016.322",
+      "supports": "CSCV/PBO evaluates a family selection procedure using the full candidate-by-time matrix.",
+      "limitations": "Single-series train-positive/test-negative fold frequency is not CSCV/PBO."
+    },
+    {
+      "id": "hansen-2005-spa",
+      "title": "A Test for Superior Predictive Ability",
+      "authors": "Peter R. Hansen",
+      "publication": "Journal of Business & Economic Statistics 23(4)",
+      "date": "2005",
+      "type": "peer_reviewed",
+      "grade": "A",
+      "url": "https://doi.org/10.1198/073500105000000063",
+      "supports": "SPA tests the maximum studentized benchmark-relative performance across all alternatives with dependence-preserving bootstrap.",
+      "limitations": "A one-series circular block-bootstrap mean test is not Hansen SPA."
+    },
+    {
+      "id": "lo-2002-sharpe-statistics",
+      "title": "The Statistics of Sharpe Ratios",
+      "authors": "Andrew W. Lo",
+      "publication": "Financial Analysts Journal 58(4)",
+      "date": "2002",
+      "type": "peer_reviewed",
+      "grade": "A",
+      "url": "https://doi.org/10.2469/faj.v58.n4.2453",
+      "supports": "Serial correlation invalidates naive square-root annualization and IID Sharpe inference, especially for overlapping high-frequency positions.",
+      "limitations": "It provides inference discipline, not an alpha source."
+    },
+    {
+      "id": "maillard-roncalli-teiletche-2010-erc",
+      "title": "The Properties of Equally Weighted Risk Contribution Portfolios",
+      "authors": "Sébastien Maillard; Thierry Roncalli; Jérôme Teïletche",
+      "publication": "Journal of Portfolio Management 36(4)",
+      "date": "2010",
+      "type": "peer_reviewed",
+      "grade": "A",
+      "url": "https://doi.org/10.3905/jpm.2010.36.4.060",
+      "supports": "ERC is a valid risk-budgeting challenger after alpha/evidence gates.",
+      "limitations": "Risk budgeting does not create alpha or rescue failed sleeves."
+    },
+    {
+      "id": "demiguel-garlappi-uppal-2009-naive",
+      "title": "Optimal Versus Naive Diversification: How Inefficient Is the 1/N Portfolio Strategy?",
+      "authors": "Victor DeMiguel; Lorenzo Garlappi; Raman Uppal",
+      "publication": "Review of Financial Studies 22(5)",
+      "date": "2009",
+      "type": "peer_reviewed",
+      "grade": "A",
+      "url": "https://doi.org/10.1093/rfs/hhm075",
+      "supports": "Equal weight is a required allocation benchmark; optimized portfolios do not consistently dominate out of sample.",
+      "limitations": "Traditional-asset allocation evidence, not crypto alpha evidence."
+    },
+    {
+      "id": "willenbrock-2011-diversification-return",
+      "title": "Diversification Return, Portfolio Rebalancing, and the Commodity Return Puzzle",
+      "authors": "Scott Willenbrock",
+      "publication": "Financial Analysts Journal 67(4)",
+      "date": "2011",
+      "type": "peer_reviewed",
+      "grade": "A",
+      "url": "https://doi.org/10.2469/faj.v67.n4.1",
+      "supports": "A constant-weight rebalanced portfolio can earn a diversification return related to constituent variance minus portfolio variance.",
+      "limitations": "Commodity/general portfolio arithmetic is not crypto alpha evidence; the same-basket buy-and-hold control and all rebalance costs are required."
+    },
+    {
+      "id": "cuthbertson-et-al-2016-rebalancing",
+      "title": "What Does Rebalancing Really Achieve?",
+      "authors": "Keith Cuthbertson; Simon Hayley; Nick Motson; Dirk Nitzsche",
+      "publication": "International Journal of Finance & Economics",
+      "date": "2016",
+      "type": "peer_reviewed",
+      "grade": "A",
+      "url": "https://doi.org/10.1002/ijfe.1545",
+      "supports": "Rebalancing effects must be decomposed from diversification and asset-return effects rather than labeled mechanical alpha.",
+      "limitations": "Non-crypto evidence; it is a falsification/control requirement, not a forecast."
+    },
+    {
+      "id": "dacapogo-authenticated-source-633ba5d",
+      "title": "Dacapogo authenticated upstream daily breakout source (crypto_backtest.py)",
+      "authors": "Hokyoung Jung",
+      "publication": "Dacapogo private GitHub source repository (authorized access required)",
+      "date": "2026-08-13 snapshot",
+      "type": "source_code",
+      "grade": "C",
+      "url": "https://github.com/HokyoungJung/dacapogo/blob/633ba5d6bc0c84a20696af6b2bf807cf55d21248/crypto_backtest.py",
+      "supports": "Direct authenticated upstream evidence for the daily top-ten previous-value-ranked 4% breakout formula reproduced by DacapogoDailySourceStrategy.",
+      "limitations": "The upstream repository is private and requires authorized access. It describes a transferred/reconstructed skeleton rather than the private Dacapogo algorithm; source parity is not performance or live-readiness evidence."
+    }
+  ],
+  "families": {
+    "benchmark": {
+      "title": "Benchmarks and Passive Controls",
+      "thesis": "Keep cash/no-position, buy-and-hold, and simple equal-weight controls as first-class comparators; they are not alpha sleeves.",
+      "research_decision": "retain_as_controls",
+      "evidence_ids": [
+        "demiguel-garlappi-uppal-2009-naive"
+      ]
+    },
+    "trend_momentum": {
+      "title": "Time-Series Trend and Momentum",
+      "thesis": "Prioritize slow own-return trend at 4h/1d and paper-aligned one-to-four-week crypto horizons; ablate signal from inverse-vol sizing and count every horizon.",
+      "research_decision": "prioritize_slow_ablation",
+      "evidence_ids": [
+        "liu-tsyvinski-2021-crypto-risks-returns",
+        "han-kang-ryu-2026-realistic-crypto-momentum",
+        "moskowitz-ooi-pedersen-2012-tsmom",
+        "lo-2002-sharpe-statistics"
+      ]
+    },
+    "cross_sectional": {
+      "title": "Cross-Sectional Momentum, Anchoring, and Factors",
+      "thesis": "Test point-in-time weekly return sorts and exact 52-week-nearness controls before repository-specific residualizers, young-coin fallbacks, or composite filters.",
+      "research_decision": "test_pit_weekly_with_long_short_attribution",
+      "evidence_ids": [
+        "liu-tsyvinski-wu-2022-common-risk-factors",
+        "fieberg-et-al-2025-crypto-trend-factor",
+        "jia-et-al-2026-near-high-crypto",
+        "han-kang-ryu-2026-realistic-crypto-momentum"
+      ]
+    },
+    "rebalancing_diversification": {
+      "title": "Rebalancing and Diversification Return",
+      "thesis": "Measure only the incremental return versus a buy-and-hold portfolio initialized with the identical assets and weights; decompose asset beta, target-weight drift, turnover, and costs.",
+      "research_decision": "diagnostic_challenger_requires_same_basket_control",
+      "evidence_ids": [
+        "willenbrock-2011-diversification-return",
+        "cuthbertson-et-al-2016-rebalancing",
+        "demiguel-garlappi-uppal-2009-naive"
+      ]
+    },
+    "breakout": {
+      "title": "Breakout and Compression Continuation",
+      "thesis": "Treat breakout/compression rules as repository hypotheses; validate only with next-bar fills, spread/impact, false-breakout attribution, and bounded trials.",
+      "research_decision": "conditional_cost_stressed_research",
+      "evidence_ids": [
+        "svogun-bazan-palomino-2022-crypto-technical-costs",
+        "lo-2002-sharpe-statistics",
+        "dyhrberg-foley-svec-2018-bitcoin-costs",
+        "bailey-lopez-de-prado-2014-dsr"
+      ]
+    },
+    "mean_reversion_relative_value": {
+      "title": "Mean Reversion and Relative Value",
+      "thesis": "Reversal may be liquidity compensation; prioritize stationary pairs/residuals at >=5m only when synchronized prices, spread, fees, borrow, and capacity are modeled.",
+      "research_decision": "conditional_pairs_only_no_naive_minute_fade",
+      "evidence_ids": [
+        "bianchi-babiak-dickerson-2022-crypto-liquidity",
+        "zaremba-et-al-2021-crypto-reversal-momentum",
+        "fil-kristoufek-2020-crypto-pairs",
+        "de-nicola-2021-intraday-bitcoin",
+        "wen-et-al-2022-intraday-momentum-reversal",
+        "dyhrberg-foley-svec-2018-bitcoin-costs"
+      ]
+    },
+    "microstructure_intraday": {
+      "title": "Microstructure and Intraday Flow",
+      "thesis": "Order-flow and lead-lag features are valid hypotheses, but OHLCV-only close execution is insufficient; require point-in-time trades/BBO/depth, latency, queue, impact, and capacity.",
+      "research_decision": "no_promotion_without_bbo_tick_economics",
+      "evidence_ids": [
+        "kurihara-matsumoto-2026-btc-alt-price-transmission",
+        "silantyev-2019-crypto-order-flow",
+        "barucci-et-al-2023-crypto-market-impact",
+        "jia-et-al-2023-crypto-seesaw",
+        "kitvanitphasu-et-al-2026-bitcoin-vpin-jumps",
+        "andersen-bondarenko-2015-vpin-counterevidence",
+        "albers-et-al-2022-bitcoin-l2-cross-impact",
+        "binance-local-orderbook-official-2026",
+        "dyhrberg-foley-svec-2018-bitcoin-costs"
+      ]
+    },
+    "event_alpha": {
+      "title": "Event and Shock Alpha",
+      "thesis": "Shock, opening-range, and liquidation events require timestamp-causal event data and conservative next-observation execution; bar-derived events remain hypotheses.",
+      "research_decision": "research_only_event_timestamp_audit",
+      "evidence_ids": [
+        "silantyev-2019-crypto-order-flow",
+        "kitvanitphasu-et-al-2026-bitcoin-vpin-jumps",
+        "dyhrberg-foley-svec-2018-bitcoin-costs",
+        "lo-2002-sharpe-statistics"
+      ]
+    },
+    "derivatives_carry": {
+      "title": "Derivatives Signals Labeled Carry",
+      "thesis": "Existing single-leg funding/basis classes are directional derivatives signals, not cash-and-carry. Do not infer carry returns from their names.",
+      "research_decision": "relabel_economics_and_block_carry_claim",
+      "evidence_ids": [
+        "schmeling-schrimpf-todorov-2026-crypto-carry",
+        "he-et-al-2024-perpetual-futures",
+        "binance-funding-official-2026"
+      ]
+    },
+    "derivatives_directional_crowding": {
+      "title": "Directional Funding, Crowding, and Liquidation Signals",
+      "thesis": "Evaluate funding/OI/liquidation features only as directional crowding or crash-risk hypotheses with exact event timing; they do not implement delta-neutral carry.",
+      "research_decision": "research_only_never_label_as_arbitrage",
+      "evidence_ids": [
+        "schmeling-schrimpf-todorov-2026-crypto-carry",
+        "he-et-al-2024-perpetual-futures",
+        "binance-funding-official-2026",
+        "makarov-schoar-2020-crypto-arbitrage"
+      ]
+    },
+    "volatility_risk_overlay": {
+      "title": "Volatility and Crash-Risk Overlays",
+      "thesis": "Keep scaled and unscaled variants separate, use lagged own-sleeve volatility, count overlay choices as trials, and benchmark against no scaling.",
+      "research_decision": "challenger_not_default",
+      "evidence_ids": [
+        "barroso-santa-clara-2015-momentum-vol",
+        "moreira-muir-2017-vol-managed",
+        "daniel-moskowitz-2016-momentum-crashes",
+        "cederburg-et-al-2020-vol-managed-counterevidence"
+      ]
+    },
+    "ensemble_regime_router": {
+      "title": "Ensembles and Regime Routers",
+      "thesis": "Only preregistered, causally available composites with jointly netted trades may combine weak forecasts; every recipe and router is another trial.",
+      "research_decision": "validation_only_with_component_ablation",
+      "evidence_ids": [
+        "bailey-lopez-de-prado-2014-dsr",
+        "bailey-et-al-2017-pbo",
+        "hansen-2005-spa",
+        "lo-2002-sharpe-statistics"
+      ]
+    },
+    "seasonality": {
+      "title": "Seasonality and Calendar Effects",
+      "thesis": "Calendar rules require timezone, venue-session, holiday, and multiple-calendar correction; preserve cash when the effect is absent.",
+      "research_decision": "bounded_hypothesis_test",
+      "evidence_ids": [
+        "bailey-lopez-de-prado-2014-dsr",
+        "hansen-2005-spa"
+      ]
+    },
+    "intermarket": {
+      "title": "Intermarket and Cross-Asset Signals",
+      "thesis": "Require synchronized point-in-time tradable clocks and asset-specific calendars/costs; never forward-fill a closed market into apparent predictability.",
+      "research_decision": "timestamp_and_calendar_audit_first",
+      "evidence_ids": [
+        "jia-et-al-2023-crypto-seesaw",
+        "lo-2002-sharpe-statistics"
+      ]
+    },
+    "formulaic_alpha": {
+      "title": "Formulaic and Alpha-Zoo Signals",
+      "thesis": "Treat the full formula search as one family-wide multiple-testing experiment with a frozen ledger and complete candidate-by-time matrix.",
+      "research_decision": "family_wide_spa_cscv_required",
+      "evidence_ids": [
+        "bailey-lopez-de-prado-2014-dsr",
+        "bailey-et-al-2017-pbo",
+        "hansen-2005-spa"
+      ]
+    },
+    "unresolved": {
+      "title": "Unresolved or Miscellaneous Signals",
+      "thesis": "No economic label is inferred from performance. Resolve causal inputs, horizon, execution, and family before promotion.",
+      "research_decision": "classify_before_promotion",
+      "evidence_ids": [
+        "bailey-lopez-de-prado-2014-dsr",
+        "hansen-2005-spa"
+      ]
+    }
+  },
+  "strategy_overrides": {
+    "AlphaZooOptunaHybridLiveStrategy": {
+      "family": "ensemble_regime_router",
+      "evidence_ids": [],
+      "note": "Implementation-semantic taxonomy; family literature is context, not direct replication evidence."
+    },
+    "AvgCorrelationCrashGuardOverlayStrategy": {
+      "family": "volatility_risk_overlay",
+      "evidence_ids": [
+        "cederburg-et-al-2020-vol-managed-counterevidence"
+      ]
+    },
+    "BenchmarkLeadLagContinuationStrategy": {
+      "family": "microstructure_intraday",
+      "evidence_ids": [
+        "kurihara-matsumoto-2026-btc-alt-price-transmission",
+        "jia-et-al-2023-crypto-seesaw"
+      ]
+    },
+    "BitcoinBuyHoldStrategy": {
+      "family": "benchmark",
+      "evidence_ids": [],
+      "note": "Implementation-semantic taxonomy; family literature is context, not direct replication evidence."
+    },
+    "CarryTrendConfluenceRiderStrategy": {
+      "family": "derivatives_directional_crowding",
+      "evidence_ids": [
+        "binance-funding-official-2026"
+      ],
+      "note": "Single-leg directional trend conditioned on funding sign; not long-spot/short-perp carry or arbitrage."
+    },
+    "CompressionBreakoutContinuationStrategy": {
+      "family": "breakout",
+      "evidence_ids": [],
+      "note": "Implementation-semantic taxonomy; family literature is context, not direct replication evidence."
+    },
+    "CrossAssetDiversifiedTrendStrategy": {
+      "family": "trend_momentum",
+      "evidence_ids": [
+        "moskowitz-ooi-pedersen-2012-tsmom"
+      ]
+    },
+    "CrossCryptoSlowDiffusionStrategy": {
+      "family": "intermarket",
+      "evidence_ids": [],
+      "note": "Implementation-semantic taxonomy; family literature is context, not direct replication evidence."
+    },
+    "CrossSectionalFundingMomentumCarryStrategy": {
+      "family": "derivatives_directional_crowding",
+      "evidence_ids": [
+        "schmeling-schrimpf-todorov-2026-crypto-carry",
+        "binance-funding-official-2026"
+      ],
+      "note": "EWMA funding differences plus directional long/short targets are not long-spot/short-perp carry."
+    },
+    "CrossSectionalNearHighAnchoringStrategy": {
+      "family": "cross_sectional",
+      "evidence_ids": [
+        "jia-et-al-2026-near-high-crypto"
+      ],
+      "note": "Use an exact 52-week/full-history/weekly control before relaxed-history variants."
+    },
+    "CrossSectionalShortTermReversalStrategy": {
+      "family": "cross_sectional",
+      "evidence_ids": [],
+      "note": "Implementation-semantic taxonomy; family literature is context, not direct replication evidence."
+    },
+    "CryptoFxAlphaZooStateStrategy": {
+      "family": "formulaic_alpha",
+      "evidence_ids": [],
+      "note": "Implementation-semantic taxonomy; family literature is context, not direct replication evidence."
+    },
+    "DacapogoDailySourceStrategy": {
+      "family": "breakout",
+      "evidence_ids": [
+        "dacapogo-authenticated-source-633ba5d"
+      ],
+      "note": "Direct authenticated-upstream source-parity research only. Variants are source, legacy ML filter, structural/ML tuner, and causal daily-v2 OLS; none is registered for event-driven, live, or real-money execution.",
+      "dedicated_diagnostic": {
+        "artifact": {
+          "path": "docs/research_note/evidence/dacapogo_common_metrics.json",
+          "bytes": 20410,
+          "sha256": "412a3dc92ed98cb1ba06704d76efd411c76a0e8e8f1eb7967e098a94851c70bf"
+        },
+        "role": "dedicated_research_diagnostic_not_common_scorecard",
+        "promotion_use": "forbidden",
+        "windows": {
+          "full": {
+            "legacy_entry_last_return": 0.09064831428224496,
+            "legacy_stop_first_return": -0.08606881019354429,
+            "daily_v2_ml_return": 0.0036740568662869677
+          },
+          "recent": {
+            "legacy_entry_last_return": -0.025144369247297238,
+            "legacy_stop_first_return": -0.025158861130080368,
+            "daily_v2_ml_return": 0.005589952521543928
+          }
+        },
+        "decision": {
+          "gate_pass": false,
+          "locked_action": "cash"
+        }
+      }
+    },
+    "DeepLearningForecastGateStrategy": {
+      "family": "ensemble_regime_router",
+      "evidence_ids": [],
+      "note": "Implementation-semantic taxonomy; family literature is context, not direct replication evidence."
+    },
+    "DerivativesFlowSqueezeStrategy": {
+      "family": "derivatives_directional_crowding",
+      "evidence_ids": [
+        "binance-funding-official-2026"
+      ]
+    },
+    "DisagreementGatedEnsembleStrategy": {
+      "family": "ensemble_regime_router",
+      "evidence_ids": [],
+      "note": "Per-symbol adaptive four-component ensemble with an explicit disagreement/regime admission gate; family literature is context, not direct implementation evidence."
+    },
+    "DiversifiedMultiFactorEnsembleStrategy": {
+      "family": "cross_sectional",
+      "evidence_ids": [],
+      "note": "Implementation-semantic taxonomy; family literature is context, not direct replication evidence."
+    },
+    "DonchianAtrTrendStrategy": {
+      "family": "trend_momentum",
+      "evidence_ids": [],
+      "note": "Implementation-semantic taxonomy; family literature is context, not direct replication evidence."
+    },
+    "EquityBenchmarkResidualReversalStrategy": {
+      "family": "mean_reversion_relative_value",
+      "evidence_ids": [],
+      "note": "Implementation-semantic taxonomy; family literature is context, not direct replication evidence."
+    },
+    "EquityMetalRiskRegimeRotationStrategy": {
+      "family": "ensemble_regime_router",
+      "evidence_ids": [],
+      "note": "Implementation-semantic taxonomy; family literature is context, not direct replication evidence."
+    },
+    "FalseBreakoutReversalStrategy": {
+      "family": "mean_reversion_relative_value",
+      "evidence_ids": [],
+      "note": "Implementation-semantic taxonomy; family literature is context, not direct replication evidence."
+    },
+    "FundingDislocationTrendCarryStrategy": {
+      "family": "derivatives_directional_crowding",
+      "evidence_ids": [
+        "schmeling-schrimpf-todorov-2026-crypto-carry",
+        "binance-funding-official-2026"
+      ],
+      "note": "Single-leg directional funding/basis plus trend exposure; not delta-neutral carry or arbitrage."
+    },
+    "FundingHarvestCarryStrategy": {
+      "family": "derivatives_directional_crowding",
+      "evidence_ids": [
+        "binance-funding-official-2026"
+      ],
+      "note": "A single perp leg remains directionally exposed even when its side receives funding."
+    },
+    "GoldSilverRatioMeanReversionStrategy": {
+      "family": "mean_reversion_relative_value",
+      "evidence_ids": [],
+      "note": "Implementation-semantic taxonomy; family literature is context, not direct replication evidence."
+    },
+    "GoldSilverRatioTrendStrategy": {
+      "family": "breakout",
+      "evidence_ids": [],
+      "note": "Implementation-semantic taxonomy; family literature is context, not direct replication evidence."
+    },
+    "HourlyShockReversionStrategy": {
+      "family": "mean_reversion_relative_value",
+      "evidence_ids": [],
+      "note": "Implementation-semantic taxonomy; family literature is context, not direct replication evidence."
+    },
+    "IntermarketLeadLagContinuationStrategy": {
+      "family": "intermarket",
+      "evidence_ids": [
+        "jia-et-al-2023-crypto-seesaw"
+      ]
+    },
+    "IntradayFlowPressureRiderStrategy": {
+      "family": "microstructure_intraday",
+      "evidence_ids": [],
+      "note": "Intraday order-flow pressure continuation; research evidence only."
+    },
+    "LeadLagSpilloverStrategy": {
+      "family": "microstructure_intraday",
+      "evidence_ids": [
+        "kurihara-matsumoto-2026-btc-alt-price-transmission",
+        "jia-et-al-2023-crypto-seesaw"
+      ],
+      "note": "Direct 1m evidence favors BTC t-1 leading low-trade-count altcoins. High-low range is volatility, not executable liquidity; rank laggards using past-only volume/trade count."
+    },
+    "LiquidationCascadeReversionStrategy": {
+      "family": "mean_reversion_relative_value",
+      "evidence_ids": [],
+      "note": "Liquidation-cascade reversal hypothesis; research evidence only."
+    },
+    "LowTurnoverTrendPersistenceStrategy": {
+      "family": "trend_momentum",
+      "evidence_ids": [
+        "liu-tsyvinski-2021-crypto-risks-returns",
+        "moskowitz-ooi-pedersen-2012-tsmom"
+      ],
+      "note": "Multi-horizon agreement, KER, ADX, volatility persistence, and long hold are repository hypotheses that require ablation."
+    },
+    "LowVolatilityMomentumStrategy": {
+      "family": "cross_sectional",
+      "evidence_ids": [],
+      "note": "Implementation-semantic taxonomy; family literature is context, not direct replication evidence."
+    },
+    "MetalEquityDivergenceReversalStrategy": {
+      "family": "mean_reversion_relative_value",
+      "evidence_ids": [],
+      "note": "Implementation-semantic taxonomy; family literature is context, not direct replication evidence."
+    },
+    "MomentumCrashDynamicScalingOverlayStrategy": {
+      "family": "volatility_risk_overlay",
+      "evidence_ids": [
+        "daniel-moskowitz-2016-momentum-crashes"
+      ]
+    },
+    "MovingAverageCrossStrategy": {
+      "family": "trend_momentum",
+      "evidence_ids": [],
+      "note": "Implementation-semantic taxonomy; family literature is context, not direct replication evidence."
+    },
+    "NearHighMomentumStrategy": {
+      "family": "cross_sectional",
+      "evidence_ids": [
+        "jia-et-al-2026-near-high-crypto"
+      ]
+    },
+    "OpenInterestTrendConfirmationRiderStrategy": {
+      "family": "derivatives_directional_crowding",
+      "evidence_ids": [],
+      "note": "Open-interest trend confirmation is directional crowding, not delta-neutral carry."
+    },
+    "OpeningRangeContinuationStrategy": {
+      "family": "breakout",
+      "evidence_ids": [],
+      "note": "Implementation-semantic taxonomy; family literature is context, not direct replication evidence."
+    },
+    "OrderBookImbalanceReversionStrategy": {
+      "family": "microstructure_intraday",
+      "evidence_ids": [
+        "albers-et-al-2022-bitcoin-l2-cross-impact",
+        "binance-local-orderbook-official-2026"
+      ],
+      "note": "Requires genuine synchronized L2/BBO. Primary evidence gives excess bid depth an immediate positive sign, so unconditional contrarian imbalance fading is rejected without observed overshoot and normalization."
+    },
+    "PairSpreadZScoreStrategy": {
+      "family": "mean_reversion_relative_value",
+      "evidence_ids": [
+        "fil-kristoufek-2020-crypto-pairs"
+      ]
+    },
+    "PairTradingZScoreStrategy": {
+      "family": "mean_reversion_relative_value",
+      "evidence_ids": [
+        "fil-kristoufek-2020-crypto-pairs"
+      ]
+    },
+    "PairsSpreadMeanReversionStrategy": {
+      "family": "mean_reversion_relative_value",
+      "evidence_ids": [],
+      "note": "Implementation-semantic taxonomy; family literature is context, not direct replication evidence."
+    },
+    "PerpCrowdingCarryStrategy": {
+      "family": "derivatives_directional_crowding",
+      "evidence_ids": [
+        "schmeling-schrimpf-todorov-2026-crypto-carry",
+        "binance-funding-official-2026"
+      ],
+      "note": "Single-symbol targets are directional crowding trades; mild positive-funding longs pay funding."
+    },
+    "RareEventScoreStrategy": {
+      "family": "mean_reversion_relative_value",
+      "evidence_ids": [],
+      "note": "Implementation-semantic taxonomy; family literature is context, not direct replication evidence."
+    },
+    "RebalancingPremiumHarvestStrategy": {
+      "family": "rebalancing_diversification",
+      "evidence_ids": [
+        "willenbrock-2011-diversification-return",
+        "cuthbertson-et-al-2016-rebalancing"
+      ],
+      "note": "Report incremental PnL against the identical initial basket held without rebalancing; the common-period total return alone mixes market beta, constituent selection, and rebalancing."
+    },
+    "RegimeAdaptiveDisagreementEnsembleStrategy": {
+      "family": "ensemble_regime_router",
+      "evidence_ids": [],
+      "note": "Per-symbol adaptive four-component ensemble with an explicit disagreement/regime admission gate; family literature is context, not direct implementation evidence."
+    },
+    "ResearchOnlyDailyCrossSectionalNearHighAnchoringStrategy": {
+      "family": "cross_sectional",
+      "evidence_ids": [],
+      "note": "Research-only daily cross-sectional near-high anchoring implementation."
+    },
+    "ResearchOnlyDailyLowTurnoverTrendPersistenceStrategy": {
+      "family": "trend_momentum",
+      "evidence_ids": [],
+      "note": "Research-only low-turnover daily trend persistence implementation."
+    },
+    "ResearchOnlyFourHourFundingHarvestCarryStrategy": {
+      "family": "derivatives_directional_crowding",
+      "evidence_ids": [],
+      "note": "Research-only four-hour directional funding/carry implementation."
+    },
+    "ResidualMomentumRotationStrategy": {
+      "family": "cross_sectional",
+      "evidence_ids": [],
+      "note": "Implementation-semantic taxonomy; family literature is context, not direct replication evidence."
+    },
+    "RsiStrategy": {
+      "family": "mean_reversion_relative_value",
+      "evidence_ids": [],
+      "note": "Implementation-semantic taxonomy; family literature is context, not direct replication evidence."
+    },
+    "SessionFilteredPairCarryStrategy": {
+      "family": "mean_reversion_relative_value",
+      "evidence_ids": [
+        "fil-kristoufek-2020-crypto-pairs"
+      ],
+      "note": "Generic session-filtered pair z-score logic has no spot/perpetual identity, funding, or basis leg."
+    },
+    "SlowCrossSectionalLeadLagStrategy": {
+      "family": "microstructure_intraday",
+      "evidence_ids": [
+        "kurihara-matsumoto-2026-btc-alt-price-transmission",
+        "jia-et-al-2023-crypto-seesaw"
+      ]
+    },
+    "TakerFlowExhaustionReversalStrategy": {
+      "family": "microstructure_intraday",
+      "evidence_ids": [],
+      "note": "Implementation-semantic taxonomy; family literature is context, not direct replication evidence."
+    },
+    "TakerFlowImbalanceContinuationStrategy": {
+      "family": "microstructure_intraday",
+      "evidence_ids": [],
+      "note": "Implementation-semantic taxonomy; family literature is context, not direct replication evidence."
+    },
+    "TimeframePairZScoreReversionStrategy": {
+      "family": "mean_reversion_relative_value",
+      "evidence_ids": [],
+      "note": "Implementation-semantic taxonomy; family literature is context, not direct replication evidence."
+    },
+    "TopCapTimeSeriesMomentumStrategy": {
+      "family": "cross_sectional",
+      "evidence_ids": [
+        "liu-tsyvinski-wu-2022-common-risk-factors"
+      ],
+      "note": "Despite its name, the implementation ranks assets cross-sectionally; treat it as CMOM-like, not a direct TSMOM replication."
+    },
+    "VolCompressionVwapReversionStrategy": {
+      "family": "mean_reversion_relative_value",
+      "evidence_ids": [],
+      "note": "Implementation-semantic taxonomy; family literature is context, not direct replication evidence."
+    },
+    "VolManagedMomentumCrashGateStrategy": {
+      "family": "trend_momentum",
+      "evidence_ids": [],
+      "note": "Implementation-semantic taxonomy; family literature is context, not direct replication evidence."
+    },
+    "VolManagedRiskOverlayStrategy": {
+      "family": "volatility_risk_overlay",
+      "evidence_ids": [
+        "barroso-santa-clara-2015-momentum-vol",
+        "moreira-muir-2017-vol-managed",
+        "cederburg-et-al-2020-vol-managed-counterevidence"
+      ],
+      "note": "Current benchmark-vol scaling is not an exact cited-paper implementation; compare against own-sleeve lagged-vol and unscaled controls."
+    },
+    "VolatilityCompressionReversionStrategy": {
+      "family": "mean_reversion_relative_value",
+      "evidence_ids": [],
+      "note": "Implementation-semantic taxonomy; family literature is context, not direct replication evidence."
+    },
+    "VolatilitySqueezeBreakoutStrategy": {
+      "family": "breakout",
+      "evidence_ids": [],
+      "note": "Implementation-semantic taxonomy; family literature is context, not direct replication evidence."
+    },
+    "VpinToxicityRiderStrategy": {
+      "family": "microstructure_intraday",
+      "evidence_ids": [
+        "kitvanitphasu-et-al-2026-bitcoin-vpin-jumps",
+        "andersen-bondarenko-2015-vpin-counterevidence",
+        "dyhrberg-foley-svec-2018-bitcoin-costs"
+      ],
+      "note": "Bar-volume-classification VPIN is an unsigned jump-risk proxy, not directional informed-flow confirmation; compare calm/avoid gating against placebo."
+    },
+    "VwapReversionStrategy": {
+      "family": "mean_reversion_relative_value",
+      "evidence_ids": [
+        "de-nicola-2021-intraday-bitcoin",
+        "wen-et-al-2022-intraday-momentum-reversal",
+        "dyhrberg-foley-svec-2018-bitcoin-costs"
+      ],
+      "note": "Causal rolling VWAP scaffold only. Test fixed-horizon, post-shock conditional reversal; do not treat raw 1m negative autocorrelation as executable alpha."
+    }
+  },
+  "recommended_experiments": [
+    {
+      "id": "E1-paper-aligned-crypto-tsmom",
+      "existing_classes": [
+        "LowTurnoverTrendPersistenceStrategy"
+      ],
+      "change": "Compare fixed wall-clock 1/2/3-week own-return signs with one-week decisions, long-only and long-short separately; freeze all extra gates, then ablate them one at a time.",
+      "promotion_gate": "Realistic net costs, purged validation, family-wide DSR/SPA/CSCV, then one locked report-only OOS."
+    },
+    {
+      "id": "E2-paper-aligned-crypto-cmom",
+      "existing_classes": [
+        "TopCapTimeSeriesMomentumStrategy"
+      ],
+      "change": "Use 1/2/3/4-week return ranks, weekly rebalance, raw returns, zero absolute threshold, and fixed 30% tails; report each leg and point-in-time universe.",
+      "promotion_gate": "No selection on locked OOS; include borrow/funding/liquidation and turnover costs."
+    },
+    {
+      "id": "E3-exact-near-high",
+      "existing_classes": [
+        "CrossSectionalNearHighAnchoringStrategy",
+        "NearHighMomentumStrategy"
+      ],
+      "change": "Compare exact 52-week/full-history/weekly/10% tails against existing relaxed-history and 25% variants with weighting held fixed.",
+      "promotion_gate": "Rank IC and net spread must survive delisted/young-coin PIT universe and family-wide multiplicity."
+    },
+    {
+      "id": "E4-stationary-pairs-cost-bound",
+      "existing_classes": [
+        "PairTradingZScoreStrategy",
+        "PairSpreadZScoreStrategy",
+        "TimeframePairZScoreReversionStrategy"
+      ],
+      "change": "Use synchronized >=5m prices, fold-local hedge/stationarity estimates, next-bar execution, explicit two-leg spread/fee/borrow, and a no-trade band.",
+      "promotion_gate": "Reject nonstationary folds, asynchronous clocks, unavailable borrow, or negative conservative-cost edge."
+    },
+    {
+      "id": "E5-volatility-overlay-challenger",
+      "existing_classes": [
+        "VolManagedRiskOverlayStrategy",
+        "MomentumCrashDynamicScalingOverlayStrategy"
+      ],
+      "change": "Compare unscaled, lagged own-sleeve inverse-vol, and current wrapper as three separately counted candidates with identical direction signals.",
+      "promotion_gate": "Net utility/tail improvement on purged validation; locked OOS remains report-only."
+    },
+    {
+      "id": "E6-rebalancing-incremental-control",
+      "existing_classes": [
+        "RebalancingPremiumHarvestStrategy"
+      ],
+      "change": "Replay the identical initial assets and target weights as buy-and-hold, equal-weight rebalanced, and diversity-weighted rebalanced arms; attribute market/constituent return, excess growth, turnover, and cost separately.",
+      "promotion_gate": "Only incremental net return versus the same-basket buy-and-hold control counts; current total-return rank is diagnostic and cannot establish a rebalancing premium."
+    },
+    {
+      "id": "E7-true-positive-funding-carry-data-contract",
+      "existing_classes": [],
+      "change": "Do not add a production strategy yet. First prove same-venue BTC/ETH spot and perp streams, actual funding events, paired fills, residual-delta invariant, separate collateral, fees, basis PnL, and financing. Then test zero-leverage long spot/short perp only.",
+      "promotion_gate": "No negative-funding reverse carry without historical spot borrow; no profit claim without both-leg accounting and margin stress."
+    },
+    {
+      "id": "E8-conditional-shock-reversion",
+      "existing_classes": [
+        "VwapReversionStrategy",
+        "VpinToxicityRiderStrategy"
+      ],
+      "change": "Predeclare large 1m/5m displacement events and 1/5/60/120-minute exits; compare VWAP-only, calm BVC-VPIN gate, high-toxicity gate, and time/volatility/volume-matched placebos.",
+      "promotion_gate": "Only next-observation net edge after actual fee, spread, impact, funding, latency, adverse-selection buffer, and family-wide multiplicity can pass."
+    },
+    {
+      "id": "E9-liquidity-mediated-btc-alt-delay",
+      "existing_classes": [
+        "LeadLagSpilloverStrategy",
+        "SlowCrossSectionalLeadLagStrategy",
+        "BenchmarkLeadLagContinuationStrategy"
+      ],
+      "change": "Use BTC t-1 only, synchronized closes, reject stale bars, rank laggards by past-only trade count/dollar volume, and compare liquid-major controls against low-liquidity alts.",
+      "promotion_gate": "Reject unless effect strength declines monotonically with liquidity and exceeds venue-specific all-in cost at a capacity-constrained size."
+    }
+  ],
+  "hard_rejections": [
+    "Online or paper Sharpe/return headlines are not LuminaQuant returns.",
+    "Do not create another trend, near-high, pairs, or volatility class before existing classes pass paper-aligned ablations.",
+    "Do not call a single-leg funding, OI, basis, or liquidation strategy carry/arbitrage.",
+    "Do not promote minute lead-lag, order-flow, reversal, or VPIN from OHLCV close fills without BBO/tick economics.",
+    "Do not select, weight, filter, or fall back using locked OOS metrics.",
+    "Do not use approximate single-series PBO or SPA-like p-values as genuine family-wide CSCV/PBO or Hansen SPA.",
+    "Do not optimize an allocator on non-co-dated returns or allow renormalization to breach weight caps."
+  ]
+}

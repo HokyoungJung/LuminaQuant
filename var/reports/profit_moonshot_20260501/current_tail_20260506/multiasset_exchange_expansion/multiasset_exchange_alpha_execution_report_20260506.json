@@ -1,0 +1,1044 @@
+{
+  "artifact_kind": "multiasset_exchange_alpha_execution_report",
+  "coverage_inventory_path": "var/reports/profit_moonshot_20260501/current_tail_20260506/multiasset_exchange_expansion/coverage_inventory_latest.json",
+  "decision": "no_new_successful_alpha_promoted",
+  "direct_trading_blocked": true,
+  "direct_trading_blocked_reason": "External venues remain feature/regime sources only; direct trading lacks spread/swap/funding/fill/session/lot-size models and raw-first evidence.",
+  "external_docs_verified": {
+    "hyperliquid_fees": "https://hyperliquid.gitbook.io/hyperliquid-docs/trading/fees",
+    "hyperliquid_info_endpoint": "https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/info-endpoint",
+    "hyperliquid_perps_info": "https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/info-endpoint/perpetuals",
+    "tickmill_instruments": "https://www.tickmill.com/trading-instruments/",
+    "tickmill_spreads_swaps": "https://www.tickmill.com/conditions/spreads-swaps"
+  },
+  "generated_at_utc": "2026-05-07T10:01:28.645017Z",
+  "hyperliquid_collection_path": "var/reports/profit_moonshot_20260501/current_tail_20260506/multiasset_exchange_expansion/hyperliquid_readonly_collection_latest.json",
+  "hyperliquid_summary": {
+    "blocked_context": [
+      "historical_oi_missing",
+      "historical_mark_raw_first_missing",
+      "direct_trading_cost_model_missing"
+    ],
+    "replay_eligible": "funding_history_only",
+    "symbols": [
+      {
+        "candle_snapshot_train_val_oos_rows": {
+          "oos": 1560,
+          "train": 1968,
+          "val": 1416
+        },
+        "current_context": {
+          "funding_rate": -8.1896e-06,
+          "index_price": 80944.0,
+          "mark_price": 80900.0,
+          "open_interest": 31497.60588,
+          "timestamp_ms": 1778147926992
+        },
+        "first_funding_utc": "2025-01-01T00:00:00.054000+00:00",
+        "funding_rows": 11736,
+        "funding_split_counts": {
+          "oos": 1560,
+          "train": 8760,
+          "val": 1416
+        },
+        "last_funding_utc": "2026-05-04T23:00:00.055000+00:00",
+        "symbol": "BTC/USDT"
+      },
+      {
+        "candle_snapshot_train_val_oos_rows": {
+          "oos": 1560,
+          "train": 1968,
+          "val": 1416
+        },
+        "current_context": {
+          "funding_rate": -2.6206e-06,
+          "index_price": 2328.3,
+          "mark_price": 2327.0,
+          "open_interest": 524647.7849999991,
+          "timestamp_ms": 1778147926992
+        },
+        "first_funding_utc": "2025-01-01T00:00:00.054000+00:00",
+        "funding_rows": 11736,
+        "funding_split_counts": {
+          "oos": 1560,
+          "train": 8760,
+          "val": 1416
+        },
+        "last_funding_utc": "2026-05-04T23:00:00.055000+00:00",
+        "symbol": "ETH/USDT"
+      },
+      {
+        "candle_snapshot_train_val_oos_rows": {
+          "oos": 1560,
+          "train": 1968,
+          "val": 1416
+        },
+        "current_context": {
+          "funding_rate": 7.0445e-06,
+          "index_price": 89.435,
+          "mark_price": 89.393,
+          "open_interest": 3799441.04,
+          "timestamp_ms": 1778147926992
+        },
+        "first_funding_utc": "2025-01-01T00:00:00.054000+00:00",
+        "funding_rows": 11736,
+        "funding_split_counts": {
+          "oos": 1560,
+          "train": 8760,
+          "val": 1416
+        },
+        "last_funding_utc": "2026-05-04T23:00:00.055000+00:00",
+        "symbol": "SOL/USDT"
+      }
+    ],
+    "upserted_feature_point_rows": 35211
+  },
+  "incumbent": {
+    "mode": "profit_moonshot_hourly_shock_reversion_eth_12h_mode",
+    "oos_mdd": 0.002819,
+    "oos_return": 0.008284,
+    "oos_sharpe": 0.100651
+  },
+  "live_equivalent_backtest": {
+    "reason": "No replay survivor earned a one-mode full live-equivalent raw-first backtest slot.",
+    "run": false
+  },
+  "process_hygiene": {
+    "duplicate_processes_checked": true,
+    "duplicate_processes_found": 0
+  },
+  "raw_first_coverage_summary": {
+    "BTC/USDT": {
+      "oos": {
+        "committed_day_count": 65,
+        "complete_raw_first": false,
+        "end_inclusive": "2026-05-05",
+        "first_missing_days": [
+          "2026-05-05"
+        ],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/BTCUSDT/2026-03.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/BTCUSDT/2026-04.parquet"
+        ],
+        "missing_day_count": 1,
+        "required_day_count": 66,
+        "start": "2026-03-01"
+      },
+      "train": {
+        "committed_day_count": 365,
+        "complete_raw_first": true,
+        "end_inclusive": "2025-12-31",
+        "first_missing_days": [],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/BTCUSDT/2025-01.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/BTCUSDT/2025-02.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/BTCUSDT/2025-03.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/BTCUSDT/2025-04.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/BTCUSDT/2025-05.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/BTCUSDT/2025-06.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/BTCUSDT/2025-07.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/BTCUSDT/2025-08.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/BTCUSDT/2025-09.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/BTCUSDT/2025-10.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/BTCUSDT/2025-11.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/BTCUSDT/2025-12.parquet"
+        ],
+        "missing_day_count": 0,
+        "required_day_count": 365,
+        "start": "2025-01-01"
+      },
+      "val": {
+        "committed_day_count": 59,
+        "complete_raw_first": true,
+        "end_inclusive": "2026-02-28",
+        "first_missing_days": [],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/BTCUSDT/2026-01.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/BTCUSDT/2026-02.parquet"
+        ],
+        "missing_day_count": 0,
+        "required_day_count": 59,
+        "start": "2026-01-01"
+      }
+    },
+    "ETH/USDT": {
+      "oos": {
+        "committed_day_count": 65,
+        "complete_raw_first": false,
+        "end_inclusive": "2026-05-05",
+        "first_missing_days": [
+          "2026-05-05"
+        ],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/ETHUSDT/2026-03.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/ETHUSDT/2026-04.parquet"
+        ],
+        "missing_day_count": 1,
+        "required_day_count": 66,
+        "start": "2026-03-01"
+      },
+      "train": {
+        "committed_day_count": 365,
+        "complete_raw_first": true,
+        "end_inclusive": "2025-12-31",
+        "first_missing_days": [],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/ETHUSDT/2025-01.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/ETHUSDT/2025-02.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/ETHUSDT/2025-03.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/ETHUSDT/2025-04.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/ETHUSDT/2025-05.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/ETHUSDT/2025-06.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/ETHUSDT/2025-07.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/ETHUSDT/2025-08.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/ETHUSDT/2025-09.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/ETHUSDT/2025-10.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/ETHUSDT/2025-11.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/ETHUSDT/2025-12.parquet"
+        ],
+        "missing_day_count": 0,
+        "required_day_count": 365,
+        "start": "2025-01-01"
+      },
+      "val": {
+        "committed_day_count": 59,
+        "complete_raw_first": true,
+        "end_inclusive": "2026-02-28",
+        "first_missing_days": [],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/ETHUSDT/2026-01.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/ETHUSDT/2026-02.parquet"
+        ],
+        "missing_day_count": 0,
+        "required_day_count": 59,
+        "start": "2026-01-01"
+      }
+    },
+    "SOL/USDT": {
+      "oos": {
+        "committed_day_count": 65,
+        "complete_raw_first": false,
+        "end_inclusive": "2026-05-05",
+        "first_missing_days": [
+          "2026-05-05"
+        ],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/SOLUSDT/2026-03.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/SOLUSDT/2026-04.parquet"
+        ],
+        "missing_day_count": 1,
+        "required_day_count": 66,
+        "start": "2026-03-01"
+      },
+      "train": {
+        "committed_day_count": 365,
+        "complete_raw_first": true,
+        "end_inclusive": "2025-12-31",
+        "first_missing_days": [],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/SOLUSDT/2025-01.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/SOLUSDT/2025-02.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/SOLUSDT/2025-03.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/SOLUSDT/2025-04.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/SOLUSDT/2025-05.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/SOLUSDT/2025-06.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/SOLUSDT/2025-07.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/SOLUSDT/2025-08.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/SOLUSDT/2025-09.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/SOLUSDT/2025-10.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/SOLUSDT/2025-11.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/SOLUSDT/2025-12.parquet"
+        ],
+        "missing_day_count": 0,
+        "required_day_count": 365,
+        "start": "2025-01-01"
+      },
+      "val": {
+        "committed_day_count": 59,
+        "complete_raw_first": true,
+        "end_inclusive": "2026-02-28",
+        "first_missing_days": [],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/SOLUSDT/2026-01.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/SOLUSDT/2026-02.parquet"
+        ],
+        "missing_day_count": 0,
+        "required_day_count": 59,
+        "start": "2026-01-01"
+      }
+    },
+    "XAG/USDT": {
+      "oos": {
+        "committed_day_count": 0,
+        "complete_raw_first": false,
+        "end_inclusive": "2026-05-05",
+        "first_missing_days": [
+          "2026-03-01",
+          "2026-03-02",
+          "2026-03-03",
+          "2026-03-04",
+          "2026-03-05",
+          "2026-03-06",
+          "2026-03-07",
+          "2026-03-08",
+          "2026-03-09",
+          "2026-03-10"
+        ],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/XAGUSDT/2026-03.parquet"
+        ],
+        "missing_day_count": 66,
+        "required_day_count": 66,
+        "start": "2026-03-01"
+      },
+      "train": {
+        "committed_day_count": 0,
+        "complete_raw_first": false,
+        "end_inclusive": "2025-12-31",
+        "first_missing_days": [
+          "2025-01-01",
+          "2025-01-02",
+          "2025-01-03",
+          "2025-01-04",
+          "2025-01-05",
+          "2025-01-06",
+          "2025-01-07",
+          "2025-01-08",
+          "2025-01-09",
+          "2025-01-10"
+        ],
+        "legacy_monthly_files": [],
+        "missing_day_count": 365,
+        "required_day_count": 365,
+        "start": "2025-01-01"
+      },
+      "val": {
+        "committed_day_count": 0,
+        "complete_raw_first": false,
+        "end_inclusive": "2026-02-28",
+        "first_missing_days": [
+          "2026-01-01",
+          "2026-01-02",
+          "2026-01-03",
+          "2026-01-04",
+          "2026-01-05",
+          "2026-01-06",
+          "2026-01-07",
+          "2026-01-08",
+          "2026-01-09",
+          "2026-01-10"
+        ],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/XAGUSDT/2026-01.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/XAGUSDT/2026-02.parquet"
+        ],
+        "missing_day_count": 59,
+        "required_day_count": 59,
+        "start": "2026-01-01"
+      }
+    },
+    "XAU/USDT": {
+      "oos": {
+        "committed_day_count": 0,
+        "complete_raw_first": false,
+        "end_inclusive": "2026-05-05",
+        "first_missing_days": [
+          "2026-03-01",
+          "2026-03-02",
+          "2026-03-03",
+          "2026-03-04",
+          "2026-03-05",
+          "2026-03-06",
+          "2026-03-07",
+          "2026-03-08",
+          "2026-03-09",
+          "2026-03-10"
+        ],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/XAUUSDT/2026-03.parquet"
+        ],
+        "missing_day_count": 66,
+        "required_day_count": 66,
+        "start": "2026-03-01"
+      },
+      "train": {
+        "committed_day_count": 0,
+        "complete_raw_first": false,
+        "end_inclusive": "2025-12-31",
+        "first_missing_days": [
+          "2025-01-01",
+          "2025-01-02",
+          "2025-01-03",
+          "2025-01-04",
+          "2025-01-05",
+          "2025-01-06",
+          "2025-01-07",
+          "2025-01-08",
+          "2025-01-09",
+          "2025-01-10"
+        ],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/XAUUSDT/2025-12.parquet"
+        ],
+        "missing_day_count": 365,
+        "required_day_count": 365,
+        "start": "2025-01-01"
+      },
+      "val": {
+        "committed_day_count": 0,
+        "complete_raw_first": false,
+        "end_inclusive": "2026-02-28",
+        "first_missing_days": [
+          "2026-01-01",
+          "2026-01-02",
+          "2026-01-03",
+          "2026-01-04",
+          "2026-01-05",
+          "2026-01-06",
+          "2026-01-07",
+          "2026-01-08",
+          "2026-01-09",
+          "2026-01-10"
+        ],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/XAUUSDT/2026-01.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/XAUUSDT/2026-02.parquet"
+        ],
+        "missing_day_count": 59,
+        "required_day_count": 59,
+        "start": "2026-01-01"
+      }
+    },
+    "XPD/USDT": {
+      "oos": {
+        "committed_day_count": 0,
+        "complete_raw_first": false,
+        "end_inclusive": "2026-05-05",
+        "first_missing_days": [
+          "2026-03-01",
+          "2026-03-02",
+          "2026-03-03",
+          "2026-03-04",
+          "2026-03-05",
+          "2026-03-06",
+          "2026-03-07",
+          "2026-03-08",
+          "2026-03-09",
+          "2026-03-10"
+        ],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/XPDUSDT/2026-03.parquet"
+        ],
+        "missing_day_count": 66,
+        "required_day_count": 66,
+        "start": "2026-03-01"
+      },
+      "train": {
+        "committed_day_count": 0,
+        "complete_raw_first": false,
+        "end_inclusive": "2025-12-31",
+        "first_missing_days": [
+          "2025-01-01",
+          "2025-01-02",
+          "2025-01-03",
+          "2025-01-04",
+          "2025-01-05",
+          "2025-01-06",
+          "2025-01-07",
+          "2025-01-08",
+          "2025-01-09",
+          "2025-01-10"
+        ],
+        "legacy_monthly_files": [],
+        "missing_day_count": 365,
+        "required_day_count": 365,
+        "start": "2025-01-01"
+      },
+      "val": {
+        "committed_day_count": 0,
+        "complete_raw_first": false,
+        "end_inclusive": "2026-02-28",
+        "first_missing_days": [
+          "2026-01-01",
+          "2026-01-02",
+          "2026-01-03",
+          "2026-01-04",
+          "2026-01-05",
+          "2026-01-06",
+          "2026-01-07",
+          "2026-01-08",
+          "2026-01-09",
+          "2026-01-10"
+        ],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/XPDUSDT/2026-01.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/XPDUSDT/2026-02.parquet"
+        ],
+        "missing_day_count": 59,
+        "required_day_count": 59,
+        "start": "2026-01-01"
+      }
+    },
+    "XPT/USDT": {
+      "oos": {
+        "committed_day_count": 0,
+        "complete_raw_first": false,
+        "end_inclusive": "2026-05-05",
+        "first_missing_days": [
+          "2026-03-01",
+          "2026-03-02",
+          "2026-03-03",
+          "2026-03-04",
+          "2026-03-05",
+          "2026-03-06",
+          "2026-03-07",
+          "2026-03-08",
+          "2026-03-09",
+          "2026-03-10"
+        ],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/XPTUSDT/2026-03.parquet"
+        ],
+        "missing_day_count": 66,
+        "required_day_count": 66,
+        "start": "2026-03-01"
+      },
+      "train": {
+        "committed_day_count": 0,
+        "complete_raw_first": false,
+        "end_inclusive": "2025-12-31",
+        "first_missing_days": [
+          "2025-01-01",
+          "2025-01-02",
+          "2025-01-03",
+          "2025-01-04",
+          "2025-01-05",
+          "2025-01-06",
+          "2025-01-07",
+          "2025-01-08",
+          "2025-01-09",
+          "2025-01-10"
+        ],
+        "legacy_monthly_files": [],
+        "missing_day_count": 365,
+        "required_day_count": 365,
+        "start": "2025-01-01"
+      },
+      "val": {
+        "committed_day_count": 0,
+        "complete_raw_first": false,
+        "end_inclusive": "2026-02-28",
+        "first_missing_days": [
+          "2026-01-01",
+          "2026-01-02",
+          "2026-01-03",
+          "2026-01-04",
+          "2026-01-05",
+          "2026-01-06",
+          "2026-01-07",
+          "2026-01-08",
+          "2026-01-09",
+          "2026-01-10"
+        ],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/XPTUSDT/2026-01.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/XPTUSDT/2026-02.parquet"
+        ],
+        "missing_day_count": 59,
+        "required_day_count": 59,
+        "start": "2026-01-01"
+      }
+    }
+  },
+  "safe_crypto_oos_end_date": "2026-05-04",
+  "shadow": {
+    "mode": "profit_moonshot_hourly_shock_reversion_eth_12h_funding_guard_mode",
+    "oos_mdd": 0.001778,
+    "oos_return": 0.007206,
+    "oos_sharpe": 0.111225
+  },
+  "stateful_replay_path": "var/reports/profit_moonshot_20260501/current_tail_20260506/multiasset_exchange_expansion/stateful_replay_candidates_latest.json",
+  "stateful_replay_summary": {
+    "oos_end_date": "2026-05-04",
+    "replay_survivor_count": 0,
+    "resource_usage": {
+      "max_rss_mib": 6710.816,
+      "rss_limit_mib": 8192
+    },
+    "specs_evaluated": 38,
+    "success_candidate_count": 0,
+    "top_candidates": [
+      {
+        "absolute_gate_shape": false,
+        "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [0, 1, 8, 9, 16, 17], \"hl_basis_abs_max\": 0.0, \"hl_funding_abs_cap\": 5e-05, \"hl_oi_z_min\": 0.0, \"hl_require_funding_sign_match\": true, \"return_threshold\": 0.008, \"tickmill_macro_filter\": \"\"}",
+        "name": "hl_funding_divergence_funding_guard_50ppm",
+        "oos_fills": 44,
+        "oos_max_drawdown": 0.001174917451354542,
+        "oos_round_trips": 22,
+        "oos_sharpe": 0.4607596266159049,
+        "oos_sortino": 0.6373039595208673,
+        "oos_total_return": 0.0020637016562394805,
+        "oos_volatility": 0.0007266017976636384,
+        "reject_top": "{\"funding_hour_excluded\": 30, \"hl_binance_funding_sign_divergence\": 48}",
+        "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": true, \"oos_return_beats_replay_incumbents\": true, \"oos_sharpe_beats_replay_incumbents\": true, \"oos_trades_not_starved\": true, \"train_positive\": false, \"val_positive\": false}",
+        "replay_survivor": false,
+        "success_candidate": false,
+        "train_fills": 332,
+        "train_max_drawdown": 0.0069696893531609894,
+        "train_round_trips": 166,
+        "train_sharpe": -0.019552145656342806,
+        "train_sortino": -0.025358927190750814,
+        "train_total_return": -0.0006414072534931536,
+        "train_volatility": 0.0009256669333493885,
+        "val_fills": 60,
+        "val_max_drawdown": 0.006220148358855881,
+        "val_round_trips": 30,
+        "val_sharpe": -0.7318328432935411,
+        "val_sortino": -0.8275189110194774,
+        "val_total_return": -0.0035728945261269685,
+        "val_volatility": 0.000870504078221007
+      },
+      {
+        "absolute_gate_shape": false,
+        "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [0, 1, 8, 9, 16, 17], \"hl_basis_abs_max\": 0.0, \"hl_funding_abs_cap\": 7.5e-05, \"hl_oi_z_min\": 0.0, \"hl_require_funding_sign_match\": true, \"return_threshold\": 0.008, \"tickmill_macro_filter\": \"\"}",
+        "name": "hl_funding_divergence_funding_guard_75ppm",
+        "oos_fills": 44,
+        "oos_max_drawdown": 0.001174917451354542,
+        "oos_round_trips": 22,
+        "oos_sharpe": 0.4607596266159049,
+        "oos_sortino": 0.6373039595208673,
+        "oos_total_return": 0.0020637016562394805,
+        "oos_volatility": 0.0007266017976636384,
+        "reject_top": "{\"funding_hour_excluded\": 30, \"hl_binance_funding_sign_divergence\": 48}",
+        "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": true, \"oos_return_beats_replay_incumbents\": true, \"oos_sharpe_beats_replay_incumbents\": true, \"oos_trades_not_starved\": true, \"train_positive\": false, \"val_positive\": false}",
+        "replay_survivor": false,
+        "success_candidate": false,
+        "train_fills": 332,
+        "train_max_drawdown": 0.006701251000219019,
+        "train_round_trips": 166,
+        "train_sharpe": -0.011005996388966722,
+        "train_sortino": -0.014303335879386286,
+        "train_total_return": -0.000366699289943373,
+        "train_volatility": 0.0009235250647148712,
+        "val_fills": 60,
+        "val_max_drawdown": 0.006220148358855881,
+        "val_round_trips": 30,
+        "val_sharpe": -0.7318328432935411,
+        "val_sortino": -0.8275189110194774,
+        "val_total_return": -0.0035728945261269685,
+        "val_volatility": 0.000870504078221007
+      },
+      {
+        "absolute_gate_shape": false,
+        "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [0, 1, 8, 9, 16, 17], \"hl_basis_abs_max\": 0.0, \"hl_funding_abs_cap\": 0.0001, \"hl_oi_z_min\": 0.0, \"hl_require_funding_sign_match\": true, \"return_threshold\": 0.008, \"tickmill_macro_filter\": \"\"}",
+        "name": "hl_funding_divergence_funding_guard_100ppm",
+        "oos_fills": 44,
+        "oos_max_drawdown": 0.001174917451354542,
+        "oos_round_trips": 22,
+        "oos_sharpe": 0.4607596266159049,
+        "oos_sortino": 0.6373039595208673,
+        "oos_total_return": 0.0020637016562394805,
+        "oos_volatility": 0.0007266017976636384,
+        "reject_top": "{\"funding_hour_excluded\": 30, \"hl_binance_funding_sign_divergence\": 48}",
+        "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": true, \"oos_return_beats_replay_incumbents\": true, \"oos_sharpe_beats_replay_incumbents\": true, \"oos_trades_not_starved\": true, \"train_positive\": false, \"val_positive\": false}",
+        "replay_survivor": false,
+        "success_candidate": false,
+        "train_fills": 334,
+        "train_max_drawdown": 0.0071243013328892634,
+        "train_round_trips": 167,
+        "train_sharpe": -0.024270089203973083,
+        "train_sortino": -0.03152915526053828,
+        "train_total_return": -0.0007916846262121524,
+        "train_volatility": 0.0009246850221301771,
+        "val_fills": 60,
+        "val_max_drawdown": 0.006220148358855881,
+        "val_round_trips": 30,
+        "val_sharpe": -0.7318328432935411,
+        "val_sortino": -0.8275189110194774,
+        "val_total_return": -0.0035728945261269685,
+        "val_volatility": 0.000870504078221007
+      },
+      {
+        "absolute_gate_shape": false,
+        "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [0, 1, 8, 9, 16, 17], \"hl_basis_abs_max\": 0.0, \"hl_funding_abs_cap\": 0.00015, \"hl_oi_z_min\": 0.0, \"hl_require_funding_sign_match\": true, \"return_threshold\": 0.008, \"tickmill_macro_filter\": \"\"}",
+        "name": "hl_funding_divergence_funding_guard_150ppm",
+        "oos_fills": 44,
+        "oos_max_drawdown": 0.001174917451354542,
+        "oos_round_trips": 22,
+        "oos_sharpe": 0.4607596266159049,
+        "oos_sortino": 0.6373039595208673,
+        "oos_total_return": 0.0020637016562394805,
+        "oos_volatility": 0.0007266017976636384,
+        "reject_top": "{\"funding_hour_excluded\": 30, \"hl_binance_funding_sign_divergence\": 48}",
+        "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": true, \"oos_return_beats_replay_incumbents\": true, \"oos_sharpe_beats_replay_incumbents\": true, \"oos_trades_not_starved\": true, \"train_positive\": false, \"val_positive\": false}",
+        "replay_survivor": false,
+        "success_candidate": false,
+        "train_fills": 334,
+        "train_max_drawdown": 0.0071243013328892634,
+        "train_round_trips": 167,
+        "train_sharpe": -0.024270089203973083,
+        "train_sortino": -0.03152915526053828,
+        "train_total_return": -0.0007916846262121524,
+        "train_volatility": 0.0009246850221301771,
+        "val_fills": 60,
+        "val_max_drawdown": 0.006220148358855881,
+        "val_round_trips": 30,
+        "val_sharpe": -0.7318328432935411,
+        "val_sortino": -0.8275189110194774,
+        "val_total_return": -0.0035728945261269685,
+        "val_volatility": 0.000870504078221007
+      },
+      {
+        "absolute_gate_shape": false,
+        "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [0, 1, 8, 9, 16, 17], \"hl_basis_abs_max\": 0.0, \"hl_funding_abs_cap\": 0.00025, \"hl_oi_z_min\": 0.0, \"hl_require_funding_sign_match\": true, \"return_threshold\": 0.008, \"tickmill_macro_filter\": \"\"}",
+        "name": "hl_funding_divergence_funding_guard_250ppm",
+        "oos_fills": 44,
+        "oos_max_drawdown": 0.001174917451354542,
+        "oos_round_trips": 22,
+        "oos_sharpe": 0.4607596266159049,
+        "oos_sortino": 0.6373039595208673,
+        "oos_total_return": 0.0020637016562394805,
+        "oos_volatility": 0.0007266017976636384,
+        "reject_top": "{\"funding_hour_excluded\": 30, \"hl_binance_funding_sign_divergence\": 48}",
+        "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": true, \"oos_return_beats_replay_incumbents\": true, \"oos_sharpe_beats_replay_incumbents\": true, \"oos_trades_not_starved\": true, \"train_positive\": false, \"val_positive\": false}",
+        "replay_survivor": false,
+        "success_candidate": false,
+        "train_fills": 334,
+        "train_max_drawdown": 0.0071243013328892634,
+        "train_round_trips": 167,
+        "train_sharpe": -0.024270089203973083,
+        "train_sortino": -0.03152915526053828,
+        "train_total_return": -0.0007916846262121524,
+        "train_volatility": 0.0009246850221301771,
+        "val_fills": 60,
+        "val_max_drawdown": 0.006220148358855881,
+        "val_round_trips": 30,
+        "val_sharpe": -0.7318328432935411,
+        "val_sortino": -0.8275189110194774,
+        "val_total_return": -0.0035728945261269685,
+        "val_volatility": 0.000870504078221007
+      },
+      {
+        "absolute_gate_shape": false,
+        "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [], \"hl_basis_abs_max\": 0.0, \"hl_funding_abs_cap\": 5e-05, \"hl_oi_z_min\": 0.0, \"hl_require_funding_sign_match\": true, \"return_threshold\": 0.01, \"tickmill_macro_filter\": \"\"}",
+        "name": "hl_funding_divergence_base_50ppm",
+        "oos_fills": 44,
+        "oos_max_drawdown": 0.0012635201287287772,
+        "oos_round_trips": 22,
+        "oos_sharpe": 0.33896412151779026,
+        "oos_sortino": 0.4300151951885293,
+        "oos_total_return": 0.0015304057011253924,
+        "oos_volatility": 0.000732857377655481,
+        "reject_top": "{\"hl_binance_funding_sign_divergence\": 63}",
+        "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": true, \"oos_return_beats_replay_incumbents\": true, \"oos_sharpe_beats_replay_incumbents\": true, \"oos_trades_not_starved\": true, \"train_positive\": false, \"val_positive\": false}",
+        "replay_survivor": false,
+        "success_candidate": false,
+        "train_fills": 330,
+        "train_max_drawdown": 0.004908858701980483,
+        "train_round_trips": 165,
+        "train_sharpe": -0.015939891428914648,
+        "train_sortino": -0.020319309200278773,
+        "train_total_return": -0.0005246130819991368,
+        "train_volatility": 0.0009238428976637838,
+        "val_fills": 64,
+        "val_max_drawdown": 0.005244221733949573,
+        "val_round_trips": 32,
+        "val_sharpe": -0.443508494561436,
+        "val_sortino": -0.5092008916061651,
+        "val_total_return": -0.002336353358930343,
+        "val_volatility": 0.000938273208153192
+      },
+      {
+        "absolute_gate_shape": false,
+        "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [], \"hl_basis_abs_max\": 0.0, \"hl_funding_abs_cap\": 7.5e-05, \"hl_oi_z_min\": 0.0, \"hl_require_funding_sign_match\": true, \"return_threshold\": 0.01, \"tickmill_macro_filter\": \"\"}",
+        "name": "hl_funding_divergence_base_75ppm",
+        "oos_fills": 44,
+        "oos_max_drawdown": 0.0012635201287287772,
+        "oos_round_trips": 22,
+        "oos_sharpe": 0.33896412151779026,
+        "oos_sortino": 0.4300151951885293,
+        "oos_total_return": 0.0015304057011253924,
+        "oos_volatility": 0.000732857377655481,
+        "reject_top": "{\"hl_binance_funding_sign_divergence\": 63}",
+        "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": true, \"oos_return_beats_replay_incumbents\": true, \"oos_sharpe_beats_replay_incumbents\": true, \"oos_trades_not_starved\": true, \"train_positive\": false, \"val_positive\": false}",
+        "replay_survivor": false,
+        "success_candidate": false,
+        "train_fills": 332,
+        "train_max_drawdown": 0.005622735274817512,
+        "train_round_trips": 166,
+        "train_sharpe": -0.05548788373979606,
+        "train_sortino": -0.07086914191272581,
+        "train_total_return": -0.0017935560359796376,
+        "train_volatility": 0.0009264710425956223,
+        "val_fills": 64,
+        "val_max_drawdown": 0.005244221733949573,
+        "val_round_trips": 32,
+        "val_sharpe": -0.443508494561436,
+        "val_sortino": -0.5092008916061651,
+        "val_total_return": -0.002336353358930343,
+        "val_volatility": 0.000938273208153192
+      },
+      {
+        "absolute_gate_shape": false,
+        "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [], \"hl_basis_abs_max\": 0.0, \"hl_funding_abs_cap\": 0.0001, \"hl_oi_z_min\": 0.0, \"hl_require_funding_sign_match\": true, \"return_threshold\": 0.01, \"tickmill_macro_filter\": \"\"}",
+        "name": "hl_funding_divergence_base_100ppm",
+        "oos_fills": 44,
+        "oos_max_drawdown": 0.0012635201287287772,
+        "oos_round_trips": 22,
+        "oos_sharpe": 0.33896412151779026,
+        "oos_sortino": 0.4300151951885293,
+        "oos_total_return": 0.0015304057011253924,
+        "oos_volatility": 0.000732857377655481,
+        "reject_top": "{\"hl_binance_funding_sign_divergence\": 63}",
+        "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": true, \"oos_return_beats_replay_incumbents\": true, \"oos_sharpe_beats_replay_incumbents\": true, \"oos_trades_not_starved\": true, \"train_positive\": false, \"val_positive\": false}",
+        "replay_survivor": false,
+        "success_candidate": false,
+        "train_fills": 334,
+        "train_max_drawdown": 0.006045482085826716,
+        "train_round_trips": 167,
+        "train_sharpe": -0.06866135181552728,
+        "train_sortino": -0.08769092325048658,
+        "train_total_return": -0.0022169823321440685,
+        "train_volatility": 0.0009271398981166556,
+        "val_fills": 64,
+        "val_max_drawdown": 0.005244221733949573,
+        "val_round_trips": 32,
+        "val_sharpe": -0.443508494561436,
+        "val_sortino": -0.5092008916061651,
+        "val_total_return": -0.002336353358930343,
+        "val_volatility": 0.000938273208153192
+      },
+      {
+        "absolute_gate_shape": false,
+        "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [], \"hl_basis_abs_max\": 0.0, \"hl_funding_abs_cap\": 0.00015, \"hl_oi_z_min\": 0.0, \"hl_require_funding_sign_match\": true, \"return_threshold\": 0.01, \"tickmill_macro_filter\": \"\"}",
+        "name": "hl_funding_divergence_base_150ppm",
+        "oos_fills": 44,
+        "oos_max_drawdown": 0.0012635201287287772,
+        "oos_round_trips": 22,
+        "oos_sharpe": 0.33896412151779026,
+        "oos_sortino": 0.4300151951885293,
+        "oos_total_return": 0.0015304057011253924,
+        "oos_volatility": 0.000732857377655481,
+        "reject_top": "{\"hl_binance_funding_sign_divergence\": 63}",
+        "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": true, \"oos_return_beats_replay_incumbents\": true, \"oos_sharpe_beats_replay_incumbents\": true, \"oos_trades_not_starved\": true, \"train_positive\": false, \"val_positive\": false}",
+        "replay_survivor": false,
+        "success_candidate": false,
+        "train_fills": 334,
+        "train_max_drawdown": 0.006045482085826716,
+        "train_round_trips": 167,
+        "train_sharpe": -0.06866135181552728,
+        "train_sortino": -0.08769092325048658,
+        "train_total_return": -0.0022169823321440685,
+        "train_volatility": 0.0009271398981166556,
+        "val_fills": 64,
+        "val_max_drawdown": 0.005244221733949573,
+        "val_round_trips": 32,
+        "val_sharpe": -0.443508494561436,
+        "val_sortino": -0.5092008916061651,
+        "val_total_return": -0.002336353358930343,
+        "val_volatility": 0.000938273208153192
+      },
+      {
+        "absolute_gate_shape": false,
+        "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [], \"hl_basis_abs_max\": 0.0, \"hl_funding_abs_cap\": 0.00025, \"hl_oi_z_min\": 0.0, \"hl_require_funding_sign_match\": true, \"return_threshold\": 0.01, \"tickmill_macro_filter\": \"\"}",
+        "name": "hl_funding_divergence_base_250ppm",
+        "oos_fills": 44,
+        "oos_max_drawdown": 0.0012635201287287772,
+        "oos_round_trips": 22,
+        "oos_sharpe": 0.33896412151779026,
+        "oos_sortino": 0.4300151951885293,
+        "oos_total_return": 0.0015304057011253924,
+        "oos_volatility": 0.000732857377655481,
+        "reject_top": "{\"hl_binance_funding_sign_divergence\": 63}",
+        "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": true, \"oos_return_beats_replay_incumbents\": true, \"oos_sharpe_beats_replay_incumbents\": true, \"oos_trades_not_starved\": true, \"train_positive\": false, \"val_positive\": false}",
+        "replay_survivor": false,
+        "success_candidate": false,
+        "train_fills": 334,
+        "train_max_drawdown": 0.006045482085826716,
+        "train_round_trips": 167,
+        "train_sharpe": -0.06866135181552728,
+        "train_sortino": -0.08769092325048658,
+        "train_total_return": -0.0022169823321440685,
+        "train_volatility": 0.0009271398981166556,
+        "val_fills": 64,
+        "val_max_drawdown": 0.005244221733949573,
+        "val_round_trips": 32,
+        "val_sharpe": -0.443508494561436,
+        "val_sortino": -0.5092008916061651,
+        "val_total_return": -0.002336353358930343,
+        "val_volatility": 0.000938273208153192
+      },
+      {
+        "absolute_gate_shape": false,
+        "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [], \"hl_basis_abs_max\": 0.0, \"hl_funding_abs_cap\": 0.0, \"hl_oi_z_min\": 0.0, \"hl_require_funding_sign_match\": false, \"return_threshold\": 0.01, \"tickmill_macro_filter\": \"\"}",
+        "name": "replay_base_12h_threshold_100bp",
+        "oos_fills": 52,
+        "oos_max_drawdown": 0.001607052424509479,
+        "oos_round_trips": 26,
+        "oos_sharpe": 0.2511367987500571,
+        "oos_sortino": 0.31401894296248917,
+        "oos_total_return": 0.0011957225354917167,
+        "oos_volatility": 0.0007733187550446284,
+        "reject_top": "{}",
+        "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": false, \"oos_return_beats_replay_incumbents\": false, \"oos_sharpe_beats_replay_incumbents\": false, \"oos_trades_not_starved\": true, \"train_positive\": false, \"val_positive\": false}",
+        "replay_survivor": false,
+        "success_candidate": false,
+        "train_fills": 356,
+        "train_max_drawdown": 0.010103745304707572,
+        "train_round_trips": 178,
+        "train_sharpe": -0.1126163975756344,
+        "train_sortino": -0.14471761987965842,
+        "train_total_return": -0.0037040219755228865,
+        "train_volatility": 0.0009475234581048218,
+        "val_fills": 68,
+        "val_max_drawdown": 0.004989176381867891,
+        "val_round_trips": 34,
+        "val_sharpe": -0.16044186426769969,
+        "val_sortino": -0.1906658249803786,
+        "val_total_return": -0.0008889283847060003,
+        "val_volatility": 0.0009841405520975626
+      },
+      {
+        "absolute_gate_shape": false,
+        "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [], \"hl_basis_abs_max\": 0.0, \"hl_funding_abs_cap\": 5e-05, \"hl_oi_z_min\": 0.0, \"hl_require_funding_sign_match\": false, \"return_threshold\": 0.01, \"tickmill_macro_filter\": \"\"}",
+        "name": "hl_funding_abs_cap_base_50ppm",
+        "oos_fills": 52,
+        "oos_max_drawdown": 0.001607052424509479,
+        "oos_round_trips": 26,
+        "oos_sharpe": 0.2511367987500571,
+        "oos_sortino": 0.31401894296248917,
+        "oos_total_return": 0.0011957225354917167,
+        "oos_volatility": 0.0007733187550446284,
+        "reject_top": "{}",
+        "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": false, \"oos_return_beats_replay_incumbents\": false, \"oos_sharpe_beats_replay_incumbents\": false, \"oos_trades_not_starved\": true, \"train_positive\": false, \"val_positive\": false}",
+        "replay_survivor": false,
+        "success_candidate": false,
+        "train_fills": 354,
+        "train_max_drawdown": 0.009390991418864033,
+        "train_round_trips": 177,
+        "train_sharpe": -0.09000912344219088,
+        "train_sortino": -0.11498858096798378,
+        "train_total_return": -0.0029623381295459383,
+        "train_volatility": 0.0009467815003268914,
+        "val_fills": 68,
+        "val_max_drawdown": 0.004989176381867891,
+        "val_round_trips": 34,
+        "val_sharpe": -0.16044186426769969,
+        "val_sortino": -0.1906658249803786,
+        "val_total_return": -0.0008889283847060003,
+        "val_volatility": 0.0009841405520975626
+      },
+      {
+        "absolute_gate_shape": false,
+        "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [], \"hl_basis_abs_max\": 0.0, \"hl_funding_abs_cap\": 7.5e-05, \"hl_oi_z_min\": 0.0, \"hl_require_funding_sign_match\": false, \"return_threshold\": 0.01, \"tickmill_macro_filter\": \"\"}",
+        "name": "hl_funding_abs_cap_base_75ppm",
+        "oos_fills": 52,
+        "oos_max_drawdown": 0.001607052424509479,
+        "oos_round_trips": 26,
+        "oos_sharpe": 0.2511367987500571,
+        "oos_sortino": 0.31401894296248917,
+        "oos_total_return": 0.0011957225354917167,
+        "oos_volatility": 0.0007733187550446284,
+        "reject_top": "{}",
+        "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": false, \"oos_return_beats_replay_incumbents\": false, \"oos_sharpe_beats_replay_incumbents\": false, \"oos_trades_not_starved\": true, \"train_positive\": false, \"val_positive\": false}",
+        "replay_survivor": false,
+        "success_candidate": false,
+        "train_fills": 354,
+        "train_max_drawdown": 0.009716923584652466,
+        "train_round_trips": 177,
+        "train_sharpe": -0.10001490418758491,
+        "train_sortino": -0.12856950567555656,
+        "train_total_return": -0.00328934900043909,
+        "train_volatility": 0.0009467721113236917,
+        "val_fills": 68,
+        "val_max_drawdown": 0.004989176381867891,
+        "val_round_trips": 34,
+        "val_sharpe": -0.16044186426769969,
+        "val_sortino": -0.1906658249803786,
+        "val_total_return": -0.0008889283847060003,
+        "val_volatility": 0.0009841405520975626
+      },
+      {
+        "absolute_gate_shape": false,
+        "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [], \"hl_basis_abs_max\": 0.0, \"hl_funding_abs_cap\": 0.0001, \"hl_oi_z_min\": 0.0, \"hl_require_funding_sign_match\": false, \"return_threshold\": 0.01, \"tickmill_macro_filter\": \"\"}",
+        "name": "hl_funding_abs_cap_base_100ppm",
+        "oos_fills": 52,
+        "oos_max_drawdown": 0.001607052424509479,
+        "oos_round_trips": 26,
+        "oos_sharpe": 0.2511367987500571,
+        "oos_sortino": 0.31401894296248917,
+        "oos_total_return": 0.0011957225354917167,
+        "oos_volatility": 0.0007733187550446284,
+        "reject_top": "{}",
+        "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": false, \"oos_return_beats_replay_incumbents\": false, \"oos_sharpe_beats_replay_incumbents\": false, \"oos_trades_not_starved\": true, \"train_positive\": false, \"val_positive\": false}",
+        "replay_survivor": false,
+        "success_candidate": false,
+        "train_fills": 356,
+        "train_max_drawdown": 0.010103745304707572,
+        "train_round_trips": 178,
+        "train_sharpe": -0.1126163975756344,
+        "train_sortino": -0.14471761987965842,
+        "train_total_return": -0.0037040219755228865,
+        "train_volatility": 0.0009475234581048218,
+        "val_fills": 68,
+        "val_max_drawdown": 0.004989176381867891,
+        "val_round_trips": 34,
+        "val_sharpe": -0.16044186426769969,
+        "val_sortino": -0.1906658249803786,
+        "val_total_return": -0.0008889283847060003,
+        "val_volatility": 0.0009841405520975626
+      },
+      {
+        "absolute_gate_shape": false,
+        "filters": "{\"cooldown_bars\": 0, \"excluded_hours\": [], \"hl_basis_abs_max\": 0.0, \"hl_funding_abs_cap\": 0.00015, \"hl_oi_z_min\": 0.0, \"hl_require_funding_sign_match\": false, \"return_threshold\": 0.01, \"tickmill_macro_filter\": \"\"}",
+        "name": "hl_funding_abs_cap_base_150ppm",
+        "oos_fills": 52,
+        "oos_max_drawdown": 0.001607052424509479,
+        "oos_round_trips": 26,
+        "oos_sharpe": 0.2511367987500571,
+        "oos_sortino": 0.31401894296248917,
+        "oos_total_return": 0.0011957225354917167,
+        "oos_volatility": 0.0007733187550446284,
+        "reject_top": "{}",
+        "replay_relative_gates": "{\"oos_mdd_beats_replay_incumbents\": false, \"oos_return_beats_replay_incumbents\": false, \"oos_sharpe_beats_replay_incumbents\": false, \"oos_trades_not_starved\": true, \"train_positive\": false, \"val_positive\": false}",
+        "replay_survivor": false,
+        "success_candidate": false,
+        "train_fills": 356,
+        "train_max_drawdown": 0.010103745304707572,
+        "train_round_trips": 178,
+        "train_sharpe": -0.1126163975756344,
+        "train_sortino": -0.14471761987965842,
+        "train_total_return": -0.0037040219755228865,
+        "train_volatility": 0.0009475234581048218,
+        "val_fills": 68,
+        "val_max_drawdown": 0.004989176381867891,
+        "val_round_trips": 34,
+        "val_sharpe": -0.16044186426769969,
+        "val_sortino": -0.1906658249803786,
+        "val_total_return": -0.0008889283847060003,
+        "val_volatility": 0.0009841405520975626
+      }
+    ]
+  },
+  "success_gate": {
+    "liquidations": 0,
+    "oos_mdd_lt": 0.001778,
+    "oos_return_gt": 0.008284,
+    "oos_sharpe_gt": 1.0,
+    "rss_lt_mib": 8192,
+    "sub_1_sharpe_policy": "shadow_only_not_success"
+  },
+  "tickmill_collection_path": "var/reports/profit_moonshot_20260501/current_tail_20260506/multiasset_exchange_expansion/tickmill_mt5_readonly_collection_latest.json",
+  "tickmill_summary": {
+    "blocked_reason": "LQ_MT5_BRIDGE_PYTHON / LQ__LIVE__MT5_BRIDGE_PYTHON is not configured.",
+    "direct_trading_blocked": true,
+    "status": "blocked"
+  },
+  "verification": {
+    "full_backtest": "not run because replay_survivor_count=0",
+    "py_compile": "passed for changed Python files before collection/replay",
+    "ruff": "passed for changed Python files",
+    "stateful_replay": "completed; max_rss_mib=6710.816 (<8192)",
+    "targeted_pytest": "8 passed: tests/test_hyperliquid_readonly.py tests/test_mt5_exchange.py tests/test_mt5_exchange_bridge.py"
+  }
+}

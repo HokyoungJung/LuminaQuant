@@ -1,0 +1,53 @@
+2026-05-18 UTC / 2026-05-18 KST — live Alpha Zoo notional/risk alignment local verification
+
+Commands passed:
+
+1. uv run --extra dev pytest tests/test_live_selection_infer.py tests/test_live_fail_fast_missing_committed_data.py tests/test_live_execution_state_machine.py tests/test_crypto_fx_alpha_zoo_state_strategy.py -q
+   Result: 32 passed in 0.33s
+
+2. uv run --extra dev pytest tests/test_profit_moonshot_fresh_start_replay.py tests/test_profit_moonshot_liquidation_aware_validation.py tests/test_profit_moonshot_live_final_selection.py tests/test_profit_moonshot_pass_under_8gb_validator.py -q
+   Result: 74 passed in 0.69s
+
+3. uv run --extra dev pytest -q
+   Result: 1340 passed in 62.77s (0:01:02)
+
+4. uv run --extra dev ruff check .
+   Result: All checks passed!
+
+5. uv run --extra dev python -m compileall -q src scripts tests
+   Result: passed
+
+6. git diff --check
+   Result: passed
+
+7. git diff --cached --check
+   Result: passed
+
+Additional targeted contract checks run during implementation:
+- uv run --extra dev pytest tests/test_portfolio_sizing.py tests/test_risk_manager_live_guards.py tests/test_live_selection_infer.py tests/test_live_fail_fast_missing_committed_data.py tests/test_live_notional_risk_aligned_alpha_zoo.py -q
+  Result: 34 passed in 0.26s
+- uv run --extra dev pytest tests/test_live_notional_risk_aligned_alpha_zoo.py -q
+  Result: 3 passed in 0.06s
+
+Post-deslop regression verification:
+
+1. uv run --extra dev pytest tests/test_live_selection_infer.py tests/test_live_fail_fast_missing_committed_data.py tests/test_live_execution_state_machine.py tests/test_crypto_fx_alpha_zoo_state_strategy.py -q
+   Result: 32 passed in 0.29s
+
+2. uv run --extra dev pytest tests/test_profit_moonshot_fresh_start_replay.py tests/test_profit_moonshot_liquidation_aware_validation.py tests/test_profit_moonshot_live_final_selection.py tests/test_profit_moonshot_pass_under_8gb_validator.py -q
+   Result: 74 passed in 0.58s
+
+3. uv run --extra dev pytest -q
+   Result: 1340 passed in 59.16s
+
+4. uv run --extra dev ruff check .
+   Result: All checks passed!
+
+5. uv run --extra dev python -m compileall -q src scripts tests
+   Result: passed
+
+6. git diff --check
+   Result: passed
+
+7. git diff --cached --check
+   Result: passed

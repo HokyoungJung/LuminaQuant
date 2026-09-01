@@ -1,0 +1,10 @@
+{
+  "bytes": 39311,
+  "cache_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g003_external_prior_cache/binance_usdm_funding_rate_docs.source",
+  "content_type": "text/html; charset=utf-8",
+  "error": null,
+  "retrieved_at": "2026-07-02T14:21:38Z",
+  "sha256": "685cedd147266aff6efd6c25af3f066e3232fb50ee3caff1710ed98a8e4dfc7f",
+  "status": 200,
+  "url": "https://developers.binance.com/docs/derivatives/usds-margined-futures/market-data/rest-api/Get-Funding-Rate-History"
+}

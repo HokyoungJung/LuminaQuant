@@ -1,0 +1,32 @@
+{
+  "artifact": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_asset_diverse_strategy_discovery_20260523/alpha_zoo_asset_diverse_strategy_discovery_latest.json",
+  "best_paper_candidate_model_id": "a30fb_asset_diverse_residual_reclaim_2h_ethusdt_btcusdt_lb48_z1p0_hold6_4p0x_0p125_fa49c5d5",
+  "candidate_count": 97560,
+  "paper_candidate_gate_pass_count": 4,
+  "ready_for_real": false,
+  "real_money_execution": false,
+  "runner_peak_rss_mib": 1972.6796875
+}
+	Command being timed: "uv run python scripts/research/run_alpha_zoo_asset_diverse_strategy_discovery.py"
+	User time (seconds): 356.33
+	System time (seconds): 7.79
+	Percent of CPU this job got: 120%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 5:01.33
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 2020024
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 2
+	Minor (reclaiming a frame) page faults: 842151
+	Voluntary context switches: 143821
+	Involuntary context switches: 3631
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 10168
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

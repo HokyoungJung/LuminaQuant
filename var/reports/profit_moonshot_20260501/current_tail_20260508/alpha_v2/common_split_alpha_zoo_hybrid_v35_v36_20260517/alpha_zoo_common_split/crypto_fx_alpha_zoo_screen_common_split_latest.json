@@ -1,0 +1,3857 @@
+{
+  "artifact_kind": "crypto_fx_alpha_zoo_common_split_screen_bundle",
+  "calendar_primary": false,
+  "candidate_outcome_ledger": {
+    "artifact_kind": "candidate_outcome_ledger_summary",
+    "calendar_primary": false,
+    "enabled": true,
+    "locked_oos_record_count": 20688,
+    "locked_oos_role": "gate_report_only",
+    "mean_net_pnl_bps": 0.1791480238116888,
+    "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/common_split_alpha_zoo_hybrid_v35_v36_20260517/alpha_zoo_common_split/candidate_outcome_ledger_common_split_latest.jsonl",
+    "record_count": 64267,
+    "split_counts": {
+      "locked_oos": 20688,
+      "train": 22760,
+      "validation": 20819
+    },
+    "strategy": "CryptoFxAlphaZooStateStrategy",
+    "train_validation_record_count": 43579,
+    "uses_locked_oos_for_selection": false
+  },
+  "common_split_manifest": {
+    "artifact_kind": "common_split_manifest",
+    "baseline_parent": "80a557c133930f51748ec20c4e582aa0d6f678de",
+    "commands": {
+      "hybrid_n_trials": 80,
+      "hybrid_seed": 42,
+      "runner": "scripts/research/run_common_split_alpha_zoo_hybrid_v35_v36.py"
+    },
+    "external_state_csv": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/external_market_state_20260512/external_market_state_lagged.csv",
+    "external_state_sha256": "23144361b99b83f21d2fdc078fc7b80255f6fc1113a173605694a71f0ebd66e0",
+    "old_alpha_replay_json": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/crypto_fx_alpha_zoo_real_data_20260514/crypto_fx_alpha_zoo_state_replay_latest.json",
+    "old_alpha_replay_sha256": "afb6e26b191d1bf9a46ef20300d29f678a4a66f217161ca894b78138b2f001f3",
+    "old_alpha_summary_json": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/crypto_fx_alpha_zoo_real_data_20260514/crypto_fx_alpha_zoo_real_data_summary_latest.json",
+    "old_alpha_summary_sha256": "365b07f71abe795524c2ce3fedffa766fe52d4669e921da76071fb6b348ca1d7",
+    "old_hybrid_json": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/hybrid_v35_v36_fixed_inputs_20260517/hybrid_v35_v36_fixed_inputs_latest.json",
+    "old_hybrid_sha256": "be038ab90d52694fa04c273e6d4924d1754bfab262da7dfafa725e4b6f503b0a",
+    "output_paths": {
+      "calibration": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/common_split_alpha_zoo_hybrid_v35_v36_20260517/alpha_zoo_common_split/edge_calibration_common_split_latest.json",
+      "carry_forward_replay": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/common_split_alpha_zoo_hybrid_v35_v36_20260517/alpha_zoo_common_split/crypto_fx_alpha_zoo_state_replay_carry_forward_common_split_latest.json",
+      "hybrid_dir": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/common_split_alpha_zoo_hybrid_v35_v36_20260517/hybrid_v35_v36_common_split",
+      "reselected_replay": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/common_split_alpha_zoo_hybrid_v35_v36_20260517/alpha_zoo_common_split/crypto_fx_alpha_zoo_state_replay_reselected_common_split_latest.json",
+      "screen": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/common_split_alpha_zoo_hybrid_v35_v36_20260517/alpha_zoo_common_split/crypto_fx_alpha_zoo_screen_common_split_latest.json"
+    },
+    "source_path": "/home/hoky/Quants-agent/LuminaQuant/var/cache/profit_moonshot_fresh_start/joined_panel_de62df511cec53df6ad39521.parquet",
+    "source_sha256": "dc6a6357d770c851fb45e20f3d8fac4fb8e6576719177d6177fed0aabafeed8d",
+    "split_contract": {
+      "locked_oos": {
+        "end": "2026-05-06T23:00:00Z",
+        "role": "gate_report_only_after_candidate_freeze",
+        "start": "2026-03-01T00:00:00Z"
+      },
+      "train": {
+        "end": "2025-12-31T23:00:00Z",
+        "role": "objective_calibration_selection",
+        "start": "2025-01-01T00:00:00Z"
+      },
+      "validation": {
+        "end": "2026-02-28T23:00:00Z",
+        "role": "objective_selection",
+        "start": "2026-01-01T00:00:00Z"
+      }
+    },
+    "split_periods": {
+      "locked_oos": {
+        "end_timestamp": "2026-05-06T23:00:00Z",
+        "row_count": 7965,
+        "start_timestamp": "2026-03-01T00:00:00Z",
+        "unique_timestamp_count": 1593
+      },
+      "train": {
+        "end_timestamp": "2025-12-31T23:00:00Z",
+        "row_count": 43800,
+        "start_timestamp": "2025-01-01T00:00:00Z",
+        "unique_timestamp_count": 8760
+      },
+      "validation": {
+        "end_timestamp": "2026-02-28T23:00:00Z",
+        "row_count": 7080,
+        "start_timestamp": "2026-01-01T00:00:00Z",
+        "unique_timestamp_count": 1416
+      }
+    },
+    "timestamp_index_hash": "9406747cdcd7d011db0e6dfbf8414a51a03778b3aa0686cedb88b79916fe004b"
+  },
+  "factor_cards": [
+    {
+      "description": "asset return minus BTC return over 48 bars",
+      "factor": "btc_residual_ret_48",
+      "family": "benchmark_relative",
+      "inputs": [
+        "close",
+        "BTC"
+      ],
+      "market": "crypto",
+      "metrics": {
+        "factor": "btc_residual_ret_48",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.027933077919242613,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": -0.0013725862302957133,
+            "rank_ic": -0.039198632656265484
+          },
+          "train": {
+            "n": 43540,
+            "quantile_spread": -4.622512438436839e-05,
+            "rank_ic": -0.027933077919242613
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": -0.0004623201883621951,
+            "rank_ic": -0.030071580496064114
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      "selection_provenance": {
+        "locked_oos_role": "gate_report_only",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_policy": "train_validation_only",
+        "uses_locked_oos_for_selection": false
+      },
+      "strategy_validity": {
+        "calendar_fields": [],
+        "calendar_primary": false,
+        "causal_state_only": true,
+        "lookahead_safe": true,
+        "pass": true,
+        "primary_signal_type": "formulaic_state_factor",
+        "rejection_reasons": [],
+        "source_refs": [
+          "input:/home/hoky/Quants-agent/LuminaQuant/var/cache/profit_moonshot_fresh_start/joined_panel_de62df511cec53df6ad39521.parquet"
+        ]
+      }
+    },
+    {
+      "description": "48-bar return",
+      "factor": "ret_48",
+      "family": "momentum_reversal",
+      "inputs": [
+        "close"
+      ],
+      "market": "crypto_fx",
+      "metrics": {
+        "factor": "ret_48",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.020274354010587456,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": -0.001117084658059291,
+            "rank_ic": -0.05605279964125992
+          },
+          "train": {
+            "n": 43540,
+            "quantile_spread": -0.0001052792708514666,
+            "rank_ic": -0.03765460927119969
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.00037874431421371546,
+            "rank_ic": -0.020274354010587456
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      "selection_provenance": {
+        "locked_oos_role": "gate_report_only",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_policy": "train_validation_only",
+        "uses_locked_oos_for_selection": false
+      },
+      "strategy_validity": {
+        "calendar_fields": [],
+        "calendar_primary": false,
+        "causal_state_only": true,
+        "lookahead_safe": true,
+        "pass": true,
+        "primary_signal_type": "formulaic_state_factor",
+        "rejection_reasons": [],
+        "source_refs": [
+          "input:/home/hoky/Quants-agent/LuminaQuant/var/cache/profit_moonshot_fresh_start/joined_panel_de62df511cec53df6ad39521.parquet"
+        ]
+      }
+    },
+    {
+      "description": "upper wick / open",
+      "factor": "kup",
+      "family": "price_shape",
+      "inputs": [
+        "open",
+        "high",
+        "close"
+      ],
+      "market": "crypto_fx",
+      "metrics": {
+        "factor": "kup",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.018263127945545864,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": 0.0007917231932555415,
+            "rank_ic": 0.005780366007911558
+          },
+          "train": {
+            "n": 43780,
+            "quantile_spread": 0.000962186596119781,
+            "rank_ic": 0.02880534145936906
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.0005552970061316041,
+            "rank_ic": 0.018263127945545864
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      "selection_provenance": {
+        "locked_oos_role": "gate_report_only",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_policy": "train_validation_only",
+        "uses_locked_oos_for_selection": false
+      },
+      "strategy_validity": {
+        "calendar_fields": [],
+        "calendar_primary": false,
+        "causal_state_only": true,
+        "lookahead_safe": true,
+        "pass": true,
+        "primary_signal_type": "formulaic_state_factor",
+        "rejection_reasons": [],
+        "source_refs": [
+          "input:/home/hoky/Quants-agent/LuminaQuant/var/cache/profit_moonshot_fresh_start/joined_panel_de62df511cec53df6ad39521.parquet"
+        ]
+      }
+    },
+    {
+      "description": "crypto volume shock z-score over 24 bars",
+      "factor": "volume_shock_z_24",
+      "family": "volume_vwap",
+      "inputs": [
+        "volume"
+      ],
+      "market": "crypto",
+      "metrics": {
+        "factor": "volume_shock_z_24",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.017495128128335365,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": 0.0009261292455290594,
+            "rank_ic": 0.04114787136854214
+          },
+          "train": {
+            "n": 43665,
+            "quantile_spread": 0.00014027846606195035,
+            "rank_ic": 0.017495128128335365
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.0011952932810606184,
+            "rank_ic": 0.06533463525555208
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      "selection_provenance": {
+        "locked_oos_role": "gate_report_only",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_policy": "train_validation_only",
+        "uses_locked_oos_for_selection": false
+      },
+      "strategy_validity": {
+        "calendar_fields": [],
+        "calendar_primary": false,
+        "causal_state_only": true,
+        "lookahead_safe": true,
+        "pass": true,
+        "primary_signal_type": "formulaic_state_factor",
+        "rejection_reasons": [],
+        "source_refs": [
+          "input:/home/hoky/Quants-agent/LuminaQuant/var/cache/profit_moonshot_fresh_start/joined_panel_de62df511cec53df6ad39521.parquet"
+        ]
+      }
+    },
+    {
+      "description": "cross-sectional crypto residual rank over 48 bars",
+      "factor": "crypto_leadership_rank_48",
+      "family": "benchmark_relative",
+      "inputs": [
+        "close"
+      ],
+      "market": "crypto",
+      "metrics": {
+        "factor": "crypto_leadership_rank_48",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.016552097095429253,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": -0.0011168766706173934,
+            "rank_ic": -0.04138354761115138
+          },
+          "train": {
+            "n": 43540,
+            "quantile_spread": -0.00013175718926278527,
+            "rank_ic": -0.016552097095429253
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": -0.0005896577768608711,
+            "rank_ic": -0.04516276862314085
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      "selection_provenance": {
+        "locked_oos_role": "gate_report_only",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_policy": "train_validation_only",
+        "uses_locked_oos_for_selection": false
+      },
+      "strategy_validity": {
+        "calendar_fields": [],
+        "calendar_primary": false,
+        "causal_state_only": true,
+        "lookahead_safe": true,
+        "pass": true,
+        "primary_signal_type": "formulaic_state_factor",
+        "rejection_reasons": [],
+        "source_refs": [
+          "input:/home/hoky/Quants-agent/LuminaQuant/var/cache/profit_moonshot_fresh_start/joined_panel_de62df511cec53df6ad39521.parquet"
+        ]
+      }
+    },
+    {
+      "description": "12-bar return",
+      "factor": "ret_12",
+      "family": "momentum_reversal",
+      "inputs": [
+        "close"
+      ],
+      "market": "crypto_fx",
+      "metrics": {
+        "factor": "ret_12",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.01630010701642126,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": -0.00031492238589592874,
+            "rank_ic": -0.01938434361167964
+          },
+          "train": {
+            "n": 43720,
+            "quantile_spread": 0.00027676257797918296,
+            "rank_ic": -0.02133829263798185
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.0021589598698521285,
+            "rank_ic": -0.01630010701642126
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      "selection_provenance": {
+        "locked_oos_role": "gate_report_only",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_policy": "train_validation_only",
+        "uses_locked_oos_for_selection": false
+      },
+      "strategy_validity": {
+        "calendar_fields": [],
+        "calendar_primary": false,
+        "causal_state_only": true,
+        "lookahead_safe": true,
+        "pass": true,
+        "primary_signal_type": "formulaic_state_factor",
+        "rejection_reasons": [],
+        "source_refs": [
+          "input:/home/hoky/Quants-agent/LuminaQuant/var/cache/profit_moonshot_fresh_start/joined_panel_de62df511cec53df6ad39521.parquet"
+        ]
+      }
+    },
+    {
+      "description": "cross-sectional crypto residual rank over 24 bars",
+      "factor": "crypto_leadership_rank_24",
+      "family": "benchmark_relative",
+      "inputs": [
+        "close"
+      ],
+      "market": "crypto",
+      "metrics": {
+        "factor": "crypto_leadership_rank_24",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.016239059022380577,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": -0.0008003363944216775,
+            "rank_ic": -0.019000874479921225
+          },
+          "train": {
+            "n": 43660,
+            "quantile_spread": -0.00016697332991172804,
+            "rank_ic": -0.016239059022380577
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.00021995081064410285,
+            "rank_ic": -0.016993262786942225
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      "selection_provenance": {
+        "locked_oos_role": "gate_report_only",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_policy": "train_validation_only",
+        "uses_locked_oos_for_selection": false
+      },
+      "strategy_validity": {
+        "calendar_fields": [],
+        "calendar_primary": false,
+        "causal_state_only": true,
+        "lookahead_safe": true,
+        "pass": true,
+        "primary_signal_type": "formulaic_state_factor",
+        "rejection_reasons": [],
+        "source_refs": [
+          "input:/home/hoky/Quants-agent/LuminaQuant/var/cache/profit_moonshot_fresh_start/joined_panel_de62df511cec53df6ad39521.parquet"
+        ]
+      }
+    },
+    {
+      "description": "range / open",
+      "factor": "klen",
+      "family": "price_shape",
+      "inputs": [
+        "open",
+        "high",
+        "low"
+      ],
+      "market": "crypto_fx",
+      "metrics": {
+        "factor": "klen",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.015569146034448035,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": 0.000979277955859149,
+            "rank_ic": 0.007243617563315277
+          },
+          "train": {
+            "n": 43780,
+            "quantile_spread": 0.0003800013249145487,
+            "rank_ic": 0.022805845700667356
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": -0.00019158553471889837,
+            "rank_ic": 0.015569146034448035
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      "selection_provenance": {
+        "locked_oos_role": "gate_report_only",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_policy": "train_validation_only",
+        "uses_locked_oos_for_selection": false
+      },
+      "strategy_validity": {
+        "calendar_fields": [],
+        "calendar_primary": false,
+        "causal_state_only": true,
+        "lookahead_safe": true,
+        "pass": true,
+        "primary_signal_type": "formulaic_state_factor",
+        "rejection_reasons": [],
+        "source_refs": [
+          "input:/home/hoky/Quants-agent/LuminaQuant/var/cache/profit_moonshot_fresh_start/joined_panel_de62df511cec53df6ad39521.parquet"
+        ]
+      }
+    },
+    {
+      "description": "crypto volume shock z-score over 48 bars",
+      "factor": "volume_shock_z_48",
+      "family": "volume_vwap",
+      "inputs": [
+        "volume"
+      ],
+      "market": "crypto",
+      "metrics": {
+        "factor": "volume_shock_z_48",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.015035042387191012,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": 0.0012734591729919155,
+            "rank_ic": 0.04997380673615019
+          },
+          "train": {
+            "n": 43545,
+            "quantile_spread": 0.0001922190558379222,
+            "rank_ic": 0.015035042387191012
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.0013300999007700074,
+            "rank_ic": 0.055105861285460724
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      "selection_provenance": {
+        "locked_oos_role": "gate_report_only",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_policy": "train_validation_only",
+        "uses_locked_oos_for_selection": false
+      },
+      "strategy_validity": {
+        "calendar_fields": [],
+        "calendar_primary": false,
+        "causal_state_only": true,
+        "lookahead_safe": true,
+        "pass": true,
+        "primary_signal_type": "formulaic_state_factor",
+        "rejection_reasons": [],
+        "source_refs": [
+          "input:/home/hoky/Quants-agent/LuminaQuant/var/cache/profit_moonshot_fresh_start/joined_panel_de62df511cec53df6ad39521.parquet"
+        ]
+      }
+    },
+    {
+      "description": "rolling z-score of BTC residual return over 48 bars",
+      "factor": "btc_residual_z_48",
+      "family": "benchmark_relative",
+      "inputs": [
+        "close",
+        "BTC"
+      ],
+      "market": "crypto",
+      "metrics": {
+        "factor": "btc_residual_z_48",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.014127952941640516,
+        "split_stats": {
+          "locked_oos": {
+            "n": 6356,
+            "quantile_spread": -0.0003159099977876541,
+            "rank_ic": -0.013678643302445226
+          },
+          "train": {
+            "n": 34644,
+            "quantile_spread": 0.00041369092949354965,
+            "rank_ic": -0.014127952941640516
+          },
+          "validation": {
+            "n": 5648,
+            "quantile_spread": -0.00048178771771044805,
+            "rank_ic": -0.04064287983347708
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      "selection_provenance": {
+        "locked_oos_role": "gate_report_only",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_policy": "train_validation_only",
+        "uses_locked_oos_for_selection": false
+      },
+      "strategy_validity": {
+        "calendar_fields": [],
+        "calendar_primary": false,
+        "causal_state_only": true,
+        "lookahead_safe": true,
+        "pass": true,
+        "primary_signal_type": "formulaic_state_factor",
+        "rejection_reasons": [],
+        "source_refs": [
+          "input:/home/hoky/Quants-agent/LuminaQuant/var/cache/profit_moonshot_fresh_start/joined_panel_de62df511cec53df6ad39521.parquet"
+        ]
+      }
+    },
+    {
+      "description": "rolling z-score of 48-bar return",
+      "factor": "mom_z_48",
+      "family": "momentum_reversal",
+      "inputs": [
+        "close"
+      ],
+      "market": "crypto_fx",
+      "metrics": {
+        "factor": "mom_z_48",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.01288428459829123,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": -0.00012443347087146402,
+            "rank_ic": -0.030626597266514514
+          },
+          "train": {
+            "n": 43065,
+            "quantile_spread": 0.0005727999772349588,
+            "rank_ic": -0.01288428459829123
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": -4.143707375565092e-05,
+            "rank_ic": -0.01331567320903879
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      "selection_provenance": {
+        "locked_oos_role": "gate_report_only",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_policy": "train_validation_only",
+        "uses_locked_oos_for_selection": false
+      },
+      "strategy_validity": {
+        "calendar_fields": [],
+        "calendar_primary": false,
+        "causal_state_only": true,
+        "lookahead_safe": true,
+        "pass": true,
+        "primary_signal_type": "formulaic_state_factor",
+        "rejection_reasons": [],
+        "source_refs": [
+          "input:/home/hoky/Quants-agent/LuminaQuant/var/cache/profit_moonshot_fresh_start/joined_panel_de62df511cec53df6ad39521.parquet"
+        ]
+      }
+    },
+    {
+      "description": "volume shock times close-vwap sign over 24 bars",
+      "factor": "volume_vwap_pressure_24",
+      "family": "volume_vwap",
+      "inputs": [
+        "volume",
+        "vwap",
+        "close"
+      ],
+      "market": "crypto",
+      "metrics": {
+        "factor": "volume_vwap_pressure_24",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.01275062687769094,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": 0.0002823346340057641,
+            "rank_ic": 0.010427393023718068
+          },
+          "train": {
+            "n": 43665,
+            "quantile_spread": 0.0003514130765614322,
+            "rank_ic": 0.01275062687769094
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.0012909826298799286,
+            "rank_ic": 0.02681732167064367
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      "selection_provenance": {
+        "locked_oos_role": "gate_report_only",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_policy": "train_validation_only",
+        "uses_locked_oos_for_selection": false
+      },
+      "strategy_validity": {
+        "calendar_fields": [],
+        "calendar_primary": false,
+        "causal_state_only": true,
+        "lookahead_safe": true,
+        "pass": true,
+        "primary_signal_type": "formulaic_state_factor",
+        "rejection_reasons": [],
+        "source_refs": [
+          "input:/home/hoky/Quants-agent/LuminaQuant/var/cache/profit_moonshot_fresh_start/joined_panel_de62df511cec53df6ad39521.parquet"
+        ]
+      }
+    },
+    {
+      "description": "volume shock times close-vwap sign over 48 bars",
+      "factor": "volume_vwap_pressure_48",
+      "family": "volume_vwap",
+      "inputs": [
+        "volume",
+        "vwap",
+        "close"
+      ],
+      "market": "crypto",
+      "metrics": {
+        "factor": "volume_vwap_pressure_48",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.012327837566782896,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": 0.0002244408579326021,
+            "rank_ic": 0.008234656754869745
+          },
+          "train": {
+            "n": 43545,
+            "quantile_spread": 0.00041299340297562445,
+            "rank_ic": 0.012327837566782896
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.0013172756124417396,
+            "rank_ic": 0.032201786060796836
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      "selection_provenance": {
+        "locked_oos_role": "gate_report_only",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_policy": "train_validation_only",
+        "uses_locked_oos_for_selection": false
+      },
+      "strategy_validity": {
+        "calendar_fields": [],
+        "calendar_primary": false,
+        "causal_state_only": true,
+        "lookahead_safe": true,
+        "pass": true,
+        "primary_signal_type": "formulaic_state_factor",
+        "rejection_reasons": [],
+        "source_refs": [
+          "input:/home/hoky/Quants-agent/LuminaQuant/var/cache/profit_moonshot_fresh_start/joined_panel_de62df511cec53df6ad39521.parquet"
+        ]
+      }
+    },
+    {
+      "description": "failed high/low breakout over 24 bars",
+      "factor": "breakout_failure_24",
+      "family": "breakout_failure",
+      "inputs": [
+        "high",
+        "low",
+        "close"
+      ],
+      "market": "crypto_fx",
+      "metrics": {
+        "factor": "breakout_failure_24",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.011943113481230954,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": 0.00014845852221171183,
+            "rank_ic": 0.002302088767675868
+          },
+          "train": {
+            "n": 43780,
+            "quantile_spread": 0.00021188717012056947,
+            "rank_ic": 0.01446806538289283
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": -0.0009328666902965401,
+            "rank_ic": 0.011943113481230954
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      "selection_provenance": {
+        "locked_oos_role": "gate_report_only",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_policy": "train_validation_only",
+        "uses_locked_oos_for_selection": false
+      },
+      "strategy_validity": {
+        "calendar_fields": [],
+        "calendar_primary": false,
+        "causal_state_only": true,
+        "lookahead_safe": true,
+        "pass": true,
+        "primary_signal_type": "formulaic_state_factor",
+        "rejection_reasons": [],
+        "source_refs": [
+          "input:/home/hoky/Quants-agent/LuminaQuant/var/cache/profit_moonshot_fresh_start/joined_panel_de62df511cec53df6ad39521.parquet"
+        ]
+      }
+    },
+    {
+      "description": "rolling z-score of BTC residual return over 4 bars",
+      "factor": "btc_residual_z_4",
+      "family": "benchmark_relative",
+      "inputs": [
+        "close",
+        "BTC"
+      ],
+      "market": "crypto",
+      "metrics": {
+        "factor": "btc_residual_z_4",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.01107885572303051,
+        "split_stats": {
+          "locked_oos": {
+            "n": 6356,
+            "quantile_spread": 0.0006331386219992557,
+            "rank_ic": 0.011293006716521073
+          },
+          "train": {
+            "n": 34996,
+            "quantile_spread": 0.0005562137730981618,
+            "rank_ic": 0.01107885572303051
+          },
+          "validation": {
+            "n": 5648,
+            "quantile_spread": 0.0015397341695910255,
+            "rank_ic": 0.023366357816887205
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      "selection_provenance": {
+        "locked_oos_role": "gate_report_only",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_policy": "train_validation_only",
+        "uses_locked_oos_for_selection": false
+      },
+      "strategy_validity": {
+        "calendar_fields": [],
+        "calendar_primary": false,
+        "causal_state_only": true,
+        "lookahead_safe": true,
+        "pass": true,
+        "primary_signal_type": "formulaic_state_factor",
+        "rejection_reasons": [],
+        "source_refs": [
+          "input:/home/hoky/Quants-agent/LuminaQuant/var/cache/profit_moonshot_fresh_start/joined_panel_de62df511cec53df6ad39521.parquet"
+        ]
+      }
+    },
+    {
+      "description": "volume shock times close-vwap sign over 12 bars",
+      "factor": "volume_vwap_pressure_12",
+      "family": "volume_vwap",
+      "inputs": [
+        "volume",
+        "vwap",
+        "close"
+      ],
+      "market": "crypto",
+      "metrics": {
+        "factor": "volume_vwap_pressure_12",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.010549785815511624,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": 0.00012912835198036022,
+            "rank_ic": 0.010120654826882677
+          },
+          "train": {
+            "n": 43725,
+            "quantile_spread": 0.0003126237123277502,
+            "rank_ic": 0.010549785815511624
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.001890768976871072,
+            "rank_ic": 0.038984949345118904
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      "selection_provenance": {
+        "locked_oos_role": "gate_report_only",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_policy": "train_validation_only",
+        "uses_locked_oos_for_selection": false
+      },
+      "strategy_validity": {
+        "calendar_fields": [],
+        "calendar_primary": false,
+        "causal_state_only": true,
+        "lookahead_safe": true,
+        "pass": true,
+        "primary_signal_type": "formulaic_state_factor",
+        "rejection_reasons": [],
+        "source_refs": [
+          "input:/home/hoky/Quants-agent/LuminaQuant/var/cache/profit_moonshot_fresh_start/joined_panel_de62df511cec53df6ad39521.parquet"
+        ]
+      }
+    },
+    {
+      "description": "rolling close-to-close volatility over 8 bars",
+      "factor": "realized_vol_8",
+      "family": "volatility_regime",
+      "inputs": [
+        "close"
+      ],
+      "market": "crypto_fx",
+      "metrics": {
+        "factor": "realized_vol_8",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.01049086314457234,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": 0.0004367747879507304,
+            "rank_ic": -0.02611370806968186
+          },
+          "train": {
+            "n": 43740,
+            "quantile_spread": -0.000357652132713263,
+            "rank_ic": 0.014185782782175669
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": -2.9036046785162066e-05,
+            "rank_ic": 0.01049086314457234
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      "selection_provenance": {
+        "locked_oos_role": "gate_report_only",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_policy": "train_validation_only",
+        "uses_locked_oos_for_selection": false
+      },
+      "strategy_validity": {
+        "calendar_fields": [],
+        "calendar_primary": false,
+        "causal_state_only": true,
+        "lookahead_safe": true,
+        "pass": true,
+        "primary_signal_type": "formulaic_state_factor",
+        "rejection_reasons": [],
+        "source_refs": [
+          "input:/home/hoky/Quants-agent/LuminaQuant/var/cache/profit_moonshot_fresh_start/joined_panel_de62df511cec53df6ad39521.parquet"
+        ]
+      }
+    },
+    {
+      "description": "asset return minus BTC return over 24 bars",
+      "factor": "btc_residual_ret_24",
+      "family": "benchmark_relative",
+      "inputs": [
+        "close",
+        "BTC"
+      ],
+      "market": "crypto",
+      "metrics": {
+        "factor": "btc_residual_ret_24",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.0099199468267754,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": -0.0004723773663742731,
+            "rank_ic": -0.002516630188257763
+          },
+          "train": {
+            "n": 43660,
+            "quantile_spread": -0.0002985694303090353,
+            "rank_ic": -0.03341933522748005
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.0009354995451889472,
+            "rank_ic": -0.0099199468267754
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      "selection_provenance": {
+        "locked_oos_role": "gate_report_only",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_policy": "train_validation_only",
+        "uses_locked_oos_for_selection": false
+      },
+      "strategy_validity": {
+        "calendar_fields": [],
+        "calendar_primary": false,
+        "causal_state_only": true,
+        "lookahead_safe": true,
+        "pass": true,
+        "primary_signal_type": "formulaic_state_factor",
+        "rejection_reasons": [],
+        "source_refs": [
+          "input:/home/hoky/Quants-agent/LuminaQuant/var/cache/profit_moonshot_fresh_start/joined_panel_de62df511cec53df6ad39521.parquet"
+        ]
+      }
+    },
+    {
+      "description": "rolling z-score of 4-bar return",
+      "factor": "mom_z_4",
+      "family": "momentum_reversal",
+      "inputs": [
+        "close"
+      ],
+      "market": "crypto_fx",
+      "metrics": {
+        "factor": "mom_z_4",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.0098330678430853,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": 0.00014366233332805499,
+            "rank_ic": -0.005080955104276845
+          },
+          "train": {
+            "n": 43725,
+            "quantile_spread": 0.0004816230722592041,
+            "rank_ic": 0.0098330678430853
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.0015046341621138852,
+            "rank_ic": 0.03644497673940424
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      "selection_provenance": {
+        "locked_oos_role": "gate_report_only",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_policy": "train_validation_only",
+        "uses_locked_oos_for_selection": false
+      },
+      "strategy_validity": {
+        "calendar_fields": [],
+        "calendar_primary": false,
+        "causal_state_only": true,
+        "lookahead_safe": true,
+        "pass": true,
+        "primary_signal_type": "formulaic_state_factor",
+        "rejection_reasons": [],
+        "source_refs": [
+          "input:/home/hoky/Quants-agent/LuminaQuant/var/cache/profit_moonshot_fresh_start/joined_panel_de62df511cec53df6ad39521.parquet"
+        ]
+      }
+    },
+    {
+      "description": "rolling close-to-close volatility over 12 bars",
+      "factor": "realized_vol_12",
+      "family": "volatility_regime",
+      "inputs": [
+        "close"
+      ],
+      "market": "crypto_fx",
+      "metrics": {
+        "factor": "realized_vol_12",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.007853928448174867,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": 0.0005567219664348074,
+            "rank_ic": -0.03780588606189653
+          },
+          "train": {
+            "n": 43720,
+            "quantile_spread": -0.00033218404711663136,
+            "rank_ic": 0.007853928448174867
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.0004897592483131807,
+            "rank_ic": 0.008302654916430539
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      "selection_provenance": {
+        "locked_oos_role": "gate_report_only",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_policy": "train_validation_only",
+        "uses_locked_oos_for_selection": false
+      },
+      "strategy_validity": {
+        "calendar_fields": [],
+        "calendar_primary": false,
+        "causal_state_only": true,
+        "lookahead_safe": true,
+        "pass": true,
+        "primary_signal_type": "formulaic_state_factor",
+        "rejection_reasons": [],
+        "source_refs": [
+          "input:/home/hoky/Quants-agent/LuminaQuant/var/cache/profit_moonshot_fresh_start/joined_panel_de62df511cec53df6ad39521.parquet"
+        ]
+      }
+    }
+  ],
+  "factor_count": 63,
+  "factor_source_coverage": {
+    "factor_non_null_coverage": {
+      "breakout_failure_12": 1.0,
+      "breakout_failure_24": 1.0,
+      "breakout_failure_48": 1.0,
+      "btc_residual_ret_12": 0.9989803721641601,
+      "btc_residual_ret_24": 0.9979607443283202,
+      "btc_residual_ret_4": 0.99966012405472,
+      "btc_residual_ret_48": 0.9959214886566403,
+      "btc_residual_z_12": 0.7984365706517121,
+      "btc_residual_z_24": 0.7968051661143682,
+      "btc_residual_z_4": 0.799524173676608,
+      "btc_residual_z_48": 0.7935423570396806,
+      "crypto_leadership_rank_12": 0.9989803721641601,
+      "crypto_leadership_rank_24": 0.9979607443283202,
+      "crypto_leadership_rank_4": 0.99966012405472,
+      "crypto_leadership_rank_48": 0.9959214886566403,
+      "funding_crowding_reversal_12": 0.0,
+      "funding_crowding_reversal_24": 0.0,
+      "funding_z_12": 0.0,
+      "funding_z_24": 0.0,
+      "fx_jpy_risk_off_12": 1.0,
+      "fx_jpy_risk_off_24": 1.0,
+      "fx_usd_strength_12": 1.0,
+      "fx_usd_strength_24": 1.0,
+      "klen": 1.0,
+      "klow": 1.0,
+      "kmid": 1.0,
+      "kup": 1.0,
+      "mom_z_12": 0.9970260854788002,
+      "mom_z_2": 0.99923527912312,
+      "mom_z_24": 0.9939672019712805,
+      "mom_z_4": 0.9990653411504801,
+      "mom_z_48": 0.987849434956241,
+      "mom_z_8": 0.9980457133146402,
+      "range_position_12": 0.9990653411504801,
+      "range_position_2": 0.99991503101368,
+      "range_position_24": 0.9980457133146402,
+      "range_position_4": 0.99974509304104,
+      "range_position_48": 0.9960064576429604,
+      "range_position_8": 0.99940521709576,
+      "realized_vol_12": 0.9989803721641601,
+      "realized_vol_2": 0.99983006202736,
+      "realized_vol_24": 0.9979607443283202,
+      "realized_vol_4": 0.99966012405472,
+      "realized_vol_48": 0.9959214886566403,
+      "realized_vol_8": 0.9993202481094401,
+      "ret_12": 0.9989803721641601,
+      "ret_2": 0.99983006202736,
+      "ret_24": 0.9979607443283202,
+      "ret_4": 0.99966012405472,
+      "ret_48": 0.9959214886566403,
+      "ret_8": 0.9993202481094401,
+      "trend_efficiency_12": 0.9989803721641601,
+      "trend_efficiency_2": 0.999813068230096,
+      "trend_efficiency_24": 0.9979607443283202,
+      "trend_efficiency_4": 0.99966012405472,
+      "trend_efficiency_48": 0.9959214886566403,
+      "trend_efficiency_8": 0.9993202481094401,
+      "volume_shock_z_12": 0.9990653411504801,
+      "volume_shock_z_24": 0.9980457133146402,
+      "volume_shock_z_48": 0.9960064576429604,
+      "volume_vwap_pressure_12": 0.9990653411504801,
+      "volume_vwap_pressure_24": 0.9980457133146402,
+      "volume_vwap_pressure_48": 0.9960064576429604
+    },
+    "row_count": 58845,
+    "split_counts": {
+      "locked_oos": 7965,
+      "train": 43800,
+      "validation": 7080
+    },
+    "symbol_split_counts": {
+      "BNB/USDT": {
+        "locked_oos": 1593,
+        "train": 8760,
+        "validation": 1416
+      },
+      "BTC/USDT": {
+        "locked_oos": 1593,
+        "train": 8760,
+        "validation": 1416
+      },
+      "ETH/USDT": {
+        "locked_oos": 1593,
+        "train": 8760,
+        "validation": 1416
+      },
+      "SOL/USDT": {
+        "locked_oos": 1593,
+        "train": 8760,
+        "validation": 1416
+      },
+      "TRX/USDT": {
+        "locked_oos": 1593,
+        "train": 8760,
+        "validation": 1416
+      }
+    }
+  },
+  "forward_label_policy": "split_bounded_no_cross_split_forward_return_labels",
+  "locked_oos_role": "gate_report_only_after_candidate_freeze",
+  "row_count": 58845,
+  "schema_version": 3,
+  "screen": {
+    "all_factors": [
+      {
+        "factor": "btc_residual_ret_48",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.027933077919242613,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": -0.0013725862302957133,
+            "rank_ic": -0.039198632656265484
+          },
+          "train": {
+            "n": 43540,
+            "quantile_spread": -4.622512438436839e-05,
+            "rank_ic": -0.027933077919242613
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": -0.0004623201883621951,
+            "rank_ic": -0.030071580496064114
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "ret_48",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.020274354010587456,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": -0.001117084658059291,
+            "rank_ic": -0.05605279964125992
+          },
+          "train": {
+            "n": 43540,
+            "quantile_spread": -0.0001052792708514666,
+            "rank_ic": -0.03765460927119969
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.00037874431421371546,
+            "rank_ic": -0.020274354010587456
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "kup",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.018263127945545864,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": 0.0007917231932555415,
+            "rank_ic": 0.005780366007911558
+          },
+          "train": {
+            "n": 43780,
+            "quantile_spread": 0.000962186596119781,
+            "rank_ic": 0.02880534145936906
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.0005552970061316041,
+            "rank_ic": 0.018263127945545864
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "volume_shock_z_24",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.017495128128335365,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": 0.0009261292455290594,
+            "rank_ic": 0.04114787136854214
+          },
+          "train": {
+            "n": 43665,
+            "quantile_spread": 0.00014027846606195035,
+            "rank_ic": 0.017495128128335365
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.0011952932810606184,
+            "rank_ic": 0.06533463525555208
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "crypto_leadership_rank_48",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.016552097095429253,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": -0.0011168766706173934,
+            "rank_ic": -0.04138354761115138
+          },
+          "train": {
+            "n": 43540,
+            "quantile_spread": -0.00013175718926278527,
+            "rank_ic": -0.016552097095429253
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": -0.0005896577768608711,
+            "rank_ic": -0.04516276862314085
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "ret_12",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.01630010701642126,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": -0.00031492238589592874,
+            "rank_ic": -0.01938434361167964
+          },
+          "train": {
+            "n": 43720,
+            "quantile_spread": 0.00027676257797918296,
+            "rank_ic": -0.02133829263798185
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.0021589598698521285,
+            "rank_ic": -0.01630010701642126
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "crypto_leadership_rank_24",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.016239059022380577,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": -0.0008003363944216775,
+            "rank_ic": -0.019000874479921225
+          },
+          "train": {
+            "n": 43660,
+            "quantile_spread": -0.00016697332991172804,
+            "rank_ic": -0.016239059022380577
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.00021995081064410285,
+            "rank_ic": -0.016993262786942225
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "klen",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.015569146034448035,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": 0.000979277955859149,
+            "rank_ic": 0.007243617563315277
+          },
+          "train": {
+            "n": 43780,
+            "quantile_spread": 0.0003800013249145487,
+            "rank_ic": 0.022805845700667356
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": -0.00019158553471889837,
+            "rank_ic": 0.015569146034448035
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "volume_shock_z_48",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.015035042387191012,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": 0.0012734591729919155,
+            "rank_ic": 0.04997380673615019
+          },
+          "train": {
+            "n": 43545,
+            "quantile_spread": 0.0001922190558379222,
+            "rank_ic": 0.015035042387191012
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.0013300999007700074,
+            "rank_ic": 0.055105861285460724
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "btc_residual_z_48",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.014127952941640516,
+        "split_stats": {
+          "locked_oos": {
+            "n": 6356,
+            "quantile_spread": -0.0003159099977876541,
+            "rank_ic": -0.013678643302445226
+          },
+          "train": {
+            "n": 34644,
+            "quantile_spread": 0.00041369092949354965,
+            "rank_ic": -0.014127952941640516
+          },
+          "validation": {
+            "n": 5648,
+            "quantile_spread": -0.00048178771771044805,
+            "rank_ic": -0.04064287983347708
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "mom_z_48",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.01288428459829123,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": -0.00012443347087146402,
+            "rank_ic": -0.030626597266514514
+          },
+          "train": {
+            "n": 43065,
+            "quantile_spread": 0.0005727999772349588,
+            "rank_ic": -0.01288428459829123
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": -4.143707375565092e-05,
+            "rank_ic": -0.01331567320903879
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "volume_vwap_pressure_24",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.01275062687769094,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": 0.0002823346340057641,
+            "rank_ic": 0.010427393023718068
+          },
+          "train": {
+            "n": 43665,
+            "quantile_spread": 0.0003514130765614322,
+            "rank_ic": 0.01275062687769094
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.0012909826298799286,
+            "rank_ic": 0.02681732167064367
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "volume_vwap_pressure_48",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.012327837566782896,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": 0.0002244408579326021,
+            "rank_ic": 0.008234656754869745
+          },
+          "train": {
+            "n": 43545,
+            "quantile_spread": 0.00041299340297562445,
+            "rank_ic": 0.012327837566782896
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.0013172756124417396,
+            "rank_ic": 0.032201786060796836
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "breakout_failure_24",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.011943113481230954,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": 0.00014845852221171183,
+            "rank_ic": 0.002302088767675868
+          },
+          "train": {
+            "n": 43780,
+            "quantile_spread": 0.00021188717012056947,
+            "rank_ic": 0.01446806538289283
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": -0.0009328666902965401,
+            "rank_ic": 0.011943113481230954
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "btc_residual_z_4",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.01107885572303051,
+        "split_stats": {
+          "locked_oos": {
+            "n": 6356,
+            "quantile_spread": 0.0006331386219992557,
+            "rank_ic": 0.011293006716521073
+          },
+          "train": {
+            "n": 34996,
+            "quantile_spread": 0.0005562137730981618,
+            "rank_ic": 0.01107885572303051
+          },
+          "validation": {
+            "n": 5648,
+            "quantile_spread": 0.0015397341695910255,
+            "rank_ic": 0.023366357816887205
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "volume_vwap_pressure_12",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.010549785815511624,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": 0.00012912835198036022,
+            "rank_ic": 0.010120654826882677
+          },
+          "train": {
+            "n": 43725,
+            "quantile_spread": 0.0003126237123277502,
+            "rank_ic": 0.010549785815511624
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.001890768976871072,
+            "rank_ic": 0.038984949345118904
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "realized_vol_8",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.01049086314457234,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": 0.0004367747879507304,
+            "rank_ic": -0.02611370806968186
+          },
+          "train": {
+            "n": 43740,
+            "quantile_spread": -0.000357652132713263,
+            "rank_ic": 0.014185782782175669
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": -2.9036046785162066e-05,
+            "rank_ic": 0.01049086314457234
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "btc_residual_ret_24",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.0099199468267754,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": -0.0004723773663742731,
+            "rank_ic": -0.002516630188257763
+          },
+          "train": {
+            "n": 43660,
+            "quantile_spread": -0.0002985694303090353,
+            "rank_ic": -0.03341933522748005
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.0009354995451889472,
+            "rank_ic": -0.0099199468267754
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "mom_z_4",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.0098330678430853,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": 0.00014366233332805499,
+            "rank_ic": -0.005080955104276845
+          },
+          "train": {
+            "n": 43725,
+            "quantile_spread": 0.0004816230722592041,
+            "rank_ic": 0.0098330678430853
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.0015046341621138852,
+            "rank_ic": 0.03644497673940424
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "realized_vol_12",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.007853928448174867,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": 0.0005567219664348074,
+            "rank_ic": -0.03780588606189653
+          },
+          "train": {
+            "n": 43720,
+            "quantile_spread": -0.00033218404711663136,
+            "rank_ic": 0.007853928448174867
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.0004897592483131807,
+            "rank_ic": 0.008302654916430539
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "ret_8",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.006813220711615367,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": -0.0008877557311320841,
+            "rank_ic": -0.04551839859215389
+          },
+          "train": {
+            "n": 43740,
+            "quantile_spread": 0.0006204583991933894,
+            "rank_ic": -0.006813220711615367
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.0020121578337679185,
+            "rank_ic": -0.008579899397667385
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "crypto_leadership_rank_12",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.0054860874742088655,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": -0.00025544625144901617,
+            "rank_ic": -0.008332057111877395
+          },
+          "train": {
+            "n": 43720,
+            "quantile_spread": 0.0001922812987537339,
+            "rank_ic": -0.0054860874742088655
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.0004817329225388971,
+            "rank_ic": -0.007443891273119571
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "breakout_failure_48",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.0053341387545517965,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": 0.0016136979766899978,
+            "rank_ic": 0.021222338521832085
+          },
+          "train": {
+            "n": 43780,
+            "quantile_spread": 0.0006264800824989168,
+            "rank_ic": 0.01643033293020496
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": -0.0018721356795947952,
+            "rank_ic": 0.0053341387545517965
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "breakout_failure_12",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.005284325916475753,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": -9.165566111087422e-05,
+            "rank_ic": -0.0025307488452993732
+          },
+          "train": {
+            "n": 43780,
+            "quantile_spread": -0.00025228251228801485,
+            "rank_ic": 0.005284325916475753
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": -6.50896253960677e-05,
+            "rank_ic": 0.021487657901665617
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "range_position_12",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.004488361152616744,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": 0.0003751319768044752,
+            "rank_ic": -0.008648438530246468
+          },
+          "train": {
+            "n": 43725,
+            "quantile_spread": 0.0005014806123451965,
+            "rank_ic": -0.008262461642530094
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.002140923518116256,
+            "rank_ic": -0.004488361152616744
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "realized_vol_4",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.003951526433974779,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": 0.0015777083677616494,
+            "rank_ic": 0.012082751354105283
+          },
+          "train": {
+            "n": 43760,
+            "quantile_spread": -0.00010452221396737767,
+            "rank_ic": 0.012159155529611328
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": -0.0007965777469477451,
+            "rank_ic": 0.003951526433974779
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "trend_efficiency_4",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.002772157813398116,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": -0.001374956657833915,
+            "rank_ic": -0.04017494555702026
+          },
+          "train": {
+            "n": 43760,
+            "quantile_spread": -0.00010491655569382027,
+            "rank_ic": 0.002772157813398116
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.0008506966946035525,
+            "rank_ic": 0.01663677651112029
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "volume_shock_z_12",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.002654780836422216,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": 0.000881725991866245,
+            "rank_ic": 0.0397370519046571
+          },
+          "train": {
+            "n": 43725,
+            "quantile_spread": 4.20394196641809e-05,
+            "rank_ic": 0.002654780836422216
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.00030382546723022735,
+            "rank_ic": 0.025121637882490513
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "ret_4",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.002643310869624832,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": -0.0006151918485666918,
+            "rank_ic": -0.029603744941832353
+          },
+          "train": {
+            "n": 43760,
+            "quantile_spread": 0.0006813357163920413,
+            "rank_ic": 0.002643310869624832
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.002187406320535118,
+            "rank_ic": 0.0053835145252701935
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "realized_vol_2",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.002620876382330441,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": 0.001217334158439107,
+            "rank_ic": 0.018453515798612614
+          },
+          "train": {
+            "n": 43770,
+            "quantile_spread": -0.00021701724414366033,
+            "rank_ic": 0.004430739849900237
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": -0.0004679591067444979,
+            "rank_ic": 0.002620876382330441
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "trend_efficiency_24",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.002517189028938456,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": -0.0023526360099504857,
+            "rank_ic": -0.10208114649107003
+          },
+          "train": {
+            "n": 43660,
+            "quantile_spread": -5.869027045271643e-05,
+            "rank_ic": 0.002517189028938456
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.0004195005923957612,
+            "rank_ic": 0.0074162872067705604
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "btc_residual_ret_4",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.001591706013927096,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": -0.00013678872129165373,
+            "rank_ic": -0.002715409219731596
+          },
+          "train": {
+            "n": 43760,
+            "quantile_spread": 0.0005929677346207191,
+            "rank_ic": 0.001591706013927096
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.0014309072662499873,
+            "rank_ic": 0.013730787088218623
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "btc_residual_z_12",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.0008243041122589016,
+        "split_stats": {
+          "locked_oos": {
+            "n": 6356,
+            "quantile_spread": 0.00090248214782791,
+            "rank_ic": 0.017059945677011183
+          },
+          "train": {
+            "n": 34932,
+            "quantile_spread": 0.000488460805722724,
+            "rank_ic": 0.0008243041122589016
+          },
+          "validation": {
+            "n": 5648,
+            "quantile_spread": 0.0006842009702082365,
+            "rank_ic": 0.01694553471440303
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "btc_residual_ret_12",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.0006947646613793605,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": 1.3164669526629543e-05,
+            "rank_ic": 0.006412360873999299
+          },
+          "train": {
+            "n": 43720,
+            "quantile_spread": 0.00012305072264001264,
+            "rank_ic": -0.015285630195335088
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.0006635995521616183,
+            "rank_ic": -0.0006947646613793605
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "crypto_leadership_rank_4",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.0006456229454231517,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": -0.00021550178907522448,
+            "rank_ic": -0.015541019545519556
+          },
+          "train": {
+            "n": 43760,
+            "quantile_spread": 0.00034328056942181635,
+            "rank_ic": 0.0032345069428385536
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.0005123126973852292,
+            "rank_ic": 0.0006456229454231517
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "trend_efficiency_8",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": -1.4173709537845104e-05,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": 0.00019850758600008518,
+            "rank_ic": 0.014400186569264608
+          },
+          "train": {
+            "n": 43740,
+            "quantile_spread": -0.0001128194489792014,
+            "rank_ic": -1.4173709537845104e-05
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.0009597048201908421,
+            "rank_ic": 0.035395812284535096
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "klow",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": -0.00015499539611408256,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": 0.0007080262687952948,
+            "rank_ic": -0.006691655164182072
+          },
+          "train": {
+            "n": 43780,
+            "quantile_spread": -0.0001443129503480559,
+            "rank_ic": -0.00015499539611408256
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.0012012309739195535,
+            "rank_ic": 0.038794566920238534
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "range_position_8",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": -0.00023650802652868197,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": -7.718168464657043e-05,
+            "rank_ic": -0.022172476388161094
+          },
+          "train": {
+            "n": 43745,
+            "quantile_spread": 0.0004589412688832071,
+            "rank_ic": 0.00023650802652868197
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.0016663851621082802,
+            "rank_ic": -0.0013858640635781706
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "trend_efficiency_48",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": -0.001094327377801638,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": -0.0017453896308162868,
+            "rank_ic": -0.05351375239048934
+          },
+          "train": {
+            "n": 43540,
+            "quantile_spread": 7.709338880630271e-05,
+            "rank_ic": -0.001094327377801638
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": -0.00010351781850345796,
+            "rank_ic": 0.013279674621708199
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "mom_z_2",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": -0.0020683745231052895,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": 0.0002635531557931851,
+            "rank_ic": -0.006239826953557281
+          },
+          "train": {
+            "n": 43735,
+            "quantile_spread": 4.6574706731334985e-05,
+            "rank_ic": -0.0020683745231052895
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.0014199793572452263,
+            "rank_ic": 0.03747921066042258
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "mom_z_12",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": -0.0026599582355271165,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": 0.0009764521919789686,
+            "rank_ic": 0.02649642662670593
+          },
+          "train": {
+            "n": 43605,
+            "quantile_spread": 0.000433380623058841,
+            "rank_ic": 0.0026599582355271165
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.0010693634710582515,
+            "rank_ic": -0.031199476172263912
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "trend_efficiency_2",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": -0.002756616885678133,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": -0.001303559444165568,
+            "rank_ic": -0.051295770728463315
+          },
+          "train": {
+            "n": 43769,
+            "quantile_spread": 0.0002979333622742617,
+            "rank_ic": 0.002756616885678133
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.0004865060655244784,
+            "rank_ic": -0.0050053812512304285
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "range_position_4",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": -0.0036039175227314353,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": -0.0002310845168332079,
+            "rank_ic": -0.017998539005488923
+          },
+          "train": {
+            "n": 43765,
+            "quantile_spread": 0.0002103901034738268,
+            "rank_ic": -0.0036039175227314353
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.0017606879240119884,
+            "rank_ic": 0.011808196384263
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "realized_vol_24",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": -0.006353727999686656,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": -0.0005677256678470719,
+            "rank_ic": -0.04805718718893619
+          },
+          "train": {
+            "n": 43660,
+            "quantile_spread": -5.7134271300101795e-05,
+            "rank_ic": 0.006353727999686656
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": -0.000925452801316376,
+            "rank_ic": -0.015306698577246682
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "kmid",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": -0.0064941335636815225,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": -0.0002923486335737991,
+            "rank_ic": -0.023264775995298477
+          },
+          "train": {
+            "n": 43780,
+            "quantile_spread": 0.00026480428274033017,
+            "rank_ic": -0.0064941335636815225
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.0017086303839578384,
+            "rank_ic": 0.02596111110101925
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "range_position_48",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": -0.006571600076591663,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": -0.0009187688872885635,
+            "rank_ic": -0.05261382063393496
+          },
+          "train": {
+            "n": 43545,
+            "quantile_spread": 0.0003136103773146132,
+            "rank_ic": -0.03683148284680628
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.0019610793404985795,
+            "rank_ic": 0.006571600076591663
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "trend_efficiency_12",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": -0.007368351331297119,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": -0.0013433627077500169,
+            "rank_ic": -0.022713237170956392
+          },
+          "train": {
+            "n": 43720,
+            "quantile_spread": -0.00020122936181451773,
+            "rank_ic": -0.007368351331297119
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.00031986246009382553,
+            "rank_ic": 0.020938081660369926
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "ret_2",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": -0.009751928806805352,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": 0.00013922804830453114,
+            "rank_ic": -0.018536780771668485
+          },
+          "train": {
+            "n": 43770,
+            "quantile_spread": 0.00025838348894352444,
+            "rank_ic": -0.009751928806805352
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.0023656042055881705,
+            "rank_ic": 0.010504253091606268
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "range_position_2",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": -0.012043668008675517,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": -0.00015012942298625305,
+            "rank_ic": -0.02118094371824505
+          },
+          "train": {
+            "n": 43775,
+            "quantile_spread": 7.030927885912059e-05,
+            "rank_ic": -0.012043668008675517
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.0013504086738519046,
+            "rank_ic": 0.016785118220821498
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "ret_24",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": -0.012935445372670194,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": -0.0021689317462732297,
+            "rank_ic": -0.0689747827603171
+          },
+          "train": {
+            "n": 43660,
+            "quantile_spread": -0.0008950006039129624,
+            "rank_ic": -0.05503876278452975
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.001436454321861836,
+            "rank_ic": 0.012935445372670194
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "realized_vol_48",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": -0.0139965347210882,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": -0.0004375168432032488,
+            "rank_ic": -0.04491486543988072
+          },
+          "train": {
+            "n": 43540,
+            "quantile_spread": 0.0005136648668152433,
+            "rank_ic": 0.0139965347210882
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": -0.0022271665167766237,
+            "rank_ic": -0.039775941903212826
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "btc_residual_z_24",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": -0.01473257052424633,
+        "split_stats": {
+          "locked_oos": {
+            "n": 6356,
+            "quantile_spread": -0.0001796662278161808,
+            "rank_ic": 0.021647042301615554
+          },
+          "train": {
+            "n": 34836,
+            "quantile_spread": 0.00016099783925603808,
+            "rank_ic": -0.01473257052424633
+          },
+          "validation": {
+            "n": 5648,
+            "quantile_spread": 0.0018199284109250854,
+            "rank_ic": 0.036091477163676486
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "range_position_24",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": -0.02580704185451328,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": 6.344441117801011e-05,
+            "rank_ic": -0.01901229263214758
+          },
+          "train": {
+            "n": 43665,
+            "quantile_spread": 0.00010238421133637059,
+            "rank_ic": -0.03967308418082166
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.0022740511013154678,
+            "rank_ic": 0.02580704185451328
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "mom_z_8",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": -0.02619353098465944,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": 0.00024195778339369426,
+            "rank_ic": -0.0040046388056080625
+          },
+          "train": {
+            "n": 43665,
+            "quantile_spread": 0.0008168524254492087,
+            "rank_ic": 0.02619353098465944
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.000343978007983469,
+            "rank_ic": -0.028014718240059303
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "mom_z_24",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": -0.02764913088484423,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": -8.04610273213216e-05,
+            "rank_ic": -0.020833800440782715
+          },
+          "train": {
+            "n": 43425,
+            "quantile_spread": -0.00029301593000199635,
+            "rank_ic": -0.02764913088484423
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.0022813681586915475,
+            "rank_ic": 0.057252633129194486
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "funding_z_12",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": null,
+        "split_stats": {
+          "locked_oos": {
+            "n": 0,
+            "quantile_spread": null,
+            "rank_ic": null
+          },
+          "train": {
+            "n": 0,
+            "quantile_spread": null,
+            "rank_ic": null
+          },
+          "validation": {
+            "n": 0,
+            "quantile_spread": null,
+            "rank_ic": null
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "funding_crowding_reversal_12",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": null,
+        "split_stats": {
+          "locked_oos": {
+            "n": 0,
+            "quantile_spread": null,
+            "rank_ic": null
+          },
+          "train": {
+            "n": 0,
+            "quantile_spread": null,
+            "rank_ic": null
+          },
+          "validation": {
+            "n": 0,
+            "quantile_spread": null,
+            "rank_ic": null
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "fx_usd_strength_12",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": null,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": null,
+            "rank_ic": null
+          },
+          "train": {
+            "n": 43780,
+            "quantile_spread": null,
+            "rank_ic": null
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": null,
+            "rank_ic": null
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "fx_jpy_risk_off_12",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": null,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": null,
+            "rank_ic": null
+          },
+          "train": {
+            "n": 43780,
+            "quantile_spread": null,
+            "rank_ic": null
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": null,
+            "rank_ic": null
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "funding_z_24",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": null,
+        "split_stats": {
+          "locked_oos": {
+            "n": 0,
+            "quantile_spread": null,
+            "rank_ic": null
+          },
+          "train": {
+            "n": 0,
+            "quantile_spread": null,
+            "rank_ic": null
+          },
+          "validation": {
+            "n": 0,
+            "quantile_spread": null,
+            "rank_ic": null
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "funding_crowding_reversal_24",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": null,
+        "split_stats": {
+          "locked_oos": {
+            "n": 0,
+            "quantile_spread": null,
+            "rank_ic": null
+          },
+          "train": {
+            "n": 0,
+            "quantile_spread": null,
+            "rank_ic": null
+          },
+          "validation": {
+            "n": 0,
+            "quantile_spread": null,
+            "rank_ic": null
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "fx_usd_strength_24",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": null,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": null,
+            "rank_ic": null
+          },
+          "train": {
+            "n": 43780,
+            "quantile_spread": null,
+            "rank_ic": null
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": null,
+            "rank_ic": null
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "fx_jpy_risk_off_24",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": null,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": null,
+            "rank_ic": null
+          },
+          "train": {
+            "n": 43780,
+            "quantile_spread": null,
+            "rank_ic": null
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": null,
+            "rank_ic": null
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      }
+    ],
+    "artifact_kind": "crypto_fx_alpha_zoo_screen",
+    "selected_factors": [
+      {
+        "factor": "btc_residual_ret_48",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.027933077919242613,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": -0.0013725862302957133,
+            "rank_ic": -0.039198632656265484
+          },
+          "train": {
+            "n": 43540,
+            "quantile_spread": -4.622512438436839e-05,
+            "rank_ic": -0.027933077919242613
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": -0.0004623201883621951,
+            "rank_ic": -0.030071580496064114
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "ret_48",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.020274354010587456,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": -0.001117084658059291,
+            "rank_ic": -0.05605279964125992
+          },
+          "train": {
+            "n": 43540,
+            "quantile_spread": -0.0001052792708514666,
+            "rank_ic": -0.03765460927119969
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.00037874431421371546,
+            "rank_ic": -0.020274354010587456
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "kup",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.018263127945545864,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": 0.0007917231932555415,
+            "rank_ic": 0.005780366007911558
+          },
+          "train": {
+            "n": 43780,
+            "quantile_spread": 0.000962186596119781,
+            "rank_ic": 0.02880534145936906
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.0005552970061316041,
+            "rank_ic": 0.018263127945545864
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "volume_shock_z_24",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.017495128128335365,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": 0.0009261292455290594,
+            "rank_ic": 0.04114787136854214
+          },
+          "train": {
+            "n": 43665,
+            "quantile_spread": 0.00014027846606195035,
+            "rank_ic": 0.017495128128335365
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.0011952932810606184,
+            "rank_ic": 0.06533463525555208
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "crypto_leadership_rank_48",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.016552097095429253,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": -0.0011168766706173934,
+            "rank_ic": -0.04138354761115138
+          },
+          "train": {
+            "n": 43540,
+            "quantile_spread": -0.00013175718926278527,
+            "rank_ic": -0.016552097095429253
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": -0.0005896577768608711,
+            "rank_ic": -0.04516276862314085
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "ret_12",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.01630010701642126,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": -0.00031492238589592874,
+            "rank_ic": -0.01938434361167964
+          },
+          "train": {
+            "n": 43720,
+            "quantile_spread": 0.00027676257797918296,
+            "rank_ic": -0.02133829263798185
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.0021589598698521285,
+            "rank_ic": -0.01630010701642126
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "crypto_leadership_rank_24",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.016239059022380577,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": -0.0008003363944216775,
+            "rank_ic": -0.019000874479921225
+          },
+          "train": {
+            "n": 43660,
+            "quantile_spread": -0.00016697332991172804,
+            "rank_ic": -0.016239059022380577
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.00021995081064410285,
+            "rank_ic": -0.016993262786942225
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "klen",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.015569146034448035,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": 0.000979277955859149,
+            "rank_ic": 0.007243617563315277
+          },
+          "train": {
+            "n": 43780,
+            "quantile_spread": 0.0003800013249145487,
+            "rank_ic": 0.022805845700667356
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": -0.00019158553471889837,
+            "rank_ic": 0.015569146034448035
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "volume_shock_z_48",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.015035042387191012,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": 0.0012734591729919155,
+            "rank_ic": 0.04997380673615019
+          },
+          "train": {
+            "n": 43545,
+            "quantile_spread": 0.0001922190558379222,
+            "rank_ic": 0.015035042387191012
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.0013300999007700074,
+            "rank_ic": 0.055105861285460724
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "btc_residual_z_48",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.014127952941640516,
+        "split_stats": {
+          "locked_oos": {
+            "n": 6356,
+            "quantile_spread": -0.0003159099977876541,
+            "rank_ic": -0.013678643302445226
+          },
+          "train": {
+            "n": 34644,
+            "quantile_spread": 0.00041369092949354965,
+            "rank_ic": -0.014127952941640516
+          },
+          "validation": {
+            "n": 5648,
+            "quantile_spread": -0.00048178771771044805,
+            "rank_ic": -0.04064287983347708
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "mom_z_48",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.01288428459829123,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": -0.00012443347087146402,
+            "rank_ic": -0.030626597266514514
+          },
+          "train": {
+            "n": 43065,
+            "quantile_spread": 0.0005727999772349588,
+            "rank_ic": -0.01288428459829123
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": -4.143707375565092e-05,
+            "rank_ic": -0.01331567320903879
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "volume_vwap_pressure_24",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.01275062687769094,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": 0.0002823346340057641,
+            "rank_ic": 0.010427393023718068
+          },
+          "train": {
+            "n": 43665,
+            "quantile_spread": 0.0003514130765614322,
+            "rank_ic": 0.01275062687769094
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.0012909826298799286,
+            "rank_ic": 0.02681732167064367
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "volume_vwap_pressure_48",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.012327837566782896,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": 0.0002244408579326021,
+            "rank_ic": 0.008234656754869745
+          },
+          "train": {
+            "n": 43545,
+            "quantile_spread": 0.00041299340297562445,
+            "rank_ic": 0.012327837566782896
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.0013172756124417396,
+            "rank_ic": 0.032201786060796836
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "breakout_failure_24",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.011943113481230954,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": 0.00014845852221171183,
+            "rank_ic": 0.002302088767675868
+          },
+          "train": {
+            "n": 43780,
+            "quantile_spread": 0.00021188717012056947,
+            "rank_ic": 0.01446806538289283
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": -0.0009328666902965401,
+            "rank_ic": 0.011943113481230954
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "btc_residual_z_4",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.01107885572303051,
+        "split_stats": {
+          "locked_oos": {
+            "n": 6356,
+            "quantile_spread": 0.0006331386219992557,
+            "rank_ic": 0.011293006716521073
+          },
+          "train": {
+            "n": 34996,
+            "quantile_spread": 0.0005562137730981618,
+            "rank_ic": 0.01107885572303051
+          },
+          "validation": {
+            "n": 5648,
+            "quantile_spread": 0.0015397341695910255,
+            "rank_ic": 0.023366357816887205
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "volume_vwap_pressure_12",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.010549785815511624,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": 0.00012912835198036022,
+            "rank_ic": 0.010120654826882677
+          },
+          "train": {
+            "n": 43725,
+            "quantile_spread": 0.0003126237123277502,
+            "rank_ic": 0.010549785815511624
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.001890768976871072,
+            "rank_ic": 0.038984949345118904
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "realized_vol_8",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.01049086314457234,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": 0.0004367747879507304,
+            "rank_ic": -0.02611370806968186
+          },
+          "train": {
+            "n": 43740,
+            "quantile_spread": -0.000357652132713263,
+            "rank_ic": 0.014185782782175669
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": -2.9036046785162066e-05,
+            "rank_ic": 0.01049086314457234
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "btc_residual_ret_24",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.0099199468267754,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": -0.0004723773663742731,
+            "rank_ic": -0.002516630188257763
+          },
+          "train": {
+            "n": 43660,
+            "quantile_spread": -0.0002985694303090353,
+            "rank_ic": -0.03341933522748005
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.0009354995451889472,
+            "rank_ic": -0.0099199468267754
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "mom_z_4",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.0098330678430853,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": 0.00014366233332805499,
+            "rank_ic": -0.005080955104276845
+          },
+          "train": {
+            "n": 43725,
+            "quantile_spread": 0.0004816230722592041,
+            "rank_ic": 0.0098330678430853
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.0015046341621138852,
+            "rank_ic": 0.03644497673940424
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      },
+      {
+        "factor": "realized_vol_12",
+        "selected_using_splits": [
+          "train",
+          "validation"
+        ],
+        "selection_score": 0.007853928448174867,
+        "split_stats": {
+          "locked_oos": {
+            "n": 7945,
+            "quantile_spread": 0.0005567219664348074,
+            "rank_ic": -0.03780588606189653
+          },
+          "train": {
+            "n": 43720,
+            "quantile_spread": -0.00033218404711663136,
+            "rank_ic": 0.007853928448174867
+          },
+          "validation": {
+            "n": 7060,
+            "quantile_spread": 0.0004897592483131807,
+            "rank_ic": 0.008302654916430539
+          }
+        },
+        "uses_locked_oos_for_selection": false
+      }
+    ],
+    "selection_policy": "train_validation_only_locked_oos_report_only",
+    "uses_locked_oos_for_selection": false
+  },
+  "selection_policy": "train_validation_only_locked_oos_report_only_common_split",
+  "source_coverage": {
+    "artifact_kind": "crypto_fx_alpha_zoo_real_data_source_coverage",
+    "external_state": {
+      "coverage_ratio_by_feature": {
+        "external_curve_z": 0.7145042059648229,
+        "external_curve_z_lag1": 0.7145042059648229,
+        "external_risk_off_score": 0.7145042059648229,
+        "external_risk_off_score_lag1": 0.7145042059648229,
+        "external_usd_ret_z": 0.7145042059648229,
+        "external_usd_ret_z_lag1": 0.7145042059648229,
+        "external_vix_z": 0.7145042059648229,
+        "external_vix_z_lag1": 0.7145042059648229,
+        "external_wti_ret_z": 0.7145042059648229,
+        "external_wti_ret_z_lag1": 0.7145042059648229
+      },
+      "enabled": true,
+      "feature_columns": [
+        "external_usd_ret_z",
+        "external_vix_z",
+        "external_curve_z",
+        "external_wti_ret_z",
+        "external_risk_off_score",
+        "external_usd_ret_z_lag1",
+        "external_vix_z_lag1",
+        "external_curve_z_lag1",
+        "external_wti_ret_z_lag1",
+        "external_risk_off_score_lag1"
+      ],
+      "joined": true,
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/external_market_state_20260512/external_market_state_lagged.csv",
+      "rows": 614
+    },
+    "generated_at_utc": "2026-05-17T05:16:41.268721Z",
+    "input": {
+      "input_format": "wide_current_tail_panel",
+      "input_shape": [
+        11769,
+        66
+      ],
+      "symbol_coverage": {
+        "BNB/USDT": {
+          "coverage_ratio_by_field": {
+            "close": 1.0,
+            "funding_rate": 0.12498937887671,
+            "high": 1.0,
+            "liquidation_long_notional": 1.0,
+            "liquidation_short_notional": 1.0,
+            "low": 1.0,
+            "open": 1.0,
+            "open_interest": 0.12312006117767015,
+            "taker_buy_base_volume": 1.0,
+            "taker_buy_quote_volume": 1.0,
+            "taker_sell_base_volume": 1.0,
+            "taker_sell_quote_volume": 1.0,
+            "volume": 1.0
+          },
+          "imputed_fields": [
+            "vwap"
+          ],
+          "observed_fields": [
+            "close",
+            "funding_rate",
+            "high",
+            "liquidation_long_notional",
+            "liquidation_short_notional",
+            "low",
+            "open",
+            "open_interest",
+            "taker_buy_base_volume",
+            "taker_buy_quote_volume",
+            "taker_sell_base_volume",
+            "taker_sell_quote_volume",
+            "volume"
+          ],
+          "required_ohlcv_observed": true,
+          "rows": 11769,
+          "source_columns": {
+            "close": "bnbusdt_close",
+            "funding_rate": "bnbusdt_funding_rate",
+            "high": "bnbusdt_high",
+            "liquidation_long_notional": "bnbusdt_liquidation_long_notional",
+            "liquidation_short_notional": "bnbusdt_liquidation_short_notional",
+            "low": "bnbusdt_low",
+            "open": "bnbusdt_open",
+            "open_interest": "bnbusdt_open_interest",
+            "taker_buy_base_volume": "bnbusdt_taker_buy_base_volume",
+            "taker_buy_quote_volume": "bnbusdt_taker_buy_quote_volume",
+            "taker_sell_base_volume": "bnbusdt_taker_sell_base_volume",
+            "taker_sell_quote_volume": "bnbusdt_taker_sell_quote_volume",
+            "volume": "bnbusdt_volume"
+          },
+          "source_prefix": "bnbusdt"
+        },
+        "BTC/USDT": {
+          "coverage_ratio_by_field": {
+            "close": 1.0,
+            "funding_rate": 0.12490440989039,
+            "high": 1.0,
+            "liquidation_long_notional": 0.9990653411504801,
+            "liquidation_short_notional": 0.9990653411504801,
+            "low": 1.0,
+            "open": 1.0,
+            "open_interest": 0.12108080550599032,
+            "taker_buy_base_volume": 0.9990653411504801,
+            "taker_buy_quote_volume": 0.9990653411504801,
+            "taker_sell_base_volume": 0.9990653411504801,
+            "taker_sell_quote_volume": 0.9990653411504801,
+            "volume": 1.0
+          },
+          "imputed_fields": [
+            "vwap"
+          ],
+          "observed_fields": [
+            "close",
+            "funding_rate",
+            "high",
+            "liquidation_long_notional",
+            "liquidation_short_notional",
+            "low",
+            "open",
+            "open_interest",
+            "taker_buy_base_volume",
+            "taker_buy_quote_volume",
+            "taker_sell_base_volume",
+            "taker_sell_quote_volume",
+            "volume"
+          ],
+          "required_ohlcv_observed": true,
+          "rows": 11769,
+          "source_columns": {
+            "close": "btcusdt_close",
+            "funding_rate": "btcusdt_funding_rate",
+            "high": "btcusdt_high",
+            "liquidation_long_notional": "btcusdt_liquidation_long_notional",
+            "liquidation_short_notional": "btcusdt_liquidation_short_notional",
+            "low": "btcusdt_low",
+            "open": "btcusdt_open",
+            "open_interest": "btcusdt_open_interest",
+            "taker_buy_base_volume": "btcusdt_taker_buy_base_volume",
+            "taker_buy_quote_volume": "btcusdt_taker_buy_quote_volume",
+            "taker_sell_base_volume": "btcusdt_taker_sell_base_volume",
+            "taker_sell_quote_volume": "btcusdt_taker_sell_quote_volume",
+            "volume": "btcusdt_volume"
+          },
+          "source_prefix": "btcusdt"
+        },
+        "ETH/USDT": {
+          "coverage_ratio_by_field": {
+            "close": 1.0,
+            "funding_rate": 0.12498937887671,
+            "high": 1.0,
+            "liquidation_long_notional": 1.0,
+            "liquidation_short_notional": 1.0,
+            "low": 1.0,
+            "open": 1.0,
+            "open_interest": 0.12312006117767015,
+            "taker_buy_base_volume": 1.0,
+            "taker_buy_quote_volume": 1.0,
+            "taker_sell_base_volume": 1.0,
+            "taker_sell_quote_volume": 1.0,
+            "volume": 1.0
+          },
+          "imputed_fields": [
+            "vwap"
+          ],
+          "observed_fields": [
+            "close",
+            "funding_rate",
+            "high",
+            "liquidation_long_notional",
+            "liquidation_short_notional",
+            "low",
+            "open",
+            "open_interest",
+            "taker_buy_base_volume",
+            "taker_buy_quote_volume",
+            "taker_sell_base_volume",
+            "taker_sell_quote_volume",
+            "volume"
+          ],
+          "required_ohlcv_observed": true,
+          "rows": 11769,
+          "source_columns": {
+            "close": "ethusdt_close",
+            "funding_rate": "ethusdt_funding_rate",
+            "high": "ethusdt_high",
+            "liquidation_long_notional": "ethusdt_liquidation_long_notional",
+            "liquidation_short_notional": "ethusdt_liquidation_short_notional",
+            "low": "ethusdt_low",
+            "open": "ethusdt_open",
+            "open_interest": "ethusdt_open_interest",
+            "taker_buy_base_volume": "ethusdt_taker_buy_base_volume",
+            "taker_buy_quote_volume": "ethusdt_taker_buy_quote_volume",
+            "taker_sell_base_volume": "ethusdt_taker_sell_base_volume",
+            "taker_sell_quote_volume": "ethusdt_taker_sell_quote_volume",
+            "volume": "ethusdt_volume"
+          },
+          "source_prefix": "ethusdt"
+        },
+        "SOL/USDT": {
+          "coverage_ratio_by_field": {
+            "close": 1.0,
+            "funding_rate": 0.12498937887671,
+            "high": 1.0,
+            "liquidation_long_notional": 1.0,
+            "liquidation_short_notional": 1.0,
+            "low": 1.0,
+            "open": 1.0,
+            "open_interest": 0.12312006117767015,
+            "taker_buy_base_volume": 1.0,
+            "taker_buy_quote_volume": 1.0,
+            "taker_sell_base_volume": 1.0,
+            "taker_sell_quote_volume": 1.0,
+            "volume": 1.0
+          },
+          "imputed_fields": [
+            "vwap"
+          ],
+          "observed_fields": [
+            "close",
+            "funding_rate",
+            "high",
+            "liquidation_long_notional",
+            "liquidation_short_notional",
+            "low",
+            "open",
+            "open_interest",
+            "taker_buy_base_volume",
+            "taker_buy_quote_volume",
+            "taker_sell_base_volume",
+            "taker_sell_quote_volume",
+            "volume"
+          ],
+          "required_ohlcv_observed": true,
+          "rows": 11769,
+          "source_columns": {
+            "close": "solusdt_close",
+            "funding_rate": "solusdt_funding_rate",
+            "high": "solusdt_high",
+            "liquidation_long_notional": "solusdt_liquidation_long_notional",
+            "liquidation_short_notional": "solusdt_liquidation_short_notional",
+            "low": "solusdt_low",
+            "open": "solusdt_open",
+            "open_interest": "solusdt_open_interest",
+            "taker_buy_base_volume": "solusdt_taker_buy_base_volume",
+            "taker_buy_quote_volume": "solusdt_taker_buy_quote_volume",
+            "taker_sell_base_volume": "solusdt_taker_sell_base_volume",
+            "taker_sell_quote_volume": "solusdt_taker_sell_quote_volume",
+            "volume": "solusdt_volume"
+          },
+          "source_prefix": "solusdt"
+        },
+        "TRX/USDT": {
+          "coverage_ratio_by_field": {
+            "close": 1.0,
+            "funding_rate": 0.12498937887671,
+            "high": 1.0,
+            "liquidation_long_notional": 1.0,
+            "liquidation_short_notional": 1.0,
+            "low": 1.0,
+            "open": 1.0,
+            "open_interest": 0.12312006117767015,
+            "taker_buy_base_volume": 1.0,
+            "taker_buy_quote_volume": 1.0,
+            "taker_sell_base_volume": 1.0,
+            "taker_sell_quote_volume": 1.0,
+            "volume": 1.0
+          },
+          "imputed_fields": [
+            "vwap"
+          ],
+          "observed_fields": [
+            "close",
+            "funding_rate",
+            "high",
+            "liquidation_long_notional",
+            "liquidation_short_notional",
+            "low",
+            "open",
+            "open_interest",
+            "taker_buy_base_volume",
+            "taker_buy_quote_volume",
+            "taker_sell_base_volume",
+            "taker_sell_quote_volume",
+            "volume"
+          ],
+          "required_ohlcv_observed": true,
+          "rows": 11769,
+          "source_columns": {
+            "close": "trxusdt_close",
+            "funding_rate": "trxusdt_funding_rate",
+            "high": "trxusdt_high",
+            "liquidation_long_notional": "trxusdt_liquidation_long_notional",
+            "liquidation_short_notional": "trxusdt_liquidation_short_notional",
+            "low": "trxusdt_low",
+            "open": "trxusdt_open",
+            "open_interest": "trxusdt_open_interest",
+            "taker_buy_base_volume": "trxusdt_taker_buy_base_volume",
+            "taker_buy_quote_volume": "trxusdt_taker_buy_quote_volume",
+            "taker_sell_base_volume": "trxusdt_taker_sell_base_volume",
+            "taker_sell_quote_volume": "trxusdt_taker_sell_quote_volume",
+            "volume": "trxusdt_volume"
+          },
+          "source_prefix": "trxusdt"
+        }
+      },
+      "symbols": [
+        "BNB/USDT",
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "TRX/USDT"
+      ],
+      "time_column": "datetime"
+    },
+    "row_count": 58845,
+    "source_path": "/home/hoky/Quants-agent/LuminaQuant/var/cache/profit_moonshot_fresh_start/joined_panel_de62df511cec53df6ad39521.parquet",
+    "split_counts_pre_factor": {},
+    "strategy_validity": {
+      "calendar_primary": false,
+      "locked_oos_role": "gate_report_only",
+      "pass": true,
+      "rejection_reasons": [],
+      "uses_locked_oos_for_selection": false
+    },
+    "strict_real_data": true,
+    "timestamp_max": "2026-05-06 23:00:00",
+    "timestamp_min": "2025-01-01 00:00:00"
+  },
+  "split_label_authority": "explicit_common_split_manifest",
+  "split_periods": {
+    "locked_oos": {
+      "end_timestamp": "2026-05-06T23:00:00Z",
+      "row_count": 7965,
+      "start_timestamp": "2026-03-01T00:00:00Z",
+      "unique_timestamp_count": 1593
+    },
+    "train": {
+      "end_timestamp": "2025-12-31T23:00:00Z",
+      "row_count": 43800,
+      "start_timestamp": "2025-01-01T00:00:00Z",
+      "unique_timestamp_count": 8760
+    },
+    "validation": {
+      "end_timestamp": "2026-02-28T23:00:00Z",
+      "row_count": 7080,
+      "start_timestamp": "2026-01-01T00:00:00Z",
+      "unique_timestamp_count": 1416
+    }
+  },
+  "strategy_validity": {
+    "calendar_primary": false,
+    "locked_oos_role": "gate_report_only",
+    "pass": true,
+    "primary_signal_type": "formulaic_state_factor",
+    "rejection_reasons": [],
+    "uses_locked_oos_for_selection": false
+  },
+  "timestamp_index_hash": "9406747cdcd7d011db0e6dfbf8414a51a03778b3aa0686cedb88b79916fe004b",
+  "uses_locked_oos_for_selection": false
+}

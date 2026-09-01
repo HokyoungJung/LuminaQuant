@@ -1,0 +1,368 @@
+{"end_inclusive": "2025-12-31", "event": "live_equivalent_split_start", "generated_at": "2026-05-03T06:49:47.053148Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train", "start": "2025-01-01", "symbols": ["BTC/USDT", "ETH/USDT", "SOL/USDT"]}
+{"chunk_days": 7, "chunk_end": "2025-01-07T23:59:59.999999", "chunk_start": "2025-01-01T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T06:49:47.053829Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.028 > Limit 0.0243. Filling 0.024300000000000002 and keeping remainder.
+[Realism] Partial Fill: Req 0.443 > Limit 0.0000. Filling 0.0 and keeping remainder.
+[Realism] Partial Fill: Req 0.443 > Limit 0.2000. Filling 0.2 and keeping remainder.
+[Realism] Partial Fill: Req 0.243 > Limit 0.1000. Filling 0.1 and keeping remainder.
+[Realism] Partial Fill: Req 0.143 > Limit 0.1000. Filling 0.1 and keeping remainder.
+[Realism] Partial Fill: Req 0.398 > Limit 0.0000. Filling 0.0 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-01-14T23:59:59.999999", "chunk_start": "2025-01-08T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T06:50:05.025622Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.453 > Limit 0.0000. Filling 0.0 and keeping remainder.
+[Realism] Partial Fill: Req 0.453 > Limit 0.0000. Filling 0.0 and keeping remainder.
+[Realism] Partial Fill: Req 0.502 > Limit 0.3000. Filling 0.30000000000000004 and keeping remainder.
+[Realism] Partial Fill: Req 0.001 > Limit 0.0007. Filling 0.0007000000000000001 and keeping remainder.
+[Realism] Partial Fill: Req 0.516 > Limit 0.0000. Filling 0.0 and keeping remainder.
+[Realism] Partial Fill: Req 0.516 > Limit 0.2000. Filling 0.2 and keeping remainder.
+[Realism] Partial Fill: Req 0.503 > Limit 0.4000. Filling 0.4 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-01-21T23:59:59.999999", "chunk_start": "2025-01-15T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T06:50:23.524317Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.513 > Limit 0.1000. Filling 0.1 and keeping remainder.
+[Realism] Partial Fill: Req 0.41300000000000003 > Limit 0.1000. Filling 0.1 and keeping remainder.
+[Realism] Partial Fill: Req 0.445 > Limit 0.1000. Filling 0.1 and keeping remainder.
+[Realism] Partial Fill: Req 0.439 > Limit 0.4000. Filling 0.4 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-01-28T23:59:59.999999", "chunk_start": "2025-01-22T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T06:50:42.839172Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.32 > Limit 0.3000. Filling 0.30000000000000004 and keeping remainder.
+[Realism] Partial Fill: Req 0.028 > Limit 0.0016. Filling 0.0016 and keeping remainder.
+[Realism] Partial Fill: Req 0.376 > Limit 0.0000. Filling 0.0 and keeping remainder.
+[Realism] Partial Fill: Req 0.03 > Limit 0.0244. Filling 0.0244 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-02-04T23:59:59.999999", "chunk_start": "2025-01-29T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T06:51:00.336393Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.03 > Limit 0.0103. Filling 0.010300000000000002 and keeping remainder.
+[Realism] Partial Fill: Req 0.399 > Limit 0.0000. Filling 0.0 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-02-11T23:59:59.999999", "chunk_start": "2025-02-05T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T06:51:19.775560Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.376 > Limit 0.0000. Filling 0.0 and keeping remainder.
+[Realism] Partial Fill: Req 0.376 > Limit 0.0000. Filling 0.0 and keeping remainder.
+[Realism] Partial Fill: Req 0.376 > Limit 0.0000. Filling 0.0 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-02-18T23:59:59.999999", "chunk_start": "2025-02-12T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T06:51:37.322635Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.495 > Limit 0.0000. Filling 0.0 and keeping remainder.
+[Realism] Partial Fill: Req 0.492 > Limit 0.0000. Filling 0.0 and keeping remainder.
+[Realism] Partial Fill: Req 0.494 > Limit 0.4000. Filling 0.4 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-02-25T23:59:59.999999", "chunk_start": "2025-02-19T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T06:51:52.826869Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.001 > Limit 0.0000. Filling 0.0 and keeping remainder.
+[Realism] Partial Fill: Req 0.552 > Limit 0.0000. Filling 0.0 and keeping remainder.
+[Realism] Partial Fill: Req 0.552 > Limit 0.0000. Filling 0.0 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-03-04T23:59:59.999999", "chunk_start": "2025-02-26T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T06:52:12.446018Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+{"chunk_days": 7, "chunk_end": "2025-03-11T23:59:59.999999", "chunk_start": "2025-03-05T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T06:52:28.612390Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+{"chunk_days": 7, "chunk_end": "2025-03-18T23:59:59.999999", "chunk_start": "2025-03-12T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T06:52:47.919623Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.7020000000000001 > Limit 0.2000. Filling 0.2 and keeping remainder.
+[Realism] Partial Fill: Req 0.717 > Limit 0.2000. Filling 0.2 and keeping remainder.
+[Realism] Partial Fill: Req 0.5169999999999999 > Limit 0.5000. Filling 0.5 and keeping remainder.
+[Realism] Partial Fill: Req 0.709 > Limit 0.3000. Filling 0.30000000000000004 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-03-25T23:59:59.999999", "chunk_start": "2025-03-19T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T06:53:06.161940Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.71 > Limit 0.2000. Filling 0.2 and keeping remainder.
+[Realism] Partial Fill: Req 0.684 > Limit 0.3000. Filling 0.30000000000000004 and keeping remainder.
+[Realism] Partial Fill: Req 0.384 > Limit 0.0000. Filling 0.0 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-04-01T23:59:59.999999", "chunk_start": "2025-03-26T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T06:53:24.830424Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.046 > Limit 0.0359. Filling 0.0359 and keeping remainder.
+[Realism] Partial Fill: Req 0.765 > Limit 0.4000. Filling 0.4 and keeping remainder.
+[Realism] Partial Fill: Req 0.365 > Limit 0.3000. Filling 0.30000000000000004 and keeping remainder.
+[Realism] Partial Fill: Req 0.051000000000000004 > Limit 0.0174. Filling 0.0174 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-04-08T23:59:59.999999", "chunk_start": "2025-04-02T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T06:53:46.223361Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+{"chunk_days": 7, "chunk_end": "2025-04-15T23:59:59.999999", "chunk_start": "2025-04-09T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T06:54:05.993528Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.797 > Limit 0.5690. Filling 0.569 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-04-22T23:59:59.999999", "chunk_start": "2025-04-16T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T06:54:25.781540Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.766 > Limit 0.6020. Filling 0.602 and keeping remainder.
+[Realism] Partial Fill: Req 0.664 > Limit 0.6390. Filling 0.6390000000000001 and keeping remainder.
+[Realism] Partial Fill: Req 0.054 > Limit 0.0213. Filling 0.021300000000000003 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-04-29T23:59:59.999999", "chunk_start": "2025-04-23T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T06:54:47.140274Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.054 > Limit 0.0072. Filling 0.0072000000000000015 and keeping remainder.
+[Realism] Partial Fill: Req 0.633 > Limit 0.0000. Filling 0.0 and keeping remainder.
+[Realism] Partial Fill: Req 0.001 > Limit 0.0000. Filling 0.0 and keeping remainder.
+[Realism] Partial Fill: Req 0.642 > Limit 0.1500. Filling 0.15000000000000002 and keeping remainder.
+[Realism] Partial Fill: Req 0.052000000000000005 > Limit 0.0024. Filling 0.0024000000000000002 and keeping remainder.
+[Realism] Partial Fill: Req 0.049600000000000005 > Limit 0.0000. Filling 0.0 and keeping remainder.
+[Realism] Partial Fill: Req 0.052000000000000005 > Limit 0.0431. Filling 0.043100000000000006 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-05-06T23:59:59.999999", "chunk_start": "2025-04-30T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T06:55:03.721230Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.051000000000000004 > Limit 0.0139. Filling 0.013900000000000003 and keeping remainder.
+[Realism] Partial Fill: Req 0.65 > Limit 0.2540. Filling 0.254 and keeping remainder.
+[Realism] Partial Fill: Req 0.658 > Limit 0.0840. Filling 0.08400000000000002 and keeping remainder.
+[Realism] Partial Fill: Req 0.5740000000000001 > Limit 0.0180. Filling 0.018 and keeping remainder.
+[Realism] Partial Fill: Req 0.556 > Limit 0.0000. Filling 0.0 and keeping remainder.
+[Realism] Partial Fill: Req 0.668 > Limit 0.0070. Filling 0.007000000000000001 and keeping remainder.
+[Realism] Partial Fill: Req 0.661 > Limit 0.4410. Filling 0.44100000000000006 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-05-13T23:59:59.999999", "chunk_start": "2025-05-07T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T06:55:22.184798Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.44 > Limit 0.0600. Filling 0.06 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-05-20T23:59:59.999999", "chunk_start": "2025-05-14T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T06:55:36.804210Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.5630000000000001 > Limit 0.0950. Filling 0.09500000000000001 and keeping remainder.
+[Realism] Partial Fill: Req 0.552 > Limit 0.4710. Filling 0.47100000000000003 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-05-27T23:59:59.999999", "chunk_start": "2025-05-21T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T06:55:53.984407Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.527 > Limit 0.0040. Filling 0.004 and keeping remainder.
+[Realism] Partial Fill: Req 0.543 > Limit 0.3400. Filling 0.3400000000000001 and keeping remainder.
+[Realism] Partial Fill: Req 0.20299999999999996 > Limit 0.0540. Filling 0.054000000000000006 and keeping remainder.
+[Realism] Partial Fill: Req 0.545 > Limit 0.2220. Filling 0.22199999999999998 and keeping remainder.
+[Realism] Partial Fill: Req 0.32300000000000006 > Limit 0.0410. Filling 0.04100000000000001 and keeping remainder.
+[Realism] Partial Fill: Req 0.28200000000000003 > Limit 0.2250. Filling 0.225 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-06-03T23:59:59.999999", "chunk_start": "2025-05-28T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T06:56:08.815229Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.037 > Limit 0.0134. Filling 0.013400000000000002 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-06-10T23:59:59.999999", "chunk_start": "2025-06-04T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T06:56:26.118010Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.038 > Limit 0.0063. Filling 0.0063 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-06-17T23:59:59.999999", "chunk_start": "2025-06-11T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T06:56:47.125997Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.557 > Limit 0.0060. Filling 0.006 and keeping remainder.
+[Realism] Partial Fill: Req 0.037 > Limit 0.0109. Filling 0.0109 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-06-24T23:59:59.999999", "chunk_start": "2025-06-18T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T06:57:06.277004Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.645 > Limit 0.4620. Filling 0.462 and keeping remainder.
+[Realism] Partial Fill: Req 0.361 > Limit 0.2790. Filling 0.279 and keeping remainder.
+[Realism] Partial Fill: Req 0.6900000000000001 > Limit 0.2200. Filling 0.22000000000000003 and keeping remainder.
+[Realism] Partial Fill: Req 0.652 > Limit 0.0950. Filling 0.095 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-07-01T23:59:59.999999", "chunk_start": "2025-06-25T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T06:57:25.170077Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.655 > Limit 0.6360. Filling 0.6360000000000001 and keeping remainder.
+[Realism] Partial Fill: Req 0.018999999999999906 > Limit 0.0040. Filling 0.004 and keeping remainder.
+[Realism] Partial Fill: Req 0.661 > Limit 0.1040. Filling 0.10400000000000001 and keeping remainder.
+[Realism] Partial Fill: Req 0.557 > Limit 0.3120. Filling 0.312 and keeping remainder.
+[Realism] Partial Fill: Req 0.666 > Limit 0.0610. Filling 0.061 and keeping remainder.
+[Realism] Partial Fill: Req 0.628 > Limit 0.5490. Filling 0.549 and keeping remainder.
+[Realism] Partial Fill: Req 0.629 > Limit 0.1250. Filling 0.125 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-07-08T23:59:59.999999", "chunk_start": "2025-07-02T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T06:57:47.004445Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.647 > Limit 0.0100. Filling 0.010000000000000002 and keeping remainder.
+[Realism] Partial Fill: Req 0.637 > Limit 0.0280. Filling 0.028000000000000004 and keeping remainder.
+[Realism] Partial Fill: Req 0.036000000000000004 > Limit 0.0339. Filling 0.033900000000000007 and keeping remainder.
+[Realism] Partial Fill: Req 0.626 > Limit 0.0170. Filling 0.017 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-07-15T23:59:59.999999", "chunk_start": "2025-07-09T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T06:58:07.819510Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.629 > Limit 0.0000. Filling 0.0 and keeping remainder.
+[Realism] Partial Fill: Req 0.629 > Limit 0.0040. Filling 0.004 and keeping remainder.
+[Realism] Partial Fill: Req 0.625 > Limit 0.0100. Filling 0.010000000000000002 and keeping remainder.
+[Realism] Partial Fill: Req 0.028 > Limit 0.0196. Filling 0.0196 and keeping remainder.
+[Realism] Partial Fill: Req 0.597 > Limit 0.2430. Filling 0.24300000000000002 and keeping remainder.
+[Realism] Partial Fill: Req 0.354 > Limit 0.3130. Filling 0.313 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-07-22T23:59:59.999999", "chunk_start": "2025-07-16T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T06:58:24.698386Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.549 > Limit 0.4300. Filling 0.4300000000000001 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-07-29T23:59:59.999999", "chunk_start": "2025-07-23T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T06:58:43.255155Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.509 > Limit 0.0000. Filling 0.0 and keeping remainder.
+[Realism] Partial Fill: Req 0.509 > Limit 0.0090. Filling 0.009 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-08-05T23:59:59.999999", "chunk_start": "2025-07-30T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T06:58:59.049118Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.53 > Limit 0.0620. Filling 0.062 and keeping remainder.
+[Realism] Partial Fill: Req 0.025 > Limit 0.0048. Filling 0.0048000000000000004 and keeping remainder.
+[Realism] Partial Fill: Req 0.027 > Limit 0.0239. Filling 0.0239 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-08-12T23:59:59.999999", "chunk_start": "2025-08-06T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T06:59:17.229026Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.581 > Limit 0.0000. Filling 0.0 and keeping remainder.
+[Realism] Partial Fill: Req 0.581 > Limit 0.5200. Filling 0.52 and keeping remainder.
+[Realism] Partial Fill: Req 0.539 > Limit 0.3770. Filling 0.377 and keeping remainder.
+[Realism] Partial Fill: Req 0.545 > Limit 0.4480. Filling 0.44800000000000006 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-08-19T23:59:59.999999", "chunk_start": "2025-08-13T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T06:59:33.279629Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+{"chunk_days": 7, "chunk_end": "2025-08-26T23:59:59.999999", "chunk_start": "2025-08-20T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T06:59:52.882806Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.527 > Limit 0.0870. Filling 0.08700000000000001 and keeping remainder.
+[Realism] Partial Fill: Req 0.483 > Limit 0.0810. Filling 0.08100000000000002 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-09-02T23:59:59.999999", "chunk_start": "2025-08-27T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T07:00:13.050625Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.462 > Limit 0.0240. Filling 0.024000000000000004 and keeping remainder.
+[Realism] Partial Fill: Req 0.438 > Limit 0.1000. Filling 0.1 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-09-09T23:59:59.999999", "chunk_start": "2025-09-03T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T07:00:30.708537Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.459 > Limit 0.0030. Filling 0.003 and keeping remainder.
+[Realism] Partial Fill: Req 0.467 > Limit 0.0480. Filling 0.048 and keeping remainder.
+[Realism] Partial Fill: Req 0.47000000000000003 > Limit 0.1730. Filling 0.17300000000000001 and keeping remainder.
+[Realism] Partial Fill: Req 0.444 > Limit 0.0520. Filling 0.052000000000000005 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-09-16T23:59:59.999999", "chunk_start": "2025-09-10T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T07:00:53.072616Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+{"chunk_days": 7, "chunk_end": "2025-09-23T23:59:59.999999", "chunk_start": "2025-09-17T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T07:01:12.264579Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.431 > Limit 0.0380. Filling 0.038000000000000006 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-09-30T23:59:59.999999", "chunk_start": "2025-09-24T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T07:01:31.834255Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+{"chunk_days": 7, "chunk_end": "2025-10-07T23:59:59.999999", "chunk_start": "2025-10-01T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T07:01:52.655644Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.422 > Limit 0.0870. Filling 0.08700000000000001 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-10-14T23:59:59.999999", "chunk_start": "2025-10-08T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T07:02:10.877996Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.427 > Limit 0.0320. Filling 0.032 and keeping remainder.
+[Realism] Partial Fill: Req 0.395 > Limit 0.3460. Filling 0.34600000000000003 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-10-21T23:59:59.999999", "chunk_start": "2025-10-15T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T07:02:28.606484Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.498 > Limit 0.1820. Filling 0.18200000000000002 and keeping remainder.
+[Realism] Partial Fill: Req 0.503 > Limit 0.2310. Filling 0.231 and keeping remainder.
+[Realism] Partial Fill: Req 0.398 > Limit 0.0180. Filling 0.018 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-10-28T23:59:59.999999", "chunk_start": "2025-10-22T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T07:02:47.741249Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.322 > Limit 0.1280. Filling 0.128 and keeping remainder.
+[Realism] Partial Fill: Req 0.49 > Limit 0.0000. Filling 0.0 and keeping remainder.
+[Realism] Partial Fill: Req 0.49 > Limit 0.0000. Filling 0.0 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-11-04T23:59:59.999999", "chunk_start": "2025-10-29T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T07:03:04.304083Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.502 > Limit 0.3120. Filling 0.31200000000000006 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-11-11T23:59:59.999999", "chunk_start": "2025-11-05T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T07:03:24.371497Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.587 > Limit 0.0110. Filling 0.011000000000000001 and keeping remainder.
+[Realism] Partial Fill: Req 0.576 > Limit 0.0940. Filling 0.094 and keeping remainder.
+[Realism] Partial Fill: Req 0.482 > Limit 0.0000. Filling 0.0 and keeping remainder.
+[Realism] Partial Fill: Req 0.58 > Limit 0.3120. Filling 0.312 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-11-18T23:59:59.999999", "chunk_start": "2025-11-12T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T07:03:46.702160Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+{"chunk_days": 7, "chunk_end": "2025-11-25T23:59:59.999999", "chunk_start": "2025-11-19T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T07:04:05.715798Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.595 > Limit 0.3330. Filling 0.333 and keeping remainder.
+[Realism] Partial Fill: Req 0.26199999999999996 > Limit 0.1010. Filling 0.101 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-12-02T23:59:59.999999", "chunk_start": "2025-11-26T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T07:04:24.571768Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.67 > Limit 0.0310. Filling 0.031 and keeping remainder.
+[Realism] Partial Fill: Req 0.031 > Limit 0.0170. Filling 0.016999999999999998 and keeping remainder.
+[Realism] Partial Fill: Req 0.6950000000000001 > Limit 0.0540. Filling 0.054000000000000006 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-12-09T23:59:59.999999", "chunk_start": "2025-12-03T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T07:04:47.035097Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.715 > Limit 0.6500. Filling 0.65 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-12-16T23:59:59.999999", "chunk_start": "2025-12-10T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T07:05:02.365893Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.711 > Limit 0.0020. Filling 0.002 and keeping remainder.
+[Realism] Partial Fill: Req 0.709 > Limit 0.0370. Filling 0.037 and keeping remainder.
+[Realism] Partial Fill: Req 0.001 > Limit 0.0009. Filling 0.0009000000000000002 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-12-23T23:59:59.999999", "chunk_start": "2025-12-17T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T07:05:21.440948Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.753 > Limit 0.3400. Filling 0.34 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-12-30T23:59:59.999999", "chunk_start": "2025-12-24T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T07:05:42.130312Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.768 > Limit 0.1610. Filling 0.16100000000000003 and keeping remainder.
+[Realism] Partial Fill: Req 0.607 > Limit 0.1590. Filling 0.15900000000000003 and keeping remainder.
+[Realism] Partial Fill: Req 0.774 > Limit 0.3790. Filling 0.379 and keeping remainder.
+[Realism] Partial Fill: Req 0.032 > Limit 0.0000. Filling 0.0 and keeping remainder.
+[Realism] Partial Fill: Req 0.032 > Limit 0.0239. Filling 0.0239 and keeping remainder.
+[Realism] Partial Fill: Req 0.775 > Limit 0.0190. Filling 0.019000000000000003 and keeping remainder.
+[Realism] Partial Fill: Req 0.032 > Limit 0.0048. Filling 0.0048000000000000004 and keeping remainder.
+[Realism] Partial Fill: Req 0.031 > Limit 0.0098. Filling 0.009800000000000001 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-12-31T23:59:59.999999", "chunk_start": "2025-12-31T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T07:05:58.915908Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+{"event": "live_equivalent_split_complete", "final_equity": 9858.191591359597, "generated_at": "2026-05-03T07:06:02.345836Z", "metrics": {"cagr": -6.849072814341106e-06, "calmar": -0.0004529008986466275, "max_drawdown": 0.015122674374918923, "sharpe": -0.016884556904703835, "sortino": -0.009061947155907173, "total_return": -0.014180840864040367, "volatility": 0.00040088382773908}, "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train", "trade_count": 2213}
+{"end_inclusive": "2026-02-28", "event": "live_equivalent_split_start", "generated_at": "2026-05-03T07:06:02.345923Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "val", "start": "2026-01-01", "symbols": ["BTC/USDT", "ETH/USDT", "SOL/USDT"]}
+{"chunk_days": 7, "chunk_end": "2026-01-07T23:59:59.999999", "chunk_start": "2026-01-01T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T07:06:02.346923Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "val"}
+[Realism] Partial Fill: Req 0.77 > Limit 0.5930. Filling 0.593 and keeping remainder.
+[Realism] Partial Fill: Req 0.17700000000000005 > Limit 0.0010. Filling 0.001 and keeping remainder.
+[Realism] Partial Fill: Req 0.756 > Limit 0.0820. Filling 0.082 and keeping remainder.
+[Realism] Partial Fill: Req 0.674 > Limit 0.3890. Filling 0.389 and keeping remainder.
+[Realism] Partial Fill: Req 0.735 > Limit 0.0110. Filling 0.011000000000000001 and keeping remainder.
+[Realism] Partial Fill: Req 0.724 > Limit 0.3880. Filling 0.388 and keeping remainder.
+[Realism] Partial Fill: Req 0.03 > Limit 0.0000. Filling 0.0 and keeping remainder.
+[Realism] Partial Fill: Req 0.03 > Limit 0.0106. Filling 0.0106 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2026-01-14T23:59:59.999999", "chunk_start": "2026-01-08T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T07:06:24.630714Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "val"}
+[Realism] Partial Fill: Req 0.001 > Limit 0.0003. Filling 0.00030000000000000003 and keeping remainder.
+[Realism] Partial Fill: Req 0.704 > Limit 0.5040. Filling 0.504 and keeping remainder.
+[Realism] Partial Fill: Req 0.19999999999999996 > Limit 0.0370. Filling 0.037000000000000005 and keeping remainder.
+[Realism] Partial Fill: Req 0.7030000000000001 > Limit 0.0290. Filling 0.028999999999999998 and keeping remainder.
+[Realism] Partial Fill: Req 0.03 > Limit 0.0090. Filling 0.009 and keeping remainder.
+[Realism] Partial Fill: Req 0.020999999999999998 > Limit 0.0010. Filling 0.001 and keeping remainder.
+[Realism] Partial Fill: Req 0.638 > Limit 0.3150. Filling 0.315 and keeping remainder.
+[Realism] Partial Fill: Req 0.323 > Limit 0.0580. Filling 0.057999999999999996 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2026-01-21T23:59:59.999999", "chunk_start": "2026-01-15T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T07:06:41.376975Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "val"}
+[Realism] Partial Fill: Req 0.667 > Limit 0.0000. Filling 0.0 and keeping remainder.
+[Realism] Partial Fill: Req 0.667 > Limit 0.0030. Filling 0.003 and keeping remainder.
+[Realism] Partial Fill: Req 0.664 > Limit 0.0010. Filling 0.001 and keeping remainder.
+[Realism] Partial Fill: Req 0.001 > Limit 0.0002. Filling 0.0002 and keeping remainder.
+[Realism] Partial Fill: Req 0.712 > Limit 0.6670. Filling 0.667 and keeping remainder.
+[Realism] Partial Fill: Req 0.04499999999999993 > Limit 0.0410. Filling 0.041 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2026-01-28T23:59:59.999999", "chunk_start": "2026-01-22T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T07:07:00.534739Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "val"}
+[Realism] Partial Fill: Req 0.032 > Limit 0.0000. Filling 0.0 and keeping remainder.
+[Realism] Partial Fill: Req 0.032 > Limit 0.0193. Filling 0.0193 and keeping remainder.
+[Realism] Partial Fill: Req 0.0127 > Limit 0.0076. Filling 0.0076 and keeping remainder.
+[Realism] Partial Fill: Req 0.0050999999999999995 > Limit 0.0000. Filling 0.0 and keeping remainder.
+[Realism] Partial Fill: Req 0.001 > Limit 0.0001. Filling 0.0001 and keeping remainder.
+[Realism] Partial Fill: Req 0.749 > Limit 0.4450. Filling 0.44500000000000006 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2026-02-04T23:59:59.999999", "chunk_start": "2026-01-29T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T07:07:18.873396Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "val"}
+[Realism] Partial Fill: Req 0.001 > Limit 0.0009. Filling 0.0009000000000000002 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2026-02-11T23:59:59.999999", "chunk_start": "2026-02-05T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T07:07:35.545509Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "val"}
+[Realism] Partial Fill: Req 0.834 > Limit 0.5530. Filling 0.553 and keeping remainder.
+[Realism] Partial Fill: Req 0.2809999999999999 > Limit 0.1380. Filling 0.13799999999999998 and keeping remainder.
+[Realism] Partial Fill: Req 0.14299999999999993 > Limit 0.0000. Filling 0.0 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2026-02-18T23:59:59.999999", "chunk_start": "2026-02-12T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T07:07:54.279694Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "val"}
+[Realism] Partial Fill: Req 1.172 > Limit 1.0690. Filling 1.0690000000000002 and keeping remainder.
+[Realism] Partial Fill: Req 1.075 > Limit 0.2550. Filling 0.255 and keeping remainder.
+[Realism] Partial Fill: Req 1.115 > Limit 0.4750. Filling 0.47500000000000003 and keeping remainder.
+[Realism] Partial Fill: Req 0.6399999999999999 > Limit 0.0100. Filling 0.010000000000000002 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2026-02-25T23:59:59.999999", "chunk_start": "2026-02-19T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T07:08:10.456197Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "val"}
+[Realism] Partial Fill: Req 1.17 > Limit 0.3500. Filling 0.35000000000000003 and keeping remainder.
+[Realism] Partial Fill: Req 0.001 > Limit 0.0002. Filling 0.0002 and keeping remainder.
+[Realism] Partial Fill: Req 1.161 > Limit 1.0290. Filling 1.029 and keeping remainder.
+[Realism] Partial Fill: Req 1.124 > Limit 0.0450. Filling 0.045000000000000005 and keeping remainder.
+[Realism] Partial Fill: Req 1.0790000000000002 > Limit 0.1360. Filling 0.136 and keeping remainder.
+[Realism] Partial Fill: Req 0.9430000000000002 > Limit 0.0400. Filling 0.04000000000000001 and keeping remainder.
+[Realism] Partial Fill: Req 0.9030000000000001 > Limit 0.1600. Filling 0.16 and keeping remainder.
+[Realism] Partial Fill: Req 1.162 > Limit 1.0680. Filling 1.068 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2026-02-28T23:59:59.999999", "chunk_start": "2026-02-26T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T07:08:26.260330Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "val"}
+{"event": "live_equivalent_split_complete", "final_equity": 9986.984078815347, "generated_at": "2026-05-03T07:08:33.917501Z", "metrics": {"cagr": -3.863434648643249e-06, "calmar": -0.0011540195780024307, "max_drawdown": 0.0033478068503228734, "sharpe": -0.04345888895286071, "sortino": -0.035350608686069575, "total_return": -0.0013015921184652557, "volatility": 8.880803893788271e-05}, "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "val", "trade_count": 469}
+{"end_inclusive": "2026-05-02", "event": "live_equivalent_split_start", "generated_at": "2026-05-03T07:08:33.917623Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "oos", "start": "2026-03-01", "symbols": ["BTC/USDT", "ETH/USDT", "SOL/USDT"]}
+{"chunk_days": 7, "chunk_end": "2026-03-07T23:59:59.999999", "chunk_start": "2026-03-01T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T07:08:33.918271Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "oos"}
+[Realism] Partial Fill: Req 1.131 > Limit 0.2860. Filling 0.286 and keeping remainder.
+[Realism] Partial Fill: Req 0.845 > Limit 0.0030. Filling 0.003 and keeping remainder.
+[Realism] Partial Fill: Req 1.139 > Limit 0.2370. Filling 0.23700000000000002 and keeping remainder.
+[Realism] Partial Fill: Req 0.902 > Limit 0.0100. Filling 0.010000000000000002 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2026-03-14T23:59:59.999999", "chunk_start": "2026-03-08T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T07:08:54.509509Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "oos"}
+[Realism] Partial Fill: Req 0.001 > Limit 0.0008. Filling 0.0008 and keeping remainder.
+[Realism] Partial Fill: Req 0.00019999999999999998 > Limit 0.0000. Filling 0.0 and keeping remainder.
+[Realism] Partial Fill: Req 1.103 > Limit 0.0440. Filling 0.044000000000000004 and keeping remainder.
+[Realism] Partial Fill: Req 1.059 > Limit 0.0190. Filling 0.019000000000000003 and keeping remainder.
+[Realism] Partial Fill: Req 1.04 > Limit 0.0000. Filling 0.0 and keeping remainder.
+[Realism] Partial Fill: Req 1.04 > Limit 0.0000. Filling 0.0 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2026-03-21T23:59:59.999999", "chunk_start": "2026-03-15T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T07:09:11.160018Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "oos"}
+[Realism] Partial Fill: Req 1.0190000000000001 > Limit 0.7460. Filling 0.7460000000000001 and keeping remainder.
+[Realism] Partial Fill: Req 0.273 > Limit 0.2000. Filling 0.2 and keeping remainder.
+[Realism] Partial Fill: Req 0.044 > Limit 0.0439. Filling 0.0439 and keeping remainder.
+[Realism] Partial Fill: Req 1.07 > Limit 0.0070. Filling 0.007000000000000001 and keeping remainder.
+[Realism] Partial Fill: Req 1.0630000000000002 > Limit 0.0000. Filling 0.0 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2026-03-28T23:59:59.999999", "chunk_start": "2026-03-22T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T07:09:27.552908Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "oos"}
+[Realism] Partial Fill: Req 1.044 > Limit 0.4770. Filling 0.477 and keeping remainder.
+[Realism] Partial Fill: Req 0.5670000000000001 > Limit 0.4150. Filling 0.415 and keeping remainder.
+[Realism] Partial Fill: Req 1.0150000000000001 > Limit 0.3630. Filling 0.363 and keeping remainder.
+[Realism] Partial Fill: Req 0.6520000000000001 > Limit 0.0420. Filling 0.04200000000000001 and keeping remainder.
+[Realism] Partial Fill: Req 1.068 > Limit 0.3460. Filling 0.34600000000000003 and keeping remainder.
+[Realism] Partial Fill: Req 0.722 > Limit 0.4340. Filling 0.434 and keeping remainder.
+[Realism] Partial Fill: Req 0.046 > Limit 0.0042. Filling 0.0042 and keeping remainder.
+[Realism] Partial Fill: Req 1.116 > Limit 0.0360. Filling 0.036 and keeping remainder.
+[Realism] Partial Fill: Req 1.08 > Limit 0.0100. Filling 0.010000000000000002 and keeping remainder.
+[Realism] Partial Fill: Req 1.07 > Limit 1.0520. Filling 1.0519999999999998 and keeping remainder.
+[Realism] Partial Fill: Req 0.048 > Limit 0.0000. Filling 0.0 and keeping remainder.
+[Realism] Partial Fill: Req 0.001 > Limit 0.0002. Filling 0.0002 and keeping remainder.
+[Realism] Partial Fill: Req 1.162 > Limit 0.0000. Filling 0.0 and keeping remainder.
+[Realism] Partial Fill: Req 0.0008 > Limit 0.0002. Filling 0.0002 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2026-04-04T23:59:59.999999", "chunk_start": "2026-03-29T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T07:09:48.652901Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "oos"}
+[Realism] Partial Fill: Req 1.163 > Limit 0.0190. Filling 0.019000000000000003 and keeping remainder.
+[Realism] Partial Fill: Req 1.1440000000000001 > Limit 0.0090. Filling 0.009000000000000001 and keeping remainder.
+[Realism] Partial Fill: Req 1.213 > Limit 0.0420. Filling 0.042 and keeping remainder.
+[Realism] Partial Fill: Req 0.046 > Limit 0.0040. Filling 0.004 and keeping remainder.
+[Realism] Partial Fill: Req 1.198 > Limit 0.0080. Filling 0.008 and keeping remainder.
+[Realism] Partial Fill: Req 1.19 > Limit 0.0070. Filling 0.007000000000000001 and keeping remainder.
+[Realism] Partial Fill: Req 1.183 > Limit 0.0000. Filling 0.0 and keeping remainder.
+[Realism] Partial Fill: Req 1.183 > Limit 0.3340. Filling 0.334 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2026-04-11T23:59:59.999999", "chunk_start": "2026-04-05T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T07:10:06.557773Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "oos"}
+[Realism] Partial Fill: Req 1.203 > Limit 0.0120. Filling 0.012 and keeping remainder.
+[Realism] Partial Fill: Req 1.205 > Limit 0.0260. Filling 0.026000000000000002 and keeping remainder.
+[Realism] Partial Fill: Req 1.179 > Limit 0.1470. Filling 0.147 and keeping remainder.
+[Realism] Partial Fill: Req 1.1440000000000001 > Limit 0.0170. Filling 0.017 and keeping remainder.
+[Realism] Partial Fill: Req 0.042 > Limit 0.0123. Filling 0.0123 and keeping remainder.
+[Realism] Partial Fill: Req 0.029700000000000004 > Limit 0.0066. Filling 0.006600000000000001 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2026-04-18T23:59:59.999999", "chunk_start": "2026-04-12T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T07:10:24.068556Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "oos"}
+[Realism] Partial Fill: Req 1.17 > Limit 0.0560. Filling 0.05600000000000001 and keeping remainder.
+[Realism] Partial Fill: Req 1.1139999999999999 > Limit 0.1860. Filling 0.18600000000000003 and keeping remainder.
+[Realism] Partial Fill: Req 1.173 > Limit 0.0080. Filling 0.008 and keeping remainder.
+[Realism] Partial Fill: Req 1.156 > Limit 0.0080. Filling 0.008 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2026-04-25T23:59:59.999999", "chunk_start": "2026-04-19T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T07:10:43.261748Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "oos"}
+[Realism] Partial Fill: Req 0.041 > Limit 0.0380. Filling 0.038000000000000006 and keeping remainder.
+[Realism] Partial Fill: Req 1.133 > Limit 0.3240. Filling 0.324 and keeping remainder.
+[Realism] Partial Fill: Req 0.0029999999999999957 > Limit 0.0005. Filling 0.0005 and keeping remainder.
+[Realism] Partial Fill: Req 0.8089999999999999 > Limit 0.0220. Filling 0.022000000000000002 and keeping remainder.
+[Realism] Partial Fill: Req 1.1400000000000001 > Limit 1.0620. Filling 1.062 and keeping remainder.
+[Realism] Partial Fill: Req 0.07800000000000007 > Limit 0.0070. Filling 0.007000000000000001 and keeping remainder.
+[Realism] Partial Fill: Req 1.12 > Limit 0.3940. Filling 0.394 and keeping remainder.
+[Realism] Partial Fill: Req 0.7260000000000001 > Limit 0.0000. Filling 0.0 and keeping remainder.
+[Realism] Partial Fill: Req 1.098 > Limit 0.2350. Filling 0.235 and keeping remainder.
+[Realism] Partial Fill: Req 1.124 > Limit 0.0060. Filling 0.006 and keeping remainder.
+[Realism] Partial Fill: Req 0.041 > Limit 0.0000. Filling 0.0 and keeping remainder.
+[Realism] Partial Fill: Req 0.041 > Limit 0.0000. Filling 0.0 and keeping remainder.
+[Realism] Partial Fill: Req 1.117 > Limit 0.0000. Filling 0.0 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2026-05-02T23:59:59.999999", "chunk_start": "2026-04-26T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T07:10:59.713131Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "oos"}
+[Realism] Partial Fill: Req 1.1260000000000001 > Limit 0.0800. Filling 0.08000000000000002 and keeping remainder.
+[Realism] Partial Fill: Req 1.046 > Limit 0.4860. Filling 0.48600000000000004 and keeping remainder.
+[Realism] Partial Fill: Req 0.041 > Limit 0.0000. Filling 0.0 and keeping remainder.
+[Realism] Partial Fill: Req 0.001 > Limit 0.0000. Filling 0.0 and keeping remainder.
+[Realism] Partial Fill: Req 0.042 > Limit 0.0219. Filling 0.021900000000000003 and keeping remainder.
+[Realism] Partial Fill: Req 1.1420000000000001 > Limit 0.0000. Filling 0.0 and keeping remainder.
+[Realism] Partial Fill: Req 1.1440000000000001 > Limit 0.4090. Filling 0.40900000000000003 and keeping remainder.
+[Realism] Partial Fill: Req 0.7350000000000001 > Limit 0.2940. Filling 0.29400000000000004 and keeping remainder.
+[Realism] Partial Fill: Req 0.44100000000000006 > Limit 0.0700. Filling 0.06999999999999999 and keeping remainder.
+[Realism] Partial Fill: Req 0.001 > Limit 0.0007. Filling 0.0007000000000000001 and keeping remainder.
+[Realism] Partial Fill: Req 1.143 > Limit 0.1080. Filling 0.10800000000000001 and keeping remainder.
+{"event": "live_equivalent_split_complete", "final_equity": 9999.416307887011, "generated_at": "2026-05-03T07:11:19.300842Z", "metrics": {"cagr": -1.6486743359411804e-07, "calmar": -1.4284884984105034e-05, "max_drawdown": 0.011541390342139125, "sharpe": 0.00013584228724878637, "sortino": 8.481210436043823e-05, "total_return": -5.934921129879811e-05, "volatility": 0.0007259439493905879}, "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "oos", "trade_count": 488}
+{
+  "artifact_reset_csv": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/derivatives_oos/profit_moonshot_derivatives_taker_flow_mode_scoped/live_equivalent_revalidation_artifact_reset_20260426.csv",
+  "json": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/derivatives_oos/profit_moonshot_derivatives_taker_flow_mode_scoped/live_equivalent_revalidation_latest.json",
+  "live_decision": "",
+  "markdown": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/derivatives_oos/profit_moonshot_derivatives_taker_flow_mode_scoped/live_equivalent_revalidation_latest.md",
+  "mode_csv": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/derivatives_oos/profit_moonshot_derivatives_taker_flow_mode_scoped/live_equivalent_revalidation_candidates_20260426.csv"
+}
+	Command being timed: "uv run python scripts/research/revalidate_live_equivalent_candidates.py --portfolio-modes profit_moonshot_derivatives_taker_flow_mode --output-dir var/reports/profit_moonshot_20260501/derivatives_oos/profit_moonshot_derivatives_taker_flow_mode_scoped --backtest-checkpoint-path var/reports/profit_moonshot_20260501/derivatives_oos/profit_moonshot_derivatives_taker_flow_mode_scoped_checkpoint.json --execute-backtests --chunk-days 7 --no-live-decision-update"
+	User time (seconds): 1322.48
+	System time (seconds): 103.61
+	Percent of CPU this job got: 109%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 21:37.02
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 2467008
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 26
+	Minor (reclaiming a frame) page faults: 5119032
+	Voluntary context switches: 3296990
+	Involuntary context switches: 40871
+	Swaps: 0
+	File system inputs: 33784
+	File system outputs: 7080
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

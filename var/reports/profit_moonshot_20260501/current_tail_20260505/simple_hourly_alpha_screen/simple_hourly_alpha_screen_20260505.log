@@ -1,0 +1,674 @@
+{
+  "count": 676,
+  "rss_mib": 2795.3203125,
+  "top": [
+    {
+      "kind": "single",
+      "symbol": "SOL/USDT",
+      "family": "reversion",
+      "side": "both",
+      "lookback": 48,
+      "horizon": 48,
+      "threshold": 0.05,
+      "metrics": {
+        "train": {
+          "count": 3162,
+          "mean": 0.005215504509043716,
+          "edge": 0.0034155045090437162,
+          "hit": 0.562618595825427,
+          "sum_edge": 10.79982525759623,
+          "t": 4.6216112451589,
+          "long": 1632,
+          "short": 1530
+        },
+        "val": {
+          "count": 507,
+          "mean": 0.011793894804219265,
+          "edge": 0.009993894804219266,
+          "hit": 0.5641025641025641,
+          "sum_edge": 5.066904665739168,
+          "t": 3.9374996740649046,
+          "long": 337,
+          "short": 170
+        },
+        "oos": {
+          "count": 285,
+          "mean": 0.020862031653862672,
+          "edge": 0.019062031653862672,
+          "hit": 0.712280701754386,
+          "sum_edge": 5.432679021350862,
+          "t": 10.008274037223197,
+          "long": 140,
+          "short": 145
+        }
+      },
+      "valid": true,
+      "score": 9.04611387998007
+    },
+    {
+      "kind": "single",
+      "symbol": "SOL/USDT",
+      "family": "reversion",
+      "side": "short_only",
+      "lookback": 72,
+      "horizon": 48,
+      "threshold": 0.05,
+      "metrics": {
+        "train": {
+          "count": 1841,
+          "mean": 0.006241723696299001,
+          "edge": 0.004441723696299001,
+          "hit": 0.594785442694188,
+          "sum_edge": 8.177213324886463,
+          "t": 4.258391797243504,
+          "long": 0,
+          "short": 1841
+        },
+        "val": {
+          "count": 229,
+          "mean": 0.017522778909853518,
+          "edge": 0.01572277890985352,
+          "hit": 0.6943231441048034,
+          "sum_edge": 3.600516370356456,
+          "t": 6.972274367622379,
+          "long": 0,
+          "short": 229
+        },
+        "oos": {
+          "count": 178,
+          "mean": 0.03348622947248924,
+          "edge": 0.03168622947248924,
+          "hit": 0.7696629213483146,
+          "sum_edge": 5.640148846103086,
+          "t": 9.349761745974558,
+          "long": 0,
+          "short": 178
+        }
+      },
+      "valid": true,
+      "score": 8.258128363769961
+    },
+    {
+      "kind": "single",
+      "symbol": "ETH/USDT",
+      "family": "reversion",
+      "side": "both",
+      "lookback": 48,
+      "horizon": 48,
+      "threshold": 0.05,
+      "metrics": {
+        "train": {
+          "count": 2463,
+          "mean": 0.0059724049847248465,
+          "edge": 0.004172404984724846,
+          "hit": 0.5688185140073082,
+          "sum_edge": 10.276633477377299,
+          "t": 5.438970645565567,
+          "long": 1251,
+          "short": 1212
+        },
+        "val": {
+          "count": 443,
+          "mean": 0.005239748827758661,
+          "edge": 0.003439748827758661,
+          "hit": 0.5598194130925508,
+          "sum_edge": 1.523808730697087,
+          "t": 1.608969510878174,
+          "long": 291,
+          "short": 152
+        },
+        "oos": {
+          "count": 311,
+          "mean": 0.02099686965294596,
+          "edge": 0.01919686965294596,
+          "hit": 0.7266881028938906,
+          "sum_edge": 5.970226462066194,
+          "t": 10.449766884981651,
+          "long": 130,
+          "short": 181
+        }
+      },
+      "valid": true,
+      "score": 7.759794175152467
+    },
+    {
+      "kind": "single",
+      "symbol": "BTC/USDT",
+      "family": "reversion",
+      "side": "both",
+      "lookback": 48,
+      "horizon": 48,
+      "threshold": 0.03,
+      "metrics": {
+        "train": {
+          "count": 2274,
+          "mean": 0.002985940785142927,
+          "edge": 0.0011859407851429271,
+          "hit": 0.5633245382585752,
+          "sum_edge": 2.696829345415016,
+          "t": 4.364640087601602,
+          "long": 1154,
+          "short": 1120
+        },
+        "val": {
+          "count": 518,
+          "mean": 0.007034601323552056,
+          "edge": 0.005234601323552057,
+          "hit": 0.6003861003861004,
+          "sum_edge": 2.7115234855999653,
+          "t": 4.151487668555671,
+          "long": 349,
+          "short": 169
+        },
+        "oos": {
+          "count": 497,
+          "mean": 0.008554781050770437,
+          "edge": 0.006754781050770438,
+          "hit": 0.5895372233400402,
+          "sum_edge": 3.357126182232907,
+          "t": 6.050397863511434,
+          "long": 172,
+          "short": 325
+        }
+      },
+      "valid": true,
+      "score": 4.982570859574391
+    },
+    {
+      "kind": "single",
+      "symbol": "SOL/USDT",
+      "family": "reversion",
+      "side": "short_only",
+      "lookback": 72,
+      "horizon": 24,
+      "threshold": 0.05,
+      "metrics": {
+        "train": {
+          "count": 1841,
+          "mean": 0.004519941116504745,
+          "edge": 0.0027199411165047447,
+          "hit": 0.5578489951113526,
+          "sum_edge": 5.007411595485234,
+          "t": 4.072276489896264,
+          "long": 0,
+          "short": 1841
+        },
+        "val": {
+          "count": 229,
+          "mean": 0.01136506192863662,
+          "edge": 0.00956506192863662,
+          "hit": 0.5633187772925764,
+          "sum_edge": 2.190399181657786,
+          "t": 5.835399282313489,
+          "long": 0,
+          "short": 229
+        },
+        "oos": {
+          "count": 178,
+          "mean": 0.020563334633038048,
+          "edge": 0.01876333463303805,
+          "hit": 0.7752808988764045,
+          "sum_edge": 3.3398735646807722,
+          "t": 9.132629263857783,
+          "long": 0,
+          "short": 178
+        }
+      },
+      "valid": true,
+      "score": 4.935814315058188
+    },
+    {
+      "kind": "single",
+      "symbol": "BTC/USDT",
+      "family": "reversion",
+      "side": "both",
+      "lookback": 48,
+      "horizon": 48,
+      "threshold": 0.05,
+      "metrics": {
+        "train": {
+          "count": 801,
+          "mean": 0.004454145709444925,
+          "edge": 0.0026541457094449252,
+          "hit": 0.5243445692883895,
+          "sum_edge": 2.125970713265385,
+          "t": 3.746929409931648,
+          "long": 428,
+          "short": 373
+        },
+        "val": {
+          "count": 264,
+          "mean": 0.0077519674880998325,
+          "edge": 0.005951967488099832,
+          "hit": 0.5795454545454546,
+          "sum_edge": 1.571319416858356,
+          "t": 2.7537380908632976,
+          "long": 182,
+          "short": 82
+        },
+        "oos": {
+          "count": 148,
+          "mean": 0.020748933476290515,
+          "edge": 0.018948933476290515,
+          "hit": 0.7702702702702703,
+          "sum_edge": 2.8044421544909963,
+          "t": 8.496887727619255,
+          "long": 83,
+          "short": 65
+        }
+      },
+      "valid": true,
+      "score": 3.802698934246713
+    },
+    {
+      "kind": "single",
+      "symbol": "BNB/USDT",
+      "family": "reversion",
+      "side": "both",
+      "lookback": 48,
+      "horizon": 48,
+      "threshold": 0.03,
+      "metrics": {
+        "train": {
+          "count": 2874,
+          "mean": 0.004208634839412062,
+          "edge": 0.0024086348394120618,
+          "hit": 0.5629784272790536,
+          "sum_edge": 6.922416528470264,
+          "t": 5.256353200962822,
+          "long": 1321,
+          "short": 1553
+        },
+        "val": {
+          "count": 547,
+          "mean": 0.00313494221526548,
+          "edge": 0.00133494221526548,
+          "hit": 0.6343692870201096,
+          "sum_edge": 0.7302133917502177,
+          "t": 1.640246703704452,
+          "long": 351,
+          "short": 196
+        },
+        "oos": {
+          "count": 353,
+          "mean": 0.00740156795367297,
+          "edge": 0.0056015679536729705,
+          "hit": 0.6090651558073654,
+          "sum_edge": 1.9773534876465584,
+          "t": 5.714427075703789,
+          "long": 180,
+          "short": 173
+        }
+      },
+      "valid": true,
+      "score": 3.0347018363686935
+    },
+    {
+      "kind": "single",
+      "symbol": "SOL/USDT",
+      "family": "reversion",
+      "side": "long_only",
+      "lookback": 48,
+      "horizon": 48,
+      "threshold": 0.05,
+      "metrics": {
+        "train": {
+          "count": 1632,
+          "mean": 0.006890091966546726,
+          "edge": 0.005090091966546726,
+          "hit": 0.5569852941176471,
+          "sum_edge": 8.307030089404257,
+          "t": 4.818012016814631,
+          "long": 1632,
+          "short": 0
+        },
+        "val": {
+          "count": 337,
+          "mean": 0.006442760209595953,
+          "edge": 0.004642760209595953,
+          "hit": 0.5103857566765578,
+          "sum_edge": 1.5646101906338368,
+          "t": 1.543447692117245,
+          "long": 337,
+          "short": 0
+        },
+        "oos": {
+          "count": 140,
+          "mean": 0.008964569963217022,
+          "edge": 0.007164569963217023,
+          "hit": 0.6071428571428571,
+          "sum_edge": 1.003039794850383,
+          "t": 4.050436808088734,
+          "long": 140,
+          "short": 0
+        }
+      },
+      "valid": true,
+      "score": 2.6160478991077274
+    },
+    {
+      "kind": "single",
+      "symbol": "TRX/USDT",
+      "family": "reversion",
+      "side": "both",
+      "lookback": 48,
+      "horizon": 48,
+      "threshold": 0.02,
+      "metrics": {
+        "train": {
+          "count": 3398,
+          "mean": 0.0038997215945914794,
+          "edge": 0.0020997215945914795,
+          "hit": 0.5264861683343143,
+          "sum_edge": 7.134853978421847,
+          "t": 7.317823381371085,
+          "long": 1569,
+          "short": 1829
+        },
+        "val": {
+          "count": 406,
+          "mean": 0.008812964559319094,
+          "edge": 0.0070129645593190945,
+          "hit": 0.6699507389162561,
+          "sum_edge": 2.8472636110835525,
+          "t": 8.01916545469732,
+          "long": 208,
+          "short": 198
+        },
+        "oos": {
+          "count": 181,
+          "mean": 0.00443865398549744,
+          "edge": 0.0026386539854974396,
+          "hit": 0.6519337016574586,
+          "sum_edge": 0.4775963713750366,
+          "t": 4.17671802576398,
+          "long": 27,
+          "short": 154
+        }
+      },
+      "valid": true,
+      "score": 2.614713574758998
+    },
+    {
+      "kind": "single",
+      "symbol": "TRX/USDT",
+      "family": "reversion",
+      "side": "both",
+      "lookback": 48,
+      "horizon": 48,
+      "threshold": 0.03,
+      "metrics": {
+        "train": {
+          "count": 1926,
+          "mean": 0.005842593747097101,
+          "edge": 0.004042593747097102,
+          "hit": 0.5384215991692627,
+          "sum_edge": 7.786035556909018,
+          "t": 7.692842649666682,
+          "long": 934,
+          "short": 992
+        },
+        "val": {
+          "count": 162,
+          "mean": 0.017480214768674576,
+          "edge": 0.015680214768674577,
+          "hit": 0.7962962962962963,
+          "sum_edge": 2.540194792525281,
+          "t": 11.1639888321792,
+          "long": 107,
+          "short": 55
+        },
+        "oos": {
+          "count": 44,
+          "mean": 0.013351633905613076,
+          "edge": 0.011551633905613076,
+          "hit": 0.8636363636363636,
+          "sum_edge": 0.5082718918469754,
+          "t": 6.486442939961904,
+          "long": 2,
+          "short": 42
+        }
+      },
+      "valid": true,
+      "score": 2.5569728438005175
+    },
+    {
+      "kind": "single",
+      "symbol": "TRX/USDT",
+      "family": "reversion",
+      "side": "long_only",
+      "lookback": 48,
+      "horizon": 48,
+      "threshold": 0.006,
+      "metrics": {
+        "train": {
+          "count": 3150,
+          "mean": 0.0026304745869142002,
+          "edge": 0.0008304745869142003,
+          "hit": 0.5349206349206349,
+          "sum_edge": 2.6159949487797314,
+          "t": 5.118488140489594,
+          "long": 3150,
+          "short": 0
+        },
+        "val": {
+          "count": 467,
+          "mean": 0.002955911097533232,
+          "edge": 0.0011559110975332318,
+          "hit": 0.5588865096359743,
+          "sum_edge": 0.5398104825480192,
+          "t": 3.8127510002126535,
+          "long": 467,
+          "short": 0
+        },
+        "oos": {
+          "count": 283,
+          "mean": 0.008118815198427047,
+          "edge": 0.0063188151984270476,
+          "hit": 0.7385159010600707,
+          "sum_edge": 1.7882247011548544,
+          "t": 10.250664485892253,
+          "long": 283,
+          "short": 0
+        }
+      },
+      "valid": true,
+      "score": 2.319729437306837
+    },
+    {
+      "kind": "single",
+      "symbol": "TRX/USDT",
+      "family": "reversion",
+      "side": "both",
+      "lookback": 72,
+      "horizon": 24,
+      "threshold": 0.03,
+      "metrics": {
+        "train": {
+          "count": 2709,
+          "mean": 0.004558199589380769,
+          "edge": 0.002758199589380769,
+          "hit": 0.5884090070136582,
+          "sum_edge": 7.471962687632503,
+          "t": 10.394863891562776,
+          "long": 1287,
+          "short": 1422
+        },
+        "val": {
+          "count": 268,
+          "mean": 0.0060623522898966605,
+          "edge": 0.004262352289896661,
+          "hit": 0.7164179104477612,
+          "sum_edge": 1.142310413692305,
+          "t": 9.091843014145777,
+          "long": 144,
+          "short": 124
+        },
+        "oos": {
+          "count": 64,
+          "mean": 0.010799316396822255,
+          "edge": 0.008999316396822256,
+          "hit": 0.828125,
+          "sum_edge": 0.5759562493966244,
+          "t": 6.3099431946747195,
+          "long": 8,
+          "short": 56
+        }
+      },
+      "valid": true,
+      "score": 1.8943077250060272
+    },
+    {
+      "kind": "single",
+      "symbol": "BTC/USDT",
+      "family": "reversion",
+      "side": "both",
+      "lookback": 72,
+      "horizon": 24,
+      "threshold": 0.05,
+      "metrics": {
+        "train": {
+          "count": 1288,
+          "mean": 0.003057073490755873,
+          "edge": 0.001257073490755873,
+          "hit": 0.5023291925465838,
+          "sum_edge": 1.6191106560935644,
+          "t": 3.8711429115080773,
+          "long": 664,
+          "short": 624
+        },
+        "val": {
+          "count": 332,
+          "mean": 0.0033494797771811574,
+          "edge": 0.0015494797771811574,
+          "hit": 0.6054216867469879,
+          "sum_edge": 0.5144272860241444,
+          "t": 1.5457046392839562,
+          "long": 265,
+          "short": 67
+        },
+        "oos": {
+          "count": 234,
+          "mean": 0.008061657536596937,
+          "edge": 0.006261657536596937,
+          "hit": 0.6965811965811965,
+          "sum_edge": 1.465227863563683,
+          "t": 6.651880932803751,
+          "long": 100,
+          "short": 134
+        }
+      },
+      "valid": true,
+      "score": 1.8843525721851118
+    },
+    {
+      "kind": "single",
+      "symbol": "TRX/USDT",
+      "family": "reversion",
+      "side": "long_only",
+      "lookback": 48,
+      "horizon": 48,
+      "threshold": 0.01,
+      "metrics": {
+        "train": {
+          "count": 2575,
+          "mean": 0.0030297848550071113,
+          "edge": 0.0012297848550071114,
+          "hit": 0.5351456310679612,
+          "sum_edge": 3.166696001643312,
+          "t": 5.287926153765161,
+          "long": 2575,
+          "short": 0
+        },
+        "val": {
+          "count": 343,
+          "mean": 0.0039000608686183143,
+          "edge": 0.0021000608686183144,
+          "hit": 0.5889212827988338,
+          "sum_edge": 0.7203208779360819,
+          "t": 4.18280372528368,
+          "long": 343,
+          "short": 0
+        },
+        "oos": {
+          "count": 199,
+          "mean": 0.007540438944993909,
+          "edge": 0.005740438944993908,
+          "hit": 0.7035175879396985,
+          "sum_edge": 1.1423473500537877,
+          "t": 7.72273821676672,
+          "long": 199,
+          "short": 0
+        }
+      },
+      "valid": true,
+      "score": 1.81917738918616
+    },
+    {
+      "kind": "single",
+      "symbol": "TRX/USDT",
+      "family": "reversion",
+      "side": "both",
+      "lookback": 24,
+      "horizon": 48,
+      "threshold": 0.02,
+      "metrics": {
+        "train": {
+          "count": 2253,
+          "mean": 0.003890491893556836,
+          "edge": 0.002090491893556836,
+          "hit": 0.5454948956946294,
+          "sum_edge": 4.709878236183551,
+          "t": 5.847185743902335,
+          "long": 1054,
+          "short": 1199
+        },
+        "val": {
+          "count": 207,
+          "mean": 0.007180679664855258,
+          "edge": 0.005380679664855259,
+          "hit": 0.5990338164251208,
+          "sum_edge": 1.1138006906250384,
+          "t": 4.70117356160679,
+          "long": 127,
+          "short": 80
+        },
+        "oos": {
+          "count": 109,
+          "mean": 0.007222101181083806,
+          "edge": 0.005422101181083806,
+          "hit": 0.7431192660550459,
+          "sum_edge": 0.5910090287381349,
+          "t": 5.454208907078149,
+          "long": 19,
+          "short": 90
+        }
+      },
+      "valid": true,
+      "score": 1.6188971976690092
+    }
+  ]
+}
+	Command being timed: "uv run python /tmp/screen_simple_hourly_alpha.py"
+	User time (seconds): 525.60
+	System time (seconds): 822.45
+	Percent of CPU this job got: 375%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 5:59.38
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 2862792
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 135
+	Minor (reclaiming a frame) page faults: 714902
+	Voluntary context switches: 27946125
+	Involuntary context switches: 388759
+	Swaps: 0
+	File system inputs: 14184
+	File system outputs: 496
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

@@ -1,0 +1,7 @@
+# Keep repository text diffs stable across Linux/Windows tools.
+* text=auto eol=lf
+
+# Windows launchers remain CRLF for native shell compatibility.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf

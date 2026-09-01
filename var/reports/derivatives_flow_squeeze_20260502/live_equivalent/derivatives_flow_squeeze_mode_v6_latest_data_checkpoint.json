@@ -1,0 +1,46 @@
+{
+  "artifact_kind": "live_equivalent_backtest_checkpoint",
+  "split_results": {
+    "derivatives_flow_squeeze_mode": {
+      "train": {
+        "equivalence_key": "62dd0822941f303dad60c783b31e5d54d0cd61cba9d4c0ac1c51149e4d2eb887",
+        "final_equity": 9090.056742148354,
+        "liquidation_count": 0,
+        "metrics": {
+          "cagr": -4.574955007696779e-05,
+          "calmar": -0.00048619328395221184,
+          "max_drawdown": 0.09409745380494507,
+          "sharpe": -0.021023562242067566,
+          "sortino": -0.018691716417483357,
+          "total_return": -0.09099468378516451,
+          "volatility": 0.0020739116173244176
+        },
+        "mode": "derivatives_flow_squeeze_mode",
+        "source_mode": "derivatives_flow_squeeze_mode",
+        "split": "train",
+        "status": "completed",
+        "trade_count": 9382
+      },
+      "val": {
+        "equivalence_key": "62dd0822941f303dad60c783b31e5d54d0cd61cba9d4c0ac1c51149e4d2eb887",
+        "final_equity": 9944.293559560143,
+        "liquidation_count": 0,
+        "metrics": {
+          "cagr": -1.6570128412829455e-05,
+          "calmar": -0.0008574982018928787,
+          "max_drawdown": 0.019323805433354654,
+          "sharpe": -0.012084293944808604,
+          "sortino": -0.01056696301591784,
+          "total_return": -0.005570644043985662,
+          "volatility": 0.0013011816961553879
+        },
+        "mode": "derivatives_flow_squeeze_mode",
+        "source_mode": "derivatives_flow_squeeze_mode",
+        "split": "val",
+        "status": "completed",
+        "trade_count": 1522
+      }
+    }
+  },
+  "updated_at": "2026-05-02T12:15:47.540754Z"
+}

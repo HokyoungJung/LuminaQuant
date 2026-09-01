@@ -1,0 +1,777 @@
+{
+  "artifact_kind": "hyperliquid_readonly_collection",
+  "direct_trading_blocked": true,
+  "direct_trading_blocked_reason": "No direct trading until cost/funding/fill/session/liquidation/lot-size models and raw-first evidence exist.",
+  "endpoint": "https://api.hyperliquid.xyz/info",
+  "exchange_id": "hyperliquid",
+  "generated_at_utc": "2026-05-07T09:59:19.246817Z",
+  "market_root": "data/market_parquet",
+  "official_docs": {
+    "fees": "https://hyperliquid.gitbook.io/hyperliquid-docs/trading/fees",
+    "info_endpoint": "https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/info-endpoint",
+    "perps_info": "https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/info-endpoint/perpetuals"
+  },
+  "read_only": true,
+  "symbols": [
+    {
+      "candle_snapshot_coverage": {
+        "oos": {
+          "complete_hourly_snapshot": true,
+          "end_inclusive": "2026-05-04",
+          "expected_hourly_rows": 1560,
+          "first_timestamp_ms": 1772323200000,
+          "first_timestamp_utc": "2026-03-01T00:00:00+00:00",
+          "last_timestamp_ms": 1777935600000,
+          "last_timestamp_utc": "2026-05-04T23:00:00+00:00",
+          "note": "Hyperliquid official candleSnapshot is exchange-aggregated context, not repo raw-first trade data.",
+          "rows": 1560,
+          "start": "2026-03-01"
+        },
+        "train": {
+          "complete_hourly_snapshot": false,
+          "end_inclusive": "2025-12-31",
+          "expected_hourly_rows": 8760,
+          "first_timestamp_ms": 1760140800000,
+          "first_timestamp_utc": "2025-10-11T00:00:00+00:00",
+          "last_timestamp_ms": 1767222000000,
+          "last_timestamp_utc": "2025-12-31T23:00:00+00:00",
+          "note": "Hyperliquid official candleSnapshot is exchange-aggregated context, not repo raw-first trade data.",
+          "rows": 1968,
+          "start": "2025-01-01"
+        },
+        "val": {
+          "complete_hourly_snapshot": true,
+          "end_inclusive": "2026-02-28",
+          "expected_hourly_rows": 1416,
+          "first_timestamp_ms": 1767225600000,
+          "first_timestamp_utc": "2026-01-01T00:00:00+00:00",
+          "last_timestamp_ms": 1772319600000,
+          "last_timestamp_utc": "2026-02-28T23:00:00+00:00",
+          "note": "Hyperliquid official candleSnapshot is exchange-aggregated context, not repo raw-first trade data.",
+          "rows": 1416,
+          "start": "2026-01-01"
+        }
+      },
+      "coin": "BTC",
+      "current_context": {
+        "funding_rate": -8.1896e-06,
+        "index_price": 80944.0,
+        "mark_price": 80900.0,
+        "open_interest": 31497.60588,
+        "timestamp_ms": 1778147926992
+      },
+      "first_funding_timestamp_ms": 1735689600054,
+      "first_funding_utc": "2025-01-01T00:00:00.054000+00:00",
+      "funding_pages": [
+        {
+          "cursor_ms": 1735689600000,
+          "first_timestamp_ms": 1735689600054,
+          "first_timestamp_utc": "2025-01-01T00:00:00.054000+00:00",
+          "last_timestamp_ms": 1737486000042,
+          "last_timestamp_utc": "2025-01-21T19:00:00.042000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1737486000043,
+          "first_timestamp_ms": 1737489600021,
+          "first_timestamp_utc": "2025-01-21T20:00:00.021000+00:00",
+          "last_timestamp_ms": 1739286000039,
+          "last_timestamp_utc": "2025-02-11T15:00:00.039000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1739286000040,
+          "first_timestamp_ms": 1739289600035,
+          "first_timestamp_utc": "2025-02-11T16:00:00.035000+00:00",
+          "last_timestamp_ms": 1741086000048,
+          "last_timestamp_utc": "2025-03-04T11:00:00.048000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1741086000049,
+          "first_timestamp_ms": 1741089600008,
+          "first_timestamp_utc": "2025-03-04T12:00:00.008000+00:00",
+          "last_timestamp_ms": 1742886000040,
+          "last_timestamp_utc": "2025-03-25T07:00:00.040000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1742886000041,
+          "first_timestamp_ms": 1742889600081,
+          "first_timestamp_utc": "2025-03-25T08:00:00.081000+00:00",
+          "last_timestamp_ms": 1744686000005,
+          "last_timestamp_utc": "2025-04-15T03:00:00.005000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1744686000006,
+          "first_timestamp_ms": 1744689600029,
+          "first_timestamp_utc": "2025-04-15T04:00:00.029000+00:00",
+          "last_timestamp_ms": 1746486000053,
+          "last_timestamp_utc": "2025-05-05T23:00:00.053000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1746486000054,
+          "first_timestamp_ms": 1746489600024,
+          "first_timestamp_utc": "2025-05-06T00:00:00.024000+00:00",
+          "last_timestamp_ms": 1748286000184,
+          "last_timestamp_utc": "2025-05-26T19:00:00.184000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1748286000185,
+          "first_timestamp_ms": 1748289600078,
+          "first_timestamp_utc": "2025-05-26T20:00:00.078000+00:00",
+          "last_timestamp_ms": 1750086000038,
+          "last_timestamp_utc": "2025-06-16T15:00:00.038000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1750086000039,
+          "first_timestamp_ms": 1750089600043,
+          "first_timestamp_utc": "2025-06-16T16:00:00.043000+00:00",
+          "last_timestamp_ms": 1751886000045,
+          "last_timestamp_utc": "2025-07-07T11:00:00.045000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1751886000046,
+          "first_timestamp_ms": 1751889600021,
+          "first_timestamp_utc": "2025-07-07T12:00:00.021000+00:00",
+          "last_timestamp_ms": 1753686000076,
+          "last_timestamp_utc": "2025-07-28T07:00:00.076000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1753686000077,
+          "first_timestamp_ms": 1753689600015,
+          "first_timestamp_utc": "2025-07-28T08:00:00.015000+00:00",
+          "last_timestamp_ms": 1755486000029,
+          "last_timestamp_utc": "2025-08-18T03:00:00.029000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1755486000030,
+          "first_timestamp_ms": 1755489600023,
+          "first_timestamp_utc": "2025-08-18T04:00:00.023000+00:00",
+          "last_timestamp_ms": 1757286000036,
+          "last_timestamp_utc": "2025-09-07T23:00:00.036000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1757286000037,
+          "first_timestamp_ms": 1757289600089,
+          "first_timestamp_utc": "2025-09-08T00:00:00.089000+00:00",
+          "last_timestamp_ms": 1759086000127,
+          "last_timestamp_utc": "2025-09-28T19:00:00.127000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1759086000128,
+          "first_timestamp_ms": 1759089600004,
+          "first_timestamp_utc": "2025-09-28T20:00:00.004000+00:00",
+          "last_timestamp_ms": 1760886000068,
+          "last_timestamp_utc": "2025-10-19T15:00:00.068000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1760886000069,
+          "first_timestamp_ms": 1760889600015,
+          "first_timestamp_utc": "2025-10-19T16:00:00.015000+00:00",
+          "last_timestamp_ms": 1762686000046,
+          "last_timestamp_utc": "2025-11-09T11:00:00.046000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1762686000047,
+          "first_timestamp_ms": 1762689600040,
+          "first_timestamp_utc": "2025-11-09T12:00:00.040000+00:00",
+          "last_timestamp_ms": 1764486000045,
+          "last_timestamp_utc": "2025-11-30T07:00:00.045000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1764486000046,
+          "first_timestamp_ms": 1764489600065,
+          "first_timestamp_utc": "2025-11-30T08:00:00.065000+00:00",
+          "last_timestamp_ms": 1766286000019,
+          "last_timestamp_utc": "2025-12-21T03:00:00.019000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1766286000020,
+          "first_timestamp_ms": 1766289600042,
+          "first_timestamp_utc": "2025-12-21T04:00:00.042000+00:00",
+          "last_timestamp_ms": 1768086000047,
+          "last_timestamp_utc": "2026-01-10T23:00:00.047000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1768086000048,
+          "first_timestamp_ms": 1768089600007,
+          "first_timestamp_utc": "2026-01-11T00:00:00.007000+00:00",
+          "last_timestamp_ms": 1769886000118,
+          "last_timestamp_utc": "2026-01-31T19:00:00.118000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1769886000119,
+          "first_timestamp_ms": 1769889600081,
+          "first_timestamp_utc": "2026-01-31T20:00:00.081000+00:00",
+          "last_timestamp_ms": 1771686000011,
+          "last_timestamp_utc": "2026-02-21T15:00:00.011000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1771686000012,
+          "first_timestamp_ms": 1771689600010,
+          "first_timestamp_utc": "2026-02-21T16:00:00.010000+00:00",
+          "last_timestamp_ms": 1773486000047,
+          "last_timestamp_utc": "2026-03-14T11:00:00.047000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1773486000048,
+          "first_timestamp_ms": 1773489600020,
+          "first_timestamp_utc": "2026-03-14T12:00:00.020000+00:00",
+          "last_timestamp_ms": 1775286000051,
+          "last_timestamp_utc": "2026-04-04T07:00:00.051000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1775286000052,
+          "first_timestamp_ms": 1775289600033,
+          "first_timestamp_utc": "2026-04-04T08:00:00.033000+00:00",
+          "last_timestamp_ms": 1777086000063,
+          "last_timestamp_utc": "2026-04-25T03:00:00.063000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1777086000064,
+          "first_timestamp_ms": 1777089600000,
+          "first_timestamp_utc": "2026-04-25T04:00:00+00:00",
+          "last_timestamp_ms": 1777935600055,
+          "last_timestamp_utc": "2026-05-04T23:00:00.055000+00:00",
+          "row_count": 236
+        }
+      ],
+      "funding_rows": 11736,
+      "funding_split_counts": {
+        "oos": 1560,
+        "train": 8760,
+        "val": 1416
+      },
+      "last_funding_timestamp_ms": 1777935600055,
+      "last_funding_utc": "2026-05-04T23:00:00.055000+00:00",
+      "symbol": "BTC/USDT"
+    },
+    {
+      "candle_snapshot_coverage": {
+        "oos": {
+          "complete_hourly_snapshot": true,
+          "end_inclusive": "2026-05-04",
+          "expected_hourly_rows": 1560,
+          "first_timestamp_ms": 1772323200000,
+          "first_timestamp_utc": "2026-03-01T00:00:00+00:00",
+          "last_timestamp_ms": 1777935600000,
+          "last_timestamp_utc": "2026-05-04T23:00:00+00:00",
+          "note": "Hyperliquid official candleSnapshot is exchange-aggregated context, not repo raw-first trade data.",
+          "rows": 1560,
+          "start": "2026-03-01"
+        },
+        "train": {
+          "complete_hourly_snapshot": false,
+          "end_inclusive": "2025-12-31",
+          "expected_hourly_rows": 8760,
+          "first_timestamp_ms": 1760140800000,
+          "first_timestamp_utc": "2025-10-11T00:00:00+00:00",
+          "last_timestamp_ms": 1767222000000,
+          "last_timestamp_utc": "2025-12-31T23:00:00+00:00",
+          "note": "Hyperliquid official candleSnapshot is exchange-aggregated context, not repo raw-first trade data.",
+          "rows": 1968,
+          "start": "2025-01-01"
+        },
+        "val": {
+          "complete_hourly_snapshot": true,
+          "end_inclusive": "2026-02-28",
+          "expected_hourly_rows": 1416,
+          "first_timestamp_ms": 1767225600000,
+          "first_timestamp_utc": "2026-01-01T00:00:00+00:00",
+          "last_timestamp_ms": 1772319600000,
+          "last_timestamp_utc": "2026-02-28T23:00:00+00:00",
+          "note": "Hyperliquid official candleSnapshot is exchange-aggregated context, not repo raw-first trade data.",
+          "rows": 1416,
+          "start": "2026-01-01"
+        }
+      },
+      "coin": "ETH",
+      "current_context": {
+        "funding_rate": -2.6206e-06,
+        "index_price": 2328.3,
+        "mark_price": 2327.0,
+        "open_interest": 524647.7849999991,
+        "timestamp_ms": 1778147926992
+      },
+      "first_funding_timestamp_ms": 1735689600054,
+      "first_funding_utc": "2025-01-01T00:00:00.054000+00:00",
+      "funding_pages": [
+        {
+          "cursor_ms": 1735689600000,
+          "first_timestamp_ms": 1735689600054,
+          "first_timestamp_utc": "2025-01-01T00:00:00.054000+00:00",
+          "last_timestamp_ms": 1737486000042,
+          "last_timestamp_utc": "2025-01-21T19:00:00.042000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1737486000043,
+          "first_timestamp_ms": 1737489600021,
+          "first_timestamp_utc": "2025-01-21T20:00:00.021000+00:00",
+          "last_timestamp_ms": 1739286000039,
+          "last_timestamp_utc": "2025-02-11T15:00:00.039000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1739286000040,
+          "first_timestamp_ms": 1739289600035,
+          "first_timestamp_utc": "2025-02-11T16:00:00.035000+00:00",
+          "last_timestamp_ms": 1741086000048,
+          "last_timestamp_utc": "2025-03-04T11:00:00.048000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1741086000049,
+          "first_timestamp_ms": 1741089600008,
+          "first_timestamp_utc": "2025-03-04T12:00:00.008000+00:00",
+          "last_timestamp_ms": 1742886000040,
+          "last_timestamp_utc": "2025-03-25T07:00:00.040000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1742886000041,
+          "first_timestamp_ms": 1742889600081,
+          "first_timestamp_utc": "2025-03-25T08:00:00.081000+00:00",
+          "last_timestamp_ms": 1744686000005,
+          "last_timestamp_utc": "2025-04-15T03:00:00.005000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1744686000006,
+          "first_timestamp_ms": 1744689600029,
+          "first_timestamp_utc": "2025-04-15T04:00:00.029000+00:00",
+          "last_timestamp_ms": 1746486000053,
+          "last_timestamp_utc": "2025-05-05T23:00:00.053000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1746486000054,
+          "first_timestamp_ms": 1746489600024,
+          "first_timestamp_utc": "2025-05-06T00:00:00.024000+00:00",
+          "last_timestamp_ms": 1748286000184,
+          "last_timestamp_utc": "2025-05-26T19:00:00.184000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1748286000185,
+          "first_timestamp_ms": 1748289600078,
+          "first_timestamp_utc": "2025-05-26T20:00:00.078000+00:00",
+          "last_timestamp_ms": 1750086000038,
+          "last_timestamp_utc": "2025-06-16T15:00:00.038000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1750086000039,
+          "first_timestamp_ms": 1750089600043,
+          "first_timestamp_utc": "2025-06-16T16:00:00.043000+00:00",
+          "last_timestamp_ms": 1751886000045,
+          "last_timestamp_utc": "2025-07-07T11:00:00.045000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1751886000046,
+          "first_timestamp_ms": 1751889600021,
+          "first_timestamp_utc": "2025-07-07T12:00:00.021000+00:00",
+          "last_timestamp_ms": 1753686000076,
+          "last_timestamp_utc": "2025-07-28T07:00:00.076000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1753686000077,
+          "first_timestamp_ms": 1753689600015,
+          "first_timestamp_utc": "2025-07-28T08:00:00.015000+00:00",
+          "last_timestamp_ms": 1755486000029,
+          "last_timestamp_utc": "2025-08-18T03:00:00.029000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1755486000030,
+          "first_timestamp_ms": 1755489600023,
+          "first_timestamp_utc": "2025-08-18T04:00:00.023000+00:00",
+          "last_timestamp_ms": 1757286000036,
+          "last_timestamp_utc": "2025-09-07T23:00:00.036000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1757286000037,
+          "first_timestamp_ms": 1757289600089,
+          "first_timestamp_utc": "2025-09-08T00:00:00.089000+00:00",
+          "last_timestamp_ms": 1759086000127,
+          "last_timestamp_utc": "2025-09-28T19:00:00.127000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1759086000128,
+          "first_timestamp_ms": 1759089600004,
+          "first_timestamp_utc": "2025-09-28T20:00:00.004000+00:00",
+          "last_timestamp_ms": 1760886000068,
+          "last_timestamp_utc": "2025-10-19T15:00:00.068000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1760886000069,
+          "first_timestamp_ms": 1760889600015,
+          "first_timestamp_utc": "2025-10-19T16:00:00.015000+00:00",
+          "last_timestamp_ms": 1762686000046,
+          "last_timestamp_utc": "2025-11-09T11:00:00.046000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1762686000047,
+          "first_timestamp_ms": 1762689600040,
+          "first_timestamp_utc": "2025-11-09T12:00:00.040000+00:00",
+          "last_timestamp_ms": 1764486000045,
+          "last_timestamp_utc": "2025-11-30T07:00:00.045000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1764486000046,
+          "first_timestamp_ms": 1764489600065,
+          "first_timestamp_utc": "2025-11-30T08:00:00.065000+00:00",
+          "last_timestamp_ms": 1766286000019,
+          "last_timestamp_utc": "2025-12-21T03:00:00.019000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1766286000020,
+          "first_timestamp_ms": 1766289600042,
+          "first_timestamp_utc": "2025-12-21T04:00:00.042000+00:00",
+          "last_timestamp_ms": 1768086000047,
+          "last_timestamp_utc": "2026-01-10T23:00:00.047000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1768086000048,
+          "first_timestamp_ms": 1768089600007,
+          "first_timestamp_utc": "2026-01-11T00:00:00.007000+00:00",
+          "last_timestamp_ms": 1769886000118,
+          "last_timestamp_utc": "2026-01-31T19:00:00.118000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1769886000119,
+          "first_timestamp_ms": 1769889600081,
+          "first_timestamp_utc": "2026-01-31T20:00:00.081000+00:00",
+          "last_timestamp_ms": 1771686000011,
+          "last_timestamp_utc": "2026-02-21T15:00:00.011000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1771686000012,
+          "first_timestamp_ms": 1771689600010,
+          "first_timestamp_utc": "2026-02-21T16:00:00.010000+00:00",
+          "last_timestamp_ms": 1773486000047,
+          "last_timestamp_utc": "2026-03-14T11:00:00.047000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1773486000048,
+          "first_timestamp_ms": 1773489600020,
+          "first_timestamp_utc": "2026-03-14T12:00:00.020000+00:00",
+          "last_timestamp_ms": 1775286000051,
+          "last_timestamp_utc": "2026-04-04T07:00:00.051000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1775286000052,
+          "first_timestamp_ms": 1775289600033,
+          "first_timestamp_utc": "2026-04-04T08:00:00.033000+00:00",
+          "last_timestamp_ms": 1777086000063,
+          "last_timestamp_utc": "2026-04-25T03:00:00.063000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1777086000064,
+          "first_timestamp_ms": 1777089600000,
+          "first_timestamp_utc": "2026-04-25T04:00:00+00:00",
+          "last_timestamp_ms": 1777935600055,
+          "last_timestamp_utc": "2026-05-04T23:00:00.055000+00:00",
+          "row_count": 236
+        }
+      ],
+      "funding_rows": 11736,
+      "funding_split_counts": {
+        "oos": 1560,
+        "train": 8760,
+        "val": 1416
+      },
+      "last_funding_timestamp_ms": 1777935600055,
+      "last_funding_utc": "2026-05-04T23:00:00.055000+00:00",
+      "symbol": "ETH/USDT"
+    },
+    {
+      "candle_snapshot_coverage": {
+        "oos": {
+          "complete_hourly_snapshot": true,
+          "end_inclusive": "2026-05-04",
+          "expected_hourly_rows": 1560,
+          "first_timestamp_ms": 1772323200000,
+          "first_timestamp_utc": "2026-03-01T00:00:00+00:00",
+          "last_timestamp_ms": 1777935600000,
+          "last_timestamp_utc": "2026-05-04T23:00:00+00:00",
+          "note": "Hyperliquid official candleSnapshot is exchange-aggregated context, not repo raw-first trade data.",
+          "rows": 1560,
+          "start": "2026-03-01"
+        },
+        "train": {
+          "complete_hourly_snapshot": false,
+          "end_inclusive": "2025-12-31",
+          "expected_hourly_rows": 8760,
+          "first_timestamp_ms": 1760140800000,
+          "first_timestamp_utc": "2025-10-11T00:00:00+00:00",
+          "last_timestamp_ms": 1767222000000,
+          "last_timestamp_utc": "2025-12-31T23:00:00+00:00",
+          "note": "Hyperliquid official candleSnapshot is exchange-aggregated context, not repo raw-first trade data.",
+          "rows": 1968,
+          "start": "2025-01-01"
+        },
+        "val": {
+          "complete_hourly_snapshot": true,
+          "end_inclusive": "2026-02-28",
+          "expected_hourly_rows": 1416,
+          "first_timestamp_ms": 1767225600000,
+          "first_timestamp_utc": "2026-01-01T00:00:00+00:00",
+          "last_timestamp_ms": 1772319600000,
+          "last_timestamp_utc": "2026-02-28T23:00:00+00:00",
+          "note": "Hyperliquid official candleSnapshot is exchange-aggregated context, not repo raw-first trade data.",
+          "rows": 1416,
+          "start": "2026-01-01"
+        }
+      },
+      "coin": "SOL",
+      "current_context": {
+        "funding_rate": 7.0445e-06,
+        "index_price": 89.435,
+        "mark_price": 89.393,
+        "open_interest": 3799441.04,
+        "timestamp_ms": 1778147926992
+      },
+      "first_funding_timestamp_ms": 1735689600054,
+      "first_funding_utc": "2025-01-01T00:00:00.054000+00:00",
+      "funding_pages": [
+        {
+          "cursor_ms": 1735689600000,
+          "first_timestamp_ms": 1735689600054,
+          "first_timestamp_utc": "2025-01-01T00:00:00.054000+00:00",
+          "last_timestamp_ms": 1737486000042,
+          "last_timestamp_utc": "2025-01-21T19:00:00.042000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1737486000043,
+          "first_timestamp_ms": 1737489600021,
+          "first_timestamp_utc": "2025-01-21T20:00:00.021000+00:00",
+          "last_timestamp_ms": 1739286000039,
+          "last_timestamp_utc": "2025-02-11T15:00:00.039000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1739286000040,
+          "first_timestamp_ms": 1739289600035,
+          "first_timestamp_utc": "2025-02-11T16:00:00.035000+00:00",
+          "last_timestamp_ms": 1741086000048,
+          "last_timestamp_utc": "2025-03-04T11:00:00.048000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1741086000049,
+          "first_timestamp_ms": 1741089600008,
+          "first_timestamp_utc": "2025-03-04T12:00:00.008000+00:00",
+          "last_timestamp_ms": 1742886000040,
+          "last_timestamp_utc": "2025-03-25T07:00:00.040000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1742886000041,
+          "first_timestamp_ms": 1742889600081,
+          "first_timestamp_utc": "2025-03-25T08:00:00.081000+00:00",
+          "last_timestamp_ms": 1744686000005,
+          "last_timestamp_utc": "2025-04-15T03:00:00.005000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1744686000006,
+          "first_timestamp_ms": 1744689600029,
+          "first_timestamp_utc": "2025-04-15T04:00:00.029000+00:00",
+          "last_timestamp_ms": 1746486000053,
+          "last_timestamp_utc": "2025-05-05T23:00:00.053000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1746486000054,
+          "first_timestamp_ms": 1746489600024,
+          "first_timestamp_utc": "2025-05-06T00:00:00.024000+00:00",
+          "last_timestamp_ms": 1748286000184,
+          "last_timestamp_utc": "2025-05-26T19:00:00.184000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1748286000185,
+          "first_timestamp_ms": 1748289600078,
+          "first_timestamp_utc": "2025-05-26T20:00:00.078000+00:00",
+          "last_timestamp_ms": 1750086000038,
+          "last_timestamp_utc": "2025-06-16T15:00:00.038000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1750086000039,
+          "first_timestamp_ms": 1750089600043,
+          "first_timestamp_utc": "2025-06-16T16:00:00.043000+00:00",
+          "last_timestamp_ms": 1751886000045,
+          "last_timestamp_utc": "2025-07-07T11:00:00.045000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1751886000046,
+          "first_timestamp_ms": 1751889600021,
+          "first_timestamp_utc": "2025-07-07T12:00:00.021000+00:00",
+          "last_timestamp_ms": 1753686000076,
+          "last_timestamp_utc": "2025-07-28T07:00:00.076000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1753686000077,
+          "first_timestamp_ms": 1753689600015,
+          "first_timestamp_utc": "2025-07-28T08:00:00.015000+00:00",
+          "last_timestamp_ms": 1755486000029,
+          "last_timestamp_utc": "2025-08-18T03:00:00.029000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1755486000030,
+          "first_timestamp_ms": 1755489600023,
+          "first_timestamp_utc": "2025-08-18T04:00:00.023000+00:00",
+          "last_timestamp_ms": 1757286000036,
+          "last_timestamp_utc": "2025-09-07T23:00:00.036000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1757286000037,
+          "first_timestamp_ms": 1757289600089,
+          "first_timestamp_utc": "2025-09-08T00:00:00.089000+00:00",
+          "last_timestamp_ms": 1759086000127,
+          "last_timestamp_utc": "2025-09-28T19:00:00.127000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1759086000128,
+          "first_timestamp_ms": 1759089600004,
+          "first_timestamp_utc": "2025-09-28T20:00:00.004000+00:00",
+          "last_timestamp_ms": 1760886000068,
+          "last_timestamp_utc": "2025-10-19T15:00:00.068000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1760886000069,
+          "first_timestamp_ms": 1760889600015,
+          "first_timestamp_utc": "2025-10-19T16:00:00.015000+00:00",
+          "last_timestamp_ms": 1762686000046,
+          "last_timestamp_utc": "2025-11-09T11:00:00.046000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1762686000047,
+          "first_timestamp_ms": 1762689600040,
+          "first_timestamp_utc": "2025-11-09T12:00:00.040000+00:00",
+          "last_timestamp_ms": 1764486000045,
+          "last_timestamp_utc": "2025-11-30T07:00:00.045000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1764486000046,
+          "first_timestamp_ms": 1764489600065,
+          "first_timestamp_utc": "2025-11-30T08:00:00.065000+00:00",
+          "last_timestamp_ms": 1766286000019,
+          "last_timestamp_utc": "2025-12-21T03:00:00.019000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1766286000020,
+          "first_timestamp_ms": 1766289600042,
+          "first_timestamp_utc": "2025-12-21T04:00:00.042000+00:00",
+          "last_timestamp_ms": 1768086000047,
+          "last_timestamp_utc": "2026-01-10T23:00:00.047000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1768086000048,
+          "first_timestamp_ms": 1768089600007,
+          "first_timestamp_utc": "2026-01-11T00:00:00.007000+00:00",
+          "last_timestamp_ms": 1769886000118,
+          "last_timestamp_utc": "2026-01-31T19:00:00.118000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1769886000119,
+          "first_timestamp_ms": 1769889600081,
+          "first_timestamp_utc": "2026-01-31T20:00:00.081000+00:00",
+          "last_timestamp_ms": 1771686000011,
+          "last_timestamp_utc": "2026-02-21T15:00:00.011000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1771686000012,
+          "first_timestamp_ms": 1771689600010,
+          "first_timestamp_utc": "2026-02-21T16:00:00.010000+00:00",
+          "last_timestamp_ms": 1773486000047,
+          "last_timestamp_utc": "2026-03-14T11:00:00.047000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1773486000048,
+          "first_timestamp_ms": 1773489600020,
+          "first_timestamp_utc": "2026-03-14T12:00:00.020000+00:00",
+          "last_timestamp_ms": 1775286000051,
+          "last_timestamp_utc": "2026-04-04T07:00:00.051000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1775286000052,
+          "first_timestamp_ms": 1775289600033,
+          "first_timestamp_utc": "2026-04-04T08:00:00.033000+00:00",
+          "last_timestamp_ms": 1777086000063,
+          "last_timestamp_utc": "2026-04-25T03:00:00.063000+00:00",
+          "row_count": 500
+        },
+        {
+          "cursor_ms": 1777086000064,
+          "first_timestamp_ms": 1777089600000,
+          "first_timestamp_utc": "2026-04-25T04:00:00+00:00",
+          "last_timestamp_ms": 1777935600055,
+          "last_timestamp_utc": "2026-05-04T23:00:00.055000+00:00",
+          "row_count": 236
+        }
+      ],
+      "funding_rows": 11736,
+      "funding_split_counts": {
+        "oos": 1560,
+        "train": 8760,
+        "val": 1416
+      },
+      "last_funding_timestamp_ms": 1777935600055,
+      "last_funding_utc": "2026-05-04T23:00:00.055000+00:00",
+      "symbol": "SOL/USDT"
+    }
+  ],
+  "upserted_feature_point_rows": 35211
+}

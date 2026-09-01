@@ -1,0 +1,10 @@
+{
+  "bytes": 43811,
+  "cache_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g003_external_prior_cache/arxiv_hmm_rl_regime_allocation.source",
+  "content_type": "text/html; charset=utf-8",
+  "error": null,
+  "retrieved_at": "2026-07-02T14:21:38Z",
+  "sha256": "7f471e90e39aae810d91b3469b44bc2eaf26cc03ef012ac4ebafe5f7d82b2c8b",
+  "status": 200,
+  "url": "https://arxiv.org/abs/2605.27848"
+}

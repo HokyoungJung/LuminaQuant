@@ -1,0 +1,70 @@
+[
+  [
+    "Total Return",
+    "-3.61%"
+  ],
+  [
+    "Benchmark Return",
+    "19.04%"
+  ],
+  [
+    "CAGR",
+    "-0.92%"
+  ],
+  [
+    "Ann. Volatility",
+    "4.84%"
+  ],
+  [
+    "Sharpe Ratio",
+    "-0.9177"
+  ],
+  [
+    "Sortino Ratio",
+    "-1.4761"
+  ],
+  [
+    "Calmar Ratio",
+    "-0.1203"
+  ],
+  [
+    "Max Drawdown",
+    "7.65%"
+  ],
+  [
+    "DD Duration",
+    "961 bars"
+  ],
+  [
+    "Alpha",
+    "-0.0079"
+  ],
+  [
+    "Beta",
+    "0.0016"
+  ],
+  [
+    "Information Ratio",
+    "-0.3231"
+  ],
+  [
+    "Daily Win Rate",
+    "46.25%"
+  ],
+  [
+    "Risk-Free Reference",
+    "us_treasury_constant:3m"
+  ],
+  [
+    "Risk-Free Annual",
+    "3.70%"
+  ],
+  [
+    "Funding (Net)",
+    "0.0000"
+  ],
+  [
+    "Liquidations",
+    "0"
+  ]
+]

@@ -1,0 +1,167 @@
+{"end_inclusive": "2025-12-31", "event": "live_equivalent_split_start", "generated_at": "2026-05-05T10:58:38.747573Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train", "start": "2025-01-01", "symbols": ["ETH/USDT", "SOL/USDT"]}
+{"chunk_days": 7, "chunk_end": "2025-01-07T23:59:59.999999", "chunk_start": "2025-01-01T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T10:58:38.748735Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.151 > Limit 0.1000. Filling 0.1 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-01-14T23:59:59.999999", "chunk_start": "2025-01-08T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T10:58:57.465895Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.17 > Limit 0.0000. Filling 0.0 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-01-21T23:59:59.999999", "chunk_start": "2025-01-15T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T10:59:12.626061Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+{"chunk_days": 7, "chunk_end": "2025-01-28T23:59:59.999999", "chunk_start": "2025-01-22T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T10:59:26.854838Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+{"chunk_days": 7, "chunk_end": "2025-02-04T23:59:59.999999", "chunk_start": "2025-01-29T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T10:59:40.753602Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.154 > Limit 0.1000. Filling 0.1 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-02-11T23:59:59.999999", "chunk_start": "2025-02-05T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T10:59:54.096365Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.167 > Limit 0.0000. Filling 0.0 and keeping remainder.
+[Realism] Partial Fill: Req 0.16 > Limit 0.0000. Filling 0.0 and keeping remainder.
+[Realism] Partial Fill: Req 0.017 > Limit 0.0115. Filling 0.011500000000000002 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-02-18T23:59:59.999999", "chunk_start": "2025-02-12T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:00:07.694534Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+{"chunk_days": 7, "chunk_end": "2025-02-25T23:59:59.999999", "chunk_start": "2025-02-19T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:00:20.629918Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+{"chunk_days": 7, "chunk_end": "2025-03-04T23:59:59.999999", "chunk_start": "2025-02-26T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:00:34.171303Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+{"chunk_days": 7, "chunk_end": "2025-03-11T23:59:59.999999", "chunk_start": "2025-03-05T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:00:47.209439Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.258 > Limit 0.1000. Filling 0.1 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-03-18T23:59:59.999999", "chunk_start": "2025-03-12T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:00:59.807764Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+{"chunk_days": 7, "chunk_end": "2025-03-25T23:59:59.999999", "chunk_start": "2025-03-19T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:01:11.781411Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.252 > Limit 0.0000. Filling 0.0 and keeping remainder.
+[Realism] Partial Fill: Req 0.252 > Limit 0.0000. Filling 0.0 and keeping remainder.
+[Realism] Partial Fill: Req 0.252 > Limit 0.0000. Filling 0.0 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-04-01T23:59:59.999999", "chunk_start": "2025-03-26T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:01:22.797143Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.251 > Limit 0.0000. Filling 0.0 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-04-08T23:59:59.999999", "chunk_start": "2025-04-02T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:01:33.833317Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+{"chunk_days": 7, "chunk_end": "2025-04-15T23:59:59.999999", "chunk_start": "2025-04-09T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:01:44.908542Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.245 > Limit 0.1040. Filling 0.10400000000000001 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-04-22T23:59:59.999999", "chunk_start": "2025-04-16T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:01:56.109840Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.241 > Limit 0.1930. Filling 0.19300000000000003 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-04-29T23:59:59.999999", "chunk_start": "2025-04-23T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:02:06.993857Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+{"chunk_days": 7, "chunk_end": "2025-05-06T23:59:59.999999", "chunk_start": "2025-04-30T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:02:17.930053Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.216 > Limit 0.0750. Filling 0.07500000000000001 and keeping remainder.
+[Realism] Partial Fill: Req 0.22 > Limit 0.0090. Filling 0.009 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-05-13T23:59:59.999999", "chunk_start": "2025-05-07T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:02:29.029653Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.182 > Limit 0.1790. Filling 0.179 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-05-20T23:59:59.999999", "chunk_start": "2025-05-14T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:02:40.963819Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+{"chunk_days": 7, "chunk_end": "2025-05-27T23:59:59.999999", "chunk_start": "2025-05-21T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:02:52.070400Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+{"chunk_days": 7, "chunk_end": "2025-06-03T23:59:59.999999", "chunk_start": "2025-05-28T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:03:03.004290Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.20600000000000002 > Limit 0.0000. Filling 0.0 and keeping remainder.
+[Realism] Partial Fill: Req 0.20600000000000002 > Limit 0.0050. Filling 0.005000000000000001 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-06-10T23:59:59.999999", "chunk_start": "2025-06-04T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:03:14.455105Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+{"chunk_days": 7, "chunk_end": "2025-06-17T23:59:59.999999", "chunk_start": "2025-06-11T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:03:25.650257Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+{"chunk_days": 7, "chunk_end": "2025-06-24T23:59:59.999999", "chunk_start": "2025-06-18T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:03:36.806896Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.018000000000000002 > Limit 0.0000. Filling 0.0 and keeping remainder.
+[Realism] Partial Fill: Req 0.22 > Limit 0.0630. Filling 0.063 and keeping remainder.
+[Realism] Partial Fill: Req 0.157 > Limit 0.0050. Filling 0.005000000000000001 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-07-01T23:59:59.999999", "chunk_start": "2025-06-25T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:03:48.054019Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.217 > Limit 0.0180. Filling 0.018 and keeping remainder.
+[Realism] Partial Fill: Req 0.199 > Limit 0.0000. Filling 0.0 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-07-08T23:59:59.999999", "chunk_start": "2025-07-02T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:03:59.259218Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+{"chunk_days": 7, "chunk_end": "2025-07-15T23:59:59.999999", "chunk_start": "2025-07-09T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:04:10.537100Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.20600000000000002 > Limit 0.0190. Filling 0.019000000000000003 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-07-22T23:59:59.999999", "chunk_start": "2025-07-16T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:04:22.039683Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+{"chunk_days": 7, "chunk_end": "2025-07-29T23:59:59.999999", "chunk_start": "2025-07-23T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:04:33.763409Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.17200000000000001 > Limit 0.0100. Filling 0.010000000000000002 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-08-05T23:59:59.999999", "chunk_start": "2025-07-30T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:04:45.052615Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+{"chunk_days": 7, "chunk_end": "2025-08-12T23:59:59.999999", "chunk_start": "2025-08-06T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:04:56.702438Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+{"chunk_days": 7, "chunk_end": "2025-08-19T23:59:59.999999", "chunk_start": "2025-08-13T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:05:08.302012Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+{"chunk_days": 7, "chunk_end": "2025-08-26T23:59:59.999999", "chunk_start": "2025-08-20T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:05:19.605600Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+{"chunk_days": 7, "chunk_end": "2025-09-02T23:59:59.999999", "chunk_start": "2025-08-27T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:05:31.138754Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+{"chunk_days": 7, "chunk_end": "2025-09-09T23:59:59.999999", "chunk_start": "2025-09-03T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:05:42.429950Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.158 > Limit 0.0060. Filling 0.006 and keeping remainder.
+[Realism] Partial Fill: Req 0.152 > Limit 0.0120. Filling 0.012000000000000002 and keeping remainder.
+[Realism] Partial Fill: Req 0.13999999999999999 > Limit 0.0120. Filling 0.012 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-09-16T23:59:59.999999", "chunk_start": "2025-09-10T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:05:54.081918Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+{"chunk_days": 7, "chunk_end": "2025-09-23T23:59:59.999999", "chunk_start": "2025-09-17T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:06:05.618395Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+{"chunk_days": 7, "chunk_end": "2025-09-30T23:59:59.999999", "chunk_start": "2025-09-24T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:06:17.034454Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+{"chunk_days": 7, "chunk_end": "2025-10-07T23:59:59.999999", "chunk_start": "2025-10-01T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:06:28.411573Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+{"chunk_days": 7, "chunk_end": "2025-10-14T23:59:59.999999", "chunk_start": "2025-10-08T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:06:40.395012Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+{"chunk_days": 7, "chunk_end": "2025-10-21T23:59:59.999999", "chunk_start": "2025-10-15T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:06:52.032038Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+{"chunk_days": 7, "chunk_end": "2025-10-28T23:59:59.999999", "chunk_start": "2025-10-22T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:07:03.422515Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.165 > Limit 0.0610. Filling 0.061 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-11-04T23:59:59.999999", "chunk_start": "2025-10-29T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:07:14.919788Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+{"chunk_days": 7, "chunk_end": "2025-11-11T23:59:59.999999", "chunk_start": "2025-11-05T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:07:26.413880Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+{"chunk_days": 7, "chunk_end": "2025-11-18T23:59:59.999999", "chunk_start": "2025-11-12T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:07:37.991346Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+{"chunk_days": 7, "chunk_end": "2025-11-25T23:59:59.999999", "chunk_start": "2025-11-19T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:07:49.368274Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+{"chunk_days": 7, "chunk_end": "2025-12-02T23:59:59.999999", "chunk_start": "2025-11-26T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:08:00.904691Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+{"chunk_days": 7, "chunk_end": "2025-12-09T23:59:59.999999", "chunk_start": "2025-12-03T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:08:12.395924Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.23 > Limit 0.0440. Filling 0.044000000000000004 and keeping remainder.
+[Realism] Partial Fill: Req 0.186 > Limit 0.0000. Filling 0.0 and keeping remainder.
+[Realism] Partial Fill: Req 0.186 > Limit 0.1070. Filling 0.10699999999999998 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-12-16T23:59:59.999999", "chunk_start": "2025-12-10T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:08:24.269132Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.244 > Limit 0.0290. Filling 0.028999999999999998 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-12-23T23:59:59.999999", "chunk_start": "2025-12-17T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:08:35.880251Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+{"chunk_days": 7, "chunk_end": "2025-12-30T23:59:59.999999", "chunk_start": "2025-12-24T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:08:47.380988Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.259 > Limit 0.0000. Filling 0.0 and keeping remainder.
+[Realism] Partial Fill: Req 0.259 > Limit 0.0210. Filling 0.021 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-12-31T23:59:59.999999", "chunk_start": "2025-12-31T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:08:59.036055Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train"}
+{"event": "live_equivalent_split_complete", "final_equity": 10065.262334060193, "generated_at": "2026-05-05T11:09:01.020821Z", "metrics": {"cagr": 3.1256164121362673e-06, "calmar": 0.0001138011519278324, "max_drawdown": 0.027465595551426344, "sharpe": 0.004041960531262683, "sortino": 0.004081116002005728, "total_return": 0.0065253724060194696, "volatility": 0.0008660636624676994}, "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "train", "trade_count": 1157}
+{"end_inclusive": "2026-02-28", "event": "live_equivalent_split_start", "generated_at": "2026-05-05T11:09:01.020863Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "val", "start": "2026-01-01", "symbols": ["ETH/USDT", "SOL/USDT"]}
+{"chunk_days": 7, "chunk_end": "2026-01-07T23:59:59.999999", "chunk_start": "2026-01-01T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:09:01.021315Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "val"}
+{"chunk_days": 7, "chunk_end": "2026-01-14T23:59:59.999999", "chunk_start": "2026-01-08T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:09:10.958563Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "val"}
+[Realism] Partial Fill: Req 0.015 > Limit 0.0072. Filling 0.0072000000000000015 and keeping remainder.
+[Realism] Partial Fill: Req 0.228 > Limit 0.0150. Filling 0.015 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2026-01-21T23:59:59.999999", "chunk_start": "2026-01-15T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:09:21.618831Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "val"}
+[Realism] Partial Fill: Req 0.252 > Limit 0.0050. Filling 0.005000000000000001 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2026-01-28T23:59:59.999999", "chunk_start": "2026-01-22T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:09:32.511444Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "val"}
+[Realism] Partial Fill: Req 0.251 > Limit 0.0020. Filling 0.002 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2026-02-04T23:59:59.999999", "chunk_start": "2026-01-29T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:09:43.273383Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "val"}
+{"chunk_days": 7, "chunk_end": "2026-02-11T23:59:59.999999", "chunk_start": "2026-02-05T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:09:54.017039Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "val"}
+[Realism] Partial Fill: Req 0.372 > Limit 0.0210. Filling 0.021000000000000005 and keeping remainder.
+[Realism] Partial Fill: Req 0.351 > Limit 0.0750. Filling 0.07500000000000001 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2026-02-18T23:59:59.999999", "chunk_start": "2026-02-12T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:10:05.208222Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "val"}
+[Realism] Partial Fill: Req 0.357 > Limit 0.2890. Filling 0.28900000000000003 and keeping remainder.
+[Realism] Partial Fill: Req 0.06799999999999995 > Limit 0.0570. Filling 0.05700000000000001 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2026-02-25T23:59:59.999999", "chunk_start": "2026-02-19T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:10:16.299247Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "val"}
+[Realism] Partial Fill: Req 0.377 > Limit 0.0000. Filling 0.0 and keeping remainder.
+[Realism] Partial Fill: Req 0.369 > Limit 0.0160. Filling 0.016 and keeping remainder.
+[Realism] Partial Fill: Req 0.384 > Limit 0.2190. Filling 0.219 and keeping remainder.
+[Realism] Partial Fill: Req 0.165 > Limit 0.0110. Filling 0.011000000000000001 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2026-02-28T23:59:59.999999", "chunk_start": "2026-02-26T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:10:27.598516Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "val"}
+{"event": "live_equivalent_split_complete", "final_equity": 10008.580270745795, "generated_at": "2026-05-05T11:10:32.875797Z", "metrics": {"cagr": 2.5437348654122616e-06, "calmar": 0.00019005223060607787, "max_drawdown": 0.01338439889550506, "sharpe": 0.002959808400867562, "sortino": 0.002879081848444251, "total_return": 0.0008578980745794773, "volatility": 0.0010432756803100155}, "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "val", "trade_count": 182}
+{"end_inclusive": "2026-05-04", "event": "live_equivalent_split_start", "generated_at": "2026-05-05T11:10:32.875836Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "oos", "start": "2026-03-01", "symbols": ["ETH/USDT", "SOL/USDT"]}
+{"chunk_days": 7, "chunk_end": "2026-03-07T23:59:59.999999", "chunk_start": "2026-03-01T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:10:32.876280Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "oos"}
+[Realism] Partial Fill: Req 0.366 > Limit 0.0860. Filling 0.08600000000000001 and keeping remainder.
+[Realism] Partial Fill: Req 0.34600000000000003 > Limit 0.1620. Filling 0.162 and keeping remainder.
+[Realism] Partial Fill: Req 0.36 > Limit 0.1310. Filling 0.131 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2026-03-14T23:59:59.999999", "chunk_start": "2026-03-08T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:10:43.170492Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "oos"}
+{"chunk_days": 7, "chunk_end": "2026-03-21T23:59:59.999999", "chunk_start": "2026-03-15T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:10:53.532329Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "oos"}
+[Realism] Partial Fill: Req 0.363 > Limit 0.0000. Filling 0.0 and keeping remainder.
+[Realism] Partial Fill: Req 0.363 > Limit 0.1990. Filling 0.199 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2026-03-28T23:59:59.999999", "chunk_start": "2026-03-22T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:11:03.413415Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "oos"}
+[Realism] Partial Fill: Req 0.364 > Limit 0.0220. Filling 0.022000000000000002 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2026-04-04T23:59:59.999999", "chunk_start": "2026-03-29T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:11:13.572541Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "oos"}
+[Realism] Partial Fill: Req 0.399 > Limit 0.2610. Filling 0.261 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2026-04-11T23:59:59.999999", "chunk_start": "2026-04-05T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:11:23.570141Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "oos"}
+[Realism] Partial Fill: Req 0.379 > Limit 0.0000. Filling 0.0 and keeping remainder.
+[Realism] Partial Fill: Req 0.387 > Limit 0.0000. Filling 0.0 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2026-04-18T23:59:59.999999", "chunk_start": "2026-04-12T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:11:33.842525Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "oos"}
+[Realism] Partial Fill: Req 0.372 > Limit 0.1370. Filling 0.137 and keeping remainder.
+[Realism] Partial Fill: Req 0.373 > Limit 0.0000. Filling 0.0 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2026-04-25T23:59:59.999999", "chunk_start": "2026-04-19T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:11:44.015655Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "oos"}
+{"chunk_days": 7, "chunk_end": "2026-05-02T23:59:59.999999", "chunk_start": "2026-04-26T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:11:54.429602Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "oos"}
+[Realism] Partial Fill: Req 0.366 > Limit 0.0410. Filling 0.041 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2026-05-04T23:59:59.999999", "chunk_start": "2026-05-03T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-05T11:12:04.652370Z", "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "oos"}
+{"event": "live_equivalent_split_complete", "final_equity": 10048.497845587028, "generated_at": "2026-05-05T11:12:07.647416Z", "metrics": {"cagr": 1.307904949676697e-05, "calmar": 0.0009025877998081197, "max_drawdown": 0.014490611882353642, "sharpe": 0.014267229916707036, "sortino": 0.014228420401172353, "total_return": 0.004849223558702764, "volatility": 0.0009482211097126162}, "mode": "profit_moonshot_filtered_shock_reversion_diversified_mode", "split": "oos", "trade_count": 144}
+{
+  "artifact_reset_csv": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260505/live_equivalent/profit_moonshot_filtered_shock_reversion_diversified_mode/live_equivalent_revalidation_artifact_reset_20260426.csv",
+  "json": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260505/live_equivalent/profit_moonshot_filtered_shock_reversion_diversified_mode/live_equivalent_revalidation_latest.json",
+  "live_decision": "",
+  "markdown": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260505/live_equivalent/profit_moonshot_filtered_shock_reversion_diversified_mode/live_equivalent_revalidation_latest.md",
+  "mode_csv": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260505/live_equivalent/profit_moonshot_filtered_shock_reversion_diversified_mode/live_equivalent_revalidation_candidates_20260426.csv"
+}
+	Command being timed: "uv run python scripts/research/revalidate_live_equivalent_candidates.py --output-dir var/reports/profit_moonshot_20260501/current_tail_20260505/live_equivalent/profit_moonshot_filtered_shock_reversion_diversified_mode --backtest-checkpoint-path var/reports/profit_moonshot_20260501/current_tail_20260505/live_equivalent/profit_moonshot_filtered_shock_reversion_diversified_mode_checkpoint.json --portfolio-modes profit_moonshot_filtered_shock_reversion_diversified_mode --execute-backtests --chunk-days 7 --no-live-decision-update"
+	User time (seconds): 818.69
+	System time (seconds): 61.46
+	Percent of CPU this job got: 108%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 13:32.31
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 1921976
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 2108
+	Minor (reclaiming a frame) page faults: 3146583
+	Voluntary context switches: 2216607
+	Involuntary context switches: 15063
+	Swaps: 0
+	File system inputs: 590408
+	File system outputs: 6952
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

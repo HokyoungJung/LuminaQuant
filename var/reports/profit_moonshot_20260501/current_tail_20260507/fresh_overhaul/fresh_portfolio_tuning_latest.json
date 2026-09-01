@@ -1,0 +1,217 @@
+{
+  "artifact_kind": "profit_moonshot_fresh_portfolio_tuning",
+  "candidate_csv": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260507/fresh_overhaul/fresh_start_overhaul_replay_candidates.csv",
+  "candidate_sleeve_count": 18,
+  "data_metadata": {
+    "feature_points": [
+      {
+        "funding_rows": 1472,
+        "open_interest_rows": 17280,
+        "rows": 2108183,
+        "symbol": "BTC/USDT",
+        "taker_flow_rows": 2101668
+      },
+      {
+        "funding_rows": 1473,
+        "open_interest_rows": 17568,
+        "rows": 2109455,
+        "symbol": "ETH/USDT",
+        "taker_flow_rows": 2102583
+      },
+      {
+        "funding_rows": 1473,
+        "open_interest_rows": 17568,
+        "rows": 2107358,
+        "symbol": "SOL/USDT",
+        "taker_flow_rows": 2099436
+      },
+      {
+        "funding_rows": 1473,
+        "open_interest_rows": 17568,
+        "rows": 707732,
+        "symbol": "BNB/USDT",
+        "taker_flow_rows": 0
+      },
+      {
+        "funding_rows": 1473,
+        "open_interest_rows": 17568,
+        "rows": 707732,
+        "symbol": "TRX/USDT",
+        "taker_flow_rows": 0
+      }
+    ],
+    "rows": 11769
+  },
+  "diagnostic_best_oos": {
+    "gates": {
+      "oos_mdd_beats_shadow": false,
+      "oos_return_beats_incumbent": false,
+      "oos_sharpe_gt_1": false,
+      "oos_trades_not_starved": true,
+      "train_positive": true,
+      "val_positive": true
+    },
+    "mode": "additive_sleeves",
+    "name": "fresh_portfolio_additive_sleeves_fresh_flow_mom_fl24_px24_imb6_h48__fresh_resid_rev_rvcap3156_lb12_z175__fresh_resid_rev_rvcap4143_lb24_z175__fresh_flow_mom_fl24_px12_imb6_h48__fresh_flow_mom_fl24_px6_imb6_h48",
+    "sleeve_count": 5,
+    "sleeves": [
+      "fresh_flow_mom_fl24_px24_imb6_h48",
+      "fresh_resid_rev_rvcap3156_lb12_z175",
+      "fresh_resid_rev_rvcap4143_lb24_z175",
+      "fresh_flow_mom_fl24_px12_imb6_h48",
+      "fresh_flow_mom_fl24_px6_imb6_h48"
+    ],
+    "splits": {
+      "oos": {
+        "fills": 202,
+        "final_equity": 10026.61134136253,
+        "metrics": {
+          "cagr": 0.00042076380793987234,
+          "calmar": 0.21430861455031663,
+          "equity_breach_count": 0.0,
+          "equity_breach_observed": false,
+          "max_drawdown": 0.0019633546174649126,
+          "min_equity": 9996.8061975196,
+          "raw_final_equity": 10026.61134136253,
+          "raw_max_drawdown": 0.0019633546174649126,
+          "raw_total_return": 0.0026611341362530183,
+          "sharpe": 0.4803200789736793,
+          "sortino": 0.5629888148659532,
+          "total_return": 0.0026611341362530183,
+          "volatility": 0.0008766229723896011
+        },
+        "round_trips": 101
+      },
+      "train": {
+        "fills": 574,
+        "final_equity": 10038.945702259625,
+        "metrics": {
+          "cagr": 0.00011183700077066483,
+          "calmar": 0.030198099643158827,
+          "equity_breach_count": 0.0,
+          "equity_breach_observed": false,
+          "max_drawdown": 0.003703444988002771,
+          "min_equity": 9999.496262388582,
+          "raw_final_equity": 10038.945702259625,
+          "raw_max_drawdown": 0.003703444988002771,
+          "raw_total_return": 0.0038945702259625126,
+          "sharpe": 0.1775554827701084,
+          "sortino": 0.16661103820739193,
+          "total_return": 0.0038945702259625126,
+          "volatility": 0.000630956485011031
+        },
+        "round_trips": 287
+      },
+      "val": {
+        "fills": 138,
+        "final_equity": 10010.17649078807,
+        "metrics": {
+          "cagr": 0.00018115928333517495,
+          "calmar": 0.18476540675799455,
+          "equity_breach_count": 0.0,
+          "equity_breach_observed": false,
+          "max_drawdown": 0.0009804826916136801,
+          "min_equity": 9991.45546372649,
+          "raw_final_equity": 10010.17649078807,
+          "raw_max_drawdown": 0.0009804826916136801,
+          "raw_total_return": 0.0010176490788069703,
+          "sharpe": 0.24742851166583144,
+          "sortino": 0.2502525396232917,
+          "total_return": 0.0010176490788069703,
+          "volatility": 0.0007331876203561234
+        },
+        "round_trips": 69
+      }
+    },
+    "success_candidate": false,
+    "validation_score": 0.22970425811944417
+  },
+  "generated_at_utc": "2026-05-07T11:21:50.849897Z",
+  "peak_rss_mib": 2670.78515625,
+  "portfolio_spec_count": 25194,
+  "selected_by_validation": {
+    "gates": {
+      "oos_mdd_beats_shadow": true,
+      "oos_return_beats_incumbent": false,
+      "oos_sharpe_gt_1": false,
+      "oos_trades_not_starved": true,
+      "train_positive": true,
+      "val_positive": true
+    },
+    "mode": "additive_sleeves",
+    "name": "fresh_portfolio_additive_sleeves_fresh_xs_mom_lb12_z175_h96__fresh_resid_flow_rev_fl6_lb6_z125_imb6__fresh_flow_mom_fl24_px24_imb6_h24__fresh_resid_rev_rvcap3156_lb12_z175__fresh_resid_rev_rvcap4143_lb24_z175",
+    "sleeve_count": 5,
+    "sleeves": [
+      "fresh_xs_mom_lb12_z175_h96",
+      "fresh_resid_flow_rev_fl6_lb6_z125_imb6",
+      "fresh_flow_mom_fl24_px24_imb6_h24",
+      "fresh_resid_rev_rvcap3156_lb12_z175",
+      "fresh_resid_rev_rvcap4143_lb24_z175"
+    ],
+    "splits": {
+      "oos": {
+        "fills": 172,
+        "final_equity": 10013.357333099466,
+        "metrics": {
+          "cagr": 0.00021334337172773665,
+          "calmar": 0.15213357654634796,
+          "equity_breach_count": 0.0,
+          "equity_breach_observed": false,
+          "max_drawdown": 0.0014023424451783722,
+          "min_equity": 9995.758998128815,
+          "raw_final_equity": 10013.357333099466,
+          "raw_max_drawdown": 0.0014023424451783722,
+          "raw_total_return": 0.0013485530154322412,
+          "sharpe": 0.3256004717520842,
+          "sortino": 0.4371259693274246,
+          "total_return": 0.0013485530154322412,
+          "volatility": 0.0006558209414728759
+        },
+        "round_trips": 86
+      },
+      "train": {
+        "fills": 716,
+        "final_equity": 10020.336098789536,
+        "metrics": {
+          "cagr": 5.845008274385499e-05,
+          "calmar": 0.015373107937271747,
+          "equity_breach_count": 0.0,
+          "equity_breach_observed": false,
+          "max_drawdown": 0.0038020992880785096,
+          "min_equity": 9999.83208746286,
+          "raw_final_equity": 10020.336098789536,
+          "raw_max_drawdown": 0.0038020992880785096,
+          "raw_total_return": 0.002033609878953513,
+          "sharpe": 0.09814305152432384,
+          "sortino": 0.11364240904946737,
+          "total_return": 0.002033609878953513,
+          "volatility": 0.0005973604152030903
+        },
+        "round_trips": 358
+      },
+      "val": {
+        "fills": 152,
+        "final_equity": 10031.113732594828,
+        "metrics": {
+          "cagr": 0.0005534031236880121,
+          "calmar": 0.9489291961886956,
+          "equity_breach_count": 0.0,
+          "equity_breach_observed": false,
+          "max_drawdown": 0.0005831869499966015,
+          "min_equity": 9996.585025826627,
+          "raw_final_equity": 10031.113732594828,
+          "raw_max_drawdown": 0.0005831869499966015,
+          "raw_total_return": 0.0031113732594827415,
+          "sharpe": 0.8833536570504543,
+          "sortino": 1.2361557823045102,
+          "total_return": 0.0031113732594827415,
+          "volatility": 0.000626529106827688
+        },
+        "round_trips": 76
+      }
+    },
+    "success_candidate": false,
+    "validation_score": 0.5087593281983869
+  },
+  "success_candidate_count": 0
+}

@@ -1,0 +1,33 @@
+{
+  "artifact_kind": "worker4_cost_verifier_materialized_by_leader",
+  "current_behavior": {
+    "live_execution": "emits realized_slippage_bps/BBO metadata but dashboard/export lacks full all-in cost timeout/partial/cancel summary",
+    "paper_telemetry_gate": "computes RPT/all-in cost and vetoes real-money if missing",
+    "primary_gate_10bps": "hard-coded/enforced in existing alpha zoo surfaces",
+    "top_seed_costs": "5/10bps only in existing top-seed reports"
+  },
+  "generated_at_utc": "2026-06-07T07:11:42Z",
+  "goal_reference": ".omx/ultragoal G006-independent-cost-turnover-theory-ver",
+  "minimal_change_points": [
+    "generalize cost grid to 10/15/20bps",
+    "extend metric/assertion tests",
+    "normalize paper fill export fields",
+    "add slippage/all-in cost dashboard summaries",
+    "wire capacity/liquidity proxy"
+  ],
+  "read_only_sidecar_map": true,
+  "schema_version": "1.0",
+  "task_id": 6,
+  "team": "clean-100pct-live-tar-4a549153",
+  "verdict": {
+    "real_money": "fail",
+    "reasons": [
+      "15bps stress not uniformly available",
+      "20bps stress only diagnostic for strict_no_leak and shows tail risk",
+      "paper fill telemetry absent",
+      "capacity/liquidity proxy missing/incomplete for final candidates"
+    ],
+    "report_only_audit": "pass_with_gaps_documented",
+    "small_sleeve": "fail"
+  }
+}

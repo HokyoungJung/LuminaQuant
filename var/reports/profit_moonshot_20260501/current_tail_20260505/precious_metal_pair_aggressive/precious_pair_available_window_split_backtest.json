@@ -1,0 +1,64 @@
+{
+  "artifact_kind": "precious_metal_pair_available_window_split_backtest",
+  "mode": "profit_moonshot_precious_metal_pair_aggressive_mode",
+  "symbols": [
+    "XAU/USDT",
+    "XAG/USDT",
+    "XPT/USDT",
+    "XPD/USDT"
+  ],
+  "data_contract": "legacy-windowed split evidence on current four-metal common overlap; raw-first live-equivalent train/val gate is separate and blocking",
+  "splits": {
+    "train": {
+      "start": "2026-01-30T10:15:00+00:00",
+      "end": "2026-02-15T00:00:00+00:00",
+      "metric_points": 22426,
+      "metrics": {
+        "total_return": -0.0005695985116410673,
+        "sharpe": -0.024200342104094674,
+        "sortino": -0.025777953235572162,
+        "max_drawdown": 0.0026240631890061565,
+        "volatility": 0.0002631386287743871,
+        "cagr": -6.402642611758047e-06,
+        "calmar": -0.002439972725726547
+      },
+      "trade_count": 70,
+      "final_equity": 9994.30401488359,
+      "liquidation_count": 0
+    },
+    "val": {
+      "start": "2026-02-15T00:00:00+00:00",
+      "end": "2026-03-01T00:00:00+00:00",
+      "metric_points": 20161,
+      "metrics": {
+        "total_return": 0.0019141973751655161,
+        "sharpe": 0.03722357203422873,
+        "sortino": 0.036104628606800054,
+        "max_drawdown": 0.004715467185975008,
+        "volatility": 0.0006478268983427386,
+        "cagr": 2.3904881141900702e-05,
+        "calmar": 0.005069461879196162
+      },
+      "trade_count": 70,
+      "final_equity": 10019.141973751655,
+      "liquidation_count": 0
+    },
+    "oos": {
+      "start": "2026-03-01T00:00:00+00:00",
+      "end": "2026-03-07T11:00:00+00:00",
+      "metric_points": 9301,
+      "metrics": {
+        "total_return": -0.00047758153059151986,
+        "sharpe": -0.1640661886615878,
+        "sortino": -0.14938674939553742,
+        "max_drawdown": 0.0005276789299077791,
+        "volatility": 7.887608914568646e-05,
+        "cagr": -1.2943926276265394e-05,
+        "calmar": -0.024529928224588323
+      },
+      "trade_count": 13,
+      "final_equity": 9995.224184694085,
+      "liquidation_count": 0
+    }
+  }
+}

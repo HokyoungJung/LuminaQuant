@@ -1,0 +1,226 @@
+{
+  "generated_at_utc": "2026-05-09T05:13:09.440Z",
+  "source_csv": "var/reports/profit_moonshot_20260501/current_tail_20260508/all_family_expansion/fresh_start_overhaul_replay_candidates.csv",
+  "replay_summary": {
+    "spec_count": 6805,
+    "replay_survivor_count": 300,
+    "success_candidate_count": 300,
+    "peak_rss_mib": 289.46484375,
+    "split_windows": [
+      {
+        "end_inclusive": "2025-12-31",
+        "name": "train",
+        "role": "sanity_filter",
+        "start": "2025-01-01"
+      },
+      {
+        "end_inclusive": "2026-02-28",
+        "name": "val",
+        "role": "primary_selection",
+        "start": "2026-01-01"
+      },
+      {
+        "end_inclusive": "2026-05-08",
+        "name": "oos",
+        "role": "report_only",
+        "start": "2026-03-01"
+      }
+    ],
+    "panel_rows": 11769,
+    "feature_points": [
+      {
+        "funding_rows": 1477,
+        "open_interest_rows": 17699,
+        "rows": 2110280,
+        "symbol": "BTC/USDT",
+        "taker_flow_rows": 2101668
+      },
+      {
+        "funding_rows": 1478,
+        "open_interest_rows": 17987,
+        "rows": 2111552,
+        "symbol": "ETH/USDT",
+        "taker_flow_rows": 2102583
+      },
+      {
+        "funding_rows": 1478,
+        "open_interest_rows": 17987,
+        "rows": 2109455,
+        "symbol": "SOL/USDT",
+        "taker_flow_rows": 2099436
+      },
+      {
+        "funding_rows": 1478,
+        "open_interest_rows": 17987,
+        "rows": 709829,
+        "symbol": "BNB/USDT",
+        "taker_flow_rows": 0
+      },
+      {
+        "funding_rows": 1478,
+        "open_interest_rows": 17987,
+        "rows": 709829,
+        "symbol": "TRX/USDT",
+        "taker_flow_rows": 0
+      }
+    ],
+    "gate_policy": {
+      "baseline_oos_return": 0.008284,
+      "liquidations_required": 0,
+      "max_order_value": 175,
+      "metric_periods_per_year": 8760,
+      "shadow_oos_mdd": 0.001778,
+      "success_oos_sharpe": 1,
+      "target_allocation": 0.008
+    }
+  },
+  "support_inventory_summary": {
+    "symbol_count": 5,
+    "total_funding_rows": 8539,
+    "total_open_interest_rows": 81052,
+    "earliest_oi_first_timestamp_utc": "2026-03-07T00:00:00+00:00",
+    "latest_oi_first_timestamp_utc": "2026-03-08T00:00:00+00:00",
+    "latest_oi_last_timestamp_utc": "2026-05-02T11:35:00+00:00",
+    "liquidation_rows_total": 0
+  },
+  "family_summaries": {
+    "funding_oi_carry_fade": {
+      "family": "funding_oi_carry_fade",
+      "spec_count": 24,
+      "success_count": 0,
+      "survivor_count": 0,
+      "success_rate": 0,
+      "avg_train_return": 0,
+      "avg_val_return": 0,
+      "avg_oos_return": -0.002234022195875665,
+      "best_val": {
+        "name": "fresh_funding_oi_fade_lb6_z125_f100_oi0",
+        "failed_gates": "train_positive,val_positive,oos_return_beats_incumbent,oos_sharpe_gt_1",
+        "train_return": 0,
+        "val_return": 0,
+        "oos_return": -0.0009207350007364168,
+        "oos_sharpe": -4.035270774404545,
+        "oos_mdd": 0.001270334306104311,
+        "oos_round_trips": 33
+      },
+      "best_oos": {
+        "name": "fresh_funding_oi_fade_lb6_z125_f100_oi0",
+        "failed_gates": "train_positive,val_positive,oos_return_beats_incumbent,oos_sharpe_gt_1",
+        "train_return": 0,
+        "val_return": 0,
+        "oos_return": -0.0009207350007364168,
+        "oos_sharpe": -4.035270774404545,
+        "oos_mdd": 0.001270334306104311,
+        "oos_round_trips": 33
+      }
+    },
+    "funding_carry_fade": {
+      "family": "funding_carry_fade",
+      "spec_count": 36,
+      "success_count": 0,
+      "survivor_count": 0,
+      "success_rate": 0,
+      "avg_train_return": -0.005648224617803701,
+      "avg_val_return": -0.0011092901213595125,
+      "avg_oos_return": -0.0006651068681659452,
+      "best_val": {
+        "name": "fresh_funding_fade_lb72_z15_f150ppm",
+        "failed_gates": "train_positive,val_positive,oos_return_beats_incumbent,oos_sharpe_gt_1",
+        "train_return": -0.0006620989335790473,
+        "val_return": -0.00035492594061359295,
+        "oos_return": -0.00046340429583402454,
+        "oos_sharpe": -3.9940299970661437,
+        "oos_mdd": 0.0006794849007652638,
+        "oos_round_trips": 6
+      },
+      "best_oos": {
+        "name": "fresh_funding_fade_lb24_z15_f50ppm",
+        "failed_gates": "train_positive,val_positive,oos_return_beats_incumbent",
+        "train_return": -0.007277335572748234,
+        "val_return": -0.001419188863701848,
+        "oos_return": 0.00046516399184337587,
+        "oos_sharpe": 1.8530220294047905,
+        "oos_mdd": 0.0005987559974281118,
+        "oos_round_trips": 28
+      }
+    },
+    "funding_carry_momentum": {
+      "family": "funding_carry_momentum",
+      "spec_count": 36,
+      "success_count": 0,
+      "survivor_count": 0,
+      "success_rate": 0,
+      "avg_train_return": -0.008074677094918952,
+      "avg_val_return": -0.0010219219830989107,
+      "avg_oos_return": -0.0008674721576035956,
+      "best_val": {
+        "name": "fresh_funding_mom_lb48_z15_f150ppm",
+        "failed_gates": "train_positive,val_positive,oos_return_beats_incumbent,oos_sharpe_gt_1",
+        "train_return": -0.0021746513365736853,
+        "val_return": -0.0002364649994244239,
+        "oos_return": -0.0002892236778092583,
+        "oos_sharpe": -6.6843164500654195,
+        "oos_mdd": 0.00028922367780924105,
+        "oos_round_trips": 7
+      },
+      "best_oos": {
+        "name": "fresh_funding_mom_lb24_z10_f150ppm",
+        "failed_gates": "train_positive,val_positive,oos_return_beats_incumbent,oos_sharpe_gt_1",
+        "train_return": -0.0033600162864185767,
+        "val_return": -0.0007849048611128229,
+        "oos_return": -0.00012629659356100387,
+        "oos_sharpe": -2.2491277316792644,
+        "oos_mdd": 0.000165595718763457,
+        "oos_round_trips": 8
+      }
+    },
+    "calendar_rotation": {
+      "family": "calendar_rotation",
+      "spec_count": 4392,
+      "success_count": 300,
+      "survivor_count": 300,
+      "success_rate": 0.06830601092896176,
+      "avg_train_return": 0.0030214099614339286,
+      "avg_val_return": 0.004524405885917602,
+      "avg_oos_return": 0.0017670755049410884,
+      "best_val": {
+        "name": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600",
+        "failed_gates": "oos_return_beats_incumbent,oos_mdd_beats_shadow",
+        "train_return": 0.02457505241530833,
+        "val_return": 0.035380085429409736,
+        "oos_return": 0.004048834557599301,
+        "oos_sharpe": 2.1633191892022876,
+        "oos_mdd": 0.002342001506609833,
+        "oos_round_trips": 8
+      },
+      "best_oos": {
+        "name": "fresh_calendar_rot_lbtcusdt_sweakest_lb168_thr100_h336_sc80_st0",
+        "failed_gates": "oos_mdd_beats_shadow,oos_trades_not_starved",
+        "train_return": 0.031834642257851486,
+        "val_return": 0.022933947985626313,
+        "oos_return": 0.018377205441852063,
+        "oos_sharpe": 4.652785234021095,
+        "oos_mdd": 0.0069017464656738105,
+        "oos_round_trips": 3
+      }
+    }
+  },
+  "funding_related_summary": {
+    "spec_count": 96,
+    "success_count": 0,
+    "survivor_count": 0,
+    "success_rate": 0
+  },
+  "derivatives_flow_v6": {
+    "status": "live_equivalent_validated",
+    "selection_eligible": false,
+    "train_total_return": -0.09099468378516451,
+    "val_total_return": -0.005570644043985662,
+    "train_sharpe": -0.021023562242067566,
+    "val_sharpe": -0.012084293944808604,
+    "train_trade_count": 9382,
+    "val_trade_count": 1522,
+    "max_rss_kb": 345772,
+    "alpha_blocking_reasons": "train_total_return_below_floor;val_total_return_not_positive;val_sharpe_not_positive;val_sortino_not_positive"
+  }
+}

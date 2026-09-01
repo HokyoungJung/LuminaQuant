@@ -1,0 +1,40 @@
+{
+  "auto_backend": {
+    "auto_fallback_warning_count": 0,
+    "auto_fallback_warning_reasons": [],
+    "description": "rust:/home/hoky/Quants-agent/LuminaQuant/native/rust_rawfirst/target/release/liblumina_rawfirst.so",
+    "native_library_path": "/home/hoky/Quants-agent/LuminaQuant/native/rust_rawfirst/target/release/liblumina_rawfirst.so",
+    "native_load_error": null,
+    "requested_backend": "auto",
+    "resolved_backend": "rust"
+  },
+  "evals": 3,
+  "parity": {
+    "checked": true,
+    "max_abs_diff": 4.440892098500626e-16,
+    "passed": true,
+    "reason": null
+  },
+  "peak_memory_note": "synthetic single-frame benchmark; keep trades bounded for <8GB sessions",
+  "python": {
+    "backend": "python",
+    "elapsed_seconds": 0.14866146100030164,
+    "evals": 3,
+    "input_trades_per_second": 4036015.7633509506,
+    "output_bars": 60000,
+    "seconds_per_eval": 0.04955382033343388
+  },
+  "rust": {
+    "backend": "rust",
+    "elapsed_seconds": 0.0737969100000555,
+    "evals": 3,
+    "input_trades_per_second": 8130421.720903338,
+    "output_bars": 60000,
+    "seconds_per_eval": 0.0245989700000185
+  },
+  "rust_available": true,
+  "rust_speedup_vs_python": 2.0144672859634616,
+  "seconds": 60000,
+  "status": "pass",
+  "trades": 200000
+}

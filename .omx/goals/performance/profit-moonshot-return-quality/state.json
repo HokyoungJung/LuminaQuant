@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "workflow": "performance-goal",
+  "slug": "profit-moonshot-return-quality",
+  "objective": "Find and verify a profit moonshot candidate with train/validation/OOS monthlyized return >=2%, OOS MDD <=25%, high Sharpe/Sortino/smart Sortino/Calmar, train/validation-only selection, locked-OOS report/gate-only, and <8GiB memory",
+  "status": "validation_passed",
+  "createdAt": "2026-05-09T06:30:57.492Z",
+  "updatedAt": "2026-05-09T07:03:58.031Z",
+  "evaluator": {
+    "command": "uv run --extra dev python scripts/research/validate_profit_moonshot_pass_under_8gb.py --result-path .omx/specs/autoresearch-profit-moonshot-alpha-v2/result.json --output-path .omx/specs/autoresearch-profit-moonshot-alpha-v2/validation_latest.json --markdown-path var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/return_quality_validation_20260509.md",
+    "contract": "PASS only when validator passes and the candidate_return_quality_contract proves train/validation/OOS monthlyized return >=2%, OOS MDD <=25%, OOS Sharpe >=2, Sortino >=3, smart Sortino >=3, Calmar >=1, current champion return/risk improvement, locked-OOS report/gate-only, and <8GiB memory evidence."
+  },
+  "artifactPaths": {
+    "state": ".omx/goals/performance/profit-moonshot-return-quality/state.json",
+    "ledger": ".omx/goals/performance/profit-moonshot-return-quality/ledger.jsonl",
+    "evaluator": ".omx/goals/performance/profit-moonshot-return-quality/evaluator.md"
+  },
+  "startedAt": "2026-05-09T06:30:57.652Z",
+  "lastValidation": {
+    "status": "pass",
+    "evidence": "Validator passed after monthly-budget candidate: train/val/OOS monthlyized returns >=2%, OOS MDD <=25%, train/val/OOS quality gates, full local tests, private/main push a1f4e07, GitHub Actions ci 25594783480 and private-ci 25594783476 success.",
+    "recordedAt": "2026-05-09T07:03:58.031Z"
+  }
+}

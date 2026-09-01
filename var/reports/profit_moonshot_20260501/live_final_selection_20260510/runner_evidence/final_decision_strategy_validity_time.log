@@ -1,0 +1,23 @@
+	Command being timed: ".venv/bin/python scripts/research/write_profit_moonshot_live_final_selection.py --refresh-json var/reports/profit_moonshot_20260501/live_final_selection_20260510/data_refresh/data_refresh_latest.json --candidate-portfolio-json var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_portfolio/fresh_portfolio_tuning_latest.json --candidate-hybrid-json var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_hybrid/candidate_hybrid_latest.json --liquidation-json var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json --legacy-hybrid-json var/reports/profit_moonshot_20260501/live_final_selection_20260510/hybrid_final/hybrid_online_portfolio_latest.json --output-dir var/reports/profit_moonshot_20260501/live_final_selection_20260510/final_decision --required-symbols BTC/USDT,ETH/USDT,SOL/USDT,BNB/USDT,TRX/USDT --time-log var/reports/profit_moonshot_20260501/live_final_selection_20260510/runner_evidence/data_refresh_time.log --time-log var/reports/profit_moonshot_20260501/live_final_selection_20260510/runner_evidence/candidate_tuning_time.log --time-log var/reports/profit_moonshot_20260501/live_final_selection_20260510/runner_evidence/candidate_hybrid_time.log --time-log var/reports/profit_moonshot_20260501/live_final_selection_20260510/runner_evidence/liquidation_validation_time.log --time-log var/reports/profit_moonshot_20260501/live_final_selection_20260510/runner_evidence/hybrid_tuning_time.log --time-log var/reports/profit_moonshot_20260501/live_final_selection_20260510/runner_evidence/hybrid_final_time.log --time-log var/reports/profit_moonshot_20260501/live_final_selection_20260510/runner_evidence/targeted_tests_time.log --time-log var/reports/profit_moonshot_20260501/live_final_selection_20260510/runner_evidence/full_pytest_time.log --time-log var/reports/profit_moonshot_20260501/live_final_selection_20260510/runner_evidence/ruff_time.log --time-log var/reports/profit_moonshot_20260501/live_final_selection_20260510/runner_evidence/compileall_time.log --time-log var/reports/profit_moonshot_20260501/live_final_selection_20260510/runner_evidence/git_diff_check_time.log"
+	User time (seconds): 0.03
+	System time (seconds): 0.00
+	Percent of CPU this job got: 80%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.05
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 28220
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 5712
+	Voluntary context switches: 8
+	Involuntary context switches: 2
+	Swaps: 0
+	File system inputs: 64
+	File system outputs: 792
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

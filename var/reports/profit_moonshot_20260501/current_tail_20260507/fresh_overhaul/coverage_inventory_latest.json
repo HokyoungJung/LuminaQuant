@@ -1,0 +1,1498 @@
+{
+  "artifact_kind": "multiasset_exchange_coverage_inventory",
+  "feature_inventories": {
+    "binance": {
+      "db_path": "data/market_parquet",
+      "exchange_id": "binance",
+      "generated_at_utc": "2026-05-07T11:03:20.372037+00:00",
+      "notes": {
+        "canonical_inventory": true,
+        "index_price": "Collector now uses pair param for indexPriceKlines; older sparse symbols reflect Binance response history or earlier collector state.",
+        "liquidation": "Rows may be zero where Binance futures liquidation endpoint is unavailable/returns HTTP 400.",
+        "open_interest": "Long-range chunking and empty-window skip are applied; rows reflect what Binance currently returns for each symbol."
+      },
+      "symbol_count": 14,
+      "symbols": [
+        {
+          "first_timestamp_ms": 1735689600015,
+          "first_timestamp_utc": "2025-01-01T00:00:00.015000+00:00",
+          "funding_fee_rows": 1295,
+          "funding_rows": 1295,
+          "has_funding_fee": true,
+          "has_index": true,
+          "has_liquidation": false,
+          "has_mark": true,
+          "has_open_interest": true,
+          "has_taker_flow": false,
+          "index_rows": 985,
+          "last_timestamp_ms": 1774715040000,
+          "last_timestamp_utc": "2026-03-28T16:24:00+00:00",
+          "liquidation_rows": 0,
+          "mark_rows": 620785,
+          "oi_first_timestamp_ms": 1772870400000,
+          "oi_first_timestamp_utc": "2026-03-07T08:00:00+00:00",
+          "oi_last_timestamp_ms": 1774714800000,
+          "oi_last_timestamp_utc": "2026-03-28T16:20:00+00:00",
+          "open_interest_rows": 222,
+          "rows": 621383,
+          "symbol": "ADAUSDT",
+          "taker_flow_first_timestamp_ms": null,
+          "taker_flow_first_timestamp_utc": null,
+          "taker_flow_last_timestamp_ms": null,
+          "taker_flow_last_timestamp_utc": null,
+          "taker_flow_rows": 0
+        },
+        {
+          "first_timestamp_ms": 1735689600015,
+          "first_timestamp_utc": "2025-01-01T00:00:00.015000+00:00",
+          "funding_fee_rows": 1295,
+          "funding_rows": 1295,
+          "has_funding_fee": true,
+          "has_index": true,
+          "has_liquidation": false,
+          "has_mark": true,
+          "has_open_interest": true,
+          "has_taker_flow": false,
+          "index_rows": 985,
+          "last_timestamp_ms": 1774715040000,
+          "last_timestamp_utc": "2026-03-28T16:24:00+00:00",
+          "liquidation_rows": 0,
+          "mark_rows": 620785,
+          "oi_first_timestamp_ms": 1772870400000,
+          "oi_first_timestamp_utc": "2026-03-07T08:00:00+00:00",
+          "oi_last_timestamp_ms": 1774714800000,
+          "oi_last_timestamp_utc": "2026-03-28T16:20:00+00:00",
+          "open_interest_rows": 222,
+          "rows": 621383,
+          "symbol": "AVAXUSDT",
+          "taker_flow_first_timestamp_ms": null,
+          "taker_flow_first_timestamp_utc": null,
+          "taker_flow_last_timestamp_ms": null,
+          "taker_flow_last_timestamp_utc": null,
+          "taker_flow_rows": 0
+        },
+        {
+          "first_timestamp_ms": 1735689600015,
+          "first_timestamp_utc": "2025-01-01T00:00:00.015000+00:00",
+          "funding_fee_rows": 1473,
+          "funding_rows": 1473,
+          "has_funding_fee": true,
+          "has_index": true,
+          "has_liquidation": false,
+          "has_mark": true,
+          "has_open_interest": true,
+          "has_taker_flow": false,
+          "index_rows": 87840,
+          "last_timestamp_ms": 1778111940000,
+          "last_timestamp_utc": "2026-05-06T23:59:00+00:00",
+          "liquidation_rows": 0,
+          "mark_rows": 707039,
+          "oi_first_timestamp_ms": 1772841600000,
+          "oi_first_timestamp_utc": "2026-03-07T00:00:00+00:00",
+          "oi_last_timestamp_ms": 1778111700000,
+          "oi_last_timestamp_utc": "2026-05-06T23:55:00+00:00",
+          "open_interest_rows": 17568,
+          "rows": 707732,
+          "symbol": "BNBUSDT",
+          "taker_flow_first_timestamp_ms": null,
+          "taker_flow_first_timestamp_utc": null,
+          "taker_flow_last_timestamp_ms": null,
+          "taker_flow_last_timestamp_utc": null,
+          "taker_flow_rows": 0
+        },
+        {
+          "first_timestamp_ms": 1700000000000,
+          "first_timestamp_utc": "2023-11-14T22:13:20+00:00",
+          "funding_fee_rows": 2712,
+          "funding_rows": 2712,
+          "has_funding_fee": true,
+          "has_index": true,
+          "has_liquidation": false,
+          "has_mark": true,
+          "has_open_interest": true,
+          "has_taker_flow": true,
+          "index_rows": 86401,
+          "last_timestamp_ms": 1778111940000,
+          "last_timestamp_utc": "2026-05-06T23:59:00+00:00",
+          "liquidation_rows": 0,
+          "mark_rows": 1301202,
+          "oi_first_timestamp_ms": 1772928000000,
+          "oi_first_timestamp_utc": "2026-03-08T00:00:00+00:00",
+          "oi_last_timestamp_ms": 1778111700000,
+          "oi_last_timestamp_utc": "2026-05-06T23:55:00+00:00",
+          "open_interest_rows": 17280,
+          "rows": 2703191,
+          "symbol": "BTCUSDT",
+          "taker_flow_first_timestamp_ms": 1735689620000,
+          "taker_flow_first_timestamp_utc": "2025-01-01T00:00:20+00:00",
+          "taker_flow_last_timestamp_ms": 1777766400000,
+          "taker_flow_last_timestamp_utc": "2026-05-03T00:00:00+00:00",
+          "taker_flow_rows": 2101668
+        },
+        {
+          "first_timestamp_ms": 1735689600015,
+          "first_timestamp_utc": "2025-01-01T00:00:00.015000+00:00",
+          "funding_fee_rows": 1295,
+          "funding_rows": 1295,
+          "has_funding_fee": true,
+          "has_index": true,
+          "has_liquidation": false,
+          "has_mark": true,
+          "has_open_interest": true,
+          "has_taker_flow": false,
+          "index_rows": 985,
+          "last_timestamp_ms": 1774715040000,
+          "last_timestamp_utc": "2026-03-28T16:24:00+00:00",
+          "liquidation_rows": 0,
+          "mark_rows": 620785,
+          "oi_first_timestamp_ms": 1772870400000,
+          "oi_first_timestamp_utc": "2026-03-07T08:00:00+00:00",
+          "oi_last_timestamp_ms": 1774714800000,
+          "oi_last_timestamp_utc": "2026-03-28T16:20:00+00:00",
+          "open_interest_rows": 222,
+          "rows": 621383,
+          "symbol": "DOGEUSDT",
+          "taker_flow_first_timestamp_ms": null,
+          "taker_flow_first_timestamp_utc": null,
+          "taker_flow_last_timestamp_ms": null,
+          "taker_flow_last_timestamp_utc": null,
+          "taker_flow_rows": 0
+        },
+        {
+          "first_timestamp_ms": 1735689600015,
+          "first_timestamp_utc": "2025-01-01T00:00:00.015000+00:00",
+          "funding_fee_rows": 1473,
+          "funding_rows": 1473,
+          "has_funding_fee": true,
+          "has_index": true,
+          "has_liquidation": false,
+          "has_mark": true,
+          "has_open_interest": true,
+          "has_taker_flow": true,
+          "index_rows": 87840,
+          "last_timestamp_ms": 1778111940000,
+          "last_timestamp_utc": "2026-05-06T23:59:00+00:00",
+          "liquidation_rows": 0,
+          "mark_rows": 707039,
+          "oi_first_timestamp_ms": 1772841600000,
+          "oi_first_timestamp_utc": "2026-03-07T00:00:00+00:00",
+          "oi_last_timestamp_ms": 1778111700000,
+          "oi_last_timestamp_utc": "2026-05-06T23:55:00+00:00",
+          "open_interest_rows": 17568,
+          "rows": 2109455,
+          "symbol": "ETHUSDT",
+          "taker_flow_first_timestamp_ms": 1735689620000,
+          "taker_flow_first_timestamp_utc": "2025-01-01T00:00:20+00:00",
+          "taker_flow_last_timestamp_ms": 1777766400000,
+          "taker_flow_last_timestamp_utc": "2026-05-03T00:00:00+00:00",
+          "taker_flow_rows": 2102583
+        },
+        {
+          "first_timestamp_ms": 1735689600015,
+          "first_timestamp_utc": "2025-01-01T00:00:00.015000+00:00",
+          "funding_fee_rows": 1473,
+          "funding_rows": 1473,
+          "has_funding_fee": true,
+          "has_index": true,
+          "has_liquidation": false,
+          "has_mark": true,
+          "has_open_interest": true,
+          "has_taker_flow": true,
+          "index_rows": 87840,
+          "last_timestamp_ms": 1778111940000,
+          "last_timestamp_utc": "2026-05-06T23:59:00+00:00",
+          "liquidation_rows": 0,
+          "mark_rows": 707039,
+          "oi_first_timestamp_ms": 1772841600000,
+          "oi_first_timestamp_utc": "2026-03-07T00:00:00+00:00",
+          "oi_last_timestamp_ms": 1778111700000,
+          "oi_last_timestamp_utc": "2026-05-06T23:55:00+00:00",
+          "open_interest_rows": 17568,
+          "rows": 2107358,
+          "symbol": "SOLUSDT",
+          "taker_flow_first_timestamp_ms": 1735693120000,
+          "taker_flow_first_timestamp_utc": "2025-01-01T00:58:40+00:00",
+          "taker_flow_last_timestamp_ms": 1777766400000,
+          "taker_flow_last_timestamp_utc": "2026-05-03T00:00:00+00:00",
+          "taker_flow_rows": 2099436
+        },
+        {
+          "first_timestamp_ms": 1735689600015,
+          "first_timestamp_utc": "2025-01-01T00:00:00.015000+00:00",
+          "funding_fee_rows": 2589,
+          "funding_rows": 2589,
+          "has_funding_fee": true,
+          "has_index": true,
+          "has_liquidation": false,
+          "has_mark": true,
+          "has_open_interest": true,
+          "has_taker_flow": false,
+          "index_rows": 985,
+          "last_timestamp_ms": 1774715040000,
+          "last_timestamp_utc": "2026-03-28T16:24:00+00:00",
+          "liquidation_rows": 0,
+          "mark_rows": 620785,
+          "oi_first_timestamp_ms": 1774656000000,
+          "oi_first_timestamp_utc": "2026-03-28T00:00:00+00:00",
+          "oi_last_timestamp_ms": 1774714800000,
+          "oi_last_timestamp_utc": "2026-03-28T16:20:00+00:00",
+          "open_interest_rows": 197,
+          "rows": 621991,
+          "symbol": "TONUSDT",
+          "taker_flow_first_timestamp_ms": null,
+          "taker_flow_first_timestamp_utc": null,
+          "taker_flow_last_timestamp_ms": null,
+          "taker_flow_last_timestamp_utc": null,
+          "taker_flow_rows": 0
+        },
+        {
+          "first_timestamp_ms": 1735689600015,
+          "first_timestamp_utc": "2025-01-01T00:00:00.015000+00:00",
+          "funding_fee_rows": 1473,
+          "funding_rows": 1473,
+          "has_funding_fee": true,
+          "has_index": true,
+          "has_liquidation": false,
+          "has_mark": true,
+          "has_open_interest": true,
+          "has_taker_flow": false,
+          "index_rows": 87840,
+          "last_timestamp_ms": 1778111940000,
+          "last_timestamp_utc": "2026-05-06T23:59:00+00:00",
+          "liquidation_rows": 0,
+          "mark_rows": 707039,
+          "oi_first_timestamp_ms": 1772841600000,
+          "oi_first_timestamp_utc": "2026-03-07T00:00:00+00:00",
+          "oi_last_timestamp_ms": 1778111700000,
+          "oi_last_timestamp_utc": "2026-05-06T23:55:00+00:00",
+          "open_interest_rows": 17568,
+          "rows": 707732,
+          "symbol": "TRXUSDT",
+          "taker_flow_first_timestamp_ms": null,
+          "taker_flow_first_timestamp_utc": null,
+          "taker_flow_last_timestamp_ms": null,
+          "taker_flow_last_timestamp_utc": null,
+          "taker_flow_rows": 0
+        },
+        {
+          "first_timestamp_ms": 1767771720000,
+          "first_timestamp_utc": "2026-01-07T07:42:00+00:00",
+          "funding_fee_rows": 361,
+          "funding_rows": 361,
+          "has_funding_fee": true,
+          "has_index": true,
+          "has_liquidation": false,
+          "has_mark": true,
+          "has_open_interest": true,
+          "has_taker_flow": false,
+          "index_rows": 86007,
+          "last_timestamp_ms": 1774715040000,
+          "last_timestamp_utc": "2026-03-28T16:24:00+00:00",
+          "liquidation_rows": 0,
+          "mark_rows": 86286,
+          "oi_first_timestamp_ms": 1770480300000,
+          "oi_first_timestamp_utc": "2026-02-07T16:05:00+00:00",
+          "oi_last_timestamp_ms": 1774714800000,
+          "oi_last_timestamp_utc": "2026-03-28T16:20:00+00:00",
+          "open_interest_rows": 8201,
+          "rows": 86631,
+          "symbol": "XAGUSDT",
+          "taker_flow_first_timestamp_ms": null,
+          "taker_flow_first_timestamp_utc": null,
+          "taker_flow_last_timestamp_ms": null,
+          "taker_flow_last_timestamp_utc": null,
+          "taker_flow_rows": 0
+        },
+        {
+          "first_timestamp_ms": 1765433280000,
+          "first_timestamp_utc": "2025-12-11T06:08:00+00:00",
+          "funding_fee_rows": 523,
+          "funding_rows": 523,
+          "has_funding_fee": true,
+          "has_index": true,
+          "has_liquidation": false,
+          "has_mark": true,
+          "has_open_interest": true,
+          "has_taker_flow": false,
+          "index_rows": 125002,
+          "last_timestamp_ms": 1774715040000,
+          "last_timestamp_utc": "2026-03-28T16:24:00+00:00",
+          "liquidation_rows": 0,
+          "mark_rows": 125260,
+          "oi_first_timestamp_ms": 1770540600000,
+          "oi_first_timestamp_utc": "2026-02-08T08:50:00+00:00",
+          "oi_last_timestamp_ms": 1774714800000,
+          "oi_last_timestamp_utc": "2026-03-28T16:20:00+00:00",
+          "open_interest_rows": 8000,
+          "rows": 125766,
+          "symbol": "XAUUSDT",
+          "taker_flow_first_timestamp_ms": null,
+          "taker_flow_first_timestamp_utc": null,
+          "taker_flow_last_timestamp_ms": null,
+          "taker_flow_last_timestamp_utc": null,
+          "taker_flow_rows": 0
+        },
+        {
+          "first_timestamp_ms": 1769768100000,
+          "first_timestamp_utc": "2026-01-30T10:15:00+00:00",
+          "funding_fee_rows": 220,
+          "funding_rows": 220,
+          "has_funding_fee": true,
+          "has_index": true,
+          "has_liquidation": false,
+          "has_mark": true,
+          "has_open_interest": true,
+          "has_taker_flow": false,
+          "index_rows": 52873,
+          "last_timestamp_ms": 1774715040000,
+          "last_timestamp_utc": "2026-03-28T16:24:00+00:00",
+          "liquidation_rows": 0,
+          "mark_rows": 52873,
+          "oi_first_timestamp_ms": 1770518100000,
+          "oi_first_timestamp_utc": "2026-02-08T02:35:00+00:00",
+          "oi_last_timestamp_ms": 1774714800000,
+          "oi_last_timestamp_utc": "2026-03-28T16:20:00+00:00",
+          "open_interest_rows": 2176,
+          "rows": 53078,
+          "symbol": "XPDUSDT",
+          "taker_flow_first_timestamp_ms": null,
+          "taker_flow_first_timestamp_utc": null,
+          "taker_flow_last_timestamp_ms": null,
+          "taker_flow_last_timestamp_utc": null,
+          "taker_flow_rows": 0
+        },
+        {
+          "first_timestamp_ms": 1769767200000,
+          "first_timestamp_utc": "2026-01-30T10:00:00+00:00",
+          "funding_fee_rows": 220,
+          "funding_rows": 220,
+          "has_funding_fee": true,
+          "has_index": true,
+          "has_liquidation": false,
+          "has_mark": true,
+          "has_open_interest": true,
+          "has_taker_flow": false,
+          "index_rows": 52888,
+          "last_timestamp_ms": 1774715040000,
+          "last_timestamp_utc": "2026-03-28T16:24:00+00:00",
+          "liquidation_rows": 0,
+          "mark_rows": 52888,
+          "oi_first_timestamp_ms": 1770517200000,
+          "oi_first_timestamp_utc": "2026-02-08T02:20:00+00:00",
+          "oi_last_timestamp_ms": 1774714800000,
+          "oi_last_timestamp_utc": "2026-03-28T16:20:00+00:00",
+          "open_interest_rows": 2191,
+          "rows": 53093,
+          "symbol": "XPTUSDT",
+          "taker_flow_first_timestamp_ms": null,
+          "taker_flow_first_timestamp_utc": null,
+          "taker_flow_last_timestamp_ms": null,
+          "taker_flow_last_timestamp_utc": null,
+          "taker_flow_rows": 0
+        },
+        {
+          "first_timestamp_ms": 1735689600015,
+          "first_timestamp_utc": "2025-01-01T00:00:00.015000+00:00",
+          "funding_fee_rows": 1295,
+          "funding_rows": 1295,
+          "has_funding_fee": true,
+          "has_index": true,
+          "has_liquidation": false,
+          "has_mark": true,
+          "has_open_interest": true,
+          "has_taker_flow": false,
+          "index_rows": 985,
+          "last_timestamp_ms": 1774715040000,
+          "last_timestamp_utc": "2026-03-28T16:24:00+00:00",
+          "liquidation_rows": 0,
+          "mark_rows": 620785,
+          "oi_first_timestamp_ms": 1772870400000,
+          "oi_first_timestamp_utc": "2026-03-07T08:00:00+00:00",
+          "oi_last_timestamp_ms": 1774714800000,
+          "oi_last_timestamp_utc": "2026-03-28T16:20:00+00:00",
+          "open_interest_rows": 222,
+          "rows": 621383,
+          "symbol": "XRPUSDT",
+          "taker_flow_first_timestamp_ms": null,
+          "taker_flow_first_timestamp_utc": null,
+          "taker_flow_last_timestamp_ms": null,
+          "taker_flow_last_timestamp_utc": null,
+          "taker_flow_rows": 0
+        }
+      ]
+    },
+    "hyperliquid": {
+      "db_path": "data/market_parquet",
+      "exchange_id": "hyperliquid",
+      "generated_at_utc": "2026-05-07T11:03:21.038641+00:00",
+      "notes": {
+        "canonical_inventory": true,
+        "index_price": "Collector now uses pair param for indexPriceKlines; older sparse symbols reflect Binance response history or earlier collector state.",
+        "liquidation": "Rows may be zero where Binance futures liquidation endpoint is unavailable/returns HTTP 400.",
+        "open_interest": "Long-range chunking and empty-window skip are applied; rows reflect what Binance currently returns for each symbol."
+      },
+      "symbol_count": 3,
+      "symbols": [
+        {
+          "first_timestamp_ms": 1735689600054,
+          "first_timestamp_utc": "2025-01-01T00:00:00.054000+00:00",
+          "funding_fee_rows": 0,
+          "funding_rows": 11737,
+          "has_funding_fee": false,
+          "has_index": true,
+          "has_liquidation": false,
+          "has_mark": true,
+          "has_open_interest": true,
+          "has_taker_flow": false,
+          "index_rows": 1,
+          "last_timestamp_ms": 1778147926992,
+          "last_timestamp_utc": "2026-05-07T09:58:46.992000+00:00",
+          "liquidation_rows": 0,
+          "mark_rows": 1,
+          "oi_first_timestamp_ms": 1778147926992,
+          "oi_first_timestamp_utc": "2026-05-07T09:58:46.992000+00:00",
+          "oi_last_timestamp_ms": 1778147926992,
+          "oi_last_timestamp_utc": "2026-05-07T09:58:46.992000+00:00",
+          "open_interest_rows": 1,
+          "rows": 11737,
+          "symbol": "BTCUSDT",
+          "taker_flow_first_timestamp_ms": null,
+          "taker_flow_first_timestamp_utc": null,
+          "taker_flow_last_timestamp_ms": null,
+          "taker_flow_last_timestamp_utc": null,
+          "taker_flow_rows": 0
+        },
+        {
+          "first_timestamp_ms": 1735689600054,
+          "first_timestamp_utc": "2025-01-01T00:00:00.054000+00:00",
+          "funding_fee_rows": 0,
+          "funding_rows": 11737,
+          "has_funding_fee": false,
+          "has_index": true,
+          "has_liquidation": false,
+          "has_mark": true,
+          "has_open_interest": true,
+          "has_taker_flow": false,
+          "index_rows": 1,
+          "last_timestamp_ms": 1778147926992,
+          "last_timestamp_utc": "2026-05-07T09:58:46.992000+00:00",
+          "liquidation_rows": 0,
+          "mark_rows": 1,
+          "oi_first_timestamp_ms": 1778147926992,
+          "oi_first_timestamp_utc": "2026-05-07T09:58:46.992000+00:00",
+          "oi_last_timestamp_ms": 1778147926992,
+          "oi_last_timestamp_utc": "2026-05-07T09:58:46.992000+00:00",
+          "open_interest_rows": 1,
+          "rows": 11737,
+          "symbol": "ETHUSDT",
+          "taker_flow_first_timestamp_ms": null,
+          "taker_flow_first_timestamp_utc": null,
+          "taker_flow_last_timestamp_ms": null,
+          "taker_flow_last_timestamp_utc": null,
+          "taker_flow_rows": 0
+        },
+        {
+          "first_timestamp_ms": 1735689600054,
+          "first_timestamp_utc": "2025-01-01T00:00:00.054000+00:00",
+          "funding_fee_rows": 0,
+          "funding_rows": 11737,
+          "has_funding_fee": false,
+          "has_index": true,
+          "has_liquidation": false,
+          "has_mark": true,
+          "has_open_interest": true,
+          "has_taker_flow": false,
+          "index_rows": 1,
+          "last_timestamp_ms": 1778147926992,
+          "last_timestamp_utc": "2026-05-07T09:58:46.992000+00:00",
+          "liquidation_rows": 0,
+          "mark_rows": 1,
+          "oi_first_timestamp_ms": 1778147926992,
+          "oi_first_timestamp_utc": "2026-05-07T09:58:46.992000+00:00",
+          "oi_last_timestamp_ms": 1778147926992,
+          "oi_last_timestamp_utc": "2026-05-07T09:58:46.992000+00:00",
+          "open_interest_rows": 1,
+          "rows": 11737,
+          "symbol": "SOLUSDT",
+          "taker_flow_first_timestamp_ms": null,
+          "taker_flow_first_timestamp_utc": null,
+          "taker_flow_last_timestamp_ms": null,
+          "taker_flow_last_timestamp_utc": null,
+          "taker_flow_rows": 0
+        }
+      ]
+    }
+  },
+  "generated_at_utc": "2026-05-07T11:03:16.099763Z",
+  "market_root": "data/market_parquet",
+  "raw_exchange": "binance",
+  "raw_first_coverage": {
+    "ADA/USDT": {
+      "oos": {
+        "committed_day_count": 0,
+        "complete_raw_first": false,
+        "end_inclusive": "2026-05-06",
+        "first_missing_days": [
+          "2026-03-01",
+          "2026-03-02",
+          "2026-03-03",
+          "2026-03-04",
+          "2026-03-05",
+          "2026-03-06",
+          "2026-03-07",
+          "2026-03-08",
+          "2026-03-09",
+          "2026-03-10"
+        ],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/ADAUSDT/2026-03.parquet"
+        ],
+        "missing_day_count": 67,
+        "required_day_count": 67,
+        "start": "2026-03-01"
+      },
+      "train": {
+        "committed_day_count": 0,
+        "complete_raw_first": false,
+        "end_inclusive": "2025-12-31",
+        "first_missing_days": [
+          "2025-01-01",
+          "2025-01-02",
+          "2025-01-03",
+          "2025-01-04",
+          "2025-01-05",
+          "2025-01-06",
+          "2025-01-07",
+          "2025-01-08",
+          "2025-01-09",
+          "2025-01-10"
+        ],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/ADAUSDT/2025-01.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/ADAUSDT/2025-02.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/ADAUSDT/2025-03.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/ADAUSDT/2025-04.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/ADAUSDT/2025-05.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/ADAUSDT/2025-06.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/ADAUSDT/2025-07.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/ADAUSDT/2025-08.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/ADAUSDT/2025-09.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/ADAUSDT/2025-10.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/ADAUSDT/2025-11.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/ADAUSDT/2025-12.parquet"
+        ],
+        "missing_day_count": 365,
+        "required_day_count": 365,
+        "start": "2025-01-01"
+      },
+      "val": {
+        "committed_day_count": 0,
+        "complete_raw_first": false,
+        "end_inclusive": "2026-02-28",
+        "first_missing_days": [
+          "2026-01-01",
+          "2026-01-02",
+          "2026-01-03",
+          "2026-01-04",
+          "2026-01-05",
+          "2026-01-06",
+          "2026-01-07",
+          "2026-01-08",
+          "2026-01-09",
+          "2026-01-10"
+        ],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/ADAUSDT/2026-01.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/ADAUSDT/2026-02.parquet"
+        ],
+        "missing_day_count": 59,
+        "required_day_count": 59,
+        "start": "2026-01-01"
+      }
+    },
+    "AVAX/USDT": {
+      "oos": {
+        "committed_day_count": 0,
+        "complete_raw_first": false,
+        "end_inclusive": "2026-05-06",
+        "first_missing_days": [
+          "2026-03-01",
+          "2026-03-02",
+          "2026-03-03",
+          "2026-03-04",
+          "2026-03-05",
+          "2026-03-06",
+          "2026-03-07",
+          "2026-03-08",
+          "2026-03-09",
+          "2026-03-10"
+        ],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/AVAXUSDT/2026-03.parquet"
+        ],
+        "missing_day_count": 67,
+        "required_day_count": 67,
+        "start": "2026-03-01"
+      },
+      "train": {
+        "committed_day_count": 0,
+        "complete_raw_first": false,
+        "end_inclusive": "2025-12-31",
+        "first_missing_days": [
+          "2025-01-01",
+          "2025-01-02",
+          "2025-01-03",
+          "2025-01-04",
+          "2025-01-05",
+          "2025-01-06",
+          "2025-01-07",
+          "2025-01-08",
+          "2025-01-09",
+          "2025-01-10"
+        ],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/AVAXUSDT/2025-01.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/AVAXUSDT/2025-02.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/AVAXUSDT/2025-03.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/AVAXUSDT/2025-04.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/AVAXUSDT/2025-05.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/AVAXUSDT/2025-06.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/AVAXUSDT/2025-07.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/AVAXUSDT/2025-08.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/AVAXUSDT/2025-09.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/AVAXUSDT/2025-10.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/AVAXUSDT/2025-11.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/AVAXUSDT/2025-12.parquet"
+        ],
+        "missing_day_count": 365,
+        "required_day_count": 365,
+        "start": "2025-01-01"
+      },
+      "val": {
+        "committed_day_count": 0,
+        "complete_raw_first": false,
+        "end_inclusive": "2026-02-28",
+        "first_missing_days": [
+          "2026-01-01",
+          "2026-01-02",
+          "2026-01-03",
+          "2026-01-04",
+          "2026-01-05",
+          "2026-01-06",
+          "2026-01-07",
+          "2026-01-08",
+          "2026-01-09",
+          "2026-01-10"
+        ],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/AVAXUSDT/2026-01.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/AVAXUSDT/2026-02.parquet"
+        ],
+        "missing_day_count": 59,
+        "required_day_count": 59,
+        "start": "2026-01-01"
+      }
+    },
+    "BNB/USDT": {
+      "oos": {
+        "committed_day_count": 67,
+        "complete_raw_first": true,
+        "end_inclusive": "2026-05-06",
+        "first_missing_days": [],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/BNBUSDT/2026-03.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/BNBUSDT/2026-04.parquet"
+        ],
+        "missing_day_count": 0,
+        "required_day_count": 67,
+        "start": "2026-03-01"
+      },
+      "train": {
+        "committed_day_count": 365,
+        "complete_raw_first": true,
+        "end_inclusive": "2025-12-31",
+        "first_missing_days": [],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/BNBUSDT/2025-01.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/BNBUSDT/2025-02.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/BNBUSDT/2025-03.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/BNBUSDT/2025-04.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/BNBUSDT/2025-05.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/BNBUSDT/2025-06.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/BNBUSDT/2025-07.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/BNBUSDT/2025-08.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/BNBUSDT/2025-09.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/BNBUSDT/2025-10.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/BNBUSDT/2025-11.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/BNBUSDT/2025-12.parquet"
+        ],
+        "missing_day_count": 0,
+        "required_day_count": 365,
+        "start": "2025-01-01"
+      },
+      "val": {
+        "committed_day_count": 59,
+        "complete_raw_first": true,
+        "end_inclusive": "2026-02-28",
+        "first_missing_days": [],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/BNBUSDT/2026-01.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/BNBUSDT/2026-02.parquet"
+        ],
+        "missing_day_count": 0,
+        "required_day_count": 59,
+        "start": "2026-01-01"
+      }
+    },
+    "BTC/USDT": {
+      "oos": {
+        "committed_day_count": 67,
+        "complete_raw_first": true,
+        "end_inclusive": "2026-05-06",
+        "first_missing_days": [],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/BTCUSDT/2026-03.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/BTCUSDT/2026-04.parquet"
+        ],
+        "missing_day_count": 0,
+        "required_day_count": 67,
+        "start": "2026-03-01"
+      },
+      "train": {
+        "committed_day_count": 365,
+        "complete_raw_first": true,
+        "end_inclusive": "2025-12-31",
+        "first_missing_days": [],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/BTCUSDT/2025-01.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/BTCUSDT/2025-02.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/BTCUSDT/2025-03.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/BTCUSDT/2025-04.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/BTCUSDT/2025-05.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/BTCUSDT/2025-06.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/BTCUSDT/2025-07.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/BTCUSDT/2025-08.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/BTCUSDT/2025-09.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/BTCUSDT/2025-10.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/BTCUSDT/2025-11.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/BTCUSDT/2025-12.parquet"
+        ],
+        "missing_day_count": 0,
+        "required_day_count": 365,
+        "start": "2025-01-01"
+      },
+      "val": {
+        "committed_day_count": 59,
+        "complete_raw_first": true,
+        "end_inclusive": "2026-02-28",
+        "first_missing_days": [],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/BTCUSDT/2026-01.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/BTCUSDT/2026-02.parquet"
+        ],
+        "missing_day_count": 0,
+        "required_day_count": 59,
+        "start": "2026-01-01"
+      }
+    },
+    "DOGE/USDT": {
+      "oos": {
+        "committed_day_count": 0,
+        "complete_raw_first": false,
+        "end_inclusive": "2026-05-06",
+        "first_missing_days": [
+          "2026-03-01",
+          "2026-03-02",
+          "2026-03-03",
+          "2026-03-04",
+          "2026-03-05",
+          "2026-03-06",
+          "2026-03-07",
+          "2026-03-08",
+          "2026-03-09",
+          "2026-03-10"
+        ],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/DOGEUSDT/2026-03.parquet"
+        ],
+        "missing_day_count": 67,
+        "required_day_count": 67,
+        "start": "2026-03-01"
+      },
+      "train": {
+        "committed_day_count": 0,
+        "complete_raw_first": false,
+        "end_inclusive": "2025-12-31",
+        "first_missing_days": [
+          "2025-01-01",
+          "2025-01-02",
+          "2025-01-03",
+          "2025-01-04",
+          "2025-01-05",
+          "2025-01-06",
+          "2025-01-07",
+          "2025-01-08",
+          "2025-01-09",
+          "2025-01-10"
+        ],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/DOGEUSDT/2025-01.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/DOGEUSDT/2025-02.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/DOGEUSDT/2025-03.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/DOGEUSDT/2025-04.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/DOGEUSDT/2025-05.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/DOGEUSDT/2025-06.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/DOGEUSDT/2025-07.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/DOGEUSDT/2025-08.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/DOGEUSDT/2025-09.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/DOGEUSDT/2025-10.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/DOGEUSDT/2025-11.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/DOGEUSDT/2025-12.parquet"
+        ],
+        "missing_day_count": 365,
+        "required_day_count": 365,
+        "start": "2025-01-01"
+      },
+      "val": {
+        "committed_day_count": 0,
+        "complete_raw_first": false,
+        "end_inclusive": "2026-02-28",
+        "first_missing_days": [
+          "2026-01-01",
+          "2026-01-02",
+          "2026-01-03",
+          "2026-01-04",
+          "2026-01-05",
+          "2026-01-06",
+          "2026-01-07",
+          "2026-01-08",
+          "2026-01-09",
+          "2026-01-10"
+        ],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/DOGEUSDT/2026-01.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/DOGEUSDT/2026-02.parquet"
+        ],
+        "missing_day_count": 59,
+        "required_day_count": 59,
+        "start": "2026-01-01"
+      }
+    },
+    "ETH/USDT": {
+      "oos": {
+        "committed_day_count": 67,
+        "complete_raw_first": true,
+        "end_inclusive": "2026-05-06",
+        "first_missing_days": [],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/ETHUSDT/2026-03.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/ETHUSDT/2026-04.parquet"
+        ],
+        "missing_day_count": 0,
+        "required_day_count": 67,
+        "start": "2026-03-01"
+      },
+      "train": {
+        "committed_day_count": 365,
+        "complete_raw_first": true,
+        "end_inclusive": "2025-12-31",
+        "first_missing_days": [],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/ETHUSDT/2025-01.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/ETHUSDT/2025-02.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/ETHUSDT/2025-03.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/ETHUSDT/2025-04.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/ETHUSDT/2025-05.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/ETHUSDT/2025-06.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/ETHUSDT/2025-07.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/ETHUSDT/2025-08.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/ETHUSDT/2025-09.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/ETHUSDT/2025-10.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/ETHUSDT/2025-11.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/ETHUSDT/2025-12.parquet"
+        ],
+        "missing_day_count": 0,
+        "required_day_count": 365,
+        "start": "2025-01-01"
+      },
+      "val": {
+        "committed_day_count": 59,
+        "complete_raw_first": true,
+        "end_inclusive": "2026-02-28",
+        "first_missing_days": [],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/ETHUSDT/2026-01.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/ETHUSDT/2026-02.parquet"
+        ],
+        "missing_day_count": 0,
+        "required_day_count": 59,
+        "start": "2026-01-01"
+      }
+    },
+    "SOL/USDT": {
+      "oos": {
+        "committed_day_count": 67,
+        "complete_raw_first": true,
+        "end_inclusive": "2026-05-06",
+        "first_missing_days": [],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/SOLUSDT/2026-03.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/SOLUSDT/2026-04.parquet"
+        ],
+        "missing_day_count": 0,
+        "required_day_count": 67,
+        "start": "2026-03-01"
+      },
+      "train": {
+        "committed_day_count": 365,
+        "complete_raw_first": true,
+        "end_inclusive": "2025-12-31",
+        "first_missing_days": [],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/SOLUSDT/2025-01.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/SOLUSDT/2025-02.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/SOLUSDT/2025-03.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/SOLUSDT/2025-04.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/SOLUSDT/2025-05.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/SOLUSDT/2025-06.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/SOLUSDT/2025-07.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/SOLUSDT/2025-08.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/SOLUSDT/2025-09.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/SOLUSDT/2025-10.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/SOLUSDT/2025-11.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/SOLUSDT/2025-12.parquet"
+        ],
+        "missing_day_count": 0,
+        "required_day_count": 365,
+        "start": "2025-01-01"
+      },
+      "val": {
+        "committed_day_count": 59,
+        "complete_raw_first": true,
+        "end_inclusive": "2026-02-28",
+        "first_missing_days": [],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/SOLUSDT/2026-01.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/SOLUSDT/2026-02.parquet"
+        ],
+        "missing_day_count": 0,
+        "required_day_count": 59,
+        "start": "2026-01-01"
+      }
+    },
+    "TON/USDT": {
+      "oos": {
+        "committed_day_count": 0,
+        "complete_raw_first": false,
+        "end_inclusive": "2026-05-06",
+        "first_missing_days": [
+          "2026-03-01",
+          "2026-03-02",
+          "2026-03-03",
+          "2026-03-04",
+          "2026-03-05",
+          "2026-03-06",
+          "2026-03-07",
+          "2026-03-08",
+          "2026-03-09",
+          "2026-03-10"
+        ],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/TONUSDT/2026-03.parquet"
+        ],
+        "missing_day_count": 67,
+        "required_day_count": 67,
+        "start": "2026-03-01"
+      },
+      "train": {
+        "committed_day_count": 0,
+        "complete_raw_first": false,
+        "end_inclusive": "2025-12-31",
+        "first_missing_days": [
+          "2025-01-01",
+          "2025-01-02",
+          "2025-01-03",
+          "2025-01-04",
+          "2025-01-05",
+          "2025-01-06",
+          "2025-01-07",
+          "2025-01-08",
+          "2025-01-09",
+          "2025-01-10"
+        ],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/TONUSDT/2025-01.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/TONUSDT/2025-02.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/TONUSDT/2025-03.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/TONUSDT/2025-04.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/TONUSDT/2025-05.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/TONUSDT/2025-06.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/TONUSDT/2025-07.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/TONUSDT/2025-08.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/TONUSDT/2025-09.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/TONUSDT/2025-10.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/TONUSDT/2025-11.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/TONUSDT/2025-12.parquet"
+        ],
+        "missing_day_count": 365,
+        "required_day_count": 365,
+        "start": "2025-01-01"
+      },
+      "val": {
+        "committed_day_count": 0,
+        "complete_raw_first": false,
+        "end_inclusive": "2026-02-28",
+        "first_missing_days": [
+          "2026-01-01",
+          "2026-01-02",
+          "2026-01-03",
+          "2026-01-04",
+          "2026-01-05",
+          "2026-01-06",
+          "2026-01-07",
+          "2026-01-08",
+          "2026-01-09",
+          "2026-01-10"
+        ],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/TONUSDT/2026-01.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/TONUSDT/2026-02.parquet"
+        ],
+        "missing_day_count": 59,
+        "required_day_count": 59,
+        "start": "2026-01-01"
+      }
+    },
+    "TRX/USDT": {
+      "oos": {
+        "committed_day_count": 67,
+        "complete_raw_first": true,
+        "end_inclusive": "2026-05-06",
+        "first_missing_days": [],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/TRXUSDT/2026-03.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/TRXUSDT/2026-04.parquet"
+        ],
+        "missing_day_count": 0,
+        "required_day_count": 67,
+        "start": "2026-03-01"
+      },
+      "train": {
+        "committed_day_count": 365,
+        "complete_raw_first": true,
+        "end_inclusive": "2025-12-31",
+        "first_missing_days": [],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/TRXUSDT/2025-01.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/TRXUSDT/2025-02.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/TRXUSDT/2025-03.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/TRXUSDT/2025-04.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/TRXUSDT/2025-05.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/TRXUSDT/2025-06.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/TRXUSDT/2025-07.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/TRXUSDT/2025-08.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/TRXUSDT/2025-09.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/TRXUSDT/2025-10.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/TRXUSDT/2025-11.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/TRXUSDT/2025-12.parquet"
+        ],
+        "missing_day_count": 0,
+        "required_day_count": 365,
+        "start": "2025-01-01"
+      },
+      "val": {
+        "committed_day_count": 59,
+        "complete_raw_first": true,
+        "end_inclusive": "2026-02-28",
+        "first_missing_days": [],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/TRXUSDT/2026-01.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/TRXUSDT/2026-02.parquet"
+        ],
+        "missing_day_count": 0,
+        "required_day_count": 59,
+        "start": "2026-01-01"
+      }
+    },
+    "XAG/USDT": {
+      "oos": {
+        "committed_day_count": 0,
+        "complete_raw_first": false,
+        "end_inclusive": "2026-05-06",
+        "first_missing_days": [
+          "2026-03-01",
+          "2026-03-02",
+          "2026-03-03",
+          "2026-03-04",
+          "2026-03-05",
+          "2026-03-06",
+          "2026-03-07",
+          "2026-03-08",
+          "2026-03-09",
+          "2026-03-10"
+        ],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/XAGUSDT/2026-03.parquet"
+        ],
+        "missing_day_count": 67,
+        "required_day_count": 67,
+        "start": "2026-03-01"
+      },
+      "train": {
+        "committed_day_count": 0,
+        "complete_raw_first": false,
+        "end_inclusive": "2025-12-31",
+        "first_missing_days": [
+          "2025-01-01",
+          "2025-01-02",
+          "2025-01-03",
+          "2025-01-04",
+          "2025-01-05",
+          "2025-01-06",
+          "2025-01-07",
+          "2025-01-08",
+          "2025-01-09",
+          "2025-01-10"
+        ],
+        "legacy_monthly_files": [],
+        "missing_day_count": 365,
+        "required_day_count": 365,
+        "start": "2025-01-01"
+      },
+      "val": {
+        "committed_day_count": 0,
+        "complete_raw_first": false,
+        "end_inclusive": "2026-02-28",
+        "first_missing_days": [
+          "2026-01-01",
+          "2026-01-02",
+          "2026-01-03",
+          "2026-01-04",
+          "2026-01-05",
+          "2026-01-06",
+          "2026-01-07",
+          "2026-01-08",
+          "2026-01-09",
+          "2026-01-10"
+        ],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/XAGUSDT/2026-01.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/XAGUSDT/2026-02.parquet"
+        ],
+        "missing_day_count": 59,
+        "required_day_count": 59,
+        "start": "2026-01-01"
+      }
+    },
+    "XAU/USDT": {
+      "oos": {
+        "committed_day_count": 0,
+        "complete_raw_first": false,
+        "end_inclusive": "2026-05-06",
+        "first_missing_days": [
+          "2026-03-01",
+          "2026-03-02",
+          "2026-03-03",
+          "2026-03-04",
+          "2026-03-05",
+          "2026-03-06",
+          "2026-03-07",
+          "2026-03-08",
+          "2026-03-09",
+          "2026-03-10"
+        ],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/XAUUSDT/2026-03.parquet"
+        ],
+        "missing_day_count": 67,
+        "required_day_count": 67,
+        "start": "2026-03-01"
+      },
+      "train": {
+        "committed_day_count": 0,
+        "complete_raw_first": false,
+        "end_inclusive": "2025-12-31",
+        "first_missing_days": [
+          "2025-01-01",
+          "2025-01-02",
+          "2025-01-03",
+          "2025-01-04",
+          "2025-01-05",
+          "2025-01-06",
+          "2025-01-07",
+          "2025-01-08",
+          "2025-01-09",
+          "2025-01-10"
+        ],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/XAUUSDT/2025-12.parquet"
+        ],
+        "missing_day_count": 365,
+        "required_day_count": 365,
+        "start": "2025-01-01"
+      },
+      "val": {
+        "committed_day_count": 0,
+        "complete_raw_first": false,
+        "end_inclusive": "2026-02-28",
+        "first_missing_days": [
+          "2026-01-01",
+          "2026-01-02",
+          "2026-01-03",
+          "2026-01-04",
+          "2026-01-05",
+          "2026-01-06",
+          "2026-01-07",
+          "2026-01-08",
+          "2026-01-09",
+          "2026-01-10"
+        ],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/XAUUSDT/2026-01.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/XAUUSDT/2026-02.parquet"
+        ],
+        "missing_day_count": 59,
+        "required_day_count": 59,
+        "start": "2026-01-01"
+      }
+    },
+    "XPD/USDT": {
+      "oos": {
+        "committed_day_count": 0,
+        "complete_raw_first": false,
+        "end_inclusive": "2026-05-06",
+        "first_missing_days": [
+          "2026-03-01",
+          "2026-03-02",
+          "2026-03-03",
+          "2026-03-04",
+          "2026-03-05",
+          "2026-03-06",
+          "2026-03-07",
+          "2026-03-08",
+          "2026-03-09",
+          "2026-03-10"
+        ],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/XPDUSDT/2026-03.parquet"
+        ],
+        "missing_day_count": 67,
+        "required_day_count": 67,
+        "start": "2026-03-01"
+      },
+      "train": {
+        "committed_day_count": 0,
+        "complete_raw_first": false,
+        "end_inclusive": "2025-12-31",
+        "first_missing_days": [
+          "2025-01-01",
+          "2025-01-02",
+          "2025-01-03",
+          "2025-01-04",
+          "2025-01-05",
+          "2025-01-06",
+          "2025-01-07",
+          "2025-01-08",
+          "2025-01-09",
+          "2025-01-10"
+        ],
+        "legacy_monthly_files": [],
+        "missing_day_count": 365,
+        "required_day_count": 365,
+        "start": "2025-01-01"
+      },
+      "val": {
+        "committed_day_count": 0,
+        "complete_raw_first": false,
+        "end_inclusive": "2026-02-28",
+        "first_missing_days": [
+          "2026-01-01",
+          "2026-01-02",
+          "2026-01-03",
+          "2026-01-04",
+          "2026-01-05",
+          "2026-01-06",
+          "2026-01-07",
+          "2026-01-08",
+          "2026-01-09",
+          "2026-01-10"
+        ],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/XPDUSDT/2026-01.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/XPDUSDT/2026-02.parquet"
+        ],
+        "missing_day_count": 59,
+        "required_day_count": 59,
+        "start": "2026-01-01"
+      }
+    },
+    "XPT/USDT": {
+      "oos": {
+        "committed_day_count": 0,
+        "complete_raw_first": false,
+        "end_inclusive": "2026-05-06",
+        "first_missing_days": [
+          "2026-03-01",
+          "2026-03-02",
+          "2026-03-03",
+          "2026-03-04",
+          "2026-03-05",
+          "2026-03-06",
+          "2026-03-07",
+          "2026-03-08",
+          "2026-03-09",
+          "2026-03-10"
+        ],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/XPTUSDT/2026-03.parquet"
+        ],
+        "missing_day_count": 67,
+        "required_day_count": 67,
+        "start": "2026-03-01"
+      },
+      "train": {
+        "committed_day_count": 0,
+        "complete_raw_first": false,
+        "end_inclusive": "2025-12-31",
+        "first_missing_days": [
+          "2025-01-01",
+          "2025-01-02",
+          "2025-01-03",
+          "2025-01-04",
+          "2025-01-05",
+          "2025-01-06",
+          "2025-01-07",
+          "2025-01-08",
+          "2025-01-09",
+          "2025-01-10"
+        ],
+        "legacy_monthly_files": [],
+        "missing_day_count": 365,
+        "required_day_count": 365,
+        "start": "2025-01-01"
+      },
+      "val": {
+        "committed_day_count": 0,
+        "complete_raw_first": false,
+        "end_inclusive": "2026-02-28",
+        "first_missing_days": [
+          "2026-01-01",
+          "2026-01-02",
+          "2026-01-03",
+          "2026-01-04",
+          "2026-01-05",
+          "2026-01-06",
+          "2026-01-07",
+          "2026-01-08",
+          "2026-01-09",
+          "2026-01-10"
+        ],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/XPTUSDT/2026-01.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/XPTUSDT/2026-02.parquet"
+        ],
+        "missing_day_count": 59,
+        "required_day_count": 59,
+        "start": "2026-01-01"
+      }
+    },
+    "XRP/USDT": {
+      "oos": {
+        "committed_day_count": 0,
+        "complete_raw_first": false,
+        "end_inclusive": "2026-05-06",
+        "first_missing_days": [
+          "2026-03-01",
+          "2026-03-02",
+          "2026-03-03",
+          "2026-03-04",
+          "2026-03-05",
+          "2026-03-06",
+          "2026-03-07",
+          "2026-03-08",
+          "2026-03-09",
+          "2026-03-10"
+        ],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/XRPUSDT/2026-03.parquet"
+        ],
+        "missing_day_count": 67,
+        "required_day_count": 67,
+        "start": "2026-03-01"
+      },
+      "train": {
+        "committed_day_count": 0,
+        "complete_raw_first": false,
+        "end_inclusive": "2025-12-31",
+        "first_missing_days": [
+          "2025-01-01",
+          "2025-01-02",
+          "2025-01-03",
+          "2025-01-04",
+          "2025-01-05",
+          "2025-01-06",
+          "2025-01-07",
+          "2025-01-08",
+          "2025-01-09",
+          "2025-01-10"
+        ],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/XRPUSDT/2025-01.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/XRPUSDT/2025-02.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/XRPUSDT/2025-03.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/XRPUSDT/2025-04.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/XRPUSDT/2025-05.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/XRPUSDT/2025-06.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/XRPUSDT/2025-07.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/XRPUSDT/2025-08.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/XRPUSDT/2025-09.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/XRPUSDT/2025-10.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/XRPUSDT/2025-11.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/XRPUSDT/2025-12.parquet"
+        ],
+        "missing_day_count": 365,
+        "required_day_count": 365,
+        "start": "2025-01-01"
+      },
+      "val": {
+        "committed_day_count": 0,
+        "complete_raw_first": false,
+        "end_inclusive": "2026-02-28",
+        "first_missing_days": [
+          "2026-01-01",
+          "2026-01-02",
+          "2026-01-03",
+          "2026-01-04",
+          "2026-01-05",
+          "2026-01-06",
+          "2026-01-07",
+          "2026-01-08",
+          "2026-01-09",
+          "2026-01-10"
+        ],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/XRPUSDT/2026-01.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/XRPUSDT/2026-02.parquet"
+        ],
+        "missing_day_count": 59,
+        "required_day_count": 59,
+        "start": "2026-01-01"
+      }
+    }
+  },
+  "safe_crypto_oos_end_date": "2026-05-06",
+  "split_windows": {
+    "oos": {
+      "end_inclusive": "2026-05-06",
+      "start": "2026-03-01"
+    },
+    "train": {
+      "end_inclusive": "2025-12-31",
+      "start": "2025-01-01"
+    },
+    "val": {
+      "end_inclusive": "2026-02-28",
+      "start": "2026-01-01"
+    }
+  }
+}

@@ -1,0 +1,27 @@
+name: trend_momentum
+enabled: true
+signal_params:
+  lookback_bars: 24
+  top_n: 2
+  bottom_n: 0
+  allow_short: false
+  liquidity_window: 20
+rebalance_rule:
+  type: periodic
+  every_bars: 1
+portfolio_construction:
+  no_trade_band_bps: 8
+  turnover_penalty: 0.15
+  cost_penalty: 1.0
+  participation_penalty: 0.25
+execution_model:
+  type: market
+  fill_basis: next_open
+  max_participation: 0.1
+  unfilled_policy: carry
+  carry_decay: 1.0
+cost_model:
+  spread_bps: 3.0
+  k_strategy: 0.85
+  participation_lambda: 1.0
+  participation_power: 1.0

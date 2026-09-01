@@ -1,0 +1,4330 @@
+{
+  "artifact_kind": "profit_moonshot_live_final_selection",
+  "data_cutoff": {
+    "artifact_cutoff_gate_passed": true,
+    "latest_complete_oos_end_date": "2026-05-09",
+    "minimum_after_ohlcv_max_utc": "2026-05-10T05:38:38Z",
+    "missing_symbols": [],
+    "observed_artifact_oos_end_dates": [
+      {
+        "artifact": "candidate_portfolio",
+        "date": "2026-05-09",
+        "path": "oos_end_date"
+      },
+      {
+        "artifact": "candidate_hybrid",
+        "date": "2026-05-09",
+        "path": "oos_end_date"
+      },
+      {
+        "artifact": "candidate_hybrid",
+        "date": "2026-05-09",
+        "path": "split_windows.oos_end_inclusive"
+      },
+      {
+        "artifact": "liquidation",
+        "date": "2026-05-09",
+        "path": "oos_end_date"
+      },
+      {
+        "artifact": "legacy_hybrid",
+        "date": "2026-05-09",
+        "path": "split_windows.oos_end_inclusive"
+      }
+    ],
+    "required_symbols": [
+      "BTCUSDT",
+      "ETHUSDT",
+      "SOLUSDT",
+      "BNBUSDT",
+      "TRXUSDT"
+    ],
+    "source_rows": [
+      {
+        "after_ohlcv_max_utc": "2026-05-10T05:38:38Z",
+        "symbol": "BTCUSDT"
+      },
+      {
+        "after_ohlcv_max_utc": "2026-05-10T05:38:38Z",
+        "symbol": "ETHUSDT"
+      },
+      {
+        "after_ohlcv_max_utc": "2026-05-10T05:38:38Z",
+        "symbol": "SOLUSDT"
+      },
+      {
+        "after_ohlcv_max_utc": "2026-05-10T05:38:38Z",
+        "symbol": "BNBUSDT"
+      },
+      {
+        "after_ohlcv_max_utc": "2026-05-10T05:38:38Z",
+        "symbol": "TRXUSDT"
+      }
+    ],
+    "stale_artifact_oos_end_dates": [],
+    "status": "derived_from_refresh"
+  },
+  "generated_at_utc": "2026-05-10T11:30:04.613905Z",
+  "memory_ledger": {
+    "entries": [
+      {
+        "artifact_index": 1,
+        "kind": "artifact_memory_summary",
+        "peak_rss_bytes": 275968000,
+        "peak_rss_mib": 263.184,
+        "under_8gib": true
+      },
+      {
+        "artifact_index": 2,
+        "kind": "artifact_memory_summary",
+        "peak_rss_bytes": 59203584,
+        "peak_rss_mib": 56.461,
+        "under_8gib": true
+      },
+      {
+        "artifact_index": 3,
+        "kind": "artifact_memory_summary",
+        "peak_rss_bytes": 59531264,
+        "peak_rss_mib": 56.773,
+        "under_8gib": true
+      },
+      {
+        "artifact_index": 4,
+        "kind": "artifact_memory_summary",
+        "peak_rss_bytes": 75038720,
+        "peak_rss_mib": 71.562,
+        "under_8gib": true
+      },
+      {
+        "kind": "time_log",
+        "path": "var/reports/profit_moonshot_20260501/dynamic_restart_full_noncalendar_20260510/replay_time.log",
+        "peak_rss_bytes": 302641152,
+        "peak_rss_mib": 288.621,
+        "under_8gib": true
+      },
+      {
+        "kind": "time_log",
+        "path": "var/reports/profit_moonshot_20260501/dynamic_restart_full_noncalendar_20260510/tuning_time.log",
+        "peak_rss_bytes": 283160576,
+        "peak_rss_mib": 270.043,
+        "under_8gib": true
+      },
+      {
+        "kind": "time_log",
+        "path": "var/reports/profit_moonshot_20260501/dynamic_restart_full_noncalendar_20260510/candidate_hybrid_time.log",
+        "peak_rss_bytes": 264720384,
+        "peak_rss_mib": 252.457,
+        "under_8gib": true
+      },
+      {
+        "kind": "time_log",
+        "path": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/runner_evidence/data_refresh_time.log",
+        "peak_rss_bytes": 5316059136,
+        "peak_rss_mib": 5069.789,
+        "under_8gib": true
+      },
+      {
+        "kind": "time_log",
+        "path": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/runner_evidence/liquidation_validation_time.log",
+        "peak_rss_bytes": 273891328,
+        "peak_rss_mib": 261.203,
+        "under_8gib": true
+      }
+    ],
+    "limit_bytes": 8589934592,
+    "limit_gib": 8,
+    "under_8gib": true
+  },
+  "metrics_explanation": {
+    "account_wipeout": "Whether an event wiped the whole account; any true value blocks promotion.",
+    "annualized_return": "Annualized/CAGR-style return where available.",
+    "calmar": "Annualized return divided by max drawdown; live safety ratio.",
+    "downside_volatility": "Downside-only volatility where available.",
+    "fills": "Executed fill count; helps detect starved or overactive sleeves.",
+    "liquidation_count": "Number of liquidation events in the split.",
+    "live_integer_leverage": "Whether the row uses a positive integer leverage supported by the live venue/runner.",
+    "live_integer_source_leverage": "For hybrid rows, whether every active source candidate also uses positive integer leverage.",
+    "max_drawdown": "Largest peak-to-trough equity loss in the split; lower is safer.",
+    "maximum_liquidation_equity_loss_fraction": "Worst equity fraction lost at liquidation event.",
+    "maximum_liquidation_event_drawdown": "Worst instantaneous drawdown at liquidation event.",
+    "memory_max_rss": "Maximum resident set size evidence; must stay below 8 GiB.",
+    "minimum_margin_buffer": "Minimum equity minus conservative margin requirement; must stay positive.",
+    "minimum_margin_ratio": "Minimum equity divided by margin requirement; higher is safer.",
+    "monthlyized_return": "Monthlyized return estimate used for train/validation stability context.",
+    "positive_period_ratio": "Fraction of positive periods or proxy win-rate where available.",
+    "return_mdd": "Total return divided by max drawdown; rewards return per drawdown unit.",
+    "round_trips": "Completed trade count when available.",
+    "sharpe": "Return per total volatility; higher is better.",
+    "smart_sortino": "Sortino adjusted by strategy-specific tail/quality penalties when available.",
+    "sortino": "Return per downside volatility; higher is better for asymmetric downside risk.",
+    "source_metadata_present": "Whether candidate rows link to durable research-history and source-search ledger references.",
+    "strategy_validity_passed": "Source-aware thesis/rule validation of the primary signal and source sleeves.",
+    "total_return": "Split ending equity return before compounding; higher is better after gates.",
+    "volatility": "Annualized or split-normalized total volatility from source artifact."
+  },
+  "recommendation": "no_live_promotion",
+  "rejected_alternatives": [
+    {
+      "benchmark_only": true,
+      "candidate_derived": false,
+      "kind": "current_base",
+      "name": "current_base_tuple_liquidation_aware_2.34273x",
+      "primary_signal_type": "calendar_primary",
+      "reasons": [
+        "calendar_fixed_month_alpha",
+        "calendar_primary_alpha_unsupported",
+        "fixed_asset_calendar_target",
+        "strategy_validity_rejected",
+        "eligible_for_candidate_live_promotion",
+        "strategy_validity_passed",
+        "live_integer_leverage",
+        "oos_return_beats_current_base",
+        "oos_return_mdd_beats_current_base"
+      ],
+      "strategy_validity_pass": false
+    },
+    {
+      "benchmark_only": false,
+      "candidate_derived": true,
+      "kind": "direct_candidate",
+      "name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600__fr_liquidation_aware_5x",
+      "primary_signal_type": "calendar_primary",
+      "reasons": [
+        "calendar_fixed_month_alpha",
+        "calendar_primary_alpha_unsupported",
+        "fixed_asset_calendar_target",
+        "strategy_validity_rejected",
+        "source_metadata_missing",
+        "strategy_validity_passed",
+        "research_history_source_metadata_present"
+      ],
+      "strategy_validity_pass": false
+    },
+    {
+      "benchmark_only": false,
+      "candidate_derived": true,
+      "kind": "direct_candidate",
+      "name": "current_base_tuple_liquidation_aware_5x",
+      "primary_signal_type": "calendar_primary",
+      "reasons": [
+        "calendar_fixed_month_alpha",
+        "calendar_primary_alpha_unsupported",
+        "fixed_asset_calendar_target",
+        "strategy_validity_rejected",
+        "source_metadata_missing",
+        "strategy_validity_passed",
+        "research_history_source_metadata_present"
+      ],
+      "strategy_validity_pass": false
+    },
+    {
+      "benchmark_only": false,
+      "candidate_derived": true,
+      "kind": "direct_candidate",
+      "name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600__fr_liquidation_aware_4x",
+      "primary_signal_type": "calendar_primary",
+      "reasons": [
+        "calendar_fixed_month_alpha",
+        "calendar_primary_alpha_unsupported",
+        "fixed_asset_calendar_target",
+        "strategy_validity_rejected",
+        "source_metadata_missing",
+        "strategy_validity_passed",
+        "research_history_source_metadata_present",
+        "oos_return_mdd_beats_current_base",
+        "oos_sortino_ok",
+        "oos_smart_sortino_ok"
+      ],
+      "strategy_validity_pass": false
+    },
+    {
+      "benchmark_only": false,
+      "candidate_derived": true,
+      "kind": "direct_candidate",
+      "name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600__fr_liquidation_aware_3x",
+      "primary_signal_type": "calendar_primary",
+      "reasons": [
+        "calendar_fixed_month_alpha",
+        "calendar_primary_alpha_unsupported",
+        "fixed_asset_calendar_target",
+        "strategy_validity_rejected",
+        "source_metadata_missing",
+        "strategy_validity_passed",
+        "research_history_source_metadata_present",
+        "oos_return_beats_current_base",
+        "oos_return_mdd_beats_current_base",
+        "oos_sortino_ok",
+        "oos_smart_sortino_ok"
+      ],
+      "strategy_validity_pass": false
+    },
+    {
+      "benchmark_only": false,
+      "candidate_derived": true,
+      "kind": "direct_candidate",
+      "name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600__fr_liquidation_aware_2x",
+      "primary_signal_type": "calendar_primary",
+      "reasons": [
+        "calendar_fixed_month_alpha",
+        "calendar_primary_alpha_unsupported",
+        "fixed_asset_calendar_target",
+        "strategy_validity_rejected",
+        "source_metadata_missing",
+        "strategy_validity_passed",
+        "research_history_source_metadata_present",
+        "oos_return_beats_current_base",
+        "oos_return_mdd_beats_current_base",
+        "oos_sortino_ok",
+        "oos_smart_sortino_ok"
+      ],
+      "strategy_validity_pass": false
+    },
+    {
+      "benchmark_only": false,
+      "candidate_derived": true,
+      "kind": "direct_candidate",
+      "name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600__fr_liquidation_aware_4x",
+      "primary_signal_type": "calendar_primary",
+      "reasons": [
+        "calendar_fixed_month_alpha",
+        "calendar_primary_alpha_unsupported",
+        "fixed_asset_calendar_target",
+        "strategy_validity_rejected",
+        "source_metadata_missing",
+        "strategy_validity_passed",
+        "research_history_source_metadata_present",
+        "oos_return_mdd_beats_current_base"
+      ],
+      "strategy_validity_pass": false
+    },
+    {
+      "benchmark_only": false,
+      "candidate_derived": true,
+      "kind": "direct_candidate",
+      "name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600__fr_liquidation_aware_5x",
+      "primary_signal_type": "calendar_primary",
+      "reasons": [
+        "calendar_fixed_month_alpha",
+        "calendar_primary_alpha_unsupported",
+        "fixed_asset_calendar_target",
+        "strategy_validity_rejected",
+        "source_metadata_missing",
+        "strategy_validity_passed",
+        "research_history_source_metadata_present"
+      ],
+      "strategy_validity_pass": false
+    },
+    {
+      "benchmark_only": false,
+      "candidate_derived": true,
+      "kind": "direct_candidate",
+      "name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600__fr_liquidation_aware_5x",
+      "primary_signal_type": "calendar_primary",
+      "reasons": [
+        "calendar_fixed_month_alpha",
+        "calendar_primary_alpha_unsupported",
+        "fixed_asset_calendar_target",
+        "strategy_validity_rejected",
+        "source_metadata_missing",
+        "strategy_validity_passed",
+        "research_history_source_metadata_present",
+        "liquidation_gate",
+        "tiny_liquidation_tolerance_ok",
+        "oos_return_mdd_beats_current_base",
+        "oos_sortino_ok",
+        "oos_smart_sortino_ok"
+      ],
+      "strategy_validity_pass": false
+    },
+    {
+      "benchmark_only": false,
+      "candidate_derived": true,
+      "kind": "candidate_portfolio",
+      "name": "fresh_portfolio_validation_return_risk_weight_fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all__fresh_pair_resid_revert_spread_lb24_z150_h72_sc10_st100_tp240_asiaus",
+      "primary_signal_type": "state_signal",
+      "reasons": [
+        "source_metadata_missing",
+        "research_history_source_metadata_present",
+        "liquidation_gate",
+        "liquidation_evidence_available",
+        "oos_return_beats_current_base",
+        "oos_return_mdd_beats_current_base",
+        "oos_sortino_ok",
+        "oos_smart_sortino_ok",
+        "diagnostic_not_promoted"
+      ],
+      "strategy_validity_pass": true
+    },
+    {
+      "benchmark_only": false,
+      "candidate_derived": true,
+      "kind": "candidate_portfolio",
+      "name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600__fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all__fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600",
+      "primary_signal_type": "calendar_primary",
+      "reasons": [
+        "calendar_fixed_month_alpha",
+        "calendar_primary_alpha_unsupported",
+        "fixed_asset_calendar_target",
+        "strategy_validity_rejected",
+        "source_metadata_missing",
+        "strategy_validity_passed",
+        "research_history_source_metadata_present",
+        "live_integer_leverage",
+        "liquidation_gate",
+        "liquidation_evidence_available",
+        "oos_mdd_within_25pct_budget",
+        "oos_return_beats_current_base",
+        "oos_return_mdd_beats_current_base",
+        "oos_sharpe_ok",
+        "oos_sortino_ok",
+        "oos_smart_sortino_ok",
+        "oos_calmar_ok"
+      ],
+      "strategy_validity_pass": false
+    },
+    {
+      "benchmark_only": false,
+      "candidate_derived": true,
+      "kind": "candidate_portfolio",
+      "name": "fresh_portfolio_validation_drawdown_budget_fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all__fresh_pair_resid_revert_spread_lb24_z150_h72_sc10_st100_tp240_asiaus",
+      "primary_signal_type": "state_signal",
+      "reasons": [
+        "source_metadata_missing",
+        "research_history_source_metadata_present",
+        "live_integer_leverage",
+        "liquidation_gate",
+        "liquidation_evidence_available",
+        "oos_return_beats_current_base",
+        "oos_return_mdd_beats_current_base",
+        "oos_sortino_ok",
+        "oos_smart_sortino_ok",
+        "diagnostic_not_promoted"
+      ],
+      "strategy_validity_pass": true
+    },
+    {
+      "benchmark_only": true,
+      "candidate_derived": false,
+      "kind": "legacy_hybrid_benchmark",
+      "name": "legacy_hybrid_benchmark",
+      "primary_signal_type": "non_candidate_row",
+      "reasons": [
+        "eligible_for_candidate_live_promotion",
+        "live_integer_leverage",
+        "liquidation_gate",
+        "liquidation_evidence_available",
+        "oos_return_beats_current_base",
+        "oos_return_mdd_beats_current_base",
+        "oos_sharpe_ok",
+        "oos_sortino_ok",
+        "oos_smart_sortino_ok"
+      ],
+      "strategy_validity_pass": true
+    },
+    {
+      "benchmark_only": true,
+      "candidate_derived": false,
+      "kind": "cash",
+      "name": "cash",
+      "primary_signal_type": "non_candidate_row",
+      "reasons": [
+        "eligible_for_candidate_live_promotion",
+        "liquidation_gate",
+        "liquidation_evidence_available",
+        "oos_return_beats_current_base",
+        "oos_return_mdd_beats_current_base",
+        "oos_sharpe_ok",
+        "oos_sortino_ok",
+        "oos_smart_sortino_ok",
+        "oos_calmar_ok"
+      ],
+      "strategy_validity_pass": true
+    }
+  ],
+  "rows": [
+    {
+      "benchmark_only": true,
+      "candidate_derived": false,
+      "decision_gates": {
+        "deployable_candidate": false,
+        "diagnostic_not_promoted": false,
+        "eligible_for_candidate_live_promotion": false,
+        "liquidation_evidence_available": true,
+        "liquidation_gate": true,
+        "live_integer_leverage": false,
+        "live_integer_source_leverage": true,
+        "live_source_candidate_metadata": true,
+        "locked_oos_report_gate_only": true,
+        "margin_buffer_positive": true,
+        "no_account_wipeout": true,
+        "oos_calmar_ok": true,
+        "oos_mdd_within_25pct_budget": true,
+        "oos_return_beats_current_base": false,
+        "oos_return_mdd_beats_current_base": false,
+        "oos_sharpe_ok": true,
+        "oos_smart_sortino_ok": true,
+        "oos_sortino_ok": true,
+        "research_history_source_metadata_present": true,
+        "selection_firewall": true,
+        "source_metadata": {
+          "missing_fields": [],
+          "present": true,
+          "rejection_reasons": [],
+          "required_for_live_promotion": false,
+          "research_history_refs": [],
+          "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json",
+          "source_ledger_refs": []
+        },
+        "source_metadata_present": true,
+        "strategy_validity": {
+          "audit_sources": [
+            "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json"
+          ],
+          "audited_sleeves": [
+            {
+              "family": "calendar_rotation",
+              "pass": false,
+              "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600",
+              "primary_signal_type": "calendar_primary",
+              "rejection_reasons": [
+                "calendar_primary_alpha_unsupported",
+                "calendar_fixed_month_alpha",
+                "fixed_asset_calendar_target"
+              ],
+              "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600"
+            },
+            {
+              "family": "calendar_rotation",
+              "pass": false,
+              "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+              "primary_signal_type": "calendar_primary",
+              "rejection_reasons": [
+                "calendar_primary_alpha_unsupported",
+                "calendar_fixed_month_alpha",
+                "fixed_asset_calendar_target"
+              ],
+              "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600"
+            },
+            {
+              "family": "pair_residual",
+              "pass": true,
+              "primary_signal_evidence": "pair_residual",
+              "primary_signal_type": "state_signal",
+              "rejection_reasons": [],
+              "sleeve": "fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all"
+            },
+            {
+              "family": "calendar_rotation",
+              "pass": false,
+              "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600",
+              "primary_signal_type": "calendar_primary",
+              "rejection_reasons": [
+                "calendar_primary_alpha_unsupported",
+                "calendar_fixed_month_alpha",
+                "fixed_asset_calendar_target"
+              ],
+              "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600"
+            }
+          ],
+          "pass": false,
+          "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600",
+          "primary_signal_type": "calendar_primary",
+          "rejection_reasons": [
+            "calendar_fixed_month_alpha",
+            "calendar_primary_alpha_unsupported",
+            "fixed_asset_calendar_target"
+          ]
+        },
+        "strategy_validity_metadata_present": true,
+        "strategy_validity_pass": false,
+        "strategy_validity_passed": false,
+        "tiny_liquidation_tolerance_ok": true
+      },
+      "kind": "current_base",
+      "leverage": 2.3427334297703024,
+      "liquidation": {
+        "account_wipeout": false,
+        "evidence_available": true,
+        "liquidation_count": 0,
+        "maximum_liquidation_equity_loss_fraction": 0.0,
+        "maximum_liquidation_event_drawdown": 0.0,
+        "minimum_margin_buffer": 9256.942426867869,
+        "minimum_margin_ratio": 85.82393690949337
+      },
+      "name": "current_base_tuple_liquidation_aware_2.34273x",
+      "non_integer_source_leverages": [],
+      "rejection_reasons": [
+        "calendar_fixed_month_alpha",
+        "calendar_primary_alpha_unsupported",
+        "fixed_asset_calendar_target",
+        "strategy_validity_rejected",
+        "eligible_for_candidate_live_promotion",
+        "strategy_validity_passed",
+        "live_integer_leverage",
+        "oos_return_beats_current_base",
+        "oos_return_mdd_beats_current_base"
+      ],
+      "selection_policy": {
+        "benchmark_only": true,
+        "locked_oos": "report_only_gate_only",
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "uses_locked_oos_for_selection": false
+      },
+      "sleeve_count": 4,
+      "sleeves": [
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+        "fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600"
+      ],
+      "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json",
+      "source_candidate_gate_failures": [],
+      "source_metadata": {
+        "missing_fields": [],
+        "present": true,
+        "rejection_reasons": [],
+        "required_for_live_promotion": false,
+        "research_history_refs": [],
+        "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json",
+        "source_ledger_refs": []
+      },
+      "splits": {
+        "oos": {
+          "account_wipeout": false,
+          "annualized_return": 0.4088926564024895,
+          "calmar": 43.998321034280735,
+          "downside_volatility": null,
+          "fills": 94,
+          "liquidation_count": 0,
+          "liquidation_event_count": 0,
+          "max_drawdown": 0.009293369537530898,
+          "maximum_liquidation_equity_loss_fraction": 0.0,
+          "maximum_liquidation_event_drawdown": 0.0,
+          "minimum_margin_buffer": 9924.14356800692,
+          "minimum_margin_ratio": 187.20443632243442,
+          "monthlyized_return": 0.028978954039558413,
+          "positive_period_ratio": null,
+          "return_mdd": 6.9168776779021455,
+          "round_trips": 34,
+          "sharpe": 5.202361970933632,
+          "smart_sortino": 6.543121366425916,
+          "sortino": 6.795742761483794,
+          "total_return": 0.06428110030664325,
+          "volatility": 0.06631723335455512
+        },
+        "train": {
+          "account_wipeout": false,
+          "annualized_return": 0.24556457549029354,
+          "calmar": 3.2743634018591616,
+          "downside_volatility": null,
+          "fills": 458,
+          "liquidation_count": 0,
+          "liquidation_event_count": 0,
+          "max_drawdown": 0.07499612759868486,
+          "maximum_liquidation_equity_loss_fraction": 0.0,
+          "maximum_liquidation_event_drawdown": 0.0,
+          "minimum_margin_buffer": 9605.222052089548,
+          "minimum_margin_ratio": 86.07454721676476,
+          "monthlyized_return": 0.018467529142047745,
+          "positive_period_ratio": null,
+          "return_mdd": 3.273947080928801,
+          "round_trips": 145,
+          "sharpe": 1.5009421683949558,
+          "smart_sortino": null,
+          "sortino": 1.4483806432991388,
+          "total_return": 0.2455333530326782,
+          "volatility": 0.1542137929215134
+        },
+        "validation": {
+          "account_wipeout": false,
+          "annualized_return": 2.12119329868366,
+          "calmar": 32.04771902582152,
+          "downside_volatility": null,
+          "fills": 108,
+          "liquidation_count": 0,
+          "liquidation_event_count": 0,
+          "max_drawdown": 0.06618858886570272,
+          "maximum_liquidation_equity_loss_fraction": 0.0,
+          "maximum_liquidation_event_drawdown": 0.0,
+          "minimum_margin_buffer": 9256.942426867869,
+          "minimum_margin_ratio": 85.82393690949337,
+          "monthlyized_return": 0.0994953293407006,
+          "positive_period_ratio": null,
+          "return_mdd": 3.0495018992244236,
+          "round_trips": 42,
+          "sharpe": 3.879258656594248,
+          "smart_sortino": null,
+          "sortino": 4.714085443592447,
+          "total_return": 0.201842227452945,
+          "volatility": 0.3054272113806552
+        }
+      },
+      "strategy_validity": {
+        "audit_sources": [
+          "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json"
+        ],
+        "audited_sleeves": [
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600"
+          },
+          {
+            "family": "pair_residual",
+            "pass": true,
+            "primary_signal_evidence": "pair_residual",
+            "primary_signal_type": "state_signal",
+            "rejection_reasons": [],
+            "sleeve": "fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600"
+          }
+        ],
+        "pass": false,
+        "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600",
+        "primary_signal_type": "calendar_primary",
+        "rejection_reasons": [
+          "calendar_fixed_month_alpha",
+          "calendar_primary_alpha_unsupported",
+          "fixed_asset_calendar_target"
+        ]
+      },
+      "train_val_stability": {
+        "leverage": 2.3427334297703024,
+        "sleeve_count": 4.0,
+        "train_calmar": 3.2743634018591616,
+        "train_max_drawdown": 0.07499612759868486,
+        "train_monthlyized_return": 0.018467529142047745,
+        "train_sharpe": 1.5009421683949558,
+        "train_sortino": 1.4483806432991388,
+        "validation_calmar": 32.04771902582152,
+        "validation_max_drawdown": 0.06618858886570272,
+        "validation_monthlyized_return": 0.0994953293407006,
+        "validation_sharpe": 3.879258656594248,
+        "validation_sortino": 4.714085443592447
+      },
+      "train_val_stability_formula": "frozen_weighted_train_validation_score_v1",
+      "train_val_stability_formula_score": 15.817103043955973,
+      "train_val_stability_score": 15.817103043955973
+    },
+    {
+      "benchmark_only": false,
+      "candidate_derived": true,
+      "decision_gates": {
+        "deployable_candidate": false,
+        "diagnostic_not_promoted": false,
+        "eligible_for_candidate_live_promotion": true,
+        "liquidation_evidence_available": true,
+        "liquidation_gate": true,
+        "live_integer_leverage": true,
+        "live_integer_source_leverage": true,
+        "live_source_candidate_metadata": true,
+        "locked_oos_report_gate_only": true,
+        "margin_buffer_positive": true,
+        "no_account_wipeout": true,
+        "oos_calmar_ok": true,
+        "oos_mdd_within_25pct_budget": true,
+        "oos_return_beats_current_base": true,
+        "oos_return_mdd_beats_current_base": true,
+        "oos_sharpe_ok": true,
+        "oos_smart_sortino_ok": true,
+        "oos_sortino_ok": true,
+        "research_history_source_metadata_present": false,
+        "selection_firewall": true,
+        "source_metadata": {
+          "missing_fields": [
+            "source_ledger_refs_missing",
+            "research_history_refs_missing"
+          ],
+          "present": false,
+          "rejection_reasons": [
+            "source_metadata_missing"
+          ],
+          "required_for_live_promotion": true,
+          "research_history_refs": [],
+          "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json",
+          "source_ledger_refs": []
+        },
+        "source_metadata_present": false,
+        "strategy_validity": {
+          "audit_sources": [
+            "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json"
+          ],
+          "audited_sleeves": [
+            {
+              "family": "calendar_rotation",
+              "pass": false,
+              "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600",
+              "primary_signal_type": "calendar_primary",
+              "rejection_reasons": [
+                "calendar_primary_alpha_unsupported",
+                "calendar_fixed_month_alpha",
+                "fixed_asset_calendar_target"
+              ],
+              "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600"
+            },
+            {
+              "family": "calendar_rotation",
+              "pass": false,
+              "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+              "primary_signal_type": "calendar_primary",
+              "rejection_reasons": [
+                "calendar_primary_alpha_unsupported",
+                "calendar_fixed_month_alpha",
+                "fixed_asset_calendar_target"
+              ],
+              "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600"
+            },
+            {
+              "family": "calendar_rotation",
+              "pass": false,
+              "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss100_tp600",
+              "primary_signal_type": "calendar_primary",
+              "rejection_reasons": [
+                "calendar_primary_alpha_unsupported",
+                "calendar_fixed_month_alpha",
+                "fixed_asset_calendar_target"
+              ],
+              "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss100_tp600"
+            }
+          ],
+          "pass": false,
+          "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss100_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss100_tp600",
+          "primary_signal_type": "calendar_primary",
+          "rejection_reasons": [
+            "calendar_fixed_month_alpha",
+            "calendar_primary_alpha_unsupported",
+            "fixed_asset_calendar_target"
+          ]
+        },
+        "strategy_validity_metadata_present": true,
+        "strategy_validity_pass": false,
+        "strategy_validity_passed": false,
+        "tiny_liquidation_tolerance_ok": true
+      },
+      "kind": "direct_candidate",
+      "leverage": 5.0,
+      "liquidation": {
+        "account_wipeout": false,
+        "evidence_available": true,
+        "liquidation_count": 0,
+        "maximum_liquidation_equity_loss_fraction": 0.0,
+        "maximum_liquidation_event_drawdown": 0.0,
+        "minimum_margin_buffer": 8514.066649257515,
+        "minimum_margin_ratio": 41.121303823239366
+      },
+      "name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600__fr_liquidation_aware_5x",
+      "non_integer_source_leverages": [],
+      "rejection_reasons": [
+        "calendar_fixed_month_alpha",
+        "calendar_primary_alpha_unsupported",
+        "fixed_asset_calendar_target",
+        "strategy_validity_rejected",
+        "source_metadata_missing",
+        "strategy_validity_passed",
+        "research_history_source_metadata_present"
+      ],
+      "selection_policy": {
+        "benchmark_only": false,
+        "locked_oos": "report_only_gate_only",
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "uses_locked_oos_for_selection": false
+      },
+      "sleeve_count": 3,
+      "sleeves": [
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss100_tp600"
+      ],
+      "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json",
+      "source_candidate_gate_failures": [],
+      "source_metadata": {
+        "missing_fields": [
+          "source_ledger_refs_missing",
+          "research_history_refs_missing"
+        ],
+        "present": false,
+        "rejection_reasons": [
+          "source_metadata_missing"
+        ],
+        "required_for_live_promotion": true,
+        "research_history_refs": [],
+        "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json",
+        "source_ledger_refs": []
+      },
+      "splits": {
+        "oos": {
+          "account_wipeout": false,
+          "annualized_return": 1.1231772104720399,
+          "calmar": 57.1717791482807,
+          "downside_volatility": null,
+          "fills": 42,
+          "liquidation_count": 0,
+          "liquidation_event_count": 0,
+          "max_drawdown": 0.019645657826372134,
+          "maximum_liquidation_equity_loss_fraction": 0.0,
+          "maximum_liquidation_event_drawdown": 0.0,
+          "minimum_margin_buffer": 9833.780970677217,
+          "minimum_margin_ratio": 93.88478077121499,
+          "monthlyized_return": 0.06475295407384918,
+          "positive_period_ratio": null,
+          "return_mdd": 7.463950442369106,
+          "round_trips": 21,
+          "sharpe": 5.225098880835966,
+          "smart_sortino": 6.054326141801769,
+          "sortino": 6.5706663966837295,
+          "total_return": 0.14663421642378238,
+          "volatility": 0.14613946757580043
+        },
+        "train": {
+          "account_wipeout": false,
+          "annualized_return": 0.6169437005803009,
+          "calmar": 4.083880122668162,
+          "downside_volatility": null,
+          "fills": 122,
+          "liquidation_count": 0,
+          "liquidation_event_count": 0,
+          "max_drawdown": 0.1510680240479799,
+          "maximum_liquidation_equity_loss_fraction": 0.0,
+          "maximum_liquidation_event_drawdown": 0.0,
+          "minimum_margin_buffer": 9144.628466247153,
+          "minimum_margin_ratio": 41.121303823239366,
+          "monthlyized_return": 0.04085741767916784,
+          "positive_period_ratio": null,
+          "return_mdd": 4.083292993232528,
+          "round_trips": 61,
+          "sharpe": 1.6734203600607893,
+          "smart_sortino": null,
+          "sortino": 1.2828308922083511,
+          "total_return": 0.6168550040965994,
+          "volatility": 0.31714738642624657
+        },
+        "validation": {
+          "account_wipeout": false,
+          "annualized_return": 7.998815481344831,
+          "calmar": 60.292161978098996,
+          "downside_volatility": null,
+          "fills": 60,
+          "liquidation_count": 0,
+          "liquidation_event_count": 0,
+          "max_drawdown": 0.13266758429147696,
+          "maximum_liquidation_equity_loss_fraction": 0.0,
+          "maximum_liquidation_event_drawdown": 0.0,
+          "minimum_margin_buffer": 8514.066649257515,
+          "minimum_margin_ratio": 41.788522453202695,
+          "monthlyized_return": 0.20092378278669432,
+          "positive_period_ratio": null,
+          "return_mdd": 3.211273848336756,
+          "round_trips": 30,
+          "sharpe": 3.8863324777126786,
+          "smart_sortino": null,
+          "sortino": 4.440036823308797,
+          "total_return": 0.4260319439572322,
+          "volatility": 0.6137054464282423
+        }
+      },
+      "strategy_validity": {
+        "audit_sources": [
+          "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json"
+        ],
+        "audited_sleeves": [
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss100_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss100_tp600"
+          }
+        ],
+        "pass": false,
+        "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss100_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss100_tp600",
+        "primary_signal_type": "calendar_primary",
+        "rejection_reasons": [
+          "calendar_fixed_month_alpha",
+          "calendar_primary_alpha_unsupported",
+          "fixed_asset_calendar_target"
+        ]
+      },
+      "train_val_stability": {
+        "leverage": 5.0,
+        "sleeve_count": 3.0,
+        "train_calmar": 4.083880122668162,
+        "train_max_drawdown": 0.1510680240479799,
+        "train_monthlyized_return": 0.04085741767916784,
+        "train_sharpe": 1.6734203600607893,
+        "train_sortino": 1.2828308922083511,
+        "validation_calmar": 60.292161978098996,
+        "validation_max_drawdown": 0.13266758429147696,
+        "validation_monthlyized_return": 0.20092378278669432,
+        "validation_sharpe": 3.8863324777126786,
+        "validation_sortino": 4.440036823308797
+      },
+      "train_val_stability_formula": "frozen_weighted_train_validation_score_v1",
+      "train_val_stability_formula_score": 19.88295221871898,
+      "train_val_stability_score": 19.88295221871898
+    },
+    {
+      "benchmark_only": false,
+      "candidate_derived": true,
+      "decision_gates": {
+        "deployable_candidate": false,
+        "diagnostic_not_promoted": false,
+        "eligible_for_candidate_live_promotion": true,
+        "liquidation_evidence_available": true,
+        "liquidation_gate": true,
+        "live_integer_leverage": true,
+        "live_integer_source_leverage": true,
+        "live_source_candidate_metadata": true,
+        "locked_oos_report_gate_only": true,
+        "margin_buffer_positive": true,
+        "no_account_wipeout": true,
+        "oos_calmar_ok": true,
+        "oos_mdd_within_25pct_budget": true,
+        "oos_return_beats_current_base": true,
+        "oos_return_mdd_beats_current_base": true,
+        "oos_sharpe_ok": true,
+        "oos_smart_sortino_ok": true,
+        "oos_sortino_ok": true,
+        "research_history_source_metadata_present": false,
+        "selection_firewall": true,
+        "source_metadata": {
+          "missing_fields": [
+            "source_ledger_refs_missing",
+            "research_history_refs_missing"
+          ],
+          "present": false,
+          "rejection_reasons": [
+            "source_metadata_missing"
+          ],
+          "required_for_live_promotion": true,
+          "research_history_refs": [],
+          "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json",
+          "source_ledger_refs": []
+        },
+        "source_metadata_present": false,
+        "strategy_validity": {
+          "audit_sources": [
+            "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json"
+          ],
+          "audited_sleeves": [
+            {
+              "family": "calendar_rotation",
+              "pass": false,
+              "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600",
+              "primary_signal_type": "calendar_primary",
+              "rejection_reasons": [
+                "calendar_primary_alpha_unsupported",
+                "calendar_fixed_month_alpha",
+                "fixed_asset_calendar_target"
+              ],
+              "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600"
+            },
+            {
+              "family": "calendar_rotation",
+              "pass": false,
+              "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+              "primary_signal_type": "calendar_primary",
+              "rejection_reasons": [
+                "calendar_primary_alpha_unsupported",
+                "calendar_fixed_month_alpha",
+                "fixed_asset_calendar_target"
+              ],
+              "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600"
+            },
+            {
+              "family": "pair_residual",
+              "pass": true,
+              "primary_signal_evidence": "pair_residual",
+              "primary_signal_type": "state_signal",
+              "rejection_reasons": [],
+              "sleeve": "fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all"
+            },
+            {
+              "family": "calendar_rotation",
+              "pass": false,
+              "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600",
+              "primary_signal_type": "calendar_primary",
+              "rejection_reasons": [
+                "calendar_primary_alpha_unsupported",
+                "calendar_fixed_month_alpha",
+                "fixed_asset_calendar_target"
+              ],
+              "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600"
+            }
+          ],
+          "pass": false,
+          "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600",
+          "primary_signal_type": "calendar_primary",
+          "rejection_reasons": [
+            "calendar_fixed_month_alpha",
+            "calendar_primary_alpha_unsupported",
+            "fixed_asset_calendar_target"
+          ]
+        },
+        "strategy_validity_metadata_present": true,
+        "strategy_validity_pass": false,
+        "strategy_validity_passed": false,
+        "tiny_liquidation_tolerance_ok": true
+      },
+      "kind": "direct_candidate",
+      "leverage": 5.0,
+      "liquidation": {
+        "account_wipeout": false,
+        "evidence_available": true,
+        "liquidation_count": 1,
+        "maximum_liquidation_equity_loss_fraction": 0.0008023320676715722,
+        "maximum_liquidation_event_drawdown": 0.0008023320676715722,
+        "minimum_margin_buffer": 8415.811074886898,
+        "minimum_margin_ratio": 37.18513090255406
+      },
+      "name": "current_base_tuple_liquidation_aware_5x",
+      "non_integer_source_leverages": [],
+      "rejection_reasons": [
+        "calendar_fixed_month_alpha",
+        "calendar_primary_alpha_unsupported",
+        "fixed_asset_calendar_target",
+        "strategy_validity_rejected",
+        "source_metadata_missing",
+        "strategy_validity_passed",
+        "research_history_source_metadata_present"
+      ],
+      "selection_policy": {
+        "benchmark_only": false,
+        "locked_oos": "report_only_gate_only",
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "uses_locked_oos_for_selection": false
+      },
+      "sleeve_count": 4,
+      "sleeves": [
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+        "fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600"
+      ],
+      "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json",
+      "source_candidate_gate_failures": [],
+      "source_metadata": {
+        "missing_fields": [
+          "source_ledger_refs_missing",
+          "research_history_refs_missing"
+        ],
+        "present": false,
+        "rejection_reasons": [
+          "source_metadata_missing"
+        ],
+        "required_for_live_promotion": true,
+        "research_history_refs": [],
+        "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json",
+        "source_ledger_refs": []
+      },
+      "splits": {
+        "oos": {
+          "account_wipeout": false,
+          "annualized_return": 1.0622000591410017,
+          "calmar": 54.236926461137905,
+          "downside_volatility": null,
+          "fills": 94,
+          "liquidation_count": 0,
+          "liquidation_event_count": 0,
+          "max_drawdown": 0.019584444186786547,
+          "maximum_liquidation_equity_loss_fraction": 0.0,
+          "maximum_liquidation_event_drawdown": 0.0,
+          "minimum_margin_buffer": 9837.883542364363,
+          "minimum_margin_ratio": 88.90612037332778,
+          "monthlyized_return": 0.06217049379558315,
+          "positive_period_ratio": null,
+          "return_mdd": 7.178039441904272,
+          "round_trips": 34,
+          "sharpe": 5.218432394942828,
+          "smart_sortino": 6.303941685466164,
+          "sortino": 6.839752705950612,
+          "total_return": 0.14057791282052667,
+          "volatility": 0.14059000182509301
+        },
+        "train": {
+          "account_wipeout": false,
+          "annualized_return": 0.6060838431816715,
+          "calmar": 3.737822863009562,
+          "downside_volatility": null,
+          "fills": 450,
+          "liquidation_count": 0,
+          "liquidation_event_count": 0,
+          "max_drawdown": 0.16214889399378182,
+          "maximum_liquidation_equity_loss_fraction": 0.0,
+          "maximum_liquidation_event_drawdown": 0.0,
+          "minimum_margin_buffer": 9053.886122571974,
+          "minimum_margin_ratio": 38.40797600534935,
+          "monthlyized_return": 0.04027305859362951,
+          "positive_period_ratio": null,
+          "return_mdd": 3.7372871498105535,
+          "round_trips": 143,
+          "sharpe": 1.5900306127196264,
+          "smart_sortino": null,
+          "sortino": 1.5433429968794228,
+          "total_return": 0.6059969778789545,
+          "volatility": 0.3327062403319996
+        },
+        "validation": {
+          "account_wipeout": false,
+          "annualized_return": 9.24252740138517,
+          "calmar": 65.55270991494466,
+          "downside_volatility": null,
+          "fills": 108,
+          "liquidation_count": 1,
+          "liquidation_event_count": 1,
+          "max_drawdown": 0.14099382639371352,
+          "maximum_liquidation_equity_loss_fraction": 0.0008023320676715722,
+          "maximum_liquidation_event_drawdown": 0.0008023320676715722,
+          "minimum_margin_buffer": 8415.811074886898,
+          "minimum_margin_ratio": 37.18513090255406,
+          "monthlyized_return": 0.2139494272349025,
+          "positive_period_ratio": null,
+          "return_mdd": 3.235358067787589,
+          "round_trips": 42,
+          "sharpe": 3.888693117330881,
+          "smart_sortino": null,
+          "sortino": 4.721708166205136,
+          "total_return": 0.4561655137311438,
+          "volatility": 0.6530065744212469
+        }
+      },
+      "strategy_validity": {
+        "audit_sources": [
+          "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json"
+        ],
+        "audited_sleeves": [
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600"
+          },
+          {
+            "family": "pair_residual",
+            "pass": true,
+            "primary_signal_evidence": "pair_residual",
+            "primary_signal_type": "state_signal",
+            "rejection_reasons": [],
+            "sleeve": "fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600"
+          }
+        ],
+        "pass": false,
+        "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600",
+        "primary_signal_type": "calendar_primary",
+        "rejection_reasons": [
+          "calendar_fixed_month_alpha",
+          "calendar_primary_alpha_unsupported",
+          "fixed_asset_calendar_target"
+        ]
+      },
+      "train_val_stability": {
+        "leverage": 5.0,
+        "sleeve_count": 4.0,
+        "train_calmar": 3.737822863009562,
+        "train_max_drawdown": 0.16214889399378182,
+        "train_monthlyized_return": 0.04027305859362951,
+        "train_sharpe": 1.5900306127196264,
+        "train_sortino": 1.5433429968794228,
+        "validation_calmar": 65.55270991494466,
+        "validation_max_drawdown": 0.14099382639371352,
+        "validation_monthlyized_return": 0.2139494272349025,
+        "validation_sharpe": 3.888693117330881,
+        "validation_sortino": 4.721708166205136
+      },
+      "train_val_stability_formula": "frozen_weighted_train_validation_score_v1",
+      "train_val_stability_formula_score": 19.24493581615202,
+      "train_val_stability_score": 19.24493581615202
+    },
+    {
+      "benchmark_only": false,
+      "candidate_derived": true,
+      "decision_gates": {
+        "deployable_candidate": false,
+        "diagnostic_not_promoted": false,
+        "eligible_for_candidate_live_promotion": true,
+        "liquidation_evidence_available": true,
+        "liquidation_gate": true,
+        "live_integer_leverage": true,
+        "live_integer_source_leverage": true,
+        "live_source_candidate_metadata": true,
+        "locked_oos_report_gate_only": true,
+        "margin_buffer_positive": true,
+        "no_account_wipeout": true,
+        "oos_calmar_ok": true,
+        "oos_mdd_within_25pct_budget": true,
+        "oos_return_beats_current_base": true,
+        "oos_return_mdd_beats_current_base": false,
+        "oos_sharpe_ok": true,
+        "oos_smart_sortino_ok": false,
+        "oos_sortino_ok": false,
+        "research_history_source_metadata_present": false,
+        "selection_firewall": true,
+        "source_metadata": {
+          "missing_fields": [
+            "source_ledger_refs_missing",
+            "research_history_refs_missing"
+          ],
+          "present": false,
+          "rejection_reasons": [
+            "source_metadata_missing"
+          ],
+          "required_for_live_promotion": true,
+          "research_history_refs": [],
+          "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json",
+          "source_ledger_refs": []
+        },
+        "source_metadata_present": false,
+        "strategy_validity": {
+          "audit_sources": [
+            "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json"
+          ],
+          "audited_sleeves": [
+            {
+              "family": "calendar_rotation",
+              "pass": false,
+              "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600",
+              "primary_signal_type": "calendar_primary",
+              "rejection_reasons": [
+                "calendar_primary_alpha_unsupported",
+                "calendar_fixed_month_alpha",
+                "fixed_asset_calendar_target"
+              ],
+              "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600"
+            },
+            {
+              "family": "calendar_rotation",
+              "pass": false,
+              "primary_signal_evidence": "fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0",
+              "primary_signal_type": "calendar_primary",
+              "rejection_reasons": [
+                "calendar_primary_alpha_unsupported",
+                "calendar_fixed_month_alpha",
+                "fixed_asset_calendar_target"
+              ],
+              "sleeve": "fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0"
+            },
+            {
+              "family": "calendar_rotation",
+              "pass": false,
+              "primary_signal_evidence": "fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0",
+              "primary_signal_type": "calendar_primary",
+              "rejection_reasons": [
+                "calendar_primary_alpha_unsupported",
+                "calendar_fixed_month_alpha",
+                "fixed_asset_calendar_target"
+              ],
+              "sleeve": "fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0"
+            }
+          ],
+          "pass": false,
+          "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600; fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0=fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0; fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0=fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0",
+          "primary_signal_type": "calendar_primary",
+          "rejection_reasons": [
+            "calendar_fixed_month_alpha",
+            "calendar_primary_alpha_unsupported",
+            "fixed_asset_calendar_target"
+          ]
+        },
+        "strategy_validity_metadata_present": true,
+        "strategy_validity_pass": false,
+        "strategy_validity_passed": false,
+        "tiny_liquidation_tolerance_ok": true
+      },
+      "kind": "direct_candidate",
+      "leverage": 4.0,
+      "liquidation": {
+        "account_wipeout": false,
+        "evidence_available": true,
+        "liquidation_count": 0,
+        "maximum_liquidation_equity_loss_fraction": 0.0,
+        "maximum_liquidation_event_drawdown": 0.0,
+        "minimum_margin_buffer": 9281.183212599875,
+        "minimum_margin_ratio": 65.68912687295045
+      },
+      "name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600__fr_liquidation_aware_4x",
+      "non_integer_source_leverages": [],
+      "rejection_reasons": [
+        "calendar_fixed_month_alpha",
+        "calendar_primary_alpha_unsupported",
+        "fixed_asset_calendar_target",
+        "strategy_validity_rejected",
+        "source_metadata_missing",
+        "strategy_validity_passed",
+        "research_history_source_metadata_present",
+        "oos_return_mdd_beats_current_base",
+        "oos_sortino_ok",
+        "oos_smart_sortino_ok"
+      ],
+      "selection_policy": {
+        "benchmark_only": false,
+        "locked_oos": "report_only_gate_only",
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "uses_locked_oos_for_selection": false
+      },
+      "sleeve_count": 3,
+      "sleeves": [
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600",
+        "fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0",
+        "fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0"
+      ],
+      "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json",
+      "source_candidate_gate_failures": [],
+      "source_metadata": {
+        "missing_fields": [
+          "source_ledger_refs_missing",
+          "research_history_refs_missing"
+        ],
+        "present": false,
+        "rejection_reasons": [
+          "source_metadata_missing"
+        ],
+        "required_for_live_promotion": true,
+        "research_history_refs": [],
+        "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json",
+        "source_ledger_refs": []
+      },
+      "splits": {
+        "oos": {
+          "account_wipeout": false,
+          "annualized_return": 0.5440758342917547,
+          "calmar": 10.11366535916942,
+          "downside_volatility": null,
+          "fills": 56,
+          "liquidation_count": 0,
+          "liquidation_event_count": 0,
+          "max_drawdown": 0.0537961080350039,
+          "maximum_liquidation_equity_loss_fraction": 0.0,
+          "maximum_liquidation_event_drawdown": 0.0,
+          "minimum_margin_buffer": 9713.630463603264,
+          "minimum_margin_ratio": 98.03953063958042,
+          "monthlyized_return": 0.03686540742291977,
+          "positive_period_ratio": null,
+          "return_mdd": 1.5270741449635752,
+          "round_trips": 28,
+          "sharpe": 2.1519901702094035,
+          "smart_sortino": 2.284031913620842,
+          "sortino": 2.9102785509834916,
+          "total_return": 0.0821506456799217,
+          "volatility": 0.21233017915494895
+        },
+        "train": {
+          "account_wipeout": false,
+          "annualized_return": 0.5643129137301177,
+          "calmar": 5.248048795784963,
+          "downside_volatility": null,
+          "fills": 126,
+          "liquidation_count": 0,
+          "liquidation_event_count": 0,
+          "max_drawdown": 0.10752813773060814,
+          "maximum_liquidation_equity_loss_fraction": 0.0,
+          "maximum_liquidation_event_drawdown": 0.0,
+          "minimum_margin_buffer": 9336.192611827277,
+          "minimum_margin_ratio": 65.68912687295045,
+          "monthlyized_return": 0.03799111457675641,
+          "positive_period_ratio": null,
+          "return_mdd": 5.24730572940362,
+          "round_trips": 63,
+          "sharpe": 1.9443111917010918,
+          "smart_sortino": null,
+          "sortino": 1.6274231880986727,
+          "total_return": 0.5642330131859217,
+          "volatility": 0.2456247134844303
+        },
+        "validation": {
+          "account_wipeout": false,
+          "annualized_return": 5.301899587103319,
+          "calmar": 69.213892836736,
+          "downside_volatility": null,
+          "fills": 54,
+          "liquidation_count": 0,
+          "liquidation_event_count": 0,
+          "max_drawdown": 0.07660166723477922,
+          "maximum_liquidation_equity_loss_fraction": 0.0,
+          "maximum_liquidation_event_drawdown": 0.0,
+          "minimum_margin_buffer": 9281.183212599875,
+          "minimum_margin_ratio": 73.42087096920659,
+          "monthlyized_return": 0.1657961674543067,
+          "positive_period_ratio": null,
+          "return_mdd": 4.520648770526013,
+          "round_trips": 27,
+          "sharpe": 4.7631373148909155,
+          "smart_sortino": null,
+          "sortino": 6.056169854463743,
+          "total_return": 0.34628923280514745,
+          "volatility": 0.40355760572931293
+        }
+      },
+      "strategy_validity": {
+        "audit_sources": [
+          "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json"
+        ],
+        "audited_sleeves": [
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0"
+          }
+        ],
+        "pass": false,
+        "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600; fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0=fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0; fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0=fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0",
+        "primary_signal_type": "calendar_primary",
+        "rejection_reasons": [
+          "calendar_fixed_month_alpha",
+          "calendar_primary_alpha_unsupported",
+          "fixed_asset_calendar_target"
+        ]
+      },
+      "train_val_stability": {
+        "leverage": 4.0,
+        "sleeve_count": 3.0,
+        "train_calmar": 5.248048795784963,
+        "train_max_drawdown": 0.10752813773060814,
+        "train_monthlyized_return": 0.03799111457675641,
+        "train_sharpe": 1.9443111917010918,
+        "train_sortino": 1.6274231880986727,
+        "validation_calmar": 69.213892836736,
+        "validation_max_drawdown": 0.07660166723477922,
+        "validation_monthlyized_return": 0.1657961674543067,
+        "validation_sharpe": 4.7631373148909155,
+        "validation_sortino": 6.056169854463743
+      },
+      "train_val_stability_formula": "frozen_weighted_train_validation_score_v1",
+      "train_val_stability_formula_score": 25.856247339077235,
+      "train_val_stability_score": 25.856247339077235
+    },
+    {
+      "benchmark_only": false,
+      "candidate_derived": true,
+      "decision_gates": {
+        "deployable_candidate": false,
+        "diagnostic_not_promoted": false,
+        "eligible_for_candidate_live_promotion": true,
+        "liquidation_evidence_available": true,
+        "liquidation_gate": true,
+        "live_integer_leverage": true,
+        "live_integer_source_leverage": true,
+        "live_source_candidate_metadata": true,
+        "locked_oos_report_gate_only": true,
+        "margin_buffer_positive": true,
+        "no_account_wipeout": true,
+        "oos_calmar_ok": true,
+        "oos_mdd_within_25pct_budget": true,
+        "oos_return_beats_current_base": false,
+        "oos_return_mdd_beats_current_base": false,
+        "oos_sharpe_ok": true,
+        "oos_smart_sortino_ok": false,
+        "oos_sortino_ok": false,
+        "research_history_source_metadata_present": false,
+        "selection_firewall": true,
+        "source_metadata": {
+          "missing_fields": [
+            "source_ledger_refs_missing",
+            "research_history_refs_missing"
+          ],
+          "present": false,
+          "rejection_reasons": [
+            "source_metadata_missing"
+          ],
+          "required_for_live_promotion": true,
+          "research_history_refs": [],
+          "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json",
+          "source_ledger_refs": []
+        },
+        "source_metadata_present": false,
+        "strategy_validity": {
+          "audit_sources": [
+            "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json"
+          ],
+          "audited_sleeves": [
+            {
+              "family": "calendar_rotation",
+              "pass": false,
+              "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600",
+              "primary_signal_type": "calendar_primary",
+              "rejection_reasons": [
+                "calendar_primary_alpha_unsupported",
+                "calendar_fixed_month_alpha",
+                "fixed_asset_calendar_target"
+              ],
+              "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600"
+            },
+            {
+              "family": "calendar_rotation",
+              "pass": false,
+              "primary_signal_evidence": "fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0",
+              "primary_signal_type": "calendar_primary",
+              "rejection_reasons": [
+                "calendar_primary_alpha_unsupported",
+                "calendar_fixed_month_alpha",
+                "fixed_asset_calendar_target"
+              ],
+              "sleeve": "fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0"
+            },
+            {
+              "family": "calendar_rotation",
+              "pass": false,
+              "primary_signal_evidence": "fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0",
+              "primary_signal_type": "calendar_primary",
+              "rejection_reasons": [
+                "calendar_primary_alpha_unsupported",
+                "calendar_fixed_month_alpha",
+                "fixed_asset_calendar_target"
+              ],
+              "sleeve": "fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0"
+            }
+          ],
+          "pass": false,
+          "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600; fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0=fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0; fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0=fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0",
+          "primary_signal_type": "calendar_primary",
+          "rejection_reasons": [
+            "calendar_fixed_month_alpha",
+            "calendar_primary_alpha_unsupported",
+            "fixed_asset_calendar_target"
+          ]
+        },
+        "strategy_validity_metadata_present": true,
+        "strategy_validity_pass": false,
+        "strategy_validity_passed": false,
+        "tiny_liquidation_tolerance_ok": true
+      },
+      "kind": "direct_candidate",
+      "leverage": 3.0,
+      "liquidation": {
+        "account_wipeout": false,
+        "evidence_available": true,
+        "liquidation_count": 0,
+        "maximum_liquidation_equity_loss_fraction": 0.0,
+        "maximum_liquidation_event_drawdown": 0.0,
+        "minimum_margin_buffer": 9461.147976192566,
+        "minimum_margin_ratio": 89.7697964042706
+      },
+      "name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600__fr_liquidation_aware_3x",
+      "non_integer_source_leverages": [],
+      "rejection_reasons": [
+        "calendar_fixed_month_alpha",
+        "calendar_primary_alpha_unsupported",
+        "fixed_asset_calendar_target",
+        "strategy_validity_rejected",
+        "source_metadata_missing",
+        "strategy_validity_passed",
+        "research_history_source_metadata_present",
+        "oos_return_beats_current_base",
+        "oos_return_mdd_beats_current_base",
+        "oos_sortino_ok",
+        "oos_smart_sortino_ok"
+      ],
+      "selection_policy": {
+        "benchmark_only": false,
+        "locked_oos": "report_only_gate_only",
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "uses_locked_oos_for_selection": false
+      },
+      "sleeve_count": 3,
+      "sleeves": [
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600",
+        "fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0",
+        "fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0"
+      ],
+      "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json",
+      "source_candidate_gate_failures": [],
+      "source_metadata": {
+        "missing_fields": [
+          "source_ledger_refs_missing",
+          "research_history_refs_missing"
+        ],
+        "present": false,
+        "rejection_reasons": [
+          "source_metadata_missing"
+        ],
+        "required_for_live_promotion": true,
+        "research_history_refs": [],
+        "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json",
+        "source_ledger_refs": []
+      },
+      "splits": {
+        "oos": {
+          "account_wipeout": false,
+          "annualized_return": 0.3871578057993179,
+          "calmar": 9.492355678999836,
+          "downside_volatility": null,
+          "fills": 56,
+          "liquidation_count": 0,
+          "liquidation_event_count": 0,
+          "max_drawdown": 0.04078627254305655,
+          "maximum_liquidation_equity_loss_fraction": 0.0,
+          "maximum_liquidation_event_drawdown": 0.0,
+          "minimum_margin_buffer": 9785.195668136674,
+          "minimum_margin_ratio": 129.32221222167618,
+          "monthlyized_return": 0.027646677625906557,
+          "positive_period_ratio": null,
+          "return_mdd": 1.5024236265045603,
+          "round_trips": 28,
+          "sharpe": 2.130191269741677,
+          "smart_sortino": 2.408387468578169,
+          "sortino": 2.8779032545484133,
+          "total_return": 0.061278259505742394,
+          "volatility": 0.15959954518947742
+        },
+        "train": {
+          "account_wipeout": false,
+          "annualized_return": 0.4067995838080143,
+          "calmar": 4.993762781680107,
+          "downside_volatility": null,
+          "fills": 126,
+          "liquidation_count": 0,
+          "liquidation_event_count": 0,
+          "max_drawdown": 0.08146153543784276,
+          "maximum_liquidation_equity_loss_fraction": 0.0,
+          "maximum_liquidation_event_drawdown": 0.0,
+          "minimum_margin_buffer": 9510.298995798248,
+          "minimum_margin_ratio": 89.7697964042706,
+          "monthlyized_return": 0.02885147830409651,
+          "positive_period_ratio": null,
+          "return_mdd": 4.993089920602372,
+          "round_trips": 63,
+          "sharpe": 1.9429396134209738,
+          "smart_sortino": null,
+          "sortino": 1.6264681959919152,
+          "total_return": 0.4067447715114856,
+          "volatility": 0.18441370084337577
+        },
+        "validation": {
+          "account_wipeout": false,
+          "annualized_return": 3.039396270043082,
+          "calmar": 52.56468347151996,
+          "downside_volatility": null,
+          "fills": 54,
+          "liquidation_count": 0,
+          "liquidation_event_count": 0,
+          "max_drawdown": 0.05782202173232633,
+          "maximum_liquidation_equity_loss_fraction": 0.0,
+          "maximum_liquidation_event_drawdown": 0.0,
+          "minimum_margin_buffer": 9461.147976192566,
+          "minimum_margin_ratio": 98.80888928506019,
+          "monthlyized_return": 0.12337918258952008,
+          "positive_period_ratio": null,
+          "return_mdd": 4.3748485681623475,
+          "round_trips": 27,
+          "sharpe": 4.750808013132186,
+          "smart_sortino": null,
+          "sortino": 6.038334349130194,
+          "total_return": 0.25296258898392,
+          "volatility": 0.30355996167753735
+        }
+      },
+      "strategy_validity": {
+        "audit_sources": [
+          "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json"
+        ],
+        "audited_sleeves": [
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0"
+          }
+        ],
+        "pass": false,
+        "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600; fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0=fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0; fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0=fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0",
+        "primary_signal_type": "calendar_primary",
+        "rejection_reasons": [
+          "calendar_fixed_month_alpha",
+          "calendar_primary_alpha_unsupported",
+          "fixed_asset_calendar_target"
+        ]
+      },
+      "train_val_stability": {
+        "leverage": 3.0,
+        "sleeve_count": 3.0,
+        "train_calmar": 4.993762781680107,
+        "train_max_drawdown": 0.08146153543784276,
+        "train_monthlyized_return": 0.02885147830409651,
+        "train_sharpe": 1.9429396134209738,
+        "train_sortino": 1.6264681959919152,
+        "validation_calmar": 52.56468347151996,
+        "validation_max_drawdown": 0.05782202173232633,
+        "validation_monthlyized_return": 0.12337918258952008,
+        "validation_sharpe": 4.750808013132186,
+        "validation_sortino": 6.038334349130194
+      },
+      "train_val_stability_formula": "frozen_weighted_train_validation_score_v1",
+      "train_val_stability_formula_score": 25.14423304848823,
+      "train_val_stability_score": 25.14423304848823
+    },
+    {
+      "benchmark_only": false,
+      "candidate_derived": true,
+      "decision_gates": {
+        "deployable_candidate": false,
+        "diagnostic_not_promoted": false,
+        "eligible_for_candidate_live_promotion": true,
+        "liquidation_evidence_available": true,
+        "liquidation_gate": true,
+        "live_integer_leverage": true,
+        "live_integer_source_leverage": true,
+        "live_source_candidate_metadata": true,
+        "locked_oos_report_gate_only": true,
+        "margin_buffer_positive": true,
+        "no_account_wipeout": true,
+        "oos_calmar_ok": true,
+        "oos_mdd_within_25pct_budget": true,
+        "oos_return_beats_current_base": false,
+        "oos_return_mdd_beats_current_base": false,
+        "oos_sharpe_ok": true,
+        "oos_smart_sortino_ok": false,
+        "oos_sortino_ok": false,
+        "research_history_source_metadata_present": false,
+        "selection_firewall": true,
+        "source_metadata": {
+          "missing_fields": [
+            "source_ledger_refs_missing",
+            "research_history_refs_missing"
+          ],
+          "present": false,
+          "rejection_reasons": [
+            "source_metadata_missing"
+          ],
+          "required_for_live_promotion": true,
+          "research_history_refs": [],
+          "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json",
+          "source_ledger_refs": []
+        },
+        "source_metadata_present": false,
+        "strategy_validity": {
+          "audit_sources": [
+            "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json"
+          ],
+          "audited_sleeves": [
+            {
+              "family": "calendar_rotation",
+              "pass": false,
+              "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600",
+              "primary_signal_type": "calendar_primary",
+              "rejection_reasons": [
+                "calendar_primary_alpha_unsupported",
+                "calendar_fixed_month_alpha",
+                "fixed_asset_calendar_target"
+              ],
+              "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600"
+            },
+            {
+              "family": "calendar_rotation",
+              "pass": false,
+              "primary_signal_evidence": "fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0",
+              "primary_signal_type": "calendar_primary",
+              "rejection_reasons": [
+                "calendar_primary_alpha_unsupported",
+                "calendar_fixed_month_alpha",
+                "fixed_asset_calendar_target"
+              ],
+              "sleeve": "fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0"
+            },
+            {
+              "family": "calendar_rotation",
+              "pass": false,
+              "primary_signal_evidence": "fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0",
+              "primary_signal_type": "calendar_primary",
+              "rejection_reasons": [
+                "calendar_primary_alpha_unsupported",
+                "calendar_fixed_month_alpha",
+                "fixed_asset_calendar_target"
+              ],
+              "sleeve": "fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0"
+            }
+          ],
+          "pass": false,
+          "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600; fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0=fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0; fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0=fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0",
+          "primary_signal_type": "calendar_primary",
+          "rejection_reasons": [
+            "calendar_fixed_month_alpha",
+            "calendar_primary_alpha_unsupported",
+            "fixed_asset_calendar_target"
+          ]
+        },
+        "strategy_validity_metadata_present": true,
+        "strategy_validity_pass": false,
+        "strategy_validity_passed": false,
+        "tiny_liquidation_tolerance_ok": true
+      },
+      "kind": "direct_candidate",
+      "leverage": 2.0,
+      "liquidation": {
+        "account_wipeout": false,
+        "evidence_available": true,
+        "liquidation_count": 0,
+        "maximum_liquidation_equity_loss_fraction": 0.0,
+        "maximum_liquidation_event_drawdown": 0.0,
+        "minimum_margin_buffer": 9640.417895138162,
+        "minimum_margin_ratio": 137.91598818543892
+      },
+      "name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600__fr_liquidation_aware_2x",
+      "non_integer_source_leverages": [],
+      "rejection_reasons": [
+        "calendar_fixed_month_alpha",
+        "calendar_primary_alpha_unsupported",
+        "fixed_asset_calendar_target",
+        "strategy_validity_rejected",
+        "source_metadata_missing",
+        "strategy_validity_passed",
+        "research_history_source_metadata_present",
+        "oos_return_beats_current_base",
+        "oos_return_mdd_beats_current_base",
+        "oos_sortino_ok",
+        "oos_smart_sortino_ok"
+      ],
+      "selection_policy": {
+        "benchmark_only": false,
+        "locked_oos": "report_only_gate_only",
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "uses_locked_oos_for_selection": false
+      },
+      "sleeve_count": 3,
+      "sleeves": [
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600",
+        "fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0",
+        "fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0"
+      ],
+      "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json",
+      "source_candidate_gate_failures": [],
+      "source_metadata": {
+        "missing_fields": [
+          "source_ledger_refs_missing",
+          "research_history_refs_missing"
+        ],
+        "present": false,
+        "rejection_reasons": [
+          "source_metadata_missing"
+        ],
+        "required_for_live_promotion": true,
+        "research_history_refs": [],
+        "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json",
+        "source_ledger_refs": []
+      },
+      "splits": {
+        "oos": {
+          "account_wipeout": false,
+          "annualized_return": 0.24444353243894512,
+          "calmar": 8.892448796976154,
+          "downside_volatility": null,
+          "fills": 56,
+          "liquidation_count": 0,
+          "liquidation_event_count": 0,
+          "max_drawdown": 0.027488888383823733,
+          "maximum_liquidation_equity_loss_fraction": 0.0,
+          "maximum_liquidation_event_drawdown": 0.0,
+          "minimum_margin_buffer": 9856.808109927853,
+          "minimum_margin_ratio": 191.90585925924378,
+          "monthlyized_return": 0.018391110168078928,
+          "positive_period_ratio": null,
+          "return_mdd": 1.4749130224591476,
+          "round_trips": 28,
+          "sharpe": 2.105194053289355,
+          "smart_sortino": 2.3243775919869716,
+          "sortino": 2.8399914659284082,
+          "total_return": 0.04054371945022761,
+          "volatility": 0.10657584061693058
+        },
+        "train": {
+          "account_wipeout": false,
+          "annualized_return": 0.26042739923540514,
+          "calmar": 4.747542272859074,
+          "downside_volatility": null,
+          "fills": 126,
+          "liquidation_count": 0,
+          "liquidation_event_count": 0,
+          "max_drawdown": 0.0548552038650032,
+          "maximum_liquidation_equity_loss_fraction": 0.0,
+          "maximum_liquidation_event_drawdown": 0.0,
+          "minimum_margin_buffer": 9678.883228637704,
+          "minimum_margin_ratio": 137.91598818543892,
+          "monthlyized_return": 0.019474779309266665,
+          "positive_period_ratio": null,
+          "return_mdd": 4.7469351885969475,
+          "round_trips": 63,
+          "sharpe": 1.9416214337584166,
+          "smart_sortino": null,
+          "sortino": 1.6256297969326907,
+          "total_return": 0.260394097504443,
+          "volatility": 0.12310531929520017
+        },
+        "validation": {
+          "account_wipeout": false,
+          "annualized_return": 1.5646023509400258,
+          "calmar": 40.32789946384216,
+          "downside_volatility": null,
+          "fills": 54,
+          "liquidation_count": 0,
+          "liquidation_event_count": 0,
+          "max_drawdown": 0.03879702071621266,
+          "maximum_liquidation_equity_loss_fraction": 0.0,
+          "maximum_liquidation_event_drawdown": 0.0,
+          "minimum_margin_buffer": 9640.417895138162,
+          "minimum_margin_ratio": 149.65370236559372,
+          "monthlyized_return": 0.0816456374571255,
+          "positive_period_ratio": null,
+          "return_mdd": 4.235136158389096,
+          "round_trips": 27,
+          "sharpe": 4.7414449918743475,
+          "smart_sortino": null,
+          "sortino": 6.021391795420162,
+          "total_return": 0.1643106652730031,
+          "volatility": 0.2029785530210136
+        }
+      },
+      "strategy_validity": {
+        "audit_sources": [
+          "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json"
+        ],
+        "audited_sleeves": [
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0"
+          }
+        ],
+        "pass": false,
+        "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600; fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0=fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0; fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0=fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0",
+        "primary_signal_type": "calendar_primary",
+        "rejection_reasons": [
+          "calendar_fixed_month_alpha",
+          "calendar_primary_alpha_unsupported",
+          "fixed_asset_calendar_target"
+        ]
+      },
+      "train_val_stability": {
+        "leverage": 2.0,
+        "sleeve_count": 3.0,
+        "train_calmar": 4.747542272859074,
+        "train_max_drawdown": 0.0548552038650032,
+        "train_monthlyized_return": 0.019474779309266665,
+        "train_sharpe": 1.9416214337584166,
+        "train_sortino": 1.6256297969326907,
+        "validation_calmar": 40.32789946384216,
+        "validation_max_drawdown": 0.03879702071621266,
+        "validation_monthlyized_return": 0.0816456374571255,
+        "validation_sharpe": 4.7414449918743475,
+        "validation_sortino": 6.021391795420162
+      },
+      "train_val_stability_formula": "frozen_weighted_train_validation_score_v1",
+      "train_val_stability_formula_score": 21.240002672650267,
+      "train_val_stability_score": 21.240002672650267
+    },
+    {
+      "benchmark_only": false,
+      "candidate_derived": true,
+      "decision_gates": {
+        "deployable_candidate": false,
+        "diagnostic_not_promoted": false,
+        "eligible_for_candidate_live_promotion": true,
+        "liquidation_evidence_available": true,
+        "liquidation_gate": true,
+        "live_integer_leverage": true,
+        "live_integer_source_leverage": true,
+        "live_source_candidate_metadata": true,
+        "locked_oos_report_gate_only": true,
+        "margin_buffer_positive": true,
+        "no_account_wipeout": true,
+        "oos_calmar_ok": true,
+        "oos_mdd_within_25pct_budget": true,
+        "oos_return_beats_current_base": true,
+        "oos_return_mdd_beats_current_base": false,
+        "oos_sharpe_ok": true,
+        "oos_smart_sortino_ok": true,
+        "oos_sortino_ok": true,
+        "research_history_source_metadata_present": false,
+        "selection_firewall": true,
+        "source_metadata": {
+          "missing_fields": [
+            "source_ledger_refs_missing",
+            "research_history_refs_missing"
+          ],
+          "present": false,
+          "rejection_reasons": [
+            "source_metadata_missing"
+          ],
+          "required_for_live_promotion": true,
+          "research_history_refs": [],
+          "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json",
+          "source_ledger_refs": []
+        },
+        "source_metadata_present": false,
+        "strategy_validity": {
+          "audit_sources": [
+            "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json"
+          ],
+          "audited_sleeves": [
+            {
+              "family": "calendar_rotation",
+              "pass": false,
+              "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600",
+              "primary_signal_type": "calendar_primary",
+              "rejection_reasons": [
+                "calendar_primary_alpha_unsupported",
+                "calendar_fixed_month_alpha",
+                "fixed_asset_calendar_target"
+              ],
+              "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600"
+            },
+            {
+              "family": "calendar_rotation",
+              "pass": false,
+              "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+              "primary_signal_type": "calendar_primary",
+              "rejection_reasons": [
+                "calendar_primary_alpha_unsupported",
+                "calendar_fixed_month_alpha",
+                "fixed_asset_calendar_target"
+              ],
+              "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600"
+            },
+            {
+              "family": "calendar_rotation",
+              "pass": false,
+              "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h168_ls530_ss120_tp450",
+              "primary_signal_type": "calendar_primary",
+              "rejection_reasons": [
+                "calendar_primary_alpha_unsupported",
+                "calendar_fixed_month_alpha",
+                "fixed_asset_calendar_target"
+              ],
+              "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h168_ls530_ss120_tp450"
+            },
+            {
+              "family": "calendar_rotation",
+              "pass": false,
+              "primary_signal_evidence": "fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0",
+              "primary_signal_type": "calendar_primary",
+              "rejection_reasons": [
+                "calendar_primary_alpha_unsupported",
+                "calendar_fixed_month_alpha",
+                "fixed_asset_calendar_target"
+              ],
+              "sleeve": "fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0"
+            }
+          ],
+          "pass": false,
+          "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr120_h168_ls530_ss120_tp450=fresh_calendar_trx_takeprofit_sethusdt_thr120_h168_ls530_ss120_tp450; fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0=fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0",
+          "primary_signal_type": "calendar_primary",
+          "rejection_reasons": [
+            "calendar_fixed_month_alpha",
+            "calendar_primary_alpha_unsupported",
+            "fixed_asset_calendar_target"
+          ]
+        },
+        "strategy_validity_metadata_present": true,
+        "strategy_validity_pass": false,
+        "strategy_validity_passed": false,
+        "tiny_liquidation_tolerance_ok": true
+      },
+      "kind": "direct_candidate",
+      "leverage": 4.0,
+      "liquidation": {
+        "account_wipeout": false,
+        "evidence_available": true,
+        "liquidation_count": 0,
+        "maximum_liquidation_equity_loss_fraction": 0.0,
+        "maximum_liquidation_event_drawdown": 0.0,
+        "minimum_margin_buffer": 8449.334129048173,
+        "minimum_margin_ratio": 39.84705856702339
+      },
+      "name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600__fr_liquidation_aware_4x",
+      "non_integer_source_leverages": [],
+      "rejection_reasons": [
+        "calendar_fixed_month_alpha",
+        "calendar_primary_alpha_unsupported",
+        "fixed_asset_calendar_target",
+        "strategy_validity_rejected",
+        "source_metadata_missing",
+        "strategy_validity_passed",
+        "research_history_source_metadata_present",
+        "oos_return_mdd_beats_current_base"
+      ],
+      "selection_policy": {
+        "benchmark_only": false,
+        "locked_oos": "report_only_gate_only",
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "uses_locked_oos_for_selection": false
+      },
+      "sleeve_count": 4,
+      "sleeves": [
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr120_h168_ls530_ss120_tp450",
+        "fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0"
+      ],
+      "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json",
+      "source_candidate_gate_failures": [],
+      "source_metadata": {
+        "missing_fields": [
+          "source_ledger_refs_missing",
+          "research_history_refs_missing"
+        ],
+        "present": false,
+        "rejection_reasons": [
+          "source_metadata_missing"
+        ],
+        "required_for_live_promotion": true,
+        "research_history_refs": [],
+        "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json",
+        "source_ledger_refs": []
+      },
+      "splits": {
+        "oos": {
+          "account_wipeout": false,
+          "annualized_return": 1.0327996265273458,
+          "calmar": 31.76388614623067,
+          "downside_volatility": null,
+          "fills": 64,
+          "liquidation_count": 0,
+          "liquidation_event_count": 0,
+          "max_drawdown": 0.03251490141265052,
+          "maximum_liquidation_equity_loss_fraction": 0.0,
+          "maximum_liquidation_event_drawdown": 0.0,
+          "minimum_margin_buffer": 9809.781901798167,
+          "minimum_margin_ratio": 84.71118773752825,
+          "monthlyized_return": 0.06090024007316308,
+          "positive_period_ratio": null,
+          "return_mdd": 4.232069579273671,
+          "round_trips": 32,
+          "sharpe": 4.311478574950592,
+          "smart_sortino": 5.359409737037084,
+          "sortino": 6.160663157899713,
+          "total_return": 0.13760532514156076,
+          "volatility": 0.1678063031220575
+        },
+        "train": {
+          "account_wipeout": false,
+          "annualized_return": 0.7425776268389388,
+          "calmar": 5.198739492080753,
+          "downside_volatility": null,
+          "fills": 162,
+          "liquidation_count": 0,
+          "liquidation_event_count": 0,
+          "max_drawdown": 0.14283801447833813,
+          "maximum_liquidation_equity_loss_fraction": 0.0,
+          "maximum_liquidation_event_drawdown": 0.0,
+          "minimum_margin_buffer": 9085.942701076525,
+          "minimum_margin_ratio": 39.84705856702339,
+          "monthlyized_return": 0.047368105184749654,
+          "positive_period_ratio": null,
+          "return_mdd": 5.197966082968303,
+          "round_trips": 81,
+          "sharpe": 1.847199047986132,
+          "smart_sortino": null,
+          "sortino": 1.4999356597480484,
+          "total_return": 0.742467154616937,
+          "volatility": 0.3300790726577438
+        },
+        "validation": {
+          "account_wipeout": false,
+          "annualized_return": 8.026030599261142,
+          "calmar": 57.73878801373846,
+          "downside_volatility": null,
+          "fills": 80,
+          "liquidation_count": 0,
+          "liquidation_event_count": 0,
+          "max_drawdown": 0.13900587240160664,
+          "maximum_liquidation_equity_loss_fraction": 0.0,
+          "maximum_liquidation_event_drawdown": 0.0,
+          "minimum_margin_buffer": 8449.334129048173,
+          "minimum_margin_ratio": 40.0737093462009,
+          "monthlyized_return": 0.20122602688244506,
+          "positive_period_ratio": null,
+          "return_mdd": 3.0698537539141704,
+          "round_trips": 40,
+          "sharpe": 3.8616700569855467,
+          "smart_sortino": null,
+          "sortino": 4.723734669886795,
+          "total_return": 0.4267276992081863,
+          "volatility": 0.619297545157014
+        }
+      },
+      "strategy_validity": {
+        "audit_sources": [
+          "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json"
+        ],
+        "audited_sleeves": [
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h168_ls530_ss120_tp450",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h168_ls530_ss120_tp450"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0"
+          }
+        ],
+        "pass": false,
+        "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr120_h168_ls530_ss120_tp450=fresh_calendar_trx_takeprofit_sethusdt_thr120_h168_ls530_ss120_tp450; fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0=fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0",
+        "primary_signal_type": "calendar_primary",
+        "rejection_reasons": [
+          "calendar_fixed_month_alpha",
+          "calendar_primary_alpha_unsupported",
+          "fixed_asset_calendar_target"
+        ]
+      },
+      "train_val_stability": {
+        "leverage": 4.0,
+        "sleeve_count": 4.0,
+        "train_calmar": 5.198739492080753,
+        "train_max_drawdown": 0.14283801447833813,
+        "train_monthlyized_return": 0.047368105184749654,
+        "train_sharpe": 1.847199047986132,
+        "train_sortino": 1.4999356597480484,
+        "validation_calmar": 57.73878801373846,
+        "validation_max_drawdown": 0.13900587240160664,
+        "validation_monthlyized_return": 0.20122602688244506,
+        "validation_sharpe": 3.8616700569855467,
+        "validation_sortino": 4.723734669886795
+      },
+      "train_val_stability_formula": "frozen_weighted_train_validation_score_v1",
+      "train_val_stability_formula_score": 20.094996436390673,
+      "train_val_stability_score": 20.094996436390673
+    },
+    {
+      "benchmark_only": false,
+      "candidate_derived": true,
+      "decision_gates": {
+        "deployable_candidate": false,
+        "diagnostic_not_promoted": false,
+        "eligible_for_candidate_live_promotion": true,
+        "liquidation_evidence_available": true,
+        "liquidation_gate": true,
+        "live_integer_leverage": true,
+        "live_integer_source_leverage": true,
+        "live_source_candidate_metadata": true,
+        "locked_oos_report_gate_only": true,
+        "margin_buffer_positive": true,
+        "no_account_wipeout": true,
+        "oos_calmar_ok": true,
+        "oos_mdd_within_25pct_budget": true,
+        "oos_return_beats_current_base": true,
+        "oos_return_mdd_beats_current_base": true,
+        "oos_sharpe_ok": true,
+        "oos_smart_sortino_ok": true,
+        "oos_sortino_ok": true,
+        "research_history_source_metadata_present": false,
+        "selection_firewall": true,
+        "source_metadata": {
+          "missing_fields": [
+            "source_ledger_refs_missing",
+            "research_history_refs_missing"
+          ],
+          "present": false,
+          "rejection_reasons": [
+            "source_metadata_missing"
+          ],
+          "required_for_live_promotion": true,
+          "research_history_refs": [],
+          "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json",
+          "source_ledger_refs": []
+        },
+        "source_metadata_present": false,
+        "strategy_validity": {
+          "audit_sources": [
+            "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json"
+          ],
+          "audited_sleeves": [
+            {
+              "family": "calendar_rotation",
+              "pass": false,
+              "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+              "primary_signal_type": "calendar_primary",
+              "rejection_reasons": [
+                "calendar_primary_alpha_unsupported",
+                "calendar_fixed_month_alpha",
+                "fixed_asset_calendar_target"
+              ],
+              "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600"
+            },
+            {
+              "family": "calendar_rotation",
+              "pass": false,
+              "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls600_ss120_tp600",
+              "primary_signal_type": "calendar_primary",
+              "rejection_reasons": [
+                "calendar_primary_alpha_unsupported",
+                "calendar_fixed_month_alpha",
+                "fixed_asset_calendar_target"
+              ],
+              "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls600_ss120_tp600"
+            },
+            {
+              "family": "calendar_rotation",
+              "pass": false,
+              "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss100_tp600",
+              "primary_signal_type": "calendar_primary",
+              "rejection_reasons": [
+                "calendar_primary_alpha_unsupported",
+                "calendar_fixed_month_alpha",
+                "fixed_asset_calendar_target"
+              ],
+              "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss100_tp600"
+            }
+          ],
+          "pass": false,
+          "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls600_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls600_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss100_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss100_tp600",
+          "primary_signal_type": "calendar_primary",
+          "rejection_reasons": [
+            "calendar_fixed_month_alpha",
+            "calendar_primary_alpha_unsupported",
+            "fixed_asset_calendar_target"
+          ]
+        },
+        "strategy_validity_metadata_present": true,
+        "strategy_validity_pass": false,
+        "strategy_validity_passed": false,
+        "tiny_liquidation_tolerance_ok": true
+      },
+      "kind": "direct_candidate",
+      "leverage": 5.0,
+      "liquidation": {
+        "account_wipeout": false,
+        "evidence_available": true,
+        "liquidation_count": 0,
+        "maximum_liquidation_equity_loss_fraction": 0.0,
+        "maximum_liquidation_event_drawdown": 0.0,
+        "minimum_margin_buffer": 8514.066649257515,
+        "minimum_margin_ratio": 41.121303823239366
+      },
+      "name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600__fr_liquidation_aware_5x",
+      "non_integer_source_leverages": [],
+      "rejection_reasons": [
+        "calendar_fixed_month_alpha",
+        "calendar_primary_alpha_unsupported",
+        "fixed_asset_calendar_target",
+        "strategy_validity_rejected",
+        "source_metadata_missing",
+        "strategy_validity_passed",
+        "research_history_source_metadata_present"
+      ],
+      "selection_policy": {
+        "benchmark_only": false,
+        "locked_oos": "report_only_gate_only",
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "uses_locked_oos_for_selection": false
+      },
+      "sleeve_count": 3,
+      "sleeves": [
+        "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls600_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss100_tp600"
+      ],
+      "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json",
+      "source_candidate_gate_failures": [],
+      "source_metadata": {
+        "missing_fields": [
+          "source_ledger_refs_missing",
+          "research_history_refs_missing"
+        ],
+        "present": false,
+        "rejection_reasons": [
+          "source_metadata_missing"
+        ],
+        "required_for_live_promotion": true,
+        "research_history_refs": [],
+        "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json",
+        "source_ledger_refs": []
+      },
+      "splits": {
+        "oos": {
+          "account_wipeout": false,
+          "annualized_return": 1.1069610018000886,
+          "calmar": 56.95841105448536,
+          "downside_volatility": null,
+          "fills": 42,
+          "liquidation_count": 0,
+          "liquidation_event_count": 0,
+          "max_drawdown": 0.01943454849436004,
+          "maximum_liquidation_equity_loss_fraction": 0.0,
+          "maximum_liquidation_event_drawdown": 0.0,
+          "minimum_margin_buffer": 9835.873993444371,
+          "minimum_margin_ratio": 94.87056452076331,
+          "monthlyized_return": 0.06407288070974548,
+          "positive_period_ratio": null,
+          "return_mdd": 7.4628770279955425,
+          "round_trips": 21,
+          "sharpe": 5.227331674812271,
+          "smart_sortino": 6.064126512165871,
+          "sortino": 6.575276643319581,
+          "total_return": 0.1450376455080249,
+          "volatility": 0.1445666434532013
+        },
+        "train": {
+          "account_wipeout": false,
+          "annualized_return": 0.6150823162236794,
+          "calmar": 4.0715586246651805,
+          "downside_volatility": null,
+          "fills": 122,
+          "liquidation_count": 0,
+          "liquidation_event_count": 0,
+          "max_drawdown": 0.1510680240479799,
+          "maximum_liquidation_equity_loss_fraction": 0.0,
+          "maximum_liquidation_event_drawdown": 0.0,
+          "minimum_margin_buffer": 9144.628466247153,
+          "minimum_margin_ratio": 41.121303823239366,
+          "monthlyized_return": 0.04075751424718055,
+          "positive_period_ratio": null,
+          "return_mdd": 4.07097357679475,
+          "round_trips": 61,
+          "sharpe": 1.67177157114406,
+          "smart_sortino": null,
+          "sortino": 1.280715424745632,
+          "total_return": 0.61499393419792,
+          "volatility": 0.3166829894066513
+        },
+        "validation": {
+          "account_wipeout": false,
+          "annualized_return": 7.998815481344822,
+          "calmar": 60.29216197809893,
+          "downside_volatility": null,
+          "fills": 60,
+          "liquidation_count": 0,
+          "liquidation_event_count": 0,
+          "max_drawdown": 0.13266758429147696,
+          "maximum_liquidation_equity_loss_fraction": 0.0,
+          "maximum_liquidation_event_drawdown": 0.0,
+          "minimum_margin_buffer": 8514.066649257515,
+          "minimum_margin_ratio": 41.788522453202695,
+          "monthlyized_return": 0.20092378278669432,
+          "positive_period_ratio": null,
+          "return_mdd": 3.2112738483367544,
+          "round_trips": 30,
+          "sharpe": 3.886332477712677,
+          "smart_sortino": null,
+          "sortino": 4.440036823308796,
+          "total_return": 0.426031943957232,
+          "volatility": 0.6137054464282423
+        }
+      },
+      "strategy_validity": {
+        "audit_sources": [
+          "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json"
+        ],
+        "audited_sleeves": [
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls600_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls600_ss120_tp600"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss100_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss100_tp600"
+          }
+        ],
+        "pass": false,
+        "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls600_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls600_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss100_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss100_tp600",
+        "primary_signal_type": "calendar_primary",
+        "rejection_reasons": [
+          "calendar_fixed_month_alpha",
+          "calendar_primary_alpha_unsupported",
+          "fixed_asset_calendar_target"
+        ]
+      },
+      "train_val_stability": {
+        "leverage": 5.0,
+        "sleeve_count": 3.0,
+        "train_calmar": 4.0715586246651805,
+        "train_max_drawdown": 0.1510680240479799,
+        "train_monthlyized_return": 0.04075751424718055,
+        "train_sharpe": 1.67177157114406,
+        "train_sortino": 1.280715424745632,
+        "validation_calmar": 60.29216197809893,
+        "validation_max_drawdown": 0.13266758429147696,
+        "validation_monthlyized_return": 0.20092378278669432,
+        "validation_sharpe": 3.886332477712677,
+        "validation_sortino": 4.440036823308796
+      },
+      "train_val_stability_formula": "frozen_weighted_train_validation_score_v1",
+      "train_val_stability_formula_score": 19.87559136982018,
+      "train_val_stability_score": 19.87559136982018
+    },
+    {
+      "benchmark_only": false,
+      "candidate_derived": true,
+      "decision_gates": {
+        "deployable_candidate": false,
+        "diagnostic_not_promoted": false,
+        "eligible_for_candidate_live_promotion": true,
+        "liquidation_evidence_available": true,
+        "liquidation_gate": false,
+        "live_integer_leverage": true,
+        "live_integer_source_leverage": true,
+        "live_source_candidate_metadata": true,
+        "locked_oos_report_gate_only": true,
+        "margin_buffer_positive": true,
+        "no_account_wipeout": true,
+        "oos_calmar_ok": true,
+        "oos_mdd_within_25pct_budget": true,
+        "oos_return_beats_current_base": true,
+        "oos_return_mdd_beats_current_base": false,
+        "oos_sharpe_ok": true,
+        "oos_smart_sortino_ok": false,
+        "oos_sortino_ok": false,
+        "research_history_source_metadata_present": false,
+        "selection_firewall": true,
+        "source_metadata": {
+          "missing_fields": [
+            "source_ledger_refs_missing",
+            "research_history_refs_missing"
+          ],
+          "present": false,
+          "rejection_reasons": [
+            "source_metadata_missing"
+          ],
+          "required_for_live_promotion": true,
+          "research_history_refs": [],
+          "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json",
+          "source_ledger_refs": []
+        },
+        "source_metadata_present": false,
+        "strategy_validity": {
+          "audit_sources": [
+            "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json"
+          ],
+          "audited_sleeves": [
+            {
+              "family": "calendar_rotation",
+              "pass": false,
+              "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600",
+              "primary_signal_type": "calendar_primary",
+              "rejection_reasons": [
+                "calendar_primary_alpha_unsupported",
+                "calendar_fixed_month_alpha",
+                "fixed_asset_calendar_target"
+              ],
+              "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600"
+            },
+            {
+              "family": "calendar_rotation",
+              "pass": false,
+              "primary_signal_evidence": "fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0",
+              "primary_signal_type": "calendar_primary",
+              "rejection_reasons": [
+                "calendar_primary_alpha_unsupported",
+                "calendar_fixed_month_alpha",
+                "fixed_asset_calendar_target"
+              ],
+              "sleeve": "fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0"
+            },
+            {
+              "family": "calendar_rotation",
+              "pass": false,
+              "primary_signal_evidence": "fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0",
+              "primary_signal_type": "calendar_primary",
+              "rejection_reasons": [
+                "calendar_primary_alpha_unsupported",
+                "calendar_fixed_month_alpha",
+                "fixed_asset_calendar_target"
+              ],
+              "sleeve": "fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0"
+            }
+          ],
+          "pass": false,
+          "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600; fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0=fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0; fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0=fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0",
+          "primary_signal_type": "calendar_primary",
+          "rejection_reasons": [
+            "calendar_fixed_month_alpha",
+            "calendar_primary_alpha_unsupported",
+            "fixed_asset_calendar_target"
+          ]
+        },
+        "strategy_validity_metadata_present": true,
+        "strategy_validity_pass": false,
+        "strategy_validity_passed": false,
+        "tiny_liquidation_tolerance_ok": false
+      },
+      "kind": "direct_candidate",
+      "leverage": 5.0,
+      "liquidation": {
+        "account_wipeout": false,
+        "evidence_available": true,
+        "liquidation_count": 3,
+        "maximum_liquidation_equity_loss_fraction": 0.019737909338028048,
+        "maximum_liquidation_event_drawdown": 0.1500694600908857,
+        "minimum_margin_buffer": 8700.76078383854,
+        "minimum_margin_ratio": 51.23872881839206
+      },
+      "name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600__fr_liquidation_aware_5x",
+      "non_integer_source_leverages": [],
+      "rejection_reasons": [
+        "calendar_fixed_month_alpha",
+        "calendar_primary_alpha_unsupported",
+        "fixed_asset_calendar_target",
+        "strategy_validity_rejected",
+        "source_metadata_missing",
+        "strategy_validity_passed",
+        "research_history_source_metadata_present",
+        "liquidation_gate",
+        "tiny_liquidation_tolerance_ok",
+        "oos_return_mdd_beats_current_base",
+        "oos_sortino_ok",
+        "oos_smart_sortino_ok"
+      ],
+      "selection_policy": {
+        "benchmark_only": false,
+        "locked_oos": "report_only_gate_only",
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "uses_locked_oos_for_selection": false
+      },
+      "sleeve_count": 3,
+      "sleeves": [
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600",
+        "fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0",
+        "fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0"
+      ],
+      "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json",
+      "source_candidate_gate_failures": [],
+      "source_metadata": {
+        "missing_fields": [
+          "source_ledger_refs_missing",
+          "research_history_refs_missing"
+        ],
+        "present": false,
+        "rejection_reasons": [
+          "source_metadata_missing"
+        ],
+        "required_for_live_promotion": true,
+        "research_history_refs": [],
+        "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json",
+        "source_ledger_refs": []
+      },
+      "splits": {
+        "oos": {
+          "account_wipeout": false,
+          "annualized_return": 0.7178036710547024,
+          "calmar": 10.732214554027609,
+          "downside_volatility": null,
+          "fills": 56,
+          "liquidation_count": 0,
+          "liquidation_event_count": 0,
+          "max_drawdown": 0.06688308991971499,
+          "maximum_liquidation_equity_loss_fraction": 0.0,
+          "maximum_liquidation_event_drawdown": 0.0,
+          "minimum_margin_buffer": 9642.112496327623,
+          "minimum_margin_ratio": 79.27340136781663,
+          "monthlyized_return": 0.046119089668880564,
+          "positive_period_ratio": null,
+          "return_mdd": 1.5448405699436363,
+          "round_trips": 28,
+          "sharpe": 2.172748046140611,
+          "smart_sortino": 2.155523826212575,
+          "sortino": 2.9428246485640184,
+          "total_return": 0.10332371075116398,
+          "volatility": 0.26516445715077397
+        },
+        "train": {
+          "account_wipeout": false,
+          "annualized_return": 0.3244647035935624,
+          "calmar": 1.5366642382675915,
+          "downside_volatility": null,
+          "fills": 128,
+          "liquidation_count": 3,
+          "liquidation_event_count": 3,
+          "max_drawdown": 0.21114873081146096,
+          "maximum_liquidation_equity_loss_fraction": 0.019737909338028048,
+          "maximum_liquidation_event_drawdown": 0.1500694600908857,
+          "minimum_margin_buffer": 8700.76078383854,
+          "minimum_margin_ratio": 51.23872881839206,
+          "monthlyized_return": 0.02369370436658902,
+          "positive_period_ratio": null,
+          "return_mdd": 1.5364630233783685,
+          "round_trips": 64,
+          "sharpe": 1.0619628897419684,
+          "smart_sortino": null,
+          "sortino": 0.8607867242248404,
+          "total_return": 0.3244222173250826,
+          "volatility": 0.3097676190015523
+        },
+        "validation": {
+          "account_wipeout": false,
+          "annualized_return": 8.72579055840369,
+          "calmar": 91.68489052039699,
+          "downside_volatility": null,
+          "fills": 54,
+          "liquidation_count": 0,
+          "liquidation_event_count": 0,
+          "max_drawdown": 0.0951715218164816,
+          "maximum_liquidation_equity_loss_fraction": 0.0,
+          "maximum_liquidation_event_drawdown": 0.0,
+          "minimum_margin_buffer": 9101.21844900719,
+          "minimum_margin_ratio": 58.18113435347649,
+          "monthlyized_return": 0.20872380708717797,
+          "positive_period_ratio": null,
+          "return_mdd": 4.665680431696493,
+          "round_trips": 27,
+          "sharpe": 4.771585088125646,
+          "smart_sortino": null,
+          "sortino": 6.06975586799551,
+          "total_return": 0.44403990699393403,
+          "volatility": 0.5032270265310588
+        }
+      },
+      "strategy_validity": {
+        "audit_sources": [
+          "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json"
+        ],
+        "audited_sleeves": [
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0"
+          }
+        ],
+        "pass": false,
+        "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600; fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0=fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0; fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0=fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0",
+        "primary_signal_type": "calendar_primary",
+        "rejection_reasons": [
+          "calendar_fixed_month_alpha",
+          "calendar_primary_alpha_unsupported",
+          "fixed_asset_calendar_target"
+        ]
+      },
+      "train_val_stability": {
+        "leverage": 5.0,
+        "sleeve_count": 3.0,
+        "train_calmar": 1.5366642382675915,
+        "train_max_drawdown": 0.21114873081146096,
+        "train_monthlyized_return": 0.02369370436658902,
+        "train_sharpe": 1.0619628897419684,
+        "train_sortino": 0.8607867242248404,
+        "validation_calmar": 91.68489052039699,
+        "validation_max_drawdown": 0.0951715218164816,
+        "validation_monthlyized_return": 0.20872380708717797,
+        "validation_sharpe": 4.771585088125646,
+        "validation_sortino": 6.06975586799551
+      },
+      "train_val_stability_formula": "frozen_weighted_train_validation_score_v1",
+      "train_val_stability_formula_score": 19.392475744455272,
+      "train_val_stability_score": 19.392475744455272
+    },
+    {
+      "benchmark_only": false,
+      "candidate_derived": true,
+      "decision_gates": {
+        "deployable_candidate": false,
+        "diagnostic_not_promoted": true,
+        "eligible_for_candidate_live_promotion": true,
+        "liquidation_evidence_available": false,
+        "liquidation_gate": false,
+        "live_integer_leverage": true,
+        "live_integer_source_leverage": true,
+        "live_source_candidate_metadata": true,
+        "locked_oos_report_gate_only": true,
+        "margin_buffer_positive": true,
+        "no_account_wipeout": true,
+        "oos_calmar_ok": true,
+        "oos_mdd_within_25pct_budget": true,
+        "oos_return_beats_current_base": false,
+        "oos_return_mdd_beats_current_base": false,
+        "oos_sharpe_ok": true,
+        "oos_smart_sortino_ok": false,
+        "oos_sortino_ok": false,
+        "research_history_source_metadata_present": false,
+        "selection_firewall": true,
+        "source_metadata": {
+          "missing_fields": [
+            "source_ledger_refs_missing",
+            "research_history_refs_missing"
+          ],
+          "present": false,
+          "rejection_reasons": [
+            "source_metadata_missing"
+          ],
+          "required_for_live_promotion": true,
+          "research_history_refs": [],
+          "source_artifact": "var/reports/profit_moonshot_20260501/dynamic_restart_full_noncalendar_20260510/tuning/fresh_portfolio_tuning_latest.json",
+          "source_ledger_refs": []
+        },
+        "source_metadata_present": false,
+        "strategy_validity": {
+          "audit_sources": [
+            "var/reports/profit_moonshot_20260501/dynamic_restart_full_noncalendar_20260510/tuning/fresh_portfolio_tuning_latest.json"
+          ],
+          "audited_sleeves": [
+            {
+              "family": "pair_residual",
+              "pass": true,
+              "primary_signal_evidence": "pair_residual",
+              "primary_signal_type": "state_signal",
+              "rejection_reasons": [],
+              "sleeve": "fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all"
+            },
+            {
+              "family": "pair_residual",
+              "pass": true,
+              "primary_signal_evidence": "pair_residual",
+              "primary_signal_type": "state_signal",
+              "rejection_reasons": [],
+              "sleeve": "fresh_pair_resid_revert_spread_lb24_z150_h72_sc10_st100_tp240_asiaus"
+            }
+          ],
+          "pass": true,
+          "primary_signal_evidence": "all_active_sleeves_non_calendar:pair_residual",
+          "primary_signal_type": "state_signal",
+          "rejection_reasons": []
+        },
+        "strategy_validity_metadata_present": true,
+        "strategy_validity_pass": true,
+        "strategy_validity_passed": true,
+        "tiny_liquidation_tolerance_ok": true
+      },
+      "kind": "candidate_portfolio",
+      "leverage": 1.0,
+      "liquidation": {
+        "account_wipeout": false,
+        "evidence_available": false,
+        "liquidation_count": 0,
+        "maximum_liquidation_equity_loss_fraction": 0.0,
+        "maximum_liquidation_event_drawdown": 0.0,
+        "minimum_margin_buffer": null,
+        "minimum_margin_ratio": null
+      },
+      "name": "fresh_portfolio_validation_return_risk_weight_fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all__fresh_pair_resid_revert_spread_lb24_z150_h72_sc10_st100_tp240_asiaus",
+      "non_integer_source_leverages": [],
+      "rejection_reasons": [
+        "source_metadata_missing",
+        "research_history_source_metadata_present",
+        "liquidation_gate",
+        "liquidation_evidence_available",
+        "oos_return_beats_current_base",
+        "oos_return_mdd_beats_current_base",
+        "oos_sortino_ok",
+        "oos_smart_sortino_ok",
+        "diagnostic_not_promoted"
+      ],
+      "selection_policy": {
+        "benchmark_only": false,
+        "locked_oos": "report_only_gate_only",
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "uses_locked_oos_for_selection": false
+      },
+      "sleeve_count": 2,
+      "sleeves": [
+        "fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all",
+        "fresh_pair_resid_revert_spread_lb24_z150_h72_sc10_st100_tp240_asiaus"
+      ],
+      "source_artifact": "var/reports/profit_moonshot_20260501/dynamic_restart_full_noncalendar_20260510/tuning/fresh_portfolio_tuning_latest.json",
+      "source_candidate_gate_failures": [],
+      "source_metadata": {
+        "missing_fields": [
+          "source_ledger_refs_missing",
+          "research_history_refs_missing"
+        ],
+        "present": false,
+        "rejection_reasons": [
+          "source_metadata_missing"
+        ],
+        "required_for_live_promotion": true,
+        "research_history_refs": [],
+        "source_artifact": "var/reports/profit_moonshot_20260501/dynamic_restart_full_noncalendar_20260510/tuning/fresh_portfolio_tuning_latest.json",
+        "source_ledger_refs": []
+      },
+      "splits": {
+        "oos": {
+          "account_wipeout": false,
+          "annualized_return": 0.004308657933125071,
+          "calmar": 8.036184345922893,
+          "downside_volatility": null,
+          "fills": 104,
+          "liquidation_count": 0,
+          "liquidation_event_count": 0,
+          "max_drawdown": 0.0005361571795339713,
+          "maximum_liquidation_equity_loss_fraction": 0.0,
+          "maximum_liquidation_event_drawdown": 0.0,
+          "minimum_margin_buffer": null,
+          "minimum_margin_ratio": null,
+          "monthlyized_return": 0.00035834771149056976,
+          "positive_period_ratio": null,
+          "return_mdd": 1.457889438188368,
+          "round_trips": 26,
+          "sharpe": 2.0903715929380393,
+          "smart_sortino": 0.04292856818407538,
+          "sortino": 2.4010663674501513,
+          "total_return": 0.0007816578892514414,
+          "volatility": 0.0020577772815819476
+        },
+        "train": {
+          "account_wipeout": false,
+          "annualized_return": 0.0012201762043828612,
+          "calmar": 0.5893068765076532,
+          "downside_volatility": null,
+          "fills": 468,
+          "liquidation_count": 0,
+          "liquidation_event_count": 0,
+          "max_drawdown": 0.0020705276877369255,
+          "maximum_liquidation_equity_loss_fraction": 0.0,
+          "maximum_liquidation_event_drawdown": 0.0,
+          "minimum_margin_buffer": null,
+          "minimum_margin_ratio": null,
+          "monthlyized_return": 0.00010162452962170221,
+          "positive_period_ratio": null,
+          "return_mdd": 0.5892395630123642,
+          "round_trips": 117,
+          "sharpe": 0.5511039876595932,
+          "smart_sortino": null,
+          "sortino": 0.4440697338298023,
+          "total_return": 0.001220036829927107,
+          "volatility": 0.002217168024966854
+        },
+        "validation": {
+          "account_wipeout": false,
+          "annualized_return": 0.005470256035065235,
+          "calmar": 10.40439341962733,
+          "downside_volatility": null,
+          "fills": 96,
+          "liquidation_count": 0,
+          "liquidation_event_count": 0,
+          "max_drawdown": 0.0005257640512464562,
+          "maximum_liquidation_equity_loss_fraction": 0.0,
+          "maximum_liquidation_event_drawdown": 0.0,
+          "minimum_margin_buffer": null,
+          "minimum_margin_ratio": null,
+          "monthlyized_return": 0.0004547157289573889,
+          "positive_period_ratio": null,
+          "return_mdd": 1.6767770121517709,
+          "round_trips": 24,
+          "sharpe": 2.333888979854039,
+          "smart_sortino": null,
+          "sortino": 3.0069319476992633,
+          "total_return": 0.0008815890749458433,
+          "volatility": 0.0023386214317999833
+        }
+      },
+      "strategy_validity": {
+        "audit_sources": [
+          "var/reports/profit_moonshot_20260501/dynamic_restart_full_noncalendar_20260510/tuning/fresh_portfolio_tuning_latest.json"
+        ],
+        "audited_sleeves": [
+          {
+            "family": "pair_residual",
+            "pass": true,
+            "primary_signal_evidence": "pair_residual",
+            "primary_signal_type": "state_signal",
+            "rejection_reasons": [],
+            "sleeve": "fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all"
+          },
+          {
+            "family": "pair_residual",
+            "pass": true,
+            "primary_signal_evidence": "pair_residual",
+            "primary_signal_type": "state_signal",
+            "rejection_reasons": [],
+            "sleeve": "fresh_pair_resid_revert_spread_lb24_z150_h72_sc10_st100_tp240_asiaus"
+          }
+        ],
+        "pass": true,
+        "primary_signal_evidence": "all_active_sleeves_non_calendar:pair_residual",
+        "primary_signal_type": "state_signal",
+        "rejection_reasons": []
+      },
+      "train_val_stability": {
+        "leverage": 1.0,
+        "sleeve_count": 2.0,
+        "train_calmar": 0.5893068765076532,
+        "train_max_drawdown": 0.0020705276877369255,
+        "train_monthlyized_return": 0.00010162452962170221,
+        "train_sharpe": 0.5511039876595932,
+        "train_sortino": 0.4440697338298023,
+        "validation_calmar": 10.40439341962733,
+        "validation_max_drawdown": 0.0005257640512464562,
+        "validation_monthlyized_return": 0.0004547157289573889,
+        "validation_sharpe": 2.333888979854039,
+        "validation_sortino": 3.0069319476992633
+      },
+      "train_val_stability_formula": "frozen_weighted_train_validation_score_v1",
+      "train_val_stability_formula_score": 6.597082577203976,
+      "train_val_stability_score": 6.597082577203976
+    },
+    {
+      "benchmark_only": false,
+      "candidate_derived": true,
+      "decision_gates": {
+        "deployable_candidate": false,
+        "diagnostic_not_promoted": false,
+        "eligible_for_candidate_live_promotion": true,
+        "liquidation_evidence_available": false,
+        "liquidation_gate": false,
+        "live_integer_leverage": false,
+        "live_integer_source_leverage": true,
+        "live_source_candidate_metadata": true,
+        "locked_oos_report_gate_only": true,
+        "margin_buffer_positive": true,
+        "no_account_wipeout": true,
+        "oos_calmar_ok": false,
+        "oos_mdd_within_25pct_budget": false,
+        "oos_return_beats_current_base": false,
+        "oos_return_mdd_beats_current_base": false,
+        "oos_sharpe_ok": false,
+        "oos_smart_sortino_ok": false,
+        "oos_sortino_ok": false,
+        "research_history_source_metadata_present": false,
+        "selection_firewall": true,
+        "source_metadata": {
+          "missing_fields": [
+            "source_ledger_refs_missing",
+            "research_history_refs_missing"
+          ],
+          "present": false,
+          "rejection_reasons": [
+            "source_metadata_missing"
+          ],
+          "required_for_live_promotion": true,
+          "research_history_refs": [],
+          "source_artifact": "var/reports/profit_moonshot_20260501/dynamic_restart_full_noncalendar_20260510/tuning/fresh_portfolio_tuning_latest.json",
+          "source_ledger_refs": []
+        },
+        "source_metadata_present": false,
+        "strategy_validity": {
+          "audit_sources": [
+            "var/reports/profit_moonshot_20260501/dynamic_restart_full_noncalendar_20260510/tuning/fresh_portfolio_tuning_latest.json"
+          ],
+          "audited_sleeves": [
+            {
+              "family": "calendar_rotation",
+              "pass": false,
+              "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600",
+              "primary_signal_type": "calendar_primary",
+              "rejection_reasons": [
+                "calendar_primary_alpha_unsupported",
+                "calendar_fixed_month_alpha",
+                "fixed_asset_calendar_target"
+              ],
+              "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600"
+            },
+            {
+              "family": "calendar_rotation",
+              "pass": false,
+              "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+              "primary_signal_type": "calendar_primary",
+              "rejection_reasons": [
+                "calendar_primary_alpha_unsupported",
+                "calendar_fixed_month_alpha",
+                "fixed_asset_calendar_target"
+              ],
+              "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600"
+            },
+            {
+              "family": "pair_residual",
+              "pass": true,
+              "primary_signal_evidence": "pair_residual",
+              "primary_signal_type": "state_signal",
+              "rejection_reasons": [],
+              "sleeve": "fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all"
+            },
+            {
+              "family": "calendar_rotation",
+              "pass": false,
+              "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600",
+              "primary_signal_type": "calendar_primary",
+              "rejection_reasons": [
+                "calendar_primary_alpha_unsupported",
+                "calendar_fixed_month_alpha",
+                "fixed_asset_calendar_target"
+              ],
+              "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600"
+            }
+          ],
+          "pass": false,
+          "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600",
+          "primary_signal_type": "calendar_primary",
+          "rejection_reasons": [
+            "calendar_fixed_month_alpha",
+            "calendar_primary_alpha_unsupported",
+            "fixed_asset_calendar_target"
+          ]
+        },
+        "strategy_validity_metadata_present": true,
+        "strategy_validity_pass": false,
+        "strategy_validity_passed": false,
+        "tiny_liquidation_tolerance_ok": true
+      },
+      "kind": "candidate_portfolio",
+      "leverage": 2.3427334297703024,
+      "liquidation": {
+        "account_wipeout": false,
+        "evidence_available": false,
+        "liquidation_count": 0,
+        "maximum_liquidation_equity_loss_fraction": 0.0,
+        "maximum_liquidation_event_drawdown": 0.0,
+        "minimum_margin_buffer": null,
+        "minimum_margin_ratio": null
+      },
+      "name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600__fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all__fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600",
+      "non_integer_source_leverages": [],
+      "rejection_reasons": [
+        "calendar_fixed_month_alpha",
+        "calendar_primary_alpha_unsupported",
+        "fixed_asset_calendar_target",
+        "strategy_validity_rejected",
+        "source_metadata_missing",
+        "strategy_validity_passed",
+        "research_history_source_metadata_present",
+        "live_integer_leverage",
+        "liquidation_gate",
+        "liquidation_evidence_available",
+        "oos_mdd_within_25pct_budget",
+        "oos_return_beats_current_base",
+        "oos_return_mdd_beats_current_base",
+        "oos_sharpe_ok",
+        "oos_sortino_ok",
+        "oos_smart_sortino_ok",
+        "oos_calmar_ok"
+      ],
+      "selection_policy": {
+        "benchmark_only": false,
+        "locked_oos": "report_only_gate_only",
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "uses_locked_oos_for_selection": false
+      },
+      "sleeve_count": 4,
+      "sleeves": [
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+        "fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600"
+      ],
+      "source_artifact": "var/reports/profit_moonshot_20260501/dynamic_restart_full_noncalendar_20260510/tuning/fresh_portfolio_tuning_latest.json",
+      "source_candidate_gate_failures": [],
+      "source_metadata": {
+        "missing_fields": [
+          "source_ledger_refs_missing",
+          "research_history_refs_missing"
+        ],
+        "present": false,
+        "rejection_reasons": [
+          "source_metadata_missing"
+        ],
+        "required_for_live_promotion": true,
+        "research_history_refs": [],
+        "source_artifact": "var/reports/profit_moonshot_20260501/dynamic_restart_full_noncalendar_20260510/tuning/fresh_portfolio_tuning_latest.json",
+        "source_ledger_refs": []
+      },
+      "splits": {
+        "oos": {
+          "account_wipeout": false,
+          "annualized_return": null,
+          "calmar": null,
+          "downside_volatility": null,
+          "fills": 0,
+          "liquidation_count": 0,
+          "liquidation_event_count": 0,
+          "max_drawdown": null,
+          "maximum_liquidation_equity_loss_fraction": 0.0,
+          "maximum_liquidation_event_drawdown": 0.0,
+          "minimum_margin_buffer": null,
+          "minimum_margin_ratio": null,
+          "monthlyized_return": null,
+          "positive_period_ratio": null,
+          "return_mdd": null,
+          "round_trips": 0,
+          "sharpe": null,
+          "smart_sortino": null,
+          "sortino": null,
+          "total_return": null,
+          "volatility": null
+        },
+        "train": {
+          "account_wipeout": false,
+          "annualized_return": null,
+          "calmar": null,
+          "downside_volatility": null,
+          "fills": 0,
+          "liquidation_count": 0,
+          "liquidation_event_count": 0,
+          "max_drawdown": null,
+          "maximum_liquidation_equity_loss_fraction": 0.0,
+          "maximum_liquidation_event_drawdown": 0.0,
+          "minimum_margin_buffer": null,
+          "minimum_margin_ratio": null,
+          "monthlyized_return": null,
+          "positive_period_ratio": null,
+          "return_mdd": null,
+          "round_trips": 0,
+          "sharpe": null,
+          "smart_sortino": null,
+          "sortino": null,
+          "total_return": null,
+          "volatility": null
+        },
+        "validation": {
+          "account_wipeout": false,
+          "annualized_return": null,
+          "calmar": null,
+          "downside_volatility": null,
+          "fills": 0,
+          "liquidation_count": 0,
+          "liquidation_event_count": 0,
+          "max_drawdown": null,
+          "maximum_liquidation_equity_loss_fraction": 0.0,
+          "maximum_liquidation_event_drawdown": 0.0,
+          "minimum_margin_buffer": null,
+          "minimum_margin_ratio": null,
+          "monthlyized_return": null,
+          "positive_period_ratio": null,
+          "return_mdd": null,
+          "round_trips": 0,
+          "sharpe": null,
+          "smart_sortino": null,
+          "sortino": null,
+          "total_return": null,
+          "volatility": null
+        }
+      },
+      "strategy_validity": {
+        "audit_sources": [
+          "var/reports/profit_moonshot_20260501/dynamic_restart_full_noncalendar_20260510/tuning/fresh_portfolio_tuning_latest.json"
+        ],
+        "audited_sleeves": [
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600"
+          },
+          {
+            "family": "pair_residual",
+            "pass": true,
+            "primary_signal_evidence": "pair_residual",
+            "primary_signal_type": "state_signal",
+            "rejection_reasons": [],
+            "sleeve": "fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600"
+          }
+        ],
+        "pass": false,
+        "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600",
+        "primary_signal_type": "calendar_primary",
+        "rejection_reasons": [
+          "calendar_fixed_month_alpha",
+          "calendar_primary_alpha_unsupported",
+          "fixed_asset_calendar_target"
+        ]
+      },
+      "train_val_stability": {
+        "leverage": 2.3427334297703024,
+        "sleeve_count": 4.0,
+        "train_calmar": 3.8842110332761934,
+        "train_max_drawdown": 0.06905953159200336,
+        "train_monthlyized_return": 0.020000000000000018,
+        "train_sharpe": 1.7212556285918195,
+        "train_sortino": 1.51511166991183,
+        "validation_calmar": 32.1417458698937,
+        "validation_max_drawdown": 0.06493479922326455,
+        "validation_monthlyized_return": 0.09848998131232078,
+        "validation_sharpe": 4.09640969448007,
+        "validation_sortino": 4.885875261022447
+      },
+      "train_val_stability_formula": "frozen_weighted_train_validation_score_v1",
+      "train_val_stability_formula_score": 16.576134102067016,
+      "train_val_stability_score": 16.576134102067016
+    },
+    {
+      "benchmark_only": false,
+      "candidate_derived": true,
+      "decision_gates": {
+        "deployable_candidate": false,
+        "diagnostic_not_promoted": true,
+        "eligible_for_candidate_live_promotion": true,
+        "liquidation_evidence_available": false,
+        "liquidation_gate": false,
+        "live_integer_leverage": false,
+        "live_integer_source_leverage": true,
+        "live_source_candidate_metadata": true,
+        "locked_oos_report_gate_only": true,
+        "margin_buffer_positive": true,
+        "no_account_wipeout": true,
+        "oos_calmar_ok": true,
+        "oos_mdd_within_25pct_budget": true,
+        "oos_return_beats_current_base": false,
+        "oos_return_mdd_beats_current_base": false,
+        "oos_sharpe_ok": true,
+        "oos_smart_sortino_ok": false,
+        "oos_sortino_ok": false,
+        "research_history_source_metadata_present": false,
+        "selection_firewall": true,
+        "source_metadata": {
+          "missing_fields": [
+            "source_ledger_refs_missing",
+            "research_history_refs_missing"
+          ],
+          "present": false,
+          "rejection_reasons": [
+            "source_metadata_missing"
+          ],
+          "required_for_live_promotion": true,
+          "research_history_refs": [],
+          "source_artifact": "var/reports/profit_moonshot_20260501/dynamic_restart_full_noncalendar_20260510/tuning/fresh_portfolio_tuning_latest.json",
+          "source_ledger_refs": []
+        },
+        "source_metadata_present": false,
+        "strategy_validity": {
+          "audit_sources": [
+            "var/reports/profit_moonshot_20260501/dynamic_restart_full_noncalendar_20260510/tuning/fresh_portfolio_tuning_latest.json"
+          ],
+          "audited_sleeves": [
+            {
+              "family": "pair_residual",
+              "pass": true,
+              "primary_signal_evidence": "pair_residual",
+              "primary_signal_type": "state_signal",
+              "rejection_reasons": [],
+              "sleeve": "fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all"
+            },
+            {
+              "family": "pair_residual",
+              "pass": true,
+              "primary_signal_evidence": "pair_residual",
+              "primary_signal_type": "state_signal",
+              "rejection_reasons": [],
+              "sleeve": "fresh_pair_resid_revert_spread_lb24_z150_h72_sc10_st100_tp240_asiaus"
+            }
+          ],
+          "pass": true,
+          "primary_signal_evidence": "all_active_sleeves_non_calendar:pair_residual",
+          "primary_signal_type": "state_signal",
+          "rejection_reasons": []
+        },
+        "strategy_validity_metadata_present": true,
+        "strategy_validity_pass": true,
+        "strategy_validity_passed": true,
+        "tiny_liquidation_tolerance_ok": true
+      },
+      "kind": "candidate_portfolio",
+      "leverage": 2.5363088192100665,
+      "liquidation": {
+        "account_wipeout": false,
+        "evidence_available": false,
+        "liquidation_count": 0,
+        "maximum_liquidation_equity_loss_fraction": 0.0,
+        "maximum_liquidation_event_drawdown": 0.0,
+        "minimum_margin_buffer": null,
+        "minimum_margin_ratio": null
+      },
+      "name": "fresh_portfolio_validation_drawdown_budget_fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all__fresh_pair_resid_revert_spread_lb24_z150_h72_sc10_st100_tp240_asiaus",
+      "non_integer_source_leverages": [],
+      "rejection_reasons": [
+        "source_metadata_missing",
+        "research_history_source_metadata_present",
+        "live_integer_leverage",
+        "liquidation_gate",
+        "liquidation_evidence_available",
+        "oos_return_beats_current_base",
+        "oos_return_mdd_beats_current_base",
+        "oos_sortino_ok",
+        "oos_smart_sortino_ok",
+        "diagnostic_not_promoted"
+      ],
+      "selection_policy": {
+        "benchmark_only": false,
+        "locked_oos": "report_only_gate_only",
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "uses_locked_oos_for_selection": false
+      },
+      "sleeve_count": 2,
+      "sleeves": [
+        "fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all",
+        "fresh_pair_resid_revert_spread_lb24_z150_h72_sc10_st100_tp240_asiaus"
+      ],
+      "source_artifact": "var/reports/profit_moonshot_20260501/dynamic_restart_full_noncalendar_20260510/tuning/fresh_portfolio_tuning_latest.json",
+      "source_candidate_gate_failures": [],
+      "source_metadata": {
+        "missing_fields": [
+          "source_ledger_refs_missing",
+          "research_history_refs_missing"
+        ],
+        "present": false,
+        "rejection_reasons": [
+          "source_metadata_missing"
+        ],
+        "required_for_live_promotion": true,
+        "research_history_refs": [],
+        "source_artifact": "var/reports/profit_moonshot_20260501/dynamic_restart_full_noncalendar_20260510/tuning/fresh_portfolio_tuning_latest.json",
+        "source_ledger_refs": []
+      },
+      "splits": {
+        "oos": {
+          "account_wipeout": false,
+          "annualized_return": 0.010957674139212115,
+          "calmar": 8.060419912404502,
+          "downside_volatility": null,
+          "fills": 104,
+          "liquidation_count": 0,
+          "liquidation_event_count": 0,
+          "max_drawdown": 0.001359442095857675,
+          "maximum_liquidation_equity_loss_fraction": 0.0,
+          "maximum_liquidation_event_drawdown": 0.0,
+          "minimum_margin_buffer": null,
+          "minimum_margin_ratio": null,
+          "monthlyized_return": 0.0009085853321300075,
+          "positive_period_ratio": null,
+          "return_mdd": 1.458337802069358,
+          "round_trips": 26,
+          "sharpe": 2.0920175548230624,
+          "smart_sortino": 0.1085742814519667,
+          "sortino": 2.4030304564222544,
+          "total_return": 0.0019825257981136435,
+          "volatility": 0.005215861759523607
+        },
+        "train": {
+          "account_wipeout": false,
+          "annualized_return": 0.0030947439988155967,
+          "calmar": 0.5915890701472795,
+          "downside_volatility": null,
+          "fills": 468,
+          "liquidation_count": 0,
+          "liquidation_event_count": 0,
+          "max_drawdown": 0.005231239309484103,
+          "maximum_liquidation_equity_loss_fraction": 0.0,
+          "maximum_liquidation_event_drawdown": 0.0,
+          "minimum_margin_buffer": null,
+          "minimum_margin_ratio": null,
+          "monthlyized_return": 0.0002575302498593057,
+          "positive_period_ratio": null,
+          "return_mdd": 0.5915214327692837,
+          "round_trips": 117,
+          "sharpe": 0.5528602274376636,
+          "smart_sortino": null,
+          "sortino": 0.44549469990534407,
+          "total_return": 0.003094390171505035,
+          "volatility": 0.0056175915447623055
+        },
+        "validation": {
+          "account_wipeout": false,
+          "annualized_return": 0.013923130285137253,
+          "calmar": 10.452519149266264,
+          "downside_volatility": null,
+          "fills": 96,
+          "liquidation_count": 0,
+          "liquidation_event_count": 0,
+          "max_drawdown": 0.0013320358553100202,
+          "maximum_liquidation_equity_loss_fraction": 0.0,
+          "maximum_liquidation_event_drawdown": 0.0,
+          "minimum_margin_buffer": null,
+          "minimum_margin_ratio": null,
+          "monthlyized_return": 0.0011529219289367898,
+          "positive_period_ratio": null,
+          "return_mdd": 1.6786200887842475,
+          "round_trips": 24,
+          "sharpe": 2.335077185052951,
+          "smart_sortino": null,
+          "sortino": 3.008595188264655,
+          "total_return": 0.002235982145704307,
+          "volatility": 0.00592899785302912
+        }
+      },
+      "strategy_validity": {
+        "audit_sources": [
+          "var/reports/profit_moonshot_20260501/dynamic_restart_full_noncalendar_20260510/tuning/fresh_portfolio_tuning_latest.json"
+        ],
+        "audited_sleeves": [
+          {
+            "family": "pair_residual",
+            "pass": true,
+            "primary_signal_evidence": "pair_residual",
+            "primary_signal_type": "state_signal",
+            "rejection_reasons": [],
+            "sleeve": "fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all"
+          },
+          {
+            "family": "pair_residual",
+            "pass": true,
+            "primary_signal_evidence": "pair_residual",
+            "primary_signal_type": "state_signal",
+            "rejection_reasons": [],
+            "sleeve": "fresh_pair_resid_revert_spread_lb24_z150_h72_sc10_st100_tp240_asiaus"
+          }
+        ],
+        "pass": true,
+        "primary_signal_evidence": "all_active_sleeves_non_calendar:pair_residual",
+        "primary_signal_type": "state_signal",
+        "rejection_reasons": []
+      },
+      "train_val_stability": {
+        "leverage": 2.5363088192100665,
+        "sleeve_count": 2.0,
+        "train_calmar": 0.5915890701472795,
+        "train_max_drawdown": 0.005231239309484103,
+        "train_monthlyized_return": 0.0002575302498593057,
+        "train_sharpe": 0.5528602274376636,
+        "train_sortino": 0.44549469990534407,
+        "validation_calmar": 10.452519149266264,
+        "validation_max_drawdown": 0.0013320358553100202,
+        "validation_monthlyized_return": 0.0011529219289367898,
+        "validation_sharpe": 2.335077185052951,
+        "validation_sortino": 3.008595188264655
+      },
+      "train_val_stability_formula": "frozen_weighted_train_validation_score_v1",
+      "train_val_stability_formula_score": 6.475738207138975,
+      "train_val_stability_score": 6.475738207138975
+    },
+    {
+      "benchmark_only": true,
+      "candidate_derived": false,
+      "decision_gates": {
+        "deployable_candidate": false,
+        "diagnostic_not_promoted": false,
+        "eligible_for_candidate_live_promotion": false,
+        "liquidation_evidence_available": false,
+        "liquidation_gate": false,
+        "live_integer_leverage": false,
+        "live_integer_source_leverage": true,
+        "live_source_candidate_metadata": true,
+        "locked_oos_report_gate_only": true,
+        "margin_buffer_positive": true,
+        "no_account_wipeout": true,
+        "oos_calmar_ok": true,
+        "oos_mdd_within_25pct_budget": true,
+        "oos_return_beats_current_base": false,
+        "oos_return_mdd_beats_current_base": false,
+        "oos_sharpe_ok": false,
+        "oos_smart_sortino_ok": false,
+        "oos_sortino_ok": false,
+        "research_history_source_metadata_present": true,
+        "selection_firewall": true,
+        "source_metadata": {
+          "missing_fields": [],
+          "present": true,
+          "rejection_reasons": [],
+          "required_for_live_promotion": false,
+          "research_history_refs": [],
+          "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/hybrid_final/hybrid_online_portfolio_latest.json",
+          "source_ledger_refs": []
+        },
+        "source_metadata_present": true,
+        "strategy_validity": {
+          "audit_sources": [
+            "var/reports/profit_moonshot_20260501/live_final_selection_20260510/hybrid_final/hybrid_online_portfolio_latest.json"
+          ],
+          "audited_sleeves": [],
+          "pass": true,
+          "primary_signal_evidence": "legacy_hybrid_benchmark:legacy_hybrid_benchmark is non-promotable row class",
+          "primary_signal_type": "non_candidate_row",
+          "rejection_reasons": []
+        },
+        "strategy_validity_metadata_present": true,
+        "strategy_validity_pass": true,
+        "strategy_validity_passed": true,
+        "tiny_liquidation_tolerance_ok": true
+      },
+      "kind": "legacy_hybrid_benchmark",
+      "leverage": 2.3427334297703024,
+      "liquidation": {
+        "account_wipeout": false,
+        "evidence_available": false,
+        "liquidation_count": 0,
+        "maximum_liquidation_equity_loss_fraction": 0.0,
+        "maximum_liquidation_event_drawdown": 0.0,
+        "minimum_margin_buffer": null,
+        "minimum_margin_ratio": null
+      },
+      "name": "legacy_hybrid_benchmark",
+      "non_integer_source_leverages": [],
+      "rejection_reasons": [
+        "eligible_for_candidate_live_promotion",
+        "live_integer_leverage",
+        "liquidation_gate",
+        "liquidation_evidence_available",
+        "oos_return_beats_current_base",
+        "oos_return_mdd_beats_current_base",
+        "oos_sharpe_ok",
+        "oos_sortino_ok",
+        "oos_smart_sortino_ok"
+      ],
+      "selection_policy": {
+        "benchmark_only": true,
+        "locked_oos": "report_only_gate_only",
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "uses_locked_oos_for_selection": false
+      },
+      "sleeve_count": 4,
+      "sleeves": [],
+      "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/hybrid_final/hybrid_online_portfolio_latest.json",
+      "source_candidate_gate_failures": [],
+      "source_metadata": {
+        "missing_fields": [],
+        "present": true,
+        "rejection_reasons": [],
+        "required_for_live_promotion": false,
+        "research_history_refs": [],
+        "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/hybrid_final/hybrid_online_portfolio_latest.json",
+        "source_ledger_refs": []
+      },
+      "splits": {
+        "oos": {
+          "account_wipeout": false,
+          "annualized_return": 0.017506928297035262,
+          "calmar": 3.575246760792684,
+          "downside_volatility": null,
+          "fills": 0,
+          "liquidation_count": 0,
+          "liquidation_event_count": 0,
+          "max_drawdown": 0.004896704890141268,
+          "maximum_liquidation_equity_loss_fraction": 0.0,
+          "maximum_liquidation_event_drawdown": 0.0,
+          "minimum_margin_buffer": null,
+          "minimum_margin_ratio": null,
+          "monthlyized_return": 0.001447333665232975,
+          "positive_period_ratio": null,
+          "return_mdd": 0.3304220637802506,
+          "round_trips": 0,
+          "sharpe": 0.7763172405928882,
+          "smart_sortino": null,
+          "sortino": 0.8998624362864446,
+          "total_return": 0.001617979335523323,
+          "volatility": 0.022677674055641042
+        },
+        "train": {
+          "account_wipeout": false,
+          "annualized_return": 0.06964170970228722,
+          "calmar": 1.394125428183764,
+          "downside_volatility": null,
+          "fills": 0,
+          "liquidation_count": 0,
+          "liquidation_event_count": 0,
+          "max_drawdown": 0.049953690173354715,
+          "maximum_liquidation_equity_loss_fraction": 0.0,
+          "maximum_liquidation_event_drawdown": 0.0,
+          "minimum_margin_buffer": null,
+          "minimum_margin_ratio": null,
+          "monthlyized_return": 0.005626079076356261,
+          "positive_period_ratio": null,
+          "return_mdd": 1.394125428183764,
+          "round_trips": 0,
+          "sharpe": 0.8957917111788695,
+          "smart_sortino": null,
+          "sortino": 1.5082663105733576,
+          "total_return": 0.06964170970228722,
+          "volatility": 0.0785758083482393
+        },
+        "validation": {
+          "account_wipeout": false,
+          "annualized_return": 0.49167518325202186,
+          "calmar": 38.66709022525689,
+          "downside_volatility": null,
+          "fills": 0,
+          "liquidation_count": 0,
+          "liquidation_event_count": 0,
+          "max_drawdown": 0.012715598209944057,
+          "maximum_liquidation_equity_loss_fraction": 0.0,
+          "maximum_liquidation_event_drawdown": 0.0,
+          "minimum_margin_buffer": null,
+          "minimum_margin_ratio": null,
+          "monthlyized_return": 0.033886478154812716,
+          "positive_period_ratio": null,
+          "return_mdd": 5.251529442879848,
+          "round_trips": 0,
+          "sharpe": 3.305313347521935,
+          "smart_sortino": null,
+          "sortino": 8.940229070146314,
+          "total_return": 0.06677633838335151,
+          "volatility": 0.12326980391207122
+        }
+      },
+      "strategy_validity": {
+        "audit_sources": [
+          "var/reports/profit_moonshot_20260501/live_final_selection_20260510/hybrid_final/hybrid_online_portfolio_latest.json"
+        ],
+        "audited_sleeves": [],
+        "pass": true,
+        "primary_signal_evidence": "legacy_hybrid_benchmark:legacy_hybrid_benchmark is non-promotable row class",
+        "primary_signal_type": "non_candidate_row",
+        "rejection_reasons": []
+      },
+      "train_val_stability": {
+        "leverage": 2.3427334297703024,
+        "sleeve_count": 4.0,
+        "train_calmar": 1.394125428183764,
+        "train_max_drawdown": 0.049953690173354715,
+        "train_monthlyized_return": 0.005626079076356261,
+        "train_sharpe": 0.8957917111788695,
+        "train_sortino": 1.5082663105733576,
+        "validation_calmar": 38.66709022525689,
+        "validation_max_drawdown": 0.012715598209944057,
+        "validation_monthlyized_return": 0.033886478154812716,
+        "validation_sharpe": 3.305313347521935,
+        "validation_sortino": 8.940229070146314
+      },
+      "train_val_stability_formula": "frozen_weighted_train_validation_score_v1",
+      "train_val_stability_formula_score": 19.066699252603822,
+      "train_val_stability_score": 19.066699252603822
+    },
+    {
+      "benchmark_only": true,
+      "candidate_derived": false,
+      "decision_gates": {
+        "deployable_candidate": false,
+        "diagnostic_not_promoted": false,
+        "eligible_for_candidate_live_promotion": false,
+        "liquidation_evidence_available": false,
+        "liquidation_gate": false,
+        "live_integer_leverage": true,
+        "live_integer_source_leverage": true,
+        "live_source_candidate_metadata": true,
+        "locked_oos_report_gate_only": true,
+        "margin_buffer_positive": true,
+        "no_account_wipeout": true,
+        "oos_calmar_ok": false,
+        "oos_mdd_within_25pct_budget": true,
+        "oos_return_beats_current_base": false,
+        "oos_return_mdd_beats_current_base": false,
+        "oos_sharpe_ok": false,
+        "oos_smart_sortino_ok": false,
+        "oos_sortino_ok": false,
+        "research_history_source_metadata_present": true,
+        "selection_firewall": true,
+        "source_metadata": {
+          "missing_fields": [],
+          "present": true,
+          "rejection_reasons": [],
+          "required_for_live_promotion": false,
+          "research_history_refs": [],
+          "source_artifact": "synthetic_cash",
+          "source_ledger_refs": []
+        },
+        "source_metadata_present": true,
+        "strategy_validity": {
+          "audit_sources": [
+            "synthetic_cash"
+          ],
+          "audited_sleeves": [],
+          "pass": true,
+          "primary_signal_evidence": "cash:cash is non-promotable row class",
+          "primary_signal_type": "non_candidate_row",
+          "rejection_reasons": []
+        },
+        "strategy_validity_metadata_present": true,
+        "strategy_validity_pass": true,
+        "strategy_validity_passed": true,
+        "tiny_liquidation_tolerance_ok": true
+      },
+      "kind": "cash",
+      "leverage": 1.0,
+      "liquidation": {
+        "account_wipeout": false,
+        "evidence_available": false,
+        "liquidation_count": 0,
+        "maximum_liquidation_equity_loss_fraction": 0.0,
+        "maximum_liquidation_event_drawdown": 0.0,
+        "minimum_margin_buffer": null,
+        "minimum_margin_ratio": null
+      },
+      "name": "cash",
+      "non_integer_source_leverages": [],
+      "rejection_reasons": [
+        "eligible_for_candidate_live_promotion",
+        "liquidation_gate",
+        "liquidation_evidence_available",
+        "oos_return_beats_current_base",
+        "oos_return_mdd_beats_current_base",
+        "oos_sharpe_ok",
+        "oos_sortino_ok",
+        "oos_smart_sortino_ok",
+        "oos_calmar_ok"
+      ],
+      "selection_policy": {
+        "benchmark_only": true,
+        "locked_oos": "report_only_gate_only",
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "uses_locked_oos_for_selection": false
+      },
+      "sleeve_count": 0,
+      "sleeves": [],
+      "source_artifact": "synthetic_cash",
+      "source_candidate_gate_failures": [],
+      "source_metadata": {
+        "missing_fields": [],
+        "present": true,
+        "rejection_reasons": [],
+        "required_for_live_promotion": false,
+        "research_history_refs": [],
+        "source_artifact": "synthetic_cash",
+        "source_ledger_refs": []
+      },
+      "splits": {
+        "oos": {
+          "account_wipeout": false,
+          "annualized_return": null,
+          "calmar": 0.0,
+          "downside_volatility": null,
+          "fills": 0,
+          "liquidation_count": 0,
+          "liquidation_event_count": 0,
+          "max_drawdown": 0.0,
+          "maximum_liquidation_equity_loss_fraction": 0.0,
+          "maximum_liquidation_event_drawdown": 0.0,
+          "minimum_margin_buffer": null,
+          "minimum_margin_ratio": null,
+          "monthlyized_return": null,
+          "positive_period_ratio": null,
+          "return_mdd": null,
+          "round_trips": 0,
+          "sharpe": 0.0,
+          "smart_sortino": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "train": {
+          "account_wipeout": false,
+          "annualized_return": null,
+          "calmar": 0.0,
+          "downside_volatility": null,
+          "fills": 0,
+          "liquidation_count": 0,
+          "liquidation_event_count": 0,
+          "max_drawdown": 0.0,
+          "maximum_liquidation_equity_loss_fraction": 0.0,
+          "maximum_liquidation_event_drawdown": 0.0,
+          "minimum_margin_buffer": null,
+          "minimum_margin_ratio": null,
+          "monthlyized_return": null,
+          "positive_period_ratio": null,
+          "return_mdd": null,
+          "round_trips": 0,
+          "sharpe": 0.0,
+          "smart_sortino": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        },
+        "validation": {
+          "account_wipeout": false,
+          "annualized_return": null,
+          "calmar": 0.0,
+          "downside_volatility": null,
+          "fills": 0,
+          "liquidation_count": 0,
+          "liquidation_event_count": 0,
+          "max_drawdown": 0.0,
+          "maximum_liquidation_equity_loss_fraction": 0.0,
+          "maximum_liquidation_event_drawdown": 0.0,
+          "minimum_margin_buffer": null,
+          "minimum_margin_ratio": null,
+          "monthlyized_return": null,
+          "positive_period_ratio": null,
+          "return_mdd": null,
+          "round_trips": 0,
+          "sharpe": 0.0,
+          "smart_sortino": 0.0,
+          "sortino": 0.0,
+          "total_return": 0.0,
+          "volatility": 0.0
+        }
+      },
+      "strategy_validity": {
+        "audit_sources": [
+          "synthetic_cash"
+        ],
+        "audited_sleeves": [],
+        "pass": true,
+        "primary_signal_evidence": "cash:cash is non-promotable row class",
+        "primary_signal_type": "non_candidate_row",
+        "rejection_reasons": []
+      },
+      "train_val_stability": {
+        "leverage": 1.0,
+        "sleeve_count": 0.0,
+        "train_calmar": 0.0,
+        "train_max_drawdown": 0.0,
+        "train_monthlyized_return": 0.0,
+        "train_sharpe": 0.0,
+        "train_sortino": 0.0,
+        "validation_calmar": 0.0,
+        "validation_max_drawdown": 0.0,
+        "validation_monthlyized_return": 0.0,
+        "validation_sharpe": 0.0,
+        "validation_sortino": 0.0
+      },
+      "train_val_stability_formula": "frozen_weighted_train_validation_score_v1",
+      "train_val_stability_formula_score": 0.0,
+      "train_val_stability_score": 0.0
+    }
+  ],
+  "selection_policy": {
+    "benchmark_only_rows_ineligible": true,
+    "calendar_primary_alpha_rejected": true,
+    "live_integer_leverage_required": true,
+    "live_integer_source_leverage_required": true,
+    "locked_oos": "report_only_gate_only",
+    "no_new_alpha_search": true,
+    "ranking_formula": "frozen_weighted_train_validation_score_v1",
+    "research_history_source_metadata_required": true,
+    "selection_inputs": [
+      "train",
+      "validation"
+    ],
+    "strategy_validity_required": true,
+    "uses_locked_oos_for_selection": false
+  },
+  "source_artifacts": {
+    "candidate_hybrid_json": "var/reports/profit_moonshot_20260501/dynamic_restart_full_noncalendar_20260510/candidate_hybrid/candidate_hybrid_latest.json",
+    "candidate_portfolio_json": "var/reports/profit_moonshot_20260501/dynamic_restart_full_noncalendar_20260510/tuning/fresh_portfolio_tuning_latest.json",
+    "legacy_hybrid_json": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/hybrid_final/hybrid_online_portfolio_latest.json",
+    "liquidation_json": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json",
+    "refresh_json": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/data_refresh/data_refresh_latest.json"
+  },
+  "status": "no_live_promotion",
+  "verification": {
+    "finalized": false,
+    "required_tests": [
+      "tests/test_profit_moonshot_candidate_hybrid.py -q",
+      "tests/test_profit_moonshot_live_final_selection.py -q",
+      "tests/test_profit_moonshot_liquidation_aware_validation.py -q",
+      "full pytest",
+      "ruff check .",
+      "compileall",
+      "git diff --check",
+      "GitHub Actions ci/private-ci green"
+    ]
+  },
+  "winner": null
+}

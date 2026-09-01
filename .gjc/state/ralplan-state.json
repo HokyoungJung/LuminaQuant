@@ -1,0 +1,29 @@
+{
+  "active": true,
+  "current_phase": "final",
+  "skill": "ralplan",
+  "version": 2,
+  "mode": "short",
+  "interactive": false,
+  "task": "Refine the deep-interview spec at .gjc/specs/deep-interview-alpha-strategy-improvement.md into a consensus plan. Stop at pending approval; do not execute implementation.",
+  "run_id": "2026-06-07-0457-b89b",
+  "updated_at": "2026-06-18T13:04:55.648Z",
+  "receipt": {
+    "version": 1,
+    "skill": "ralplan",
+    "owner": "gjc-runtime",
+    "command": "gjc ralplan persist-run-id",
+    "state_path": "/home/hoky/Quants-agent/LuminaQuant/.gjc/state/skill-active-state.json",
+    "storage_path": "/home/hoky/Quants-agent/LuminaQuant/.gjc/state/ralplan-state.json",
+    "mutated_at": "2026-06-18T13:04:55.648Z",
+    "fresh_until": "2026-06-18T13:34:55.648Z",
+    "status": "fresh",
+    "mutation_id": "ralplan:2026-06-18T13:04:55.648Z",
+    "content_sha256": {
+      "algorithm": "sha256",
+      "value": "f75fc10aea6ba6348e18f5de6b985da6aa71c232e17de178a978778a4642d245",
+      "covered_path": "/home/hoky/Quants-agent/LuminaQuant/.gjc/state/ralplan-state.json",
+      "computed_at": "2026-06-18T13:04:55.648Z"
+    }
+  }
+}

@@ -1,0 +1,280 @@
+{
+  "artifact_kind": "profit_moonshot_precious_metal_pair_new_alpha_report",
+  "generated_at": "2026-05-05T13:22:24.517807+00:00",
+  "mode": "profit_moonshot_precious_metal_pair_aggressive_mode",
+  "decision": "rejected_not_deployment_ready",
+  "rationale": "New precious-metal pair alpha is implemented and includes XAU/XAG/XPT/XPD, but raw-first live-equivalent train/val is blocked and legacy split OOS is negative; keep incumbent/shadow instead.",
+  "external_sources": [
+    {
+      "name": "CME gold/silver ratio overview",
+      "url": "https://www.cmegroup.com/trading/metals/files/the-gold-silver-ratio.pdf",
+      "use": "motivates XAU/XAG relative-value spread but warns ratio is dynamic due different fundamentals"
+    },
+    {
+      "name": "CME spread trading opportunities in metals",
+      "url": "https://www.cmegroup.com/education/whitepapers/spread-trading-opportunities-in-metals",
+      "use": "documents gold/silver ratio and metals spread trading as a known relative-value construct"
+    },
+    {
+      "name": "CME launch of precious metals spread and ratio futures",
+      "url": "https://investor.cmegroup.com/news-releases/news-release-details/cme-group-announces-launch-first-ever-precious-metals-spread-and",
+      "use": "supports XAU/XAG and XPT/XPD spread/ratio family selection"
+    },
+    {
+      "name": "Mean Reversion Pays, but Costs",
+      "url": "https://arxiv.org/abs/1103.4934",
+      "use": "motivates wider/no-trade buffer and fee/fill-aware filters after the first engine run overtraded"
+    }
+  ],
+  "implementation": {
+    "strategy": "TimeframePairZScoreReversionStrategy",
+    "mode_components": [
+      {
+        "pair": "XAU/USDT-XAG/USDT",
+        "weight": 0.65,
+        "child_target_allocation": 0.024,
+        "effective_per_leg_target": 0.0156,
+        "lookback_window": 96,
+        "hedge_window": 192,
+        "entry_z": 1.2,
+        "exit_z": 0.2,
+        "volume_guard": {
+          "x": 0.01,
+          "y": 1.0
+        }
+      },
+      {
+        "pair": "XPT/USDT-XPD/USDT",
+        "weight": 0.35,
+        "child_target_allocation": 0.024,
+        "effective_per_leg_target": 0.0084,
+        "lookback_window": 24,
+        "hedge_window": 72,
+        "entry_z": 1.8,
+        "exit_z": 0.2,
+        "volume_guard": {
+          "x": 0.01,
+          "y": 0.01
+        }
+      }
+    ],
+    "risk_controls": [
+      "completed-timeframe 1h bars only",
+      "rolling hedge beta/correlation filter",
+      "explicit target_allocation/max_order_value metadata",
+      "stop_loss/take_profit/max_hold exits",
+      "current 1m volume guard to reduce zero-fill entries"
+    ]
+  },
+  "screen_evidence": {
+    "artifact": "var/reports/profit_moonshot_20260501/current_tail_20260505/precious_metal_pair_aggressive/precious_pair_screen_top.json",
+    "selected_rows": {
+      "xau_xag": {
+        "pair": "XAUUSDT/XAGUSDT",
+        "tf": "1h",
+        "lookback": 96,
+        "hedge": 192,
+        "entry": 1.2,
+        "exit": 0.2,
+        "stop_z": 3.2,
+        "maxhold": 72,
+        "mincorr": 0.1,
+        "min_beta": 0.02,
+        "max_beta": 8.0,
+        "vol_window": 24,
+        "min_vol_ratio": 0.0,
+        "cost_turn": 0.00035,
+        "stop_loss": 0.015,
+        "take_profit": 0.035,
+        "train_bars": 373,
+        "train_return": 0.004386027884414081,
+        "train_mdd": 0.012182469117820345,
+        "train_sharpe": 1.5356191458972468,
+        "train_trades": 2,
+        "val_bars": 336,
+        "val_return": 0.01545859872541646,
+        "val_mdd": 0.019657897130243594,
+        "val_sharpe": 3.6891873417298076,
+        "val_trades": 4,
+        "oos_bars": 155,
+        "oos_return": 0.042730891195227626,
+        "oos_mdd": 0.009918836934793014,
+        "oos_sharpe": 16.155080643503435,
+        "oos_trades": 4,
+        "trades_total": 10,
+        "score": 0.1020445660870378
+      },
+      "xpt_xpd": {
+        "pair": "XPTUSDT/XPDUSDT",
+        "tf": "1h",
+        "lookback": 24,
+        "hedge": 72,
+        "entry": 1.8,
+        "exit": 0.2,
+        "stop_z": 3.6,
+        "maxhold": 48,
+        "mincorr": 0.1,
+        "min_beta": 0.02,
+        "max_beta": 8.0,
+        "vol_window": 24,
+        "min_vol_ratio": 0.0,
+        "cost_turn": 0.00035,
+        "stop_loss": 0.015,
+        "take_profit": 0.035,
+        "train_bars": 373,
+        "train_return": -0.04113156240998983,
+        "train_mdd": 0.05948443580705069,
+        "train_sharpe": -5.0715267975654745,
+        "train_trades": 13,
+        "val_bars": 336,
+        "val_return": 0.03127926549293962,
+        "val_mdd": 0.026150720990698213,
+        "val_sharpe": 4.725826906026122,
+        "val_trades": 12,
+        "oos_bars": 155,
+        "oos_return": 0.030109230627704625,
+        "oos_mdd": 0.012917248198812858,
+        "oos_sharpe": 7.8470667308433715,
+        "oos_trades": 7,
+        "trades_total": 32,
+        "score": 0.09608668056741165
+      }
+    }
+  },
+  "live_equivalent_gate": {
+    "artifact": "var/reports/profit_moonshot_20260501/current_tail_20260505/live_equivalent/profit_moonshot_precious_metal_pair_aggressive_mode/live_equivalent_revalidation_latest.json",
+    "status": "blocked_missing_raw_first_market_data",
+    "blocking_reasons": [
+      "XAU/USDT:train_raw_first_incomplete",
+      "XAU/USDT:val_raw_first_incomplete",
+      "XAG/USDT:train_raw_first_incomplete",
+      "XAG/USDT:val_raw_first_incomplete",
+      "XPT/USDT:train_raw_first_incomplete",
+      "XPT/USDT:val_raw_first_incomplete",
+      "XPD/USDT:train_raw_first_incomplete",
+      "XPD/USDT:val_raw_first_incomplete"
+    ]
+  },
+  "legacy_windowed_split_backtest": {
+    "artifact_kind": "precious_metal_pair_available_window_split_backtest",
+    "mode": "profit_moonshot_precious_metal_pair_aggressive_mode",
+    "symbols": [
+      "XAU/USDT",
+      "XAG/USDT",
+      "XPT/USDT",
+      "XPD/USDT"
+    ],
+    "data_contract": "legacy-windowed split evidence on current four-metal common overlap; raw-first live-equivalent train/val gate is separate and blocking",
+    "splits": {
+      "train": {
+        "start": "2026-01-30T10:15:00+00:00",
+        "end": "2026-02-15T00:00:00+00:00",
+        "metric_points": 22426,
+        "metrics": {
+          "total_return": -0.0005695985116410673,
+          "sharpe": -0.024200342104094674,
+          "sortino": -0.025777953235572162,
+          "max_drawdown": 0.0026240631890061565,
+          "volatility": 0.0002631386287743871,
+          "cagr": -6.402642611758047e-06,
+          "calmar": -0.002439972725726547
+        },
+        "trade_count": 70,
+        "final_equity": 9994.30401488359,
+        "liquidation_count": 0
+      },
+      "val": {
+        "start": "2026-02-15T00:00:00+00:00",
+        "end": "2026-03-01T00:00:00+00:00",
+        "metric_points": 20161,
+        "metrics": {
+          "total_return": 0.0019141973751655161,
+          "sharpe": 0.03722357203422873,
+          "sortino": 0.036104628606800054,
+          "max_drawdown": 0.004715467185975008,
+          "volatility": 0.0006478268983427386,
+          "cagr": 2.3904881141900702e-05,
+          "calmar": 0.005069461879196162
+        },
+        "trade_count": 70,
+        "final_equity": 10019.141973751655,
+        "liquidation_count": 0
+      },
+      "oos": {
+        "start": "2026-03-01T00:00:00+00:00",
+        "end": "2026-03-07T11:00:00+00:00",
+        "metric_points": 9301,
+        "metrics": {
+          "total_return": -0.00047758153059151986,
+          "sharpe": -0.1640661886615878,
+          "sortino": -0.14938674939553742,
+          "max_drawdown": 0.0005276789299077791,
+          "volatility": 7.887608914568646e-05,
+          "cagr": -1.2943926276265394e-05,
+          "calmar": -0.024529928224588323
+        },
+        "trade_count": 13,
+        "final_equity": 9995.224184694085,
+        "liquidation_count": 0
+      }
+    }
+  },
+  "tail_refresh_attempt": {
+    "artifact_kind": "precious_metals_tail_refresh_attempt",
+    "generated_at": "2026-05-05T13:22:24.517575+00:00",
+    "command": "scripts/research/refresh_final_portfolio_validation_data.py --symbols XAU/USDT,XAG/USDT,XPT/USDT,XPD/USDT --min-start-utc 2026-03-28T00:00:00Z --cutoff-utc 2026-05-05T00:00:00Z --max-workers 1 --soft-rss-bytes 7000000000",
+    "status": "aborted_after_no_progress_stall",
+    "elapsed_before_kill": "~28 minutes",
+    "rss_log": "var/reports/profit_moonshot_20260501/current_tail_20260505/data_refresh/precious_metals_tail_refresh_rss.jsonl",
+    "observed_peak_rss_mib": 1537.184,
+    "completed_observed_effects": {
+      "XAU/USDT": "raw aggtrade archive extended through date=2026-05-04 and ohlcv WAL written; final refresh json/md not produced because process was killed after CloudFront/no-progress stall"
+    },
+    "not_completed": [
+      "XAG/USDT tail beyond 2026-03-28",
+      "XPT/USDT tail beyond 2026-03-28",
+      "XPD/USDT tail beyond 2026-03-28"
+    ]
+  },
+  "incumbent_after_this_work": {
+    "oos_return_best": "profit_moonshot_hourly_shock_reversion_eth_12h_mode",
+    "risk_adjusted_shadow": "profit_moonshot_hourly_shock_reversion_eth_12h_funding_guard_mode",
+    "conservative_legacy_candidate": "profit_moonshot_momentum_hybrid_safe_mode"
+  },
+  "failure_reasons": [
+    "standard raw-first gate is blocked for all four metals train/val windows",
+    "available-window engine OOS total_return is negative after fees/fills",
+    "XPT/XPD sleeve is not train-stable",
+    "partial fills remain on thin metal bars even after volume guard"
+  ],
+  "next_actions": [
+    "backfill/materialize raw-first train/val for XAU/XAG/XPT/XPD before any promotion",
+    "add fill-aware entry scheduling or order cancellation for zero-volume bars",
+    "screen XAU/XPT and gold/platinum spread separately only after raw-first coverage exists"
+  ],
+  "verification": {
+    "generated_at": "2026-05-05T13:23:39.088833+00:00",
+    "commands": [
+      {
+        "cmd": "uv run pytest tests/unit/test_timeframe_pair_zscore_reversion_strategy.py tests/test_pair_trading_zscore.py tests/unit/test_artifact_portfolio_mode.py::test_profit_moonshot_precious_metal_pair_mode_includes_four_metals_with_caps tests/test_live_selection_infer.py::test_infer_strategy_class_name_precious_metal_pair_mode -q",
+        "result": "8 passed in 0.31s"
+      },
+      {
+        "cmd": "uv run ruff check <changed files/tests>",
+        "result": "All checks passed"
+      },
+      {
+        "cmd": "uv run python -m compileall -q src tests",
+        "result": "passed"
+      },
+      {
+        "cmd": "scripts/research/revalidate_live_equivalent_candidates.py --portfolio-modes profit_moonshot_precious_metal_pair_aggressive_mode --execute-backtests",
+        "result": "blocked_missing_raw_first_market_data; no split backtests executed"
+      },
+      {
+        "cmd": "run_available_window_split_backtest.py",
+        "result": "train -0.05696%, val +0.19142%, OOS -0.04776%, no liquidations, peak RSS 1019.396 MiB"
+      }
+    ]
+  }
+}

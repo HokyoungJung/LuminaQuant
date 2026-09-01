@@ -1,0 +1,83 @@
+{
+  "artifact_kind": "live_equivalent_backtest_checkpoint",
+  "split_results": {
+    "profit_moonshot_hourly_shock_reversion_eth_12h_funding_taker_flow_guard_mode": {
+      "oos": {
+        "equivalence_key": "3a6a6d7bac3ecf9a3e5d2765faebd79c79b5f85f334b83254a81a3453790a07e",
+        "final_equity": 10017.571134855612,
+        "liquidation_count": 0,
+        "metrics": {
+          "cagr": 4.751485389364873e-06,
+          "calmar": 0.00215553012079833,
+          "equity_breach_count": 0.0,
+          "equity_breach_observed": false,
+          "max_drawdown": 0.002204323355780849,
+          "min_equity": 9999.82913095898,
+          "raw_final_equity": 10017.589494855612,
+          "raw_max_drawdown": 0.002204323355780849,
+          "raw_total_return": 0.001758949485561212,
+          "sharpe": 0.04347587233534467,
+          "sortino": 0.04829942270793199,
+          "total_return": 0.001758949485561212,
+          "volatility": 0.00010942762147905987
+        },
+        "mode": "profit_moonshot_hourly_shock_reversion_eth_12h_funding_taker_flow_guard_mode",
+        "source_mode": "profit_moonshot_hourly_shock_reversion_eth_12h_funding_taker_flow_guard_mode",
+        "split": "oos",
+        "status": "completed",
+        "trade_count": 34
+      },
+      "train": {
+        "equivalence_key": "3a6a6d7bac3ecf9a3e5d2765faebd79c79b5f85f334b83254a81a3453790a07e",
+        "final_equity": 9977.388580304705,
+        "liquidation_count": 1,
+        "metrics": {
+          "cagr": -1.086980698339346e-06,
+          "calmar": -3.5923796186190004e-05,
+          "equity_breach_count": 0.0,
+          "equity_breach_observed": false,
+          "max_drawdown": 0.03025795750275435,
+          "min_equity": 9965.64863437092,
+          "raw_final_equity": 9977.406430304705,
+          "raw_max_drawdown": 0.03025795750275435,
+          "raw_total_return": -0.0022593569695295024,
+          "sharpe": -0.0031742344272710195,
+          "sortino": -0.0035780201575332884,
+          "total_return": -0.0022593569695295024,
+          "volatility": 0.00032572642944853785
+        },
+        "mode": "profit_moonshot_hourly_shock_reversion_eth_12h_funding_taker_flow_guard_mode",
+        "source_mode": "profit_moonshot_hourly_shock_reversion_eth_12h_funding_taker_flow_guard_mode",
+        "split": "train",
+        "status": "completed",
+        "trade_count": 228
+      },
+      "val": {
+        "equivalence_key": "3a6a6d7bac3ecf9a3e5d2765faebd79c79b5f85f334b83254a81a3453790a07e",
+        "final_equity": 10072.495418548966,
+        "liquidation_count": 0,
+        "metrics": {
+          "cagr": 2.140602853017981e-05,
+          "calmar": 0.006619202754904549,
+          "equity_breach_count": 0.0,
+          "equity_breach_observed": false,
+          "max_drawdown": 0.003233928514173229,
+          "min_equity": 9986.186639064368,
+          "raw_final_equity": 10072.422318548966,
+          "raw_max_drawdown": 0.003233928514173229,
+          "raw_total_return": 0.007242231854896586,
+          "sharpe": 0.0784684945550294,
+          "sortino": 0.08717366666110087,
+          "total_return": 0.007242231854896586,
+          "volatility": 0.00027327067377613253
+        },
+        "mode": "profit_moonshot_hourly_shock_reversion_eth_12h_funding_taker_flow_guard_mode",
+        "source_mode": "profit_moonshot_hourly_shock_reversion_eth_12h_funding_taker_flow_guard_mode",
+        "split": "val",
+        "status": "completed",
+        "trade_count": 38
+      }
+    }
+  },
+  "updated_at": "2026-05-06T13:26:37.745523Z"
+}

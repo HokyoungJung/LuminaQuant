@@ -1,0 +1,313 @@
+{
+  "csvPath": "var/reports/profit_moonshot_20260501/current_tail_20260508/all_family_expansion/fresh_start_overhaul_replay_candidates.csv",
+  "handoffPath": "var/reports/profit_moonshot_20260501/current_tail_20260508/all_family_expansion/SESSION_HANDOFF_20260508_ALL_FAMILY_EXPANSION.md",
+  "totalRows": 6805,
+  "champion": {
+    "train": "3.5993%",
+    "val": "2.6755%",
+    "oos": "1.2181%",
+    "mdd": "0.1662%",
+    "sharpe": "6.7264",
+    "specs": 6805,
+    "replaySuccess": 300,
+    "memory": "289.46 MiB"
+  },
+  "stats": [
+    {
+      "family": "compression_breakout",
+      "n": 27,
+      "survivors": 0,
+      "success": 0,
+      "oosMean": -0.0015327701707069858,
+      "oosCI": [
+        -0.0018586077899443894,
+        -0.0012069325514695822
+      ],
+      "trainMean": -0.010422649005513086,
+      "valMean": -0.0010417606863853382,
+      "mddMean": 0.0015730341667170094,
+      "sharpeMean": -9.765328994518926,
+      "tripsMean": 29.11111111111111,
+      "bestName": "fresh_compression_breakout_lb6_thr140_c55",
+      "bestOos": -0.00019343236785385187,
+      "bestVal": -0.00029221961609959823,
+      "bestTrain": -0.002777398335416348,
+      "bestMdd": 0.00019343236785389307,
+      "bestSharpe": -3.787837969403351,
+      "bestTrips": 2,
+      "bestFailed": "train_positive,val_positive,oos_return_beats_incumbent,oos_sharpe_gt_1,oos_trades_not_starved",
+      "topReasons": [
+        [
+          "train_positive",
+          27
+        ],
+        [
+          "val_positive",
+          27
+        ],
+        [
+          "oos_return_beats_incumbent",
+          27
+        ],
+        [
+          "oos_sharpe_gt_1",
+          27
+        ],
+        [
+          "oos_mdd_beats_shadow",
+          11
+        ],
+        [
+          "oos_trades_not_starved",
+          1
+        ]
+      ]
+    },
+    {
+      "family": "compression_breakout_fade",
+      "n": 108,
+      "survivors": 0,
+      "success": 0,
+      "oosMean": -0.0015823656901912254,
+      "oosCI": [
+        -0.0018462889906481431,
+        -0.0013184423897343077
+      ],
+      "trainMean": -0.011446612504397304,
+      "valMean": -0.0014464802627974062,
+      "mddMean": 0.001582660875286686,
+      "sharpeMean": -14.893094961066051,
+      "tripsMean": 39.55555555555556,
+      "bestName": "fresh_compression_fade_lb6_thr200_c55_h12",
+      "bestOos": -0.000029602482795043628,
+      "bestVal": -0.00004620710501679337,
+      "bestTrain": -0.0014204456119135678,
+      "bestMdd": 0.00002960248279505322,
+      "bestSharpe": -3.2883078275273268,
+      "bestTrips": 1,
+      "bestFailed": "train_positive,val_positive,oos_return_beats_incumbent,oos_sharpe_gt_1,oos_trades_not_starved",
+      "topReasons": [
+        [
+          "train_positive",
+          108
+        ],
+        [
+          "val_positive",
+          108
+        ],
+        [
+          "oos_return_beats_incumbent",
+          108
+        ],
+        [
+          "oos_sharpe_gt_1",
+          108
+        ],
+        [
+          "oos_mdd_beats_shadow",
+          38
+        ],
+        [
+          "oos_trades_not_starved",
+          9
+        ]
+      ]
+    },
+    {
+      "family": "calendar_rotation",
+      "n": 4392,
+      "survivors": 300,
+      "success": 300,
+      "oosMean": 0.0017670755049410884,
+      "oosCI": [
+        0.0015581065546854719,
+        0.0019760444551967047
+      ],
+      "trainMean": 0.0030214099614339286,
+      "valMean": 0.004524405885917602,
+      "mddMean": 0.0038111085083778274,
+      "sharpeMean": -1.682780752636791,
+      "tripsMean": 20.389344262295083,
+      "bestName": "fresh_calendar_rot_lbtcusdt_sweakest_lb168_thr100_h336_sc80_st0",
+      "bestOos": 0.018377205441852063,
+      "bestVal": 0.022933947985626313,
+      "bestTrain": 0.031834642257851486,
+      "bestMdd": 0.0069017464656738105,
+      "bestSharpe": 4.652785234021095,
+      "bestTrips": 3,
+      "bestFailed": "oos_mdd_beats_shadow,oos_trades_not_starved",
+      "topReasons": [
+        [
+          "oos_return_beats_incumbent",
+          3606
+        ],
+        [
+          "oos_mdd_beats_shadow",
+          2898
+        ],
+        [
+          "train_positive",
+          1814
+        ],
+        [
+          "oos_sharpe_gt_1",
+          1760
+        ],
+        [
+          "val_positive",
+          1606
+        ],
+        [
+          "oos_trades_not_starved",
+          360
+        ]
+      ]
+    },
+    {
+      "family": "residual_reversion",
+      "n": 456,
+      "survivors": 0,
+      "success": 0,
+      "oosMean": -0.001879193812022796,
+      "oosCI": [
+        -0.0020063816683818184,
+        -0.0017520059556637734
+      ],
+      "trainMean": -0.01636401362168574,
+      "valMean": -0.00225286254048893,
+      "mddMean": 0.002107356045971083,
+      "sharpeMean": -6.293166637821411,
+      "tripsMean": 48.228070175438596,
+      "bestName": "fresh_resid_rev_lb24_z175_h72_asia_us",
+      "bestOos": 0.0006678036077529814,
+      "bestVal": -0.0016396266800746684,
+      "bestTrain": -0.009605892140468142,
+      "bestMdd": 0.0003744266392688384,
+      "bestSharpe": 2.5158069842134108,
+      "bestTrips": 25,
+      "bestFailed": "train_positive,val_positive,oos_return_beats_incumbent",
+      "topReasons": [
+        [
+          "train_positive",
+          456
+        ],
+        [
+          "oos_return_beats_incumbent",
+          456
+        ],
+        [
+          "val_positive",
+          444
+        ],
+        [
+          "oos_sharpe_gt_1",
+          443
+        ],
+        [
+          "oos_mdd_beats_shadow",
+          229
+        ]
+      ]
+    },
+    {
+      "family": "funding_carry_fade",
+      "n": 36,
+      "survivors": 0,
+      "success": 0,
+      "oosMean": -0.0006651068681659452,
+      "oosCI": [
+        -0.000823539927323224,
+        -0.0005066738090086664
+      ],
+      "trainMean": -0.005648224617803701,
+      "valMean": -0.0011092901213595125,
+      "mddMean": 0.000913751400893421,
+      "sharpeMean": -3.6552003751703555,
+      "tripsMean": 18.055555555555557,
+      "bestName": "fresh_funding_fade_lb24_z15_f50ppm",
+      "bestOos": 0.00046516399184337587,
+      "bestVal": -0.001419188863701848,
+      "bestTrain": -0.007277335572748234,
+      "bestMdd": 0.0005987559974281118,
+      "bestSharpe": 1.8530220294047905,
+      "bestTrips": 28,
+      "bestFailed": "train_positive,val_positive,oos_return_beats_incumbent",
+      "topReasons": [
+        [
+          "train_positive",
+          36
+        ],
+        [
+          "val_positive",
+          36
+        ],
+        [
+          "oos_return_beats_incumbent",
+          36
+        ],
+        [
+          "oos_sharpe_gt_1",
+          35
+        ],
+        [
+          "oos_trades_not_starved",
+          2
+        ],
+        [
+          "oos_mdd_beats_shadow",
+          2
+        ]
+      ]
+    },
+    {
+      "family": "flow_imbalance_persistence",
+      "n": 256,
+      "survivors": 0,
+      "success": 0,
+      "oosMean": -0.0014028611527982667,
+      "oosCI": [
+        -0.0016215666602680387,
+        -0.0011841556453284947
+      ],
+      "trainMean": -0.007347146759694417,
+      "valMean": -0.0013356217515487273,
+      "mddMean": 0.0014613194017236322,
+      "sharpeMean": -6.343514027623213,
+      "tripsMean": 30.73046875,
+      "bestName": "fresh_flow_imb_persist_fl6_px3_imb15_h12",
+      "bestOos": 0.00008264907489330398,
+      "bestVal": 0,
+      "bestTrain": -0.00010395854818523453,
+      "bestMdd": 0.00008545731608198618,
+      "bestSharpe": 1.6772983671364434,
+      "bestTrips": 3,
+      "bestFailed": "train_positive,val_positive,oos_return_beats_incumbent,oos_trades_not_starved",
+      "topReasons": [
+        [
+          "train_positive",
+          256
+        ],
+        [
+          "oos_return_beats_incumbent",
+          256
+        ],
+        [
+          "oos_sharpe_gt_1",
+          246
+        ],
+        [
+          "val_positive",
+          240
+        ],
+        [
+          "oos_mdd_beats_shadow",
+          82
+        ],
+        [
+          "oos_trades_not_starved",
+          80
+        ]
+      ]
+    }
+  ]
+}

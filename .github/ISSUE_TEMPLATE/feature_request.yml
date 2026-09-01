@@ -1,0 +1,29 @@
+name: Feature request
+description: Propose a focused enhancement.
+title: "[feature] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem statement
+      description: What user/developer problem does this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: Keep scope minimal and concrete.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: How do we verify done?
+      placeholder: |
+        - command ...
+        - expected output ...
+    validations:
+      required: true

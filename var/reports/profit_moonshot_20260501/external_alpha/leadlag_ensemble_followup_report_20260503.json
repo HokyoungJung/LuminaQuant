@@ -1,0 +1,179 @@
+{
+  "artifact_kind": "profit_moonshot_leadlag_ensemble_followup",
+  "artifacts": {
+    "ensemble_backtest_json": "var/reports/profit_moonshot_20260501/external_alpha/leadlag_slow_diffusion_ensemble/live_equivalent_revalidation_latest.json",
+    "ensemble_preflight_json": "var/reports/profit_moonshot_20260501/external_alpha/leadlag_slow_diffusion_ensemble_preflight/live_equivalent_revalidation_latest.json",
+    "hybrid_safe_oos_json": "var/reports/profit_moonshot_20260501/oos_full/profit_moonshot_momentum_hybrid_safe_mode/live_equivalent_revalidation_latest.json",
+    "single_leadlag_backtest_json": "var/reports/profit_moonshot_20260501/external_alpha/leadlag_slow_diffusion/live_equivalent_revalidation_latest.json"
+  },
+  "conservative_fallback": "profit_moonshot_momentum_hybrid_safe_mode",
+  "decision": "reject_leadlag_ensemble_keep_single_leadlag",
+  "ensemble_preflight": {
+    "blocking_reasons": [],
+    "component_count": 2,
+    "component_summary": [
+      {
+        "component_id": "profit_moonshot_leadlag_btc_eth_2h_8h_slow_diffusion",
+        "label": "profit_moonshot_leadlag_btc_eth_2h_8h_slow_diffusion",
+        "strategy_class": "CrossCryptoSlowDiffusionStrategy",
+        "symbols": [
+          "BTC/USDT",
+          "ETH/USDT"
+        ],
+        "weight": 0.6
+      },
+      {
+        "component_id": "profit_moonshot_leadlag_sol_eth_1h_8h_slow_diffusion",
+        "label": "profit_moonshot_leadlag_sol_eth_1h_8h_slow_diffusion",
+        "strategy_class": "CrossCryptoSlowDiffusionStrategy",
+        "symbols": [
+          "SOL/USDT",
+          "ETH/USDT"
+        ],
+        "weight": 0.4
+      }
+    ],
+    "coverage_complete": {
+      "BTC/USDT": {
+        "oos": true,
+        "train": true,
+        "val": true
+      },
+      "ETH/USDT": {
+        "oos": true,
+        "train": true,
+        "val": true
+      },
+      "SOL/USDT": {
+        "oos": true,
+        "train": true,
+        "val": true
+      }
+    },
+    "max_rss_kb_from_time_log": 344760,
+    "status": "ready_for_live_equivalent_backtest",
+    "symbols": [
+      "BTC/USDT",
+      "ETH/USDT",
+      "SOL/USDT"
+    ]
+  },
+  "ensemble_resource_evidence": {
+    "elapsed": "20:12.32",
+    "max_rss_kb_from_time_log": 2501688,
+    "single_mode_full_backtest": true
+  },
+  "generated_at": "2026-05-03T11:30:15.919662Z",
+  "live_equivalent_comparison": {
+    "hybrid_safe": {
+      "mode": "profit_moonshot_momentum_hybrid_safe_mode",
+      "splits": {
+        "oos": {
+          "liquidation_count": 0,
+          "max_drawdown": 0.033917370307692,
+          "sharpe": -0.0037504499025209966,
+          "sortino": -0.0037765214494177015,
+          "total_return": -0.003832463588937074,
+          "trade_count": 136
+        },
+        "train": {
+          "liquidation_count": 0,
+          "max_drawdown": 0.1236949840884687,
+          "sharpe": 0.004175236857947524,
+          "sortino": 0.004367273527303323,
+          "total_return": -0.013551486496041987,
+          "trade_count": 1185
+        },
+        "val": {
+          "liquidation_count": 0,
+          "max_drawdown": 0.010438136911899503,
+          "sharpe": 0.010167858124343822,
+          "sortino": 0.009833095226985623,
+          "total_return": 0.002837148217925023,
+          "trade_count": 183
+        }
+      },
+      "status": "live_equivalent_validated"
+    },
+    "leadlag_ensemble": {
+      "mode": "profit_moonshot_leadlag_slow_diffusion_ensemble_mode",
+      "splits": {
+        "oos": {
+          "liquidation_count": 0,
+          "max_drawdown": 0.007261214250762898,
+          "sharpe": -0.037976420780159205,
+          "sortino": -0.0445279365001917,
+          "total_return": -0.0030592742009190044,
+          "trade_count": 72
+        },
+        "train": {
+          "liquidation_count": 0,
+          "max_drawdown": 0.11309400653040817,
+          "sharpe": 0.007110417991451464,
+          "sortino": 0.0073437047349064165,
+          "total_return": 0.04942233199282686,
+          "trade_count": 530
+        },
+        "val": {
+          "liquidation_count": 0,
+          "max_drawdown": 0.020263227275694733,
+          "sharpe": 0.0044916662417316755,
+          "sortino": 0.004550587964898087,
+          "total_return": 0.0019238644216947876,
+          "trade_count": 96
+        }
+      },
+      "status": "live_equivalent_validated"
+    },
+    "leadlag_single": {
+      "mode": "profit_moonshot_leadlag_slow_diffusion_mode",
+      "splits": {
+        "oos": {
+          "liquidation_count": 0,
+          "max_drawdown": 0.010095645255617703,
+          "sharpe": 0.01112664133991498,
+          "sortino": 0.014112314200776783,
+          "total_return": 0.002208708487563049,
+          "trade_count": 38
+        },
+        "train": {
+          "liquidation_count": 0,
+          "max_drawdown": 0.09130222780463179,
+          "sharpe": 0.006797828179471699,
+          "sortino": 0.006916989401422137,
+          "total_return": 0.031274183227514296,
+          "trade_count": 176
+        },
+        "val": {
+          "liquidation_count": 0,
+          "max_drawdown": 0.01260058501529033,
+          "sharpe": 0.02829260456497342,
+          "sortino": 0.02853711998689675,
+          "total_return": 0.006833193830638962,
+          "trade_count": 40
+        }
+      },
+      "status": "live_equivalent_validated"
+    }
+  },
+  "promoted_mode": "profit_moonshot_leadlag_slow_diffusion_mode",
+  "rejected_mode": "profit_moonshot_leadlag_slow_diffusion_ensemble_mode",
+  "rejection_reasons": [
+    "OOS total_return is negative (-0.3059%) under the user-mandated OOS gate.",
+    "OOS Sharpe and Sortino are negative, despite zero liquidations.",
+    "Validation return (+0.1924%) and validation Sharpe are worse than the single BTC->ETH leadlag mode.",
+    "The added SOL->ETH sleeve increased train trades but did not survive live-equivalent OOS execution."
+  ],
+  "why_not_hybrid_blend": {
+    "decision": "reject_before_full_backtest",
+    "hybrid_safe_oos": {
+      "liquidation_count": 0,
+      "max_drawdown": 0.033917370307692,
+      "sharpe": -0.0037504499025209966,
+      "sortino": -0.0037765214494177015,
+      "total_return": -0.003832463588937074,
+      "trade_count": 136
+    },
+    "reason": "hybrid_safe already has negative repaired OOS total_return and negative OOS Sharpe/Sortino, so blending it into the positive-OOS leadlag alpha is dilution rather than a useful performance improvement."
+  }
+}

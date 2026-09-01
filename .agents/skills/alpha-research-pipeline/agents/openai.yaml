@@ -1,0 +1,4 @@
+interface:
+  display_name: "Alpha Research Pipeline"
+  short_description: "Find and validate LuminaQuant alphas"
+  default_prompt: "Use $alpha-research-pipeline to initialize a safe LuminaQuant alpha discovery run and pre-register candidate tests."

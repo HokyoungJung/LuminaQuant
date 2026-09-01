@@ -1,0 +1,44 @@
+{
+  "candidate_count": 1,
+  "candidates": [
+    {
+      "clean_promotion_eligible": false,
+      "family": "lagged_shadow_leaf_router",
+      "guardrails": [
+        "train_validation_mdd_budget_no_current_oos",
+        "lagged_shadow_router_top_shadow_family"
+      ],
+      "label": "lagged_shadow_leaf_router:core_warmup4_avg2_val05_mdd12_lag_val_mdd12_cap110_trimmed",
+      "promotion_decision": "no_clean_promotion",
+      "requires_fresh_forward_shadow": true,
+      "measured_full_universe_walkforward": {
+        "annualized_oos_return_approx": 0.4338535048595331,
+        "compounded_oos_return": 0.3914343390276458,
+        "fold_count": 11,
+        "hard_stop_promotable": false,
+        "max_oos_mdd": 0.27690078457641154,
+        "mean_oos_return": 0.0344331777578232,
+        "oos_return_to_max_mdd": 1.4136266880805042,
+        "positive_oos_folds": 3,
+        "ranking_usage_policy": "locked_oos_diagnostic_only_not_selection",
+        "source": "var/reports/strategy_performance_improvement_20260707/full_universe_walkforward/full_universe_walkforward_summary_latest.json"
+      },
+      "risk_controls": {
+        "current_fold_oos_used_for_selection": false,
+        "current_fold_oos_used_for_weighting": false,
+        "lagged_max_scale": 1.1,
+        "lagged_target_validation_mdd": 0.12
+      },
+      "status": "research/shadow-only"
+    }
+  ],
+  "created_at": "2026-07-07T11:45:00.529535Z",
+  "details": "Integrated strategy candidate is research/shadow-only. Full-universe WF measured the candidate, but it remains post-OOS research/diagnostic-only and requires fresh forward shadow evidence before any promotion.",
+  "promotion_decision": "no_clean_promotion",
+  "schema_version": "1.0",
+  "source": {
+    "constant": "LAGGED_SHADOW_LEAF_ROUTER_TRIMMED_LABEL",
+    "script": "scripts/research/run_alpha_zoo_69_asset_monthly_refit_walkforward.py"
+  },
+  "status": "requires_fresh_forward_shadow"
+}

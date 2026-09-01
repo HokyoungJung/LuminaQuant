@@ -1,0 +1,3197 @@
+{
+  "artifact_kind": "profit_moonshot_external_alpha_ex_ante_screen",
+  "generated_at": "2026-05-05T08:59:15.759571+00:00",
+  "peak_rss_mib": 2619.10546875,
+  "roundtrip_cost_assumption": 0.0018,
+  "screens": {
+    "cross_crypto_slow_diffusion": {
+      "base_rows": 11690,
+      "decision": "candidate_requires_live_equivalent",
+      "hypothesis_family": "cross_crypto_slow_diffusion",
+      "rejected_top": [
+        {
+          "horizon": "1h",
+          "hypothesis": "cross_crypto_slow_diffusion",
+          "lag": "1h",
+          "leader": "BTC/USDT",
+          "params": {
+            "leader_abs_ret_min": 0.0015,
+            "target_underreaction_cap": 999.0
+          },
+          "rejected_reason": "post_cost_edge_not_positive_in_all_splits",
+          "splits": [
+            {
+              "count": 5269,
+              "hit_rate": 0.47732017460618714,
+              "long_count": 2686,
+              "mean": 8.752851509433439e-05,
+              "mean_after_cost": -0.0017124714849056657,
+              "short_count": 2583,
+              "split": "train",
+              "t_stat": 0.743439258180485
+            },
+            {
+              "count": 913,
+              "hit_rate": 0.5038335158817087,
+              "long_count": 449,
+              "mean": 0.0005963387787284583,
+              "mean_after_cost": -0.0012036612212715416,
+              "short_count": 464,
+              "split": "val",
+              "t_stat": 2.1644940997240583
+            },
+            {
+              "count": 963,
+              "hit_rate": 0.470404984423676,
+              "long_count": 486,
+              "mean": 0.00012156181297135855,
+              "mean_after_cost": -0.0016784381870286415,
+              "short_count": 477,
+              "split": "oos",
+              "t_stat": 0.5764812673273616
+            }
+          ],
+          "target": "ETH/USDT"
+        },
+        {
+          "horizon": "1h",
+          "hypothesis": "cross_crypto_slow_diffusion",
+          "lag": "1h",
+          "leader": "BTC/USDT",
+          "params": {
+            "leader_abs_ret_min": 0.0015,
+            "target_underreaction_cap": 0.5
+          },
+          "rejected_reason": "post_cost_edge_not_positive_in_all_splits",
+          "splits": [
+            {
+              "count": 732,
+              "hit_rate": 0.4931693989071038,
+              "long_count": 405,
+              "mean": 1.1590887674223439e-05,
+              "mean_after_cost": -0.0017884091123257764,
+              "short_count": 327,
+              "split": "train",
+              "t_stat": 0.040193380897753116
+            },
+            {
+              "count": 129,
+              "hit_rate": 0.4728682170542636,
+              "long_count": 67,
+              "mean": 0.0010885441330969784,
+              "mean_after_cost": -0.0007114558669030215,
+              "short_count": 62,
+              "split": "val",
+              "t_stat": 1.3959217206844854
+            },
+            {
+              "count": 115,
+              "hit_rate": 0.4782608695652174,
+              "long_count": 56,
+              "mean": 0.00021528720825279978,
+              "mean_after_cost": -0.0015847127917472002,
+              "short_count": 59,
+              "split": "oos",
+              "t_stat": 0.367354914430224
+            }
+          ],
+          "target": "ETH/USDT"
+        },
+        {
+          "horizon": "1h",
+          "hypothesis": "cross_crypto_slow_diffusion",
+          "lag": "1h",
+          "leader": "BTC/USDT",
+          "params": {
+            "leader_abs_ret_min": 0.0015,
+            "target_underreaction_cap": 0.25
+          },
+          "rejected_reason": "post_cost_edge_not_positive_in_all_splits",
+          "splits": [
+            {
+              "count": 349,
+              "hit_rate": 0.46418338108882523,
+              "long_count": 197,
+              "mean": -0.000278051660674603,
+              "mean_after_cost": -0.0020780516606746027,
+              "short_count": 152,
+              "split": "train",
+              "t_stat": -0.7101014610208018
+            },
+            {
+              "count": 65,
+              "hit_rate": 0.49230769230769234,
+              "long_count": 32,
+              "mean": 0.0018943433325569888,
+              "mean_after_cost": 9.434333255698888e-05,
+              "short_count": 33,
+              "split": "val",
+              "t_stat": 1.5382225112916637
+            },
+            {
+              "count": 44,
+              "hit_rate": 0.5227272727272727,
+              "long_count": 23,
+              "mean": 0.0010909397763226075,
+              "mean_after_cost": -0.0007090602236773924,
+              "short_count": 21,
+              "split": "oos",
+              "t_stat": 1.3699355209450126
+            }
+          ],
+          "target": "ETH/USDT"
+        },
+        {
+          "horizon": "1h",
+          "hypothesis": "cross_crypto_slow_diffusion",
+          "lag": "1h",
+          "leader": "BTC/USDT",
+          "params": {
+            "leader_abs_ret_min": 0.0015,
+            "target_underreaction_cap": 0.0
+          },
+          "rejected_reason": "insufficient_split_events_for_live_equivalent_followup",
+          "splits": [
+            {
+              "count": 0,
+              "hit_rate": null,
+              "long_count": 0,
+              "mean": null,
+              "mean_after_cost": null,
+              "short_count": 0,
+              "split": "train",
+              "t_stat": null
+            },
+            {
+              "count": 0,
+              "hit_rate": null,
+              "long_count": 0,
+              "mean": null,
+              "mean_after_cost": null,
+              "short_count": 0,
+              "split": "val",
+              "t_stat": null
+            },
+            {
+              "count": 0,
+              "hit_rate": null,
+              "long_count": 0,
+              "mean": null,
+              "mean_after_cost": null,
+              "short_count": 0,
+              "split": "oos",
+              "t_stat": null
+            }
+          ],
+          "target": "ETH/USDT"
+        },
+        {
+          "horizon": "1h",
+          "hypothesis": "cross_crypto_slow_diffusion",
+          "lag": "1h",
+          "leader": "BTC/USDT",
+          "params": {
+            "leader_abs_ret_min": 0.0025,
+            "target_underreaction_cap": 999.0
+          },
+          "rejected_reason": "post_cost_edge_not_positive_in_all_splits",
+          "splits": [
+            {
+              "count": 3584,
+              "hit_rate": 0.4720982142857143,
+              "long_count": 1842,
+              "mean": 0.00010462001908325648,
+              "mean_after_cost": -0.0016953799809167436,
+              "short_count": 1742,
+              "split": "train",
+              "t_stat": 0.6816888210225084
+            },
+            {
+              "count": 670,
+              "hit_rate": 0.5014925373134328,
+              "long_count": 332,
+              "mean": 0.0006984996428650171,
+              "mean_after_cost": -0.0011015003571349829,
+              "short_count": 338,
+              "split": "val",
+              "t_stat": 1.9733616991952372
+            },
+            {
+              "count": 684,
+              "hit_rate": 0.45614035087719296,
+              "long_count": 342,
+              "mean": -3.58142142050598e-05,
+              "mean_after_cost": -0.0018358142142050598,
+              "short_count": 342,
+              "split": "oos",
+              "t_stat": -0.1349362997083505
+            }
+          ],
+          "target": "ETH/USDT"
+        },
+        {
+          "horizon": "1h",
+          "hypothesis": "cross_crypto_slow_diffusion",
+          "lag": "1h",
+          "leader": "BTC/USDT",
+          "params": {
+            "leader_abs_ret_min": 0.0025,
+            "target_underreaction_cap": 0.5
+          },
+          "rejected_reason": "post_cost_edge_not_positive_in_all_splits",
+          "splits": [
+            {
+              "count": 466,
+              "hit_rate": 0.48497854077253216,
+              "long_count": 261,
+              "mean": 0.00026061041488438454,
+              "mean_after_cost": -0.0015393895851156154,
+              "short_count": 205,
+              "split": "train",
+              "t_stat": 0.727278044616166
+            },
+            {
+              "count": 85,
+              "hit_rate": 0.4588235294117647,
+              "long_count": 49,
+              "mean": 0.0013345710675528458,
+              "mean_after_cost": -0.00046542893244715415,
+              "short_count": 36,
+              "split": "val",
+              "t_stat": 1.2460381198553376
+            },
+            {
+              "count": 62,
+              "hit_rate": 0.46774193548387094,
+              "long_count": 33,
+              "mean": 0.00021620310356792926,
+              "mean_after_cost": -0.0015837968964320707,
+              "short_count": 29,
+              "split": "oos",
+              "t_stat": 0.23786971210983338
+            }
+          ],
+          "target": "ETH/USDT"
+        },
+        {
+          "horizon": "1h",
+          "hypothesis": "cross_crypto_slow_diffusion",
+          "lag": "1h",
+          "leader": "BTC/USDT",
+          "params": {
+            "leader_abs_ret_min": 0.0025,
+            "target_underreaction_cap": 0.25
+          },
+          "rejected_reason": "insufficient_split_events_for_live_equivalent_followup",
+          "splits": [
+            {
+              "count": 220,
+              "hit_rate": 0.44545454545454544,
+              "long_count": 126,
+              "mean": -0.00033819204643616987,
+              "mean_after_cost": -0.0021381920464361697,
+              "short_count": 94,
+              "split": "train",
+              "t_stat": -0.7193468467431653
+            },
+            {
+              "count": 37,
+              "hit_rate": 0.4594594594594595,
+              "long_count": 21,
+              "mean": 0.0029263584390136614,
+              "mean_after_cost": 0.0011263584390136614,
+              "short_count": 16,
+              "split": "val",
+              "t_stat": 1.5571099470385863
+            },
+            {
+              "count": 20,
+              "hit_rate": 0.45,
+              "long_count": 14,
+              "mean": 0.0015202981274727411,
+              "mean_after_cost": -0.0002797018725272588,
+              "short_count": 6,
+              "split": "oos",
+              "t_stat": 1.2622400931989313
+            }
+          ],
+          "target": "ETH/USDT"
+        },
+        {
+          "horizon": "1h",
+          "hypothesis": "cross_crypto_slow_diffusion",
+          "lag": "1h",
+          "leader": "BTC/USDT",
+          "params": {
+            "leader_abs_ret_min": 0.0025,
+            "target_underreaction_cap": 0.0
+          },
+          "rejected_reason": "insufficient_split_events_for_live_equivalent_followup",
+          "splits": [
+            {
+              "count": 0,
+              "hit_rate": null,
+              "long_count": 0,
+              "mean": null,
+              "mean_after_cost": null,
+              "short_count": 0,
+              "split": "train",
+              "t_stat": null
+            },
+            {
+              "count": 0,
+              "hit_rate": null,
+              "long_count": 0,
+              "mean": null,
+              "mean_after_cost": null,
+              "short_count": 0,
+              "split": "val",
+              "t_stat": null
+            },
+            {
+              "count": 0,
+              "hit_rate": null,
+              "long_count": 0,
+              "mean": null,
+              "mean_after_cost": null,
+              "short_count": 0,
+              "split": "oos",
+              "t_stat": null
+            }
+          ],
+          "target": "ETH/USDT"
+        },
+        {
+          "horizon": "1h",
+          "hypothesis": "cross_crypto_slow_diffusion",
+          "lag": "1h",
+          "leader": "BTC/USDT",
+          "params": {
+            "leader_abs_ret_min": 0.004,
+            "target_underreaction_cap": 999.0
+          },
+          "rejected_reason": "post_cost_edge_not_positive_in_all_splits",
+          "splits": [
+            {
+              "count": 2074,
+              "hit_rate": 0.46962391513982643,
+              "long_count": 1052,
+              "mean": 0.00021492608994887487,
+              "mean_after_cost": -0.0015850739100511252,
+              "short_count": 1022,
+              "split": "train",
+              "t_stat": 0.9427072446251361
+            },
+            {
+              "count": 419,
+              "hit_rate": 0.5083532219570406,
+              "long_count": 204,
+              "mean": 0.0008151114568152066,
+              "mean_after_cost": -0.0009848885431847933,
+              "short_count": 215,
+              "split": "val",
+              "t_stat": 1.6270488810724786
+            },
+            {
+              "count": 401,
+              "hit_rate": 0.46384039900249374,
+              "long_count": 210,
+              "mean": 0.00019412589177856713,
+              "mean_after_cost": -0.0016058741082214329,
+              "short_count": 191,
+              "split": "oos",
+              "t_stat": 0.5379279913162877
+            }
+          ],
+          "target": "ETH/USDT"
+        },
+        {
+          "horizon": "1h",
+          "hypothesis": "cross_crypto_slow_diffusion",
+          "lag": "1h",
+          "leader": "BTC/USDT",
+          "params": {
+            "leader_abs_ret_min": 0.004,
+            "target_underreaction_cap": 0.5
+          },
+          "rejected_reason": "insufficient_split_events_for_live_equivalent_followup",
+          "splits": [
+            {
+              "count": 230,
+              "hit_rate": 0.508695652173913,
+              "long_count": 138,
+              "mean": 0.00016580243131361275,
+              "mean_after_cost": -0.0016341975686863873,
+              "short_count": 92,
+              "split": "train",
+              "t_stat": 0.2880351048328931
+            },
+            {
+              "count": 41,
+              "hit_rate": 0.4634146341463415,
+              "long_count": 21,
+              "mean": 0.002617917126350175,
+              "mean_after_cost": 0.0008179171263501752,
+              "short_count": 20,
+              "split": "val",
+              "t_stat": 1.6885987643726847
+            },
+            {
+              "count": 23,
+              "hit_rate": 0.5652173913043478,
+              "long_count": 14,
+              "mean": 0.0017035998436542021,
+              "mean_after_cost": -9.640015634579781e-05,
+              "short_count": 9,
+              "split": "oos",
+              "t_stat": 1.0301739914504364
+            }
+          ],
+          "target": "ETH/USDT"
+        }
+      ],
+      "screen_gate": "train>=80, val>=20, OOS>=40; all post-cost edges >2.5bp per event (0.00025 return units); OOS hit-rate >=50%; split edge ratio <=5x",
+      "survivor_count": 2,
+      "survivors": [
+        {
+          "horizon": "8h",
+          "hypothesis": "cross_crypto_slow_diffusion",
+          "lag": "2h",
+          "leader": "BTC/USDT",
+          "params": {
+            "leader_abs_ret_min": 0.015,
+            "target_underreaction_cap": 999.0
+          },
+          "splits": [
+            {
+              "count": 359,
+              "hit_rate": 0.5069637883008357,
+              "long_count": 161,
+              "mean": 0.0023908338965098787,
+              "mean_after_cost": 0.0005908338965098787,
+              "short_count": 198,
+              "split": "train",
+              "t_stat": 1.4525435342045867
+            },
+            {
+              "count": 93,
+              "hit_rate": 0.4838709677419355,
+              "long_count": 38,
+              "mean": 0.002847379265395148,
+              "mean_after_cost": 0.0010473792653951479,
+              "short_count": 55,
+              "split": "val",
+              "t_stat": 0.9279041730176452
+            },
+            {
+              "count": 63,
+              "hit_rate": 0.5238095238095238,
+              "long_count": 38,
+              "mean": 0.002256146763009599,
+              "mean_after_cost": 0.00045614676300959923,
+              "short_count": 25,
+              "split": "oos",
+              "t_stat": 0.8789770291954359
+            }
+          ],
+          "target": "ETH/USDT"
+        },
+        {
+          "horizon": "8h",
+          "hypothesis": "cross_crypto_slow_diffusion",
+          "lag": "1h",
+          "leader": "SOL/USDT",
+          "params": {
+            "leader_abs_ret_min": 0.015,
+            "target_underreaction_cap": 999.0
+          },
+          "splits": [
+            {
+              "count": 700,
+              "hit_rate": 0.54,
+              "long_count": 343,
+              "mean": 0.0021716226508642304,
+              "mean_after_cost": 0.0003716226508642304,
+              "short_count": 357,
+              "split": "train",
+              "t_stat": 1.8989892343501356
+            },
+            {
+              "count": 95,
+              "hit_rate": 0.4842105263157895,
+              "long_count": 37,
+              "mean": 0.002339658510240201,
+              "mean_after_cost": 0.0005396585102402009,
+              "short_count": 58,
+              "split": "val",
+              "t_stat": 0.8801303198484927
+            },
+            {
+              "count": 49,
+              "hit_rate": 0.5714285714285714,
+              "long_count": 26,
+              "mean": 0.0021763947910836555,
+              "mean_after_cost": 0.00037639479108365556,
+              "short_count": 23,
+              "split": "oos",
+              "t_stat": 0.6174151690408193
+            }
+          ],
+          "target": "ETH/USDT"
+        }
+      ],
+      "top_ranked": [
+        {
+          "horizon": "8h",
+          "hypothesis": "cross_crypto_slow_diffusion",
+          "lag": "2h",
+          "leader": "BTC/USDT",
+          "params": {
+            "leader_abs_ret_min": 0.015,
+            "target_underreaction_cap": 999.0
+          },
+          "splits": [
+            {
+              "count": 359,
+              "hit_rate": 0.5069637883008357,
+              "long_count": 161,
+              "mean": 0.0023908338965098787,
+              "mean_after_cost": 0.0005908338965098787,
+              "short_count": 198,
+              "split": "train",
+              "t_stat": 1.4525435342045867
+            },
+            {
+              "count": 93,
+              "hit_rate": 0.4838709677419355,
+              "long_count": 38,
+              "mean": 0.002847379265395148,
+              "mean_after_cost": 0.0010473792653951479,
+              "short_count": 55,
+              "split": "val",
+              "t_stat": 0.9279041730176452
+            },
+            {
+              "count": 63,
+              "hit_rate": 0.5238095238095238,
+              "long_count": 38,
+              "mean": 0.002256146763009599,
+              "mean_after_cost": 0.00045614676300959923,
+              "short_count": 25,
+              "split": "oos",
+              "t_stat": 0.8789770291954359
+            }
+          ],
+          "target": "ETH/USDT"
+        },
+        {
+          "horizon": "8h",
+          "hypothesis": "cross_crypto_slow_diffusion",
+          "lag": "1h",
+          "leader": "SOL/USDT",
+          "params": {
+            "leader_abs_ret_min": 0.015,
+            "target_underreaction_cap": 999.0
+          },
+          "splits": [
+            {
+              "count": 700,
+              "hit_rate": 0.54,
+              "long_count": 343,
+              "mean": 0.0021716226508642304,
+              "mean_after_cost": 0.0003716226508642304,
+              "short_count": 357,
+              "split": "train",
+              "t_stat": 1.8989892343501356
+            },
+            {
+              "count": 95,
+              "hit_rate": 0.4842105263157895,
+              "long_count": 37,
+              "mean": 0.002339658510240201,
+              "mean_after_cost": 0.0005396585102402009,
+              "short_count": 58,
+              "split": "val",
+              "t_stat": 0.8801303198484927
+            },
+            {
+              "count": 49,
+              "hit_rate": 0.5714285714285714,
+              "long_count": 26,
+              "mean": 0.0021763947910836555,
+              "mean_after_cost": 0.00037639479108365556,
+              "short_count": 23,
+              "split": "oos",
+              "t_stat": 0.6174151690408193
+            }
+          ],
+          "target": "ETH/USDT"
+        },
+        {
+          "horizon": "1h",
+          "hypothesis": "cross_crypto_slow_diffusion",
+          "lag": "1h",
+          "leader": "BTC/USDT",
+          "params": {
+            "leader_abs_ret_min": 0.0015,
+            "target_underreaction_cap": 999.0
+          },
+          "splits": [
+            {
+              "count": 5269,
+              "hit_rate": 0.47732017460618714,
+              "long_count": 2686,
+              "mean": 8.752851509433439e-05,
+              "mean_after_cost": -0.0017124714849056657,
+              "short_count": 2583,
+              "split": "train",
+              "t_stat": 0.743439258180485
+            },
+            {
+              "count": 913,
+              "hit_rate": 0.5038335158817087,
+              "long_count": 449,
+              "mean": 0.0005963387787284583,
+              "mean_after_cost": -0.0012036612212715416,
+              "short_count": 464,
+              "split": "val",
+              "t_stat": 2.1644940997240583
+            },
+            {
+              "count": 963,
+              "hit_rate": 0.470404984423676,
+              "long_count": 486,
+              "mean": 0.00012156181297135855,
+              "mean_after_cost": -0.0016784381870286415,
+              "short_count": 477,
+              "split": "oos",
+              "t_stat": 0.5764812673273616
+            }
+          ],
+          "target": "ETH/USDT"
+        },
+        {
+          "horizon": "1h",
+          "hypothesis": "cross_crypto_slow_diffusion",
+          "lag": "1h",
+          "leader": "BTC/USDT",
+          "params": {
+            "leader_abs_ret_min": 0.0015,
+            "target_underreaction_cap": 0.5
+          },
+          "splits": [
+            {
+              "count": 732,
+              "hit_rate": 0.4931693989071038,
+              "long_count": 405,
+              "mean": 1.1590887674223439e-05,
+              "mean_after_cost": -0.0017884091123257764,
+              "short_count": 327,
+              "split": "train",
+              "t_stat": 0.040193380897753116
+            },
+            {
+              "count": 129,
+              "hit_rate": 0.4728682170542636,
+              "long_count": 67,
+              "mean": 0.0010885441330969784,
+              "mean_after_cost": -0.0007114558669030215,
+              "short_count": 62,
+              "split": "val",
+              "t_stat": 1.3959217206844854
+            },
+            {
+              "count": 115,
+              "hit_rate": 0.4782608695652174,
+              "long_count": 56,
+              "mean": 0.00021528720825279978,
+              "mean_after_cost": -0.0015847127917472002,
+              "short_count": 59,
+              "split": "oos",
+              "t_stat": 0.367354914430224
+            }
+          ],
+          "target": "ETH/USDT"
+        },
+        {
+          "horizon": "1h",
+          "hypothesis": "cross_crypto_slow_diffusion",
+          "lag": "1h",
+          "leader": "BTC/USDT",
+          "params": {
+            "leader_abs_ret_min": 0.0015,
+            "target_underreaction_cap": 0.25
+          },
+          "splits": [
+            {
+              "count": 349,
+              "hit_rate": 0.46418338108882523,
+              "long_count": 197,
+              "mean": -0.000278051660674603,
+              "mean_after_cost": -0.0020780516606746027,
+              "short_count": 152,
+              "split": "train",
+              "t_stat": -0.7101014610208018
+            },
+            {
+              "count": 65,
+              "hit_rate": 0.49230769230769234,
+              "long_count": 32,
+              "mean": 0.0018943433325569888,
+              "mean_after_cost": 9.434333255698888e-05,
+              "short_count": 33,
+              "split": "val",
+              "t_stat": 1.5382225112916637
+            },
+            {
+              "count": 44,
+              "hit_rate": 0.5227272727272727,
+              "long_count": 23,
+              "mean": 0.0010909397763226075,
+              "mean_after_cost": -0.0007090602236773924,
+              "short_count": 21,
+              "split": "oos",
+              "t_stat": 1.3699355209450126
+            }
+          ],
+          "target": "ETH/USDT"
+        },
+        {
+          "horizon": "1h",
+          "hypothesis": "cross_crypto_slow_diffusion",
+          "lag": "1h",
+          "leader": "BTC/USDT",
+          "params": {
+            "leader_abs_ret_min": 0.0015,
+            "target_underreaction_cap": 0.0
+          },
+          "splits": [
+            {
+              "count": 0,
+              "hit_rate": null,
+              "long_count": 0,
+              "mean": null,
+              "mean_after_cost": null,
+              "short_count": 0,
+              "split": "train",
+              "t_stat": null
+            },
+            {
+              "count": 0,
+              "hit_rate": null,
+              "long_count": 0,
+              "mean": null,
+              "mean_after_cost": null,
+              "short_count": 0,
+              "split": "val",
+              "t_stat": null
+            },
+            {
+              "count": 0,
+              "hit_rate": null,
+              "long_count": 0,
+              "mean": null,
+              "mean_after_cost": null,
+              "short_count": 0,
+              "split": "oos",
+              "t_stat": null
+            }
+          ],
+          "target": "ETH/USDT"
+        },
+        {
+          "horizon": "1h",
+          "hypothesis": "cross_crypto_slow_diffusion",
+          "lag": "1h",
+          "leader": "BTC/USDT",
+          "params": {
+            "leader_abs_ret_min": 0.0025,
+            "target_underreaction_cap": 999.0
+          },
+          "splits": [
+            {
+              "count": 3584,
+              "hit_rate": 0.4720982142857143,
+              "long_count": 1842,
+              "mean": 0.00010462001908325648,
+              "mean_after_cost": -0.0016953799809167436,
+              "short_count": 1742,
+              "split": "train",
+              "t_stat": 0.6816888210225084
+            },
+            {
+              "count": 670,
+              "hit_rate": 0.5014925373134328,
+              "long_count": 332,
+              "mean": 0.0006984996428650171,
+              "mean_after_cost": -0.0011015003571349829,
+              "short_count": 338,
+              "split": "val",
+              "t_stat": 1.9733616991952372
+            },
+            {
+              "count": 684,
+              "hit_rate": 0.45614035087719296,
+              "long_count": 342,
+              "mean": -3.58142142050598e-05,
+              "mean_after_cost": -0.0018358142142050598,
+              "short_count": 342,
+              "split": "oos",
+              "t_stat": -0.1349362997083505
+            }
+          ],
+          "target": "ETH/USDT"
+        },
+        {
+          "horizon": "1h",
+          "hypothesis": "cross_crypto_slow_diffusion",
+          "lag": "1h",
+          "leader": "BTC/USDT",
+          "params": {
+            "leader_abs_ret_min": 0.0025,
+            "target_underreaction_cap": 0.5
+          },
+          "splits": [
+            {
+              "count": 466,
+              "hit_rate": 0.48497854077253216,
+              "long_count": 261,
+              "mean": 0.00026061041488438454,
+              "mean_after_cost": -0.0015393895851156154,
+              "short_count": 205,
+              "split": "train",
+              "t_stat": 0.727278044616166
+            },
+            {
+              "count": 85,
+              "hit_rate": 0.4588235294117647,
+              "long_count": 49,
+              "mean": 0.0013345710675528458,
+              "mean_after_cost": -0.00046542893244715415,
+              "short_count": 36,
+              "split": "val",
+              "t_stat": 1.2460381198553376
+            },
+            {
+              "count": 62,
+              "hit_rate": 0.46774193548387094,
+              "long_count": 33,
+              "mean": 0.00021620310356792926,
+              "mean_after_cost": -0.0015837968964320707,
+              "short_count": 29,
+              "split": "oos",
+              "t_stat": 0.23786971210983338
+            }
+          ],
+          "target": "ETH/USDT"
+        },
+        {
+          "horizon": "1h",
+          "hypothesis": "cross_crypto_slow_diffusion",
+          "lag": "1h",
+          "leader": "BTC/USDT",
+          "params": {
+            "leader_abs_ret_min": 0.0025,
+            "target_underreaction_cap": 0.25
+          },
+          "splits": [
+            {
+              "count": 220,
+              "hit_rate": 0.44545454545454544,
+              "long_count": 126,
+              "mean": -0.00033819204643616987,
+              "mean_after_cost": -0.0021381920464361697,
+              "short_count": 94,
+              "split": "train",
+              "t_stat": -0.7193468467431653
+            },
+            {
+              "count": 37,
+              "hit_rate": 0.4594594594594595,
+              "long_count": 21,
+              "mean": 0.0029263584390136614,
+              "mean_after_cost": 0.0011263584390136614,
+              "short_count": 16,
+              "split": "val",
+              "t_stat": 1.5571099470385863
+            },
+            {
+              "count": 20,
+              "hit_rate": 0.45,
+              "long_count": 14,
+              "mean": 0.0015202981274727411,
+              "mean_after_cost": -0.0002797018725272588,
+              "short_count": 6,
+              "split": "oos",
+              "t_stat": 1.2622400931989313
+            }
+          ],
+          "target": "ETH/USDT"
+        },
+        {
+          "horizon": "1h",
+          "hypothesis": "cross_crypto_slow_diffusion",
+          "lag": "1h",
+          "leader": "BTC/USDT",
+          "params": {
+            "leader_abs_ret_min": 0.0025,
+            "target_underreaction_cap": 0.0
+          },
+          "splits": [
+            {
+              "count": 0,
+              "hit_rate": null,
+              "long_count": 0,
+              "mean": null,
+              "mean_after_cost": null,
+              "short_count": 0,
+              "split": "train",
+              "t_stat": null
+            },
+            {
+              "count": 0,
+              "hit_rate": null,
+              "long_count": 0,
+              "mean": null,
+              "mean_after_cost": null,
+              "short_count": 0,
+              "split": "val",
+              "t_stat": null
+            },
+            {
+              "count": 0,
+              "hit_rate": null,
+              "long_count": 0,
+              "mean": null,
+              "mean_after_cost": null,
+              "short_count": 0,
+              "split": "oos",
+              "t_stat": null
+            }
+          ],
+          "target": "ETH/USDT"
+        },
+        {
+          "horizon": "1h",
+          "hypothesis": "cross_crypto_slow_diffusion",
+          "lag": "1h",
+          "leader": "BTC/USDT",
+          "params": {
+            "leader_abs_ret_min": 0.004,
+            "target_underreaction_cap": 999.0
+          },
+          "splits": [
+            {
+              "count": 2074,
+              "hit_rate": 0.46962391513982643,
+              "long_count": 1052,
+              "mean": 0.00021492608994887487,
+              "mean_after_cost": -0.0015850739100511252,
+              "short_count": 1022,
+              "split": "train",
+              "t_stat": 0.9427072446251361
+            },
+            {
+              "count": 419,
+              "hit_rate": 0.5083532219570406,
+              "long_count": 204,
+              "mean": 0.0008151114568152066,
+              "mean_after_cost": -0.0009848885431847933,
+              "short_count": 215,
+              "split": "val",
+              "t_stat": 1.6270488810724786
+            },
+            {
+              "count": 401,
+              "hit_rate": 0.46384039900249374,
+              "long_count": 210,
+              "mean": 0.00019412589177856713,
+              "mean_after_cost": -0.0016058741082214329,
+              "short_count": 191,
+              "split": "oos",
+              "t_stat": 0.5379279913162877
+            }
+          ],
+          "target": "ETH/USDT"
+        },
+        {
+          "horizon": "1h",
+          "hypothesis": "cross_crypto_slow_diffusion",
+          "lag": "1h",
+          "leader": "BTC/USDT",
+          "params": {
+            "leader_abs_ret_min": 0.004,
+            "target_underreaction_cap": 0.5
+          },
+          "splits": [
+            {
+              "count": 230,
+              "hit_rate": 0.508695652173913,
+              "long_count": 138,
+              "mean": 0.00016580243131361275,
+              "mean_after_cost": -0.0016341975686863873,
+              "short_count": 92,
+              "split": "train",
+              "t_stat": 0.2880351048328931
+            },
+            {
+              "count": 41,
+              "hit_rate": 0.4634146341463415,
+              "long_count": 21,
+              "mean": 0.002617917126350175,
+              "mean_after_cost": 0.0008179171263501752,
+              "short_count": 20,
+              "split": "val",
+              "t_stat": 1.6885987643726847
+            },
+            {
+              "count": 23,
+              "hit_rate": 0.5652173913043478,
+              "long_count": 14,
+              "mean": 0.0017035998436542021,
+              "mean_after_cost": -9.640015634579781e-05,
+              "short_count": 9,
+              "split": "oos",
+              "t_stat": 1.0301739914504364
+            }
+          ],
+          "target": "ETH/USDT"
+        },
+        {
+          "horizon": "1h",
+          "hypothesis": "cross_crypto_slow_diffusion",
+          "lag": "1h",
+          "leader": "BTC/USDT",
+          "params": {
+            "leader_abs_ret_min": 0.004,
+            "target_underreaction_cap": 0.25
+          },
+          "splits": [
+            {
+              "count": 117,
+              "hit_rate": 0.48717948717948717,
+              "long_count": 77,
+              "mean": -0.00044496745326259727,
+              "mean_after_cost": -0.002244967453262597,
+              "short_count": 40,
+              "split": "train",
+              "t_stat": -0.6004528314180475
+            },
+            {
+              "count": 19,
+              "hit_rate": 0.47368421052631576,
+              "long_count": 8,
+              "mean": 0.0041311726327661015,
+              "mean_after_cost": 0.0023311726327661015,
+              "short_count": 11,
+              "split": "val",
+              "t_stat": 1.5652310432179521
+            },
+            {
+              "count": 6,
+              "hit_rate": 0.6666666666666666,
+              "long_count": 3,
+              "mean": 0.005177883960630625,
+              "mean_after_cost": 0.003377883960630625,
+              "short_count": 3,
+              "split": "oos",
+              "t_stat": 1.8652276895007414
+            }
+          ],
+          "target": "ETH/USDT"
+        },
+        {
+          "horizon": "1h",
+          "hypothesis": "cross_crypto_slow_diffusion",
+          "lag": "1h",
+          "leader": "BTC/USDT",
+          "params": {
+            "leader_abs_ret_min": 0.004,
+            "target_underreaction_cap": 0.0
+          },
+          "splits": [
+            {
+              "count": 0,
+              "hit_rate": null,
+              "long_count": 0,
+              "mean": null,
+              "mean_after_cost": null,
+              "short_count": 0,
+              "split": "train",
+              "t_stat": null
+            },
+            {
+              "count": 0,
+              "hit_rate": null,
+              "long_count": 0,
+              "mean": null,
+              "mean_after_cost": null,
+              "short_count": 0,
+              "split": "val",
+              "t_stat": null
+            },
+            {
+              "count": 0,
+              "hit_rate": null,
+              "long_count": 0,
+              "mean": null,
+              "mean_after_cost": null,
+              "short_count": 0,
+              "split": "oos",
+              "t_stat": null
+            }
+          ],
+          "target": "ETH/USDT"
+        },
+        {
+          "horizon": "1h",
+          "hypothesis": "cross_crypto_slow_diffusion",
+          "lag": "1h",
+          "leader": "BTC/USDT",
+          "params": {
+            "leader_abs_ret_min": 0.006,
+            "target_underreaction_cap": 999.0
+          },
+          "splits": [
+            {
+              "count": 1110,
+              "hit_rate": 0.4486486486486487,
+              "long_count": 553,
+              "mean": 0.00018372958011795903,
+              "mean_after_cost": -0.001616270419882041,
+              "short_count": 557,
+              "split": "train",
+              "t_stat": 0.515377519728565
+            },
+            {
+              "count": 253,
+              "hit_rate": 0.5217391304347826,
+              "long_count": 126,
+              "mean": 0.0010041951496925555,
+              "mean_after_cost": -0.0007958048503074445,
+              "short_count": 127,
+              "split": "val",
+              "t_stat": 1.434829220254182
+            },
+            {
+              "count": 216,
+              "hit_rate": 0.4722222222222222,
+              "long_count": 118,
+              "mean": 0.00018859607567770303,
+              "mean_after_cost": -0.0016114039243222968,
+              "short_count": 98,
+              "split": "oos",
+              "t_stat": 0.35192364260842657
+            }
+          ],
+          "target": "ETH/USDT"
+        },
+        {
+          "horizon": "1h",
+          "hypothesis": "cross_crypto_slow_diffusion",
+          "lag": "1h",
+          "leader": "BTC/USDT",
+          "params": {
+            "leader_abs_ret_min": 0.006,
+            "target_underreaction_cap": 0.5
+          },
+          "splits": [
+            {
+              "count": 105,
+              "hit_rate": 0.5238095238095238,
+              "long_count": 64,
+              "mean": 0.0001375726031087588,
+              "mean_after_cost": -0.0016624273968912412,
+              "short_count": 41,
+              "split": "train",
+              "t_stat": 0.14001407097950794
+            },
+            {
+              "count": 16,
+              "hit_rate": 0.375,
+              "long_count": 7,
+              "mean": 0.0036306575599337337,
+              "mean_after_cost": 0.0018306575599337338,
+              "short_count": 9,
+              "split": "val",
+              "t_stat": 1.338923827100948
+            },
+            {
+              "count": 7,
+              "hit_rate": 0.7142857142857143,
+              "long_count": 4,
+              "mean": 0.00350196137620516,
+              "mean_after_cost": 0.00170196137620516,
+              "short_count": 3,
+              "split": "oos",
+              "t_stat": 1.103100904163061
+            }
+          ],
+          "target": "ETH/USDT"
+        },
+        {
+          "horizon": "1h",
+          "hypothesis": "cross_crypto_slow_diffusion",
+          "lag": "1h",
+          "leader": "BTC/USDT",
+          "params": {
+            "leader_abs_ret_min": 0.006,
+            "target_underreaction_cap": 0.25
+          },
+          "splits": [
+            {
+              "count": 51,
+              "hit_rate": 0.5490196078431373,
+              "long_count": 35,
+              "mean": -0.001031025731377129,
+              "mean_after_cost": -0.002831025731377129,
+              "short_count": 16,
+              "split": "train",
+              "t_stat": -0.8599090275013727
+            },
+            {
+              "count": 9,
+              "hit_rate": 0.4444444444444444,
+              "long_count": 4,
+              "mean": 0.006038655003670105,
+              "mean_after_cost": 0.004238655003670105,
+              "short_count": 5,
+              "split": "val",
+              "t_stat": 1.6066698896325127
+            },
+            {
+              "count": 1,
+              "hit_rate": 1.0,
+              "long_count": 0,
+              "mean": 0.006208068950740109,
+              "mean_after_cost": 0.004408068950740109,
+              "short_count": 1,
+              "split": "oos",
+              "t_stat": 0.0
+            }
+          ],
+          "target": "ETH/USDT"
+        },
+        {
+          "horizon": "1h",
+          "hypothesis": "cross_crypto_slow_diffusion",
+          "lag": "1h",
+          "leader": "BTC/USDT",
+          "params": {
+            "leader_abs_ret_min": 0.006,
+            "target_underreaction_cap": 0.0
+          },
+          "splits": [
+            {
+              "count": 0,
+              "hit_rate": null,
+              "long_count": 0,
+              "mean": null,
+              "mean_after_cost": null,
+              "short_count": 0,
+              "split": "train",
+              "t_stat": null
+            },
+            {
+              "count": 0,
+              "hit_rate": null,
+              "long_count": 0,
+              "mean": null,
+              "mean_after_cost": null,
+              "short_count": 0,
+              "split": "val",
+              "t_stat": null
+            },
+            {
+              "count": 0,
+              "hit_rate": null,
+              "long_count": 0,
+              "mean": null,
+              "mean_after_cost": null,
+              "short_count": 0,
+              "split": "oos",
+              "t_stat": null
+            }
+          ],
+          "target": "ETH/USDT"
+        },
+        {
+          "horizon": "1h",
+          "hypothesis": "cross_crypto_slow_diffusion",
+          "lag": "1h",
+          "leader": "BTC/USDT",
+          "params": {
+            "leader_abs_ret_min": 0.01,
+            "target_underreaction_cap": 999.0
+          },
+          "splits": [
+            {
+              "count": 378,
+              "hit_rate": 0.4312169312169312,
+              "long_count": 171,
+              "mean": 0.00022608832854066757,
+              "mean_after_cost": -0.0015739116714593325,
+              "short_count": 207,
+              "split": "train",
+              "t_stat": 0.29802120311303665
+            },
+            {
+              "count": 110,
+              "hit_rate": 0.509090909090909,
+              "long_count": 48,
+              "mean": 0.0007369643395236532,
+              "mean_after_cost": -0.0010630356604763467,
+              "short_count": 62,
+              "split": "val",
+              "t_stat": 0.5706001420675899
+            },
+            {
+              "count": 65,
+              "hit_rate": 0.5076923076923077,
+              "long_count": 34,
+              "mean": 0.0012945653008386614,
+              "mean_after_cost": -0.0005054346991613386,
+              "short_count": 31,
+              "split": "oos",
+              "t_stat": 1.2330976404324236
+            }
+          ],
+          "target": "ETH/USDT"
+        },
+        {
+          "horizon": "1h",
+          "hypothesis": "cross_crypto_slow_diffusion",
+          "lag": "1h",
+          "leader": "BTC/USDT",
+          "params": {
+            "leader_abs_ret_min": 0.01,
+            "target_underreaction_cap": 0.5
+          },
+          "splits": [
+            {
+              "count": 23,
+              "hit_rate": 0.391304347826087,
+              "long_count": 14,
+              "mean": 9.253408364138045e-05,
+              "mean_after_cost": -0.0017074659163586194,
+              "short_count": 9,
+              "split": "train",
+              "t_stat": 0.0318151112733862
+            },
+            {
+              "count": 3,
+              "hit_rate": 0.3333333333333333,
+              "long_count": 1,
+              "mean": 0.0017668555159396544,
+              "mean_after_cost": -3.314448406034555e-05,
+              "short_count": 2,
+              "split": "val",
+              "t_stat": 0.1789439264949696
+            },
+            {
+              "count": 1,
+              "hit_rate": 1.0,
+              "long_count": 0,
+              "mean": 0.0029187128202486923,
+              "mean_after_cost": 0.0011187128202486923,
+              "short_count": 1,
+              "split": "oos",
+              "t_stat": 0.0
+            }
+          ],
+          "target": "ETH/USDT"
+        },
+        {
+          "horizon": "1h",
+          "hypothesis": "cross_crypto_slow_diffusion",
+          "lag": "1h",
+          "leader": "BTC/USDT",
+          "params": {
+            "leader_abs_ret_min": 0.01,
+            "target_underreaction_cap": 0.25
+          },
+          "splits": [
+            {
+              "count": 10,
+              "hit_rate": 0.5,
+              "long_count": 8,
+              "mean": -0.001974742473422808,
+              "mean_after_cost": -0.003774742473422808,
+              "short_count": 2,
+              "split": "train",
+              "t_stat": -0.7584201424050192
+            },
+            {
+              "count": 0,
+              "hit_rate": null,
+              "long_count": 0,
+              "mean": null,
+              "mean_after_cost": null,
+              "short_count": 0,
+              "split": "val",
+              "t_stat": null
+            },
+            {
+              "count": 0,
+              "hit_rate": null,
+              "long_count": 0,
+              "mean": null,
+              "mean_after_cost": null,
+              "short_count": 0,
+              "split": "oos",
+              "t_stat": null
+            }
+          ],
+          "target": "ETH/USDT"
+        },
+        {
+          "horizon": "1h",
+          "hypothesis": "cross_crypto_slow_diffusion",
+          "lag": "1h",
+          "leader": "BTC/USDT",
+          "params": {
+            "leader_abs_ret_min": 0.01,
+            "target_underreaction_cap": 0.0
+          },
+          "splits": [
+            {
+              "count": 0,
+              "hit_rate": null,
+              "long_count": 0,
+              "mean": null,
+              "mean_after_cost": null,
+              "short_count": 0,
+              "split": "train",
+              "t_stat": null
+            },
+            {
+              "count": 0,
+              "hit_rate": null,
+              "long_count": 0,
+              "mean": null,
+              "mean_after_cost": null,
+              "short_count": 0,
+              "split": "val",
+              "t_stat": null
+            },
+            {
+              "count": 0,
+              "hit_rate": null,
+              "long_count": 0,
+              "mean": null,
+              "mean_after_cost": null,
+              "short_count": 0,
+              "split": "oos",
+              "t_stat": null
+            }
+          ],
+          "target": "ETH/USDT"
+        },
+        {
+          "horizon": "1h",
+          "hypothesis": "cross_crypto_slow_diffusion",
+          "lag": "1h",
+          "leader": "BTC/USDT",
+          "params": {
+            "leader_abs_ret_min": 0.015,
+            "target_underreaction_cap": 999.0
+          },
+          "splits": [
+            {
+              "count": 151,
+              "hit_rate": 0.40397350993377484,
+              "long_count": 68,
+              "mean": -0.00015608993558825567,
+              "mean_after_cost": -0.0019560899355882556,
+              "short_count": 83,
+              "split": "train",
+              "t_stat": -0.1351978359917653
+            },
+            {
+              "count": 34,
+              "hit_rate": 0.47058823529411764,
+              "long_count": 11,
+              "mean": 0.0004789810601175572,
+              "mean_after_cost": -0.0013210189398824427,
+              "short_count": 23,
+              "split": "val",
+              "t_stat": 0.16156964863613882
+            },
+            {
+              "count": 16,
+              "hit_rate": 0.625,
+              "long_count": 10,
+              "mean": 0.004949861517946366,
+              "mean_after_cost": 0.0031498615179463662,
+              "short_count": 6,
+              "split": "oos",
+              "t_stat": 2.127138097810349
+            }
+          ],
+          "target": "ETH/USDT"
+        },
+        {
+          "horizon": "1h",
+          "hypothesis": "cross_crypto_slow_diffusion",
+          "lag": "1h",
+          "leader": "BTC/USDT",
+          "params": {
+            "leader_abs_ret_min": 0.015,
+            "target_underreaction_cap": 0.5
+          },
+          "splits": [
+            {
+              "count": 7,
+              "hit_rate": 0.2857142857142857,
+              "long_count": 4,
+              "mean": -0.0017345366553545652,
+              "mean_after_cost": -0.0035345366553545653,
+              "short_count": 3,
+              "split": "train",
+              "t_stat": -0.3869155993062144
+            },
+            {
+              "count": 0,
+              "hit_rate": null,
+              "long_count": 0,
+              "mean": null,
+              "mean_after_cost": null,
+              "short_count": 0,
+              "split": "val",
+              "t_stat": null
+            },
+            {
+              "count": 0,
+              "hit_rate": null,
+              "long_count": 0,
+              "mean": null,
+              "mean_after_cost": null,
+              "short_count": 0,
+              "split": "oos",
+              "t_stat": null
+            }
+          ],
+          "target": "ETH/USDT"
+        },
+        {
+          "horizon": "1h",
+          "hypothesis": "cross_crypto_slow_diffusion",
+          "lag": "1h",
+          "leader": "BTC/USDT",
+          "params": {
+            "leader_abs_ret_min": 0.015,
+            "target_underreaction_cap": 0.25
+          },
+          "splits": [
+            {
+              "count": 2,
+              "hit_rate": 0.5,
+              "long_count": 2,
+              "mean": -0.004458450791634039,
+              "mean_after_cost": -0.006258450791634038,
+              "short_count": 0,
+              "split": "train",
+              "t_stat": -0.9638579406764435
+            },
+            {
+              "count": 0,
+              "hit_rate": null,
+              "long_count": 0,
+              "mean": null,
+              "mean_after_cost": null,
+              "short_count": 0,
+              "split": "val",
+              "t_stat": null
+            },
+            {
+              "count": 0,
+              "hit_rate": null,
+              "long_count": 0,
+              "mean": null,
+              "mean_after_cost": null,
+              "short_count": 0,
+              "split": "oos",
+              "t_stat": null
+            }
+          ],
+          "target": "ETH/USDT"
+        }
+      ]
+    },
+    "funding_taker_flow": {
+      "decision": "reject_full_backtest",
+      "hypothesis_family": "funding_taker_flow",
+      "rejected_top": [
+        {
+          "horizon": "8h",
+          "hypothesis": "funding_crowding_unwind",
+          "params": {
+            "flow_abs": 0.12,
+            "funding_abs": 7.5e-05,
+            "momentum_abs": 0.004
+          },
+          "rejected_reason": "train_or_validation_post_cost_edge_non_positive",
+          "splits": [
+            {
+              "count": 77,
+              "hit_rate": 0.5324675324675324,
+              "long_count": 2,
+              "mean": 0.0012368151305583767,
+              "mean_after_cost": -0.0005631848694416233,
+              "short_count": 75,
+              "split": "train",
+              "t_stat": 0.4915473665592362
+            },
+            {
+              "count": 8,
+              "hit_rate": 0.75,
+              "long_count": 3,
+              "mean": 0.011799625300725425,
+              "mean_after_cost": 0.009999625300725425,
+              "short_count": 5,
+              "split": "val",
+              "t_stat": 2.4373358040978066
+            },
+            {
+              "count": 0,
+              "hit_rate": null,
+              "long_count": 0,
+              "mean": null,
+              "mean_after_cost": null,
+              "short_count": 0,
+              "split": "oos",
+              "t_stat": null
+            }
+          ],
+          "symbol": "ETH/USDT"
+        },
+        {
+          "horizon": "8h",
+          "hypothesis": "funding_crowding_unwind",
+          "params": {
+            "flow_abs": 0.12,
+            "funding_abs": 7.5e-05,
+            "momentum_abs": 0.0015
+          },
+          "rejected_reason": "train_or_validation_post_cost_edge_non_positive",
+          "splits": [
+            {
+              "count": 95,
+              "hit_rate": 0.5263157894736842,
+              "long_count": 2,
+              "mean": 0.0012685984067738068,
+              "mean_after_cost": -0.0005314015932261931,
+              "short_count": 93,
+              "split": "train",
+              "t_stat": 0.5734918818749918
+            },
+            {
+              "count": 10,
+              "hit_rate": 0.8,
+              "long_count": 3,
+              "mean": 0.011795501007265018,
+              "mean_after_cost": 0.009995501007265019,
+              "short_count": 7,
+              "split": "val",
+              "t_stat": 3.0886999923930443
+            },
+            {
+              "count": 5,
+              "hit_rate": 0.2,
+              "long_count": 5,
+              "mean": -0.009362448719209281,
+              "mean_after_cost": -0.01116244871920928,
+              "short_count": 0,
+              "split": "oos",
+              "t_stat": -2.367080095147945
+            }
+          ],
+          "symbol": "ETH/USDT"
+        },
+        {
+          "horizon": "8h",
+          "hypothesis": "funding_crowding_unwind",
+          "params": {
+            "flow_abs": 0.06,
+            "funding_abs": 0.00015,
+            "momentum_abs": 0.0025
+          },
+          "rejected_reason": "train_or_validation_post_cost_edge_non_positive",
+          "splits": [
+            {
+              "count": 23,
+              "hit_rate": 0.6086956521739131,
+              "long_count": 21,
+              "mean": 0.0012884966424028931,
+              "mean_after_cost": -0.0005115033575971068,
+              "short_count": 2,
+              "split": "train",
+              "t_stat": 0.25937866400346404
+            },
+            {
+              "count": 16,
+              "hit_rate": 0.625,
+              "long_count": 16,
+              "mean": 0.010692586422432065,
+              "mean_after_cost": 0.008892586422432066,
+              "short_count": 0,
+              "split": "val",
+              "t_stat": 1.3722216242349727
+            },
+            {
+              "count": 4,
+              "hit_rate": 0.25,
+              "long_count": 4,
+              "mean": -0.007552682335727506,
+              "mean_after_cost": -0.009352682335727506,
+              "short_count": 0,
+              "split": "oos",
+              "t_stat": -1.1868505089645585
+            }
+          ],
+          "symbol": "SOL/USDT"
+        },
+        {
+          "horizon": "8h",
+          "hypothesis": "funding_crowding_unwind",
+          "params": {
+            "flow_abs": 0.12,
+            "funding_abs": 7.5e-05,
+            "momentum_abs": 0.001
+          },
+          "rejected_reason": "train_or_validation_post_cost_edge_non_positive",
+          "splits": [
+            {
+              "count": 96,
+              "hit_rate": 0.5208333333333334,
+              "long_count": 2,
+              "mean": 0.0010602815495954407,
+              "mean_after_cost": -0.0007397184504045592,
+              "short_count": 94,
+              "split": "train",
+              "t_stat": 0.48221208901559
+            },
+            {
+              "count": 10,
+              "hit_rate": 0.8,
+              "long_count": 3,
+              "mean": 0.011795501007265018,
+              "mean_after_cost": 0.009995501007265019,
+              "short_count": 7,
+              "split": "val",
+              "t_stat": 3.0886999923930443
+            },
+            {
+              "count": 5,
+              "hit_rate": 0.2,
+              "long_count": 5,
+              "mean": -0.009362448719209281,
+              "mean_after_cost": -0.01116244871920928,
+              "short_count": 0,
+              "split": "oos",
+              "t_stat": -2.367080095147945
+            }
+          ],
+          "symbol": "ETH/USDT"
+        },
+        {
+          "horizon": "8h",
+          "hypothesis": "funding_crowding_unwind",
+          "params": {
+            "flow_abs": 0.12,
+            "funding_abs": 7.5e-05,
+            "momentum_abs": 0.0025
+          },
+          "rejected_reason": "train_or_validation_post_cost_edge_non_positive",
+          "splits": [
+            {
+              "count": 88,
+              "hit_rate": 0.5227272727272727,
+              "long_count": 2,
+              "mean": 0.0009839910143462827,
+              "mean_after_cost": -0.0008160089856537173,
+              "short_count": 86,
+              "split": "train",
+              "t_stat": 0.4160193395976486
+            },
+            {
+              "count": 10,
+              "hit_rate": 0.8,
+              "long_count": 3,
+              "mean": 0.011795501007265018,
+              "mean_after_cost": 0.009995501007265019,
+              "short_count": 7,
+              "split": "val",
+              "t_stat": 3.0886999923930443
+            },
+            {
+              "count": 3,
+              "hit_rate": 0.3333333333333333,
+              "long_count": 3,
+              "mean": -0.010654661863290227,
+              "mean_after_cost": -0.012454661863290226,
+              "short_count": 0,
+              "split": "oos",
+              "t_stat": -1.52360476276581
+            }
+          ],
+          "symbol": "ETH/USDT"
+        },
+        {
+          "horizon": "8h",
+          "hypothesis": "funding_crowding_unwind",
+          "params": {
+            "flow_abs": 0.04,
+            "funding_abs": 7.5e-05,
+            "momentum_abs": 0.004
+          },
+          "rejected_reason": "train_or_validation_post_cost_edge_non_positive",
+          "splits": [
+            {
+              "count": 271,
+              "hit_rate": 0.5608856088560885,
+              "long_count": 8,
+              "mean": 0.001399885146641535,
+              "mean_after_cost": -0.00040011485335846486,
+              "short_count": 263,
+              "split": "train",
+              "t_stat": 1.0128740002551913
+            },
+            {
+              "count": 27,
+              "hit_rate": 0.6296296296296297,
+              "long_count": 13,
+              "mean": 0.008002037715947442,
+              "mean_after_cost": 0.0062020377159474425,
+              "short_count": 14,
+              "split": "val",
+              "t_stat": 1.9611058126495433
+            },
+            {
+              "count": 12,
+              "hit_rate": 0.08333333333333333,
+              "long_count": 9,
+              "mean": -0.004613195384539331,
+              "mean_after_cost": -0.006413195384539331,
+              "short_count": 3,
+              "split": "oos",
+              "t_stat": -1.7483778948282402
+            }
+          ],
+          "symbol": "ETH/USDT"
+        },
+        {
+          "horizon": "4h",
+          "hypothesis": "funding_crowding_unwind",
+          "params": {
+            "flow_abs": 0.04,
+            "funding_abs": 0.00015,
+            "momentum_abs": 0.0015
+          },
+          "rejected_reason": "oos_post_cost_edge_non_positive",
+          "splits": [
+            {
+              "count": 31,
+              "hit_rate": 0.5806451612903226,
+              "long_count": 28,
+              "mean": 0.005052923427605914,
+              "mean_after_cost": 0.0032529234276059142,
+              "short_count": 3,
+              "split": "train",
+              "t_stat": 1.4169706197214145
+            },
+            {
+              "count": 25,
+              "hit_rate": 0.56,
+              "long_count": 25,
+              "mean": 0.0020941834070632792,
+              "mean_after_cost": 0.0002941834070632793,
+              "short_count": 0,
+              "split": "val",
+              "t_stat": 0.5675483883425785
+            },
+            {
+              "count": 7,
+              "hit_rate": 0.2857142857142857,
+              "long_count": 7,
+              "mean": -0.0009037388300368361,
+              "mean_after_cost": -0.002703738830036836,
+              "short_count": 0,
+              "split": "oos",
+              "t_stat": -0.20721620721787995
+            }
+          ],
+          "symbol": "SOL/USDT"
+        },
+        {
+          "horizon": "8h",
+          "hypothesis": "funding_crowding_unwind",
+          "params": {
+            "flow_abs": 0.04,
+            "funding_abs": 7.5e-05,
+            "momentum_abs": 0.0015
+          },
+          "rejected_reason": "train_or_validation_post_cost_edge_non_positive",
+          "splits": [
+            {
+              "count": 370,
+              "hit_rate": 0.5513513513513514,
+              "long_count": 10,
+              "mean": 0.0014056394988838333,
+              "mean_after_cost": -0.00039436050111616664,
+              "short_count": 360,
+              "split": "train",
+              "t_stat": 1.2182570011301461
+            },
+            {
+              "count": 35,
+              "hit_rate": 0.6571428571428571,
+              "long_count": 14,
+              "mean": 0.007152029870771158,
+              "mean_after_cost": 0.005352029870771158,
+              "short_count": 21,
+              "split": "val",
+              "t_stat": 2.213369906200027
+            },
+            {
+              "count": 22,
+              "hit_rate": 0.22727272727272727,
+              "long_count": 17,
+              "mean": -0.0039045513140614167,
+              "mean_after_cost": -0.005704551314061416,
+              "short_count": 5,
+              "split": "oos",
+              "t_stat": -1.7230172859709152
+            }
+          ],
+          "symbol": "ETH/USDT"
+        },
+        {
+          "horizon": "8h",
+          "hypothesis": "funding_crowding_unwind",
+          "params": {
+            "flow_abs": 0.04,
+            "funding_abs": 7.5e-05,
+            "momentum_abs": 0.0025
+          },
+          "rejected_reason": "train_or_validation_post_cost_edge_non_positive",
+          "splits": [
+            {
+              "count": 328,
+              "hit_rate": 0.5487804878048781,
+              "long_count": 9,
+              "mean": 0.0009311506895038584,
+              "mean_after_cost": -0.0008688493104961416,
+              "short_count": 319,
+              "split": "train",
+              "t_stat": 0.7459641449405242
+            },
+            {
+              "count": 29,
+              "hit_rate": 0.6551724137931034,
+              "long_count": 13,
+              "mean": 0.008262518137842335,
+              "mean_after_cost": 0.006462518137842335,
+              "short_count": 16,
+              "split": "val",
+              "t_stat": 2.175342717082495
+            },
+            {
+              "count": 16,
+              "hit_rate": 0.125,
+              "long_count": 12,
+              "mean": -0.006016557585234256,
+              "mean_after_cost": -0.007816557585234255,
+              "short_count": 4,
+              "split": "oos",
+              "t_stat": -2.5760973015656026
+            }
+          ],
+          "symbol": "ETH/USDT"
+        },
+        {
+          "horizon": "8h",
+          "hypothesis": "funding_crowding_unwind",
+          "params": {
+            "flow_abs": 0.06,
+            "funding_abs": 0.00015,
+            "momentum_abs": 0.0015
+          },
+          "rejected_reason": "train_or_validation_post_cost_edge_non_positive",
+          "splits": [
+            {
+              "count": 24,
+              "hit_rate": 0.5833333333333334,
+              "long_count": 22,
+              "mean": 0.0009466534794410897,
+              "mean_after_cost": -0.0008533465205589103,
+              "short_count": 2,
+              "split": "train",
+              "t_stat": 0.19852600568274298
+            },
+            {
+              "count": 17,
+              "hit_rate": 0.5882352941176471,
+              "long_count": 17,
+              "mean": 0.008783485295699467,
+              "mean_after_cost": 0.006983485295699468,
+              "short_count": 0,
+              "split": "val",
+              "t_stat": 1.1611692760319776
+            },
+            {
+              "count": 4,
+              "hit_rate": 0.25,
+              "long_count": 4,
+              "mean": -0.007552682335727506,
+              "mean_after_cost": -0.009352682335727506,
+              "short_count": 0,
+              "split": "oos",
+              "t_stat": -1.1868505089645585
+            }
+          ],
+          "symbol": "SOL/USDT"
+        }
+      ],
+      "screen_gate": "train and validation post-cost positive; OOS must also have enough events and positive post-cost edge before full backtest",
+      "survivor_count": 0,
+      "survivors": [],
+      "symbol_summaries": [
+        {
+          "decision_rows": 5840,
+          "peak_rss_mib": 1712.71875,
+          "symbol": "BTC/USDT"
+        },
+        {
+          "decision_rows": 5847,
+          "peak_rss_mib": 2098.17578125,
+          "symbol": "ETH/USDT"
+        },
+        {
+          "decision_rows": 0,
+          "peak_rss_mib": 2397.10546875,
+          "symbol": "BNB/USDT"
+        },
+        {
+          "decision_rows": 5834,
+          "peak_rss_mib": 2426.625,
+          "symbol": "SOL/USDT"
+        },
+        {
+          "decision_rows": 0,
+          "peak_rss_mib": 2471.16015625,
+          "symbol": "TRX/USDT"
+        }
+      ],
+      "top_ranked": [
+        {
+          "horizon": "8h",
+          "hypothesis": "funding_crowding_unwind",
+          "params": {
+            "flow_abs": 0.12,
+            "funding_abs": 7.5e-05,
+            "momentum_abs": 0.004
+          },
+          "splits": [
+            {
+              "count": 77,
+              "hit_rate": 0.5324675324675324,
+              "long_count": 2,
+              "mean": 0.0012368151305583767,
+              "mean_after_cost": -0.0005631848694416233,
+              "short_count": 75,
+              "split": "train",
+              "t_stat": 0.4915473665592362
+            },
+            {
+              "count": 8,
+              "hit_rate": 0.75,
+              "long_count": 3,
+              "mean": 0.011799625300725425,
+              "mean_after_cost": 0.009999625300725425,
+              "short_count": 5,
+              "split": "val",
+              "t_stat": 2.4373358040978066
+            },
+            {
+              "count": 0,
+              "hit_rate": null,
+              "long_count": 0,
+              "mean": null,
+              "mean_after_cost": null,
+              "short_count": 0,
+              "split": "oos",
+              "t_stat": null
+            }
+          ],
+          "symbol": "ETH/USDT"
+        },
+        {
+          "horizon": "8h",
+          "hypothesis": "funding_crowding_unwind",
+          "params": {
+            "flow_abs": 0.12,
+            "funding_abs": 7.5e-05,
+            "momentum_abs": 0.0015
+          },
+          "splits": [
+            {
+              "count": 95,
+              "hit_rate": 0.5263157894736842,
+              "long_count": 2,
+              "mean": 0.0012685984067738068,
+              "mean_after_cost": -0.0005314015932261931,
+              "short_count": 93,
+              "split": "train",
+              "t_stat": 0.5734918818749918
+            },
+            {
+              "count": 10,
+              "hit_rate": 0.8,
+              "long_count": 3,
+              "mean": 0.011795501007265018,
+              "mean_after_cost": 0.009995501007265019,
+              "short_count": 7,
+              "split": "val",
+              "t_stat": 3.0886999923930443
+            },
+            {
+              "count": 5,
+              "hit_rate": 0.2,
+              "long_count": 5,
+              "mean": -0.009362448719209281,
+              "mean_after_cost": -0.01116244871920928,
+              "short_count": 0,
+              "split": "oos",
+              "t_stat": -2.367080095147945
+            }
+          ],
+          "symbol": "ETH/USDT"
+        },
+        {
+          "horizon": "8h",
+          "hypothesis": "funding_crowding_unwind",
+          "params": {
+            "flow_abs": 0.06,
+            "funding_abs": 0.00015,
+            "momentum_abs": 0.0025
+          },
+          "splits": [
+            {
+              "count": 23,
+              "hit_rate": 0.6086956521739131,
+              "long_count": 21,
+              "mean": 0.0012884966424028931,
+              "mean_after_cost": -0.0005115033575971068,
+              "short_count": 2,
+              "split": "train",
+              "t_stat": 0.25937866400346404
+            },
+            {
+              "count": 16,
+              "hit_rate": 0.625,
+              "long_count": 16,
+              "mean": 0.010692586422432065,
+              "mean_after_cost": 0.008892586422432066,
+              "short_count": 0,
+              "split": "val",
+              "t_stat": 1.3722216242349727
+            },
+            {
+              "count": 4,
+              "hit_rate": 0.25,
+              "long_count": 4,
+              "mean": -0.007552682335727506,
+              "mean_after_cost": -0.009352682335727506,
+              "short_count": 0,
+              "split": "oos",
+              "t_stat": -1.1868505089645585
+            }
+          ],
+          "symbol": "SOL/USDT"
+        },
+        {
+          "horizon": "8h",
+          "hypothesis": "funding_crowding_unwind",
+          "params": {
+            "flow_abs": 0.12,
+            "funding_abs": 7.5e-05,
+            "momentum_abs": 0.001
+          },
+          "splits": [
+            {
+              "count": 96,
+              "hit_rate": 0.5208333333333334,
+              "long_count": 2,
+              "mean": 0.0010602815495954407,
+              "mean_after_cost": -0.0007397184504045592,
+              "short_count": 94,
+              "split": "train",
+              "t_stat": 0.48221208901559
+            },
+            {
+              "count": 10,
+              "hit_rate": 0.8,
+              "long_count": 3,
+              "mean": 0.011795501007265018,
+              "mean_after_cost": 0.009995501007265019,
+              "short_count": 7,
+              "split": "val",
+              "t_stat": 3.0886999923930443
+            },
+            {
+              "count": 5,
+              "hit_rate": 0.2,
+              "long_count": 5,
+              "mean": -0.009362448719209281,
+              "mean_after_cost": -0.01116244871920928,
+              "short_count": 0,
+              "split": "oos",
+              "t_stat": -2.367080095147945
+            }
+          ],
+          "symbol": "ETH/USDT"
+        },
+        {
+          "horizon": "8h",
+          "hypothesis": "funding_crowding_unwind",
+          "params": {
+            "flow_abs": 0.12,
+            "funding_abs": 7.5e-05,
+            "momentum_abs": 0.0025
+          },
+          "splits": [
+            {
+              "count": 88,
+              "hit_rate": 0.5227272727272727,
+              "long_count": 2,
+              "mean": 0.0009839910143462827,
+              "mean_after_cost": -0.0008160089856537173,
+              "short_count": 86,
+              "split": "train",
+              "t_stat": 0.4160193395976486
+            },
+            {
+              "count": 10,
+              "hit_rate": 0.8,
+              "long_count": 3,
+              "mean": 0.011795501007265018,
+              "mean_after_cost": 0.009995501007265019,
+              "short_count": 7,
+              "split": "val",
+              "t_stat": 3.0886999923930443
+            },
+            {
+              "count": 3,
+              "hit_rate": 0.3333333333333333,
+              "long_count": 3,
+              "mean": -0.010654661863290227,
+              "mean_after_cost": -0.012454661863290226,
+              "short_count": 0,
+              "split": "oos",
+              "t_stat": -1.52360476276581
+            }
+          ],
+          "symbol": "ETH/USDT"
+        },
+        {
+          "horizon": "8h",
+          "hypothesis": "funding_crowding_unwind",
+          "params": {
+            "flow_abs": 0.04,
+            "funding_abs": 7.5e-05,
+            "momentum_abs": 0.004
+          },
+          "splits": [
+            {
+              "count": 271,
+              "hit_rate": 0.5608856088560885,
+              "long_count": 8,
+              "mean": 0.001399885146641535,
+              "mean_after_cost": -0.00040011485335846486,
+              "short_count": 263,
+              "split": "train",
+              "t_stat": 1.0128740002551913
+            },
+            {
+              "count": 27,
+              "hit_rate": 0.6296296296296297,
+              "long_count": 13,
+              "mean": 0.008002037715947442,
+              "mean_after_cost": 0.0062020377159474425,
+              "short_count": 14,
+              "split": "val",
+              "t_stat": 1.9611058126495433
+            },
+            {
+              "count": 12,
+              "hit_rate": 0.08333333333333333,
+              "long_count": 9,
+              "mean": -0.004613195384539331,
+              "mean_after_cost": -0.006413195384539331,
+              "short_count": 3,
+              "split": "oos",
+              "t_stat": -1.7483778948282402
+            }
+          ],
+          "symbol": "ETH/USDT"
+        },
+        {
+          "horizon": "4h",
+          "hypothesis": "funding_crowding_unwind",
+          "params": {
+            "flow_abs": 0.04,
+            "funding_abs": 0.00015,
+            "momentum_abs": 0.0015
+          },
+          "splits": [
+            {
+              "count": 31,
+              "hit_rate": 0.5806451612903226,
+              "long_count": 28,
+              "mean": 0.005052923427605914,
+              "mean_after_cost": 0.0032529234276059142,
+              "short_count": 3,
+              "split": "train",
+              "t_stat": 1.4169706197214145
+            },
+            {
+              "count": 25,
+              "hit_rate": 0.56,
+              "long_count": 25,
+              "mean": 0.0020941834070632792,
+              "mean_after_cost": 0.0002941834070632793,
+              "short_count": 0,
+              "split": "val",
+              "t_stat": 0.5675483883425785
+            },
+            {
+              "count": 7,
+              "hit_rate": 0.2857142857142857,
+              "long_count": 7,
+              "mean": -0.0009037388300368361,
+              "mean_after_cost": -0.002703738830036836,
+              "short_count": 0,
+              "split": "oos",
+              "t_stat": -0.20721620721787995
+            }
+          ],
+          "symbol": "SOL/USDT"
+        },
+        {
+          "horizon": "8h",
+          "hypothesis": "funding_crowding_unwind",
+          "params": {
+            "flow_abs": 0.04,
+            "funding_abs": 7.5e-05,
+            "momentum_abs": 0.0015
+          },
+          "splits": [
+            {
+              "count": 370,
+              "hit_rate": 0.5513513513513514,
+              "long_count": 10,
+              "mean": 0.0014056394988838333,
+              "mean_after_cost": -0.00039436050111616664,
+              "short_count": 360,
+              "split": "train",
+              "t_stat": 1.2182570011301461
+            },
+            {
+              "count": 35,
+              "hit_rate": 0.6571428571428571,
+              "long_count": 14,
+              "mean": 0.007152029870771158,
+              "mean_after_cost": 0.005352029870771158,
+              "short_count": 21,
+              "split": "val",
+              "t_stat": 2.213369906200027
+            },
+            {
+              "count": 22,
+              "hit_rate": 0.22727272727272727,
+              "long_count": 17,
+              "mean": -0.0039045513140614167,
+              "mean_after_cost": -0.005704551314061416,
+              "short_count": 5,
+              "split": "oos",
+              "t_stat": -1.7230172859709152
+            }
+          ],
+          "symbol": "ETH/USDT"
+        },
+        {
+          "horizon": "8h",
+          "hypothesis": "funding_crowding_unwind",
+          "params": {
+            "flow_abs": 0.04,
+            "funding_abs": 7.5e-05,
+            "momentum_abs": 0.0025
+          },
+          "splits": [
+            {
+              "count": 328,
+              "hit_rate": 0.5487804878048781,
+              "long_count": 9,
+              "mean": 0.0009311506895038584,
+              "mean_after_cost": -0.0008688493104961416,
+              "short_count": 319,
+              "split": "train",
+              "t_stat": 0.7459641449405242
+            },
+            {
+              "count": 29,
+              "hit_rate": 0.6551724137931034,
+              "long_count": 13,
+              "mean": 0.008262518137842335,
+              "mean_after_cost": 0.006462518137842335,
+              "short_count": 16,
+              "split": "val",
+              "t_stat": 2.175342717082495
+            },
+            {
+              "count": 16,
+              "hit_rate": 0.125,
+              "long_count": 12,
+              "mean": -0.006016557585234256,
+              "mean_after_cost": -0.007816557585234255,
+              "short_count": 4,
+              "split": "oos",
+              "t_stat": -2.5760973015656026
+            }
+          ],
+          "symbol": "ETH/USDT"
+        },
+        {
+          "horizon": "8h",
+          "hypothesis": "funding_crowding_unwind",
+          "params": {
+            "flow_abs": 0.06,
+            "funding_abs": 0.00015,
+            "momentum_abs": 0.0015
+          },
+          "splits": [
+            {
+              "count": 24,
+              "hit_rate": 0.5833333333333334,
+              "long_count": 22,
+              "mean": 0.0009466534794410897,
+              "mean_after_cost": -0.0008533465205589103,
+              "short_count": 2,
+              "split": "train",
+              "t_stat": 0.19852600568274298
+            },
+            {
+              "count": 17,
+              "hit_rate": 0.5882352941176471,
+              "long_count": 17,
+              "mean": 0.008783485295699467,
+              "mean_after_cost": 0.006983485295699468,
+              "short_count": 0,
+              "split": "val",
+              "t_stat": 1.1611692760319776
+            },
+            {
+              "count": 4,
+              "hit_rate": 0.25,
+              "long_count": 4,
+              "mean": -0.007552682335727506,
+              "mean_after_cost": -0.009352682335727506,
+              "short_count": 0,
+              "split": "oos",
+              "t_stat": -1.1868505089645585
+            }
+          ],
+          "symbol": "SOL/USDT"
+        },
+        {
+          "horizon": "4h",
+          "hypothesis": "funding_crowding_unwind",
+          "params": {
+            "flow_abs": 0.04,
+            "funding_abs": 0.0001,
+            "momentum_abs": 0.004
+          },
+          "splits": [
+            {
+              "count": 75,
+              "hit_rate": 0.48,
+              "long_count": 1,
+              "mean": 0.0013520765831731014,
+              "mean_after_cost": -0.00044792341682689855,
+              "short_count": 74,
+              "split": "train",
+              "t_stat": 1.0342496073480834
+            },
+            {
+              "count": 5,
+              "hit_rate": 0.2,
+              "long_count": 3,
+              "mean": 0.006936750689075688,
+              "mean_after_cost": 0.005136750689075688,
+              "short_count": 2,
+              "split": "val",
+              "t_stat": 0.6841204293872694
+            },
+            {
+              "count": 1,
+              "hit_rate": 0.0,
+              "long_count": 1,
+              "mean": -0.0047772066349138775,
+              "mean_after_cost": -0.006577206634913877,
+              "short_count": 0,
+              "split": "oos",
+              "t_stat": 0.0
+            }
+          ],
+          "symbol": "BTC/USDT"
+        },
+        {
+          "horizon": "8h",
+          "hypothesis": "flow_momentum_continuation",
+          "params": {
+            "flow_abs": 0.08,
+            "funding_cap": 0.00025,
+            "momentum_abs": 0.004
+          },
+          "splits": [
+            {
+              "count": 875,
+              "hit_rate": 0.5154285714285715,
+              "long_count": 321,
+              "mean": 0.001304203585142176,
+              "mean_after_cost": -0.000495796414857824,
+              "short_count": 554,
+              "split": "train",
+              "t_stat": 1.5261808114772633
+            },
+            {
+              "count": 107,
+              "hit_rate": 0.5607476635514018,
+              "long_count": 51,
+              "mean": 0.0050817505595888894,
+              "mean_after_cost": 0.0032817505595888895,
+              "short_count": 56,
+              "split": "val",
+              "t_stat": 1.9445847286620461
+            },
+            {
+              "count": 135,
+              "hit_rate": 0.48148148148148145,
+              "long_count": 57,
+              "mean": -0.0009760201243045667,
+              "mean_after_cost": -0.0027760201243045668,
+              "short_count": 78,
+              "split": "oos",
+              "t_stat": -0.6450865027168284
+            }
+          ],
+          "symbol": "SOL/USDT"
+        },
+        {
+          "horizon": "8h",
+          "hypothesis": "funding_crowding_unwind",
+          "params": {
+            "flow_abs": 0.06,
+            "funding_abs": 0.00015,
+            "momentum_abs": 0.001
+          },
+          "splits": [
+            {
+              "count": 25,
+              "hit_rate": 0.56,
+              "long_count": 23,
+              "mean": 0.0007582108664141796,
+              "mean_after_cost": -0.0010417891335858204,
+              "short_count": 2,
+              "split": "train",
+              "t_stat": 0.16563577862536935
+            },
+            {
+              "count": 18,
+              "hit_rate": 0.6111111111111112,
+              "long_count": 18,
+              "mean": 0.008702221407932456,
+              "mean_after_cost": 0.006902221407932457,
+              "short_count": 0,
+              "split": "val",
+              "t_stat": 1.220132106010486
+            },
+            {
+              "count": 4,
+              "hit_rate": 0.25,
+              "long_count": 4,
+              "mean": -0.007552682335727506,
+              "mean_after_cost": -0.009352682335727506,
+              "short_count": 0,
+              "split": "oos",
+              "t_stat": -1.1868505089645585
+            }
+          ],
+          "symbol": "SOL/USDT"
+        },
+        {
+          "horizon": "4h",
+          "hypothesis": "funding_crowding_unwind",
+          "params": {
+            "flow_abs": 0.04,
+            "funding_abs": 0.00015,
+            "momentum_abs": 0.001
+          },
+          "splits": [
+            {
+              "count": 32,
+              "hit_rate": 0.5625,
+              "long_count": 29,
+              "mean": 0.0048075344828778475,
+              "mean_after_cost": 0.0030075344828778476,
+              "short_count": 3,
+              "split": "train",
+              "t_stat": 1.388867624376938
+            },
+            {
+              "count": 27,
+              "hit_rate": 0.5555555555555556,
+              "long_count": 27,
+              "mean": 0.0010872358598858264,
+              "mean_after_cost": -0.0007127641401141736,
+              "short_count": 0,
+              "split": "val",
+              "t_stat": 0.30045102669346807
+            },
+            {
+              "count": 7,
+              "hit_rate": 0.2857142857142857,
+              "long_count": 7,
+              "mean": -0.0009037388300368361,
+              "mean_after_cost": -0.002703738830036836,
+              "short_count": 0,
+              "split": "oos",
+              "t_stat": -0.20721620721787995
+            }
+          ],
+          "symbol": "SOL/USDT"
+        },
+        {
+          "horizon": "4h",
+          "hypothesis": "funding_crowding_unwind",
+          "params": {
+            "flow_abs": 0.04,
+            "funding_abs": 0.0001,
+            "momentum_abs": 0.0025
+          },
+          "splits": [
+            {
+              "count": 128,
+              "hit_rate": 0.484375,
+              "long_count": 3,
+              "mean": 0.0005928333555705817,
+              "mean_after_cost": -0.0012071666444294182,
+              "short_count": 125,
+              "split": "train",
+              "t_stat": 0.6356535790163684
+            },
+            {
+              "count": 5,
+              "hit_rate": 0.2,
+              "long_count": 3,
+              "mean": 0.006936750689075688,
+              "mean_after_cost": 0.005136750689075688,
+              "short_count": 2,
+              "split": "val",
+              "t_stat": 0.6841204293872694
+            },
+            {
+              "count": 2,
+              "hit_rate": 0.0,
+              "long_count": 2,
+              "mean": -0.004319651340490005,
+              "mean_after_cost": -0.0061196513404900045,
+              "short_count": 0,
+              "split": "oos",
+              "t_stat": -9.440719828035348
+            }
+          ],
+          "symbol": "BTC/USDT"
+        },
+        {
+          "horizon": "8h",
+          "hypothesis": "flow_momentum_continuation",
+          "params": {
+            "flow_abs": 0.12,
+            "funding_cap": 0.00025,
+            "momentum_abs": 0.0025
+          },
+          "splits": [
+            {
+              "count": 427,
+              "hit_rate": 0.5409836065573771,
+              "long_count": 158,
+              "mean": 0.0014391887422236388,
+              "mean_after_cost": -0.0003608112577763612,
+              "short_count": 269,
+              "split": "train",
+              "t_stat": 1.3561617294432775
+            },
+            {
+              "count": 61,
+              "hit_rate": 0.5737704918032787,
+              "long_count": 33,
+              "mean": 0.004266394423896339,
+              "mean_after_cost": 0.002466394423896339,
+              "short_count": 28,
+              "split": "val",
+              "t_stat": 1.9335166685006542
+            },
+            {
+              "count": 77,
+              "hit_rate": 0.4935064935064935,
+              "long_count": 39,
+              "mean": -0.001015264683689909,
+              "mean_after_cost": -0.002815264683689909,
+              "short_count": 38,
+              "split": "oos",
+              "t_stat": -0.4524275709557037
+            }
+          ],
+          "symbol": "ETH/USDT"
+        },
+        {
+          "horizon": "8h",
+          "hypothesis": "funding_crowding_unwind",
+          "params": {
+            "flow_abs": 0.08,
+            "funding_abs": 7.5e-05,
+            "momentum_abs": 0.004
+          },
+          "splits": [
+            {
+              "count": 161,
+              "hit_rate": 0.5900621118012422,
+              "long_count": 4,
+              "mean": 0.0027912409441795045,
+              "mean_after_cost": 0.0009912409441795045,
+              "short_count": 157,
+              "split": "train",
+              "t_stat": 1.5715867824797736
+            },
+            {
+              "count": 15,
+              "hit_rate": 0.6,
+              "long_count": 6,
+              "mean": 0.004925027990277357,
+              "mean_after_cost": 0.003125027990277357,
+              "short_count": 9,
+              "split": "val",
+              "t_stat": 1.1690081397062824
+            },
+            {
+              "count": 7,
+              "hit_rate": 0.14285714285714285,
+              "long_count": 4,
+              "mean": -0.005191293909309677,
+              "mean_after_cost": -0.006991293909309677,
+              "short_count": 3,
+              "split": "oos",
+              "t_stat": -1.1570119351553347
+            }
+          ],
+          "symbol": "ETH/USDT"
+        },
+        {
+          "horizon": "8h",
+          "hypothesis": "flow_momentum_continuation",
+          "params": {
+            "flow_abs": 0.12,
+            "funding_cap": 0.00025,
+            "momentum_abs": 0.0015
+          },
+          "splits": [
+            {
+              "count": 467,
+              "hit_rate": 0.5267665952890792,
+              "long_count": 177,
+              "mean": 0.001163490942040358,
+              "mean_after_cost": -0.000636509057959642,
+              "short_count": 290,
+              "split": "train",
+              "t_stat": 1.1799541817565105
+            },
+            {
+              "count": 71,
+              "hit_rate": 0.5774647887323944,
+              "long_count": 36,
+              "mean": 0.004469116643734097,
+              "mean_after_cost": 0.002669116643734097,
+              "short_count": 35,
+              "split": "val",
+              "t_stat": 2.1636256980722384
+            },
+            {
+              "count": 91,
+              "hit_rate": 0.46153846153846156,
+              "long_count": 48,
+              "mean": -0.00109538961149755,
+              "mean_after_cost": -0.00289538961149755,
+              "short_count": 43,
+              "split": "oos",
+              "t_stat": -0.5497783263028077
+            }
+          ],
+          "symbol": "ETH/USDT"
+        },
+        {
+          "horizon": "4h",
+          "hypothesis": "funding_crowding_unwind",
+          "params": {
+            "flow_abs": 0.04,
+            "funding_abs": 0.00015,
+            "momentum_abs": 0.0025
+          },
+          "splits": [
+            {
+              "count": 30,
+              "hit_rate": 0.6,
+              "long_count": 27,
+              "mean": 0.005358946617111168,
+              "mean_after_cost": 0.0035589466171111676,
+              "short_count": 3,
+              "split": "train",
+              "t_stat": 1.458884183999998
+            },
+            {
+              "count": 24,
+              "hit_rate": 0.5416666666666666,
+              "long_count": 24,
+              "mean": 0.0016283360864836661,
+              "mean_after_cost": -0.00017166391351633383,
+              "short_count": 0,
+              "split": "val",
+              "t_stat": 0.4266926400889612
+            },
+            {
+              "count": 5,
+              "hit_rate": 0.2,
+              "long_count": 5,
+              "mean": -0.0038560290945646837,
+              "mean_after_cost": -0.005656029094564684,
+              "short_count": 0,
+              "split": "oos",
+              "t_stat": -0.7862861709076088
+            }
+          ],
+          "symbol": "SOL/USDT"
+        },
+        {
+          "horizon": "4h",
+          "hypothesis": "funding_crowding_unwind",
+          "params": {
+            "flow_abs": 0.06,
+            "funding_abs": 0.0001,
+            "momentum_abs": 0.001
+          },
+          "splits": [
+            {
+              "count": 171,
+              "hit_rate": 0.4678362573099415,
+              "long_count": 3,
+              "mean": 0.00011282350141978033,
+              "mean_after_cost": -0.0016871764985802195,
+              "short_count": 168,
+              "split": "train",
+              "t_stat": 0.15702324488840666
+            },
+            {
+              "count": 5,
+              "hit_rate": 0.4,
+              "long_count": 2,
+              "mean": 0.008176194040507578,
+              "mean_after_cost": 0.006376194040507578,
+              "short_count": 3,
+              "split": "val",
+              "t_stat": 0.825714603465428
+            },
+            {
+              "count": 4,
+              "hit_rate": 0.0,
+              "long_count": 4,
+              "mean": -0.006554209214972712,
+              "mean_after_cost": -0.008354209214972711,
+              "short_count": 0,
+              "split": "oos",
+              "t_stat": -2.6863839042092534
+            }
+          ],
+          "symbol": "BTC/USDT"
+        },
+        {
+          "horizon": "8h",
+          "hypothesis": "flow_momentum_continuation",
+          "params": {
+            "flow_abs": 0.12,
+            "funding_cap": 0.00025,
+            "momentum_abs": 0.004
+          },
+          "splits": [
+            {
+              "count": 400,
+              "hit_rate": 0.535,
+              "long_count": 119,
+              "mean": 0.0008202861264214745,
+              "mean_after_cost": -0.0009797138735785256,
+              "short_count": 281,
+              "split": "train",
+              "t_stat": 0.6283214282763488
+            },
+            {
+              "count": 43,
+              "hit_rate": 0.5348837209302325,
+              "long_count": 21,
+              "mean": 0.0031821918522130493,
+              "mean_after_cost": 0.0013821918522130493,
+              "short_count": 22,
+              "split": "val",
+              "t_stat": 0.7242777557869723
+            },
+            {
+              "count": 66,
+              "hit_rate": 0.5454545454545454,
+              "long_count": 24,
+              "mean": 0.0018862704202764328,
+              "mean_after_cost": 8.627042027643285e-05,
+              "short_count": 42,
+              "split": "oos",
+              "t_stat": 0.997636776732728
+            }
+          ],
+          "symbol": "SOL/USDT"
+        },
+        {
+          "horizon": "8h",
+          "hypothesis": "flow_momentum_continuation",
+          "params": {
+            "flow_abs": 0.12,
+            "funding_cap": 0.0001,
+            "momentum_abs": 0.0015
+          },
+          "splits": [
+            {
+              "count": 467,
+              "hit_rate": 0.5267665952890792,
+              "long_count": 177,
+              "mean": 0.001163490942040358,
+              "mean_after_cost": -0.000636509057959642,
+              "short_count": 290,
+              "split": "train",
+              "t_stat": 1.1799541817565105
+            },
+            {
+              "count": 67,
+              "hit_rate": 0.5671641791044776,
+              "long_count": 34,
+              "mean": 0.0042199150557876595,
+              "mean_after_cost": 0.0024199150557876596,
+              "short_count": 33,
+              "split": "val",
+              "t_stat": 1.9575248455092757
+            },
+            {
+              "count": 83,
+              "hit_rate": 0.4819277108433735,
+              "long_count": 45,
+              "mean": -0.0008927780390082829,
+              "mean_after_cost": -0.002692778039008283,
+              "short_count": 38,
+              "split": "oos",
+              "t_stat": -0.4101271781775184
+            }
+          ],
+          "symbol": "ETH/USDT"
+        },
+        {
+          "horizon": "8h",
+          "hypothesis": "flow_momentum_continuation",
+          "params": {
+            "flow_abs": 0.12,
+            "funding_cap": 0.0001,
+            "momentum_abs": 0.0025
+          },
+          "splits": [
+            {
+              "count": 427,
+              "hit_rate": 0.5409836065573771,
+              "long_count": 158,
+              "mean": 0.0014391887422236388,
+              "mean_after_cost": -0.0003608112577763612,
+              "short_count": 269,
+              "split": "train",
+              "t_stat": 1.3561617294432775
+            },
+            {
+              "count": 57,
+              "hit_rate": 0.5614035087719298,
+              "long_count": 31,
+              "mean": 0.003959247138426824,
+              "mean_after_cost": 0.002159247138426824,
+              "short_count": 26,
+              "split": "val",
+              "t_stat": 1.707748622666165
+            },
+            {
+              "count": 72,
+              "hit_rate": 0.5,
+              "long_count": 38,
+              "mean": -0.0009679318532704965,
+              "mean_after_cost": -0.0027679318532704963,
+              "short_count": 34,
+              "split": "oos",
+              "t_stat": -0.4043107671876868
+            }
+          ],
+          "symbol": "ETH/USDT"
+        },
+        {
+          "horizon": "8h",
+          "hypothesis": "flow_momentum_continuation",
+          "params": {
+            "flow_abs": 0.12,
+            "funding_cap": 0.00025,
+            "momentum_abs": 0.0015
+          },
+          "splits": [
+            {
+              "count": 492,
+              "hit_rate": 0.524390243902439,
+              "long_count": 143,
+              "mean": 0.0005803607425302143,
+              "mean_after_cost": -0.0012196392574697857,
+              "short_count": 349,
+              "split": "train",
+              "t_stat": 0.5058971770205959
+            },
+            {
+              "count": 62,
+              "hit_rate": 0.5483870967741935,
+              "long_count": 27,
+              "mean": 0.0038029081331416993,
+              "mean_after_cost": 0.0020029081331416993,
+              "short_count": 35,
+              "split": "val",
+              "t_stat": 1.0624529730281644
+            },
+            {
+              "count": 103,
+              "hit_rate": 0.5436893203883495,
+              "long_count": 42,
+              "mean": 0.0010582093455701813,
+              "mean_after_cost": -0.0007417906544298187,
+              "short_count": 61,
+              "split": "oos",
+              "t_stat": 0.7824305390144785
+            }
+          ],
+          "symbol": "SOL/USDT"
+        },
+        {
+          "horizon": "8h",
+          "hypothesis": "flow_momentum_continuation",
+          "params": {
+            "flow_abs": 0.12,
+            "funding_cap": 0.00015,
+            "momentum_abs": 0.0015
+          },
+          "splits": [
+            {
+              "count": 467,
+              "hit_rate": 0.5267665952890792,
+              "long_count": 177,
+              "mean": 0.001163490942040358,
+              "mean_after_cost": -0.000636509057959642,
+              "short_count": 290,
+              "split": "train",
+              "t_stat": 1.1799541817565105
+            },
+            {
+              "count": 70,
+              "hit_rate": 0.5714285714285714,
+              "long_count": 36,
+              "mean": 0.004189413766023055,
+              "mean_after_cost": 0.0023894137660230553,
+              "short_count": 34,
+              "split": "val",
+              "t_stat": 2.0180305201129634
+            },
+            {
+              "count": 84,
+              "hit_rate": 0.47619047619047616,
+              "long_count": 45,
+              "mean": -0.0009089036837077868,
+              "mean_after_cost": -0.002708903683707787,
+              "short_count": 39,
+              "split": "oos",
+              "t_stat": -0.42258436533269694
+            }
+          ],
+          "symbol": "ETH/USDT"
+        }
+      ]
+    }
+  },
+  "selection_contract": {
+    "full_backtest_rule": "exactly_one_mode_after_raw_first_screen_survival",
+    "memory_rule": "RSS must stay below 8GB",
+    "rejected_backtest_policy": "save rejected hypothesis and reason; do not threshold-mine in full backtest"
+  },
+  "source_links": [
+    {
+      "reason": "Cross-cryptocurrency intraday return predictability and lead-lag/seesaw effects.",
+      "title": "A Seesaw Effect in the Cryptocurrency Market",
+      "url": "https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3465924"
+    },
+    {
+      "reason": "Perpetual-futures return predictors include basis, momentum, volume and price-volume factors.",
+      "title": "Anatomy of cryptocurrency perpetual futures returns",
+      "url": "https://www.research.ed.ac.uk/en/publications/anatomy-of-cryptocurrency-perpetual-futures-returns/"
+    },
+    {
+      "reason": "Funding-rate replay field used by the funding/taker screen.",
+      "title": "Binance USD\u24c8-M Funding Rate History API",
+      "url": "https://developers.binance.com/docs/derivatives/usds-margined-futures/market-data/rest-api/Get-Funding-Rate-History"
+    },
+    {
+      "reason": "Taker buy/sell volume is the raw flow field behind the taker-flow screen.",
+      "title": "Binance USD\u24c8-M Taker Buy/Sell Volume API",
+      "url": "https://developers.binance.com/docs/derivatives/usds-margined-futures/market-data/rest-api/Taker-BuySell-Volume"
+    },
+    {
+      "reason": "Documents the one-month OI-history limit that makes OI replay unsuitable for old OOS claims here.",
+      "title": "Binance USD\u24c8-M Open Interest Statistics API",
+      "url": "https://developers.binance.com/docs/derivatives/usds-margined-futures/market-data/rest-api/Open-Interest-Statistics"
+    }
+  ],
+  "splits": {
+    "oos": [
+      "2026-03-01",
+      "2026-05-03"
+    ],
+    "train": [
+      "2025-01-01",
+      "2025-12-31"
+    ],
+    "val": [
+      "2026-01-01",
+      "2026-02-28"
+    ]
+  },
+  "symbols": [
+    "BTC/USDT",
+    "ETH/USDT",
+    "BNB/USDT",
+    "SOL/USDT",
+    "TRX/USDT"
+  ],
+  "window": {
+    "end_date": "2026-05-04",
+    "start_date": "2025-01-01"
+  }
+}

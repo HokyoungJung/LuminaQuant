@@ -1,0 +1,12 @@
+{
+  "advisory_findings": [],
+  "artifact_kind": "full_all_strategy_walkforward_cleanup_report",
+  "blocking_findings": [],
+  "checked_files": [
+    "/home/hoky/Quants-agent/LuminaQuant/var/reports/latest_alpha_refresh_20260704_full_walkforward/full_all_strategy_walkforward_selection_latest.json",
+    "/home/hoky/Quants-agent/LuminaQuant/var/reports/latest_alpha_refresh_20260704_full_walkforward/full_all_strategy_walkforward_selection_latest.md",
+    "/home/hoky/Quants-agent/LuminaQuant/var/reports/latest_alpha_refresh_20260704_full_walkforward/full_all_strategy_walkforward_selection_latest.csv"
+  ],
+  "generated_at_utc": "2026-07-04T16:08:14.409420Z",
+  "status": "passed"
+}

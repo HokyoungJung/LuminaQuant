@@ -1,0 +1,496 @@
+"""Reusable rolling-stat primitives for strategy composition."""
+
+from __future__ import annotations
+
+import math
+from collections import deque
+from statistics import mean
+
+
+def sample_std(values) -> float | None:
+    """Return sample standard deviation (ddof=1) or ``None`` if invalid."""
+    try:
+        series = [float(value) for value in values]
+    except Exception:
+        return None
+    if not all(math.isfinite(value) for value in series):
+        return None
+    count = len(series)
+    if count < 2:
+        return None
+    avg = math.fsum(series) / float(count)
+    variance = math.fsum((value - avg) ** 2 for value in series) / float(count - 1)
+    if not math.isfinite(variance) or variance < 0.0:
+        return None
+    return math.sqrt(variance)
+
+
+def rolling_beta(x_values, y_values) -> float | None:
+    """Return beta of x relative to y over aligned rolling samples."""
+    try:
+        x_series = [float(value) for value in x_values]
+        y_series = [float(value) for value in y_values]
+    except Exception:
+        return None
+    count = min(len(x_series), len(y_series))
+    if count < 2:
+        return None
+    x_tail = x_series[-count:]
+    y_tail = y_series[-count:]
+    if not all(math.isfinite(value) for value in x_tail + y_tail):
+        return None
+
+    mean_x = mean(x_tail)
+    mean_y = mean(y_tail)
+    var_y = sum((value - mean_y) ** 2 for value in y_tail) / float(count - 1)
+    if not math.isfinite(var_y) or var_y <= 0.0:
+        return None
+
+    cov_xy = sum((xv - mean_x) * (yv - mean_y) for xv, yv in zip(x_tail, y_tail, strict=False))
+    cov_xy /= float(count - 1)
+    beta = cov_xy / var_y
+    if not math.isfinite(beta):
+        return None
+    return beta
+
+
+def _aligned_xy(x_values, y_values) -> tuple[list[float], list[float], float, float, float] | None:
+    """Return aligned ``(x_tail, y_tail, mean_x, mean_y, var_x)`` or ``None``.
+
+    Mirrors the alignment/guard numerics of :func:`rolling_beta`: trims both
+    series to their common trailing length, requires at least two finite-friendly
+    samples, and rejects degenerate ``x`` (the regressor) whose variance is zero.
+    """
+    count = min(len(x_values), len(y_values))
+    if count < 2:
+        return None
+    x_tail = [float(value) for value in list(x_values)[-count:]]
+    y_tail = [float(value) for value in list(y_values)[-count:]]
+    if not all(math.isfinite(value) for value in x_tail):
+        return None
+    if not all(math.isfinite(value) for value in y_tail):
+        return None
+
+    mean_x = mean(x_tail)
+    mean_y = mean(y_tail)
+    var_x = sum((value - mean_x) ** 2 for value in x_tail) / float(count - 1)
+    if var_x <= 1e-12:
+        return None
+    return x_tail, y_tail, mean_x, mean_y, var_x
+
+
+def ts_regression_slope(x_values, y_values) -> float | None:
+    """Return OLS slope of ``y`` regressed on ``x`` over aligned samples."""
+    aligned = _aligned_xy(x_values, y_values)
+    if aligned is None:
+        return None
+    x_tail, y_tail, mean_x, mean_y, var_x = aligned
+    count = len(x_tail)
+    cov_xy = sum((xv - mean_x) * (yv - mean_y) for xv, yv in zip(x_tail, y_tail, strict=False))
+    cov_xy /= float(count - 1)
+    slope = cov_xy / var_x
+    if not math.isfinite(slope):
+        return None
+    return slope
+
+
+def ts_regression_intercept(x_values, y_values) -> float | None:
+    """Return OLS intercept of ``y`` regressed on ``x`` over aligned samples."""
+    aligned = _aligned_xy(x_values, y_values)
+    if aligned is None:
+        return None
+    x_tail, y_tail, mean_x, mean_y, var_x = aligned
+    count = len(x_tail)
+    cov_xy = sum((xv - mean_x) * (yv - mean_y) for xv, yv in zip(x_tail, y_tail, strict=False))
+    cov_xy /= float(count - 1)
+    slope = cov_xy / var_x
+    intercept = mean_y - (slope * mean_x)
+    if not math.isfinite(intercept):
+        return None
+    return intercept
+
+
+def ts_regression_rsquared(x_values, y_values) -> float | None:
+    """Return OLS coefficient of determination (R^2) over aligned samples."""
+    aligned = _aligned_xy(x_values, y_values)
+    if aligned is None:
+        return None
+    x_tail, y_tail, mean_x, mean_y, var_x = aligned
+    count = len(x_tail)
+    syy = sum((value - mean_y) ** 2 for value in y_tail)
+    if syy <= 1e-12:
+        return None
+    cov_xy = sum((xv - mean_x) * (yv - mean_y) for xv, yv in zip(x_tail, y_tail, strict=False))
+    cov_xy /= float(count - 1)
+    slope = cov_xy / var_x
+    sse = sum(
+        (yv - (mean_y + slope * (xv - mean_x))) ** 2 for xv, yv in zip(x_tail, y_tail, strict=False)
+    )
+    rsquared = 1.0 - (sse / syy)
+    if not math.isfinite(rsquared):
+        return None
+    return max(0.0, min(1.0, rsquared))
+
+
+def hurst_exponent(values, *, min_lag: int = 2, max_lag: int = 20) -> float | None:
+    """Return the Hurst exponent via a rescaled-range (R/S) log-log fit.
+
+    Returns ``None`` on empty/degenerate/non-finite input or when the lag range
+    is too narrow to fit a slope.
+    """
+    try:
+        series = [float(value) for value in values]
+        low_lag = int(min_lag)
+        high_lag = int(max_lag)
+    except Exception:
+        return None
+    if not series or not all(math.isfinite(value) for value in series):
+        return None
+    count = len(series)
+
+    low_lag = max(2, low_lag)
+    high_lag = min(high_lag, count)
+    if high_lag <= low_lag:
+        return None
+
+    log_lags: list[float] = []
+    log_rs: list[float] = []
+    for lag in range(low_lag, high_lag + 1):
+        blocks = [series[start : start + lag] for start in range(0, count - lag + 1, lag)]
+        if not blocks:
+            continue
+        rs_values: list[float] = []
+        for block in blocks:
+            block_mean = math.fsum(block) / float(lag)
+            running = 0.0
+            deviations = []
+            for value in block:
+                running += value - block_mean
+                deviations.append(running)
+            rng = max(deviations) - min(deviations)
+            variance = math.fsum((value - block_mean) ** 2 for value in block) / float(lag)
+            if variance <= 1e-12:
+                continue
+            rs_values.append(rng / math.sqrt(variance))
+        if not rs_values:
+            continue
+        rescaled = math.fsum(rs_values) / float(len(rs_values))
+        if rescaled <= 1e-12 or lag <= 0:
+            continue
+        log_lags.append(math.log(float(lag)))
+        log_rs.append(math.log(rescaled))
+
+    if len(log_lags) < 2:
+        return None
+    slope = ts_regression_slope(log_lags, log_rs)
+    if slope is None or not math.isfinite(slope):
+        return None
+    return max(0.0, min(1.0, slope))
+
+
+def ewma_volatility(values, *, half_life: int = 10, annualization=None) -> float | None:
+    """Return EWMA volatility of returns with ``lambda = exp(-ln2/half_life)``.
+
+    ``values`` are treated as a return series. Returns ``None`` on empty or
+    non-finite input or a degenerate half-life.
+    """
+    series = [float(value) for value in values]
+    if not series or not all(math.isfinite(value) for value in series):
+        return None
+    half_life_val = float(half_life)
+    if half_life_val <= 0.0 or not math.isfinite(half_life_val):
+        return None
+
+    decay = math.exp(-math.log(2.0) / half_life_val)
+    if not math.isfinite(decay) or not (0.0 < decay < 1.0):
+        return None
+
+    ewma_var = series[0] * series[0]
+    for value in series[1:]:
+        ewma_var = (decay * ewma_var) + ((1.0 - decay) * value * value)
+    if ewma_var < 0.0 or not math.isfinite(ewma_var):
+        return None
+
+    vol = math.sqrt(ewma_var)
+    if annualization is not None:
+        factor = float(annualization)
+        if not math.isfinite(factor) or factor <= 0.0:
+            return None
+        vol *= math.sqrt(factor)
+    if not math.isfinite(vol):
+        return None
+    return vol
+
+
+def rolling_quantile(values, *, window: int, q: float) -> float | None:
+    """Return the ``q`` quantile over the trailing ``window`` samples.
+
+    Uses linear interpolation between order statistics. Returns ``None`` on
+    empty/non-finite input, a non-positive window, an out-of-range ``q``, or when
+    fewer than one sample is available.
+    """
+    window_val = int(window)
+    if window_val < 1:
+        return None
+    q_val = float(q)
+    if not math.isfinite(q_val) or q_val < 0.0 or q_val > 1.0:
+        return None
+
+    tail = [float(value) for value in list(values)[-window_val:]]
+    if not tail or not all(math.isfinite(value) for value in tail):
+        return None
+
+    ordered = sorted(tail)
+    count = len(ordered)
+    if count == 1:
+        return ordered[0]
+
+    position = q_val * (count - 1)
+    lower_idx = math.floor(position)
+    upper_idx = math.ceil(position)
+    if lower_idx == upper_idx:
+        result = ordered[lower_idx]
+    else:
+        frac = position - lower_idx
+        result = ordered[lower_idx] + frac * (ordered[upper_idx] - ordered[lower_idx])
+    if not math.isfinite(result):
+        return None
+    return result
+
+
+def rolling_corr(x_values, y_values) -> float | None:
+    """Return Pearson correlation over aligned rolling samples."""
+    count = min(len(x_values), len(y_values))
+    if count < 2:
+        return None
+    x_tail = list(x_values)[-count:]
+    y_tail = list(y_values)[-count:]
+
+    mean_x = mean(x_tail)
+    mean_y = mean(y_tail)
+    sxx = sum((value - mean_x) ** 2 for value in x_tail)
+    syy = sum((value - mean_y) ** 2 for value in y_tail)
+    if sxx <= 1e-12 or syy <= 1e-12:
+        return None
+
+    sxy = sum((xv - mean_x) * (yv - mean_y) for xv, yv in zip(x_tail, y_tail, strict=False))
+    corr = sxy / math.sqrt(sxx * syy)
+    if not math.isfinite(corr):
+        return None
+    return max(-1.0, min(1.0, corr))
+
+
+def recursive_least_squares_beta_update(
+    beta: float,
+    covariance: float,
+    *,
+    x_value: float,
+    y_value: float,
+    forgetting_factor: float = 0.985,
+    covariance_floor: float = 1e-6,
+    covariance_cap: float = 1e6,
+) -> tuple[float, float] | None:
+    """Update a scalar hedge ratio with an O(1) recursive least-squares step."""
+    x_val = float(x_value)
+    y_val = float(y_value)
+    if not math.isfinite(x_val) or not math.isfinite(y_val) or abs(y_val) <= 1e-12:
+        return None
+
+    beta_val = float(beta)
+    cov_val = max(float(covariance_floor), min(float(covariance_cap), float(covariance)))
+    lambda_val = max(1e-6, min(0.999999, float(forgetting_factor)))
+
+    gain_num = cov_val * y_val
+    denom = lambda_val + (y_val * gain_num)
+    if not math.isfinite(denom) or denom <= 1e-12:
+        return None
+
+    gain = gain_num / denom
+    error = x_val - (beta_val * y_val)
+    updated_beta = beta_val + (gain * error)
+    updated_cov = (cov_val - (gain * y_val * cov_val)) / lambda_val
+    if not math.isfinite(updated_beta) or not math.isfinite(updated_cov):
+        return None
+    updated_cov = max(float(covariance_floor), min(float(covariance_cap), float(updated_cov)))
+    return float(updated_beta), float(updated_cov)
+
+
+def _finite_tail(values, *, window: int | None) -> list[float] | None:
+    """Return the trailing-``window`` slice of ``values`` as finite floats.
+
+    The window slice is taken BEFORE cleaning (mirroring the historical
+    strategy-side call pattern ``_skewness(series[-window:])``), then entries
+    are float-coerced and non-finite samples dropped.  Returns ``None`` when
+    ``values`` is not iterable or ``window`` is unusable; never raises.
+    """
+    try:
+        tail = list(values)
+    except TypeError:
+        return None
+    if window is not None:
+        try:
+            width = int(window)
+        except TypeError, ValueError:
+            return None
+        if width < 1:
+            return None
+        tail = tail[-width:]
+    cleaned: list[float] = []
+    for value in tail:
+        try:
+            parsed = float(value)
+        except Exception:
+            continue
+        if math.isfinite(parsed):
+            cleaned.append(parsed)
+    return cleaned
+
+
+def rolling_skewness(values, *, window: int | None = None) -> float | None:
+    """Fisher-Pearson (ddof-free) sample skewness over the trailing window.
+
+    Canonical extraction (2026-08-20) of the formerly duplicated
+    strategy-private ``_skewness`` helpers in
+    ``strategies/skew_innovation_alpha_sleeves.py`` and
+    ``strategies/cross_sectional_anomaly_alpha_sleeves.py`` -- the exact
+    ``math.fsum`` recipe of the skew-innovation copy, parity-locked by pinned
+    fixtures in ``tests/indicators/test_rolling_skew_kurt.py``.
+
+    Prior: Amaya, Christoffersen, Jacobs & Vasquez (2015, JFE) establish
+    realized skewness as a standard rolling characteristic.
+
+    ``window=None`` uses the full sample.  Returns ``None`` on fewer than three
+    finite samples, degenerate (``<= 1e-12``) variance, non-finite output, or
+    non-iterable input.  Latest-scalar ``float | None``; never raises.
+    """
+    cleaned = _finite_tail(values, window=window)
+    if cleaned is None:
+        return None
+    count = len(cleaned)
+    if count < 3:
+        return None
+    try:
+        avg = math.fsum(cleaned) / float(count)
+        variance = math.fsum((value - avg) ** 2 for value in cleaned) / float(count)
+        if variance <= 1e-12:
+            return None
+        std = variance**0.5
+        third = math.fsum((value - avg) ** 3 for value in cleaned) / float(count)
+        skew = third / (std**3)
+    except OverflowError, ZeroDivisionError:
+        return None
+    return float(skew) if math.isfinite(skew) else None
+
+
+def rolling_excess_kurtosis(values, *, window: int | None = None) -> float | None:
+    """Excess (Fisher) sample kurtosis over the trailing window.
+
+    Standardized fourth central moment minus 3 (ddof-free, same moment
+    conventions as :func:`rolling_skewness`): ``0.0`` for a normal sample,
+    negative for platykurtic input (uniform ~ ``-1.2``), positive for fat
+    tails.  Named non-trading consumer: the V-DIAG vol-spillover diagnostic
+    reports the RV-series excess kurtosis to flag admissions driven by a
+    handful of fat-tail days (Patton-Sheppard loss-differential caveat).
+
+    ``window=None`` uses the full sample.  Returns ``None`` on fewer than four
+    finite samples, degenerate (``<= 1e-12``) variance, non-finite output, or
+    non-iterable input.  Latest-scalar ``float | None``; never raises.
+    """
+    cleaned = _finite_tail(values, window=window)
+    if cleaned is None:
+        return None
+    count = len(cleaned)
+    if count < 4:
+        return None
+    try:
+        avg = math.fsum(cleaned) / float(count)
+        variance = math.fsum((value - avg) ** 2 for value in cleaned) / float(count)
+        if variance <= 1e-12:
+            return None
+        fourth = math.fsum((value - avg) ** 4 for value in cleaned) / float(count)
+        kurtosis = fourth / (variance * variance) - 3.0
+    except OverflowError, ZeroDivisionError:
+        return None
+    return float(kurtosis) if math.isfinite(kurtosis) else None
+
+
+class RollingZScoreWindow:
+    """Rolling z-score helper with stable removable variance updates."""
+
+    _STATE_VERSION = 1
+
+    def __init__(self, window: int):
+        try:
+            self.window = max(2, int(window))
+        except Exception:
+            self.window = 2
+        self.values: deque[float] = deque()
+        self.mean_value = 0.0
+        self.m2 = 0.0
+
+    def append(self, value: float) -> bool:
+        """Append one finite value, returning ``False`` for invalid input."""
+        try:
+            parsed = float(value)
+        except Exception:
+            return False
+        if not math.isfinite(parsed):
+            return False
+        if len(self.values) == self.window:
+            dropped = self.values.popleft()
+            count = len(self.values) + 1
+            new_count = count - 1
+            new_mean = ((count * self.mean_value) - dropped) / float(new_count)
+            self.m2 -= (dropped - self.mean_value) * (dropped - new_mean)
+            self.mean_value = new_mean
+            self.m2 = max(0.0, self.m2)
+        count = len(self.values)
+        new_count = count + 1
+        delta = parsed - self.mean_value
+        self.mean_value += delta / float(new_count)
+        self.m2 += delta * (parsed - self.mean_value)
+        self.values.append(parsed)
+        return True
+
+    def zscore(self, value: float) -> float | None:
+        count = len(self.values)
+        if count < self.window:
+            return None
+        try:
+            parsed = float(value)
+        except Exception:
+            return None
+        if not math.isfinite(parsed):
+            return None
+        variance = self.m2 / float(count)
+        if variance <= 1e-12:
+            return None
+        std_value = math.sqrt(variance)
+        result = (parsed - self.mean_value) / std_value
+        return result if math.isfinite(result) else None
+
+    def to_state(self) -> dict:
+        return {
+            "version": self._STATE_VERSION,
+            "window": self.window,
+            "values": list(self.values),
+        }
+
+    def load_state(self, state: dict) -> None:
+        self.values = deque()
+        self.mean_value = 0.0
+        self.m2 = 0.0
+        if (
+            not isinstance(state, dict)
+            or state.get("version") != self._STATE_VERSION
+            or state.get("window") != self.window
+            or not isinstance(state.get("values"), list)
+            or len(state["values"]) > self.window
+        ):
+            return
+        for value in state["values"]:
+            if not self.append(value):
+                self.values = deque()
+                self.mean_value = 0.0
+                self.m2 = 0.0
+                return

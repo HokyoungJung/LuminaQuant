@@ -1,0 +1,27 @@
+{
+  "candidate_commit": "f1a2a0c618efe1844dfc5a7c51d2beb289c59ef8",
+  "incumbent_artifact_path": "var/reports/exact_window_backtests/followup_status/autoresearch_incumbent_rebaseline/portfolio_optimization_latest.json",
+  "split_contract": {
+    "train_start": "2025-01-01T00:00:00Z",
+    "train_end_exclusive": "2026-01-01T00:00:00Z",
+    "val_start": "2026-01-01T00:00:00Z",
+    "val_end_exclusive": "2026-02-01T00:00:00Z",
+    "oos_start": "2026-02-01T00:00:00Z"
+  },
+  "monthly_thresholds": [
+    {
+      "month": "2026-02",
+      "threshold_return": 0.02,
+      "btc_buy_hold_return": -0.14953745996211243
+    },
+    {
+      "month": "2026-03",
+      "threshold_return": 0.02,
+      "btc_buy_hold_return": 0.01711268615686179
+    }
+  ],
+  "notes": [
+    "Bounded blend chosen from archived exact-window candidates; thresholds pinned to the incumbent OOS endpoint.",
+    "Both threshold rows floor to 2% because BTC buy-and-hold is below 2% in February and in the partial March OOS window."
+  ]
+}

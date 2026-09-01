@@ -1,0 +1,665 @@
+{
+  "inputs": [
+    {
+      "bytes": 30732,
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/common_period_reval_20260812/dacapogo_daily_source/daily.csv",
+      "sha256": "fea833240f8914e56dcc7d7ae92b19e2af1c60586fc254f7dfc30c259e0ed8b5"
+    },
+    {
+      "bytes": 632074,
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/common_period_reval_20260812/dacapogo_daily_source/execution_daily.csv",
+      "sha256": "e357f09b649f8aadf1b05d70ee68497f7f34e44b804aa2e1e786deeee8d759a1"
+    },
+    {
+      "bytes": 11142753,
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/common_period_reval_20260812/dacapogo_daily_source/execution_trades.csv",
+      "sha256": "f5b35711239b33f636a298ad3a9f5a95637158013acd1526e18dd628cc018dd7"
+    },
+    {
+      "bytes": 1170166,
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/common_period_reval_20260812/dacapogo_daily_ml/daily.csv",
+      "sha256": "bccf7bc61eb690b1b55716a206edca2fb3d759fe25cbe073da40ac8f56ccc9a1"
+    },
+    {
+      "bytes": 163443,
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/common_period_reval_20260812/dacapogo_daily_ml/selections.csv",
+      "sha256": "9f27964d0855f462db5b0108284af49d260da2205b6a285a8e825b37652d9b19"
+    },
+    {
+      "bytes": 21221,
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/common_period_reval_20260812/dacapogo_daily_v2/dacapogo_binance_daily_v2_daily.csv",
+      "sha256": "04e0eb7d3ab9882ee4356bca263b844c00ae26b888201852913ba827a626118b"
+    },
+    {
+      "bytes": 6984,
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/common_period_reval_20260812/dacapogo_daily_v2/dacapogo_binance_daily_v2_summary.json",
+      "sha256": "9400141d511baccbef32a676b557632e983fe9a0d2ce946315218f2eea5597b0"
+    }
+  ],
+  "notes": {
+    "daily_v2_2x": "doubled transaction-cost stress, not leverage",
+    "source_daily_formula": "descriptive daily-OHLC accounting; not executable path-aware returns"
+  },
+  "v2_gate_pass": false,
+  "v2_locked_action": "cash",
+  "windows": {
+    "full": {
+      "daily_v2": {
+        "baseline_1x": {
+          "days": 42,
+          "max_drawdown": 0.125639471219135,
+          "total_return": 0.002426986086185412,
+          "trades": 21966
+        },
+        "baseline_2x": {
+          "days": 42,
+          "max_drawdown": 0.1580191824794045,
+          "total_return": -0.05882706950239003,
+          "trades": 21966
+        },
+        "cash": {
+          "days": 42,
+          "max_drawdown": 0.0,
+          "total_return": 0.0,
+          "trades": 0
+        },
+        "ml_1x": {
+          "days": 42,
+          "max_drawdown": 0.00581501620448599,
+          "total_return": 0.0036740568662869677,
+          "trades": 283
+        },
+        "ml_2x": {
+          "days": 42,
+          "max_drawdown": 0.006214593408069735,
+          "total_return": 0.0028595243218161315,
+          "trades": 283
+        }
+      },
+      "end_exclusive": "2026-08-12",
+      "last_included": "2026-08-11",
+      "legacy_ml_filter": {
+        "baseline_close_exit_entry_last_1x": {
+          "days": 42,
+          "liquidations": 0,
+          "max_drawdown": 0.037570825625937276,
+          "possible_liquidations": 0,
+          "total_return": 0.09064831428224496,
+          "trades": 163
+        },
+        "baseline_close_exit_entry_last_3x": {
+          "days": 42,
+          "liquidations": 0,
+          "max_drawdown": 0.1087767360613443,
+          "possible_liquidations": 0,
+          "total_return": 0.23090798736137153,
+          "trades": 163
+        },
+        "baseline_close_exit_stop_first_1x": {
+          "days": 42,
+          "liquidations": 0,
+          "max_drawdown": 0.08649337623576492,
+          "possible_liquidations": 0,
+          "total_return": -0.08606881019354429,
+          "trades": 163
+        },
+        "baseline_close_exit_stop_first_3x": {
+          "days": 42,
+          "liquidations": 0,
+          "max_drawdown": 0.23819286968699993,
+          "possible_liquidations": 0,
+          "total_return": -0.23713727456309197,
+          "trades": 163
+        },
+        "baseline_tp_sl_stop_first_1x": {
+          "days": 42,
+          "liquidations": 0,
+          "max_drawdown": 0.08263321065332185,
+          "possible_liquidations": 0,
+          "total_return": -0.08263321065332185,
+          "trades": 163
+        },
+        "baseline_tp_sl_stop_first_3x": {
+          "days": 42,
+          "liquidations": 0,
+          "max_drawdown": 0.22846747021418023,
+          "possible_liquidations": 0,
+          "total_return": -0.22846747021418023,
+          "trades": 163
+        },
+        "baseline_tp_sl_tp_first_1x": {
+          "days": 42,
+          "liquidations": 0,
+          "max_drawdown": 0.004901370520314696,
+          "possible_liquidations": 0,
+          "total_return": -0.0003926853563899213,
+          "trades": 163
+        },
+        "baseline_tp_sl_tp_first_3x": {
+          "days": 42,
+          "liquidations": 0,
+          "max_drawdown": 0.01473275835155663,
+          "possible_liquidations": 0,
+          "total_return": -0.0013668529695290976,
+          "trades": 163
+        },
+        "locked_close_exit_entry_last_1x": {
+          "days": 42,
+          "liquidations": 0,
+          "max_drawdown": 0.0,
+          "possible_liquidations": 0,
+          "total_return": 0.0,
+          "trades": 0
+        },
+        "locked_close_exit_entry_last_3x": {
+          "days": 42,
+          "liquidations": 0,
+          "max_drawdown": 0.0,
+          "possible_liquidations": 0,
+          "total_return": 0.0,
+          "trades": 0
+        },
+        "locked_close_exit_stop_first_1x": {
+          "days": 42,
+          "liquidations": 0,
+          "max_drawdown": 0.0,
+          "possible_liquidations": 0,
+          "total_return": 0.0,
+          "trades": 0
+        },
+        "locked_close_exit_stop_first_3x": {
+          "days": 42,
+          "liquidations": 0,
+          "max_drawdown": 0.0,
+          "possible_liquidations": 0,
+          "total_return": 0.0,
+          "trades": 0
+        },
+        "locked_tp_sl_stop_first_1x": {
+          "days": 42,
+          "liquidations": 0,
+          "max_drawdown": 0.0,
+          "possible_liquidations": 0,
+          "total_return": 0.0,
+          "trades": 0
+        },
+        "locked_tp_sl_stop_first_3x": {
+          "days": 42,
+          "liquidations": 0,
+          "max_drawdown": 0.0,
+          "possible_liquidations": 0,
+          "total_return": 0.0,
+          "trades": 0
+        },
+        "locked_tp_sl_tp_first_1x": {
+          "days": 42,
+          "liquidations": 0,
+          "max_drawdown": 0.0,
+          "possible_liquidations": 0,
+          "total_return": 0.0,
+          "trades": 0
+        },
+        "locked_tp_sl_tp_first_3x": {
+          "days": 42,
+          "liquidations": 0,
+          "max_drawdown": 0.0,
+          "possible_liquidations": 0,
+          "total_return": 0.0,
+          "trades": 0
+        },
+        "research_ml_close_exit_entry_last_1x": {
+          "days": 42,
+          "liquidations": 0,
+          "max_drawdown": 0.0,
+          "possible_liquidations": 0,
+          "total_return": 0.0,
+          "trades": 0
+        },
+        "research_ml_close_exit_entry_last_3x": {
+          "days": 42,
+          "liquidations": 0,
+          "max_drawdown": 0.0,
+          "possible_liquidations": 0,
+          "total_return": 0.0,
+          "trades": 0
+        },
+        "research_ml_close_exit_stop_first_1x": {
+          "days": 42,
+          "liquidations": 0,
+          "max_drawdown": 0.0,
+          "possible_liquidations": 0,
+          "total_return": 0.0,
+          "trades": 0
+        },
+        "research_ml_close_exit_stop_first_3x": {
+          "days": 42,
+          "liquidations": 0,
+          "max_drawdown": 0.0,
+          "possible_liquidations": 0,
+          "total_return": 0.0,
+          "trades": 0
+        },
+        "research_ml_tp_sl_stop_first_1x": {
+          "days": 42,
+          "liquidations": 0,
+          "max_drawdown": 0.0,
+          "possible_liquidations": 0,
+          "total_return": 0.0,
+          "trades": 0
+        },
+        "research_ml_tp_sl_stop_first_3x": {
+          "days": 42,
+          "liquidations": 0,
+          "max_drawdown": 0.0,
+          "possible_liquidations": 0,
+          "total_return": 0.0,
+          "trades": 0
+        },
+        "research_ml_tp_sl_tp_first_1x": {
+          "days": 42,
+          "liquidations": 0,
+          "max_drawdown": 0.0,
+          "possible_liquidations": 0,
+          "total_return": 0.0,
+          "trades": 0
+        },
+        "research_ml_tp_sl_tp_first_3x": {
+          "days": 42,
+          "liquidations": 0,
+          "max_drawdown": 0.0,
+          "possible_liquidations": 0,
+          "total_return": 0.0,
+          "trades": 0
+        }
+      },
+      "source_daily_formula": {
+        "ret_opt": {
+          "days": 42,
+          "max_drawdown": 0.0,
+          "total_return": 0.08447106987671416
+        },
+        "ret_pess": {
+          "days": 42,
+          "max_drawdown": 0.003708263564105807,
+          "total_return": 2.274165572841544
+        }
+      },
+      "source_executable": {
+        "close_exit_entry_last_1x": {
+          "days": 42,
+          "liquidations": 0,
+          "max_drawdown": 0.037570825625937276,
+          "possible_liquidations": 0,
+          "total_return": 0.09064831428224496,
+          "trades": 163
+        },
+        "close_exit_entry_last_3x": {
+          "days": 42,
+          "liquidations": 0,
+          "max_drawdown": 0.1087767360613443,
+          "possible_liquidations": 0,
+          "total_return": 0.23090798736137153,
+          "trades": 163
+        },
+        "close_exit_stop_first_1x": {
+          "days": 42,
+          "liquidations": 0,
+          "max_drawdown": 0.08649337623576492,
+          "possible_liquidations": 0,
+          "total_return": -0.08606881019354429,
+          "trades": 163
+        },
+        "close_exit_stop_first_3x": {
+          "days": 42,
+          "liquidations": 0,
+          "max_drawdown": 0.23819286968699993,
+          "possible_liquidations": 0,
+          "total_return": -0.23713727456309197,
+          "trades": 163
+        },
+        "tp_sl_stop_first_1x": {
+          "days": 42,
+          "liquidations": 0,
+          "max_drawdown": 0.08263321065332185,
+          "possible_liquidations": 0,
+          "total_return": -0.08263321065332185,
+          "trades": 163
+        },
+        "tp_sl_stop_first_3x": {
+          "days": 42,
+          "liquidations": 0,
+          "max_drawdown": 0.22846747021418023,
+          "possible_liquidations": 0,
+          "total_return": -0.22846747021418023,
+          "trades": 163
+        },
+        "tp_sl_tp_first_1x": {
+          "days": 42,
+          "liquidations": 0,
+          "max_drawdown": 0.004901370520314696,
+          "possible_liquidations": 0,
+          "total_return": -0.0003926853563899213,
+          "trades": 163
+        },
+        "tp_sl_tp_first_3x": {
+          "days": 42,
+          "liquidations": 0,
+          "max_drawdown": 0.01473275835155663,
+          "possible_liquidations": 0,
+          "total_return": -0.0013668529695290976,
+          "trades": 163
+        }
+      },
+      "start": "2026-07-01"
+    },
+    "recent": {
+      "daily_v2": {
+        "baseline_1x": {
+          "days": 11,
+          "max_drawdown": 0.027064016786029876,
+          "total_return": 0.04195711884030029,
+          "trades": 5762
+        },
+        "baseline_2x": {
+          "days": 11,
+          "max_drawdown": 0.030020925361724515,
+          "total_return": 0.024955053353000967,
+          "trades": 5762
+        },
+        "cash": {
+          "days": 11,
+          "max_drawdown": 0.0,
+          "total_return": 0.0,
+          "trades": 0
+        },
+        "ml_1x": {
+          "days": 11,
+          "max_drawdown": 0.0012907397562444967,
+          "total_return": 0.005589952521543928,
+          "trades": 63
+        },
+        "ml_2x": {
+          "days": 11,
+          "max_drawdown": 0.0013394347046269406,
+          "total_return": 0.0054086343878794185,
+          "trades": 63
+        }
+      },
+      "end_exclusive": "2026-08-12",
+      "last_included": "2026-08-11",
+      "legacy_ml_filter": {
+        "baseline_close_exit_entry_last_1x": {
+          "days": 11,
+          "liquidations": 0,
+          "max_drawdown": 0.025144369247297238,
+          "possible_liquidations": 0,
+          "total_return": -0.025144369247297238,
+          "trades": 43
+        },
+        "baseline_close_exit_entry_last_3x": {
+          "days": 11,
+          "liquidations": 0,
+          "max_drawdown": 0.07373827583597503,
+          "possible_liquidations": 0,
+          "total_return": -0.07373827583597503,
+          "trades": 43
+        },
+        "baseline_close_exit_stop_first_1x": {
+          "days": 11,
+          "liquidations": 0,
+          "max_drawdown": 0.025158861130080368,
+          "possible_liquidations": 0,
+          "total_return": -0.025158861130080368,
+          "trades": 43
+        },
+        "baseline_close_exit_stop_first_3x": {
+          "days": 11,
+          "liquidations": 0,
+          "max_drawdown": 0.0737798542419198,
+          "possible_liquidations": 0,
+          "total_return": -0.0737798542419198,
+          "trades": 43
+        },
+        "baseline_tp_sl_stop_first_1x": {
+          "days": 11,
+          "liquidations": 0,
+          "max_drawdown": 0.023800333508021465,
+          "possible_liquidations": 0,
+          "total_return": -0.023800333508021465,
+          "trades": 43
+        },
+        "baseline_tp_sl_stop_first_3x": {
+          "days": 11,
+          "liquidations": 0,
+          "max_drawdown": 0.06987308733540887,
+          "possible_liquidations": 0,
+          "total_return": -0.06987308733540887,
+          "trades": 43
+        },
+        "baseline_tp_sl_tp_first_1x": {
+          "days": 11,
+          "liquidations": 0,
+          "max_drawdown": 0.003248730028374891,
+          "possible_liquidations": 0,
+          "total_return": 0.0006341028676211113,
+          "trades": 43
+        },
+        "baseline_tp_sl_tp_first_3x": {
+          "days": 11,
+          "liquidations": 0,
+          "max_drawdown": 0.009738525766125217,
+          "possible_liquidations": 0,
+          "total_return": 0.0018666360073118504,
+          "trades": 43
+        },
+        "locked_close_exit_entry_last_1x": {
+          "days": 11,
+          "liquidations": 0,
+          "max_drawdown": 0.0,
+          "possible_liquidations": 0,
+          "total_return": 0.0,
+          "trades": 0
+        },
+        "locked_close_exit_entry_last_3x": {
+          "days": 11,
+          "liquidations": 0,
+          "max_drawdown": 0.0,
+          "possible_liquidations": 0,
+          "total_return": 0.0,
+          "trades": 0
+        },
+        "locked_close_exit_stop_first_1x": {
+          "days": 11,
+          "liquidations": 0,
+          "max_drawdown": 0.0,
+          "possible_liquidations": 0,
+          "total_return": 0.0,
+          "trades": 0
+        },
+        "locked_close_exit_stop_first_3x": {
+          "days": 11,
+          "liquidations": 0,
+          "max_drawdown": 0.0,
+          "possible_liquidations": 0,
+          "total_return": 0.0,
+          "trades": 0
+        },
+        "locked_tp_sl_stop_first_1x": {
+          "days": 11,
+          "liquidations": 0,
+          "max_drawdown": 0.0,
+          "possible_liquidations": 0,
+          "total_return": 0.0,
+          "trades": 0
+        },
+        "locked_tp_sl_stop_first_3x": {
+          "days": 11,
+          "liquidations": 0,
+          "max_drawdown": 0.0,
+          "possible_liquidations": 0,
+          "total_return": 0.0,
+          "trades": 0
+        },
+        "locked_tp_sl_tp_first_1x": {
+          "days": 11,
+          "liquidations": 0,
+          "max_drawdown": 0.0,
+          "possible_liquidations": 0,
+          "total_return": 0.0,
+          "trades": 0
+        },
+        "locked_tp_sl_tp_first_3x": {
+          "days": 11,
+          "liquidations": 0,
+          "max_drawdown": 0.0,
+          "possible_liquidations": 0,
+          "total_return": 0.0,
+          "trades": 0
+        },
+        "research_ml_close_exit_entry_last_1x": {
+          "days": 11,
+          "liquidations": 0,
+          "max_drawdown": 0.0,
+          "possible_liquidations": 0,
+          "total_return": 0.0,
+          "trades": 0
+        },
+        "research_ml_close_exit_entry_last_3x": {
+          "days": 11,
+          "liquidations": 0,
+          "max_drawdown": 0.0,
+          "possible_liquidations": 0,
+          "total_return": 0.0,
+          "trades": 0
+        },
+        "research_ml_close_exit_stop_first_1x": {
+          "days": 11,
+          "liquidations": 0,
+          "max_drawdown": 0.0,
+          "possible_liquidations": 0,
+          "total_return": 0.0,
+          "trades": 0
+        },
+        "research_ml_close_exit_stop_first_3x": {
+          "days": 11,
+          "liquidations": 0,
+          "max_drawdown": 0.0,
+          "possible_liquidations": 0,
+          "total_return": 0.0,
+          "trades": 0
+        },
+        "research_ml_tp_sl_stop_first_1x": {
+          "days": 11,
+          "liquidations": 0,
+          "max_drawdown": 0.0,
+          "possible_liquidations": 0,
+          "total_return": 0.0,
+          "trades": 0
+        },
+        "research_ml_tp_sl_stop_first_3x": {
+          "days": 11,
+          "liquidations": 0,
+          "max_drawdown": 0.0,
+          "possible_liquidations": 0,
+          "total_return": 0.0,
+          "trades": 0
+        },
+        "research_ml_tp_sl_tp_first_1x": {
+          "days": 11,
+          "liquidations": 0,
+          "max_drawdown": 0.0,
+          "possible_liquidations": 0,
+          "total_return": 0.0,
+          "trades": 0
+        },
+        "research_ml_tp_sl_tp_first_3x": {
+          "days": 11,
+          "liquidations": 0,
+          "max_drawdown": 0.0,
+          "possible_liquidations": 0,
+          "total_return": 0.0,
+          "trades": 0
+        }
+      },
+      "source_daily_formula": {
+        "ret_opt": {
+          "days": 11,
+          "max_drawdown": 0.0,
+          "total_return": 0.022983786692290176
+        },
+        "ret_pess": {
+          "days": 11,
+          "max_drawdown": 0.003708263564105585,
+          "total_return": 0.22402573868344233
+        }
+      },
+      "source_executable": {
+        "close_exit_entry_last_1x": {
+          "days": 11,
+          "liquidations": 0,
+          "max_drawdown": 0.025144369247297238,
+          "possible_liquidations": 0,
+          "total_return": -0.025144369247297238,
+          "trades": 43
+        },
+        "close_exit_entry_last_3x": {
+          "days": 11,
+          "liquidations": 0,
+          "max_drawdown": 0.07373827583597503,
+          "possible_liquidations": 0,
+          "total_return": -0.07373827583597503,
+          "trades": 43
+        },
+        "close_exit_stop_first_1x": {
+          "days": 11,
+          "liquidations": 0,
+          "max_drawdown": 0.025158861130080368,
+          "possible_liquidations": 0,
+          "total_return": -0.025158861130080368,
+          "trades": 43
+        },
+        "close_exit_stop_first_3x": {
+          "days": 11,
+          "liquidations": 0,
+          "max_drawdown": 0.0737798542419198,
+          "possible_liquidations": 0,
+          "total_return": -0.0737798542419198,
+          "trades": 43
+        },
+        "tp_sl_stop_first_1x": {
+          "days": 11,
+          "liquidations": 0,
+          "max_drawdown": 0.023800333508021465,
+          "possible_liquidations": 0,
+          "total_return": -0.023800333508021465,
+          "trades": 43
+        },
+        "tp_sl_stop_first_3x": {
+          "days": 11,
+          "liquidations": 0,
+          "max_drawdown": 0.06987308733540887,
+          "possible_liquidations": 0,
+          "total_return": -0.06987308733540887,
+          "trades": 43
+        },
+        "tp_sl_tp_first_1x": {
+          "days": 11,
+          "liquidations": 0,
+          "max_drawdown": 0.003248730028374891,
+          "possible_liquidations": 0,
+          "total_return": 0.0006341028676211113,
+          "trades": 43
+        },
+        "tp_sl_tp_first_3x": {
+          "days": 11,
+          "liquidations": 0,
+          "max_drawdown": 0.009738525766125217,
+          "possible_liquidations": 0,
+          "total_return": 0.0018666360073118504,
+          "trades": 43
+        }
+      },
+      "start": "2026-08-01"
+    }
+  }
+}

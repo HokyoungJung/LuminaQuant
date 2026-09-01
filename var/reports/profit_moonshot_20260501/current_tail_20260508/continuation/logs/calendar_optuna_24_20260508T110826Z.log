@@ -1,0 +1,49 @@
+[I 2026-05-08 20:08:32,174] A new study created in memory with name: no-name-b8fa88f2-aa97-4270-8656-27db06367548
+[I 2026-05-08 20:08:32,198] Trial 0 finished with value: 6.40165343120691 and parameters: {'short_symbol': 'ETHUSDT', 'threshold': 0.015, 'hold_bars': 120, 'long_scale': 6.2, 'short_scale': 10.0, 'take_profit_pct': 0.018}. Best is trial 0 with value: 6.40165343120691.
+[I 2026-05-08 20:08:32,230] Trial 1 finished with value: 18.283502983337 and parameters: {'short_symbol': '', 'threshold': 0.012, 'hold_bars': 120, 'long_scale': 5.4, 'short_scale': 12.0, 'take_profit_pct': 0.045}. Best is trial 1 with value: 18.283502983337.
+[I 2026-05-08 20:08:32,253] Trial 2 finished with value: 12.631506212603588 and parameters: {'short_symbol': 'ETHUSDT', 'threshold': 0.018, 'hold_bars': 144, 'long_scale': 6.2, 'short_scale': 12.0, 'take_profit_pct': 0.06}. Best is trial 1 with value: 18.283502983337.
+[I 2026-05-08 20:08:32,274] Trial 3 finished with value: -41.19037629494313 and parameters: {'short_symbol': '', 'threshold': 0.01, 'hold_bars': 168, 'long_scale': 5.7, 'short_scale': 10.0, 'take_profit_pct': 0.045}. Best is trial 1 with value: 18.283502983337.
+[I 2026-05-08 20:08:32,297] Trial 4 finished with value: 13.165370151769674 and parameters: {'short_symbol': '', 'threshold': 0.015, 'hold_bars': 96, 'long_scale': 5.6, 'short_scale': 8.0, 'take_profit_pct': 0.06}. Best is trial 1 with value: 18.283502983337.
+[I 2026-05-08 20:08:32,320] Trial 5 finished with value: 9.935039079407304 and parameters: {'short_symbol': 'ETHUSDT', 'threshold': 0.015, 'hold_bars': 144, 'long_scale': 6.0, 'short_scale': 10.0, 'take_profit_pct': 0.045}. Best is trial 1 with value: 18.283502983337.
+[I 2026-05-08 20:08:32,342] Trial 6 finished with value: 17.576307818139224 and parameters: {'short_symbol': '', 'threshold': 0.02, 'hold_bars': 120, 'long_scale': 5.6, 'short_scale': 8.0, 'take_profit_pct': 0.06}. Best is trial 1 with value: 18.283502983337.
+[I 2026-05-08 20:08:32,371] Trial 7 finished with value: 3.5605572547317563 and parameters: {'short_symbol': 'ETHUSDT', 'threshold': 0.015, 'hold_bars': 96, 'long_scale': 5.6, 'short_scale': 8.0, 'take_profit_pct': 0.03}. Best is trial 1 with value: 18.283502983337.
+[I 2026-05-08 20:08:32,395] Trial 8 finished with value: -37.46679725410421 and parameters: {'short_symbol': '', 'threshold': 0.02, 'hold_bars': 144, 'long_scale': 5.7, 'short_scale': 8.0, 'take_profit_pct': 0.06}. Best is trial 1 with value: 18.283502983337.
+[I 2026-05-08 20:08:32,417] Trial 9 finished with value: -45.815007200725994 and parameters: {'short_symbol': '', 'threshold': 0.012, 'hold_bars': 168, 'long_scale': 5.7, 'short_scale': 10.0, 'take_profit_pct': 0.024}. Best is trial 1 with value: 18.283502983337.
+[I 2026-05-08 20:08:32,442] Trial 10 finished with value: 14.63093330224887 and parameters: {'short_symbol': 'ETHUSDT', 'threshold': 0.018, 'hold_bars': 144, 'long_scale': 6.0, 'short_scale': 8.0, 'take_profit_pct': 0.03}. Best is trial 1 with value: 18.283502983337.
+[I 2026-05-08 20:08:32,466] Trial 11 finished with value: 10.416578818816653 and parameters: {'short_symbol': 'ETHUSDT', 'threshold': 0.02, 'hold_bars': 96, 'long_scale': 6.4, 'short_scale': 8.0, 'take_profit_pct': 0.06}. Best is trial 1 with value: 18.283502983337.
+[I 2026-05-08 20:08:32,495] Trial 12 finished with value: 2.655592236888257 and parameters: {'short_symbol': '', 'threshold': 0.012, 'hold_bars': 120, 'long_scale': 5.2, 'short_scale': 12.0, 'take_profit_pct': 0.035}. Best is trial 1 with value: 18.283502983337.
+[I 2026-05-08 20:08:32,521] Trial 13 finished with value: 15.681064190025271 and parameters: {'short_symbol': '', 'threshold': 0.02, 'hold_bars': 120, 'long_scale': 5.3, 'short_scale': 12.0, 'take_profit_pct': 0.045}. Best is trial 1 with value: 18.283502983337.
+[I 2026-05-08 20:08:32,549] Trial 14 finished with value: -0.2928839676923012 and parameters: {'short_symbol': '', 'threshold': 0.012, 'hold_bars': 120, 'long_scale': 5.0, 'short_scale': 12.0, 'take_profit_pct': 0.018}. Best is trial 1 with value: 18.283502983337.
+[I 2026-05-08 20:08:32,578] Trial 15 finished with value: 11.676205042087448 and parameters: {'short_symbol': '', 'threshold': 0.01, 'hold_bars': 120, 'long_scale': 5.4, 'short_scale': 12.0, 'take_profit_pct': 0.024}. Best is trial 1 with value: 18.283502983337.
+[I 2026-05-08 20:08:32,602] Trial 16 finished with value: 3.570743477815271 and parameters: {'short_symbol': '', 'threshold': 0.012, 'hold_bars': 120, 'long_scale': 5.4, 'short_scale': 8.0, 'take_profit_pct': 0.035}. Best is trial 1 with value: 18.283502983337.
+[I 2026-05-08 20:08:32,629] Trial 17 finished with value: 15.692017818415255 and parameters: {'short_symbol': '', 'threshold': 0.02, 'hold_bars': 120, 'long_scale': 5.1, 'short_scale': 12.0, 'take_profit_pct': 0.045}. Best is trial 1 with value: 18.283502983337.
+[I 2026-05-08 20:08:32,655] Trial 18 finished with value: 11.283508151405815 and parameters: {'short_symbol': '', 'threshold': 0.012, 'hold_bars': 120, 'long_scale': 5.9, 'short_scale': 12.0, 'take_profit_pct': 0.06}. Best is trial 1 with value: 18.283502983337.
+[I 2026-05-08 20:08:32,680] Trial 19 finished with value: 10.146683358918215 and parameters: {'short_symbol': '', 'threshold': 0.02, 'hold_bars': 168, 'long_scale': 5.5, 'short_scale': 8.0, 'take_profit_pct': 0.045}. Best is trial 1 with value: 18.283502983337.
+[I 2026-05-08 20:08:32,705] Trial 20 finished with value: 11.715167820603202 and parameters: {'short_symbol': '', 'threshold': 0.01, 'hold_bars': 120, 'long_scale': 5.9, 'short_scale': 12.0, 'take_profit_pct': 0.024}. Best is trial 1 with value: 18.283502983337.
+[I 2026-05-08 20:08:32,731] Trial 21 finished with value: 15.697478994531927 and parameters: {'short_symbol': '', 'threshold': 0.02, 'hold_bars': 120, 'long_scale': 5.0, 'short_scale': 12.0, 'take_profit_pct': 0.045}. Best is trial 1 with value: 18.283502983337.
+[I 2026-05-08 20:08:32,755] Trial 22 finished with value: 15.697478994531927 and parameters: {'short_symbol': '', 'threshold': 0.02, 'hold_bars': 120, 'long_scale': 5.0, 'short_scale': 12.0, 'take_profit_pct': 0.045}. Best is trial 1 with value: 18.283502983337.
+[I 2026-05-08 20:08:32,782] Trial 23 finished with value: 15.68654623010178 and parameters: {'short_symbol': '', 'threshold': 0.02, 'hold_bars': 120, 'long_scale': 5.2, 'short_scale': 12.0, 'take_profit_pct': 0.045}. Best is trial 1 with value: 18.283502983337.
+{"csv": "var/reports/profit_moonshot_20260501/current_tail_20260508/continuation/calendar_optuna_trials.csv", "json": "var/reports/profit_moonshot_20260501/current_tail_20260508/continuation/calendar_optuna_latest.json", "markdown": "var/reports/profit_moonshot_20260501/current_tail_20260508/continuation/calendar_optuna_latest.md", "peak_rss_mib": 243.5859375, "success_candidate_count": 2}
+	Command being timed: "uv run --extra optimize python scripts/research/optuna_tune_profit_moonshot_calendar.py --output-dir var/reports/profit_moonshot_20260501/current_tail_20260508/continuation --oos-end-date 2026-05-08 --n-trials 24 --seed 43 --enqueue-known-good"
+	User time (seconds): 8.95
+	System time (seconds): 0.28
+	Percent of CPU this job got: 128%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:07.19
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 249432
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 1
+	Minor (reclaiming a frame) page faults: 45558
+	Voluntary context switches: 55
+	Involuntary context switches: 66
+	Swaps: 0
+	File system inputs: 88
+	File system outputs: 320
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

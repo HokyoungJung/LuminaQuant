@@ -1,0 +1,791 @@
+{
+  "generated_at": "2026-04-22T10:47:17.682668+00:00",
+  "artifact_kind": "portfolio_superiority_wave2_resliced_common_window",
+  "common_window": {
+    "train": {
+      "start": "2025-01-01",
+      "end": "2025-12-31"
+    },
+    "val": {
+      "start": "2026-01-01",
+      "end": "2026-02-28"
+    },
+    "oos": {
+      "start": "2026-03-01",
+      "end": "2026-04-03"
+    }
+  },
+  "input_artifact": "/home/hoky/Quants-agent/LuminaQuant/var/reports/portfolio_superiority_wave2/candidate_research_wave2_latest.json",
+  "candidate_count": 14,
+  "survivor_count": 1,
+  "survivors": [
+    {
+      "name": "pair_spread_1h_exec_tightstop_tp_bnbusdt_trxusdt_2.2_0.55",
+      "family": "market_neutral",
+      "strategy_class": "PairSpreadZScoreStrategy",
+      "symbols": [
+        "BNB/USDT",
+        "TRX/USDT"
+      ],
+      "train": {
+        "total_return": -0.07146823388385826,
+        "cagr": -0.07146823388385826,
+        "sharpe": -0.874047911013688,
+        "sortino": -0.6895886026400156,
+        "calmar": -0.6226642614204864,
+        "max_drawdown": 0.11477812091032413,
+        "volatility": 0.08107765149012951,
+        "return": -0.07146823388385826,
+        "days": 365
+      },
+      "val": {
+        "total_return": 0.09388586664590193,
+        "cagr": 0.7422001029012324,
+        "sharpe": 3.6690694114583877,
+        "sortino": 6.9613562087157925,
+        "calmar": 34.78134475430955,
+        "max_drawdown": 0.02133902838271573,
+        "volatility": 0.1545629816960561,
+        "return": 0.09388586664590193,
+        "days": 59
+      },
+      "oos": {
+        "total_return": 0.0011812010861260713,
+        "cagr": 0.01275370133332654,
+        "sharpe": 0.23761230946174597,
+        "sortino": 0.10635559495958578,
+        "calmar": 0.9037652659566093,
+        "max_drawdown": 0.01411174097272605,
+        "volatility": 0.06095146039463603,
+        "return": 0.0011812010861260713,
+        "days": 34
+      },
+      "oos_participation": {
+        "total_days": 34,
+        "active_days": 8,
+        "active_day_ratio": 0.23529411764705882
+      },
+      "resliced_source": "wave2_raw_report_realigned_to_current_baseline_window",
+      "artifact_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/portfolio_superiority_wave2/candidate_research_wave2_latest.json"
+    }
+  ],
+  "leaderboard": [
+    {
+      "name": "pair_spread_1h_exec_tightstop_tp_btcusdt_xauusdt_2.2_0.55",
+      "family": "market_neutral",
+      "strategy_class": "PairSpreadZScoreStrategy",
+      "symbols": [
+        "BTC/USDT",
+        "XAU/USDT"
+      ],
+      "train": {
+        "total_return": -0.0008000000000000229,
+        "cagr": -0.013814025227931848,
+        "sharpe": -4.16904693916396,
+        "sortino": 0.0,
+        "calmar": 0.0,
+        "max_drawdown": 0.0,
+        "volatility": 0.0033352375513311674,
+        "return": -0.0008000000000000229,
+        "days": 21
+      },
+      "val": {
+        "total_return": -0.015507464145445793,
+        "cagr": -0.09216047441656783,
+        "sharpe": -1.3436605330521263,
+        "sortino": -0.981805679920374,
+        "calmar": -2.3502112774754718,
+        "max_drawdown": 0.039213697636394595,
+        "volatility": 0.07014244598040395,
+        "return": -0.015507464145445793,
+        "days": 59
+      },
+      "oos": {
+        "total_return": 0.005245019265933015,
+        "cagr": 0.07328022406090606,
+        "sharpe": 0.8834872492051119,
+        "sortino": 1.1428044310749377,
+        "calmar": 3.3899124893193973,
+        "max_drawdown": 0.021617143301424502,
+        "volatility": 0.0838792965747603,
+        "return": 0.005245019265933015,
+        "days": 27
+      },
+      "oos_participation": {
+        "total_days": 27,
+        "active_days": 8,
+        "active_day_ratio": 0.2962962962962963
+      },
+      "resliced_source": "wave2_raw_report_realigned_to_current_baseline_window",
+      "artifact_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/portfolio_superiority_wave2/candidate_research_wave2_latest.json"
+    },
+    {
+      "name": "pair_spread_1h_exec_tightstop_tp_bnbusdt_trxusdt_2.2_0.55",
+      "family": "market_neutral",
+      "strategy_class": "PairSpreadZScoreStrategy",
+      "symbols": [
+        "BNB/USDT",
+        "TRX/USDT"
+      ],
+      "train": {
+        "total_return": -0.07146823388385826,
+        "cagr": -0.07146823388385826,
+        "sharpe": -0.874047911013688,
+        "sortino": -0.6895886026400156,
+        "calmar": -0.6226642614204864,
+        "max_drawdown": 0.11477812091032413,
+        "volatility": 0.08107765149012951,
+        "return": -0.07146823388385826,
+        "days": 365
+      },
+      "val": {
+        "total_return": 0.09388586664590193,
+        "cagr": 0.7422001029012324,
+        "sharpe": 3.6690694114583877,
+        "sortino": 6.9613562087157925,
+        "calmar": 34.78134475430955,
+        "max_drawdown": 0.02133902838271573,
+        "volatility": 0.1545629816960561,
+        "return": 0.09388586664590193,
+        "days": 59
+      },
+      "oos": {
+        "total_return": 0.0011812010861260713,
+        "cagr": 0.01275370133332654,
+        "sharpe": 0.23761230946174597,
+        "sortino": 0.10635559495958578,
+        "calmar": 0.9037652659566093,
+        "max_drawdown": 0.01411174097272605,
+        "volatility": 0.06095146039463603,
+        "return": 0.0011812010861260713,
+        "days": 34
+      },
+      "oos_participation": {
+        "total_days": 34,
+        "active_days": 8,
+        "active_day_ratio": 0.23529411764705882
+      },
+      "resliced_source": "wave2_raw_report_realigned_to_current_baseline_window",
+      "artifact_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/portfolio_superiority_wave2/candidate_research_wave2_latest.json"
+    },
+    {
+      "name": "carry_trend_factor_rotation_1h_production_lo_guarded_48_12_0.250",
+      "family": "cross_sectional",
+      "strategy_class": "CarryTrendFactorRotationStrategy",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "BNB/USDT",
+        "SOL/USDT",
+        "TRX/USDT"
+      ],
+      "train": {
+        "total_return": -0.06440573028971552,
+        "cagr": -0.06440573028971552,
+        "sharpe": -0.3634356142145882,
+        "sortino": -0.4577502126217353,
+        "calmar": -0.45244646468356686,
+        "max_drawdown": 0.1423499470479005,
+        "volatility": 0.15177424718581917,
+        "return": -0.06440573028971552,
+        "days": 365
+      },
+      "val": {
+        "total_return": -0.024598496372902345,
+        "cagr": -0.14279662146521588,
+        "sharpe": -1.5578030909640417,
+        "sortino": -1.6210202201439263,
+        "calmar": -2.653277067025551,
+        "max_drawdown": 0.05381896343953918,
+        "volatility": 0.09597847067570815,
+        "return": -0.024598496372902345,
+        "days": 59
+      },
+      "oos": {
+        "total_return": 0.0006737023702874101,
+        "cagr": 0.007256157193966661,
+        "sharpe": 0.11864900180057904,
+        "sortino": 0.20409013732157474,
+        "calmar": 0.3002486760562582,
+        "max_drawdown": 0.024167158001413003,
+        "volatility": 0.1356937771328317,
+        "return": 0.0006737023702874101,
+        "days": 34
+      },
+      "oos_participation": {
+        "total_days": 34,
+        "active_days": 22,
+        "active_day_ratio": 0.6470588235294118
+      },
+      "resliced_source": "wave2_raw_report_realigned_to_current_baseline_window",
+      "artifact_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/portfolio_superiority_wave2/candidate_research_wave2_latest.json"
+    },
+    {
+      "name": "funding_liquidation_crowding_fade_30m_balanced_ls_96_0.85",
+      "family": "mean_reversion",
+      "strategy_class": "FundingLiquidationCrowdingFadeStrategy",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "BNB/USDT",
+        "SOL/USDT",
+        "TRX/USDT"
+      ],
+      "train": {
+        "total_return": 0.0,
+        "cagr": 0.0,
+        "sharpe": 0.0,
+        "sortino": 0.0,
+        "calmar": 0.0,
+        "max_drawdown": 0.0,
+        "volatility": 0.0,
+        "return": 0.0,
+        "days": 365
+      },
+      "val": {
+        "total_return": 0.0,
+        "cagr": 0.0,
+        "sharpe": 0.0,
+        "sortino": 0.0,
+        "calmar": 0.0,
+        "max_drawdown": 0.0,
+        "volatility": 0.0,
+        "return": 0.0,
+        "days": 59
+      },
+      "oos": {
+        "total_return": 0.0,
+        "cagr": 0.0,
+        "sharpe": 0.0,
+        "sortino": 0.0,
+        "calmar": 0.0,
+        "max_drawdown": 0.0,
+        "volatility": 0.0,
+        "return": 0.0,
+        "days": 34
+      },
+      "oos_participation": {
+        "total_days": 34,
+        "active_days": 0,
+        "active_day_ratio": 0.0
+      },
+      "resliced_source": "wave2_raw_report_realigned_to_current_baseline_window",
+      "artifact_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/portfolio_superiority_wave2/candidate_research_wave2_latest.json"
+    },
+    {
+      "name": "last_day_liquidity_regime_1d_guarded_lo_1_1_0.006",
+      "family": "cross_sectional",
+      "strategy_class": "LastDayLiquidityRegimeStrategy",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "BNB/USDT",
+        "SOL/USDT",
+        "TRX/USDT"
+      ],
+      "train": {
+        "total_return": -0.10949446138575114,
+        "cagr": -0.10949446138575114,
+        "sharpe": -0.5985673275727553,
+        "sortino": -0.6639628846241659,
+        "calmar": -0.6490299621878469,
+        "max_drawdown": 0.16870478678156997,
+        "volatility": 0.1696948289227696,
+        "return": -0.10949446138575114,
+        "days": 365
+      },
+      "val": {
+        "total_return": -0.036391281031356915,
+        "cagr": -0.20493476269678623,
+        "sharpe": -1.9896974523438442,
+        "sortino": -1.9424516442191007,
+        "calmar": -2.5395459654928505,
+        "max_drawdown": 0.08069740240240719,
+        "volatility": 0.11210789379378608,
+        "return": -0.036391281031356915,
+        "days": 59
+      },
+      "oos": {
+        "total_return": -0.01593946279396563,
+        "cagr": -0.15843601156849296,
+        "sharpe": -0.8410726286183159,
+        "sortino": -1.204870378872876,
+        "calmar": -2.45030199014383,
+        "max_drawdown": 0.0646597897752158,
+        "volatility": 0.18528964235761153,
+        "return": -0.01593946279396563,
+        "days": 34
+      },
+      "oos_participation": {
+        "total_days": 34,
+        "active_days": 25,
+        "active_day_ratio": 0.7352941176470589
+      },
+      "resliced_source": "wave2_raw_report_realigned_to_current_baseline_window",
+      "artifact_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/portfolio_superiority_wave2/candidate_research_wave2_latest.json"
+    },
+    {
+      "name": "last_day_liquidity_regime_1h_guarded_lo_24_12_0.015",
+      "family": "cross_sectional",
+      "strategy_class": "LastDayLiquidityRegimeStrategy",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "BNB/USDT",
+        "SOL/USDT",
+        "TRX/USDT"
+      ],
+      "train": {
+        "total_return": -0.15170600537455636,
+        "cagr": -0.15170600537455636,
+        "sharpe": -0.9090051773437089,
+        "sortino": -1.118634558926668,
+        "calmar": -0.6955293655703818,
+        "max_drawdown": 0.2181158882488693,
+        "volatility": 0.16594948908738982,
+        "return": -0.15170600537455636,
+        "days": 365
+      },
+      "val": {
+        "total_return": -0.0007621448505383821,
+        "cagr": -0.0047056551112497624,
+        "sharpe": 0.0023413001417498546,
+        "sortino": 0.003136140941304334,
+        "calmar": -0.10184406686388804,
+        "max_drawdown": 0.04620450907109541,
+        "volatility": 0.10053139866592738,
+        "return": -0.0007621448505383821,
+        "days": 59
+      },
+      "oos": {
+        "total_return": -0.022750357946708655,
+        "cagr": -0.21890057522109385,
+        "sharpe": -1.7360581415211516,
+        "sortino": -2.7582368978394025,
+        "calmar": -5.298445870948213,
+        "max_drawdown": 0.041314109939547095,
+        "volatility": 0.13703242498762302,
+        "return": -0.022750357946708655,
+        "days": 34
+      },
+      "oos_participation": {
+        "total_days": 34,
+        "active_days": 24,
+        "active_day_ratio": 0.7058823529411765
+      },
+      "resliced_source": "wave2_raw_report_realigned_to_current_baseline_window",
+      "artifact_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/portfolio_superiority_wave2/candidate_research_wave2_latest.json"
+    },
+    {
+      "name": "pair_spread_1h_exec_tightstop_tp_xptusdt_xpdusdt_2.2_0.55",
+      "family": "market_neutral",
+      "strategy_class": "PairSpreadZScoreStrategy",
+      "symbols": [
+        "XPT/USDT",
+        "XPD/USDT"
+      ],
+      "train": {
+        "total_return": 0.0,
+        "cagr": 0.0,
+        "sharpe": 0.0,
+        "sortino": 0.0,
+        "calmar": 0.0,
+        "max_drawdown": 0.0,
+        "volatility": 0.0,
+        "return": 0.0,
+        "days": 0
+      },
+      "val": {
+        "total_return": 0.0075071631628615965,
+        "cagr": 0.09526464237846266,
+        "sharpe": 3.4927309812481355,
+        "sortino": 15.277774199730908,
+        "calmar": 76.66926767852496,
+        "max_drawdown": 0.0012425401371760625,
+        "volatility": 0.026150443039174204,
+        "return": 0.0075071631628615965,
+        "days": 30
+      },
+      "oos": {
+        "total_return": -0.012720270848843529,
+        "cagr": -0.1589147569311119,
+        "sharpe": -1.9491659694997903,
+        "sortino": -1.7581850606263258,
+        "calmar": -6.919428805703636,
+        "max_drawdown": 0.022966455959503418,
+        "volatility": 0.08689455984416623,
+        "return": -0.012720270848843529,
+        "days": 27
+      },
+      "oos_participation": {
+        "total_days": 27,
+        "active_days": 13,
+        "active_day_ratio": 0.48148148148148145
+      },
+      "resliced_source": "wave2_raw_report_realigned_to_current_baseline_window",
+      "artifact_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/portfolio_superiority_wave2/candidate_research_wave2_latest.json"
+    },
+    {
+      "name": "pair_spread_1h_exec_tightstop_tp_xauusdt_xagusdt_2.2_0.55",
+      "family": "market_neutral",
+      "strategy_class": "PairSpreadZScoreStrategy",
+      "symbols": [
+        "XAU/USDT",
+        "XAG/USDT"
+      ],
+      "train": {
+        "total_return": 0.0,
+        "cagr": 0.0,
+        "sharpe": 0.0,
+        "sortino": 0.0,
+        "calmar": 0.0,
+        "max_drawdown": 0.0,
+        "volatility": 0.0,
+        "return": 0.0,
+        "days": 0
+      },
+      "val": {
+        "total_return": 0.017122348555475675,
+        "cagr": 0.12402941525975164,
+        "sharpe": 1.7495936457775862,
+        "sortino": 1.4052802804569071,
+        "calmar": 12.53649368143738,
+        "max_drawdown": 0.00989346929144952,
+        "volatility": 0.06813033701490938,
+        "return": 0.017122348555475675,
+        "days": 53
+      },
+      "oos": {
+        "total_return": -0.0043221523420429175,
+        "cagr": -0.05687432261469838,
+        "sharpe": -2.132252875758229,
+        "sortino": -1.9217470730901915,
+        "calmar": -6.513506807678404,
+        "max_drawdown": 0.0087317514656855,
+        "volatility": 0.027291211524479192,
+        "return": -0.0043221523420429175,
+        "days": 27
+      },
+      "oos_participation": {
+        "total_days": 27,
+        "active_days": 4,
+        "active_day_ratio": 0.14814814814814814
+      },
+      "resliced_source": "wave2_raw_report_realigned_to_current_baseline_window",
+      "artifact_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/portfolio_superiority_wave2/candidate_research_wave2_latest.json"
+    },
+    {
+      "name": "perp_crowding_carry_1h_0.25_0.08",
+      "family": "carry",
+      "strategy_class": "PerpCrowdingCarryStrategy",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "BNB/USDT",
+        "SOL/USDT",
+        "TRX/USDT"
+      ],
+      "train": {
+        "total_return": -9.999999999998899e-05,
+        "cagr": -9.999999999998899e-05,
+        "sharpe": -1.0000000000000002,
+        "sortino": 0.0,
+        "calmar": 0.0,
+        "max_drawdown": 0.0,
+        "volatility": 9.999999999999998e-05,
+        "return": -9.999999999998899e-05,
+        "days": 365
+      },
+      "val": {
+        "total_return": 0.0,
+        "cagr": 0.0,
+        "sharpe": 0.0,
+        "sortino": 0.0,
+        "calmar": 0.0,
+        "max_drawdown": 0.0,
+        "volatility": 0.0,
+        "return": 0.0,
+        "days": 59
+      },
+      "oos": {
+        "total_return": -0.0687824657792101,
+        "cagr": -0.534676551983128,
+        "sharpe": -3.5679358552280296,
+        "sortino": -6.356652716537941,
+        "calmar": -5.813114710222678,
+        "max_drawdown": 0.09197763654016156,
+        "volatility": 0.20830459590316155,
+        "return": -0.0687824657792101,
+        "days": 34
+      },
+      "oos_participation": {
+        "total_days": 34,
+        "active_days": 28,
+        "active_day_ratio": 0.8235294117647058
+      },
+      "resliced_source": "wave2_raw_report_realigned_to_current_baseline_window",
+      "artifact_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/portfolio_superiority_wave2/candidate_research_wave2_latest.json"
+    },
+    {
+      "name": "carry_trend_factor_rotation_1h_guarded_ls_32_8_0.150",
+      "family": "cross_sectional",
+      "strategy_class": "CarryTrendFactorRotationStrategy",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "BNB/USDT",
+        "SOL/USDT",
+        "TRX/USDT"
+      ],
+      "train": {
+        "total_return": -0.04167010002189819,
+        "cagr": -0.04167010002189819,
+        "sharpe": -0.07016095034584165,
+        "sortino": -0.11226523724261116,
+        "calmar": -0.2133696614265408,
+        "max_drawdown": 0.19529533741255167,
+        "volatility": 0.2303673084849949,
+        "return": -0.04167010002189819,
+        "days": 365
+      },
+      "val": {
+        "total_return": 0.07601590956270332,
+        "cagr": 0.5734192338498607,
+        "sharpe": 1.9643597115016964,
+        "sortino": 3.208847309719228,
+        "calmar": 6.59993622959493,
+        "max_drawdown": 0.086882541573444,
+        "volatility": 0.24586199678686543,
+        "return": 0.07601590956270332,
+        "days": 59
+      },
+      "oos": {
+        "total_return": -0.08036706904294688,
+        "cagr": -0.5931904768486218,
+        "sharpe": -4.363567251922643,
+        "sortino": -5.341515980868191,
+        "calmar": -8.167064067116957,
+        "max_drawdown": 0.07263203422598141,
+        "volatility": 0.20133090799709377,
+        "return": -0.08036706904294688,
+        "days": 34
+      },
+      "oos_participation": {
+        "total_days": 34,
+        "active_days": 34,
+        "active_day_ratio": 1.0
+      },
+      "resliced_source": "wave2_raw_report_realigned_to_current_baseline_window",
+      "artifact_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/portfolio_superiority_wave2/candidate_research_wave2_latest.json"
+    },
+    {
+      "name": "perp_crowding_carry_30m_0.25_0.08",
+      "family": "carry",
+      "strategy_class": "PerpCrowdingCarryStrategy",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "BNB/USDT",
+        "SOL/USDT",
+        "TRX/USDT"
+      ],
+      "train": {
+        "total_return": -9.999999999998899e-05,
+        "cagr": -9.999999999998899e-05,
+        "sharpe": -1.0000000000000002,
+        "sortino": 0.0,
+        "calmar": 0.0,
+        "max_drawdown": 0.0,
+        "volatility": 9.999999999999998e-05,
+        "return": -9.999999999998899e-05,
+        "days": 365
+      },
+      "val": {
+        "total_return": 0.0,
+        "cagr": 0.0,
+        "sharpe": 0.0,
+        "sortino": 0.0,
+        "calmar": 0.0,
+        "max_drawdown": 0.0,
+        "volatility": 0.0,
+        "return": 0.0,
+        "days": 59
+      },
+      "oos": {
+        "total_return": -0.09844296427509547,
+        "cagr": -0.6712703787755854,
+        "sharpe": -6.362527651665575,
+        "sortino": -11.25391495138583,
+        "calmar": -6.818876125060024,
+        "max_drawdown": 0.09844296427509547,
+        "volatility": 0.17232773395598297,
+        "return": -0.09844296427509547,
+        "days": 34
+      },
+      "oos_participation": {
+        "total_days": 34,
+        "active_days": 28,
+        "active_day_ratio": 0.8235294117647058
+      },
+      "resliced_source": "wave2_raw_report_realigned_to_current_baseline_window",
+      "artifact_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/portfolio_superiority_wave2/candidate_research_wave2_latest.json"
+    },
+    {
+      "name": "basis_snapback_reversion_30m_balanced_ls_96_1.8",
+      "family": "mean_reversion",
+      "strategy_class": "BasisSnapbackReversionStrategy",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "BNB/USDT",
+        "SOL/USDT",
+        "TRX/USDT"
+      ],
+      "train": {
+        "total_return": 0.0,
+        "cagr": 0.0,
+        "sharpe": 0.0,
+        "sortino": 0.0,
+        "calmar": 0.0,
+        "max_drawdown": 0.0,
+        "volatility": 0.0,
+        "return": 0.0,
+        "days": 365
+      },
+      "val": {
+        "total_return": 0.0,
+        "cagr": 0.0,
+        "sharpe": 0.0,
+        "sortino": 0.0,
+        "calmar": 0.0,
+        "max_drawdown": 0.0,
+        "volatility": 0.0,
+        "return": 0.0,
+        "days": 59
+      },
+      "oos": {
+        "total_return": -0.12076130289592102,
+        "cagr": -0.7488287107935594,
+        "sharpe": -11.163198424613062,
+        "sortino": -13.71834264083843,
+        "calmar": -6.200899566634709,
+        "max_drawdown": 0.12076130289592102,
+        "volatility": 0.12287199029976403,
+        "return": -0.12076130289592102,
+        "days": 34
+      },
+      "oos_participation": {
+        "total_days": 34,
+        "active_days": 28,
+        "active_day_ratio": 0.8235294117647058
+      },
+      "resliced_source": "wave2_raw_report_realigned_to_current_baseline_window",
+      "artifact_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/portfolio_superiority_wave2/candidate_research_wave2_latest.json"
+    },
+    {
+      "name": "leadlag_spillover_15m_0.25_lag2",
+      "family": "intraday_alpha",
+      "strategy_class": "LeadLagSpilloverStrategy",
+      "symbols": [
+        "BNB/USDT",
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "TRX/USDT"
+      ],
+      "train": {
+        "total_return": -0.9764286813438533,
+        "cagr": -0.9764286813438533,
+        "sharpe": -50.83067617015692,
+        "sortino": -54.383525201415544,
+        "calmar": -1.0002945474391132,
+        "max_drawdown": 0.9761411614645309,
+        "volatility": 0.0732991126163544,
+        "return": -0.9764286813438533,
+        "days": 365
+      },
+      "val": {
+        "total_return": -0.44420113198157263,
+        "cagr": -0.9735790625583706,
+        "sharpe": -76.15784050569754,
+        "sortino": -76.15784050569754,
+        "calmar": -2.2122361031280926,
+        "max_drawdown": 0.4400882261987018,
+        "volatility": 0.04746003702452275,
+        "return": -0.44420113198157263,
+        "days": 59
+      },
+      "oos": {
+        "total_return": -0.3246852591233642,
+        "cagr": -0.9852191561049732,
+        "sharpe": -65.48275686841893,
+        "sortino": -65.48275686841893,
+        "calmar": -3.108223012788241,
+        "max_drawdown": 0.3169718363358939,
+        "volatility": 0.0639584843827646,
+        "return": -0.3246852591233642,
+        "days": 34
+      },
+      "oos_participation": {
+        "total_days": 34,
+        "active_days": 34,
+        "active_day_ratio": 1.0
+      },
+      "resliced_source": "wave2_raw_report_realigned_to_current_baseline_window",
+      "artifact_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/portfolio_superiority_wave2/candidate_research_wave2_latest.json"
+    },
+    {
+      "name": "leadlag_spillover_15m_0.35_lag3",
+      "family": "intraday_alpha",
+      "strategy_class": "LeadLagSpilloverStrategy",
+      "symbols": [
+        "BNB/USDT",
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "TRX/USDT"
+      ],
+      "train": {
+        "total_return": -0.9638955461858433,
+        "cagr": -0.9638955461858433,
+        "sharpe": -45.81950718383102,
+        "sortino": -48.77977861067706,
+        "calmar": -1.0003993104665323,
+        "max_drawdown": 0.9635108062362961,
+        "volatility": 0.07210153835975099,
+        "return": -0.9638955461858433,
+        "days": 365
+      },
+      "val": {
+        "total_return": -0.39726832708758664,
+        "cagr": -0.9563735118243187,
+        "sharpe": -60.14768472260357,
+        "sortino": -60.14768472260357,
+        "calmar": -2.4225361862199466,
+        "max_drawdown": 0.3947819303028103,
+        "volatility": 0.0518284309535058,
+        "return": -0.39726832708758664,
+        "days": 59
+      },
+      "oos": {
+        "total_return": -0.2907194787925138,
+        "cagr": -0.9749684519922278,
+        "sharpe": -66.19522604015911,
+        "sortino": -66.19522604015911,
+        "calmar": -3.4512414455621903,
+        "max_drawdown": 0.2824978974582899,
+        "volatility": 0.055405009914925536,
+        "return": -0.2907194787925138,
+        "days": 34
+      },
+      "oos_participation": {
+        "total_days": 34,
+        "active_days": 34,
+        "active_day_ratio": 1.0
+      },
+      "resliced_source": "wave2_raw_report_realigned_to_current_baseline_window",
+      "artifact_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/portfolio_superiority_wave2/candidate_research_wave2_latest.json"
+    }
+  ],
+  "takeaway": "This is the executed broad follow-up after the overlay lane failed: the prior 14-candidate wave2 set was re-scored on the current baseline contract instead of launching a new heavy sweep immediately."
+}

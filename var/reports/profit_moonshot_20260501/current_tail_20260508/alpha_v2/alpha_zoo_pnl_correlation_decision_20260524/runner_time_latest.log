@@ -1,0 +1,51 @@
+{
+  "output_paths": {
+    "artifact_generation_validation_log": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_pnl_correlation_decision_20260524/artifact_generation_validation_latest.log",
+    "decision_rows_csv": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_pnl_correlation_decision_20260524/correlation_decision_rows_latest.csv",
+    "latest_json": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_pnl_correlation_decision_20260524/alpha_zoo_pnl_correlation_decision_latest.json",
+    "latest_markdown": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_pnl_correlation_decision_20260524/alpha_zoo_pnl_correlation_decision_latest.md",
+    "methodology_markdown": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_pnl_correlation_decision_20260524/pnl_correlation_decision_methodology_latest.md",
+    "paper_corr_locked_oos_report_only_csv": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_pnl_correlation_decision_20260524/paper_pnl_corr_locked_oos_report_only_latest.csv",
+    "paper_corr_train_validation_csv": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_pnl_correlation_decision_20260524/paper_pnl_corr_train_validation_latest.csv",
+    "paper_corr_validation_csv": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_pnl_correlation_decision_20260524/paper_pnl_corr_validation_latest.csv",
+    "selected_candidates_csv": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_pnl_correlation_decision_20260524/selected_corr_diversified_candidates_latest.csv",
+    "selected_corr_train_validation_csv": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_pnl_correlation_decision_20260524/selected_pnl_corr_train_validation_latest.csv",
+    "shadow_corr_train_validation_csv": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_pnl_correlation_decision_20260524/shadow_representative_pnl_corr_train_validation_latest.csv",
+    "timestamped_json": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_pnl_correlation_decision_20260524/alpha_zoo_pnl_correlation_decision_20260524T105814Z.json"
+  },
+  "summary": {
+    "all_paper_adoption_judgement": "reject_unscaled_all_in_due_to_duplicate_pnl_clusters_and_excess_gross_notional",
+    "captured_paper_pnl_candidate_count": 136,
+    "captured_pnl_candidate_count": 166,
+    "decision": "do_not_adopt_all_paper_candidates; use corr-diversified paper/testnet-only subset",
+    "high_corr_cluster_count": 14,
+    "largest_high_corr_cluster_size": 41,
+    "missing_pnl_model_ids": [],
+    "paper_universe_candidate_count": 136,
+    "selected_candidate_count": 11,
+    "strict_shadow_representative_count": 30
+  }
+}
+	Command being timed: ".venv/bin/python scripts/research/run_alpha_zoo_pnl_correlation_decision.py"
+	User time (seconds): 532.69
+	System time (seconds): 52.07
+	Percent of CPU this job got: 154%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 6:19.06
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 6481872
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 36307
+	Minor (reclaiming a frame) page faults: 2454206
+	Voluntary context switches: 294402
+	Involuntary context switches: 8011
+	Swaps: 0
+	File system inputs: 7405056
+	File system outputs: 4896
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

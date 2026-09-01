@@ -1,0 +1,288 @@
+{
+  "schema_version": "1",
+  "generated_at_utc": "2026-06-10T03:50:34.253685+00:00",
+  "numpy_seed": 42,
+  "environment": {
+    "python_version": "3.14.4 (main, Apr 14 2026, 14:26:14) [Clang 22.1.3 ]",
+    "platform": "Linux-6.6.114.1-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+    "rustc": "rustc 1.96.0 (ac68faa20 2026-05-25)",
+    "cargo": "cargo 1.96.0 (30a34c682 2026-05-25)",
+    "env_lock_path": "baseline/env.lock",
+    "env_lock_sha256": "fa7712a0ea928a4e61a45a93a679e6027ea80d9d59c13315b1c98ef335c7cfa9"
+  },
+  "config": {
+    "config_path": "baseline/golden/configs/config_frozen.yaml",
+    "config_sha256": "1f49e9654b957fa64760d9297779c6fecc7d6150e1a27b4408a0f352d3fd9a44",
+    "research_profile_path": "baseline/golden/configs/research_frozen.yaml",
+    "research_profile_sha256": "16c4530dc219a037788849a553f9d3c0b3e69a3c28185e6df435d8360c2aafd6"
+  },
+  "input_data": {
+    "type": "synthetic",
+    "generator": "generate_data.py (logic embedded in capture script)",
+    "numpy_seed": 42,
+    "symbols": [
+      "BTCUSDT",
+      "ETHUSDT"
+    ],
+    "days": 1000,
+    "start_date": "2022-01-01T00:00:00",
+    "fixtures": {
+      "BTCUSDT": {
+        "path": "tests/fixtures/ohlcv/BTCUSDT_seed42_1000d.parquet",
+        "sha256": "6930ee3e48f41bbee129e476e3c7406996517379a09d23656d7a0df42d6e674f"
+      },
+      "ETHUSDT": {
+        "path": "tests/fixtures/ohlcv/ETHUSDT_seed42_1000d.parquet",
+        "sha256": "4e971e48b4f0d9ed7d405eebdb14aa1df43a252e2a754d5cc4bac2ca0ffe61b2"
+      }
+    }
+  },
+  "aggtrades_fixture": {
+    "status": "captured",
+    "path": "tests/fixtures/aggtrades/BTCUSDT_1h_1781046000000_1781049600000.parquet",
+    "symbol": "BTCUSDT",
+    "start_ms": 1781046000000,
+    "end_ms": 1781049600000,
+    "record_count": 48730,
+    "sha256": "51426ca3fe8493488d637b1bd66f4ba2253c863c9abb32195a8ac8ecef59e0d7"
+  },
+  "goldens": {
+    "ma_cross_equity_curve": "baseline/golden/ma_cross_equity_curve.parquet",
+    "ma_cross_stats": "baseline/golden/ma_cross_stats.json",
+    "ma_cross_trades": "baseline/golden/ma_cross_trades.json",
+    "ma_cross_positions_sample": "baseline/golden/ma_cross_positions_sample.json",
+    "buyholdstrategy_equity_curve": "baseline/golden/buyholdstrategy_equity_curve.parquet",
+    "buyholdstrategy_stats": "baseline/golden/buyholdstrategy_stats.json",
+    "native_backends": "baseline/golden/native_backends.json",
+    "walk_forward_variant_a": "baseline/golden/walk_forward_results.json",
+    "walk_forward_variant_b": "baseline/golden/walk_forward_results_warmup.json"
+  },
+  "backends": {
+    "rust_metrics": {
+      "crate": "native/rust_metrics",
+      "lib": "native/rust_metrics/target/release/liblumina_metrics.so",
+      "exported_fns": [
+        "evaluate_metrics"
+      ],
+      "golden_result": {
+        "sharpe": 0.2993542540374392,
+        "cagr": 0.04491008636884075,
+        "max_dd": 0.5085791489826454
+      }
+    },
+    "c_metrics": {
+      "crate": "native/c_metrics",
+      "lib": "native/c_metrics/build/liblumina_metrics.so",
+      "exported_fns": [
+        "evaluate_metrics"
+      ],
+      "golden_result": {
+        "sharpe": 0.2993542540374392,
+        "cagr": 0.04491008636884075,
+        "max_dd": 0.5085791489826454
+      }
+    },
+    "rust_alpha_fold": {
+      "crate": "native/rust_alpha_fold",
+      "lib": "native/rust_alpha_fold/target/release/liblumina_alpha_fold.so",
+      "exported_fns": [
+        "simulate_symbol_fold_native"
+      ],
+      "golden_result": {
+        "backend": "rust",
+        "n": 1000,
+        "total_return": -1.335412446167978,
+        "liquidation_count": 0,
+        "wipeout_count": 0,
+        "returns_first5": [
+          -0.0,
+          -0.0,
+          0.0,
+          -0.0,
+          0.0
+        ],
+        "returns_last5": [
+          -0.025224121067528724,
+          -0.01616133372035935,
+          -0.016167722285499665,
+          0.013285655258999773,
+          0.0
+        ]
+      }
+    },
+    "rust_hybrid_optuna": {
+      "crate": "native/rust_hybrid_optuna",
+      "lib": "native/rust_hybrid_optuna/target/release/liblumina_hybrid_optuna.so",
+      "exported_fns": [
+        "evaluate_hybrid_optuna_portfolio"
+      ],
+      "golden_result": {
+        "backend": "rust",
+        "n": 1000,
+        "portfolio_final": 9824.906231479908,
+        "weights_exp_final": [
+          0.5555555555555556,
+          0.3055555555555556,
+          0.1388888888888889
+        ]
+      }
+    },
+    "rust_live_signals": {
+      "crate": "native/rust_live_signals",
+      "lib": "native/rust_live_signals/target/release/liblumina_live_signals.so",
+      "exported_fns": [
+        "debounced_state_signal_native",
+        "trailing_state_signal_native"
+      ],
+      "golden_result": {
+        "debounced": {
+          "available": true,
+          "n": 1000,
+          "signal_changes": 0,
+          "first5": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        "trailing": {
+          "available": true,
+          "n": 1000,
+          "signal_changes": 0,
+          "first5": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ]
+        }
+      }
+    },
+    "rust_rawfirst": {
+      "crate": "native/rust_rawfirst",
+      "lib": "native/rust_rawfirst/target/release/liblumina_rawfirst.so",
+      "exported_fns": [
+        "aggregate_raw_aggtrades_to_1s",
+        "append_ohlcv_1s_wal"
+      ],
+      "golden_result": {
+        "backend": "rust",
+        "n": 3598,
+        "columns": [
+          "datetime",
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume"
+        ],
+        "first_row": {
+          "datetime": "2026-06-09 23:00:00",
+          "open": 61687.9,
+          "high": 61687.9,
+          "low": 61687.9,
+          "close": 61687.9,
+          "volume": 0.019
+        },
+        "last_row": {
+          "datetime": "2026-06-09 23:59:57",
+          "open": 61695.0,
+          "high": 61695.0,
+          "low": 61694.9,
+          "close": 61694.9,
+          "volume": 0.013000000000000001
+        }
+      }
+    }
+  },
+  "tolerance": {
+    "rtol": 1e-08,
+    "determinism_contract": "same backend + same seed -> bit-exact reproduction across machines; all divergences require docs/divergences/<artifact>.md"
+  },
+  "walk_forward": {
+    "folds": 3,
+    "train_months": 6,
+    "val_months": 3,
+    "test_months": 3,
+    "step_months": 3,
+    "start_date": "2022-01-01T00:00:00",
+    "param_grid": {
+      "short_window": [
+        10,
+        20,
+        30
+      ],
+      "long_window": [
+        40,
+        80,
+        120
+      ]
+    },
+    "n_combos": 9,
+    "variant_a": {
+      "file": "baseline/golden/walk_forward_results.json",
+      "description": "preservation oracle \u2014 current behaviour incl. -999 sentinels",
+      "note": "Phase 4 improvement will NOT reproduce -999; divergence documented per procedure"
+    },
+    "variant_b": {
+      "file": "baseline/golden/walk_forward_results_warmup.json",
+      "description": "warmup-context oracle \u2014 real metrics for all folds",
+      "warmup_context_bars": 120
+    },
+    "split_build_elapsed_s": null,
+    "authoritative_e2e_timing": "baseline/perf-baseline.json (worker-3, 170.71s)"
+  },
+  "last_updated_at_utc": "2026-07-08T13:11:15Z",
+  "golden_recaptures": [
+    {
+      "id": "engine_funding_partial_fill_rebaseline_20260707",
+      "captured_at_utc": "2026-07-07T12:18:28.337466Z",
+      "scope": [
+        "baseline/golden/buyholdstrategy_stats.json",
+        "baseline/golden/ma_cross_stats.json",
+        "baseline/golden/ma_cross_trades.json"
+      ],
+      "divergence_doc": "docs/divergences/engine-golden-funding-rebaseline-20260707.md",
+      "reason": "Current engine-golden pytest under the uv/Python 3.14.5 environment deterministically includes funding accrual and partial-fill quantity drift that the older 2026-06-10 baseline did not match. Strategy/WF changes did not edit the engine hot path; this recaptures the existing deterministic engine behavior so CI can enforce it instead of carrying stale oracle rows.",
+      "validation": [
+        "clean-env uv run pytest -q tests/integration/test_engine_golden.py tests/test_research_selection_flags_config.py => 13 passed",
+        "final clean-env targeted pytest including engine golden and strategy/report suites => 70 passed",
+        "full clean-env uv run pytest -q => 3571 passed, 20 skipped, 3 xfailed"
+      ],
+      "sha256": {
+        "baseline/golden/buyholdstrategy_stats.json": "1f5bbcb612772ac04584b239bf7020357118e3457c3d8465a31d00088824e913",
+        "baseline/golden/ma_cross_stats.json": "c322e039adcba0b2e1197174fb00b7699dff5ee09f31f2665f9b91c4cc64168b",
+        "baseline/golden/ma_cross_trades.json": "5602aac54d1691a3f4f4dbd40109df140da9bfa005672f07965eada86479d603"
+      },
+      "python_version": "3.14.5",
+      "superseded_by": "engine_golden_data_dict_feature_isolation_20260708",
+      "supersession_reason": "Remote CI showed the 2026-07-07 recapture depended on an ambient local feature store. Preloaded OHLCV fixtures are now isolated from default sidecar feature lookup unless the caller opts in explicitly."
+    },
+    {
+      "id": "engine_golden_data_dict_feature_isolation_20260708",
+      "captured_at_utc": "2026-07-08T13:11:15Z",
+      "scope": [
+        "baseline/golden/buyholdstrategy_stats.json",
+        "baseline/golden/ma_cross_stats.json",
+        "baseline/golden/ma_cross_trades.json"
+      ],
+      "divergence_doc": "docs/divergences/engine-golden-funding-rebaseline-20260707.md",
+      "reason": "Fix deterministic engine-golden isolation: HistoricCSVDataHandler now treats preloaded data_dict frames as complete inputs and disables ambient default feature-store lookup unless feature_db_path or feature_exchange is supplied. The engine goldens are recaptured to the CI/no-sidecar values with Funding (Net)=0.0000 for synthetic OHLCV fixtures.",
+      "validation": [
+        "clean-env uv run pytest -q tests/integration/test_engine_golden.py tests/test_historic_data_feature_support.py => 7 passed",
+        "clean-env uv run pytest -q => 3575 passed, 20 skipped, 3 xfailed",
+        "uv run ruff check . => passed",
+        "uv run ruff format --check . => 1033 files already formatted"
+      ],
+      "sha256": {
+        "baseline/golden/buyholdstrategy_stats.json": "a4543e116cc571508379972f312f93a4a9439ab01ad27bdc8ce943dc30cf55a1",
+        "baseline/golden/ma_cross_stats.json": "c1778993530a7881bb230e0218308cbb3eff4810bf26f75c7d7be94fd5fea4fd",
+        "baseline/golden/ma_cross_trades.json": "37908ffad55086857bc86c98a0497fbeba0f126f5cf0e6a033defa363c06bb65"
+      },
+      "python_version": "3.14.5"
+    }
+  ]
+}

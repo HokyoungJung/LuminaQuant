@@ -1,0 +1,27 @@
+{
+  "artifact_kind": "live_equivalent_backtest_checkpoint",
+  "split_results": {
+    "profit_reboot_adaptive_momentum_mode": {
+      "val": {
+        "equivalence_key": "9fdb60795b5587d58cd4f5147112d47b719e297c378fa39ceaef53398fdc5012",
+        "final_equity": 10025.550130401376,
+        "liquidation_count": 0,
+        "metrics": {
+          "cagr": 7.558296142740062e-06,
+          "calmar": 0.0009942289564417125,
+          "max_drawdown": 0.007602168588803492,
+          "sharpe": 0.0119697544306497,
+          "sortino": 0.011600672983836864,
+          "total_return": 0.002551315040137725,
+          "volatility": 0.0006490433967422531
+        },
+        "mode": "profit_reboot_adaptive_momentum_mode",
+        "source_mode": "profit_reboot_adaptive_momentum_mode",
+        "split": "val",
+        "status": "completed",
+        "trade_count": 51
+      }
+    }
+  },
+  "updated_at": "2026-05-01T07:18:34.873075Z"
+}

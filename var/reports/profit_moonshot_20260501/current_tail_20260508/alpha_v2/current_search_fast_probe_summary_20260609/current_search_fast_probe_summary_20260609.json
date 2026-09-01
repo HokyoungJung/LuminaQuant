@@ -1,0 +1,620 @@
+{
+  "artifact_kind": "current_search_fast_probe_summary",
+  "best_probe": "family_lead_lag (+2.60% comp over latest 3 folds, only 1/3 positive)",
+  "generated_local_date": "2026-06-09",
+  "next_required": [
+    "do not deploy",
+    "keep allocation 0%",
+    "use fast smoke loop for new alphas before 10-fold",
+    "if promising, rerun current search space fresh-forward at 10bps and exact fill/cost telemetry"
+  ],
+  "round_trip_cost_bps": "default runner primary cost, 10bps",
+  "rows": [
+    {
+      "aggregate": {
+        "annualized_oos_return_approx": -0.12340664695432735,
+        "compounded_oos_return": -0.032391792950096865,
+        "fold_count": 3,
+        "latest_oos_return": 0.0,
+        "max_oos_mdd": 0.0362905296905105,
+        "min_oos_return": -0.016710726450646973,
+        "monthly_equity_mdd": 0.032391792950096865,
+        "monthly_sharpe_approx": -3.9967275904171338,
+        "positive_oos_folds": 0,
+        "profit_factor": 0.0,
+        "profit_factor_unbounded": false
+      },
+      "candidate_row_count_total": 1500,
+      "candidate_rows_written": 0,
+      "elapsed": "1:05.69",
+      "enabled_families": [
+        "indicator_kalman_residual_reversion",
+        "btc_beta_residual_momentum",
+        "indicator_kalman_volatility_trend",
+        "standardized_indicator_ridge_directional",
+        "cross_asset_lead_lag_momentum"
+      ],
+      "integer_leverages": [
+        4
+      ],
+      "name": "combined_4symbol_3fold_newalpha",
+      "path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/current_search_fast_3fold_newalpha_smoke_20260609",
+      "selected": [
+        {
+          "family": "standardized_indicator_ridge_directional",
+          "fold": "2026-04",
+          "locked_oos_return_report_only": -0.01594756184296242,
+          "symbol": "AVAXUSDT",
+          "timeframe": "1h",
+          "train_return": 0.47891608349046777,
+          "validation_return": 0.18579987026609035,
+          "validation_trade_event_count": 51
+        },
+        {
+          "family": "cross_asset_lead_lag_momentum",
+          "fold": "2026-05",
+          "locked_oos_return_report_only": -0.016710726450646973,
+          "symbol": "XRPUSDT",
+          "timeframe": "1h",
+          "train_return": 0.06535408117087216,
+          "validation_return": 0.09250421367688633,
+          "validation_trade_event_count": 48
+        },
+        {
+          "family": "indicator_kalman_residual_reversion",
+          "fold": "2026-06",
+          "locked_oos_return_report_only": 0.0,
+          "symbol": "AVAXUSDT",
+          "timeframe": "4h",
+          "train_return": 0.07984217999690468,
+          "validation_return": 0.06238644751326028,
+          "validation_trade_event_count": 14
+        }
+      ],
+      "selection_policy": "robust_train_validation_v1",
+      "symbols": [
+        "ETHUSDT",
+        "SOLUSDT",
+        "XRPUSDT",
+        "AVAXUSDT"
+      ],
+      "timeframes": [
+        "1h",
+        "4h"
+      ]
+    },
+    {
+      "aggregate": {
+        "annualized_oos_return_approx": 0.02664087663267556,
+        "compounded_oos_return": 0.006594696842123993,
+        "fold_count": 3,
+        "latest_oos_return": 0.0,
+        "max_oos_mdd": 0.0020148265945586497,
+        "min_oos_return": 0.0,
+        "monthly_equity_mdd": 0.0,
+        "monthly_sharpe_approx": 2.0,
+        "positive_oos_folds": 1,
+        "profit_factor": 0.0,
+        "profit_factor_unbounded": true
+      },
+      "candidate_row_count_total": 1500,
+      "candidate_rows_written": 0,
+      "elapsed": "0:38.94",
+      "enabled_families": [
+        "indicator_kalman_residual_reversion"
+      ],
+      "integer_leverages": [
+        4
+      ],
+      "name": "family_kalman_residual",
+      "path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/current_search_family_smokes_20260609/indicator_kalman_residual_reversion",
+      "selected": [
+        {
+          "family": "indicator_kalman_residual_reversion",
+          "fold": "2026-04",
+          "locked_oos_return_report_only": 0.006594696842123993,
+          "symbol": "XRPUSDT",
+          "timeframe": "4h",
+          "train_return": 0.08259532463739028,
+          "validation_return": 0.0598461825448966,
+          "validation_trade_event_count": 6
+        },
+        {
+          "family": "indicator_kalman_residual_reversion",
+          "fold": "2026-05",
+          "locked_oos_return_report_only": 0.0,
+          "symbol": "SOLUSDT",
+          "timeframe": "4h",
+          "train_return": 0.10210406113181114,
+          "validation_return": 0.037550541620470224,
+          "validation_trade_event_count": 18
+        },
+        {
+          "family": "indicator_kalman_residual_reversion",
+          "fold": "2026-06",
+          "locked_oos_return_report_only": 0.0,
+          "symbol": "AVAXUSDT",
+          "timeframe": "4h",
+          "train_return": 0.07984217999690468,
+          "validation_return": 0.06238644751326028,
+          "validation_trade_event_count": 14
+        }
+      ],
+      "selection_policy": "robust_train_validation_v1",
+      "symbols": [
+        "ETHUSDT",
+        "SOLUSDT",
+        "XRPUSDT",
+        "AVAXUSDT"
+      ],
+      "timeframes": [
+        "1h",
+        "4h"
+      ]
+    },
+    {
+      "aggregate": {
+        "annualized_oos_return_approx": 0.0,
+        "compounded_oos_return": 0.0,
+        "fold_count": 0,
+        "latest_oos_return": 0.0,
+        "max_oos_mdd": 0.0,
+        "min_oos_return": 0.0,
+        "monthly_equity_mdd": 0.0,
+        "monthly_sharpe_approx": 0.0,
+        "positive_oos_folds": 0,
+        "profit_factor": 0.0,
+        "profit_factor_unbounded": true
+      },
+      "candidate_row_count_total": 0,
+      "candidate_rows_written": 0,
+      "elapsed": "0:14.56",
+      "enabled_families": [
+        "btc_beta_residual_momentum"
+      ],
+      "integer_leverages": [
+        4
+      ],
+      "name": "family_btc_beta_residual",
+      "path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/current_search_family_smokes_20260609/btc_beta_residual_momentum",
+      "selected": [],
+      "selection_policy": "robust_train_validation_v1",
+      "symbols": [
+        "ETHUSDT",
+        "SOLUSDT",
+        "XRPUSDT",
+        "AVAXUSDT"
+      ],
+      "timeframes": [
+        "1h",
+        "4h"
+      ]
+    },
+    {
+      "aggregate": {
+        "annualized_oos_return_approx": -0.07227802876121259,
+        "compounded_oos_return": -0.018581002301304328,
+        "fold_count": 3,
+        "latest_oos_return": 0.10622891939551105,
+        "max_oos_mdd": 0.12455607959014248,
+        "min_oos_return": -0.10143480173537844,
+        "monthly_equity_mdd": 0.11282467806484087,
+        "monthly_sharpe_approx": -0.08734300061813965,
+        "positive_oos_folds": 1,
+        "profit_factor": 0.9309308672857245,
+        "profit_factor_unbounded": false
+      },
+      "candidate_row_count_total": 1500,
+      "candidate_rows_written": 0,
+      "elapsed": "0:28.86",
+      "enabled_families": [
+        "indicator_kalman_volatility_trend"
+      ],
+      "integer_leverages": [
+        4
+      ],
+      "name": "family_kalman_vol_trend",
+      "path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/current_search_family_smokes_20260609/indicator_kalman_volatility_trend",
+      "selected": [
+        {
+          "family": "indicator_kalman_volatility_trend",
+          "fold": "2026-04",
+          "locked_oos_return_report_only": -0.10143480173537844,
+          "symbol": "AVAXUSDT",
+          "timeframe": "1h",
+          "train_return": 0.3090323283257923,
+          "validation_return": 0.19694793955052914,
+          "validation_trade_event_count": 70
+        },
+        {
+          "family": "indicator_kalman_volatility_trend",
+          "fold": "2026-05",
+          "locked_oos_return_report_only": -0.012675625932830892,
+          "symbol": "XRPUSDT",
+          "timeframe": "4h",
+          "train_return": 0.03662487904504119,
+          "validation_return": 0.05205622439643487,
+          "validation_trade_event_count": 11
+        },
+        {
+          "family": "indicator_kalman_volatility_trend",
+          "fold": "2026-06",
+          "locked_oos_return_report_only": 0.10622891939551105,
+          "symbol": "SOLUSDT",
+          "timeframe": "4h",
+          "train_return": 0.09850819530904853,
+          "validation_return": 0.04686688472551537,
+          "validation_trade_event_count": 12
+        }
+      ],
+      "selection_policy": "robust_train_validation_v1",
+      "symbols": [
+        "ETHUSDT",
+        "SOLUSDT",
+        "XRPUSDT",
+        "AVAXUSDT"
+      ],
+      "timeframes": [
+        "1h",
+        "4h"
+      ]
+    },
+    {
+      "aggregate": {
+        "annualized_oos_return_approx": -0.01294949168214754,
+        "compounded_oos_return": -0.002169986714511296,
+        "fold_count": 2,
+        "latest_oos_return": 0.014000854623412273,
+        "max_oos_mdd": 0.04224343361623484,
+        "min_oos_return": -0.01594756184296242,
+        "monthly_equity_mdd": 0.01594756184296242,
+        "monthly_sharpe_approx": -0.15922175290449586,
+        "positive_oos_folds": 1,
+        "profit_factor": 0.8779307308089092,
+        "profit_factor_unbounded": false
+      },
+      "candidate_row_count_total": 384,
+      "candidate_rows_written": 0,
+      "elapsed": "0:19.99",
+      "enabled_families": [
+        "standardized_indicator_ridge_directional"
+      ],
+      "integer_leverages": [
+        4
+      ],
+      "name": "family_standardized_ridge",
+      "path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/current_search_family_smokes_20260609/standardized_indicator_ridge_directional",
+      "selected": [
+        {
+          "family": "standardized_indicator_ridge_directional",
+          "fold": "2026-04",
+          "locked_oos_return_report_only": -0.01594756184296242,
+          "symbol": "AVAXUSDT",
+          "timeframe": "1h",
+          "train_return": 0.47891608349046777,
+          "validation_return": 0.18579987026609035,
+          "validation_trade_event_count": 51
+        },
+        {
+          "family": "standardized_indicator_ridge_directional",
+          "fold": "2026-05",
+          "locked_oos_return_report_only": 0.014000854623412273,
+          "symbol": "ETHUSDT",
+          "timeframe": "4h",
+          "train_return": 0.07781904792365202,
+          "validation_return": 0.06072575501893285,
+          "validation_trade_event_count": 17
+        }
+      ],
+      "selection_policy": "robust_train_validation_v1",
+      "symbols": [
+        "ETHUSDT",
+        "SOLUSDT",
+        "XRPUSDT",
+        "AVAXUSDT"
+      ],
+      "timeframes": [
+        "1h",
+        "4h"
+      ]
+    },
+    {
+      "aggregate": {
+        "annualized_oos_return_approx": 0.10815915960998623,
+        "compounded_oos_return": 0.026007499285098268,
+        "fold_count": 3,
+        "latest_oos_return": -0.007204555782297506,
+        "max_oos_mdd": 0.032013605626946995,
+        "min_oos_return": -0.016710726450646973,
+        "monthly_equity_mdd": 0.023794888872068154,
+        "monthly_sharpe_approx": 0.8534441447848533,
+        "positive_oos_folds": 1,
+        "profit_factor": 2.1332098539952864,
+        "profit_factor_unbounded": false
+      },
+      "candidate_row_count_total": 864,
+      "candidate_rows_written": 0,
+      "elapsed": "0:24.33",
+      "enabled_families": [
+        "cross_asset_lead_lag_momentum"
+      ],
+      "integer_leverages": [
+        4
+      ],
+      "name": "family_lead_lag",
+      "path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/current_search_family_smokes_20260609/cross_asset_lead_lag_momentum",
+      "selected": [
+        {
+          "family": "cross_asset_lead_lag_momentum",
+          "fold": "2026-04",
+          "locked_oos_return_report_only": 0.051016315720395555,
+          "symbol": "XRPUSDT",
+          "timeframe": "1h",
+          "train_return": 0.03988901423790536,
+          "validation_return": 0.06492898185143403,
+          "validation_trade_event_count": 82
+        },
+        {
+          "family": "cross_asset_lead_lag_momentum",
+          "fold": "2026-05",
+          "locked_oos_return_report_only": -0.016710726450646973,
+          "symbol": "XRPUSDT",
+          "timeframe": "1h",
+          "train_return": 0.06535408117087216,
+          "validation_return": 0.09250421367688633,
+          "validation_trade_event_count": 48
+        },
+        {
+          "family": "cross_asset_lead_lag_momentum",
+          "fold": "2026-06",
+          "locked_oos_return_report_only": -0.007204555782297506,
+          "symbol": "XRPUSDT",
+          "timeframe": "1h",
+          "train_return": 0.025177272951466323,
+          "validation_return": 0.02065313883942066,
+          "validation_trade_event_count": 30
+        }
+      ],
+      "selection_policy": "robust_train_validation_v1",
+      "symbols": [
+        "ETHUSDT",
+        "SOLUSDT",
+        "XRPUSDT",
+        "AVAXUSDT"
+      ],
+      "timeframes": [
+        "1h",
+        "4h"
+      ]
+    },
+    {
+      "aggregate": {
+        "annualized_oos_return_approx": -0.139030750666849,
+        "compounded_oos_return": -0.036732494782720004,
+        "fold_count": 3,
+        "latest_oos_return": 0.000643124432083253,
+        "max_oos_mdd": 0.051469601270145326,
+        "min_oos_return": -0.019679975134888616,
+        "monthly_equity_mdd": 0.03735159748988015,
+        "monthly_sharpe_approx": -3.791862697080332,
+        "positive_oos_folds": 1,
+        "profit_factor": 0.0170561278397314,
+        "profit_factor_unbounded": false
+      },
+      "candidate_row_count_total": 1500,
+      "candidate_rows_written": 0,
+      "elapsed": "0:37.02",
+      "enabled_families": [
+        "cross_sectional_vol_adjusted_momentum"
+      ],
+      "integer_leverages": [
+        4
+      ],
+      "name": "family_xs_vol_adjusted_momentum",
+      "path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/current_search_xs_vol_adj_momentum_smoke_20260609",
+      "selected": [
+        {
+          "family": "cross_sectional_vol_adjusted_momentum",
+          "fold": "2026-04",
+          "locked_oos_return_report_only": -0.01802638108654675,
+          "symbol": "AVAXUSDT",
+          "timeframe": "4h",
+          "train_return": 0.06377344874899293,
+          "validation_return": 0.08345487480167835,
+          "validation_trade_event_count": 12
+        },
+        {
+          "family": "cross_sectional_vol_adjusted_momentum",
+          "fold": "2026-05",
+          "locked_oos_return_report_only": -0.019679975134888616,
+          "symbol": "XRPUSDT",
+          "timeframe": "4h",
+          "train_return": 0.09940720105065304,
+          "validation_return": 0.07351434600421314,
+          "validation_trade_event_count": 34
+        },
+        {
+          "family": "cross_sectional_vol_adjusted_momentum",
+          "fold": "2026-06",
+          "locked_oos_return_report_only": 0.000643124432083253,
+          "symbol": "ETHUSDT",
+          "timeframe": "4h",
+          "train_return": 0.08768125066965382,
+          "validation_return": 0.10003847949501332,
+          "validation_trade_event_count": 23
+        }
+      ],
+      "selection_policy": "robust_train_validation_v1",
+      "symbols": [
+        "ETHUSDT",
+        "SOLUSDT",
+        "XRPUSDT",
+        "AVAXUSDT"
+      ],
+      "timeframes": [
+        "1h",
+        "4h"
+      ]
+    },
+    {
+      "aggregate": {
+        "annualized_oos_return_approx": -0.12340664695432735,
+        "compounded_oos_return": -0.032391792950096865,
+        "fold_count": 3,
+        "latest_oos_return": 0.0,
+        "max_oos_mdd": 0.0362905296905105,
+        "min_oos_return": -0.016710726450646973,
+        "monthly_equity_mdd": 0.032391792950096865,
+        "monthly_sharpe_approx": -3.9967275904171338,
+        "positive_oos_folds": 0,
+        "profit_factor": 0.0,
+        "profit_factor_unbounded": false
+      },
+      "candidate_row_count_total": 2400,
+      "candidate_rows_written": 2400,
+      "elapsed": "1:36.10",
+      "enabled_families": [
+        "indicator_kalman_residual_reversion",
+        "btc_beta_residual_momentum",
+        "indicator_kalman_volatility_trend",
+        "standardized_indicator_ridge_directional",
+        "cross_asset_lead_lag_momentum",
+        "cross_sectional_vol_adjusted_momentum"
+      ],
+      "integer_leverages": [
+        4
+      ],
+      "name": "combined_4symbol_candidate_dump",
+      "path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/current_search_fast_3fold_candidate_dump_20260609",
+      "selected": [
+        {
+          "family": "standardized_indicator_ridge_directional",
+          "fold": "2026-04",
+          "locked_oos_return_report_only": -0.01594756184296242,
+          "symbol": "AVAXUSDT",
+          "timeframe": "1h",
+          "train_return": 0.47891608349046777,
+          "validation_return": 0.18579987026609035,
+          "validation_trade_event_count": 51
+        },
+        {
+          "family": "cross_asset_lead_lag_momentum",
+          "fold": "2026-05",
+          "locked_oos_return_report_only": -0.016710726450646973,
+          "symbol": "XRPUSDT",
+          "timeframe": "1h",
+          "train_return": 0.06535408117087216,
+          "validation_return": 0.09250421367688633,
+          "validation_trade_event_count": 48
+        },
+        {
+          "family": "indicator_kalman_residual_reversion",
+          "fold": "2026-06",
+          "locked_oos_return_report_only": 0.0,
+          "symbol": "AVAXUSDT",
+          "timeframe": "4h",
+          "train_return": 0.07984217999690468,
+          "validation_return": 0.06238644751326028,
+          "validation_trade_event_count": 14
+        }
+      ],
+      "selection_policy": "robust_train_validation_v1",
+      "symbols": [
+        "ETHUSDT",
+        "SOLUSDT",
+        "XRPUSDT",
+        "AVAXUSDT"
+      ],
+      "timeframes": [
+        "1h",
+        "4h"
+      ]
+    },
+    {
+      "aggregate": {
+        "annualized_oos_return_approx": -0.19933766347432802,
+        "compounded_oos_return": -0.05406270198837304,
+        "fold_count": 3,
+        "latest_oos_return": -0.0037428423110466014,
+        "max_oos_mdd": 0.09407774490083554,
+        "min_oos_return": -0.09339560126614155,
+        "monthly_equity_mdd": 0.09339560126614155,
+        "monthly_sharpe_approx": -0.8078770963714952,
+        "positive_oos_folds": 1,
+        "profit_factor": 0.48698279046534915,
+        "profit_factor_unbounded": false
+      },
+      "candidate_row_count_total": 3000,
+      "candidate_rows_written": 3000,
+      "elapsed": "3:56.46",
+      "enabled_families": [
+        "cross_asset_lead_lag_momentum",
+        "cross_sectional_vol_adjusted_momentum",
+        "indicator_kalman_residual_reversion",
+        "deep_research_vol_managed_momentum_crash_gate"
+      ],
+      "integer_leverages": [
+        4
+      ],
+      "name": "core10_momentum_probe",
+      "path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/current_search_core_3fold_momentum_probe_20260609",
+      "selected": [
+        {
+          "family": "cross_asset_lead_lag_momentum",
+          "fold": "2026-04",
+          "locked_oos_return_report_only": -0.09339560126614155,
+          "symbol": "DOGEUSDT",
+          "timeframe": "1h",
+          "train_return": 0.0441588354998006,
+          "validation_return": 0.13464351655414197,
+          "validation_trade_event_count": 111
+        },
+        {
+          "family": "cross_sectional_vol_adjusted_momentum",
+          "fold": "2026-05",
+          "locked_oos_return_report_only": 0.047304750314679955,
+          "symbol": "BTCUSDT",
+          "timeframe": "4h",
+          "train_return": 0.03990929541885735,
+          "validation_return": 0.10456475713279767,
+          "validation_trade_event_count": 20
+        },
+        {
+          "family": "deep_research_vol_managed_momentum_crash_gate",
+          "fold": "2026-06",
+          "locked_oos_return_report_only": -0.0037428423110466014,
+          "symbol": "TONUSDT",
+          "timeframe": "4h",
+          "train_return": 0.1848152202812341,
+          "validation_return": 0.4280258524237339,
+          "validation_trade_event_count": 53
+        }
+      ],
+      "selection_policy": "robust_train_validation_v1",
+      "symbols": [
+        "BTCUSDT",
+        "ETHUSDT",
+        "SOLUSDT",
+        "BNBUSDT",
+        "XRPUSDT",
+        "ADAUSDT",
+        "AVAXUSDT",
+        "TONUSDT",
+        "DOGEUSDT",
+        "LINKUSDT"
+      ],
+      "timeframes": [
+        "1h",
+        "4h"
+      ]
+    }
+  ],
+  "speed_changes": [
+    "--families subset gate",
+    "--leverages single-value probe",
+    "--fold-workers",
+    "--max-candidate-rows-output",
+    "eligible-first heap cap by active train/validation score"
+  ],
+  "verdict": "NO_PROMOTION_FAST_PROBES_WEAK"
+}

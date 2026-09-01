@@ -1,0 +1,1698 @@
+import argparse
+import json
+import math
+import multiprocessing
+import os
+import sys
+import time
+import traceback
+import uuid
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+from typing import Any
+
+import polars as pl
+
+# Engine Imports
+from lumina_quant.backtesting.backtest import Backtest
+from lumina_quant.backtesting.chunked_runner import run_backtest_chunked
+from lumina_quant.backtesting.cli_contract import (
+    RawFirstDataMissingError,
+    RawFirstManifestInvalidError,
+    RawFirstStaleWindowError,
+    raw_first_exit_code,
+    resolve_data_contract,
+)
+from lumina_quant.backtesting.data import HistoricCSVDataHandler
+from lumina_quant.backtesting.data_windowed_parquet import HistoricParquetWindowedDataHandler
+from lumina_quant.backtesting.execution_sim import SimulatedExecutionHandler
+from lumina_quant.backtesting.portfolio_backtest import Portfolio
+from lumina_quant.compute.ohlcv_loader import OHLCVFrameLoader
+from lumina_quant.configuration import get_default_runtime_config
+from lumina_quant.market_data import (
+    load_data_dict_from_db,
+    load_data_dict_from_external_root,
+    load_data_dict_from_parquet,
+    resolve_symbol_csv_path,
+    timeframe_to_milliseconds,
+)
+from lumina_quant.optimization.storage import save_optimization_rows
+from lumina_quant.optimization.search_policy import (
+    build_bounded_grid_combinations,
+    run_optuna_study,
+    suggest_params_from_optuna_config,
+)
+from lumina_quant.optimization.threading_control import configure_numba_threads
+from lumina_quant.optimization.walkers import InsufficientWarmupError, build_walk_forward_splits
+from lumina_quant.storage.parquet import (
+    ParquetMarketDataRepository,
+    is_parquet_market_data_store,
+)
+from lumina_quant.utils.audit_store import AuditStore
+
+_strategy_registry = None
+
+
+def _auto_collect_market_data(*args, **kwargs):
+    try:
+        from lumina_quant.data_collector import auto_collect_market_data as collector
+    except Exception as exc:
+        raise RuntimeError("auto_collect_market_data is unavailable in this distribution.") from exc
+    return collector(*args, **kwargs)
+
+
+# Optuna Import
+try:
+    import optuna
+    from optuna.trial import TrialState
+
+    OPTUNA_AVAILABLE = True
+except ImportError:
+    optuna = None
+    TrialState = None
+    OPTUNA_AVAILABLE = False
+
+# ==========================================
+# CONFIGURATION FROM YAML
+# ==========================================
+
+# 3. Data Settings / lazy-initialized runtime state
+CSV_DIR = "data"
+SYMBOL_LIST: list[str] = []
+MARKET_DB_PATH = "data/market_parquet"
+MARKET_DB_EXCHANGE = "binance"
+MARKET_DB_BACKEND = "local"
+BASE_TIMEFRAME = str(os.getenv("LQ_BASE_TIMEFRAME", "1s") or "1s").strip().lower()
+STRATEGY_TIMEFRAME = "1m"
+DATA_MODE = str(os.getenv("LQ_DATA_MODE", "raw-first") or "raw-first").strip().lower()
+if DATA_MODE not in {"raw-first", "legacy"}:
+    DATA_MODE = "raw-first"
+
+# 4. Optimization Settings / lazy-initialized runtime state
+OPTIMIZATION_METHOD = "OPTUNA"
+STRATEGY_CLASS = None
+ACTIVE_STRATEGY_NAME = ""
+GRID_PARAMS: dict[str, Any] = {}
+OPTUNA_CONFIG: dict[str, Any] = {}
+OPTUNA_TRIALS = 20
+MAX_WORKERS = 1
+BASE_START = datetime(2023, 1, 1)
+
+AUTO_COLLECT_DB = str(os.getenv("LQ_AUTO_COLLECT_DB", "0")).strip().lower() not in {
+    "0",
+    "false",
+    "no",
+    "off",
+}
+
+BASE_END = None
+
+
+def _enforce_1s_base_timeframe(value: str) -> str:
+    token = str(value or "").strip().lower() or "1s"
+    if token != "1s":
+        print(f"[WARN] base_timeframe '{token}' overridden to '1s' for intrabar optimization feed.")
+    return "1s"
+
+
+# Runtime data context (configured in __main__)
+DATA_DICT = {}
+PARQUET_MODE = False
+ACTIVE_DATA_SOURCE = "auto"
+ACTIVE_DATA_MODE = "raw-first"
+ACTIVE_MARKET_DB_PATH = str(MARKET_DB_PATH)
+ACTIVE_MARKET_EXCHANGE = str(MARKET_DB_EXCHANGE)
+ACTIVE_BASE_TIMEFRAME = str(BASE_TIMEFRAME)
+PARQUET_REPO: ParquetMarketDataRepository | None = None
+PROFILE_ENABLED = str(os.getenv("LQ_OPT_PROFILE", "0")).strip().lower() in {"1", "true", "yes"}
+PROFILE_TOTALS = {
+    "feature_seconds": 0.0,
+    "simulation_seconds": 0.0,
+    "orchestration_seconds": 0.0,
+    "calls": 0,
+}
+
+
+def _get_strategy_registry():
+    global _strategy_registry
+    if _strategy_registry is None:
+        from lumina_quant.strategies import registry
+
+        _strategy_registry = registry
+    return _strategy_registry
+
+
+def _resolve_strategy_class():
+    strategy_registry = _get_strategy_registry()
+    requested_strategy_name = str(get_default_runtime_config().optimization.strategy or "").strip()
+    return strategy_registry.resolve_strategy_class(
+        requested_strategy_name,
+        default_name=strategy_registry.DEFAULT_STRATEGY_NAME,
+    )
+
+
+def _initialize_optimize_runtime_state(*, log: bool = False) -> None:
+    global OPTIMIZATION_METHOD, STRATEGY_CLASS, ACTIVE_STRATEGY_NAME
+    global GRID_PARAMS, OPTUNA_CONFIG, OPTUNA_TRIALS, MAX_WORKERS
+    global BASE_START, BASE_END
+
+    _rt = get_default_runtime_config()
+    _opt = _rt.optimization
+    _bt = _rt.backtest
+    strategy_registry = _get_strategy_registry()
+    STRATEGY_CLASS = _resolve_strategy_class()
+    ACTIVE_STRATEGY_NAME = STRATEGY_CLASS.__name__
+    OPTIMIZATION_METHOD = str(_opt.method)
+
+    resolved_optuna_config = strategy_registry.resolve_optuna_config(
+        ACTIVE_STRATEGY_NAME,
+        dict(_opt.optuna),
+    )
+    resolved_grid_config = strategy_registry.resolve_grid_config(
+        ACTIVE_STRATEGY_NAME,
+        dict(_opt.grid),
+    )
+    GRID_PARAMS = dict(resolved_grid_config.get("params", {}))
+    OPTUNA_CONFIG = dict(resolved_optuna_config.get("params", {}))
+    OPTUNA_TRIALS = int(resolved_optuna_config.get("n_trials", 20))
+    MAX_WORKERS = min(2, max(1, int(_opt.max_workers)))
+
+    try:
+        BASE_START = datetime.strptime(str(_bt.start_date), "%Y-%m-%d")
+    except Exception as exc:
+        if log:
+            print(f"Error parsing dates from config: {exc}. Using defaults.")
+        BASE_START = datetime(2023, 1, 1)
+
+    try:
+        BASE_END = datetime.strptime(str(_bt.end_date), "%Y-%m-%d") if _bt.end_date else None
+    except Exception:
+        BASE_END = None
+
+
+def _env_int(name: str, default: int) -> int:
+    raw = str(os.getenv(name, str(default))).strip()
+    try:
+        return int(raw)
+    except Exception:
+        return int(default)
+
+
+def _env_float(name: str, default: float) -> float:
+    raw = str(os.getenv(name, str(default))).strip()
+    try:
+        return float(raw)
+    except Exception:
+        return float(default)
+
+
+BT_CHUNK_DAYS = max(1, _env_int("LQ__BACKTEST__CHUNK_DAYS", 2))
+BT_CHUNK_WARMUP_BARS = max(0, _env_int("LQ__BACKTEST__CHUNK_WARMUP_BARS", 0))
+BACKTEST_POLL_SECONDS = max(1, _env_int("LQ__BACKTEST__POLL_SECONDS", 20))
+BACKTEST_WINDOW_SECONDS = max(1, _env_int("LQ__BACKTEST__WINDOW_SECONDS", 20))
+BACKTEST_DECISION_CADENCE_SECONDS = max(1, _env_int("LQ__BACKTEST__DECISION_CADENCE_SECONDS", 20))
+
+
+def _normalize_backtest_mode(value: str | None, default: str = "windowed") -> str:
+    token = str(value or default).strip().lower()
+    if token in {"windowed", "legacy_batch", "legacy_1s"}:
+        return token
+    return str(default)
+
+
+BACKTEST_MODE = _normalize_backtest_mode(
+    os.getenv("LQ_BACKTEST_MODE", "windowed"), default="windowed"
+)
+
+
+TWO_STAGE_ENABLED = str(os.getenv("LQ_TWO_STAGE_OPT", "1")).strip().lower() not in {
+    "0",
+    "false",
+    "no",
+    "off",
+}
+TWO_STAGE_TOPK_RATIO = min(1.0, max(0.05, _env_float("LQ_TWO_STAGE_TOPK_RATIO", 0.4)))
+TWO_STAGE_MIN_TOPK = max(1, _env_int("LQ_TWO_STAGE_MIN_TOPK", 5))
+TWO_STAGE_MAX_TOPK = max(TWO_STAGE_MIN_TOPK, _env_int("LQ_TWO_STAGE_MAX_TOPK", 80))
+TWO_STAGE_PREFILTER_FRACTION = min(
+    0.9,
+    max(0.1, _env_float("LQ_TWO_STAGE_PREFILTER_FRACTION", 0.4)),
+)
+
+
+@dataclass(frozen=True, slots=True)
+class OptimizeRuntimeSettings:
+    symbol_list: list[str]
+    market_db_path: str
+    market_db_exchange: str
+    market_db_backend: str
+    base_timeframe: str
+    strategy_timeframe: str
+    data_mode: str
+    auto_collect_db: bool
+    backtest_mode: str
+    bt_chunk_days: int
+    bt_chunk_warmup_bars: int
+    backtest_poll_seconds: int
+    backtest_window_seconds: int
+    backtest_decision_cadence_seconds: int
+    max_workers: int
+
+
+def _current_optimize_runtime_settings() -> OptimizeRuntimeSettings:
+    _rt = get_default_runtime_config()
+    _bt = _rt.backtest
+    _opt = _rt.optimization
+    data_mode = str(os.getenv("LQ_DATA_MODE", "raw-first") or "raw-first").strip().lower()
+    if data_mode not in {"raw-first", "legacy"}:
+        data_mode = "raw-first"
+    return OptimizeRuntimeSettings(
+        symbol_list=list(_rt.trading.symbols),
+        market_db_path=str(_rt.storage.market_data_parquet_path),
+        market_db_exchange=str(_rt.storage.market_data_exchange),
+        market_db_backend=str(_rt.storage.backend),
+        base_timeframe=str(os.getenv("LQ_BASE_TIMEFRAME", "1s") or "1s").strip().lower(),
+        strategy_timeframe=str(_rt.trading.timeframe),
+        data_mode=data_mode,
+        auto_collect_db=str(os.getenv("LQ_AUTO_COLLECT_DB", "0")).strip().lower()
+        not in {"0", "false", "no", "off"},
+        backtest_mode=_normalize_backtest_mode(
+            os.getenv("LQ_BACKTEST_MODE", str(_bt.mode)),
+            default="windowed",
+        ),
+        bt_chunk_days=max(1, _env_int("LQ__BACKTEST__CHUNK_DAYS", int(_bt.chunk_days))),
+        bt_chunk_warmup_bars=max(
+            0,
+            _env_int("LQ__BACKTEST__CHUNK_WARMUP_BARS", int(_bt.chunk_warmup_bars)),
+        ),
+        backtest_poll_seconds=max(
+            1,
+            _env_int("LQ__BACKTEST__POLL_SECONDS", int(_bt.poll_seconds)),
+        ),
+        backtest_window_seconds=max(
+            1,
+            _env_int("LQ__BACKTEST__WINDOW_SECONDS", int(_bt.window_seconds)),
+        ),
+        backtest_decision_cadence_seconds=max(
+            1,
+            _env_int("LQ__BACKTEST__DECISION_CADENCE_SECONDS", int(_bt.decision_cadence_seconds)),
+        ),
+        max_workers=min(2, max(1, int(_opt.max_workers))),
+    )
+
+
+def _apply_optimize_runtime_settings(settings: OptimizeRuntimeSettings) -> None:
+    global SYMBOL_LIST, MARKET_DB_PATH, MARKET_DB_EXCHANGE, MARKET_DB_BACKEND
+    global BASE_TIMEFRAME, STRATEGY_TIMEFRAME, DATA_MODE, AUTO_COLLECT_DB, BACKTEST_MODE
+    global BT_CHUNK_DAYS, BT_CHUNK_WARMUP_BARS
+    global BACKTEST_POLL_SECONDS, BACKTEST_WINDOW_SECONDS, BACKTEST_DECISION_CADENCE_SECONDS
+
+    SYMBOL_LIST = list(settings.symbol_list)
+    MARKET_DB_PATH = str(settings.market_db_path)
+    MARKET_DB_EXCHANGE = str(settings.market_db_exchange)
+    MARKET_DB_BACKEND = str(settings.market_db_backend)
+    BASE_TIMEFRAME = str(settings.base_timeframe)
+    STRATEGY_TIMEFRAME = str(settings.strategy_timeframe)
+    DATA_MODE = str(settings.data_mode)
+    AUTO_COLLECT_DB = bool(settings.auto_collect_db)
+    BACKTEST_MODE = str(settings.backtest_mode)
+    BT_CHUNK_DAYS = int(settings.bt_chunk_days)
+    BT_CHUNK_WARMUP_BARS = int(settings.bt_chunk_warmup_bars)
+    BACKTEST_POLL_SECONDS = int(settings.backtest_poll_seconds)
+    BACKTEST_WINDOW_SECONDS = int(settings.backtest_window_seconds)
+    BACKTEST_DECISION_CADENCE_SECONDS = int(settings.backtest_decision_cadence_seconds)
+    os.environ.setdefault(
+        "LQ__BACKTEST__DECISION_CADENCE_SECONDS",
+        str(int(BACKTEST_DECISION_CADENCE_SECONDS)),
+    )
+
+
+def _profile_add(key: str, elapsed: float) -> None:
+    if not PROFILE_ENABLED:
+        return
+    PROFILE_TOTALS[key] = float(PROFILE_TOTALS.get(key, 0.0)) + float(elapsed)
+
+
+def _resolve_topk(total_candidates: int) -> int:
+    total = max(0, int(total_candidates))
+    if total <= 0:
+        return 0
+    topk = math.ceil(float(total) * float(TWO_STAGE_TOPK_RATIO))
+    topk = max(TWO_STAGE_MIN_TOPK, topk)
+    topk = min(TWO_STAGE_MAX_TOPK, topk)
+    topk = min(topk, total)
+    return max(1, int(topk))
+
+
+def _resolve_prefilter_window(start_date, end_date):
+    if start_date is None or end_date is None:
+        return start_date, end_date
+    if end_date <= start_date:
+        return start_date, end_date
+    span = end_date - start_date
+    fast_end = start_date + (span * float(TWO_STAGE_PREFILTER_FRACTION))
+    if fast_end <= start_date:
+        fast_end = end_date
+    if fast_end > end_date:
+        fast_end = end_date
+    return start_date, fast_end
+
+
+def _params_signature(params: dict) -> tuple:
+    items = []
+    for key, value in dict(params or {}).items():
+        items.append((str(key), repr(value)))
+    items.sort(key=lambda x: x[0])
+    return tuple(items)
+
+
+def _slice_data_dict_frames(data_dict: dict, start_date, end_date) -> dict:
+    out = {}
+    if not data_dict:
+        return out
+    for symbol, frame in data_dict.items():
+        if frame is None or "datetime" not in frame.columns or frame.height == 0:
+            continue
+        sliced = frame
+        if start_date is not None:
+            sliced = sliced.filter(pl.col("datetime") >= start_date)
+        if end_date is not None:
+            sliced = sliced.filter(pl.col("datetime") <= end_date)
+        if sliced.height > 0:
+            out[str(symbol)] = sliced
+    return out
+
+
+def load_all_data(
+    csv_dir,
+    symbol_list,
+    *,
+    data_mode="raw-first",
+    backtest_mode="windowed",
+    data_source="auto",
+    market_db_path=None,
+    external_data_root=None,
+    external_symbol_map=None,
+    market_exchange="binance",
+    timeframe="1m",
+    start_date=None,
+    end_date=None,
+):
+    """
+    Load all data into memory once.
+    Priority: DB (when selected/available) then CSV fallback.
+    """
+    contract = resolve_data_contract(
+        data_mode=str(data_mode),
+        backtest_mode=str(backtest_mode),
+        data_source=str(data_source),
+        default_backtest_mode="windowed",
+        default_data_source="auto",
+    )
+    source = str(contract.data_source).strip().lower()
+    data = {}
+    csv_loader = OHLCVFrameLoader()
+    if source == "external":
+        return load_data_dict_from_external_root(
+            str(external_data_root or market_db_path or csv_dir),
+            symbol_list=[str(item) for item in symbol_list],
+            symbol_map=dict(external_symbol_map or {}),
+            start_date=start_date,
+            end_date=end_date,
+        )
+    use_parquet = bool(market_db_path) and is_parquet_market_data_store(
+        str(market_db_path),
+        backend=str(MARKET_DB_BACKEND),
+    )
+    if contract.data_mode == "raw-first" and not use_parquet:
+        raise RawFirstDataMissingError(
+            "Raw-first optimization requires parquet manifest store path."
+        )
+
+    if source in {"db", "auto"} and market_db_path:
+        if use_parquet:
+            db_data = load_data_dict_from_parquet(
+                str(market_db_path),
+                exchange=str(market_exchange),
+                symbol_list=[str(item) for item in symbol_list],
+                timeframe=str(timeframe),
+                start_date=start_date,
+                end_date=end_date,
+                chunk_days=BT_CHUNK_DAYS,
+                warmup_bars=BT_CHUNK_WARMUP_BARS,
+                data_mode=str(contract.data_mode),
+            )
+        else:
+            db_data = load_data_dict_from_db(
+                market_db_path,
+                exchange=market_exchange,
+                symbol_list=symbol_list,
+                timeframe=timeframe,
+                start_date=start_date,
+                end_date=end_date,
+                backend=str(MARKET_DB_BACKEND),
+            )
+        if db_data:
+            for symbol, frame in db_data.items():
+                normalized = csv_loader.normalize(frame)
+                if normalized is not None and normalized.height > 0:
+                    data[symbol] = normalized
+            print(
+                f"Loaded {len(data)}/{len(symbol_list)} symbols from DB "
+                f"{market_db_path} (exchange={market_exchange}, timeframe={timeframe})."
+            )
+            if contract.data_mode == "raw-first":
+                missing = [symbol for symbol in symbol_list if symbol not in data]
+                if missing:
+                    raise RawFirstDataMissingError(
+                        "Raw-first committed data missing for symbols: " + ", ".join(missing)
+                    )
+        elif source == "db":
+            message = (
+                f"Warning: no OHLCV rows found in DB {market_db_path} for "
+                f"exchange={market_exchange}, timeframe={timeframe}."
+            )
+            if contract.data_mode == "raw-first":
+                raise RawFirstDataMissingError(message)
+            print(message)
+
+    if source == "db":
+        return data
+
+    if contract.data_mode == "raw-first":
+        raise RawFirstDataMissingError(
+            "Raw-first optimization forbids CSV fallback. Use committed parquet manifest data."
+        )
+
+    print(f"Loading CSV fallback for missing symbols from {csv_dir}...")
+    for s in symbol_list:
+        if s in data:
+            continue
+        csv_path = resolve_symbol_csv_path(csv_dir, s)
+        try:
+            if os.path.exists(csv_path):
+                df = csv_loader.load_csv(csv_path)
+                if df is not None:
+                    data[s] = df
+                else:
+                    print(
+                        "Warning: Missing or invalid OHLCV columns in "
+                        f"{csv_path}. Expected {csv_loader.columns}."
+                    )
+            else:
+                print(f"Warning: {csv_path} not found.")
+        except Exception as e:
+            print(f"Error loading {s}: {e}")
+    return data
+
+
+def _data_datetime_range(data_dict):
+    starts = []
+    ends = []
+    for df in data_dict.values():
+        if df is None or "datetime" not in df.columns or df.height == 0:
+            continue
+        starts.append(df["datetime"].min())
+        ends.append(df["datetime"].max())
+    if not starts or not ends:
+        return None, None
+    # Use intersection across symbols for robust multi-asset walk-forward windows.
+    return max(starts), min(ends)
+
+
+def _data_datetime_range_from_repo(
+    repo: ParquetMarketDataRepository,
+    exchange: str,
+    symbol_list,
+    *,
+    data_mode: str = "legacy",
+    timeframe: str = "1s",
+):
+    starts = []
+    ends = []
+    mode = str(data_mode or "legacy").strip().lower()
+    for symbol in symbol_list:
+        if mode == "raw-first":
+            try:
+                frame = repo.load_committed_ohlcv_chunked(
+                    exchange=exchange,
+                    symbol=symbol,
+                    timeframe=str(timeframe),
+                    start_date=None,
+                    end_date=None,
+                    chunk_days=max(1, int(BT_CHUNK_DAYS)),
+                    warmup_bars=0,
+                )
+            except Exception:
+                frame = None
+            if frame is None or frame.is_empty():
+                continue
+            start_dt = frame["datetime"].min()
+            end_dt = frame["datetime"].max()
+        else:
+            start_dt, end_dt = repo.get_symbol_time_range(exchange=exchange, symbol=symbol)
+        if start_dt is None or end_dt is None:
+            continue
+        starts.append(start_dt)
+        ends.append(end_dt)
+    if not starts or not ends:
+        return None, None
+    return max(starts), min(ends)
+
+
+def _build_data_aware_split(data_start, data_end):
+    total_seconds = (data_end - data_start).total_seconds()
+    if total_seconds <= 0:
+        return None
+
+    train_end = data_start + (data_end - data_start) * 0.7
+    val_end = train_end + (data_end - data_start) * 0.15
+
+    if train_end <= data_start or val_end <= train_end or data_end <= val_end:
+        return None
+
+    return {
+        "fold": 1,
+        "train_start": data_start,
+        "train_end": train_end,
+        "val_start": train_end,
+        "val_end": val_end,
+        "test_start": val_end,
+        "test_end": data_end,
+    }
+
+
+def _resolve_in_sample_and_oos_window(data_start, data_end, oos_days, timeframe):
+    """Split loaded data range into in-sample and final OOS holdout windows."""
+    requested_days = max(0, int(oos_days))
+    if requested_days <= 0:
+        return None, None, None
+
+    oos_start = data_end - timedelta(days=requested_days)
+    tf_ms = max(1, int(timeframe_to_milliseconds(str(timeframe))))
+    in_sample_end = oos_start - timedelta(milliseconds=tf_ms)
+    min_train_days = max(1, _env_int("LQ_MIN_TRAIN_DAYS", 7))
+    min_train_span = timedelta(days=min_train_days)
+    if in_sample_end <= data_start + min_train_span:
+        return None, None, None
+    return in_sample_end, oos_start, data_end
+
+
+def _build_recent_validation_split(
+    data_start,
+    *,
+    in_sample_end,
+    oos_start,
+    oos_end,
+    validation_days,
+    timeframe,
+):
+    """Build one strict split anchored to the month before OOS holdout."""
+    requested_days = max(0, int(validation_days))
+    if requested_days <= 0:
+        return None
+
+    tf_ms = max(1, int(timeframe_to_milliseconds(str(timeframe))))
+    val_start = oos_start - timedelta(days=requested_days)
+    val_end = in_sample_end
+    train_end = val_start - timedelta(milliseconds=tf_ms)
+
+    min_train_days = max(1, _env_int("LQ_MIN_TRAIN_DAYS", 7))
+    if train_end <= data_start + timedelta(days=min_train_days):
+        return None
+    if val_start <= data_start or val_end <= val_start:
+        return None
+
+    return {
+        "fold": 1,
+        "train_start": data_start,
+        "train_end": train_end,
+        "val_start": val_start,
+        "val_end": val_end,
+        "test_start": oos_start,
+        "test_end": oos_end,
+    }
+
+
+def _filter_valid_splits(splits, data_start, data_end):
+    valid = []
+    for split in splits:
+        if split["train_start"] < data_start:
+            continue
+        if split["test_end"] > data_end:
+            continue
+        valid.append(split)
+    return valid
+
+
+def _auto_collect_db_if_enabled(
+    data_source,
+    market_db_path,
+    market_exchange,
+    *,
+    base_timeframe,
+    auto_collect_db,
+    symbol_list,
+    market_db_backend,
+    start_date,
+):
+    source = str(data_source).strip().lower()
+    if source not in {"auto", "db"}:
+        return []
+    if not bool(auto_collect_db):
+        return []
+    if is_parquet_market_data_store(str(market_db_path), backend=str(market_db_backend)):
+        print("[INFO] Auto collector skipped for parquet market-data backend.")
+        return []
+
+    _lv = get_default_runtime_config().live
+    sync_rows = _auto_collect_market_data(
+        symbol_list=list(symbol_list),
+        timeframe=str(base_timeframe),
+        db_path=str(market_db_path),
+        exchange_id=str(market_exchange),
+        market_type=str(_lv.exchange.market_type),
+        since_dt=start_date,
+        until_dt=None,
+        api_key=str(_lv.api_key or ""),
+        secret_key=str(_lv.secret_key or ""),
+        testnet=bool(str(_lv.mode).strip().lower() != "real"),
+        limit=1000,
+        max_batches=100000,
+        retries=3,
+        base_wait_sec=0.5,
+    )
+
+    def _safe_int(value):
+        try:
+            return int(value)
+        except Exception:
+            return 0
+
+    fetched = sum(_safe_int(item.get("fetched_rows", 0)) for item in sync_rows)
+    upserted = sum(_safe_int(item.get("upserted_rows", 0)) for item in sync_rows)
+    print(
+        f"[INFO] Auto collector checked DB coverage for {len(sync_rows)} symbols "
+        f"(fetched={fetched}, upserted={upserted})."
+    )
+    return sync_rows
+
+
+# ==========================================
+# IMPLEMENTATION
+# ==========================================
+
+
+def _execute_backtest(
+    strategy_cls, params, csv_dir, symbol_list, start_date, end_date, data_dict=None
+):
+    """
+    Core execution logic shared by Grid and Optuna.
+    Use provided data_dict if available, otherwise fallback (or use global DATA_DICT safely).
+    """
+    orchestration_start = time.perf_counter()
+    strategy_name = getattr(strategy_cls, "__name__", "")
+    resolved_params = _get_strategy_registry().resolve_strategy_params(
+        strategy_name,
+        params if isinstance(params, dict) else {},
+    )
+    warmup_bars = max(0, int(BT_CHUNK_WARMUP_BARS))
+    try:
+        sim_start = time.perf_counter()
+        if PARQUET_MODE:
+            if end_date is None:
+                raise RuntimeError("Chunked optimization requires explicit end_date.")
+            resolved_backtest_mode = "windowed"
+
+            def _chunk_loader(chunk_start, chunk_end):
+                # warmup_bars=0: run_backtest_chunked already extends the first
+                # chunk's load window backwards by the warmup span, so the repo
+                # must not extend it a second time.
+                return load_data_dict_from_parquet(
+                    str(ACTIVE_MARKET_DB_PATH),
+                    exchange=str(ACTIVE_MARKET_EXCHANGE),
+                    symbol_list=list(symbol_list),
+                    timeframe=str(ACTIVE_BASE_TIMEFRAME),
+                    start_date=chunk_start,
+                    end_date=chunk_end,
+                    chunk_days=max(1, int(BT_CHUNK_DAYS)),
+                    warmup_bars=0,
+                    data_mode=str(ACTIVE_DATA_MODE),
+                )
+
+            backtest = run_backtest_chunked(
+                csv_dir=csv_dir,
+                symbol_list=list(symbol_list),
+                start_date=start_date,
+                end_date=end_date,
+                strategy_cls=strategy_cls,
+                strategy_params=resolved_params,
+                data_loader=_chunk_loader,
+                chunk_days=max(1, int(BT_CHUNK_DAYS)),
+                strategy_timeframe=str(STRATEGY_TIMEFRAME),
+                data_handler_cls=HistoricParquetWindowedDataHandler,
+                execution_handler_cls=SimulatedExecutionHandler,
+                portfolio_cls=Portfolio,
+                backtest_mode=str(resolved_backtest_mode),
+                data_handler_kwargs={
+                    "backtest_poll_seconds": int(BACKTEST_POLL_SECONDS),
+                    "backtest_window_seconds": int(BACKTEST_WINDOW_SECONDS),
+                },
+                record_history=False,
+                track_metrics=True,
+                record_trades=False,
+                warmup_bars=warmup_bars,
+            )
+        else:
+            slice_start = start_date
+            if warmup_bars > 0 and start_date is not None:
+                tf_ms = max(1, int(timeframe_to_milliseconds(str(STRATEGY_TIMEFRAME))))
+                slice_start = start_date - timedelta(milliseconds=warmup_bars * tf_ms)
+            current_data = _slice_data_dict_frames(
+                data_dict if data_dict is not None else DATA_DICT, slice_start, end_date
+            )
+            backtest = Backtest(
+                csv_dir=csv_dir,
+                symbol_list=symbol_list,
+                start_date=start_date,  # Specific Start (trading boundary)
+                end_date=end_date,  # Specific End
+                data_handler_cls=HistoricCSVDataHandler,
+                execution_handler_cls=SimulatedExecutionHandler,
+                portfolio_cls=Portfolio,
+                strategy_cls=strategy_cls,
+                strategy_params=resolved_params,
+                data_dict=current_data,
+                record_history=False,
+                track_metrics=True,
+                record_trades=False,
+                strategy_timeframe=str(STRATEGY_TIMEFRAME),
+                warmup_bars=warmup_bars,
+            )
+            backtest.simulate_trading(output=False)
+
+        _profile_add("simulation_seconds", time.perf_counter() - sim_start)
+        stats = backtest.portfolio.output_summary_stats_fast()
+        no_data = stats.get("status") != "ok"
+
+        sharpe = float(stats.get("sharpe", -999.0))
+        if not math.isfinite(sharpe):
+            sharpe = -999.0
+        if no_data:
+            sharpe = -999.0
+
+        cagr_pct = float(stats.get("cagr", 0.0)) * 100.0
+        mdd_pct = float(stats.get("max_drawdown", 0.0)) * 100.0
+
+        return {
+            "params": resolved_params,
+            "sharpe": sharpe,
+            "cagr": f"{cagr_pct:.4f}",
+            "mdd": f"{mdd_pct:.4f}",
+            "num_trades": int(getattr(backtest.portfolio, "trade_count", 0)),
+            "no_data": no_data,
+        }
+    except RawFirstDataMissingError, RawFirstManifestInvalidError, RawFirstStaleWindowError:
+        raise
+    except InsufficientWarmupError:
+        # Requested warmup context is unavailable — a loud failure by contract,
+        # never a -999 sentinel (docs/TODO.md item 1).
+        raise
+    except ValueError as e:
+        # Infeasible parameter combination (strategy/param validation): prune as
+        # worst-score sentinel so grid/optuna can continue. Every other
+        # exception type is an unexpected bug and must propagate — the old
+        # blanket `except Exception` silently converted real engine bugs into
+        # -999 rows (docs/divergences/walk_forward_warmup_engine_gap.md).
+        return {"params": resolved_params, "error": str(e), "sharpe": -999.0, "infeasible": True}
+    finally:
+        _profile_add("orchestration_seconds", time.perf_counter() - orchestration_start)
+        PROFILE_TOTALS["calls"] = int(PROFILE_TOTALS.get("calls", 0)) + 1
+
+
+def run_single_backtest_train(args):
+    strategy_cls, params, csv_dir, symbol_list, start_date, end_date = args
+
+    return _execute_backtest(
+        strategy_cls,
+        params,
+        csv_dir,
+        symbol_list,
+        start_date,
+        end_date,
+        data_dict=DATA_DICT,
+    )
+
+
+def _run_backtests_parallel(pool_args, worker_count):
+    workers = min(2, max(1, int(worker_count)))
+    if PARQUET_MODE:
+        workers = 1
+    if workers == 1 or len(pool_args) <= 1:
+        return [run_single_backtest_train(args) for args in pool_args]
+
+    ctx = multiprocessing.get_context("spawn")
+    chunksize = max(1, len(pool_args) // max(1, workers * 4))
+    context = {
+        "data_dict": DATA_DICT,
+        "parquet_mode": bool(PARQUET_MODE),
+        "data_source": str(ACTIVE_DATA_SOURCE),
+        "data_mode": str(ACTIVE_DATA_MODE),
+        "market_db_path": str(ACTIVE_MARKET_DB_PATH),
+        "market_exchange": str(ACTIVE_MARKET_EXCHANGE),
+        "base_timeframe": str(ACTIVE_BASE_TIMEFRAME),
+    }
+    with ctx.Pool(
+        processes=workers,
+        initializer=pool_initializer,
+        initargs=(context,),
+    ) as pool:
+        return pool.map(run_single_backtest_train, pool_args, chunksize)
+
+
+def _build_pool_args(strategy_cls, params_list, csv_dir, symbol_list, start_date, end_date):
+    return [
+        (
+            strategy_cls,
+            params,
+            csv_dir,
+            symbol_list,
+            start_date,
+            end_date,
+        )
+        for params in list(params_list)
+    ]
+
+
+def pool_initializer(context):
+    global DATA_DICT, PARQUET_MODE, ACTIVE_DATA_SOURCE, ACTIVE_DATA_MODE, ACTIVE_MARKET_DB_PATH
+    global ACTIVE_MARKET_EXCHANGE, ACTIVE_BASE_TIMEFRAME, PARQUET_REPO
+    DATA_DICT = dict(context.get("data_dict", {}))
+    PARQUET_MODE = bool(context.get("parquet_mode", False))
+    ACTIVE_DATA_SOURCE = str(context.get("data_source", ACTIVE_DATA_SOURCE))
+    ACTIVE_DATA_MODE = str(context.get("data_mode", ACTIVE_DATA_MODE))
+    ACTIVE_MARKET_DB_PATH = str(context.get("market_db_path", ACTIVE_MARKET_DB_PATH))
+    ACTIVE_MARKET_EXCHANGE = str(context.get("market_exchange", ACTIVE_MARKET_EXCHANGE))
+    ACTIVE_BASE_TIMEFRAME = str(context.get("base_timeframe", ACTIVE_BASE_TIMEFRAME))
+    PARQUET_REPO = ParquetMarketDataRepository(ACTIVE_MARKET_DB_PATH) if PARQUET_MODE else None
+
+
+class GridSearchOptimizer:
+    def __init__(self, strategy_cls, param_grid, csv_dir, symbol_list, start_date, end_date):
+        self.strategy_cls = strategy_cls
+        self.param_grid = param_grid
+        self.csv_dir = csv_dir
+        self.symbol_list = symbol_list
+        self.start_date = start_date
+        self.end_date = end_date
+
+    def generate_param_combinations(self):
+        result = build_bounded_grid_combinations(
+            self.param_grid,
+            justification="cli grid-search mode over strategy parameter registry values",
+        )
+        return result.combinations
+
+    def run(self, max_workers=4):
+        combinations = self.generate_param_combinations()
+        print(f"Starting Grid Search (Train Phase) with {len(combinations)} combinations...")
+        if not combinations:
+            return []
+
+        worker_count = max(1, int(max_workers))
+        if not TWO_STAGE_ENABLED or len(combinations) <= TWO_STAGE_MIN_TOPK:
+            pool_args = _build_pool_args(
+                self.strategy_cls,
+                combinations,
+                self.csv_dir,
+                self.symbol_list,
+                self.start_date,
+                self.end_date,
+            )
+            results = _run_backtests_parallel(pool_args, worker_count)
+            valid_results = [r for r in results if "error" not in r]
+            return sorted(valid_results, key=lambda x: x["sharpe"], reverse=True)
+
+        fast_start, fast_end = _resolve_prefilter_window(self.start_date, self.end_date)
+        print(
+            f"[Two-Stage] Prefilter window [{fast_start} ~ {fast_end}] "
+            f"for {len(combinations)} combinations"
+        )
+        pre_args = _build_pool_args(
+            self.strategy_cls,
+            combinations,
+            self.csv_dir,
+            self.symbol_list,
+            fast_start,
+            fast_end,
+        )
+        pre_results = _run_backtests_parallel(pre_args, worker_count)
+        valid_prefilter = sorted(
+            [r for r in pre_results if "error" not in r],
+            key=lambda x: x["sharpe"],
+            reverse=True,
+        )
+        if not valid_prefilter and worker_count > 1:
+            print("[Two-Stage] Prefilter retrying in single-worker mode due empty valid results")
+            pre_results = _run_backtests_parallel(pre_args, 1)
+            valid_prefilter = sorted(
+                [r for r in pre_results if "error" not in r],
+                key=lambda x: x["sharpe"],
+                reverse=True,
+            )
+        if not valid_prefilter:
+            return []
+
+        topk = _resolve_topk(len(valid_prefilter))
+        finalists = [row["params"] for row in valid_prefilter[:topk]]
+        print(f"[Two-Stage] Prefilter selected Top-{topk} finalists for full replay")
+
+        full_args = _build_pool_args(
+            self.strategy_cls,
+            finalists,
+            self.csv_dir,
+            self.symbol_list,
+            self.start_date,
+            self.end_date,
+        )
+        full_results = _run_backtests_parallel(full_args, worker_count)
+        valid_results = [r for r in full_results if "error" not in r]
+        if not valid_results and worker_count > 1:
+            print("[Two-Stage] Full replay retrying in single-worker mode due empty valid results")
+            full_results = _run_backtests_parallel(full_args, 1)
+            valid_results = [r for r in full_results if "error" not in r]
+        prefilter_map = {
+            _params_signature(row["params"]): float(row.get("sharpe", -999.0))
+            for row in valid_prefilter
+        }
+        for row in valid_results:
+            row["prefilter_sharpe"] = prefilter_map.get(_params_signature(row["params"]), -999.0)
+        return sorted(valid_results, key=lambda x: x["sharpe"], reverse=True)
+
+
+class OptunaOptimizer:
+    def __init__(self, strategy_cls, optuna_config, csv_dir, symbol_list, start_date, end_date):
+        self.strategy_cls = strategy_cls
+        self.optuna_config = optuna_config
+        self.csv_dir = csv_dir
+        self.symbol_list = symbol_list
+        self.start_date = start_date
+        self.end_date = end_date
+        self.prefilter_start, self.prefilter_end = _resolve_prefilter_window(start_date, end_date)
+
+    def objective(self, trial):
+        params = suggest_params_from_optuna_config(trial, self.optuna_config)
+
+        eval_start = self.start_date
+        eval_end = self.end_date
+        if TWO_STAGE_ENABLED:
+            eval_start = self.prefilter_start
+            eval_end = self.prefilter_end
+
+        result = _execute_backtest(
+            self.strategy_cls,
+            params,
+            self.csv_dir,
+            self.symbol_list,
+            eval_start,
+            eval_end,
+            data_dict=DATA_DICT,
+        )
+        score = float(result.get("sharpe", -999.0))
+        trial.set_user_attr("prefilter_sharpe", score)
+        return score
+
+    def run(self, n_trials=20, n_jobs=1):
+        if not OPTUNA_AVAILABLE or optuna is None or TrialState is None:
+            print("Error: Optuna not installed.")
+            return []
+
+        worker_count = max(1, int(n_jobs))
+        study = run_optuna_study(
+            optuna_module=optuna,
+            objective=self.objective,
+            n_trials=n_trials,
+            n_jobs=worker_count,
+        )
+
+        best_trials = sorted(study.trials, key=lambda t: t.value if t.value else -999, reverse=True)
+        complete_trials = [t for t in best_trials if t.state == TrialState.COMPLETE]
+        if not complete_trials:
+            return []
+
+        if not TWO_STAGE_ENABLED:
+            params_list = []
+            for trial in complete_trials[:10]:
+                params_list.append(
+                    {
+                        "params": trial.params,
+                        "sharpe": float(trial.value if trial.value is not None else -999.0),
+                        "cagr": "N/A",
+                        "mdd": "N/A",
+                        "prefilter_sharpe": float(
+                            trial.user_attrs.get(
+                                "prefilter_sharpe",
+                                trial.value if trial.value is not None else -999.0,
+                            )
+                        ),
+                    }
+                )
+            return params_list
+
+        topk = _resolve_topk(len(complete_trials))
+        finalists = complete_trials[:topk]
+        print(
+            f"[Two-Stage] Optuna prefilter completed {len(complete_trials)} trials; "
+            f"replaying Top-{topk} on full train window"
+        )
+
+        finalists_params = [dict(trial.params) for trial in finalists]
+        full_args = _build_pool_args(
+            self.strategy_cls,
+            finalists_params,
+            self.csv_dir,
+            self.symbol_list,
+            self.start_date,
+            self.end_date,
+        )
+        full_results = _run_backtests_parallel(full_args, worker_count)
+        valid_results = [row for row in full_results if "error" not in row]
+        if not valid_results and worker_count > 1:
+            print("[Two-Stage] Optuna full replay retrying in single-worker mode")
+            full_results = _run_backtests_parallel(full_args, 1)
+            valid_results = [row for row in full_results if "error" not in row]
+        prefilter_map = {
+            _params_signature(dict(trial.params)): float(
+                trial.user_attrs.get(
+                    "prefilter_sharpe",
+                    trial.value if trial.value is not None else -999.0,
+                )
+            )
+            for trial in finalists
+        }
+        for row in valid_results:
+            row["prefilter_sharpe"] = prefilter_map.get(_params_signature(row["params"]), -999.0)
+
+        sorted_results = sorted(valid_results, key=lambda x: x["sharpe"], reverse=True)
+        return sorted_results[:10]
+
+
+def _apply_fold_metadata(rows, split):
+    out = []
+    for row in rows:
+        r = dict(row)
+        r["fold"] = split["fold"]
+        r["train_start"] = split["train_start"].date().isoformat()
+        r["train_end"] = split["train_end"].date().isoformat()
+        r["val_start"] = split["val_start"].date().isoformat()
+        r["val_end"] = split["val_end"].date().isoformat()
+        r["test_start"] = split["test_start"].date().isoformat()
+        r["test_end"] = split["test_end"].date().isoformat()
+        out.append(r)
+    return out
+
+
+def run_walk_forward_fold(split):
+    fold = split["fold"]
+    train_start = split["train_start"]
+    train_end = split["train_end"]
+    val_start = split["val_start"]
+    val_end = split["val_end"]
+    test_start = split["test_start"]
+    test_end = split["test_end"]
+
+    print(f"\n=== FOLD {fold} TRAIN [{train_start.date()} ~ {train_end.date()}] ===")
+    if OPTIMIZATION_METHOD == "GRID":
+        optimizer = GridSearchOptimizer(
+            STRATEGY_CLASS, GRID_PARAMS, CSV_DIR, SYMBOL_LIST, train_start, train_end
+        )
+        train_results = optimizer.run(max_workers=MAX_WORKERS)
+    elif OPTIMIZATION_METHOD == "OPTUNA":
+        optimizer = OptunaOptimizer(
+            STRATEGY_CLASS, OPTUNA_CONFIG, CSV_DIR, SYMBOL_LIST, train_start, train_end
+        )
+        train_results = optimizer.run(n_trials=OPTUNA_TRIALS, n_jobs=MAX_WORKERS)
+    else:
+        raise ValueError(f"Unknown optimization method: {OPTIMIZATION_METHOD}")
+
+    if not train_results:
+        return None
+
+    best_candidate = train_results[0]
+    print(
+        f"[Fold {fold} Train] Top Candidate: Params={best_candidate['params']} | Sharpe={best_candidate['sharpe']:.4f}"
+    )
+
+    print(f"=== FOLD {fold} VALIDATION [{val_start.date()} ~ {val_end.date()}] ===")
+    val_candidates = []
+    limit = min(3, len(train_results))
+    for cand in train_results[:limit]:
+        res = _execute_backtest(
+            STRATEGY_CLASS,
+            cand["params"],
+            CSV_DIR,
+            SYMBOL_LIST,
+            val_start,
+            val_end,
+            data_dict=DATA_DICT,
+        )
+        res["train_sharpe"] = cand["sharpe"]
+        divergence = abs(float(cand["sharpe"]) - float(res["sharpe"]))
+        penalty_factor = get_default_runtime_config().optimization.overfit_penalty
+        res["robustness_score"] = float(res["sharpe"]) - (divergence * penalty_factor)
+        if res.get("no_data"):
+            res["robustness_score"] = -999.0
+        val_candidates.append(res)
+        print(
+            f"[Fold {fold} Val] Params={cand['params']} -> Val Sharpe={res['sharpe']:.4f} (Train={cand['sharpe']:.4f})"
+        )
+
+    val_candidates.sort(key=lambda x: x["robustness_score"], reverse=True)
+    final_best = val_candidates[0]
+    print(f"[Fold {fold} Validation] Selected Params: {final_best['params']}")
+
+    # NOTE: Fold-test window is intentionally not evaluated for model selection.
+    # We keep this range metadata for audit only and reserve true performance check
+    # for the final OOS holdout after parameter selection is frozen.
+    test_res = {
+        "params": dict(final_best["params"]),
+        "sharpe": -999.0,
+        "cagr": "N/A",
+        "mdd": "N/A",
+        "num_trades": 0,
+        "no_data": True,
+        "status": "skipped_in_optimization",
+    }
+    print(
+        f"[Fold {fold}] Test window reserved for holdout policy "
+        f"[{test_start.date()} ~ {test_end.date()}]"
+    )
+
+    return {
+        "fold": fold,
+        "split": split,
+        "train_results": _apply_fold_metadata(train_results, split),
+        "best_candidate": dict(best_candidate),
+        "val_candidates": _apply_fold_metadata(val_candidates, split),
+        "selected": dict(final_best),
+        "test_result": _apply_fold_metadata([test_res], split)[0],
+    }
+
+
+def _run_fold_under_policy(split, fold_runner=None):
+    """Evaluate one walk-forward fold under the per-fold failure policy.
+
+    docs/TODO.md item 1a: a calendar-valid fold can still hit a data gap inside
+    its warmup region — ``InsufficientWarmupError`` (a ``ValueError`` subclass,
+    so it must be caught first) skips JUST that fold with a loud log line and
+    never produces a ``-999`` row. Any other unexpected exception aborted the
+    fold's whole study/grid by contract; here it is logged with a full
+    traceback and then re-raised, so one bad fold cannot silently shrink the
+    validation universe and still select parameters from surviving folds.
+    """
+    runner = fold_runner if fold_runner is not None else run_walk_forward_fold
+    fold = split.get("fold") if isinstance(split, dict) else None
+    try:
+        report = runner(split)
+    except InsufficientWarmupError as exc:
+        print(
+            f"[Fold {fold}] SKIPPED — insufficient warmup data inside a "
+            f"calendar-valid window (never scored as -999): {exc}"
+        )
+        return None
+    except Exception:
+        print(f"[Fold {fold}] FAILED — unexpected error; full traceback follows.")
+        traceback.print_exc()
+        raise
+    if report is None:
+        print(f"[Fold {fold}] No valid optimization results.")
+        return None
+    return report
+
+
+def main(argv: list[str] | None = None) -> int:
+    global OPTUNA_TRIALS, MAX_WORKERS
+    global ACTIVE_DATA_SOURCE, ACTIVE_DATA_MODE
+    global ACTIVE_MARKET_DB_PATH, ACTIVE_MARKET_EXCHANGE, ACTIVE_BASE_TIMEFRAME
+    global PARQUET_MODE, DATA_DICT, PARQUET_REPO
+
+    settings = _current_optimize_runtime_settings()
+    _apply_optimize_runtime_settings(settings)
+    parser = argparse.ArgumentParser(description="Run LuminaQuant walk-forward optimization.")
+    parser.add_argument(
+        "--folds",
+        type=int,
+        default=get_default_runtime_config().optimization.walk_forward_folds,
+        help="Number of walk-forward folds.",
+    )
+    parser.add_argument(
+        "--n-trials",
+        type=int,
+        default=None,
+        help="Optuna trial count per fold when OPTUNA is selected.",
+    )
+    parser.add_argument(
+        "--max-workers",
+        type=int,
+        default=None,
+        help="Worker process count for grid search.",
+    )
+    parser.add_argument(
+        "--save-best-params",
+        action="store_true",
+        help="Write winning params into best_optimized_parameters/<strategy>/best_params.json.",
+    )
+    parser.add_argument(
+        "--data-mode",
+        choices=["raw-first", "legacy"],
+        default=str(settings.data_mode),
+        help="Data contract mode. raw-first enforces committed manifest parquet input.",
+    )
+    parser.add_argument(
+        "--data-source",
+        choices=["auto", "csv", "db", "external"],
+        default=str(get_default_runtime_config().backtest.data_source or "auto"),
+        help="Market data source for optimization (auto: DB then CSV fallback; external: user-managed CSV/parquet root).",
+    )
+    parser.add_argument(
+        "--external-data-root",
+        default=str(get_default_runtime_config().backtest.external.root_path or ""),
+        help="External market-data root for --data-source external (canonical CSV/parquet OHLCV).",
+    )
+    parser.add_argument(
+        "--market-db-path",
+        default=str(settings.market_db_path),
+        help="Market data parquet root path.",
+    )
+    parser.add_argument(
+        "--market-exchange",
+        default=str(settings.market_db_exchange),
+        help="Exchange key used in OHLCV DB rows.",
+    )
+    parser.add_argument(
+        "--base-timeframe",
+        default=str(settings.base_timeframe),
+        help="Collection/load source timeframe. Use minimum resolution (recommended: 1s).",
+    )
+    parser.add_argument(
+        "--run-id",
+        default="",
+        help="Optional external run_id for audit trail correlation.",
+    )
+    parser.add_argument(
+        "--oos-days",
+        type=int,
+        default=get_default_runtime_config().optimization.oos_days,
+        help="Final holdout window length in days excluded from optimization and used only for final evaluation.",
+    )
+    parser.add_argument(
+        "--validation-days",
+        type=int,
+        default=get_default_runtime_config().optimization.validation_days,
+        help=(
+            "If > 0, enforce a strict recent validation window immediately before OOS "
+            "(e.g. 30 = previous month). Set 0 to keep legacy walk-forward windows."
+        ),
+    )
+    parser.add_argument(
+        "--no-auto-collect-db",
+        action="store_true",
+        help="Disable automatic DB market-data collection before optimization load.",
+    )
+    args = parser.parse_args(argv)
+    _initialize_optimize_runtime_state(log=False)
+    if args.n_trials is None:
+        args.n_trials = int(OPTUNA_TRIALS)
+    if args.max_workers is None:
+        args.max_workers = int(settings.max_workers)
+    args.base_timeframe = _enforce_1s_base_timeframe(str(args.base_timeframe))
+    try:
+        contract = resolve_data_contract(
+            data_mode=str(args.data_mode),
+            backtest_mode="windowed",
+            data_source=str(args.data_source),
+            default_backtest_mode="windowed",
+            default_data_source="auto",
+        )
+    except (
+        RawFirstDataMissingError,
+        RawFirstManifestInvalidError,
+        RawFirstStaleWindowError,
+    ) as exc:
+        return int(raw_first_exit_code(exc) or 1)
+
+    run_id = str(args.run_id or "").strip() or str(uuid.uuid4())
+    db_path = get_default_runtime_config().storage.postgres_dsn
+    audit_store = AuditStore(db_path)
+    audit_store.start_run(
+        mode="optimize",
+        metadata={
+            "strategy": STRATEGY_CLASS.__name__,
+            "method": str(OPTIMIZATION_METHOD),
+            "folds": int(args.folds),
+            "n_trials": int(args.n_trials),
+            "max_workers": int(args.max_workers),
+            "data_source": str(contract.data_source),
+            "data_mode": str(contract.data_mode),
+            "market_db_path": str(args.market_db_path),
+            "market_exchange": str(args.market_exchange),
+            "base_timeframe": str(args.base_timeframe),
+            "strategy_timeframe": str(settings.strategy_timeframe),
+            "auto_collect_db": bool(
+                not bool(args.no_auto_collect_db) and bool(settings.auto_collect_db)
+            ),
+            "validation_days": int(max(0, int(args.validation_days))),
+            "oos_days": int(max(0, int(args.oos_days))),
+            "two_stage_enabled": bool(TWO_STAGE_ENABLED),
+            "two_stage_topk_ratio": float(TWO_STAGE_TOPK_RATIO),
+            "two_stage_prefilter_fraction": float(TWO_STAGE_PREFILTER_FRACTION),
+        },
+        run_id=run_id,
+    )
+
+    final_status = "FAILED"
+    final_metadata = {}
+
+    OPTUNA_TRIALS = args.n_trials
+    MAX_WORKERS = min(2, max(1, int(args.max_workers)))
+    configured_numba_threads = configure_numba_threads(MAX_WORKERS)
+    persist_best_params = bool(
+        args.save_best_params or get_default_runtime_config().optimization.persist_best_params
+    )
+
+    try:
+        if int(args.oos_days) <= 0:
+            raise ValueError("--oos-days must be > 0 for strict OOS exclusion.")
+        if int(args.validation_days) < 0:
+            raise ValueError("--validation-days must be >= 0.")
+
+        _auto_collect_db_if_enabled(
+            data_source=contract.data_source,
+            market_db_path=args.market_db_path,
+            market_exchange=args.market_exchange,
+            base_timeframe=str(args.base_timeframe),
+            auto_collect_db=(not bool(args.no_auto_collect_db) and bool(settings.auto_collect_db)),
+            symbol_list=list(settings.symbol_list),
+            market_db_backend=str(settings.market_db_backend),
+            start_date=BASE_START,
+        )
+
+        ACTIVE_DATA_SOURCE = str(contract.data_source)
+        ACTIVE_DATA_MODE = str(contract.data_mode)
+        ACTIVE_MARKET_DB_PATH = str(args.market_db_path)
+        ACTIVE_MARKET_EXCHANGE = str(args.market_exchange)
+        ACTIVE_BASE_TIMEFRAME = str(args.base_timeframe)
+        PARQUET_MODE = is_parquet_market_data_store(
+            str(args.market_db_path),
+            backend=str(settings.market_db_backend),
+        )
+        if PARQUET_MODE and MAX_WORKERS != 1:
+            print("[INFO] Parquet optimization enforces single worker (MAX_WORKERS=1).")
+            MAX_WORKERS = 1
+
+        feature_start = time.perf_counter()
+        if PARQUET_MODE:
+            DATA_DICT = {}
+            PARQUET_REPO = ParquetMarketDataRepository(str(args.market_db_path))
+            data_start, data_end = _data_datetime_range_from_repo(
+                PARQUET_REPO,
+                str(args.market_exchange),
+                settings.symbol_list,
+                data_mode=str(contract.data_mode),
+                timeframe=str(args.base_timeframe),
+            )
+        else:
+            PARQUET_REPO = None
+            DATA_DICT = load_all_data(
+                CSV_DIR,
+                settings.symbol_list,
+                data_mode=str(contract.data_mode),
+                backtest_mode="windowed",
+                data_source=contract.data_source,
+                market_db_path=args.market_db_path,
+                external_data_root=args.external_data_root,
+                external_symbol_map=dict(
+                    get_default_runtime_config().backtest.external.symbol_map or {}
+                ),
+                market_exchange=args.market_exchange,
+                timeframe=str(args.base_timeframe),
+                start_date=BASE_START,
+                end_date=BASE_END,
+            )
+            data_start, data_end = _data_datetime_range(DATA_DICT)
+        _profile_add("feature_seconds", time.perf_counter() - feature_start)
+
+        if data_start is None or data_end is None:
+            print("No usable datetime range found in loaded data.")
+            sys.exit(1)
+
+        # Warmup feasibility: every fold window must keep warmup_bars of context
+        # INSIDE the loaded data range, otherwise Backtest raises
+        # InsufficientWarmupError. Shift the earliest usable window start so the
+        # split builders/filters only produce folds with full warmup coverage.
+        optimization_data_start = data_start
+        if int(BT_CHUNK_WARMUP_BARS) > 0:
+            _tf_ms = max(1, int(timeframe_to_milliseconds(str(settings.strategy_timeframe))))
+            optimization_data_start = data_start + timedelta(
+                milliseconds=int(BT_CHUNK_WARMUP_BARS) * _tf_ms
+            )
+            print(
+                f"[INFO] Warmup context enabled: {int(BT_CHUNK_WARMUP_BARS)} bars "
+                f"({settings.strategy_timeframe}). Earliest window start shifted "
+                f"{data_start} -> {optimization_data_start}."
+            )
+
+        if configured_numba_threads is not None:
+            print(f"[INFO] Numba threads configured: {configured_numba_threads}")
+        if TWO_STAGE_ENABLED:
+            print(
+                "[INFO] Two-stage optimization enabled: "
+                f"prefilter_fraction={TWO_STAGE_PREFILTER_FRACTION:.2f}, "
+                f"topk_ratio={TWO_STAGE_TOPK_RATIO:.2f}, "
+                f"topk_min={TWO_STAGE_MIN_TOPK}, topk_max={TWO_STAGE_MAX_TOPK}"
+            )
+
+        splits = build_walk_forward_splits(
+            BASE_START,
+            args.folds,
+        )
+
+        in_sample_end, final_oos_start, final_oos_end = _resolve_in_sample_and_oos_window(
+            data_start,
+            data_end,
+            args.oos_days,
+            settings.strategy_timeframe,
+        )
+        if in_sample_end is None or final_oos_start is None or final_oos_end is None:
+            raise ValueError(
+                "Insufficient data range to reserve strict OOS holdout. "
+                "Expand data history or reduce --oos-days."
+            )
+        print(
+            f"[INFO] OOS holdout excluded from optimization: "
+            f"[{final_oos_start.date()} ~ {final_oos_end.date()}]"
+        )
+
+        valid_splits = _filter_valid_splits(splits, optimization_data_start, data_end)
+        if in_sample_end < data_end:
+            valid_splits = _filter_valid_splits(
+                valid_splits, optimization_data_start, in_sample_end
+            )
+
+        strict_recent_split = _build_recent_validation_split(
+            optimization_data_start,
+            in_sample_end=in_sample_end,
+            oos_start=final_oos_start,
+            oos_end=final_oos_end,
+            validation_days=int(args.validation_days),
+            timeframe=settings.strategy_timeframe,
+        )
+        if int(args.validation_days) > 0:
+            if strict_recent_split is None:
+                raise ValueError(
+                    "Could not reserve strict validation window before OOS. "
+                    "Expand data history or reduce --validation-days / --oos-days."
+                )
+            valid_splits = [strict_recent_split]
+            print(
+                "[INFO] Validation window anchored before OOS: "
+                f"[{strict_recent_split['val_start'].date()} ~ {strict_recent_split['val_end'].date()}]"
+            )
+
+        if not valid_splits:
+            fallback_split = strict_recent_split or _build_data_aware_split(
+                optimization_data_start, in_sample_end
+            )
+            if fallback_split is None:
+                print(
+                    "Could not build a valid walk-forward split from current data range. "
+                    "Check your dataset coverage and config dates."
+                )
+                sys.exit(1)
+            valid_splits = [fallback_split]
+            print(
+                "[INFO] Default walk-forward windows were outside available data range. "
+                "Using one fallback split."
+            )
+
+        if not valid_splits:
+            print("No walk-forward splits generated.")
+            sys.exit(1)
+
+        fold_reports = []
+        for split in valid_splits:
+            report = _run_fold_under_policy(split)
+            if report is None:
+                continue
+            fold_reports.append(report)
+            try:
+                save_optimization_rows(
+                    db_path,
+                    run_id,
+                    f"fold_{split['fold']}_train",
+                    report["train_results"],
+                )
+                save_optimization_rows(
+                    db_path,
+                    run_id,
+                    f"fold_{split['fold']}_validation",
+                    report["val_candidates"],
+                )
+                save_optimization_rows(
+                    db_path,
+                    run_id,
+                    f"fold_{split['fold']}_test",
+                    [report["test_result"]],
+                )
+            except Exception as e:
+                print(f"[Fold {split['fold']}] Failed to persist fold rows: {e}")
+
+        if not fold_reports:
+            print("No valid fold report generated.")
+            sys.exit(1)
+
+        # Select overall winner by validation robustness inside in-sample only.
+        fold_reports.sort(
+            key=lambda r: (
+                float(r["selected"].get("robustness_score", -999.0)),
+                float(r["selected"].get("sharpe", -999.0)),
+                int(r["selected"].get("num_trades", 0)),
+            ),
+            reverse=True,
+        )
+        winner = fold_reports[0]
+
+        print("\n>>>> FINAL WALK-FORWARD REPORT <<<<")
+        for report in fold_reports:
+            f = report["fold"]
+            print(
+                f"Fold {f}: Train={report['best_candidate']['sharpe']:.4f} | "
+                f"Val={report['selected']['sharpe']:.4f} | "
+                f"Test={report['test_result']['sharpe']:.4f}"
+            )
+
+        print(
+            f"\nSelected Fold: {winner['fold']} | Params: {winner['selected']['params']} | "
+            f"In-sample Val Sharpe: {winner['selected']['sharpe']:.4f}"
+        )
+
+        final_oos_result = None
+        if final_oos_start is not None and final_oos_end is not None:
+            final_oos_result = _execute_backtest(
+                STRATEGY_CLASS,
+                winner["selected"]["params"],
+                CSV_DIR,
+                SYMBOL_LIST,
+                final_oos_start,
+                final_oos_end,
+                data_dict=DATA_DICT,
+            )
+            save_optimization_rows(
+                db_path,
+                run_id,
+                "final_oos",
+                [
+                    {
+                        **final_oos_result,
+                        "oos_start": final_oos_start.date().isoformat(),
+                        "oos_end": final_oos_end.date().isoformat(),
+                    }
+                ],
+            )
+            print(
+                f"[FINAL OOS] Sharpe={final_oos_result['sharpe']:.4f} | "
+                f"CAGR={final_oos_result['cagr']} | MaxDD={final_oos_result['mdd']}"
+            )
+
+        if persist_best_params:
+            # Save best parameters from winning fold (opt-in artifact).
+            strategy_name = STRATEGY_CLASS.__name__
+            save_dir = os.path.join("best_optimized_parameters", strategy_name)
+            os.makedirs(save_dir, exist_ok=True)
+            best_params_file = os.path.join(save_dir, "best_params.json")
+            with open(best_params_file, "w") as f:
+                json.dump(winner["selected"]["params"], f, indent=4)
+            best_meta_file = os.path.join(save_dir, "best_params.meta.json")
+            meta_payload = {
+                "selection_basis": "validation_only",
+                "run_id": run_id,
+                "validation_days": int(args.validation_days),
+                "oos_days": int(args.oos_days),
+                "in_sample_end": in_sample_end.date().isoformat(),
+                "oos_start": final_oos_start.date().isoformat(),
+                "oos_end": final_oos_end.date().isoformat(),
+                "selected_fold": int(winner["fold"]),
+                "selected_val_sharpe": float(winner["selected"].get("sharpe", -999.0)),
+                "final_oos_sharpe": float(final_oos_result.get("sharpe", -999.0))
+                if isinstance(final_oos_result, dict)
+                else -999.0,
+            }
+            with open(best_meta_file, "w") as f:
+                json.dump(meta_payload, f, indent=2)
+            print(f"[Artifact] Best Parameters saved to '{best_params_file}'")
+        else:
+            print("[Artifact] best_params.json export skipped (pure-compute mode).")
+
+        final_status = "COMPLETED"
+        final_metadata = {
+            "selected_fold": int(winner["fold"]),
+            "validation_days": int(args.validation_days),
+            "oos_days": int(args.oos_days),
+            "selected_params": winner["selected"].get("params", {}),
+            "selected_val_sharpe": float(winner["selected"].get("sharpe", -999.0)),
+            "final_oos_sharpe": float(final_oos_result.get("sharpe", -999.0))
+            if isinstance(final_oos_result, dict)
+            else -999.0,
+        }
+        return 0
+    except SystemExit as exc:
+        code = int(exc.code or 0)
+        final_status = "COMPLETED" if code == 0 else "FAILED"
+        final_metadata = {"exit_code": code}
+        return code
+    except (
+        RawFirstDataMissingError,
+        RawFirstManifestInvalidError,
+        RawFirstStaleWindowError,
+    ) as exc:
+        code = int(raw_first_exit_code(exc) or 1)
+        final_status = "FAILED"
+        final_metadata = {"error": str(exc), "exit_code": int(code)}
+        return code
+    except Exception as exc:
+        final_status = "FAILED"
+        final_metadata = {"error": str(exc)}
+        raise
+    finally:
+        if PROFILE_ENABLED:
+            calls = max(1, int(PROFILE_TOTALS.get("calls", 1)))
+            print("[PROFILE] optimization runtime breakdown")
+            print(f"  feature/indicator: {PROFILE_TOTALS['feature_seconds']:.4f}s")
+            print(f"  simulation core:   {PROFILE_TOTALS['simulation_seconds']:.4f}s")
+            print(f"  orchestration:     {PROFILE_TOTALS['orchestration_seconds']:.4f}s")
+            print(f"  avg simulation/call: {(PROFILE_TOTALS['simulation_seconds'] / calls):.6f}s")
+        audit_store.end_run(run_id, status=final_status, metadata=final_metadata)
+        audit_store.close()
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

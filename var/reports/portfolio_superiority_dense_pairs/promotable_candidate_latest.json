@@ -1,0 +1,371 @@
+{
+  "generated_at": "2026-04-22T12:28:37.796147+00:00",
+  "artifact_kind": "portfolio_superiority_promotable_candidate",
+  "verdict": "promotable_challenger_found",
+  "candidate_key": "production_guarded_40_state_vwap_pair_25_cash_35",
+  "selection_basis": "best_train_positive_overlay_that_beats_base_on_oos_return_and_sharpe",
+  "structure": {
+    "base_mode": "production_guarded_mode",
+    "base_weight": 0.4,
+    "pair_candidate": "pair_spread_1h_state_vwap_bnbusdt_trxusdt_2.2_0.55",
+    "pair_weight": 0.25,
+    "explicit_cash_weight": 0.35,
+    "estimated_total_cash_weight": 0.37,
+    "estimated_total_active_weight": 0.63,
+    "gross_notional_weight": 0.65,
+    "selected_mode": "production_guarded_state_vwap_pair_mode",
+    "resolved_mode_cash_weight": 0.535,
+    "resolved_mode_active_weight": 0.46499999999999997,
+    "resolved_mode_components": [
+      {
+        "component_id": "b5e3b2b17fb91aed",
+        "label": "pair_spread_1h_state_vwap_bnbusdt_trxusdt_2.2_0.55",
+        "strategy_class": "PairSpreadZScoreStrategy",
+        "weight": 0.25,
+        "symbols": [
+          "BNB/USDT",
+          "TRX/USDT"
+        ]
+      },
+      {
+        "component_id": "4b050c2ad437c77f",
+        "label": "pair_spread_1h_core_bnbusdt_trxusdt_2.2_0.55",
+        "strategy_class": "PairSpreadZScoreStrategy",
+        "weight": 0.10469999999999999,
+        "symbols": [
+          "BNB/USDT",
+          "TRX/USDT"
+        ]
+      },
+      {
+        "component_id": "feecc2c87fbb8475",
+        "label": "composite_trend_stable_30m_stable_ls_highconv_ls_0.75_0.45_0.20_0.80",
+        "strategy_class": "CompositeTrendStrategy",
+        "weight": 0.044391103351870104,
+        "symbols": [
+          "BTC/USDT",
+          "ETH/USDT",
+          "BNB/USDT",
+          "SOL/USDT",
+          "TRX/USDT"
+        ]
+      },
+      {
+        "component_id": "4c8fdaeabe315563",
+        "label": "topcap_tsmom_1h_balanced_16_4_0.015",
+        "strategy_class": "TopCapTimeSeriesMomentumStrategy",
+        "weight": 0.0254088966481299,
+        "symbols": [
+          "BTC/USDT",
+          "ETH/USDT",
+          "BNB/USDT",
+          "SOL/USDT",
+          "TRX/USDT"
+        ]
+      },
+      {
+        "component_id": "9853949fcd79e754",
+        "label": "pair_spread_1d_balanced_btcusdt_trxusdt_1.8_0.45",
+        "strategy_class": "PairSpreadZScoreStrategy",
+        "weight": 0.022275000000000003,
+        "symbols": [
+          "BTC/USDT",
+          "TRX/USDT"
+        ]
+      },
+      {
+        "component_id": "cfba6007e934a2ad",
+        "label": "pair_spread_1h_exec_tightstop_tp_bnbusdt_trxusdt_2.6_0.70",
+        "strategy_class": "PairSpreadZScoreStrategy",
+        "weight": 0.018225,
+        "symbols": [
+          "BNB/USDT",
+          "TRX/USDT"
+        ]
+      }
+    ]
+  },
+  "metrics": {
+    "train": {
+      "total_return": 0.0005136670055165826,
+      "cagr": 0.0005136670055165826,
+      "sharpe": 0.0346832019337855,
+      "sortino": 0.04960957109650272,
+      "calmar": 0.011112053325290288,
+      "max_drawdown": 0.04622611055577919,
+      "volatility": 0.04840008500600244,
+      "return": 0.0005136670055165826,
+      "days": 365
+    },
+    "val": {
+      "total_return": 0.05307684816284919,
+      "cagr": 0.37704413333911235,
+      "sharpe": 3.9019258443009566,
+      "sortino": 11.224541213726969,
+      "calmar": 41.89057376212574,
+      "max_drawdown": 0.009000691551281803,
+      "volatility": 0.08288674095733677,
+      "return": 0.05307684816284919,
+      "days": 59
+    },
+    "oos": {
+      "total_return": 0.004624845602231753,
+      "cagr": 0.05078197059258183,
+      "sharpe": 3.463846797383109,
+      "sortino": 5.0603094458836555,
+      "calmar": 23.17803702357995,
+      "max_drawdown": 0.0021909521734269077,
+      "volatility": 0.014330174194312342,
+      "return": 0.004624845602231753,
+      "days": 34
+    }
+  },
+  "oos_monthly_mean": 0.0023124228011158765,
+  "validation_monthly_equivalent": 0.026988227879414843,
+  "benchmark_comparisons": {
+    "production_guarded": {
+      "benchmark": {
+        "total_return": 0.0036539751477997484,
+        "cagr": 0.03993166647999802,
+        "sharpe": 1.6079500601746737,
+        "sortino": 2.1734208156245796,
+        "calmar": 12.540662011932996,
+        "max_drawdown": 0.003184175320409821,
+        "volatility": 0.02453339945818646,
+        "return": 0.0036539751477997484,
+        "days": 34
+      },
+      "delta_return": 0.0009708704544320046,
+      "delta_sharpe": 1.8558967372084354,
+      "delta_max_drawdown": -0.0009932231469829134,
+      "beats_return": true,
+      "beats_sharpe": true,
+      "beats_max_drawdown": true
+    },
+    "hybrid_guarded": {
+      "benchmark": {
+        "total_return": 0.001617979335523323,
+        "cagr": 0.017506928297035262,
+        "sharpe": 0.7763172405928882,
+        "sortino": 0.8998624362864446,
+        "calmar": 3.575246760792684,
+        "max_drawdown": 0.004896704890141268,
+        "volatility": 0.022677674055641042,
+        "return": 0.001617979335523323,
+        "days": 34
+      },
+      "delta_return": 0.00300686626670843,
+      "delta_sharpe": 2.6875295567902207,
+      "delta_max_drawdown": -0.0027057527167143602,
+      "beats_return": true,
+      "beats_sharpe": true,
+      "beats_max_drawdown": true
+    },
+    "soft_three_way": {
+      "benchmark": {
+        "total_return": 0.0008871113034689682,
+        "cagr": 0.047321563035285674,
+        "sharpe": 0.7422961066883907,
+        "sortino": 2.035053621238738,
+        "calmar": 8.252309318430727,
+        "max_drawdown": 0.0057343418925897005,
+        "volatility": 0.06470520784089931,
+        "return": 0.0008871113034689682,
+        "days": 7
+      },
+      "delta_return": 0.003737734298762785,
+      "delta_sharpe": 2.7215506906947184,
+      "delta_max_drawdown": -0.0035433897191627928,
+      "beats_return": true,
+      "beats_sharpe": true,
+      "beats_max_drawdown": true
+    },
+    "incumbent": {
+      "benchmark": {
+        "total_return": -0.0031538790429648245,
+        "sharpe": -2.5718362580596232,
+        "max_drawdown": 0.007291470322926541
+      },
+      "delta_return": 0.0077787246451965775,
+      "delta_sharpe": 6.035683055442732,
+      "delta_max_drawdown": -0.005100518149499633,
+      "beats_return": true,
+      "beats_sharpe": true,
+      "beats_max_drawdown": true
+    },
+    "static_blend_76_24": {
+      "benchmark": {
+        "total_return": 0.004307374701628897,
+        "sharpe": 3.0424053455784232,
+        "max_drawdown": 0.005106822602280903
+      },
+      "delta_return": 0.00031747090060285643,
+      "delta_sharpe": 0.42144145180468584,
+      "delta_max_drawdown": -0.002915870428853995,
+      "beats_return": true,
+      "beats_sharpe": true,
+      "beats_max_drawdown": true
+    },
+    "balanced_overlay": {
+      "benchmark": {
+        "total_return": 0.0010908766261372715,
+        "sharpe": 0.4828032243356779,
+        "max_drawdown": 0.005161645351370647
+      },
+      "delta_return": 0.0035339689760944815,
+      "delta_sharpe": 2.9810435730474314,
+      "delta_max_drawdown": -0.0029706931779437395,
+      "beats_return": true,
+      "beats_sharpe": true,
+      "beats_max_drawdown": true
+    },
+    "three_way": {
+      "benchmark": {
+        "total_return": 0.0019732347599001887,
+        "sharpe": 1.3086956348526622,
+        "max_drawdown": 0.007291470322926541
+      },
+      "delta_return": 0.0026516108423315643,
+      "delta_sharpe": 2.155151162530447,
+      "delta_max_drawdown": -0.005100518149499633,
+      "beats_return": true,
+      "beats_sharpe": true,
+      "beats_max_drawdown": true
+    },
+    "cash": {
+      "benchmark": {
+        "total_return": 0.0,
+        "sharpe": 0.0,
+        "max_drawdown": 0.0
+      },
+      "delta_return": 0.004624845602231753,
+      "delta_sharpe": 3.463846797383109,
+      "delta_max_drawdown": 0.0021909521734269077,
+      "beats_return": true,
+      "beats_sharpe": true,
+      "beats_max_drawdown": false
+    },
+    "old_pair_tactical": {
+      "benchmark": {
+        "total_return": 0.002891851580793414,
+        "cagr": 0.031485581278054564,
+        "sharpe": 3.276475868619675,
+        "sortino": 0.0,
+        "calmar": 0.0,
+        "max_drawdown": 0.0,
+        "volatility": 0.009475081920099418,
+        "return": 0.002891851580793414,
+        "days": 34
+      },
+      "delta_return": 0.0017329940214383388,
+      "delta_sharpe": 0.1873709287634342,
+      "delta_max_drawdown": 0.0021909521734269077,
+      "beats_return": true,
+      "beats_sharpe": true,
+      "beats_max_drawdown": false
+    },
+    "btc_buy_hold": {
+      "benchmark": {
+        "total_return": -0.00010756366798070349,
+        "sharpe": 0.2303064953224857,
+        "max_drawdown": 0.11854811988285341
+      },
+      "delta_return": 0.0047324092702124565,
+      "delta_sharpe": 3.2335403020606233,
+      "delta_max_drawdown": -0.1163571677094265,
+      "beats_return": true,
+      "beats_sharpe": true,
+      "beats_max_drawdown": true
+    },
+    "new_pair_standalone": {
+      "benchmark": {
+        "total_return": 0.012610986336285768,
+        "cagr": 0.144005960098746,
+        "sharpe": 3.1892091886057528,
+        "sortino": 4.800294534303885,
+        "calmar": 35.66351921007238,
+        "max_drawdown": 0.004037906614052678,
+        "volatility": 0.042465869790975705,
+        "return": 0.012610986336285768,
+        "days": 34
+      },
+      "delta_return": -0.007986140734054015,
+      "delta_sharpe": 0.2746376087773563,
+      "delta_max_drawdown": -0.0018469544406257699,
+      "beats_return": false,
+      "beats_sharpe": true,
+      "beats_max_drawdown": true
+    }
+  },
+  "current_default": {
+    "allocation": {
+      "production_guarded_portfolio": 1.0
+    },
+    "max_drawdown": 0.003184175320409821,
+    "mode": "production_guarded_mode",
+    "oos_total_return": 0.0036539751477997484,
+    "reason": "Mixed regime and the production-guarded candidate beats balanced on OOS return/sharpe while reducing drawdown (\u0394return=+0.2563%, \u0394sharpe=+1.1251) -> promote production guarded mode.",
+    "sharpe": 1.6079500601746737,
+    "status": "switch_default"
+  },
+  "new_pair_standalone": {
+    "train": {
+      "total_return": -0.0697272715793511,
+      "cagr": -0.0697272715793511,
+      "sharpe": -0.7192983241510685,
+      "sortino": -0.6187918728151263,
+      "calmar": -0.5529404998112473,
+      "max_drawdown": 0.12610266674832704,
+      "volatility": 0.09432351314973955,
+      "return": -0.0697272715793511,
+      "days": 365
+    },
+    "val": {
+      "total_return": 0.09560500428430463,
+      "cagr": 0.7592078878133055,
+      "sharpe": 3.7317327843266987,
+      "sortino": 7.080819732434194,
+      "calmar": 35.57837190133078,
+      "max_drawdown": 0.021339028382715508,
+      "volatility": 0.15457546375009137,
+      "return": 0.09560500428430463,
+      "days": 59
+    },
+    "oos": {
+      "total_return": 0.012610986336285768,
+      "cagr": 0.144005960098746,
+      "sharpe": 3.1892091886057528,
+      "sortino": 4.800294534303885,
+      "calmar": 35.66351921007238,
+      "max_drawdown": 0.004037906614052678,
+      "volatility": 0.042465869790975705,
+      "return": 0.012610986336285768,
+      "days": 34
+    },
+    "participation": {
+      "train": {
+        "total_days": 365,
+        "active_days": 121,
+        "active_day_ratio": 0.3315068493150685
+      },
+      "val": {
+        "total_days": 59,
+        "active_days": 17,
+        "active_day_ratio": 0.288135593220339
+      },
+      "oos": {
+        "total_days": 34,
+        "active_days": 8,
+        "active_day_ratio": 0.23529411764705882
+      }
+    }
+  },
+  "risks": [
+    "The standalone state_vwap pair sleeve still has negative train total return/sharpe, so the chosen promotable route uses a guarded overlay rather than a full active replacement.",
+    "OOS monthly mean on the short 34-day window is below 2%, so the promotion case leans on positive OOS plus strong validation monthly-equivalent performance.",
+    "The optimized dense-pairs-only portfolio over-diversified across near-duplicate BNB/TRX variants and is not the recommended route; the guarded overlay is materially stronger."
+  ],
+  "notes": [
+    "Resolved live mode `production_guarded_state_vwap_pair_mode` expands recursively to 46.50% active weight and 53.50% total cash because production_guarded carries internal cash."
+  ]
+}

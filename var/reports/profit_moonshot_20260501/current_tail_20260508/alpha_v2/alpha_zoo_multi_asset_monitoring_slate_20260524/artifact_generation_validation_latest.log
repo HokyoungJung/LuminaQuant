@@ -1,0 +1,15 @@
+generated_at_utc=2026-05-24T08:12:32.023761Z
+artifact_kind=alpha_zoo_multi_asset_monitoring_slate
+candidate_row_count=2488
+symbol_count=14
+paper_monitor_candidate_count=136
+uses_locked_oos_for_discovery=false
+uses_locked_oos_for_selection=false
+uses_locked_oos_for_objective=false
+uses_locked_oos_for_pruning=false
+uses_locked_oos_for_parameter_fitting=false
+monitor_all_symbols_together=true
+ready_for_real=false
+real_money_execution=false
+runner_peak_rss_mib=117.141
+latest_json=/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_multi_asset_monitoring_slate_20260524/multi_asset_monitoring_slate_latest.json

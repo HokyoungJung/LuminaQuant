@@ -1,0 +1,24 @@
+{"generated_at_utc": "2026-05-05T05:20:18.448027+00:00", "db_path": "data/market_parquet", "exchange": "binance", "required_timeframes": ["1s"], "success": true, "symbols": [{"symbol": "BTC/USDT", "status": "committed", "bundle_id": "bundle-20260505T052007Z-BTC-USDT", "timeframes": {"1s": [{"partition": "2026-05-03", "commit_id": "20260503-aa268b42888aaaaf", "row_count": 86400, "canonical_row_checksum": "aa268b42888aaaafd57aa8e5ebd4ba330b2abb0681c531fecc04ddf0ae25893a", "manifest_path": "data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-05-03/manifest.json"}, {"partition": "2026-05-04", "commit_id": "20260504-2b0658025c0cfe0f", "row_count": 86398, "canonical_row_checksum": "2b0658025c0cfe0fd47e825e30b4c7db9c1aa1c46bf7de39289fb7e422ab197a", "manifest_path": "data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-05-04/manifest.json"}]}}, {"symbol": "ETH/USDT", "status": "committed", "bundle_id": "bundle-20260505T052012Z-ETH-USDT", "timeframes": {"1s": [{"partition": "2026-05-03", "commit_id": "20260503-ecec61fef36f2fb2", "row_count": 86399, "canonical_row_checksum": "ecec61fef36f2fb2f197c231b3bb47a8e0d7ec1088f4db2aec89e9845e190c5e", "manifest_path": "data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-05-03/manifest.json"}, {"partition": "2026-05-04", "commit_id": "20260504-a2485e0533a74897", "row_count": 86398, "canonical_row_checksum": "a2485e0533a74897668694e9f02480de06ed8ded2b5b916fb421cca502aac215", "manifest_path": "data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-05-04/manifest.json"}]}}, {"symbol": "BNB/USDT", "status": "committed", "bundle_id": "bundle-20260505T052014Z-BNB-USDT", "timeframes": {"1s": [{"partition": "2026-05-03", "commit_id": "20260503-599b8c51b034bf99", "row_count": 86400, "canonical_row_checksum": "599b8c51b034bf992994b9c07bd5c9082d827a5c38de9d666d22c3b3754bf3be", "manifest_path": "data/market_parquet/market_data_materialized/binance/BNBUSDT/timeframe=1s/date=2026-05-03/manifest.json"}, {"partition": "2026-05-04", "commit_id": "20260504-2b729d6eae4de02a", "row_count": 86398, "canonical_row_checksum": "2b729d6eae4de02a0cff35ba5b739ac2a1eb562eb04a84b7220df0426483be08", "manifest_path": "data/market_parquet/market_data_materialized/binance/BNBUSDT/timeframe=1s/date=2026-05-04/manifest.json"}]}}, {"symbol": "SOL/USDT", "status": "committed", "bundle_id": "bundle-20260505T052016Z-SOL-USDT", "timeframes": {"1s": [{"partition": "2026-05-03", "commit_id": "20260503-f2488a81ff32bcf3", "row_count": 86400, "canonical_row_checksum": "f2488a81ff32bcf3a0e0f1168f4efd26abafbe41e3f9b6e0c38e83fe95fad52d", "manifest_path": "data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-05-03/manifest.json"}, {"partition": "2026-05-04", "commit_id": "20260504-240a51f32f1c1a96", "row_count": 86398, "canonical_row_checksum": "240a51f32f1c1a962b015b7666bc99d1b8af17d35815a3c7d9d065d27f24eeff", "manifest_path": "data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-05-04/manifest.json"}]}}, {"symbol": "TRX/USDT", "status": "committed", "bundle_id": "bundle-20260505T052017Z-TRX-USDT", "timeframes": {"1s": [{"partition": "2026-05-03", "commit_id": "20260503-3dc8368adbc35690", "row_count": 86400, "canonical_row_checksum": "3dc8368adbc356909248e31e24a68f58031853f73f63313a5bb6f772bf80639d", "manifest_path": "data/market_parquet/market_data_materialized/binance/TRXUSDT/timeframe=1s/date=2026-05-03/manifest.json"}, {"partition": "2026-05-04", "commit_id": "20260504-551c82183ca5179c", "row_count": 86397, "canonical_row_checksum": "551c82183ca5179c485d9631364a068bd715e2dc5367b10de05e181c3c900abb", "manifest_path": "data/market_parquet/market_data_materialized/binance/TRXUSDT/timeframe=1s/date=2026-05-04/manifest.json"}]}}], "cycle": 1}
+	Command being timed: "uv run python scripts/materialize_market_windows.py --once --symbols BTC/USDT,ETH/USDT,BNB/USDT,SOL/USDT,TRX/USDT --exchange binance --required-timeframes 1s --db-path data/market_parquet --start-date 2026-05-03T00:00:00Z --end-date 2026-05-04T23:59:59Z --producer profit_moonshot_current_tail_oos_materialize_20260505"
+	User time (seconds): 15.87
+	System time (seconds): 8.74
+	Percent of CPU this job got: 201%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:12.20
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 1792948
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 2093
+	Minor (reclaiming a frame) page faults: 433652
+	Voluntary context switches: 30020
+	Involuntary context switches: 879
+	Swaps: 0
+	File system inputs: 356984
+	File system outputs: 13592
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

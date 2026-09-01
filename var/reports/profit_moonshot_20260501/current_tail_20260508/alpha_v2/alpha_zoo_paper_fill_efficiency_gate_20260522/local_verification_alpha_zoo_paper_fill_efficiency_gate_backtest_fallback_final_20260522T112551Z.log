@@ -1,0 +1,70 @@
+local verification start utc=2026-05-22T11:25:51Z
+commit=559ea5d7c4a0b34416fd537ba20c7bb7625a0d24
+step=regenerate fill efficiency gate artifact with backtest fallback
+{"artifact_generation_validation_log": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_paper_fill_efficiency_gate_20260522/artifact_generation_validation_latest.log", "backtest_fallback_candidates_csv": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_paper_fill_efficiency_gate_20260522/backtest_fallback_candidates_latest.csv", "latest_json": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_paper_fill_efficiency_gate_20260522/alpha_zoo_paper_fill_efficiency_gate_latest.json", "latest_markdown": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_paper_fill_efficiency_gate_20260522/alpha_zoo_paper_fill_efficiency_gate_latest.md", "paper_fill_efficiency_decisions_csv": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_paper_fill_efficiency_gate_20260522/paper_fill_efficiency_decisions_latest.csv", "timestamped_json": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_paper_fill_efficiency_gate_20260522/alpha_zoo_paper_fill_efficiency_gate_20260522T112551Z.json"}
+step=targeted tests
+...........                                                              [100%]
+11 passed in 0.69s
+step=ruff
+All checks passed!
+step=compileall
+step=full pytest
+........................................................................ [  5%]
+........................................................................ [ 10%]
+........................................................................ [ 15%]
+........................................................................ [ 20%]
+........................................................................ [ 25%]
+........................................................................ [ 31%]
+........................................................................ [ 36%]
+........................................................................ [ 41%]
+........................................................................ [ 46%]
+........................................................................ [ 51%]
+........................................................................ [ 57%]
+........................................................................ [ 62%]
+........................................................................ [ 67%]
+........................................................................ [ 72%]
+........................................................................ [ 77%]
+........................................................................ [ 82%]
+........................................................................ [ 88%]
+........................................................................ [ 93%]
+........................................................................ [ 98%]
+.....................                                                    [100%]
+1389 passed in 76.13s (0:01:16)
+	Command being timed: "uv run --extra dev pytest -q"
+	User time (seconds): 79.82
+	System time (seconds): 16.48
+	Percent of CPU this job got: 136%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:10.64
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 2715696
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 294
+	Minor (reclaiming a frame) page faults: 1898069
+	Voluntary context switches: 324074
+	Involuntary context switches: 2855
+	Swaps: 0
+	File system inputs: 30376
+	File system outputs: 211192
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+step=diff check
+step=artifact invariants
+{
+  "ready_for_real": false,
+  "real_money_execution": false,
+  "actual_fill_status": "pending_paper_testnet_fill_telemetry",
+  "fill_count": 0,
+  "backtest_fallback_pass_count": 0,
+  "fallback_rows_emitted": 60,
+  "fallback_csv": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_paper_fill_efficiency_gate_20260522/backtest_fallback_candidates_latest.csv"
+}
+local verification end utc=2026-05-22T11:27:04Z
+post_doc_diff_check_utc=2026-05-22T11:27:30Z
+git diff --check: passed
+git diff --cached --check: passed

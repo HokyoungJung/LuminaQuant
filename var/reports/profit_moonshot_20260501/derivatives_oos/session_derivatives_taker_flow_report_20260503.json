@@ -1,0 +1,336 @@
+{
+  "artifact_kind": "profit_moonshot_derivatives_taker_flow_session_report",
+  "base_commit": "755c04708794ae960f03f81cf85a76ce3aa3f762",
+  "branch": "private-main",
+  "data_refresh": {
+    "canonical_source": "binance_raw_aggtrades",
+    "collection_cutoff_utc": "2026-05-03T04:10:03Z",
+    "feature_symbol_count": 5,
+    "ohlcv_derivation": "derived_from_raw_aggtrades",
+    "ohlcv_symbol_count": 5,
+    "path": "var/reports/profit_moonshot_20260501/latest/data_refresh_20260503_current.json",
+    "peak_rss_mib": 2584.52734375,
+    "status": "completed"
+  },
+  "decision": {
+    "best_shadow_candidate": "profit_moonshot_derivatives_taker_flow_sparse_mode",
+    "conservative_research_candidate_retained": "profit_moonshot_momentum_hybrid_safe_mode",
+    "decision": "shadow_review_only_not_deployment_ready",
+    "deployment_ready": false,
+    "reasons": [
+      "liquidation feature replay is still absent for BTC/ETH/SOL (0 rows), so liquidation alpha cannot be proven",
+      "open-interest feature history starts only in 2026-03 for the top-3 symbols; train/val still rely on the documented volume OI proxy",
+      "OOS edge is positive but economically tiny (+0.0247%, Sharpe 0.00144), so it is not robust enough for deployment",
+      "the denser taker-flow/liquidation blend failed validation and OOS return"
+    ]
+  },
+  "failed_candidates": {
+    "profit_moonshot_derivatives_taker_flow_mode": {
+      "oos_total_return": -5.934921129879811e-05,
+      "reason": "raw taker-flow blend was train/val/OOS negative or validation-negative after scoped rerun",
+      "val_total_return": -0.0013015921184652557
+    },
+    "unscoped_profit_moonshot_derivatives_taker_flow_mode": {
+      "path": "var/reports/profit_moonshot_20260501/derivatives_oos/profit_moonshot_derivatives_taker_flow_mode/run.log",
+      "reason": "feature lookup loaded full sidecar history per symbol and breached the 8GB RSS guard; run killed and not counted",
+      "runtime": {
+        "elapsed": "1:15.62",
+        "exit_status": 143,
+        "max_rss_kb": 9064676
+      }
+    }
+  },
+  "feature_replay": {
+    "assertions": {
+      "backfill_peak_rss_under_8gb": true,
+      "missing_raw_days_zero": true,
+      "raw_aggtrade_rows_positive": true,
+      "taker_feature_rows_positive": true,
+      "top3_liquidation_absent": true,
+      "top3_oi_oos_only": true,
+      "top3_taker_flow_present": true
+    },
+    "raw_taker_flow_backfill": {
+      "cadence_seconds": 20,
+      "end": "2026-05-02",
+      "path": "var/reports/profit_moonshot_20260501/feature_replay/raw_taker_flow_backfill_top3_20260503.json",
+      "start": "2025-01-01",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT"
+      ],
+      "time_log": {
+        "elapsed": "15:53.22",
+        "exit_status": 0,
+        "max_rss_kb": 4293212
+      },
+      "totals": {
+        "feature_rows": 6303687,
+        "missing_raw_days": 0,
+        "peak_rss_mb": 4192.59,
+        "raw_rows": 1986107402,
+        "written_rows": 6303687
+      }
+    },
+    "support_inventory_path": "var/reports/profit_moonshot_20260501/feature_replay/support_inventory_after_taker_flow_20260503.json",
+    "top3_inventory": {
+      "BTCUSDT": {
+        "first_timestamp_ms": 1700000000000,
+        "first_timestamp_utc": "2023-11-14T22:13:20+00:00",
+        "funding_fee_rows": 2701,
+        "funding_rows": 2701,
+        "has_funding_fee": true,
+        "has_index": true,
+        "has_liquidation": false,
+        "has_mark": true,
+        "has_open_interest": true,
+        "has_taker_flow": true,
+        "index_rows": 80892,
+        "last_timestamp_ms": 1777781400000,
+        "last_timestamp_utc": "2026-05-03T04:10:00+00:00",
+        "liquidation_rows": 0,
+        "mark_rows": 1295693,
+        "oi_first_timestamp_ms": 1772928000000,
+        "oi_first_timestamp_utc": "2026-03-08T00:00:00+00:00",
+        "oi_last_timestamp_ms": 1777781400000,
+        "oi_last_timestamp_utc": "2026-05-03T04:10:00+00:00",
+        "open_interest_rows": 16179,
+        "rows": 2697677,
+        "symbol": "BTCUSDT",
+        "taker_flow_first_timestamp_ms": 1735689620000,
+        "taker_flow_first_timestamp_utc": "2025-01-01T00:00:20+00:00",
+        "taker_flow_last_timestamp_ms": 1777766400000,
+        "taker_flow_last_timestamp_utc": "2026-05-03T00:00:00+00:00",
+        "taker_flow_rows": 2101668
+      },
+      "ETHUSDT": {
+        "first_timestamp_ms": 1735689600015,
+        "first_timestamp_utc": "2025-01-01T00:00:00.015000+00:00",
+        "funding_fee_rows": 1462,
+        "funding_rows": 1462,
+        "has_funding_fee": true,
+        "has_index": true,
+        "has_liquidation": false,
+        "has_mark": true,
+        "has_open_interest": true,
+        "has_taker_flow": true,
+        "index_rows": 82331,
+        "last_timestamp_ms": 1777781400000,
+        "last_timestamp_utc": "2026-05-03T04:10:00+00:00",
+        "liquidation_rows": 0,
+        "mark_rows": 701530,
+        "oi_first_timestamp_ms": 1772841600000,
+        "oi_first_timestamp_utc": "2026-03-07T00:00:00+00:00",
+        "oi_last_timestamp_ms": 1777781400000,
+        "oi_last_timestamp_utc": "2026-05-03T04:10:00+00:00",
+        "open_interest_rows": 16467,
+        "rows": 2103941,
+        "symbol": "ETHUSDT",
+        "taker_flow_first_timestamp_ms": 1735689620000,
+        "taker_flow_first_timestamp_utc": "2025-01-01T00:00:20+00:00",
+        "taker_flow_last_timestamp_ms": 1777766400000,
+        "taker_flow_last_timestamp_utc": "2026-05-03T00:00:00+00:00",
+        "taker_flow_rows": 2102583
+      },
+      "SOLUSDT": {
+        "first_timestamp_ms": 1735689600015,
+        "first_timestamp_utc": "2025-01-01T00:00:00.015000+00:00",
+        "funding_fee_rows": 1462,
+        "funding_rows": 1462,
+        "has_funding_fee": true,
+        "has_index": true,
+        "has_liquidation": false,
+        "has_mark": true,
+        "has_open_interest": true,
+        "has_taker_flow": true,
+        "index_rows": 82331,
+        "last_timestamp_ms": 1777781400000,
+        "last_timestamp_utc": "2026-05-03T04:10:00+00:00",
+        "liquidation_rows": 0,
+        "mark_rows": 701530,
+        "oi_first_timestamp_ms": 1772841600000,
+        "oi_first_timestamp_utc": "2026-03-07T00:00:00+00:00",
+        "oi_last_timestamp_ms": 1777781400000,
+        "oi_last_timestamp_utc": "2026-05-03T04:10:00+00:00",
+        "open_interest_rows": 16467,
+        "rows": 2101844,
+        "symbol": "SOLUSDT",
+        "taker_flow_first_timestamp_ms": 1735693120000,
+        "taker_flow_first_timestamp_utc": "2025-01-01T00:58:40+00:00",
+        "taker_flow_last_timestamp_ms": 1777766400000,
+        "taker_flow_last_timestamp_utc": "2026-05-03T00:00:00+00:00",
+        "taker_flow_rows": 2099436
+      }
+    }
+  },
+  "generated_at": "2026-05-03T07:36:41.813258Z",
+  "mode_results": {
+    "profit_moonshot_derivatives_taker_flow_mode": {
+      "alpha_blocking_reasons": "val_total_return_not_positive;val_sharpe_not_positive;val_sortino_not_positive",
+      "oos": {
+        "liquidation_count": 0,
+        "max_drawdown": 0.011541390342139125,
+        "sharpe": 0.00013584228724878637,
+        "sortino": 8.481210436043823e-05,
+        "total_return": -5.934921129879811e-05,
+        "trade_count": 488
+      },
+      "path": "var/reports/profit_moonshot_20260501/derivatives_oos/profit_moonshot_derivatives_taker_flow_mode_scoped/live_equivalent_revalidation_latest.json",
+      "role": "failed_new_alpha_family_dense_blend",
+      "runtime": {
+        "elapsed": "21:37.02",
+        "exit_status": 0,
+        "max_rss_kb": 2467008
+      },
+      "selection_eligible": false,
+      "strict_status": "failed_val_and_oos_return",
+      "train": {
+        "liquidation_count": 0,
+        "max_drawdown": 0.015122674374918923,
+        "sharpe": -0.016884556904703835,
+        "sortino": -0.009061947155907173,
+        "total_return": -0.014180840864040367,
+        "trade_count": 2213
+      },
+      "val": {
+        "liquidation_count": 0,
+        "max_drawdown": 0.0033478068503228734,
+        "sharpe": -0.04345888895286071,
+        "sortino": -0.035350608686069575,
+        "total_return": -0.0013015921184652557,
+        "trade_count": 469
+      }
+    },
+    "profit_moonshot_derivatives_taker_flow_sparse_mode": {
+      "alpha_blocking_reasons": "",
+      "oos": {
+        "liquidation_count": 0,
+        "max_drawdown": 0.008590384648995517,
+        "sharpe": 0.0014435199202554668,
+        "sortino": 0.0005975054614012424,
+        "total_return": 0.0002471309190161808,
+        "trade_count": 140
+      },
+      "path": "var/reports/profit_moonshot_20260501/derivatives_oos/profit_moonshot_derivatives_taker_flow_sparse_mode/live_equivalent_revalidation_latest.json",
+      "role": "best_new_shadow_candidate",
+      "runtime": {
+        "elapsed": "16:05.63",
+        "exit_status": 0,
+        "max_rss_kb": 2469756
+      },
+      "selection_eligible": true,
+      "strict_status": "shadow_review_only_not_deployment_ready",
+      "train": {
+        "liquidation_count": 0,
+        "max_drawdown": 0.01036480904444516,
+        "sharpe": -0.006999772321745199,
+        "sortino": -0.0022342590050824633,
+        "total_return": -0.0037649577686351687,
+        "trade_count": 627
+      },
+      "val": {
+        "liquidation_count": 0,
+        "max_drawdown": 0.0005262562514120817,
+        "sharpe": 0.05547258132857314,
+        "sortino": 0.02702952679938594,
+        "total_return": 0.0007985443852063234,
+        "trade_count": 108
+      }
+    },
+    "profit_moonshot_momentum_hybrid_safe_mode": {
+      "oos": {
+        "liquidation_count": 0,
+        "max_drawdown": 0.033917370307692,
+        "sharpe": -0.0037504499025209966,
+        "sortino": -0.0037765214494177015,
+        "total_return": -0.003832463588937074,
+        "trade_count": 136
+      },
+      "path": "var/reports/profit_moonshot_20260501/oos_full/profit_moonshot_momentum_hybrid_safe_mode/live_equivalent_revalidation_latest.json",
+      "role": "conservative_research_candidate_retained_but_oos_failed",
+      "strict_status": "not_deployment_ready_oos_negative",
+      "train": {
+        "liquidation_count": 0,
+        "max_drawdown": 0.1236949840884687,
+        "sharpe": 0.004175236857947524,
+        "sortino": 0.004367273527303323,
+        "total_return": -0.013551486496041987,
+        "trade_count": 1185
+      },
+      "val": {
+        "liquidation_count": 0,
+        "max_drawdown": 0.010438136911899503,
+        "sharpe": 0.010167858124343822,
+        "sortino": 0.009833095226985623,
+        "total_return": 0.002837148217925023,
+        "trade_count": 183
+      }
+    }
+  },
+  "paths": {
+    "aborted_log": "var/reports/profit_moonshot_20260501/derivatives_oos/profit_moonshot_derivatives_taker_flow_mode/run.log",
+    "backfill_log": "var/reports/profit_moonshot_20260501/feature_replay/logs/raw_taker_flow_backfill_top3_20260503.log",
+    "hybrid_oos": "var/reports/profit_moonshot_20260501/oos_full/profit_moonshot_momentum_hybrid_safe_mode/live_equivalent_revalidation_latest.json",
+    "preflight": "var/reports/profit_moonshot_20260501/derivatives_oos/profit_moonshot_derivatives_taker_flow_mode_preflight/live_equivalent_revalidation_latest.json",
+    "sparse_mode": "var/reports/profit_moonshot_20260501/derivatives_oos/profit_moonshot_derivatives_taker_flow_sparse_mode/live_equivalent_revalidation_latest.json",
+    "sparse_run_log": "var/reports/profit_moonshot_20260501/derivatives_oos/profit_moonshot_derivatives_taker_flow_sparse_mode/run.log",
+    "support_inventory": "var/reports/profit_moonshot_20260501/feature_replay/support_inventory_after_taker_flow_20260503.json",
+    "taker_backfill": "var/reports/profit_moonshot_20260501/feature_replay/raw_taker_flow_backfill_top3_20260503.json",
+    "taker_mode": "var/reports/profit_moonshot_20260501/derivatives_oos/profit_moonshot_derivatives_taker_flow_mode_scoped/live_equivalent_revalidation_latest.json",
+    "taker_run_log": "var/reports/profit_moonshot_20260501/derivatives_oos/profit_moonshot_derivatives_taker_flow_mode_scoped/run.log"
+  },
+  "raw_first_coverage": {
+    "assertions": {
+      "BTC/USDT_oos_complete": true,
+      "BTC/USDT_train_complete": true,
+      "BTC/USDT_val_complete": true,
+      "ETH/USDT_oos_complete": true,
+      "ETH/USDT_train_complete": true,
+      "ETH/USDT_val_complete": true,
+      "SOL/USDT_oos_complete": true,
+      "SOL/USDT_train_complete": true,
+      "SOL/USDT_val_complete": true
+    },
+    "preflight_path": "var/reports/profit_moonshot_20260501/derivatives_oos/profit_moonshot_derivatives_taker_flow_mode_preflight/live_equivalent_revalidation_latest.json",
+    "splits": [
+      {
+        "end_inclusive": "2025-12-31",
+        "name": "train",
+        "role": "sanity_filter",
+        "start": "2025-01-01"
+      },
+      {
+        "end_inclusive": "2026-02-28",
+        "name": "val",
+        "role": "primary_selection",
+        "start": "2026-01-01"
+      },
+      {
+        "end_inclusive": "2026-05-02",
+        "name": "oos",
+        "role": "report_only",
+        "start": "2026-03-01"
+      }
+    ],
+    "symbols": [
+      "BTC/USDT",
+      "ETH/USDT",
+      "SOL/USDT"
+    ]
+  },
+  "verification": {
+    "assertions": {
+      "aborted_unscoped_run_exceeded_8gb_and_was_not_counted": true,
+      "sparse_liquidations_zero": true,
+      "sparse_mode_rss_under_8gb": true,
+      "sparse_oos_positive": true,
+      "sparse_val_positive": true,
+      "taker_mode_rejected_by_val": true,
+      "taker_mode_scoped_rss_under_8gb": true
+    },
+    "duplicate_backtest_process_check": "ps grep returned no revalidate/backfill/materialize/backtest processes",
+    "lint": "uv run ruff check -> All checks passed",
+    "pytest": "uv run pytest tests/test_raw_taker_flow_feature_backfill.py tests/test_strategy_support_inventory.py tests/test_historic_data_feature_support.py tests/test_feature_point_lookup.py tests/test_live_selection_infer.py tests/unit/test_artifact_portfolio_mode.py tests/unit/test_derivatives_flow_squeeze_strategy.py tests/unit/test_live_equivalent_revalidation.py -q -> 26 passed"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "workflow": "autoresearch-goal",
+  "slug": "profit-moonshot-return-quality-alpha",
+  "topic": "Profit moonshot return-quality alpha discovery: find stable train/validation-selected candidate with >=2% monthlyized train/val/OOS returns, OOS MDD <=25%, high Sharpe/Sortino/smart Sortino/Calmar, locked-OOS report/gate-only, <8GiB memory",
+  "rubric": "Professor-critic passes only if the mission validator passes and artifacts prove train/validation-only selection, locked-OOS report/gate-only, train/validation/OOS monthlyized return >=2%, OOS MDD <=25%, OOS Sharpe >=2, Sortino >=3, smart Sortino >=3, Calmar >=1, OOS return and return/risk improvement over current champion, full local tests, private/main push, and GitHub Actions ci/private-ci green.",
+  "critic_command": "uv run --extra dev python scripts/research/validate_profit_moonshot_pass_under_8gb.py --result-path .omx/specs/autoresearch-profit-moonshot-alpha-v2/result.json --output-path .omx/specs/autoresearch-profit-moonshot-alpha-v2/validation_latest.json --markdown-path var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/return_quality_validation_20260509.md",
+  "status": "passed",
+  "created_at": "2026-05-09T06:31:14.136Z",
+  "updated_at": "2026-05-09T07:03:58.189Z",
+  "mission_path": ".omx/goals/autoresearch/profit-moonshot-return-quality-alpha/mission.json",
+  "rubric_path": ".omx/goals/autoresearch/profit-moonshot-return-quality-alpha/rubric.md",
+  "ledger_path": ".omx/goals/autoresearch/profit-moonshot-return-quality-alpha/ledger.jsonl",
+  "completion_path": ".omx/goals/autoresearch/profit-moonshot-return-quality-alpha/completion.json"
+}

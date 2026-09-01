@@ -1,0 +1,81 @@
+profile: research
+optimization:
+  method: OPTUNA
+  walk_forward_folds: 3
+data:
+  # research profile: ohlcv + feature_points for strategy development
+  kinds: [ohlcv, feature_points]
+
+# Honest-research execution numerics: charge funding on the Binance
+# 00:00/08:00/16:00 UTC settlement snapshots a position is open across, instead of
+# the legacy entry-anchored 8h clock (which lets any sub-8h round trip pay ZERO
+# funding — strategy_viability_assessment 2026-07-06 Axis 3 #7).
+execution:
+  funding_on_utc_boundary: true
+
+# Research / selection validation wiring — CORRECTED GATES (all ON). Every
+# promotion-gate correction from docs/audits/strategy_viability_assessment_20260706.md
+# (Axis 3) is turned ON so research selection uses the stringent gates, not the
+# legacy lie-by-omission ones. Consumers read these defensively via
+# getattr(config.research, <flag>, <legacy_default>).
+research:
+  # #1 deflated-Sharpe / SPA is a HARD reject in the strategy hurdle (not a soft weight).
+  strict_selection_gate: true
+  # #2 4-way train/val/oos/lockbox split; rank + gate on validation, report lockbox as OOS.
+  use_lockbox_split: true
+  # purge + embargo gap (bars) between contiguous splits (multi-bar-label leakage guard).
+  purge_embargo_bars: 1
+  # #3 remove the N_eff double-discount so the binding DSR gate is actually stringent.
+  single_correlation_discount: true
+  # #4/#5 HAC / block-correct the iid inference (DSR/Sharpe n AND rank-IC t-stat).
+  hac_inference: true
+  # CSCV PBO estimator as the binding gate (else approx_pbo stays advisory).
+  cscv_pbo: true
+  # #6 exposure-normalize the portfolio-superiority objective so leverage cannot buy it.
+  exposure_normalized_promotion: true
+  # Anti-overfit HARD selection-reject gate (overfit_selection_gates 2026-07-08).
+  # Master ON switch for the reject + basket-dedup pass in the monthly-refit
+  # walk-forward selection engine, with binding DSR / SPA / PBO floors that are
+  # promote-nothing no-ops at their default (0.0 / 1.0 / 1.0 / 1.0) values.
+  enforce_selection_reject_gate: true
+  dsr_gate_floor: 0.90
+  spa_gate_ceiling: 0.05
+  pbo_gate_ceiling: 0.50
+  # cross-trial CSCV/PBO ceiling: reject the run tail when family-wise PBO exceeds this.
+  max_cross_trial_pbo: 0.50
+  # Basket-dedup caps (default None = OFF/byte-identical). Keep at most 2 clones per
+  # identical-symbol basket, 1 per lineage, 1 per family-basket so a single
+  # over-searched basket cannot flood the shortlist with near-identical variants.
+  max_per_symbol_basket: 2
+  max_per_lineage: 1
+  max_per_family_basket: 1
+  # E1 (overfit_selection_gates): stamp per-candidate spa_pvalue + approx_pbo into
+  # the monthly-refit walk-forward runner's validation metric block (the DSR-less
+  # SPA/PBO axes the reject gate reads). Default OFF/byte-identical; ON here in the
+  # honest-research profile. Whole-search-deflated DSR is a data-PC stamp, not this.
+  emit_candidate_overfit_stats: true
+  # v5 defect fix (silent generic-fallback substitution): candidates whose
+  # strategy_class has no bespoke dispatcher handler are executed as their REAL
+  # registered event-driven class instead of being silently scored as the shared
+  # 64-bar momentum proxy (84/111 classes incl. every research_only sleeve were
+  # proxy-scored, so their recorded metrics measured the proxy, not the lane).
+  # Default OFF/legacy; ON here so research runs measure the actual strategies.
+  # The generic fallback is always labelled meta.evaluation_mode either way.
+  route_unmapped_registered_strategies: true
+  # Portfolio-layer honest gate (performance_lever_measurement 2026-07-08): run
+  # DSR / CSCV-PBO / SPA on the weighted-portfolio NET stream, deflating the
+  # portfolio DSR by the TOTAL allocation config-grid cells searched (the
+  # cross-run trial accountant) so tuning a config grid and shipping the best cell
+  # cannot clear the gate. No cost_rate_multiplier here: this profile carries no
+  # execution cost model (see backtest_cost_realistic.yaml for the cost floor).
+  portfolio_honest_gate: true
+  # Equity-flow complements (eq-flow v5 follow-up, 2026-07-10): five ADDITIVE
+  # walk-forward variants / ranking treatments from the fold-by-fold equity-flow
+  # diagnosis (.omc/research/equity-flow-analysis-20260710.md). Default OFF /
+  # byte-identical (count pins hold); ON here so the next research run measures
+  # them. Variant params are PRE-REGISTERED constants in the walk-forward script.
+  walkforward_corr_guard_router_variant: true
+  walkforward_crash_scaled_conviction_variant: true
+  walkforward_val_saturation_conviction_variant: true
+  walkforward_partial_fold_bar_count_weighting: true
+  walkforward_regime_gated_strict_efficiency_variant: true

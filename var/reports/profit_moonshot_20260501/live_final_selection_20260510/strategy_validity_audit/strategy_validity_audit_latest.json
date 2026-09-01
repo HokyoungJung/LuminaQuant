@@ -1,0 +1,2657 @@
+{
+  "artifact_kind": "profit_moonshot_strategy_validity_audit",
+  "closure_manifest": [
+    {
+      "artifact_kind": "json",
+      "path": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_hybrid/candidate_hybrid_latest.json",
+      "row_count": 12,
+      "source_role": "candidate_hybrid"
+    },
+    {
+      "artifact_kind": "json",
+      "path": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_portfolio/fresh_portfolio_tuning_latest.json",
+      "row_count": 50,
+      "source_role": "candidate_portfolio"
+    },
+    {
+      "artifact_kind": "json",
+      "path": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/final_decision/profit_moonshot_live_final_selection_latest.json",
+      "row_count": 33,
+      "source_role": "final_selection_json"
+    },
+    {
+      "artifact_kind": "md",
+      "path": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/final_decision/profit_moonshot_live_final_selection_latest.md",
+      "row_count": 84,
+      "source_role": "final_selection_md"
+    },
+    {
+      "artifact_kind": "json",
+      "path": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/hybrid_final/hybrid_online_portfolio_latest.json",
+      "row_count": 9,
+      "source_role": "legacy_hybrid"
+    },
+    {
+      "artifact_kind": "json",
+      "path": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json",
+      "row_count": 60,
+      "source_role": "liquidation_validation"
+    },
+    {
+      "artifact_kind": "csv",
+      "path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/merged_alpha_v2_candidates.csv",
+      "row_count": 8821,
+      "source_role": "merged_candidate_csv"
+    },
+    {
+      "artifact_kind": "json",
+      "path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/passing_candidate_latest.json",
+      "row_count": 7,
+      "source_role": "passing_artifacts"
+    },
+    {
+      "artifact_kind": "json",
+      "path": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/data_refresh/data_refresh_latest.json",
+      "row_count": 6,
+      "source_role": "refresh_json"
+    },
+    {
+      "artifact_kind": "inline_audit_index",
+      "path": "inline:final_selection.rows.strategy_validity",
+      "row_count": 87,
+      "source_role": "per_row_per_sleeve_sources"
+    }
+  ],
+  "deployable_invalid_rows": [],
+  "generated_at_utc": "2026-05-10T10:26:15.978327Z",
+  "missing_metadata_rows": [],
+  "missing_optional_sources": [
+    {
+      "reason": "not_provided",
+      "source_role": "current_base"
+    }
+  ],
+  "no_new_alpha_search": true,
+  "rows": [
+    {
+      "benchmark_only": true,
+      "candidate_derived": false,
+      "deployable_candidate": false,
+      "kind": "current_base",
+      "name": "current_base_tuple_liquidation_aware_2.34273x",
+      "rejection_reasons": [
+        "calendar_fixed_month_alpha",
+        "calendar_primary_alpha_unsupported",
+        "fixed_asset_calendar_target",
+        "strategy_validity_rejected",
+        "eligible_for_candidate_live_promotion",
+        "strategy_validity_passed",
+        "live_integer_leverage",
+        "oos_return_beats_current_base",
+        "oos_return_mdd_beats_current_base"
+      ],
+      "sleeves": [
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+        "fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600"
+      ],
+      "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json",
+      "strategy_validity": {
+        "audit_sources": [
+          "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json"
+        ],
+        "audited_sleeves": [
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600"
+          },
+          {
+            "family": "pair_residual",
+            "pass": true,
+            "primary_signal_evidence": "pair_residual",
+            "primary_signal_type": "state_signal",
+            "rejection_reasons": [],
+            "sleeve": "fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600"
+          }
+        ],
+        "pass": false,
+        "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600",
+        "primary_signal_type": "calendar_primary",
+        "rejection_reasons": [
+          "calendar_fixed_month_alpha",
+          "calendar_primary_alpha_unsupported",
+          "fixed_asset_calendar_target"
+        ]
+      }
+    },
+    {
+      "benchmark_only": false,
+      "candidate_derived": true,
+      "deployable_candidate": false,
+      "kind": "direct_candidate",
+      "name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600__fr_liquidation_aware_5x",
+      "rejection_reasons": [
+        "calendar_fixed_month_alpha",
+        "calendar_primary_alpha_unsupported",
+        "fixed_asset_calendar_target",
+        "strategy_validity_rejected",
+        "strategy_validity_passed"
+      ],
+      "sleeves": [
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss100_tp600"
+      ],
+      "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json",
+      "strategy_validity": {
+        "audit_sources": [
+          "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json"
+        ],
+        "audited_sleeves": [
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss100_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss100_tp600"
+          }
+        ],
+        "pass": false,
+        "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss100_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss100_tp600",
+        "primary_signal_type": "calendar_primary",
+        "rejection_reasons": [
+          "calendar_fixed_month_alpha",
+          "calendar_primary_alpha_unsupported",
+          "fixed_asset_calendar_target"
+        ]
+      }
+    },
+    {
+      "benchmark_only": false,
+      "candidate_derived": true,
+      "deployable_candidate": false,
+      "kind": "direct_candidate",
+      "name": "current_base_tuple_liquidation_aware_5x",
+      "rejection_reasons": [
+        "calendar_fixed_month_alpha",
+        "calendar_primary_alpha_unsupported",
+        "fixed_asset_calendar_target",
+        "strategy_validity_rejected",
+        "strategy_validity_passed"
+      ],
+      "sleeves": [
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+        "fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600"
+      ],
+      "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json",
+      "strategy_validity": {
+        "audit_sources": [
+          "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json"
+        ],
+        "audited_sleeves": [
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600"
+          },
+          {
+            "family": "pair_residual",
+            "pass": true,
+            "primary_signal_evidence": "pair_residual",
+            "primary_signal_type": "state_signal",
+            "rejection_reasons": [],
+            "sleeve": "fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600"
+          }
+        ],
+        "pass": false,
+        "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600",
+        "primary_signal_type": "calendar_primary",
+        "rejection_reasons": [
+          "calendar_fixed_month_alpha",
+          "calendar_primary_alpha_unsupported",
+          "fixed_asset_calendar_target"
+        ]
+      }
+    },
+    {
+      "benchmark_only": false,
+      "candidate_derived": true,
+      "deployable_candidate": false,
+      "kind": "direct_candidate",
+      "name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600__fr_liquidation_aware_4x",
+      "rejection_reasons": [
+        "calendar_fixed_month_alpha",
+        "calendar_primary_alpha_unsupported",
+        "fixed_asset_calendar_target",
+        "strategy_validity_rejected",
+        "strategy_validity_passed",
+        "oos_return_mdd_beats_current_base",
+        "oos_sortino_ok",
+        "oos_smart_sortino_ok"
+      ],
+      "sleeves": [
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600",
+        "fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0",
+        "fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0"
+      ],
+      "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json",
+      "strategy_validity": {
+        "audit_sources": [
+          "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json"
+        ],
+        "audited_sleeves": [
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0"
+          }
+        ],
+        "pass": false,
+        "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600; fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0=fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0; fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0=fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0",
+        "primary_signal_type": "calendar_primary",
+        "rejection_reasons": [
+          "calendar_fixed_month_alpha",
+          "calendar_primary_alpha_unsupported",
+          "fixed_asset_calendar_target"
+        ]
+      }
+    },
+    {
+      "benchmark_only": false,
+      "candidate_derived": true,
+      "deployable_candidate": false,
+      "kind": "direct_candidate",
+      "name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600__fr_liquidation_aware_3x",
+      "rejection_reasons": [
+        "calendar_fixed_month_alpha",
+        "calendar_primary_alpha_unsupported",
+        "fixed_asset_calendar_target",
+        "strategy_validity_rejected",
+        "strategy_validity_passed",
+        "oos_return_beats_current_base",
+        "oos_return_mdd_beats_current_base",
+        "oos_sortino_ok",
+        "oos_smart_sortino_ok"
+      ],
+      "sleeves": [
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600",
+        "fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0",
+        "fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0"
+      ],
+      "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json",
+      "strategy_validity": {
+        "audit_sources": [
+          "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json"
+        ],
+        "audited_sleeves": [
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0"
+          }
+        ],
+        "pass": false,
+        "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600; fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0=fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0; fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0=fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0",
+        "primary_signal_type": "calendar_primary",
+        "rejection_reasons": [
+          "calendar_fixed_month_alpha",
+          "calendar_primary_alpha_unsupported",
+          "fixed_asset_calendar_target"
+        ]
+      }
+    },
+    {
+      "benchmark_only": false,
+      "candidate_derived": true,
+      "deployable_candidate": false,
+      "kind": "direct_candidate",
+      "name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600__fr_liquidation_aware_2x",
+      "rejection_reasons": [
+        "calendar_fixed_month_alpha",
+        "calendar_primary_alpha_unsupported",
+        "fixed_asset_calendar_target",
+        "strategy_validity_rejected",
+        "strategy_validity_passed",
+        "oos_return_beats_current_base",
+        "oos_return_mdd_beats_current_base",
+        "oos_sortino_ok",
+        "oos_smart_sortino_ok"
+      ],
+      "sleeves": [
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600",
+        "fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0",
+        "fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0"
+      ],
+      "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json",
+      "strategy_validity": {
+        "audit_sources": [
+          "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json"
+        ],
+        "audited_sleeves": [
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0"
+          }
+        ],
+        "pass": false,
+        "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600; fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0=fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0; fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0=fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0",
+        "primary_signal_type": "calendar_primary",
+        "rejection_reasons": [
+          "calendar_fixed_month_alpha",
+          "calendar_primary_alpha_unsupported",
+          "fixed_asset_calendar_target"
+        ]
+      }
+    },
+    {
+      "benchmark_only": false,
+      "candidate_derived": true,
+      "deployable_candidate": false,
+      "kind": "direct_candidate",
+      "name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600__fr_liquidation_aware_4x",
+      "rejection_reasons": [
+        "calendar_fixed_month_alpha",
+        "calendar_primary_alpha_unsupported",
+        "fixed_asset_calendar_target",
+        "strategy_validity_rejected",
+        "strategy_validity_passed",
+        "oos_return_mdd_beats_current_base"
+      ],
+      "sleeves": [
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr120_h168_ls530_ss120_tp450",
+        "fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0"
+      ],
+      "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json",
+      "strategy_validity": {
+        "audit_sources": [
+          "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json"
+        ],
+        "audited_sleeves": [
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h168_ls530_ss120_tp450",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h168_ls530_ss120_tp450"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0"
+          }
+        ],
+        "pass": false,
+        "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr120_h168_ls530_ss120_tp450=fresh_calendar_trx_takeprofit_sethusdt_thr120_h168_ls530_ss120_tp450; fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0=fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0",
+        "primary_signal_type": "calendar_primary",
+        "rejection_reasons": [
+          "calendar_fixed_month_alpha",
+          "calendar_primary_alpha_unsupported",
+          "fixed_asset_calendar_target"
+        ]
+      }
+    },
+    {
+      "benchmark_only": false,
+      "candidate_derived": true,
+      "deployable_candidate": false,
+      "kind": "direct_candidate",
+      "name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600__fr_liquidation_aware_5x",
+      "rejection_reasons": [
+        "calendar_fixed_month_alpha",
+        "calendar_primary_alpha_unsupported",
+        "fixed_asset_calendar_target",
+        "strategy_validity_rejected",
+        "strategy_validity_passed"
+      ],
+      "sleeves": [
+        "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls600_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss100_tp600"
+      ],
+      "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json",
+      "strategy_validity": {
+        "audit_sources": [
+          "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json"
+        ],
+        "audited_sleeves": [
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls600_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls600_ss120_tp600"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss100_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss100_tp600"
+          }
+        ],
+        "pass": false,
+        "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls600_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls600_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss100_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss100_tp600",
+        "primary_signal_type": "calendar_primary",
+        "rejection_reasons": [
+          "calendar_fixed_month_alpha",
+          "calendar_primary_alpha_unsupported",
+          "fixed_asset_calendar_target"
+        ]
+      }
+    },
+    {
+      "benchmark_only": false,
+      "candidate_derived": true,
+      "deployable_candidate": false,
+      "kind": "direct_candidate",
+      "name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600__fr_liquidation_aware_5x",
+      "rejection_reasons": [
+        "calendar_fixed_month_alpha",
+        "calendar_primary_alpha_unsupported",
+        "fixed_asset_calendar_target",
+        "strategy_validity_rejected",
+        "strategy_validity_passed",
+        "liquidation_gate",
+        "tiny_liquidation_tolerance_ok",
+        "oos_return_mdd_beats_current_base",
+        "oos_sortino_ok",
+        "oos_smart_sortino_ok"
+      ],
+      "sleeves": [
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600",
+        "fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0",
+        "fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0"
+      ],
+      "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json",
+      "strategy_validity": {
+        "audit_sources": [
+          "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json"
+        ],
+        "audited_sleeves": [
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0"
+          }
+        ],
+        "pass": false,
+        "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600; fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0=fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0; fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0=fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0",
+        "primary_signal_type": "calendar_primary",
+        "rejection_reasons": [
+          "calendar_fixed_month_alpha",
+          "calendar_primary_alpha_unsupported",
+          "fixed_asset_calendar_target"
+        ]
+      }
+    },
+    {
+      "benchmark_only": false,
+      "candidate_derived": true,
+      "deployable_candidate": false,
+      "kind": "candidate_portfolio",
+      "name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls600_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls600_ss120_tp600__fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all",
+      "rejection_reasons": [
+        "calendar_fixed_month_alpha",
+        "calendar_primary_alpha_unsupported",
+        "fixed_asset_calendar_target",
+        "strategy_validity_rejected",
+        "strategy_validity_passed",
+        "liquidation_gate",
+        "liquidation_evidence_available",
+        "oos_return_mdd_beats_current_base",
+        "diagnostic_not_promoted"
+      ],
+      "sleeves": [
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls600_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls600_ss120_tp600",
+        "fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all"
+      ],
+      "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_portfolio/fresh_portfolio_tuning_latest.json",
+      "strategy_validity": {
+        "audit_sources": [
+          "var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_portfolio/fresh_portfolio_tuning_latest.json"
+        ],
+        "audited_sleeves": [
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls600_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls600_ss120_tp600"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls600_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls600_ss120_tp600"
+          },
+          {
+            "family": "pair_residual",
+            "pass": true,
+            "primary_signal_evidence": "pair_residual",
+            "primary_signal_type": "state_signal",
+            "rejection_reasons": [],
+            "sleeve": "fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all"
+          }
+        ],
+        "pass": false,
+        "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls600_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls600_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls600_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls600_ss120_tp600",
+        "primary_signal_type": "calendar_primary",
+        "rejection_reasons": [
+          "calendar_fixed_month_alpha",
+          "calendar_primary_alpha_unsupported",
+          "fixed_asset_calendar_target"
+        ]
+      }
+    },
+    {
+      "benchmark_only": false,
+      "candidate_derived": true,
+      "deployable_candidate": false,
+      "kind": "candidate_portfolio",
+      "name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600__fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all__fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600",
+      "rejection_reasons": [
+        "calendar_fixed_month_alpha",
+        "calendar_primary_alpha_unsupported",
+        "fixed_asset_calendar_target",
+        "strategy_validity_rejected",
+        "strategy_validity_passed",
+        "live_integer_leverage",
+        "liquidation_gate",
+        "liquidation_evidence_available",
+        "oos_mdd_within_25pct_budget",
+        "oos_return_beats_current_base",
+        "oos_return_mdd_beats_current_base",
+        "oos_sharpe_ok",
+        "oos_sortino_ok",
+        "oos_smart_sortino_ok",
+        "oos_calmar_ok"
+      ],
+      "sleeves": [
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+        "fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600"
+      ],
+      "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_portfolio/fresh_portfolio_tuning_latest.json",
+      "strategy_validity": {
+        "audit_sources": [
+          "var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_portfolio/fresh_portfolio_tuning_latest.json"
+        ],
+        "audited_sleeves": [
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600"
+          },
+          {
+            "family": "pair_residual",
+            "pass": true,
+            "primary_signal_evidence": "pair_residual",
+            "primary_signal_type": "state_signal",
+            "rejection_reasons": [],
+            "sleeve": "fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600"
+          }
+        ],
+        "pass": false,
+        "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600",
+        "primary_signal_type": "calendar_primary",
+        "rejection_reasons": [
+          "calendar_fixed_month_alpha",
+          "calendar_primary_alpha_unsupported",
+          "fixed_asset_calendar_target"
+        ]
+      }
+    },
+    {
+      "benchmark_only": false,
+      "candidate_derived": true,
+      "deployable_candidate": false,
+      "kind": "candidate_portfolio",
+      "name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr150_h120_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sweakest_thr120_h120_ls620_ss120_tp450__fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all",
+      "rejection_reasons": [
+        "calendar_fixed_month_alpha",
+        "calendar_primary_alpha_unsupported",
+        "fixed_asset_calendar_target",
+        "strategy_validity_rejected",
+        "strategy_validity_passed",
+        "liquidation_gate",
+        "liquidation_evidence_available",
+        "oos_return_mdd_beats_current_base",
+        "diagnostic_not_promoted"
+      ],
+      "sleeves": [
+        "fresh_calendar_trx_takeprofit_sethusdt_thr150_h120_ls620_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sweakest_thr120_h120_ls620_ss120_tp450",
+        "fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all"
+      ],
+      "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_portfolio/fresh_portfolio_tuning_latest.json",
+      "strategy_validity": {
+        "audit_sources": [
+          "var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_portfolio/fresh_portfolio_tuning_latest.json"
+        ],
+        "audited_sleeves": [
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr150_h120_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr150_h120_ls620_ss120_tp600"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sweakest_thr120_h120_ls620_ss120_tp450",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sweakest_thr120_h120_ls620_ss120_tp450"
+          },
+          {
+            "family": "pair_residual",
+            "pass": true,
+            "primary_signal_evidence": "pair_residual",
+            "primary_signal_type": "state_signal",
+            "rejection_reasons": [],
+            "sleeve": "fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all"
+          }
+        ],
+        "pass": false,
+        "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr150_h120_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr150_h120_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sweakest_thr120_h120_ls620_ss120_tp450=fresh_calendar_trx_takeprofit_sweakest_thr120_h120_ls620_ss120_tp450",
+        "primary_signal_type": "calendar_primary",
+        "rejection_reasons": [
+          "calendar_fixed_month_alpha",
+          "calendar_primary_alpha_unsupported",
+          "fixed_asset_calendar_target"
+        ]
+      }
+    },
+    {
+      "benchmark_only": false,
+      "candidate_derived": true,
+      "deployable_candidate": false,
+      "kind": "candidate_portfolio",
+      "name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr150_h120_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sweakest_thr120_h120_ls620_ss120_tp450",
+      "rejection_reasons": [
+        "calendar_fixed_month_alpha",
+        "calendar_primary_alpha_unsupported",
+        "fixed_asset_calendar_target",
+        "strategy_validity_rejected",
+        "strategy_validity_passed",
+        "liquidation_gate",
+        "liquidation_evidence_available",
+        "oos_return_mdd_beats_current_base",
+        "diagnostic_not_promoted"
+      ],
+      "sleeves": [
+        "fresh_calendar_trx_takeprofit_sethusdt_thr150_h120_ls620_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sweakest_thr120_h120_ls620_ss120_tp450"
+      ],
+      "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_portfolio/fresh_portfolio_tuning_latest.json",
+      "strategy_validity": {
+        "audit_sources": [
+          "var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_portfolio/fresh_portfolio_tuning_latest.json"
+        ],
+        "audited_sleeves": [
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr150_h120_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr150_h120_ls620_ss120_tp600"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sweakest_thr120_h120_ls620_ss120_tp450",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sweakest_thr120_h120_ls620_ss120_tp450"
+          }
+        ],
+        "pass": false,
+        "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr150_h120_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr150_h120_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sweakest_thr120_h120_ls620_ss120_tp450=fresh_calendar_trx_takeprofit_sweakest_thr120_h120_ls620_ss120_tp450",
+        "primary_signal_type": "calendar_primary",
+        "rejection_reasons": [
+          "calendar_fixed_month_alpha",
+          "calendar_primary_alpha_unsupported",
+          "fixed_asset_calendar_target"
+        ]
+      }
+    },
+    {
+      "benchmark_only": false,
+      "candidate_derived": true,
+      "deployable_candidate": false,
+      "kind": "candidate_portfolio",
+      "name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600__fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all",
+      "rejection_reasons": [
+        "calendar_fixed_month_alpha",
+        "calendar_primary_alpha_unsupported",
+        "fixed_asset_calendar_target",
+        "strategy_validity_rejected",
+        "strategy_validity_passed",
+        "liquidation_gate",
+        "liquidation_evidence_available",
+        "diagnostic_not_promoted"
+      ],
+      "sleeves": [
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+        "fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all"
+      ],
+      "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_portfolio/fresh_portfolio_tuning_latest.json",
+      "strategy_validity": {
+        "audit_sources": [
+          "var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_portfolio/fresh_portfolio_tuning_latest.json"
+        ],
+        "audited_sleeves": [
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600"
+          },
+          {
+            "family": "pair_residual",
+            "pass": true,
+            "primary_signal_evidence": "pair_residual",
+            "primary_signal_type": "state_signal",
+            "rejection_reasons": [],
+            "sleeve": "fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all"
+          }
+        ],
+        "pass": false,
+        "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+        "primary_signal_type": "calendar_primary",
+        "rejection_reasons": [
+          "calendar_fixed_month_alpha",
+          "calendar_primary_alpha_unsupported",
+          "fixed_asset_calendar_target"
+        ]
+      }
+    },
+    {
+      "benchmark_only": false,
+      "candidate_derived": true,
+      "deployable_candidate": false,
+      "kind": "candidate_portfolio",
+      "name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sweakest_thr120_h120_ls620_ss120_tp450",
+      "rejection_reasons": [
+        "calendar_fixed_month_alpha",
+        "calendar_primary_alpha_unsupported",
+        "fixed_asset_calendar_target",
+        "strategy_validity_rejected",
+        "strategy_validity_passed",
+        "liquidation_gate",
+        "liquidation_evidence_available",
+        "oos_return_mdd_beats_current_base",
+        "diagnostic_not_promoted"
+      ],
+      "sleeves": [
+        "fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sweakest_thr120_h120_ls620_ss120_tp450"
+      ],
+      "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_portfolio/fresh_portfolio_tuning_latest.json",
+      "strategy_validity": {
+        "audit_sources": [
+          "var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_portfolio/fresh_portfolio_tuning_latest.json"
+        ],
+        "audited_sleeves": [
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sweakest_thr120_h120_ls620_ss120_tp450",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sweakest_thr120_h120_ls620_ss120_tp450"
+          }
+        ],
+        "pass": false,
+        "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sweakest_thr120_h120_ls620_ss120_tp450=fresh_calendar_trx_takeprofit_sweakest_thr120_h120_ls620_ss120_tp450",
+        "primary_signal_type": "calendar_primary",
+        "rejection_reasons": [
+          "calendar_fixed_month_alpha",
+          "calendar_primary_alpha_unsupported",
+          "fixed_asset_calendar_target"
+        ]
+      }
+    },
+    {
+      "benchmark_only": false,
+      "candidate_derived": true,
+      "deployable_candidate": false,
+      "kind": "candidate_portfolio",
+      "name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls600_ss120_tp600__fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all",
+      "rejection_reasons": [
+        "calendar_fixed_month_alpha",
+        "calendar_primary_alpha_unsupported",
+        "fixed_asset_calendar_target",
+        "strategy_validity_rejected",
+        "strategy_validity_passed",
+        "liquidation_gate",
+        "liquidation_evidence_available",
+        "oos_return_mdd_beats_current_base",
+        "diagnostic_not_promoted"
+      ],
+      "sleeves": [
+        "fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls600_ss120_tp600",
+        "fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all"
+      ],
+      "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_portfolio/fresh_portfolio_tuning_latest.json",
+      "strategy_validity": {
+        "audit_sources": [
+          "var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_portfolio/fresh_portfolio_tuning_latest.json"
+        ],
+        "audited_sleeves": [
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls600_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls600_ss120_tp600"
+          },
+          {
+            "family": "pair_residual",
+            "pass": true,
+            "primary_signal_evidence": "pair_residual",
+            "primary_signal_type": "state_signal",
+            "rejection_reasons": [],
+            "sleeve": "fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all"
+          }
+        ],
+        "pass": false,
+        "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls600_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls600_ss120_tp600",
+        "primary_signal_type": "calendar_primary",
+        "rejection_reasons": [
+          "calendar_fixed_month_alpha",
+          "calendar_primary_alpha_unsupported",
+          "fixed_asset_calendar_target"
+        ]
+      }
+    },
+    {
+      "benchmark_only": false,
+      "candidate_derived": true,
+      "deployable_candidate": false,
+      "kind": "candidate_portfolio",
+      "name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls590_ss120_tp600__fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all",
+      "rejection_reasons": [
+        "calendar_fixed_month_alpha",
+        "calendar_primary_alpha_unsupported",
+        "fixed_asset_calendar_target",
+        "strategy_validity_rejected",
+        "strategy_validity_passed",
+        "liquidation_gate",
+        "liquidation_evidence_available",
+        "oos_return_mdd_beats_current_base",
+        "diagnostic_not_promoted"
+      ],
+      "sleeves": [
+        "fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls590_ss120_tp600",
+        "fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all"
+      ],
+      "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_portfolio/fresh_portfolio_tuning_latest.json",
+      "strategy_validity": {
+        "audit_sources": [
+          "var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_portfolio/fresh_portfolio_tuning_latest.json"
+        ],
+        "audited_sleeves": [
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls590_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls590_ss120_tp600"
+          },
+          {
+            "family": "pair_residual",
+            "pass": true,
+            "primary_signal_evidence": "pair_residual",
+            "primary_signal_type": "state_signal",
+            "rejection_reasons": [],
+            "sleeve": "fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all"
+          }
+        ],
+        "pass": false,
+        "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls590_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls590_ss120_tp600",
+        "primary_signal_type": "calendar_primary",
+        "rejection_reasons": [
+          "calendar_fixed_month_alpha",
+          "calendar_primary_alpha_unsupported",
+          "fixed_asset_calendar_target"
+        ]
+      }
+    },
+    {
+      "benchmark_only": false,
+      "candidate_derived": true,
+      "deployable_candidate": false,
+      "kind": "candidate_portfolio",
+      "name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls580_ss120_tp600__fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all",
+      "rejection_reasons": [
+        "calendar_fixed_month_alpha",
+        "calendar_primary_alpha_unsupported",
+        "fixed_asset_calendar_target",
+        "strategy_validity_rejected",
+        "strategy_validity_passed",
+        "liquidation_gate",
+        "liquidation_evidence_available",
+        "oos_return_mdd_beats_current_base",
+        "diagnostic_not_promoted"
+      ],
+      "sleeves": [
+        "fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls580_ss120_tp600",
+        "fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all"
+      ],
+      "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_portfolio/fresh_portfolio_tuning_latest.json",
+      "strategy_validity": {
+        "audit_sources": [
+          "var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_portfolio/fresh_portfolio_tuning_latest.json"
+        ],
+        "audited_sleeves": [
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls580_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls580_ss120_tp600"
+          },
+          {
+            "family": "pair_residual",
+            "pass": true,
+            "primary_signal_evidence": "pair_residual",
+            "primary_signal_type": "state_signal",
+            "rejection_reasons": [],
+            "sleeve": "fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all"
+          }
+        ],
+        "pass": false,
+        "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls580_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls580_ss120_tp600",
+        "primary_signal_type": "calendar_primary",
+        "rejection_reasons": [
+          "calendar_fixed_month_alpha",
+          "calendar_primary_alpha_unsupported",
+          "fixed_asset_calendar_target"
+        ]
+      }
+    },
+    {
+      "benchmark_only": false,
+      "candidate_derived": true,
+      "deployable_candidate": false,
+      "kind": "candidate_portfolio",
+      "name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+      "rejection_reasons": [
+        "calendar_fixed_month_alpha",
+        "calendar_primary_alpha_unsupported",
+        "fixed_asset_calendar_target",
+        "strategy_validity_rejected",
+        "strategy_validity_passed",
+        "liquidation_gate",
+        "liquidation_evidence_available",
+        "oos_return_mdd_beats_current_base",
+        "diagnostic_not_promoted"
+      ],
+      "sleeves": [
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600"
+      ],
+      "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_portfolio/fresh_portfolio_tuning_latest.json",
+      "strategy_validity": {
+        "audit_sources": [
+          "var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_portfolio/fresh_portfolio_tuning_latest.json"
+        ],
+        "audited_sleeves": [
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600"
+          }
+        ],
+        "pass": false,
+        "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+        "primary_signal_type": "calendar_primary",
+        "rejection_reasons": [
+          "calendar_fixed_month_alpha",
+          "calendar_primary_alpha_unsupported",
+          "fixed_asset_calendar_target"
+        ]
+      }
+    },
+    {
+      "benchmark_only": false,
+      "candidate_derived": true,
+      "deployable_candidate": false,
+      "kind": "candidate_portfolio",
+      "name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls560_ss120_tp600__fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all",
+      "rejection_reasons": [
+        "calendar_fixed_month_alpha",
+        "calendar_primary_alpha_unsupported",
+        "fixed_asset_calendar_target",
+        "strategy_validity_rejected",
+        "strategy_validity_passed",
+        "liquidation_gate",
+        "liquidation_evidence_available",
+        "oos_return_mdd_beats_current_base",
+        "diagnostic_not_promoted"
+      ],
+      "sleeves": [
+        "fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls560_ss120_tp600",
+        "fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all"
+      ],
+      "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_portfolio/fresh_portfolio_tuning_latest.json",
+      "strategy_validity": {
+        "audit_sources": [
+          "var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_portfolio/fresh_portfolio_tuning_latest.json"
+        ],
+        "audited_sleeves": [
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls560_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls560_ss120_tp600"
+          },
+          {
+            "family": "pair_residual",
+            "pass": true,
+            "primary_signal_evidence": "pair_residual",
+            "primary_signal_type": "state_signal",
+            "rejection_reasons": [],
+            "sleeve": "fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all"
+          }
+        ],
+        "pass": false,
+        "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls560_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls560_ss120_tp600",
+        "primary_signal_type": "calendar_primary",
+        "rejection_reasons": [
+          "calendar_fixed_month_alpha",
+          "calendar_primary_alpha_unsupported",
+          "fixed_asset_calendar_target"
+        ]
+      }
+    },
+    {
+      "benchmark_only": false,
+      "candidate_derived": true,
+      "deployable_candidate": false,
+      "kind": "candidate_portfolio",
+      "name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls600_ss120_tp600",
+      "rejection_reasons": [
+        "calendar_fixed_month_alpha",
+        "calendar_primary_alpha_unsupported",
+        "fixed_asset_calendar_target",
+        "strategy_validity_rejected",
+        "strategy_validity_passed",
+        "liquidation_gate",
+        "liquidation_evidence_available",
+        "oos_return_mdd_beats_current_base",
+        "diagnostic_not_promoted"
+      ],
+      "sleeves": [
+        "fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls600_ss120_tp600"
+      ],
+      "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_portfolio/fresh_portfolio_tuning_latest.json",
+      "strategy_validity": {
+        "audit_sources": [
+          "var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_portfolio/fresh_portfolio_tuning_latest.json"
+        ],
+        "audited_sleeves": [
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls600_ss120_tp600",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls600_ss120_tp600"
+          }
+        ],
+        "pass": false,
+        "primary_signal_evidence": "fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600; fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls600_ss120_tp600=fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls600_ss120_tp600",
+        "primary_signal_type": "calendar_primary",
+        "rejection_reasons": [
+          "calendar_fixed_month_alpha",
+          "calendar_primary_alpha_unsupported",
+          "fixed_asset_calendar_target"
+        ]
+      }
+    },
+    {
+      "benchmark_only": false,
+      "candidate_derived": true,
+      "deployable_candidate": false,
+      "kind": "candidate_hybrid",
+      "name": "candidate_hybrid_online_rank_01_candidate_hybrid_input_01_fresh_portfolio_train_val_monthly_",
+      "rejection_reasons": [
+        "calendar_fixed_month_alpha",
+        "calendar_primary_alpha_unsupported",
+        "fixed_asset_calendar_target",
+        "strategy_validity_rejected",
+        "strategy_validity_passed"
+      ],
+      "sleeves": [
+        "candidate_hybrid_input_01_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+        "candidate_hybrid_input_03_current_base_tuple_liquidation_aware_5x",
+        "candidate_hybrid_input_07_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+        "candidate_hybrid_input_08_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+        "candidate_hybrid_input_09_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+        "candidate_hybrid_input_10_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+        "candidate_hybrid_input_11_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+        "candidate_hybrid_input_17_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+        "candidate_hybrid_input_18_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+        "candidate_hybrid_input_19_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+        "candidate_hybrid_input_20_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+        "candidate_hybrid_input_21_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se"
+      ],
+      "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_hybrid/candidate_hybrid_latest.json",
+      "strategy_validity": {
+        "audit_sources": [
+          "var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_hybrid/candidate_hybrid_latest.json"
+        ],
+        "audited_sleeves": [
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "candidate_hybrid_input_01_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "candidate_hybrid_input_01_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se"
+          },
+          {
+            "family": "stateful_dynamic",
+            "pass": true,
+            "primary_signal_evidence": "stateful_dynamic",
+            "primary_signal_type": "state_signal",
+            "rejection_reasons": [],
+            "sleeve": "candidate_hybrid_input_03_current_base_tuple_liquidation_aware_5x"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "candidate_hybrid_input_07_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "candidate_hybrid_input_07_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "candidate_hybrid_input_08_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "candidate_hybrid_input_08_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "candidate_hybrid_input_09_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "candidate_hybrid_input_09_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "candidate_hybrid_input_10_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "candidate_hybrid_input_10_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "candidate_hybrid_input_11_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "candidate_hybrid_input_11_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "candidate_hybrid_input_17_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "candidate_hybrid_input_17_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "candidate_hybrid_input_18_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "candidate_hybrid_input_18_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "candidate_hybrid_input_19_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "candidate_hybrid_input_19_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "candidate_hybrid_input_20_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "candidate_hybrid_input_20_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se"
+          },
+          {
+            "family": "calendar_rotation",
+            "pass": false,
+            "primary_signal_evidence": "candidate_hybrid_input_21_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+            "primary_signal_type": "calendar_primary",
+            "rejection_reasons": [
+              "calendar_primary_alpha_unsupported",
+              "calendar_fixed_month_alpha",
+              "fixed_asset_calendar_target"
+            ],
+            "sleeve": "candidate_hybrid_input_21_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se"
+          }
+        ],
+        "pass": false,
+        "primary_signal_evidence": "candidate_hybrid_input_01_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se=candidate_hybrid_input_01_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se; candidate_hybrid_input_07_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se=candidate_hybrid_input_07_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se; candidate_hybrid_input_08_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se=candidate_hybrid_input_08_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se; candidate_hybrid_input_09_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se=candidate_hybrid_input_09_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se; candidate_hybrid_input_10_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se=candidate_hybrid_input_10_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+        "primary_signal_type": "calendar_primary",
+        "rejection_reasons": [
+          "calendar_fixed_month_alpha",
+          "calendar_primary_alpha_unsupported",
+          "fixed_asset_calendar_target"
+        ]
+      }
+    },
+    {
+      "benchmark_only": false,
+      "candidate_derived": true,
+      "deployable_candidate": false,
+      "kind": "candidate_hybrid",
+      "name": "candidate_hybrid_online_rank_02_candidate_hybrid_input_07_fresh_portfolio_train_val_monthly_",
+      "rejection_reasons": [
+        "strategy_source_row_missing_sleeves",
+        "strategy_validity_rejected",
+        "strategy_validity_passed",
+        "live_integer_source_leverage",
+        "liquidation_gate",
+        "liquidation_evidence_available"
+      ],
+      "sleeves": [],
+      "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_hybrid/candidate_hybrid_latest.json",
+      "strategy_validity": {
+        "audit_sources": [
+          "var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_hybrid/candidate_hybrid_latest.json"
+        ],
+        "audited_sleeves": [],
+        "pass": false,
+        "primary_signal_evidence": "no sleeves present",
+        "primary_signal_type": "unknown",
+        "rejection_reasons": [
+          "strategy_source_row_missing_sleeves"
+        ]
+      }
+    },
+    {
+      "benchmark_only": false,
+      "candidate_derived": true,
+      "deployable_candidate": false,
+      "kind": "candidate_hybrid",
+      "name": "candidate_hybrid_online_rank_03_candidate_hybrid_input_08_fresh_portfolio_train_val_monthly_",
+      "rejection_reasons": [
+        "strategy_source_row_missing_sleeves",
+        "strategy_validity_rejected",
+        "strategy_validity_passed",
+        "live_integer_source_leverage",
+        "liquidation_gate",
+        "liquidation_evidence_available"
+      ],
+      "sleeves": [],
+      "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_hybrid/candidate_hybrid_latest.json",
+      "strategy_validity": {
+        "audit_sources": [
+          "var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_hybrid/candidate_hybrid_latest.json"
+        ],
+        "audited_sleeves": [],
+        "pass": false,
+        "primary_signal_evidence": "no sleeves present",
+        "primary_signal_type": "unknown",
+        "rejection_reasons": [
+          "strategy_source_row_missing_sleeves"
+        ]
+      }
+    },
+    {
+      "benchmark_only": false,
+      "candidate_derived": true,
+      "deployable_candidate": false,
+      "kind": "candidate_hybrid",
+      "name": "candidate_hybrid_online_rank_04_candidate_hybrid_input_01_fresh_portfolio_train_val_monthly_",
+      "rejection_reasons": [
+        "strategy_source_row_missing_sleeves",
+        "strategy_validity_rejected",
+        "strategy_validity_passed",
+        "live_integer_source_leverage",
+        "liquidation_gate",
+        "liquidation_evidence_available"
+      ],
+      "sleeves": [],
+      "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_hybrid/candidate_hybrid_latest.json",
+      "strategy_validity": {
+        "audit_sources": [
+          "var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_hybrid/candidate_hybrid_latest.json"
+        ],
+        "audited_sleeves": [],
+        "pass": false,
+        "primary_signal_evidence": "no sleeves present",
+        "primary_signal_type": "unknown",
+        "rejection_reasons": [
+          "strategy_source_row_missing_sleeves"
+        ]
+      }
+    },
+    {
+      "benchmark_only": false,
+      "candidate_derived": true,
+      "deployable_candidate": false,
+      "kind": "candidate_hybrid",
+      "name": "candidate_hybrid_online_rank_05_candidate_hybrid_input_07_fresh_portfolio_train_val_monthly_",
+      "rejection_reasons": [
+        "strategy_source_row_missing_sleeves",
+        "strategy_validity_rejected",
+        "strategy_validity_passed",
+        "live_integer_source_leverage",
+        "liquidation_gate",
+        "liquidation_evidence_available"
+      ],
+      "sleeves": [],
+      "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_hybrid/candidate_hybrid_latest.json",
+      "strategy_validity": {
+        "audit_sources": [
+          "var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_hybrid/candidate_hybrid_latest.json"
+        ],
+        "audited_sleeves": [],
+        "pass": false,
+        "primary_signal_evidence": "no sleeves present",
+        "primary_signal_type": "unknown",
+        "rejection_reasons": [
+          "strategy_source_row_missing_sleeves"
+        ]
+      }
+    },
+    {
+      "benchmark_only": false,
+      "candidate_derived": true,
+      "deployable_candidate": false,
+      "kind": "candidate_hybrid",
+      "name": "candidate_hybrid_online_rank_06_candidate_hybrid_input_08_fresh_portfolio_train_val_monthly_",
+      "rejection_reasons": [
+        "strategy_source_row_missing_sleeves",
+        "strategy_validity_rejected",
+        "strategy_validity_passed",
+        "live_integer_source_leverage",
+        "liquidation_gate",
+        "liquidation_evidence_available"
+      ],
+      "sleeves": [],
+      "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_hybrid/candidate_hybrid_latest.json",
+      "strategy_validity": {
+        "audit_sources": [
+          "var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_hybrid/candidate_hybrid_latest.json"
+        ],
+        "audited_sleeves": [],
+        "pass": false,
+        "primary_signal_evidence": "no sleeves present",
+        "primary_signal_type": "unknown",
+        "rejection_reasons": [
+          "strategy_source_row_missing_sleeves"
+        ]
+      }
+    },
+    {
+      "benchmark_only": false,
+      "candidate_derived": true,
+      "deployable_candidate": false,
+      "kind": "candidate_hybrid",
+      "name": "candidate_hybrid_online_rank_07_candidate_hybrid_input_01_fresh_portfolio_train_val_monthly_",
+      "rejection_reasons": [
+        "strategy_source_row_missing_sleeves",
+        "strategy_validity_rejected",
+        "strategy_validity_passed",
+        "live_integer_source_leverage",
+        "liquidation_gate",
+        "liquidation_evidence_available"
+      ],
+      "sleeves": [],
+      "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_hybrid/candidate_hybrid_latest.json",
+      "strategy_validity": {
+        "audit_sources": [
+          "var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_hybrid/candidate_hybrid_latest.json"
+        ],
+        "audited_sleeves": [],
+        "pass": false,
+        "primary_signal_evidence": "no sleeves present",
+        "primary_signal_type": "unknown",
+        "rejection_reasons": [
+          "strategy_source_row_missing_sleeves"
+        ]
+      }
+    },
+    {
+      "benchmark_only": false,
+      "candidate_derived": true,
+      "deployable_candidate": false,
+      "kind": "candidate_hybrid",
+      "name": "candidate_hybrid_online_rank_08_candidate_hybrid_input_07_fresh_portfolio_train_val_monthly_",
+      "rejection_reasons": [
+        "strategy_source_row_missing_sleeves",
+        "strategy_validity_rejected",
+        "strategy_validity_passed",
+        "live_integer_source_leverage",
+        "liquidation_gate",
+        "liquidation_evidence_available"
+      ],
+      "sleeves": [],
+      "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_hybrid/candidate_hybrid_latest.json",
+      "strategy_validity": {
+        "audit_sources": [
+          "var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_hybrid/candidate_hybrid_latest.json"
+        ],
+        "audited_sleeves": [],
+        "pass": false,
+        "primary_signal_evidence": "no sleeves present",
+        "primary_signal_type": "unknown",
+        "rejection_reasons": [
+          "strategy_source_row_missing_sleeves"
+        ]
+      }
+    },
+    {
+      "benchmark_only": false,
+      "candidate_derived": true,
+      "deployable_candidate": false,
+      "kind": "candidate_hybrid",
+      "name": "candidate_hybrid_online_rank_09_candidate_hybrid_input_08_fresh_portfolio_train_val_monthly_",
+      "rejection_reasons": [
+        "strategy_source_row_missing_sleeves",
+        "strategy_validity_rejected",
+        "strategy_validity_passed",
+        "live_integer_source_leverage",
+        "liquidation_gate",
+        "liquidation_evidence_available"
+      ],
+      "sleeves": [],
+      "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_hybrid/candidate_hybrid_latest.json",
+      "strategy_validity": {
+        "audit_sources": [
+          "var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_hybrid/candidate_hybrid_latest.json"
+        ],
+        "audited_sleeves": [],
+        "pass": false,
+        "primary_signal_evidence": "no sleeves present",
+        "primary_signal_type": "unknown",
+        "rejection_reasons": [
+          "strategy_source_row_missing_sleeves"
+        ]
+      }
+    },
+    {
+      "benchmark_only": false,
+      "candidate_derived": true,
+      "deployable_candidate": false,
+      "kind": "candidate_hybrid",
+      "name": "candidate_hybrid_online_rank_10_candidate_hybrid_input_01_fresh_portfolio_train_val_monthly_",
+      "rejection_reasons": [
+        "strategy_source_row_missing_sleeves",
+        "strategy_validity_rejected",
+        "strategy_validity_passed",
+        "live_integer_source_leverage",
+        "liquidation_gate",
+        "liquidation_evidence_available"
+      ],
+      "sleeves": [],
+      "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_hybrid/candidate_hybrid_latest.json",
+      "strategy_validity": {
+        "audit_sources": [
+          "var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_hybrid/candidate_hybrid_latest.json"
+        ],
+        "audited_sleeves": [],
+        "pass": false,
+        "primary_signal_evidence": "no sleeves present",
+        "primary_signal_type": "unknown",
+        "rejection_reasons": [
+          "strategy_source_row_missing_sleeves"
+        ]
+      }
+    },
+    {
+      "benchmark_only": true,
+      "candidate_derived": false,
+      "deployable_candidate": false,
+      "kind": "legacy_hybrid_benchmark",
+      "name": "legacy_hybrid_benchmark",
+      "rejection_reasons": [
+        "eligible_for_candidate_live_promotion",
+        "live_integer_leverage",
+        "liquidation_gate",
+        "liquidation_evidence_available",
+        "oos_return_beats_current_base",
+        "oos_return_mdd_beats_current_base",
+        "oos_sharpe_ok",
+        "oos_sortino_ok",
+        "oos_smart_sortino_ok"
+      ],
+      "sleeves": [],
+      "source_artifact": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/hybrid_final/hybrid_online_portfolio_latest.json",
+      "strategy_validity": {
+        "audit_sources": [
+          "var/reports/profit_moonshot_20260501/live_final_selection_20260510/hybrid_final/hybrid_online_portfolio_latest.json"
+        ],
+        "audited_sleeves": [],
+        "pass": true,
+        "primary_signal_evidence": "legacy_hybrid_benchmark:legacy_hybrid_benchmark is non-promotable row class",
+        "primary_signal_type": "non_candidate_row",
+        "rejection_reasons": []
+      }
+    },
+    {
+      "benchmark_only": true,
+      "candidate_derived": false,
+      "deployable_candidate": false,
+      "kind": "cash",
+      "name": "cash",
+      "rejection_reasons": [
+        "eligible_for_candidate_live_promotion",
+        "liquidation_gate",
+        "liquidation_evidence_available",
+        "oos_return_beats_current_base",
+        "oos_return_mdd_beats_current_base",
+        "oos_sharpe_ok",
+        "oos_sortino_ok",
+        "oos_smart_sortino_ok",
+        "oos_calmar_ok"
+      ],
+      "sleeves": [],
+      "source_artifact": "synthetic_cash",
+      "strategy_validity": {
+        "audit_sources": [
+          "synthetic_cash"
+        ],
+        "audited_sleeves": [],
+        "pass": true,
+        "primary_signal_evidence": "cash:cash is non-promotable row class",
+        "primary_signal_type": "non_candidate_row",
+        "rejection_reasons": []
+      }
+    }
+  ],
+  "selection_policy": {
+    "calendar_primary_alpha_rejected": true,
+    "locked_oos": "report_only_gate_only",
+    "selection_inputs": [
+      "train",
+      "validation"
+    ],
+    "strategy_validity_required": true,
+    "uses_locked_oos_for_selection": false
+  },
+  "source_pool_summary": {
+    "available": true,
+    "calendar_primary_invalid_rows": 4392,
+    "path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/merged_alpha_v2_candidates.csv",
+    "row_count": 8821,
+    "strategy_valid_rows": 4429,
+    "strategy_valid_success_candidate_count": 0,
+    "success_candidate_count": 300,
+    "top_strategy_valid_candidates": [
+      {
+        "family": "residual_pair_reversion_spread",
+        "name": "fresh_pair_resid_revert_spread_lb24_z150_h48_sc10_st100_tp400_asiaus",
+        "oos_max_drawdown": 0.001623338486232169,
+        "oos_total_return": -0.0011007060953359682,
+        "replay_survivor": false,
+        "strategy_validity_pass": true,
+        "strategy_validity_reasons": [],
+        "success_candidate": false,
+        "train_max_drawdown": 0.0012854521576357073,
+        "train_total_return": 0.004366271857272563,
+        "train_val_screen_score": 0.0020832697394866134,
+        "validation_max_drawdown": 0.001043788165586276,
+        "validation_total_return": 4.62382054360333e-05
+      },
+      {
+        "family": "residual_reversion_flow_confirmed",
+        "name": "fresh_resid_flow_rev_fl12_lb48_z175_imb10",
+        "oos_max_drawdown": 7.463812971478058e-05,
+        "oos_total_return": -7.177648578149398e-05,
+        "replay_survivor": false,
+        "strategy_validity_pass": true,
+        "strategy_validity_reasons": [],
+        "success_candidate": false,
+        "train_max_drawdown": 0.0,
+        "train_total_return": 0.0,
+        "train_val_screen_score": 0.0,
+        "validation_max_drawdown": 0.0,
+        "validation_total_return": 0.0
+      },
+      {
+        "family": "residual_reversion_flow_confirmed",
+        "name": "fresh_resid_flow_rev_fl12_lb48_z15_imb10",
+        "oos_max_drawdown": 7.463382553301544e-05,
+        "oos_total_return": -1.4105663572405724e-05,
+        "replay_survivor": false,
+        "strategy_validity_pass": true,
+        "strategy_validity_reasons": [],
+        "success_candidate": false,
+        "train_max_drawdown": 0.0,
+        "train_total_return": 0.0,
+        "train_val_screen_score": 0.0,
+        "validation_max_drawdown": 0.0,
+        "validation_total_return": 0.0
+      },
+      {
+        "family": "residual_reversion_flow_confirmed",
+        "name": "fresh_resid_flow_rev_fl12_lb48_z125_imb10",
+        "oos_max_drawdown": 7.463382553301544e-05,
+        "oos_total_return": -1.4105663572405724e-05,
+        "replay_survivor": false,
+        "strategy_validity_pass": true,
+        "strategy_validity_reasons": [],
+        "success_candidate": false,
+        "train_max_drawdown": 0.0,
+        "train_total_return": 0.0,
+        "train_val_screen_score": 0.0,
+        "validation_max_drawdown": 0.0,
+        "validation_total_return": 0.0
+      },
+      {
+        "family": "residual_reversion_flow_confirmed",
+        "name": "fresh_resid_flow_rev_fl12_lb24_z175_imb10",
+        "oos_max_drawdown": 0.0,
+        "oos_total_return": 0.0,
+        "replay_survivor": false,
+        "strategy_validity_pass": true,
+        "strategy_validity_reasons": [],
+        "success_candidate": false,
+        "train_max_drawdown": 0.0,
+        "train_total_return": 0.0,
+        "train_val_screen_score": 0.0,
+        "validation_max_drawdown": 0.0,
+        "validation_total_return": 0.0
+      },
+      {
+        "family": "residual_reversion_flow_confirmed",
+        "name": "fresh_resid_flow_rev_fl12_lb24_z15_imb10",
+        "oos_max_drawdown": 0.0,
+        "oos_total_return": 0.0,
+        "replay_survivor": false,
+        "strategy_validity_pass": true,
+        "strategy_validity_reasons": [],
+        "success_candidate": false,
+        "train_max_drawdown": 0.0,
+        "train_total_return": 0.0,
+        "train_val_screen_score": 0.0,
+        "validation_max_drawdown": 0.0,
+        "validation_total_return": 0.0
+      },
+      {
+        "family": "residual_reversion_flow_confirmed",
+        "name": "fresh_resid_flow_rev_fl12_lb24_z125_imb10",
+        "oos_max_drawdown": 7.929369520825986e-05,
+        "oos_total_return": -1.9238247264352637e-05,
+        "replay_survivor": false,
+        "strategy_validity_pass": true,
+        "strategy_validity_reasons": [],
+        "success_candidate": false,
+        "train_max_drawdown": 0.0,
+        "train_total_return": 0.0,
+        "train_val_screen_score": 0.0,
+        "validation_max_drawdown": 0.0,
+        "validation_total_return": 0.0
+      },
+      {
+        "family": "funding_oi_carry_fade",
+        "name": "fresh_funding_oi_fade_lb6_z175_f50_oi0",
+        "oos_max_drawdown": 0.00252387403904213,
+        "oos_total_return": -0.002507104376249125,
+        "replay_survivor": false,
+        "strategy_validity_pass": true,
+        "strategy_validity_reasons": [],
+        "success_candidate": false,
+        "train_max_drawdown": 0.0,
+        "train_total_return": 0.0,
+        "train_val_screen_score": 0.0,
+        "validation_max_drawdown": 0.0,
+        "validation_total_return": 0.0
+      },
+      {
+        "family": "funding_oi_carry_fade",
+        "name": "fresh_funding_oi_fade_lb6_z175_f100_oi0",
+        "oos_max_drawdown": 0.001270334306104311,
+        "oos_total_return": -0.0009207350007364168,
+        "replay_survivor": false,
+        "strategy_validity_pass": true,
+        "strategy_validity_reasons": [],
+        "success_candidate": false,
+        "train_max_drawdown": 0.0,
+        "train_total_return": 0.0,
+        "train_val_screen_score": 0.0,
+        "validation_max_drawdown": 0.0,
+        "validation_total_return": 0.0
+      },
+      {
+        "family": "funding_oi_carry_fade",
+        "name": "fresh_funding_oi_fade_lb6_z15_f50_oi0",
+        "oos_max_drawdown": 0.00252387403904213,
+        "oos_total_return": -0.002507104376249125,
+        "replay_survivor": false,
+        "strategy_validity_pass": true,
+        "strategy_validity_reasons": [],
+        "success_candidate": false,
+        "train_max_drawdown": 0.0,
+        "train_total_return": 0.0,
+        "train_val_screen_score": 0.0,
+        "validation_max_drawdown": 0.0,
+        "validation_total_return": 0.0
+      },
+      {
+        "family": "funding_oi_carry_fade",
+        "name": "fresh_funding_oi_fade_lb6_z15_f100_oi0",
+        "oos_max_drawdown": 0.001270334306104311,
+        "oos_total_return": -0.0009207350007364168,
+        "replay_survivor": false,
+        "strategy_validity_pass": true,
+        "strategy_validity_reasons": [],
+        "success_candidate": false,
+        "train_max_drawdown": 0.0,
+        "train_total_return": 0.0,
+        "train_val_screen_score": 0.0,
+        "validation_max_drawdown": 0.0,
+        "validation_total_return": 0.0
+      },
+      {
+        "family": "funding_oi_carry_fade",
+        "name": "fresh_funding_oi_fade_lb6_z125_f50_oi0",
+        "oos_max_drawdown": 0.00252387403904213,
+        "oos_total_return": -0.002507104376249125,
+        "replay_survivor": false,
+        "strategy_validity_pass": true,
+        "strategy_validity_reasons": [],
+        "success_candidate": false,
+        "train_max_drawdown": 0.0,
+        "train_total_return": 0.0,
+        "train_val_screen_score": 0.0,
+        "validation_max_drawdown": 0.0,
+        "validation_total_return": 0.0
+      },
+      {
+        "family": "funding_oi_carry_fade",
+        "name": "fresh_funding_oi_fade_lb6_z125_f100_oi0",
+        "oos_max_drawdown": 0.001270334306104311,
+        "oos_total_return": -0.0009207350007364168,
+        "replay_survivor": false,
+        "strategy_validity_pass": true,
+        "strategy_validity_reasons": [],
+        "success_candidate": false,
+        "train_max_drawdown": 0.0,
+        "train_total_return": 0.0,
+        "train_val_screen_score": 0.0,
+        "validation_max_drawdown": 0.0,
+        "validation_total_return": 0.0
+      },
+      {
+        "family": "funding_oi_carry_fade",
+        "name": "fresh_funding_oi_fade_lb48_z175_f50_oi0",
+        "oos_max_drawdown": 0.002972310692274263,
+        "oos_total_return": -0.002925957636859655,
+        "replay_survivor": false,
+        "strategy_validity_pass": true,
+        "strategy_validity_reasons": [],
+        "success_candidate": false,
+        "train_max_drawdown": 0.0,
+        "train_total_return": 0.0,
+        "train_val_screen_score": 0.0,
+        "validation_max_drawdown": 0.0,
+        "validation_total_return": 0.0
+      },
+      {
+        "family": "funding_oi_carry_fade",
+        "name": "fresh_funding_oi_fade_lb48_z175_f100_oi0",
+        "oos_max_drawdown": 0.0013792964894815262,
+        "oos_total_return": -0.0013513666515698741,
+        "replay_survivor": false,
+        "strategy_validity_pass": true,
+        "strategy_validity_reasons": [],
+        "success_candidate": false,
+        "train_max_drawdown": 0.0,
+        "train_total_return": 0.0,
+        "train_val_screen_score": 0.0,
+        "validation_max_drawdown": 0.0,
+        "validation_total_return": 0.0
+      },
+      {
+        "family": "funding_oi_carry_fade",
+        "name": "fresh_funding_oi_fade_lb48_z15_f50_oi0",
+        "oos_max_drawdown": 0.002972310692274263,
+        "oos_total_return": -0.002925957636859655,
+        "replay_survivor": false,
+        "strategy_validity_pass": true,
+        "strategy_validity_reasons": [],
+        "success_candidate": false,
+        "train_max_drawdown": 0.0,
+        "train_total_return": 0.0,
+        "train_val_screen_score": 0.0,
+        "validation_max_drawdown": 0.0,
+        "validation_total_return": 0.0
+      },
+      {
+        "family": "funding_oi_carry_fade",
+        "name": "fresh_funding_oi_fade_lb48_z15_f100_oi0",
+        "oos_max_drawdown": 0.0013792964894815262,
+        "oos_total_return": -0.0013513666515698741,
+        "replay_survivor": false,
+        "strategy_validity_pass": true,
+        "strategy_validity_reasons": [],
+        "success_candidate": false,
+        "train_max_drawdown": 0.0,
+        "train_total_return": 0.0,
+        "train_val_screen_score": 0.0,
+        "validation_max_drawdown": 0.0,
+        "validation_total_return": 0.0
+      },
+      {
+        "family": "funding_oi_carry_fade",
+        "name": "fresh_funding_oi_fade_lb48_z125_f50_oi0",
+        "oos_max_drawdown": 0.002972310692274263,
+        "oos_total_return": -0.002925957636859655,
+        "replay_survivor": false,
+        "strategy_validity_pass": true,
+        "strategy_validity_reasons": [],
+        "success_candidate": false,
+        "train_max_drawdown": 0.0,
+        "train_total_return": 0.0,
+        "train_val_screen_score": 0.0,
+        "validation_max_drawdown": 0.0,
+        "validation_total_return": 0.0
+      },
+      {
+        "family": "funding_oi_carry_fade",
+        "name": "fresh_funding_oi_fade_lb48_z125_f100_oi0",
+        "oos_max_drawdown": 0.0013792964894815262,
+        "oos_total_return": -0.0013513666515698741,
+        "replay_survivor": false,
+        "strategy_validity_pass": true,
+        "strategy_validity_reasons": [],
+        "success_candidate": false,
+        "train_max_drawdown": 0.0,
+        "train_total_return": 0.0,
+        "train_val_screen_score": 0.0,
+        "validation_max_drawdown": 0.0,
+        "validation_total_return": 0.0
+      },
+      {
+        "family": "funding_oi_carry_fade",
+        "name": "fresh_funding_oi_fade_lb24_z175_f50_oi0",
+        "oos_max_drawdown": 0.003536505705379956,
+        "oos_total_return": -0.0034336777569358157,
+        "replay_survivor": false,
+        "strategy_validity_pass": true,
+        "strategy_validity_reasons": [],
+        "success_candidate": false,
+        "train_max_drawdown": 0.0,
+        "train_total_return": 0.0,
+        "train_val_screen_score": 0.0,
+        "validation_max_drawdown": 0.0,
+        "validation_total_return": 0.0
+      }
+    ],
+    "top_strategy_valid_success_candidates": []
+  },
+  "status": "pass_with_rejections",
+  "strategy_invalid_rows": [
+    "current_base_tuple_liquidation_aware_2.34273x",
+    "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600__fr_liquidation_aware_5x",
+    "current_base_tuple_liquidation_aware_5x",
+    "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600__fr_liquidation_aware_4x",
+    "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600__fr_liquidation_aware_3x",
+    "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600__fr_liquidation_aware_2x",
+    "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600__fr_liquidation_aware_4x",
+    "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600__fr_liquidation_aware_5x",
+    "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600__fr_liquidation_aware_5x",
+    "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls600_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls600_ss120_tp600__fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all",
+    "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600__fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all__fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600",
+    "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr150_h120_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sweakest_thr120_h120_ls620_ss120_tp450__fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all",
+    "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr150_h120_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sweakest_thr120_h120_ls620_ss120_tp450",
+    "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600__fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all",
+    "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sweakest_thr120_h120_ls620_ss120_tp450",
+    "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls600_ss120_tp600__fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all",
+    "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls590_ss120_tp600__fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all",
+    "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls580_ss120_tp600__fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all",
+    "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+    "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls560_ss120_tp600__fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all",
+    "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr150_h168_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls600_ss120_tp600",
+    "candidate_hybrid_online_rank_01_candidate_hybrid_input_01_fresh_portfolio_train_val_monthly_",
+    "candidate_hybrid_online_rank_02_candidate_hybrid_input_07_fresh_portfolio_train_val_monthly_",
+    "candidate_hybrid_online_rank_03_candidate_hybrid_input_08_fresh_portfolio_train_val_monthly_",
+    "candidate_hybrid_online_rank_04_candidate_hybrid_input_01_fresh_portfolio_train_val_monthly_",
+    "candidate_hybrid_online_rank_05_candidate_hybrid_input_07_fresh_portfolio_train_val_monthly_",
+    "candidate_hybrid_online_rank_06_candidate_hybrid_input_08_fresh_portfolio_train_val_monthly_",
+    "candidate_hybrid_online_rank_07_candidate_hybrid_input_01_fresh_portfolio_train_val_monthly_",
+    "candidate_hybrid_online_rank_08_candidate_hybrid_input_07_fresh_portfolio_train_val_monthly_",
+    "candidate_hybrid_online_rank_09_candidate_hybrid_input_08_fresh_portfolio_train_val_monthly_",
+    "candidate_hybrid_online_rank_10_candidate_hybrid_input_01_fresh_portfolio_train_val_monthly_"
+  ],
+  "summary": {
+    "deployable_invalid_count": 0,
+    "deployable_valid_count": 0,
+    "missing_metadata_count": 0,
+    "row_count": 33,
+    "strategy_invalid_count": 31
+  },
+  "verification": {
+    "completed_at_utc": "2026-05-10T10:32:03.079108Z",
+    "evidence": [
+      {
+        "command": "uv run pytest -q tests/test_profit_moonshot_live_final_selection.py tests/test_profit_moonshot_strategy_validity_audit.py tests/test_profit_moonshot_candidate_hybrid.py tests/test_profit_moonshot_liquidation_aware_validation.py",
+        "result": "27 passed",
+        "time_log": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/runner_evidence/targeted_strategy_validity_tests_time.log"
+      },
+      {
+        "command": "uv run pytest",
+        "result": "1253 passed",
+        "time_log": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/runner_evidence/full_pytest_strategy_validity_time.log"
+      },
+      {
+        "command": "uv run ruff check .",
+        "result": "All checks passed",
+        "time_log": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/runner_evidence/ruff_strategy_validity_time.log"
+      },
+      {
+        "command": "python3 -m compileall -q scripts tests",
+        "result": "passed",
+        "time_log": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/runner_evidence/compileall_strategy_validity_time.log"
+      },
+      {
+        "command": "git diff --check",
+        "result": "passed",
+        "time_log": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/runner_evidence/git_diff_check_strategy_validity_time.log"
+      }
+    ],
+    "finalized": true
+  }
+}

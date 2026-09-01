@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "createdAt": "2026-07-10T07:53:34.028Z",
+  "updatedAt": "2026-07-10T07:58:05.148Z",
+  "briefPath": ".omx/ultragoal/brief.md",
+  "goalsPath": ".omx/ultragoal/goals.json",
+  "ledgerPath": ".omx/ultragoal/ledger.jsonl",
+  "codexGoalMode": "aggregate",
+  "goals": [
+    {
+      "id": "G001-establish-isolated-execution-baselin",
+      "title": "Establish isolated execution baseline and integrity plumbing",
+      "objective": "Create the exact isolated branch/worktree from baseline 252910e54e280cc593365484cbc99d6ca87893f9, carry only approved planning artifacts, implement one-descriptor ArtifactReadReceipt and generic receipt propagation, add alpha-only receipt enforcement plus portfolio funding seams, and prove legacy neutrality.",
+      "status": "in_progress",
+      "attempt": 1,
+      "createdAt": "2026-07-10T07:53:34.028Z",
+      "updatedAt": "2026-07-10T07:58:05.148Z",
+      "startedAt": "2026-07-10T07:58:05.148Z"
+    },
+    {
+      "id": "G002-implement-the-three-alpha-sleeves-an",
+      "title": "Implement the three alpha sleeves and portfolio artifacts",
+      "objective": "Implement daily trend persistence, daily near-52-week-high anchoring, and 4h funding-harvest carry using existing patterns; add frozen research-only configs/manifests and causal admitted-symbol/funding contracts with focused tests.",
+      "status": "pending",
+      "attempt": 0,
+      "createdAt": "2026-07-10T07:53:34.028Z",
+      "updatedAt": "2026-07-10T07:53:34.028Z"
+    },
+    {
+      "id": "G003-implement-experiment-runner-statisti",
+      "title": "Implement experiment runner, statistics, and external replay package",
+      "objective": "Implement the raw-first runner, exact 21+1466=1487 trial-family accounting, DSR/PBO/SPA diagnostics, cost cells, MDD soft-band policy, incumbent/report-only history handling, deterministic bundles, and external-PC runbook without local performance claims.",
+      "status": "pending",
+      "attempt": 0,
+      "createdAt": "2026-07-10T07:53:34.028Z",
+      "updatedAt": "2026-07-10T07:53:34.028Z"
+    },
+    {
+      "id": "G004-integrate-independently-review-verif",
+      "title": "Integrate, independently review, verify, commit, and push",
+      "objective": "Run targeted/full CI, changed-file cleanup, distinct code-reviewer and architect invariant reviews, fix blockers, make a Lore-protocol commit, and push feat/alpha-max-20260710 with exact verification evidence and external-backtest limitation.",
+      "status": "pending",
+      "attempt": 0,
+      "createdAt": "2026-07-10T07:53:34.028Z",
+      "updatedAt": "2026-07-10T07:53:34.028Z"
+    }
+  ],
+  "codexObjective": "Complete the durable ultragoal plan in .omx/ultragoal/goals.json, including later accepted/appended stories, under the original brief constraints; use .omx/ultragoal/ledger.jsonl as the audit trail.",
+  "activeGoalId": "G001-establish-isolated-execution-baselin"
+}

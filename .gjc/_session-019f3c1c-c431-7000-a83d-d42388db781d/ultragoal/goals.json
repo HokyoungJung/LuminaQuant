@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "brief": "Approved execution recovery for LuminaQuant strategy performance improvement.\n\nSource consensus artifacts (approved RALPLAN equivalent): .omx/plans/ralplan-handoff-strategy-performance-improvement-20260707T020500Z.json, .omx/plans/prd-strategy-performance-improvement-20260707T020500Z.md, .omx/plans/test-spec-strategy-performance-improvement-20260707T020500Z.md. User-provided GJC plan path was absent in this checkout, so recover the current-session GJC ultragoal state from the approved repo-native OM artifacts and current committed implementation evidence.\n\nObjective: Complete the approved strategy performance improvement execution as one validation-coupled GJC ultragoal story: establish baseline and refresh Binance USD-M TRADIFI_PERPETUAL/USDT TradFi coverage; preserve Track A strict hard gates and Track B research_only headline separation; implement plausible guarded improved top-strategy candidates without OOS leakage; produce full-universe walk-forward/report artifacts or truthful blocker artifacts; record compute/memory/native-Rust consideration with parity/version/build_info/benchmark evidence when relevant; run uv-based verification/CI; commit and push only intended changes; preserve unrelated concurrent changes.\n\nConstraints: no real-money, paper, testnet, live, or order execution; no locked-OOS tuning/selection/threshold/tie-break/correlation/sizing; no promotion of research-only/shadow-only artifacts; newly discovered/short-history TradFi remains monitor/research-only unless train+validation coverage gates pass; use uv; prefer existing pyo3/native kernels unless measured hotspot plus parity justifies Rust; separate Track A hard-gated evidence from Track B research_only headlines; maintain audit evidence in .gjc/_session-019f3c1c-c431-7000-a83d-d42388db781d/ultragoal/ledger.jsonl.",
+  "gjcGoalMode": "aggregate",
+  "gjcObjective": "Complete the durable ultragoal plan in .gjc/ultragoal/goals.json, including later accepted/appended stories, under the original brief constraints; use .gjc/ultragoal/ledger.jsonl as the audit trail.",
+  "goals": [
+    {
+      "id": "G001",
+      "title": "Approved execution recovery for LuminaQuant strategy performance improvement.",
+      "objective": "Approved execution recovery for LuminaQuant strategy performance improvement.\n\nSource consensus artifacts (approved RALPLAN equivalent): .omx/plans/ralplan-handoff-strategy-performance-improvement-20260707T020500Z.json, .omx/plans/prd-strategy-performance-improvement-20260707T020500Z.md, .omx/plans/test-spec-strategy-performance-improvement-20260707T020500Z.md. User-provided GJC plan path was absent in this checkout, so recover the current-session GJC ultragoal state from the approved repo-native OM artifacts and current committed implementation evidence.\n\nObjective: Complete the approved strategy performance improvement execution as one validation-coupled GJC ultragoal story: establish baseline and refresh Binance USD-M TRADIFI_PERPETUAL/USDT TradFi coverage; preserve Track A strict hard gates and Track B research_only headline separation; implement plausible guarded improved top-strategy candidates without OOS leakage; produce full-universe walk-forward/report artifacts or truthful blocker artifacts; record compute/memory/native-Rust consideration with parity/version/build_info/benchmark evidence when relevant; run uv-based verification/CI; commit and push only intended changes; preserve unrelated concurrent changes.\n\nConstraints: no real-money, paper, testnet, live, or order execution; no locked-OOS tuning/selection/threshold/tie-break/correlation/sizing; no promotion of research-only/shadow-only artifacts; newly discovered/short-history TradFi remains monitor/research-only unless train+validation coverage gates pass; use uv; prefer existing pyo3/native kernels unless measured hotspot plus parity justifies Rust; separate Track A hard-gated evidence from Track B research_only headlines; maintain audit evidence in .gjc/_session-019f3c1c-c431-7000-a83d-d42388db781d/ultragoal/ledger.jsonl.",
+      "status": "complete",
+      "createdAt": "2026-07-08T11:18:32.992Z",
+      "updatedAt": "2026-07-08T12:02:06.863Z",
+      "pipelineMetadata": {
+        "schemaVersion": 1,
+        "goalId": "G001",
+        "source": "legacy_brief_only",
+        "eligible": false,
+        "dependsOn": [],
+        "independentOf": [],
+        "targets": {
+          "files": [],
+          "surfaces": []
+        },
+        "overlap": "none",
+        "invalidationReason": "missing_pipeline_metadata",
+        "metadataHash": "ee22f050202eddb1df159edbc575f74df1661c7cce97b7394afe3f786d576e94"
+      },
+      "startedAt": "2026-07-08T11:18:36.408Z",
+      "completedAt": "2026-07-08T12:02:06.863Z",
+      "evidence": "G001 complete: recovered missing GJC ultragoal state from approved OM RALPLAN artifacts, completed full-universe WF on existing local data (110/110 symbols, 11 folds, 1733 rows, peak RSS 1834.566 MiB), updated reports/docs/manifest to preserve Track A hard gates and Track B research_only diagnostic-only separation, ran ruff format/check, focused clean-env pytest 70 passed, full clean-env pytest 3574 passed/20 skipped/3 xfailed, native build passed, native parity/version 32 passed, architect reviews CLEAR/APPROVE, executor QA/red-team passed, no real/paper/testnet/live/order execution and no clean/live promotion.",
+      "completionVerification": {
+        "schemaVersion": 1,
+        "receiptId": "9ced909f-f284-4378-850e-8251beb78bcc",
+        "verifiedAt": "2026-07-08T12:02:06.863Z",
+        "goalId": "G001",
+        "receiptKind": "final-aggregate",
+        "goalStatusBeforeCheckpoint": "active",
+        "gjcGoalMode": "aggregate",
+        "gjcObjective": "Complete the durable ultragoal plan in .gjc/ultragoal/goals.json, including later accepted/appended stories, under the original brief constraints; use .gjc/ultragoal/ledger.jsonl as the audit trail.",
+        "qualityGateHash": "0a535ff64d6b404ac73d3e4a9478dca8defc15b84763fc2b9a56a2857c49d953",
+        "planGeneration": "ecb40d3d84ec9a3f59752d7a6a22d131a2ca51386a2031ca89c81edd4bd145f8",
+        "basis": {
+          "planHashBeforeCheckpoint": "efa783a105a6a786e41012bd6b54da91a3b44d90414027cea9e19ad8a7a0f2d0",
+          "latestRelevantLedgerEventIdBeforeCheckpoint": "3888430b-a37b-49d0-a994-51700803ec4c",
+          "goalUpdatedAtBeforeCheckpoint": "2026-07-08T12:02:06.863Z",
+          "relevantGoalIdsBeforeCheckpoint": [
+            "G001"
+          ],
+          "requiredGoalSetHashBeforeCheckpoint": "1d8b5072720f6bdf101c903a0a1392cfea6ff6132967ad3367238789a60f48ea"
+        },
+        "checkpointLedgerEventId": "b1742cfe-912d-441d-ab35-4c7076a1e383"
+      }
+    }
+  ],
+  "createdAt": "2026-07-08T11:18:32.992Z",
+  "updatedAt": "2026-07-08T12:02:06.863Z",
+  "state_revision": 3
+}

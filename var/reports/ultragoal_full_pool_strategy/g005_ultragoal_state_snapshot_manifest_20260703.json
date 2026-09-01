@@ -1,0 +1,27 @@
+{
+  "artifact_kind": "ultragoal_state_snapshot",
+  "generated_at_utc": "2026-07-03T16:39:15.476600+00:00",
+  "note": "Final snapshot after user-requested stop, nudge-budget exhaustion, human_blocked classification, and inline goal pause. Durable G005 remains active for new-session resume; inline goal is paused in this session only.",
+  "session_id": "019f22a1-90f7-7000-ab18-d0fd7010803b",
+  "snapshots": [
+    {
+      "bytes": 8651,
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g005_ultragoal_goals_snapshot_20260703.json",
+      "sha256": "7f5ef4cb3664b515b506feee0dbe882d1bd3dfc2f46d3508bc8659f79f139715",
+      "source": "/tmp/.gjc/_session-019f22a1-90f7-7000-ab18-d0fd7010803b/ultragoal/goals.json"
+    },
+    {
+      "bytes": 18697,
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g005_ultragoal_ledger_snapshot_20260703.jsonl",
+      "sha256": "924ac01473b07ad4664ab6048909ed4440e38fa3a643f197dc9201e834ca7397",
+      "source": "/tmp/.gjc/_session-019f22a1-90f7-7000-ab18-d0fd7010803b/ultragoal/ledger.jsonl"
+    },
+    {
+      "bytes": 2312,
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g005_ultragoal_brief_snapshot_20260703.md",
+      "sha256": "fe29341bd247eda8d047c019cb6ae2fe52ef255eea3a1628931656613628eef4",
+      "source": "/tmp/.gjc/_session-019f22a1-90f7-7000-ab18-d0fd7010803b/ultragoal/brief.md"
+    }
+  ],
+  "source_dir": "/tmp/.gjc/_session-019f22a1-90f7-7000-ab18-d0fd7010803b/ultragoal"
+}

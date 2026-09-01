@@ -1,0 +1,45 @@
+{
+  "artifact_inventory_count": 2384,
+  "checks": {
+    "compileall": {
+      "elapsed": "0:00.16",
+      "exit_status": 0,
+      "max_rss_kb": 34560
+    },
+    "full_pytest": {
+      "elapsed": "4:00.73",
+      "exit_status": 0,
+      "max_rss_kb": 2816720,
+      "stdout_tail": "........................................................................ [ 86%]\n........................................................................ [ 91%]\n........................................................................ [ 97%]\n..............................                                           [100%]\n1254 passed in 268.86s (0:04:28)"
+    },
+    "generator": {
+      "elapsed": "0:01.31",
+      "exit_status": 0,
+      "max_rss_kb": 192972
+    },
+    "git_diff_check": {
+      "elapsed": "0:00.15",
+      "exit_status": 0,
+      "max_rss_kb": 31668
+    },
+    "ruff": {
+      "elapsed": "0:00.04",
+      "exit_status": 0,
+      "max_rss_kb": 34816,
+      "stdout": "All checks passed!"
+    },
+    "targeted_tests": {
+      "elapsed": "0:01.17",
+      "exit_status": 0,
+      "max_rss_kb": 172316,
+      "stdout": ".....................                                                    [100%]\n21 passed in 0.09s"
+    }
+  },
+  "generated_at_utc": "2026-05-10T12:09:00Z",
+  "git_commit_count": 278,
+  "inventory_count": 2667,
+  "ledger_count": 2666,
+  "research_history_scope": "2026-03-01..2026-05-10",
+  "strategy_chronology_count": 15,
+  "under_8gib": true
+}

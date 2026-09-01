@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="360" viewBox="0 0 900 360">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="180" y="32" font-family="sans-serif" font-size="18" font-weight="700">Replay specs vs successful candidates by family</text>
+<text x="180" y="54" font-family="sans-serif" font-size="12" fill="#555">Source: fresh_start_overhaul_replay_candidates.csv, generated 2026-05-08</text>
+<text x="20" y="108" font-family="sans-serif" font-size="13">funding+OI fade</text>
+<rect x="180" y="90" width="3" height="18" fill="#b7d7ff"/>
+<rect x="180" y="112" width="0" height="18" fill="#1f77b4"/>
+<text x="191" y="104" font-family="sans-serif" font-size="12">specs 24</text>
+<text x="190" y="126" font-family="sans-serif" font-size="12">success 0</text>
+<text x="20" y="166" font-family="sans-serif" font-size="13">funding fade</text>
+<rect x="180" y="148" width="5" height="18" fill="#b7d7ff"/>
+<rect x="180" y="170" width="0" height="18" fill="#1f77b4"/>
+<text x="193" y="162" font-family="sans-serif" font-size="12">specs 36</text>
+<text x="190" y="184" font-family="sans-serif" font-size="12">success 0</text>
+<text x="20" y="224" font-family="sans-serif" font-size="13">funding momentum</text>
+<rect x="180" y="206" width="5" height="18" fill="#b7d7ff"/>
+<rect x="180" y="228" width="0" height="18" fill="#1f77b4"/>
+<text x="193" y="220" font-family="sans-serif" font-size="12">specs 36</text>
+<text x="190" y="242" font-family="sans-serif" font-size="12">success 0</text>
+<text x="20" y="282" font-family="sans-serif" font-size="13">calendar rotation</text>
+<rect x="180" y="264" width="560" height="18" fill="#b7d7ff"/>
+<rect x="180" y="286" width="38" height="18" fill="#1f77b4"/>
+<text x="748" y="278" font-family="sans-serif" font-size="12">specs 4392</text>
+<text x="226" y="300" font-family="sans-serif" font-size="12">success 300</text>
+<text x="180" y="330" font-family="sans-serif" font-size="12" fill="#555">Light bar = specs evaluated; dark bar = candidates passing train/val/OOS replay gates.</text>
+</svg>

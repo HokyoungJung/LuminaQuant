@@ -1,0 +1,159 @@
+{
+  "candidate_research": {
+    "stage1_prefilter_weights": {
+      "sharpe_weight": 2.0,
+      "return_weight": 20.0,
+      "pbo_penalty": 2.0
+    },
+    "candidate_rank_score_weights": {
+      "sharpe_weight": 2.8,
+      "deflated_sharpe_weight": 1.4,
+      "pbo_penalty": 2.0,
+      "return_weight": 35.0,
+      "turnover_penalty": 2.5,
+      "turnover_threshold": 2.5,
+      "drawdown_penalty": 3.0,
+      "cross_corr_penalty": 0.8
+    },
+    "hurdle_score_weights": {
+      "sharpe_weight": 2.4,
+      "return_weight": 35.0,
+      "deflated_sharpe_weight": 1.2,
+      "pbo_penalty": 2.0,
+      "turnover_penalty": 4.0,
+      "drawdown_penalty": 5.0,
+      "spa_pvalue_penalty": 1.0
+    },
+    "reject_thresholds": {
+      "in_sample_sharpe_min": -0.1,
+      "oos_sharpe_min": 0.35,
+      "max_pbo": 0.45,
+      "max_turnover": 2.5,
+      "max_drawdown": 0.45,
+      "min_trade_count": 5.0
+    },
+    "keep_ratio_bounds": {
+      "min": 0.05,
+      "max": 1.0
+    },
+    "shortlist_selection": {
+      "max_per_family": 20,
+      "max_per_timeframe": 20,
+      "drop_single_without_metrics": false,
+      "single_min_score": 0.0,
+      "single_min_return": 0.0,
+      "single_min_sharpe": 0.0,
+      "single_min_trades": 5,
+      "allow_multi_asset": true,
+      "include_weights": true,
+      "weight_temperature": 0.35,
+      "max_weight": 0.35,
+      "robust_score_params": {
+        "sharpe_weight": 2.8,
+        "deflated_sharpe_weight": 1.4,
+        "pbo_penalty": 2.0,
+        "return_weight": 35.0,
+        "drawdown_penalty": 3.0,
+        "turnover_penalty": 2.5,
+        "turnover_threshold": 2.5,
+        "cross_corr_penalty": 0.8,
+        "failed_candidate_scale": 0.1,
+        "sentinel_floor_score": -1000000.0,
+        "failed_candidate_base_penalty": -500000.0,
+        "shortlist_missing_score_fallback": -1000000.0,
+        "weight_exp_clamp_floor": -60.0,
+        "pair_multi_mix_bonus": 1.05,
+        "mdd_risk_penalty_coeff": 2.5
+      }
+    }
+  },
+  "portfolio_optimization": {
+    "candidate_rank_score_weights": {
+      "sharpe_weight": 2.8,
+      "deflated_sharpe_weight": 1.5,
+      "pbo_penalty": 2.0,
+      "return_weight": 25.0
+    },
+    "allocation_quality_params": {
+      "deflated_sharpe_floor": 0.01,
+      "deflated_sharpe_offset": 0.5
+    },
+    "vol_targeting": {
+      "target_vol_floor": 0.01,
+      "vol_scale_cap": 2.0,
+      "vol_scale_epsilon": 1e-12
+    },
+    "sensitivity": {
+      "cost_stress_x2_multiplier": 2.0,
+      "cost_stress_x3_multiplier": 3.0,
+      "signal_drift_down_multiplier": 0.9,
+      "signal_drift_up_multiplier": 1.1
+    },
+    "constraints": {
+      "max_strategy": 0.15,
+      "max_family": 0.4,
+      "max_asset": 0.2,
+      "max_metals": 0.15
+    }
+  },
+  "strategy_shortlist": {
+    "candidate_score": {
+      "fallback_missing_score": -1000000000.0,
+      "sharpe_weight": 0.35,
+      "return_weight": 45.0,
+      "drawdown_penalty": 20.0,
+      "trade_bonus_cap": 0.4,
+      "trade_bonus_per_trade": 0.03,
+      "require_pass_penalty": 100.0
+    },
+    "portfolio_weights": {
+      "missing_selection_score": -1000000000.0,
+      "weight_exp_clamp_floor": -60.0,
+      "mdd_risk_penalty_coeff": 2.5,
+      "weight_cap_floor": 0.05
+    },
+    "single_asset_sets": {
+      "missing_selection_score": -1000000000.0,
+      "weight_exp_clamp_floor": -60.0
+    }
+  },
+  "futures_strategy_factory": {
+    "hurdle": {
+      "missing_score_fallback": -1000000.0,
+      "missing_excess_fallback": -1000000.0,
+      "failed_candidate_base_penalty": -1000000.0
+    },
+    "selection": {
+      "missing_adjusted_score_fallback": -1000000.0
+    },
+    "regime_bias": {
+      "trend_overlay": {
+        "eff_min": 0.33,
+        "eff_bonus": 0.3,
+        "ntr_min": 0.01,
+        "ntr_bonus": 0.2,
+        "vshock_min": 1.0,
+        "vshock_bonus": 0.1
+      },
+      "alpha_market_neutral": {
+        "eff_max": 0.25,
+        "eff_bonus": 0.25,
+        "ntr_max": 0.009,
+        "ntr_bonus": 0.15,
+        "vshock_abs_min": 1.5,
+        "vshock_bonus": 0.05
+      },
+      "momentum_mean_reversion": {
+        "eff_min": 0.2,
+        "eff_max": 0.55,
+        "eff_bonus": 0.2,
+        "vshock_min": 0.5,
+        "vshock_bonus": 0.05
+      }
+    }
+  },
+  "vol_targeting": {
+    "target_vol": 0.08,
+    "vol_scale_cap": 1.0
+  }
+}

@@ -1,0 +1,556 @@
+{
+  "artifact_kind": "alpha_zoo_69_asset_monthly_refit_diagnostics",
+  "diagnostic_selector": {
+    "metrics": {
+      "average_gain_month": 0.03378495672749845,
+      "average_loss_month": -0.05148419833038039,
+      "compounded_oos_return": -0.2437321309941778,
+      "equity_curve_max_drawdown": 0.25350870045459517,
+      "fold_count": 10,
+      "gain_loss_ratio": 0.6562199242318245,
+      "hit_rate": 0.3,
+      "max_consecutive_loss_folds": 4,
+      "max_fold_oos_mdd": 0.17653004842326658,
+      "max_monthly_return": 0.0709729730407167,
+      "max_validation_return": 0.42075962751291196,
+      "mean_fold_calmar": -0.3752507843293791,
+      "mean_fold_sharpe": -5.587426214309408,
+      "mean_fold_sortino": -5.078523478214074,
+      "mean_validation_return": 0.2185447256693557,
+      "median_fold_calmar": -0.35059840434042067,
+      "median_fold_sharpe": -1.1409522568007355,
+      "median_fold_sortino": -1.3830808616060186,
+      "min_monthly_return": -0.14791823705789797,
+      "min_validation_return": 0.05224678735520172,
+      "monthly_cvar_25": -0.09196000945153242,
+      "monthly_mean_return": -0.02590345181301674,
+      "monthly_median_return": -0.015195263798362169,
+      "monthly_return_stdev": 0.05898769662707689,
+      "monthly_sharpe_approx": -1.5212017826430075,
+      "monthly_sortino_approx": -1.8684278044443345,
+      "monthly_var_25": -0.0523613959960928,
+      "monthly_var_5": -0.11340203143234313,
+      "positive_oos_folds": 3
+    },
+    "monthly_choices": [
+      {
+        "candidate_label": "individual_robust:hybrid_v3_6",
+        "fold_id": "2025-09",
+        "locked_oos_mdd": 0.08847636598874431,
+        "locked_oos_return": -0.01544028932960606,
+        "validation_return": 0.20993677375390818
+      },
+      {
+        "candidate_label": "individual_robust:individual_robust_balanced_mdd10_gross3_core10",
+        "fold_id": "2025-10",
+        "locked_oos_mdd": 0.17653004842326658,
+        "locked_oos_return": -0.14791823705789797,
+        "validation_return": 0.11334622799952898
+      },
+      {
+        "candidate_label": "individual_robust:hybrid_v3_5",
+        "fold_id": "2025-11",
+        "locked_oos_mdd": 0.07980458039209304,
+        "locked_oos_return": -0.05674623340670093,
+        "validation_return": 0.2511449122670546
+      },
+      {
+        "candidate_label": "individual_robust:hybrid_v3_6",
+        "fold_id": "2025-12",
+        "locked_oos_mdd": 0.07542250283473428,
+        "locked_oos_return": -0.07121555788999834,
+        "validation_return": 0.2012355953028413
+      },
+      {
+        "candidate_label": "individual_robust:hybrid_v3_5",
+        "fold_id": "2026-01",
+        "locked_oos_mdd": 0.048863111932540226,
+        "locked_oos_return": 0.0709729730407167,
+        "validation_return": 0.42075962751291196
+      },
+      {
+        "candidate_label": "relaxed_efficiency:balanced_mdd12_gross5_69_asset_relaxed_efficiency_repair_optuna",
+        "fold_id": "2026-02",
+        "locked_oos_mdd": 0.12955105504185893,
+        "locked_oos_return": 0.02337865122059779,
+        "validation_return": 0.2139626818782232
+      },
+      {
+        "candidate_label": "individual_robust:hybrid_v3_6",
+        "fold_id": "2026-03",
+        "locked_oos_mdd": 0.03663498593442527,
+        "locked_oos_return": 0.007003245921180845,
+        "validation_return": 0.27147355966510656
+      },
+      {
+        "candidate_label": "relaxed_efficiency:balanced_mdd12_gross5_69_asset_relaxed_efficiency_repair_optuna",
+        "fold_id": "2026-04",
+        "locked_oos_mdd": 0.0558671635017276,
+        "locked_oos_return": -0.014911948597072788,
+        "validation_return": 0.05224678735520172
+      },
+      {
+        "candidate_label": "individual_robust:hybrid_v3_6",
+        "fold_id": "2026-05",
+        "locked_oos_mdd": 0.09028043324387036,
+        "locked_oos_return": -0.039206883764268396,
+        "validation_return": 0.20024994107983596
+      },
+      {
+        "candidate_label": "individual_robust:hybrid_v3_5",
+        "fold_id": "2026-06",
+        "locked_oos_mdd": 0.006771867832257139,
+        "locked_oos_return": -0.014950238267118277,
+        "validation_return": 0.2510911498789443
+      }
+    ],
+    "name": "diagnostic_individual_calmar_vcap20_vmdd8_with_relaxed_fallback",
+    "oos_used_to_discover_rule": true,
+    "promotion_allowed": false,
+    "rule": {
+      "candidate_pool": "individual_robust rows",
+      "fallback": "relaxed_efficiency balanced profile when no row passes",
+      "filter": "0 <= validation_return <= 45%, validation_mdd <= 8%, train_return <= 300%",
+      "score": "validation_calmar/5 + 3*min(validation_return,20%) - 2*validation_mdd - penalties"
+    },
+    "warning": "This rule was surfaced after inspecting historical OOS; use only as a forward shadow challenger unless it passes future months without further tuning."
+  },
+  "generated_at_utc": "2026-06-02T05:08:37Z",
+  "logic_audit": {
+    "aggregate_match": {
+      "artifact_aggregate": {
+        "avg_gain": 0.10336169629659993,
+        "avg_loss": -0.013818643519949408,
+        "candidate_label": "dynamic_conviction_switch:t0.95_risk_capped_fallback",
+        "clean_promotion_eligible": true,
+        "compounded_oos_return": 0.5332572061345149,
+        "family": "dynamic_conviction_switch",
+        "fold_count": 10,
+        "gain_loss_ratio": 7.47987283609863,
+        "hard_stop_promotable": false,
+        "hard_stop_reasons": {
+          "beats_challenger": false,
+          "clean_candidate": true,
+          "current_challenger_max_oos_mdd": 0.188,
+          "current_challenger_oos_comp": 0.5338,
+          "material_risk_improvement": false,
+          "robust_default_improvement": false,
+          "robust_default_max_oos_mdd_limit": 0.15,
+          "robust_default_oos_comp": 0.2701
+        },
+        "latest_oos_return": 0.0,
+        "max_loss_streak": 2,
+        "max_oos_mdd": 0.19203106598954722,
+        "max_validation_mdd": 0.12019941878095641,
+        "mean_oos_return": 0.046153390740320197,
+        "mean_train_return": 1.137758246055372,
+        "mean_validation_return": 0.26999111643052076,
+        "median_oos_return": 0.0006815103547720414,
+        "min_oos_return": -0.026537767500901865,
+        "min_validation_return": 9.757071251570437e-05,
+        "monthly_cvar_25": -0.01797870550592473,
+        "monthly_sharpe_approx": 2.0650401934958995,
+        "monthly_sortino_approx": 13.8227736649195,
+        "monthly_var_05": -0.023673028245031667,
+        "positive_oos_folds": 5,
+        "positive_validation_folds": 10,
+        "ready_for_paper_folds": 10
+      },
+      "deltas": {
+        "compounded_oos_return": 0.0,
+        "max_oos_mdd": 0.0,
+        "mean_oos_return": 0.0,
+        "mean_validation_return": 0.0,
+        "median_oos_return": 0.0,
+        "min_oos_return": 0.0,
+        "min_validation_return": 0.0
+      },
+      "pass": true,
+      "recomputed": {
+        "average_gain_month": 0.10336169629659993,
+        "average_loss_month": -0.013818643519949408,
+        "compounded_oos_return": 0.5332572061345149,
+        "equity_curve_max_drawdown": 0.046174136405544686,
+        "fold_count": 10,
+        "gain_loss_ratio": 7.47987283609863,
+        "hit_rate": 0.5,
+        "max_consecutive_loss_folds": 2,
+        "max_fold_oos_mdd": 0.19203106598954722,
+        "max_monthly_return": 0.20190036021699176,
+        "max_validation_return": 1.1116581839821356,
+        "mean_fold_calmar": 0.5222580037918322,
+        "mean_fold_sharpe": 0.8872538024194989,
+        "mean_fold_sortino": 1.2457763479262847,
+        "mean_validation_return": 0.26999111643052076,
+        "median_fold_calmar": 0.24693039985600165,
+        "median_fold_sharpe": 1.2992313278635714,
+        "median_fold_sortino": 1.6352554316972554,
+        "min_monthly_return": -0.026537767500901865,
+        "min_validation_return": 9.757071251570437e-05,
+        "monthly_cvar_25": -0.01797870550592473,
+        "monthly_mean_return": 0.046153390740320197,
+        "monthly_median_return": 0.0006815103547720414,
+        "monthly_return_stdev": 0.0774222390010563,
+        "monthly_sharpe_approx": 2.0650401934958995,
+        "monthly_sortino_approx": 13.8227736649195,
+        "monthly_var_25": -0.005754615953934034,
+        "monthly_var_5": -0.023673028245031667,
+        "positive_oos_folds": 5
+      }
+    },
+    "existing_unit_tests_executed": [
+      "tests/test_alpha_zoo_integer_leverage_optuna_hybrid_decision.py",
+      "tests/test_alpha_zoo_69_asset_individual_robust_paper_decision.py"
+    ],
+    "fold_schedule": {
+      "checks": [
+        {
+          "fold_id": "2025-09",
+          "train_before_validation": true,
+          "validation_before_oos": true
+        },
+        {
+          "fold_id": "2025-10",
+          "train_before_validation": true,
+          "validation_before_oos": true
+        },
+        {
+          "fold_id": "2025-11",
+          "train_before_validation": true,
+          "validation_before_oos": true
+        },
+        {
+          "fold_id": "2025-12",
+          "train_before_validation": true,
+          "validation_before_oos": true
+        },
+        {
+          "fold_id": "2026-01",
+          "train_before_validation": true,
+          "validation_before_oos": true
+        },
+        {
+          "fold_id": "2026-02",
+          "train_before_validation": true,
+          "validation_before_oos": true
+        },
+        {
+          "fold_id": "2026-03",
+          "train_before_validation": true,
+          "validation_before_oos": true
+        },
+        {
+          "fold_id": "2026-04",
+          "train_before_validation": true,
+          "validation_before_oos": true
+        },
+        {
+          "fold_id": "2026-05",
+          "train_before_validation": true,
+          "validation_before_oos": true
+        },
+        {
+          "fold_id": "2026-06",
+          "train_before_validation": true,
+          "validation_before_oos": true
+        }
+      ],
+      "pass": true
+    },
+    "latest_detail_match": {
+      "pass": null,
+      "reason": "latest detail artifact not provided"
+    },
+    "protocol_oos_used_for_selection": false
+  },
+  "selected_candidate": {
+    "candidate_label": "dynamic_conviction_switch:t0.95_risk_capped_fallback",
+    "extended_metrics": {
+      "average_gain_month": 0.10336169629659993,
+      "average_loss_month": -0.013818643519949408,
+      "compounded_oos_return": 0.5332572061345149,
+      "equity_curve_max_drawdown": 0.046174136405544686,
+      "fold_count": 10,
+      "gain_loss_ratio": 7.47987283609863,
+      "hit_rate": 0.5,
+      "max_consecutive_loss_folds": 2,
+      "max_fold_oos_mdd": 0.19203106598954722,
+      "max_monthly_return": 0.20190036021699176,
+      "max_validation_return": 1.1116581839821356,
+      "mean_fold_calmar": 0.5222580037918322,
+      "mean_fold_sharpe": 0.8872538024194989,
+      "mean_fold_sortino": 1.2457763479262847,
+      "mean_validation_return": 0.26999111643052076,
+      "median_fold_calmar": 0.24693039985600165,
+      "median_fold_sharpe": 1.2992313278635714,
+      "median_fold_sortino": 1.6352554316972554,
+      "min_monthly_return": -0.026537767500901865,
+      "min_validation_return": 9.757071251570437e-05,
+      "monthly_cvar_25": -0.01797870550592473,
+      "monthly_mean_return": 0.046153390740320197,
+      "monthly_median_return": 0.0006815103547720414,
+      "monthly_return_stdev": 0.0774222390010563,
+      "monthly_sharpe_approx": 2.0650401934958995,
+      "monthly_sortino_approx": 13.8227736649195,
+      "monthly_var_25": -0.005754615953934034,
+      "monthly_var_5": -0.023673028245031667,
+      "positive_oos_folds": 5
+    },
+    "monthly_rows": [
+      {
+        "fold_id": "2025-09",
+        "locked_oos": {
+          "bar_count": 180,
+          "calmar": 1.907328230640562,
+          "end": "2025-09-30T23:30:00",
+          "mdd": 0.0007146230458122682,
+          "sharpe": 3.6890292124996495,
+          "sortino": 3.636074141268813,
+          "start": "2025-09-01T00:00:00",
+          "total_return": 0.0013630207095440827
+        },
+        "ready_for_paper": true,
+        "selection_reasons": [],
+        "validation": {
+          "bar_count": 372,
+          "calmar": 0.052706444229251304,
+          "end": "2025-08-31T23:30:00",
+          "mdd": 0.0025312036040677777,
+          "sharpe": 0.16155853646207796,
+          "sortino": 0.10854006489109377,
+          "start": "2025-07-01T00:00:00",
+          "total_return": 0.00013341074159067823
+        }
+      },
+      {
+        "fold_id": "2025-10",
+        "locked_oos": {
+          "bar_count": 372,
+          "calmar": -0.521577143484267,
+          "end": "2025-10-31T23:30:00",
+          "mdd": 0.013855416866930925,
+          "sharpe": -1.7479151703778288,
+          "sortino": -1.500792121020886,
+          "start": "2025-10-01T00:00:00",
+          "total_return": -0.007226668751237564
+        },
+        "ready_for_paper": true,
+        "selection_reasons": [],
+        "validation": {
+          "bar_count": 732,
+          "calmar": 0.6779324624299249,
+          "end": "2025-09-30T23:30:00",
+          "mdd": 0.02549010106216254,
+          "sharpe": 1.6335605192866836,
+          "sortino": 1.5862411841536384,
+          "start": "2025-08-01T00:00:00",
+          "total_return": 0.017280566980659495
+        }
+      },
+      {
+        "fold_id": "2025-11",
+        "locked_oos": {
+          "bar_count": 360,
+          "calmar": 1.2102061776763668,
+          "end": "2025-11-30T23:30:00",
+          "mdd": 0.10080179114594867,
+          "sharpe": 3.138897587106553,
+          "sortino": 4.255131483244035,
+          "start": "2025-11-01T00:00:00",
+          "total_return": 0.12199095036566998
+        },
+        "ready_for_paper": true,
+        "selection_reasons": [],
+        "validation": {
+          "bar_count": 732,
+          "calmar": 3.5370986781815894,
+          "end": "2025-10-31T23:30:00",
+          "mdd": 0.07579822223497834,
+          "sharpe": 3.468361191781144,
+          "sortino": 4.145383019677032,
+          "start": "2025-09-01T00:00:00",
+          "total_return": 0.26810579167585624
+        }
+      },
+      {
+        "fold_id": "2025-12",
+        "locked_oos": {
+          "bar_count": 372,
+          "calmar": -0.08199194579965706,
+          "end": "2025-12-31T23:30:00",
+          "mdd": 0.01632425659581116,
+          "sharpe": -0.2798494572626581,
+          "sortino": -0.27194759678113467,
+          "start": "2025-12-01T00:00:00",
+          "total_return": -0.001338457562023443
+        },
+        "ready_for_paper": true,
+        "selection_reasons": [],
+        "validation": {
+          "bar_count": 732,
+          "calmar": 0.7676752201622741,
+          "end": "2025-11-30T23:30:00",
+          "mdd": 0.02504910031472496,
+          "sharpe": 1.3896231713843856,
+          "sortino": 1.970763099118796,
+          "start": "2025-10-01T00:00:00",
+          "total_return": 0.01922957359897337
+        }
+      },
+      {
+        "fold_id": "2026-01",
+        "locked_oos": {
+          "bar_count": 1488,
+          "calmar": 2.550929736734276,
+          "end": "2026-01-31T23:30:00",
+          "mdd": 0.04017733861693784,
+          "sharpe": 3.558786761482621,
+          "sortino": 4.442888523841665,
+          "start": "2026-01-01T00:00:00",
+          "total_return": 0.10248956782078911
+        },
+        "ready_for_paper": true,
+        "selection_reasons": [],
+        "validation": {
+          "bar_count": 2928,
+          "calmar": 14.326002715732052,
+          "end": "2025-12-31T23:30:00",
+          "mdd": 0.05550218138812579,
+          "sharpe": 10.19478976411674,
+          "sortino": 19.311612480387794,
+          "start": "2025-11-01T00:00:00",
+          "total_return": 0.7951244012953431
+        }
+      },
+      {
+        "fold_id": "2026-02",
+        "locked_oos": {
+          "bar_count": 672,
+          "calmar": 1.05139425840599,
+          "end": "2026-02-28T23:30:00",
+          "mdd": 0.19203106598954722,
+          "sharpe": 3.916443537565769,
+          "sortino": 4.780281084049079,
+          "start": "2026-02-01T00:00:00",
+          "total_return": 0.20190036021699176
+        },
+        "ready_for_paper": true,
+        "selection_reasons": [],
+        "validation": {
+          "bar_count": 1488,
+          "calmar": 9.248448913117866,
+          "end": "2026-01-31T23:30:00",
+          "mdd": 0.12019941878095641,
+          "sharpe": 6.6417013482686595,
+          "sortino": 8.474054042160565,
+          "start": "2025-12-01T00:00:00",
+          "total_return": 1.1116581839821356
+        }
+      },
+      {
+        "fold_id": "2026-03",
+        "locked_oos": {
+          "bar_count": 1488,
+          "calmar": -0.9463373956179532,
+          "end": "2026-03-31T23:30:00",
+          "mdd": 0.028042606816327753,
+          "sharpe": -3.8921284389253143,
+          "sortino": -3.7294464924076145,
+          "start": "2026-03-01T00:00:00",
+          "total_return": -0.026537767500901865
+        },
+        "ready_for_paper": true,
+        "selection_reasons": [],
+        "validation": {
+          "bar_count": 2832,
+          "calmar": 0.49286501547474854,
+          "end": "2026-02-28T23:30:00",
+          "mdd": 0.0369595979116375,
+          "sharpe": 0.9144919032300611,
+          "sortino": 0.9640427677316317,
+          "start": "2026-01-01T00:00:00",
+          "total_return": 0.0182160927966597
+        }
+      },
+      {
+        "fold_id": "2026-04",
+        "locked_oos": {
+          "bar_count": 720,
+          "calmar": -0.4412326803489991,
+          "end": "2026-04-30T23:30:00",
+          "mdd": 0.04571665056559204,
+          "sharpe": -2.1091886636209436,
+          "sortino": -2.424936406325622,
+          "start": "2026-04-01T00:00:00",
+          "total_return": -0.02017168026563476
+        },
+        "ready_for_paper": true,
+        "selection_reasons": [],
+        "validation": {
+          "bar_count": 1416,
+          "calmar": 1.5466649697167145,
+          "end": "2026-03-31T23:30:00",
+          "mdd": 0.03742391129165068,
+          "sharpe": 2.2607821110375124,
+          "sortino": 2.927783934401789,
+          "start": "2026-02-01T00:00:00",
+          "total_return": 0.05788225262458191
+        }
+      },
+      {
+        "fold_id": "2026-05",
+        "locked_oos": {
+          "bar_count": 1488,
+          "calmar": 0.4938607997120033,
+          "end": "2026-05-31T23:30:00",
+          "mdd": 0.18034349440559572,
+          "sharpe": 2.598462655727143,
+          "sortino": 3.270510863394511,
+          "start": "2026-05-01T00:00:00",
+          "total_return": 0.0890645823700047
+        },
+        "ready_for_paper": true,
+        "selection_reasons": [],
+        "validation": {
+          "bar_count": 2928,
+          "calmar": 5.647470117749878,
+          "end": "2026-04-30T23:30:00",
+          "mdd": 0.07298548045458597,
+          "sharpe": 4.893515876499978,
+          "sortino": 6.25861031457998,
+          "start": "2026-03-01T00:00:00",
+          "total_return": 0.41218331989689205
+        }
+      },
+      {
+        "fold_id": "2026-06",
+        "locked_oos": {
+          "bar_count": 1,
+          "calmar": 0.0,
+          "end": "2026-06-01T06:30:00",
+          "mdd": 0.0,
+          "sharpe": 0.0,
+          "sortino": 0.0,
+          "start": "2026-06-01T00:00:00",
+          "total_return": 0.0
+        },
+        "ready_for_paper": true,
+        "selection_reasons": [],
+        "validation": {
+          "bar_count": 244,
+          "calmar": 0.13371702802731622,
+          "end": "2026-05-31T23:30:00",
+          "mdd": 0.0007296805347466462,
+          "sharpe": 0.33481994327784415,
+          "sortino": 0.38518761533325924,
+          "start": "2026-04-01T00:00:00",
+          "total_return": 9.757071251570437e-05
+        }
+      }
+    ]
+  },
+  "source_artifacts": {
+    "latest_detail": null,
+    "walkforward": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_oos_oracle_bridge_20260602/oos_oracle_bridge_walkforward_latest.json"
+  }
+}

@@ -1,0 +1,127 @@
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import pytest
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from scripts.research import run_alpha_zoo_69_asset_profile_optuna_hybrid_refit as module
+from scripts.research import run_alpha_zoo_69_asset_optuna_hybrid_refit as broad69
+
+
+def _stream(symbol: str, anchor: str, notional: float = 1.0) -> broad69.CandidateStream:
+    index = pd.date_range("2026-01-01", periods=4, freq="h")
+    row = {
+        "model_id": f"m_{symbol}",
+        "symbol": symbol,
+        "asset_group": broad69._asset_group(symbol),
+        "family": "trend_pullback_reclaim",
+        "notional_fraction": notional,
+        "dominant_anchor": anchor,
+    }
+    returns = pd.Series([0.01, -0.002, 0.003, 0.0], index=index)
+    position = pd.Series([1.0, 1.0, 0.0, 0.0], index=index)
+    return broad69.CandidateStream(row=row, returns=returns, position=position)
+
+
+def test_profile_concentration_tracks_domain_anchor_shares() -> None:
+    streams = [_stream("BTCUSDT", "crypto_beta_btc"), _stream("SPYUSDT", "us_equity_beta_spy")]
+
+    concentration = module._profile_concentration(streams, np.array([1.0, 0.5]))
+
+    assert concentration["top_symbol"] == "BTCUSDT"
+    assert concentration["top_anchor"] == "crypto_beta_btc"
+    assert concentration["top_anchor_share"] == pytest.approx(2 / 3)
+    assert concentration["asset_group_shares"]["crypto_core"] == pytest.approx(2 / 3)
+
+
+def test_candidate_objective_penalizes_single_anchor_clone() -> None:
+    base = {
+        "train_return": 0.10,
+        "validation_return": 0.05,
+        "train_mdd": 0.02,
+        "validation_mdd": 0.02,
+        "train_return_per_turnover_proxy_bps": 50.0,
+        "validation_return_per_turnover_proxy_bps": 50.0,
+        "train_trade_event_count": 100,
+        "validation_trade_event_count": 40,
+    }
+    spec = module.PROFILE_SPECS[0]
+
+    diversified = module._candidate_objective({**base, "dominant_anchor_abs_corr": 0.20}, spec)
+    clone = module._candidate_objective({**base, "dominant_anchor_abs_corr": 0.95}, spec)
+
+    assert diversified > clone
+
+
+def test_params_from_trial_uses_requested_timeframe_and_integer_leverage_cap() -> None:
+    class Trial:
+        def suggest_categorical(self, name, choices):
+            return choices[-1]
+
+        def suggest_int(self, name, low, high, step=1):
+            return high
+
+        def suggest_float(self, name, low, high, step=None):
+            return high
+
+    params = module._params_from_trial(Trial(), {**module.PROFILE_SPECS[0], "_timeframes": ("2h",)})
+
+    assert params["timeframe"] == "2h"
+    assert params["integer_leverage"] == module.PROFILE_SPECS[0]["max_integer_leverage"]
+    assert params["family"] == "trend_pullback_reclaim"
+
+
+def test_broad69_timeframe_support_includes_one_day_complete_bucket_policy() -> None:
+    assert "1d" in broad69.DEFAULT_TIMEFRAMES
+    assert broad69._timeframe_minutes("1d") == 24 * 60
+    assert broad69._polars_every("1d") == "1d"
+    with pytest.raises(ValueError, match="minimum research timeframe"):
+        broad69._timeframe_minutes("15m")
+
+
+def test_split_windows_for_hybrid_preserves_empty_locked_oos() -> None:
+    windows = broad69.SplitWindows(
+        train=(pd.Timestamp("2026-01-01"), pd.Timestamp("2026-01-02")),
+        validation=(pd.Timestamp("2026-01-03"), pd.Timestamp("2026-01-04")),
+    )
+
+    split_windows = module._split_windows_for_hybrid(windows.as_payload())
+
+    assert split_windows["locked_oos"][0] > split_windows["locked_oos"][1]
+
+
+def test_train_eligibility_excludes_validation_only_symbols() -> None:
+    windows = broad69.SplitWindows(
+        train=(pd.Timestamp("2026-01-01"), pd.Timestamp("2026-01-03")),
+        validation=(pd.Timestamp("2026-01-04"), pd.Timestamp("2026-01-05")),
+    )
+    train_frame = pd.DataFrame(
+        {
+            "datetime": pd.date_range("2026-01-01", periods=5, freq="h"),
+            "close": np.linspace(1.0, 1.1, 5),
+        }
+    )
+    validation_only_frame = pd.DataFrame(
+        {
+            "datetime": pd.date_range("2026-01-04", periods=5, freq="h"),
+            "close": np.linspace(1.0, 1.1, 5),
+        }
+    )
+
+    report = broad69.build_train_eligibility_report(
+        {("BTCUSDT", "1h"): train_frame, ("NEWUSDT", "1h"): validation_only_frame},
+        symbols=("BTCUSDT", "NEWUSDT"),
+        timeframes=("1h",),
+        windows=windows,
+    )
+
+    assert report["train_eligible_symbols"] == ["BTCUSDT"]
+    assert report["train_ineligible_symbols"] == ["NEWUSDT"]
+    assert module._eligible_timeframes_for_symbol(report, "NEWUSDT", ("1h",)) == ()

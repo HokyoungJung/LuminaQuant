@@ -1,0 +1,3995 @@
+{
+  "artifact_kind": "profit_moonshot_fresh_start_overhaul_replay",
+  "data_metadata": {
+    "feature_points": [
+      {
+        "funding_rows": 1473,
+        "open_interest_rows": 17281,
+        "rows": 2108184,
+        "symbol": "BTC/USDT",
+        "taker_flow_rows": 2101668
+      },
+      {
+        "funding_rows": 1474,
+        "open_interest_rows": 17569,
+        "rows": 2109456,
+        "symbol": "ETH/USDT",
+        "taker_flow_rows": 2102583
+      },
+      {
+        "funding_rows": 1474,
+        "open_interest_rows": 17569,
+        "rows": 2107359,
+        "symbol": "SOL/USDT",
+        "taker_flow_rows": 2099436
+      },
+      {
+        "funding_rows": 1474,
+        "open_interest_rows": 17569,
+        "rows": 707733,
+        "symbol": "BNB/USDT",
+        "taker_flow_rows": 0
+      },
+      {
+        "funding_rows": 1474,
+        "open_interest_rows": 17569,
+        "rows": 707733,
+        "symbol": "TRX/USDT",
+        "taker_flow_rows": 0
+      }
+    ],
+    "panel_cache": {
+      "cache_hit": true,
+      "cache_key": "f4370fbcd5c7c38cd3607bb9deb0a9e6df1cb75a353a740e5e5899dc5377e290",
+      "end": "2026-05-06",
+      "exchange": "binance",
+      "market_root": "/home/hoky/Quants-agent/LuminaQuant/data/market_parquet",
+      "path": "var/cache/profit_moonshot_fresh_start/joined_panel_f4370fbcd5c7c38cd3607bb9.parquet",
+      "schema": 2,
+      "source_count": 7445,
+      "source_latest_mtime_ns": 1778238134872640200,
+      "source_total_bytes": 3564498874,
+      "start": "2025-01-01",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT"
+      ]
+    },
+    "rows": 11769
+  },
+  "exchange": "binance",
+  "gate_policy": {
+    "baseline_oos_return": 0.012181,
+    "liquidations_required": 0,
+    "max_order_value": 175.0,
+    "metric_periods_per_year": 8760,
+    "shadow_oos_mdd": 0.001778,
+    "success_oos_sharpe": 1.0,
+    "target_allocation": 0.008
+  },
+  "generated_at_utc": "2026-05-09T04:45:47.012341Z",
+  "market_root": "data/market_parquet",
+  "memory_policy": {
+    "disk_budget_gib": 30.0,
+    "exact_window_hard_fraction": 0.8,
+    "exact_window_soft_fraction": 0.6,
+    "explicit_budget_bytes": 6979321856,
+    "explicit_budget_gib": 6.5,
+    "heavy_lock_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/exact_window_backtests/followup_status/portfolio_followup_heavy_run.lock",
+    "heavy_run_cap_gib": 6.5,
+    "heavy_run_parallelism": 1,
+    "light_worker_parallelism": 2,
+    "rss_limit_fraction": 0.9,
+    "rss_limit_gib": 7.2,
+    "session_memory_lease_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/exact_window_backtests/followup_status/session_memory_budget.lock",
+    "total_memory_cap_bytes": 8589934592,
+    "total_memory_cap_gib": 8.0
+  },
+  "memory_summary": {
+    "artifact_kind": "portfolio_followup_memory_summary",
+    "budget_bytes": 6979321856,
+    "budget_mib": 6656.0,
+    "context": {
+      "csv_path": "var/reports/profit_moonshot_20260501/current_tail_20260508/h3_h4_h5_calendar_conditioned/fresh_start_overhaul_replay_candidates.csv",
+      "json_path": "var/reports/profit_moonshot_20260501/current_tail_20260508/h3_h4_h5_calendar_conditioned/fresh_start_overhaul_replay_latest.json",
+      "markdown_path": "var/reports/profit_moonshot_20260501/current_tail_20260508/h3_h4_h5_calendar_conditioned/fresh_start_overhaul_replay_latest.md",
+      "spec_count": 80,
+      "success_candidate_count": 0
+    },
+    "error": null,
+    "generated_at": "2026-05-09T04:45:47.018755+00:00",
+    "hard_limit_bytes": 5583457484,
+    "hard_limit_mib": 5324.799999237061,
+    "hard_trigger_count": 0,
+    "label": "portfolio_followup::profit_moonshot_fresh_start_replay",
+    "memory_policy": {
+      "disk_budget_gib": 30.0,
+      "exact_window_hard_fraction": 0.8,
+      "exact_window_soft_fraction": 0.6,
+      "explicit_budget_bytes": 6979321856,
+      "explicit_budget_gib": 6.5,
+      "heavy_lock_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/exact_window_backtests/followup_status/portfolio_followup_heavy_run.lock",
+      "heavy_run_cap_gib": 6.5,
+      "heavy_run_parallelism": 1,
+      "light_worker_parallelism": 2,
+      "rss_limit_fraction": 0.9,
+      "rss_limit_gib": 7.2,
+      "session_memory_lease_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/exact_window_backtests/followup_status/session_memory_budget.lock",
+      "total_memory_cap_bytes": 8589934592,
+      "total_memory_cap_gib": 8.0
+    },
+    "output_dir": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/h3_h4_h5_calendar_conditioned",
+    "peak_rss_bytes": 254685184,
+    "peak_rss_mib": 242.88671875,
+    "rss_log_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/h3_h4_h5_calendar_conditioned/_memory_guard/profit_moonshot_fresh_start_replay_rss_latest.jsonl",
+    "run_name": "profit_moonshot_fresh_start_replay",
+    "sample_count": 2,
+    "schema_version": "1.0",
+    "soft_limit_bytes": 4187593113,
+    "soft_limit_mib": 3993.5999994277954,
+    "soft_trigger_count": 0,
+    "status": "completed",
+    "summary_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/h3_h4_h5_calendar_conditioned/_memory_guard/profit_moonshot_fresh_start_replay_memory_latest.json"
+  },
+  "memory_summary_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/h3_h4_h5_calendar_conditioned/_memory_guard/profit_moonshot_fresh_start_replay_memory_latest.json",
+  "oos_end_date": "2026-05-06",
+  "peak_rss_mib": 250.70703125,
+  "replay_survivor_count": 0,
+  "rss_log_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/h3_h4_h5_calendar_conditioned/_memory_guard/profit_moonshot_fresh_start_replay_rss_latest.jsonl",
+  "spec_count": 80,
+  "spec_filter": {
+    "filtered_spec_count": 80,
+    "max_specs": 0,
+    "spec_family": [],
+    "spec_name_contains": [
+      "fresh_calendar_trx_veto",
+      "fresh_calendar_trx_daywin",
+      "fresh_calendar_spread"
+    ],
+    "unfiltered_spec_count": 6885
+  },
+  "split_windows": [
+    {
+      "end_inclusive": "2025-12-31",
+      "name": "train",
+      "role": "sanity_filter",
+      "start": "2025-01-01"
+    },
+    {
+      "end_inclusive": "2026-02-28",
+      "name": "val",
+      "role": "primary_selection",
+      "start": "2026-01-01"
+    },
+    {
+      "end_inclusive": "2026-05-06",
+      "name": "oos",
+      "role": "report_only",
+      "start": "2026-03-01"
+    }
+  ],
+  "success_candidate_count": 0,
+  "symbols": [
+    "BTC/USDT",
+    "ETH/USDT",
+    "SOL/USDT",
+    "BNB/USDT",
+    "TRX/USDT"
+  ],
+  "top_results": [
+    {
+      "failed_gates": [
+        "oos_return_beats_incumbent"
+      ],
+      "family": "calendar_rotation",
+      "filters": {
+        "adaptive_lookback_bars": 12,
+        "allow_long": true,
+        "allow_short": true,
+        "broad_min_abs": 0.0,
+        "calendar_long_months": [
+          3,
+          4,
+          5
+        ],
+        "calendar_long_symbol": "TRXUSDT",
+        "calendar_short_months": [
+          1,
+          2
+        ],
+        "calendar_short_symbol": "",
+        "calendar_veto_flow_abs": 0.0,
+        "calendar_veto_funding_abs": 0.0,
+        "calendar_veto_market_ret_abs": 0.0,
+        "calendar_veto_resid_z": 1.0,
+        "compression_lookback_bars": 24,
+        "compression_quantile": 0.0,
+        "cooldown_bars": 42,
+        "entry_days_of_month": [],
+        "entry_hours": [],
+        "family": "calendar_rotation",
+        "flow_lookback_bars": 0,
+        "flow_persistence_bars": 0,
+        "flow_persistence_threshold": 0.0,
+        "flow_threshold": 0.0,
+        "funding_abs_cap": 0.0,
+        "funding_rank_min": 0.0,
+        "hold_bars": 168,
+        "long_allocation_scale": 6.0,
+        "lookback_bars": 168,
+        "max_order_value": 175.0,
+        "max_rv": 0.0,
+        "min_abs_return": 0.018,
+        "name": "fresh_calendar_trx_veto_rz10_sweakest_thr180_h168",
+        "oi_rank_min": 0.0,
+        "rv_lookback_bars": 24,
+        "sharpe_lookback_bars": 0,
+        "sharpe_rank_min": 0.0,
+        "short_allocation_scale": 12.0,
+        "spread_hedge_ratio": 1.0,
+        "stop_loss_pct": 0.0,
+        "take_profit_pct": 0.06,
+        "target_allocation": 0.008,
+        "threshold": 0.018,
+        "trailing_stop_cap_pct": 0.0,
+        "trailing_stop_floor_pct": 0.0,
+        "trailing_stop_rv_multiple": 0.0
+      },
+      "gates": {
+        "liquidations_zero": true,
+        "not_incumbent_or_context_wrapper": true,
+        "oos_mdd_beats_shadow": true,
+        "oos_return_beats_incumbent": false,
+        "oos_sharpe_gt_1": true,
+        "oos_trades_not_starved": true,
+        "train_positive": true,
+        "val_positive": true
+      },
+      "name": "fresh_calendar_trx_veto_rz10_sweakest_thr180_h168",
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 12,
+          "final_equity": 10097.36609867103,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.05476360997766361,
+            "calmar": 36.22051239691205,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0015119501728068439,
+            "min_equity": 9994.541269962823,
+            "raw_final_equity": 10097.36609867103,
+            "raw_max_drawdown": 0.0015119501728068439,
+            "raw_total_return": 0.009736609867103008,
+            "sharpe": 5.390545786252525,
+            "sortino": 6.085749748485142,
+            "total_return": 0.009736609867103008,
+            "volatility": 0.009899888880321209
+          },
+          "reject_counts": {
+            "calendar_residual_veto": 12,
+            "cooldown": 210,
+            "signal_missing": 459
+          },
+          "round_trips": 6
+        },
+        "train": {
+          "fills": 36,
+          "final_equity": 10206.722419078482,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.020674626253067485,
+            "calmar": 0.6329701750877386,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0326628758617287,
+            "min_equity": 9915.107447229033,
+            "raw_final_equity": 10206.722419078482,
+            "raw_max_drawdown": 0.0326628758617287,
+            "raw_total_return": 0.02067224190784822,
+            "sharpe": 0.5721030127631952,
+            "sortino": 0.3427764040664679,
+            "total_return": 0.02067224190784822,
+            "volatility": 0.03696458605796084
+          },
+          "reject_counts": {
+            "calendar_residual_veto": 29,
+            "cooldown": 756,
+            "signal_missing": 5585
+          },
+          "round_trips": 18
+        },
+        "val": {
+          "fills": 20,
+          "final_equity": 10196.436110267856,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.12798279818258607,
+            "calmar": 8.989516845688437,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.01423689397100016,
+            "min_equity": 9908.21415296322,
+            "raw_final_equity": 10196.436110267856,
+            "raw_max_drawdown": 0.01423689397100016,
+            "raw_total_return": 0.01964361102678569,
+            "sharpe": 2.4101903406918885,
+            "sortino": 2.675621075573831,
+            "total_return": 0.01964361102678569,
+            "volatility": 0.05049610926629281
+          },
+          "reject_counts": {
+            "cooldown": 378,
+            "signal_missing": 240
+          },
+          "round_trips": 10
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "failed_gates": [
+        "oos_return_beats_incumbent"
+      ],
+      "family": "calendar_rotation",
+      "filters": {
+        "adaptive_lookback_bars": 12,
+        "allow_long": true,
+        "allow_short": true,
+        "broad_min_abs": 0.0,
+        "calendar_long_months": [
+          3,
+          4,
+          5
+        ],
+        "calendar_long_symbol": "TRXUSDT",
+        "calendar_short_months": [
+          1,
+          2
+        ],
+        "calendar_short_symbol": "ETHUSDT",
+        "calendar_veto_flow_abs": 0.0,
+        "calendar_veto_funding_abs": 0.0,
+        "calendar_veto_market_ret_abs": 0.0,
+        "calendar_veto_resid_z": 1.0,
+        "compression_lookback_bars": 24,
+        "compression_quantile": 0.0,
+        "cooldown_bars": 42,
+        "entry_days_of_month": [],
+        "entry_hours": [],
+        "family": "calendar_rotation",
+        "flow_lookback_bars": 0,
+        "flow_persistence_bars": 0,
+        "flow_persistence_threshold": 0.0,
+        "flow_threshold": 0.0,
+        "funding_abs_cap": 0.0,
+        "funding_rank_min": 0.0,
+        "hold_bars": 168,
+        "long_allocation_scale": 6.0,
+        "lookback_bars": 168,
+        "max_order_value": 175.0,
+        "max_rv": 0.0,
+        "min_abs_return": 0.018,
+        "name": "fresh_calendar_trx_veto_rz10_sethusdt_thr180_h168",
+        "oi_rank_min": 0.0,
+        "rv_lookback_bars": 24,
+        "sharpe_lookback_bars": 0,
+        "sharpe_rank_min": 0.0,
+        "short_allocation_scale": 12.0,
+        "spread_hedge_ratio": 1.0,
+        "stop_loss_pct": 0.0,
+        "take_profit_pct": 0.06,
+        "target_allocation": 0.008,
+        "threshold": 0.018,
+        "trailing_stop_cap_pct": 0.0,
+        "trailing_stop_floor_pct": 0.0,
+        "trailing_stop_rv_multiple": 0.0
+      },
+      "gates": {
+        "liquidations_zero": true,
+        "not_incumbent_or_context_wrapper": true,
+        "oos_mdd_beats_shadow": true,
+        "oos_return_beats_incumbent": false,
+        "oos_sharpe_gt_1": true,
+        "oos_trades_not_starved": true,
+        "train_positive": true,
+        "val_positive": true
+      },
+      "name": "fresh_calendar_trx_veto_rz10_sethusdt_thr180_h168",
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 12,
+          "final_equity": 10097.36609867103,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.05476360997766361,
+            "calmar": 36.22051239691205,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0015119501728068439,
+            "min_equity": 9994.541269962823,
+            "raw_final_equity": 10097.36609867103,
+            "raw_max_drawdown": 0.0015119501728068439,
+            "raw_total_return": 0.009736609867103008,
+            "sharpe": 5.390545786252525,
+            "sortino": 6.085749748485142,
+            "total_return": 0.009736609867103008,
+            "volatility": 0.009899888880321209
+          },
+          "reject_counts": {
+            "calendar_residual_veto": 12,
+            "cooldown": 210,
+            "signal_missing": 459
+          },
+          "round_trips": 6
+        },
+        "train": {
+          "fills": 36,
+          "final_equity": 10396.63436269742,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.039668053226236566,
+            "calmar": 3.7688597494118508,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.010525213423616245,
+            "min_equity": 9968.051158951157,
+            "raw_final_equity": 10396.63436269742,
+            "raw_max_drawdown": 0.010525213423616245,
+            "raw_total_return": 0.03966343626974189,
+            "sharpe": 1.6883719650712825,
+            "sortino": 1.1184609249505733,
+            "total_return": 0.03966343626974189,
+            "volatility": 0.023200211375343924
+          },
+          "reject_counts": {
+            "calendar_residual_veto": 29,
+            "cooldown": 756,
+            "signal_missing": 5890
+          },
+          "round_trips": 18
+        },
+        "val": {
+          "fills": 18,
+          "final_equity": 10293.893654795487,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.1964055696733582,
+            "calmar": 21.39824123371191,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.009178584703677916,
+            "min_equity": 9908.21415296322,
+            "raw_final_equity": 10293.893654795487,
+            "raw_max_drawdown": 0.009178584703677916,
+            "raw_total_return": 0.029389365479548735,
+            "sharpe": 3.819250799129493,
+            "sortino": 3.7562123674534944,
+            "total_return": 0.029389365479548735,
+            "volatility": 0.047244500799617874
+          },
+          "reject_counts": {
+            "cooldown": 336,
+            "signal_missing": 361
+          },
+          "round_trips": 9
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "failed_gates": [
+        "oos_return_beats_incumbent"
+      ],
+      "family": "calendar_rotation",
+      "filters": {
+        "adaptive_lookback_bars": 24,
+        "allow_long": true,
+        "allow_short": true,
+        "broad_min_abs": 0.0,
+        "calendar_long_months": [
+          3,
+          4,
+          5
+        ],
+        "calendar_long_symbol": "TRXUSDT",
+        "calendar_short_months": [
+          1,
+          2
+        ],
+        "calendar_short_symbol": "",
+        "calendar_veto_flow_abs": 0.0,
+        "calendar_veto_funding_abs": 0.0,
+        "calendar_veto_market_ret_abs": 0.04,
+        "calendar_veto_resid_z": 0.0,
+        "compression_lookback_bars": 24,
+        "compression_quantile": 0.0,
+        "cooldown_bars": 42,
+        "entry_days_of_month": [],
+        "entry_hours": [],
+        "family": "calendar_rotation",
+        "flow_lookback_bars": 0,
+        "flow_persistence_bars": 0,
+        "flow_persistence_threshold": 0.0,
+        "flow_threshold": 0.0,
+        "funding_abs_cap": 0.0,
+        "funding_rank_min": 0.0,
+        "hold_bars": 168,
+        "long_allocation_scale": 6.0,
+        "lookback_bars": 168,
+        "max_order_value": 175.0,
+        "max_rv": 0.0,
+        "min_abs_return": 0.018,
+        "name": "fresh_calendar_trx_veto_mkt24_sweakest_thr180_h168",
+        "oi_rank_min": 0.0,
+        "rv_lookback_bars": 24,
+        "sharpe_lookback_bars": 0,
+        "sharpe_rank_min": 0.0,
+        "short_allocation_scale": 12.0,
+        "spread_hedge_ratio": 1.0,
+        "stop_loss_pct": 0.0,
+        "take_profit_pct": 0.06,
+        "target_allocation": 0.008,
+        "threshold": 0.018,
+        "trailing_stop_cap_pct": 0.0,
+        "trailing_stop_floor_pct": 0.0,
+        "trailing_stop_rv_multiple": 0.0
+      },
+      "gates": {
+        "liquidations_zero": true,
+        "not_incumbent_or_context_wrapper": true,
+        "oos_mdd_beats_shadow": true,
+        "oos_return_beats_incumbent": false,
+        "oos_sharpe_gt_1": true,
+        "oos_trades_not_starved": true,
+        "train_positive": true,
+        "val_positive": true
+      },
+      "name": "fresh_calendar_trx_veto_mkt24_sweakest_thr180_h168",
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 12,
+          "final_equity": 10095.56478727241,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.053728652613478145,
+            "calmar": 35.535994227729184,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0015119501728068439,
+            "min_equity": 9994.541269962823,
+            "raw_final_equity": 10095.56478727241,
+            "raw_max_drawdown": 0.0015119501728068439,
+            "raw_total_return": 0.009556478727240858,
+            "sharpe": 5.317699120925221,
+            "sortino": 5.951202257295634,
+            "total_return": 0.009556478727240858,
+            "volatility": 0.009850803701855091
+          },
+          "reject_counts": {
+            "calendar_market_extreme_veto": 5,
+            "cooldown": 210,
+            "signal_missing": 466
+          },
+          "round_trips": 6
+        },
+        "train": {
+          "fills": 36,
+          "final_equity": 10047.38828531089,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.004739370835046719,
+            "calmar": 0.21754253200323614,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.02178595050542216,
+            "min_equity": 9824.766578153187,
+            "raw_final_equity": 10047.38828531089,
+            "raw_max_drawdown": 0.02178595050542216,
+            "raw_total_return": 0.004738828531088979,
+            "sharpe": 0.19304627966338503,
+            "sortino": 0.11979740894933123,
+            "total_return": 0.004738828531088979,
+            "volatility": 0.026282383188256386
+          },
+          "reject_counts": {
+            "calendar_market_extreme_veto": 33,
+            "cooldown": 756,
+            "signal_missing": 5527
+          },
+          "round_trips": 18
+        },
+        "val": {
+          "fills": 16,
+          "final_equity": 10036.359581610308,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.022723035824299354,
+            "calmar": 1.1935180174701976,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.01903870364057303,
+            "min_equity": 9908.21415296322,
+            "raw_final_equity": 10036.359581610308,
+            "raw_max_drawdown": 0.01903870364057303,
+            "raw_total_return": 0.0036359581610307945,
+            "sharpe": 0.4705325004125534,
+            "sortino": 0.5073453290000743,
+            "total_return": 0.0036359581610307945,
+            "volatility": 0.0504545767278023
+          },
+          "reject_counts": {
+            "calendar_market_extreme_veto": 25,
+            "cooldown": 294,
+            "signal_missing": 241
+          },
+          "round_trips": 8
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "failed_gates": [
+        "oos_return_beats_incumbent"
+      ],
+      "family": "calendar_rotation",
+      "filters": {
+        "adaptive_lookback_bars": 24,
+        "allow_long": true,
+        "allow_short": true,
+        "broad_min_abs": 0.0,
+        "calendar_long_months": [
+          3,
+          4,
+          5
+        ],
+        "calendar_long_symbol": "TRXUSDT",
+        "calendar_short_months": [
+          1,
+          2
+        ],
+        "calendar_short_symbol": "ETHUSDT",
+        "calendar_veto_flow_abs": 0.0,
+        "calendar_veto_funding_abs": 0.0,
+        "calendar_veto_market_ret_abs": 0.04,
+        "calendar_veto_resid_z": 0.0,
+        "compression_lookback_bars": 24,
+        "compression_quantile": 0.0,
+        "cooldown_bars": 42,
+        "entry_days_of_month": [],
+        "entry_hours": [],
+        "family": "calendar_rotation",
+        "flow_lookback_bars": 0,
+        "flow_persistence_bars": 0,
+        "flow_persistence_threshold": 0.0,
+        "flow_threshold": 0.0,
+        "funding_abs_cap": 0.0,
+        "funding_rank_min": 0.0,
+        "hold_bars": 168,
+        "long_allocation_scale": 6.0,
+        "lookback_bars": 168,
+        "max_order_value": 175.0,
+        "max_rv": 0.0,
+        "min_abs_return": 0.018,
+        "name": "fresh_calendar_trx_veto_mkt24_sethusdt_thr180_h168",
+        "oi_rank_min": 0.0,
+        "rv_lookback_bars": 24,
+        "sharpe_lookback_bars": 0,
+        "sharpe_rank_min": 0.0,
+        "short_allocation_scale": 12.0,
+        "spread_hedge_ratio": 1.0,
+        "stop_loss_pct": 0.0,
+        "take_profit_pct": 0.06,
+        "target_allocation": 0.008,
+        "threshold": 0.018,
+        "trailing_stop_cap_pct": 0.0,
+        "trailing_stop_floor_pct": 0.0,
+        "trailing_stop_rv_multiple": 0.0
+      },
+      "gates": {
+        "liquidations_zero": true,
+        "not_incumbent_or_context_wrapper": true,
+        "oos_mdd_beats_shadow": true,
+        "oos_return_beats_incumbent": false,
+        "oos_sharpe_gt_1": true,
+        "oos_trades_not_starved": true,
+        "train_positive": true,
+        "val_positive": true
+      },
+      "name": "fresh_calendar_trx_veto_mkt24_sethusdt_thr180_h168",
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 12,
+          "final_equity": 10095.56478727241,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.053728652613478145,
+            "calmar": 35.535994227729184,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0015119501728068439,
+            "min_equity": 9994.541269962823,
+            "raw_final_equity": 10095.56478727241,
+            "raw_max_drawdown": 0.0015119501728068439,
+            "raw_total_return": 0.009556478727240858,
+            "sharpe": 5.317699120925221,
+            "sortino": 5.951202257295634,
+            "total_return": 0.009556478727240858,
+            "volatility": 0.009850803701855091
+          },
+          "reject_counts": {
+            "calendar_market_extreme_veto": 5,
+            "cooldown": 210,
+            "signal_missing": 466
+          },
+          "round_trips": 6
+        },
+        "train": {
+          "fills": 38,
+          "final_equity": 10363.706151959394,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.03637484218824438,
+            "calmar": 3.4559719337022945,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.010525213423616245,
+            "min_equity": 9968.051158951157,
+            "raw_final_equity": 10363.706151959394,
+            "raw_max_drawdown": 0.010525213423616245,
+            "raw_total_return": 0.036370615195939315,
+            "sharpe": 1.5353190764326987,
+            "sortino": 1.0667397197918338,
+            "total_return": 0.036370615195939315,
+            "volatility": 0.023450385351557395
+          },
+          "reject_counts": {
+            "calendar_market_extreme_veto": 22,
+            "cooldown": 798,
+            "signal_missing": 5614
+          },
+          "round_trips": 19
+        },
+        "val": {
+          "fills": 18,
+          "final_equity": 10223.762934877543,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.14682851090495963,
+            "calmar": 15.996857429024383,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.009178584703677916,
+            "min_equity": 9908.21415296322,
+            "raw_final_equity": 10223.762934877543,
+            "raw_max_drawdown": 0.009178584703677916,
+            "raw_total_return": 0.022376293487754273,
+            "sharpe": 3.0649071131013192,
+            "sortino": 3.293949729754552,
+            "total_return": 0.022376293487754273,
+            "volatility": 0.04503050039579249
+          },
+          "reject_counts": {
+            "calendar_market_extreme_veto": 25,
+            "cooldown": 336,
+            "signal_missing": 306
+          },
+          "round_trips": 9
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "failed_gates": [
+        "oos_return_beats_incumbent"
+      ],
+      "family": "calendar_rotation",
+      "filters": {
+        "adaptive_lookback_bars": 12,
+        "allow_long": true,
+        "allow_short": true,
+        "broad_min_abs": 0.0,
+        "calendar_long_months": [
+          3,
+          4,
+          5
+        ],
+        "calendar_long_symbol": "TRXUSDT",
+        "calendar_short_months": [
+          1,
+          2
+        ],
+        "calendar_short_symbol": "",
+        "calendar_veto_flow_abs": 0.0,
+        "calendar_veto_funding_abs": 0.0001,
+        "calendar_veto_market_ret_abs": 0.0,
+        "calendar_veto_resid_z": 0.0,
+        "compression_lookback_bars": 24,
+        "compression_quantile": 0.0,
+        "cooldown_bars": 42,
+        "entry_days_of_month": [],
+        "entry_hours": [],
+        "family": "calendar_rotation",
+        "flow_lookback_bars": 0,
+        "flow_persistence_bars": 0,
+        "flow_persistence_threshold": 0.0,
+        "flow_threshold": 0.0,
+        "funding_abs_cap": 0.0,
+        "funding_rank_min": 0.0,
+        "hold_bars": 168,
+        "long_allocation_scale": 6.0,
+        "lookback_bars": 168,
+        "max_order_value": 175.0,
+        "max_rv": 0.0,
+        "min_abs_return": 0.015,
+        "name": "fresh_calendar_trx_veto_fund100_sweakest_thr150_h168",
+        "oi_rank_min": 0.0,
+        "rv_lookback_bars": 24,
+        "sharpe_lookback_bars": 0,
+        "sharpe_rank_min": 0.0,
+        "short_allocation_scale": 12.0,
+        "spread_hedge_ratio": 1.0,
+        "stop_loss_pct": 0.0,
+        "take_profit_pct": 0.06,
+        "target_allocation": 0.008,
+        "threshold": 0.015,
+        "trailing_stop_cap_pct": 0.0,
+        "trailing_stop_floor_pct": 0.0,
+        "trailing_stop_rv_multiple": 0.0
+      },
+      "gates": {
+        "liquidations_zero": true,
+        "not_incumbent_or_context_wrapper": true,
+        "oos_mdd_beats_shadow": true,
+        "oos_return_beats_incumbent": false,
+        "oos_sharpe_gt_1": true,
+        "oos_trades_not_starved": true,
+        "train_positive": true,
+        "val_positive": true
+      },
+      "name": "fresh_calendar_trx_veto_fund100_sweakest_thr150_h168",
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 12,
+          "final_equity": 10095.526106825468,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.05370643758115157,
+            "calmar": 35.59761275028583,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0015087089675899779,
+            "min_equity": 9994.474928288295,
+            "raw_final_equity": 10095.526106825468,
+            "raw_max_drawdown": 0.0015087089675899779,
+            "raw_total_return": 0.009552610682546758,
+            "sharpe": 5.281608503199587,
+            "sortino": 5.962865185828014,
+            "total_return": 0.009552610682546758,
+            "volatility": 0.009914243734799249
+          },
+          "reject_counts": {
+            "calendar_funding_conflict_veto": 15,
+            "cooldown": 210,
+            "signal_missing": 445
+          },
+          "round_trips": 6
+        },
+        "train": {
+          "fills": 36,
+          "final_equity": 10206.238199863983,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.020626198690371966,
+            "calmar": 1.079809328914631,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.01910170447508947,
+            "min_equity": 9937.87590314792,
+            "raw_final_equity": 10206.238199863983,
+            "raw_max_drawdown": 0.01910170447508947,
+            "raw_total_return": 0.020623819986398395,
+            "sharpe": 0.7619377186601637,
+            "sortino": 0.4965860603464351,
+            "total_return": 0.020623819986398395,
+            "volatility": 0.027284001346489832
+          },
+          "reject_counts": {
+            "calendar_funding_conflict_veto": 6,
+            "cooldown": 756,
+            "signal_missing": 5495
+          },
+          "round_trips": 18
+        },
+        "val": {
+          "fills": 20,
+          "final_equity": 10197.694362697544,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.1288448008589831,
+            "calmar": 9.050459063456314,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0142362724316636,
+            "min_equity": 9906.185465152455,
+            "raw_final_equity": 10197.694362697544,
+            "raw_max_drawdown": 0.0142362724316636,
+            "raw_total_return": 0.01976943626975447,
+            "sharpe": 2.4217529565817255,
+            "sortino": 2.711929759889064,
+            "total_return": 0.01976943626975447,
+            "volatility": 0.05057203994739024
+          },
+          "reject_counts": {
+            "cooldown": 378,
+            "signal_missing": 222
+          },
+          "round_trips": 10
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "failed_gates": [
+        "oos_return_beats_incumbent"
+      ],
+      "family": "calendar_rotation",
+      "filters": {
+        "adaptive_lookback_bars": 12,
+        "allow_long": true,
+        "allow_short": true,
+        "broad_min_abs": 0.0,
+        "calendar_long_months": [
+          3,
+          4,
+          5
+        ],
+        "calendar_long_symbol": "TRXUSDT",
+        "calendar_short_months": [
+          1,
+          2
+        ],
+        "calendar_short_symbol": "ETHUSDT",
+        "calendar_veto_flow_abs": 0.0,
+        "calendar_veto_funding_abs": 0.0001,
+        "calendar_veto_market_ret_abs": 0.0,
+        "calendar_veto_resid_z": 0.0,
+        "compression_lookback_bars": 24,
+        "compression_quantile": 0.0,
+        "cooldown_bars": 42,
+        "entry_days_of_month": [],
+        "entry_hours": [],
+        "family": "calendar_rotation",
+        "flow_lookback_bars": 0,
+        "flow_persistence_bars": 0,
+        "flow_persistence_threshold": 0.0,
+        "flow_threshold": 0.0,
+        "funding_abs_cap": 0.0,
+        "funding_rank_min": 0.0,
+        "hold_bars": 168,
+        "long_allocation_scale": 6.0,
+        "lookback_bars": 168,
+        "max_order_value": 175.0,
+        "max_rv": 0.0,
+        "min_abs_return": 0.015,
+        "name": "fresh_calendar_trx_veto_fund100_sethusdt_thr150_h168",
+        "oi_rank_min": 0.0,
+        "rv_lookback_bars": 24,
+        "sharpe_lookback_bars": 0,
+        "sharpe_rank_min": 0.0,
+        "short_allocation_scale": 12.0,
+        "spread_hedge_ratio": 1.0,
+        "stop_loss_pct": 0.0,
+        "take_profit_pct": 0.06,
+        "target_allocation": 0.008,
+        "threshold": 0.015,
+        "trailing_stop_cap_pct": 0.0,
+        "trailing_stop_floor_pct": 0.0,
+        "trailing_stop_rv_multiple": 0.0
+      },
+      "gates": {
+        "liquidations_zero": true,
+        "not_incumbent_or_context_wrapper": true,
+        "oos_mdd_beats_shadow": true,
+        "oos_return_beats_incumbent": false,
+        "oos_sharpe_gt_1": true,
+        "oos_trades_not_starved": true,
+        "train_positive": true,
+        "val_positive": true
+      },
+      "name": "fresh_calendar_trx_veto_fund100_sethusdt_thr150_h168",
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 12,
+          "final_equity": 10095.526106825468,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.05370643758115157,
+            "calmar": 35.59761275028583,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0015087089675899779,
+            "min_equity": 9994.474928288295,
+            "raw_final_equity": 10095.526106825468,
+            "raw_max_drawdown": 0.0015087089675899779,
+            "raw_total_return": 0.009552610682546758,
+            "sharpe": 5.281608503199587,
+            "sortino": 5.962865185828014,
+            "total_return": 0.009552610682546758,
+            "volatility": 0.009914243734799249
+          },
+          "reject_counts": {
+            "calendar_funding_conflict_veto": 15,
+            "cooldown": 210,
+            "signal_missing": 445
+          },
+          "round_trips": 6
+        },
+        "train": {
+          "fills": 36,
+          "final_equity": 10360.352691855598,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.03603945653026708,
+            "calmar": 3.149431014235396,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.011443164294556414,
+            "min_equity": 9971.213286612305,
+            "raw_final_equity": 10360.352691855598,
+            "raw_max_drawdown": 0.011443164294556414,
+            "raw_total_return": 0.03603526918555988,
+            "sharpe": 1.4649546033582181,
+            "sortino": 1.0206758258339654,
+            "total_return": 0.03603526918555988,
+            "volatility": 0.02437082272431428
+          },
+          "reject_counts": {
+            "calendar_funding_conflict_veto": 24,
+            "cooldown": 756,
+            "signal_missing": 5649
+          },
+          "round_trips": 18
+        },
+        "val": {
+          "fills": 18,
+          "final_equity": 10255.207160911123,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.16883972834940564,
+            "calmar": 13.00483547952225,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.012982842313942767,
+            "min_equity": 9906.185465152455,
+            "raw_final_equity": 10255.207160911123,
+            "raw_max_drawdown": 0.012982842313942767,
+            "raw_total_return": 0.025520716091112172,
+            "sharpe": 3.0710668832243124,
+            "sortino": 3.1648358294017345,
+            "total_return": 0.025520716091112172,
+            "volatility": 0.051227826564261315
+          },
+          "reject_counts": {
+            "calendar_funding_conflict_veto": 3,
+            "cooldown": 336,
+            "signal_missing": 274
+          },
+          "round_trips": 9
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "failed_gates": [
+        "oos_return_beats_incumbent"
+      ],
+      "family": "calendar_rotation",
+      "filters": {
+        "adaptive_lookback_bars": 12,
+        "allow_long": true,
+        "allow_short": true,
+        "broad_min_abs": 0.0,
+        "calendar_long_months": [
+          3,
+          4,
+          5
+        ],
+        "calendar_long_symbol": "TRXUSDT",
+        "calendar_short_months": [
+          1,
+          2
+        ],
+        "calendar_short_symbol": "",
+        "calendar_veto_flow_abs": 0.0,
+        "calendar_veto_funding_abs": 0.0,
+        "calendar_veto_market_ret_abs": 0.0,
+        "calendar_veto_resid_z": 1.5,
+        "compression_lookback_bars": 24,
+        "compression_quantile": 0.0,
+        "cooldown_bars": 42,
+        "entry_days_of_month": [],
+        "entry_hours": [],
+        "family": "calendar_rotation",
+        "flow_lookback_bars": 0,
+        "flow_persistence_bars": 0,
+        "flow_persistence_threshold": 0.0,
+        "flow_threshold": 0.0,
+        "funding_abs_cap": 0.0,
+        "funding_rank_min": 0.0,
+        "hold_bars": 168,
+        "long_allocation_scale": 6.0,
+        "lookback_bars": 168,
+        "max_order_value": 175.0,
+        "max_rv": 0.0,
+        "min_abs_return": 0.018,
+        "name": "fresh_calendar_trx_veto_rz15_sweakest_thr180_h168",
+        "oi_rank_min": 0.0,
+        "rv_lookback_bars": 24,
+        "sharpe_lookback_bars": 0,
+        "sharpe_rank_min": 0.0,
+        "short_allocation_scale": 12.0,
+        "spread_hedge_ratio": 1.0,
+        "stop_loss_pct": 0.0,
+        "take_profit_pct": 0.06,
+        "target_allocation": 0.008,
+        "threshold": 0.018,
+        "trailing_stop_cap_pct": 0.0,
+        "trailing_stop_floor_pct": 0.0,
+        "trailing_stop_rv_multiple": 0.0
+      },
+      "gates": {
+        "liquidations_zero": true,
+        "not_incumbent_or_context_wrapper": true,
+        "oos_mdd_beats_shadow": true,
+        "oos_return_beats_incumbent": false,
+        "oos_sharpe_gt_1": true,
+        "oos_trades_not_starved": true,
+        "train_positive": true,
+        "val_positive": true
+      },
+      "name": "fresh_calendar_trx_veto_rz15_sweakest_thr180_h168",
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 12,
+          "final_equity": 10092.453723782719,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.05194312406636903,
+            "calmar": 34.35505018656783,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0015119501728068439,
+            "min_equity": 9994.541269962823,
+            "raw_final_equity": 10092.453723782719,
+            "raw_max_drawdown": 0.0015119501728068439,
+            "raw_total_return": 0.009245372378271943,
+            "sharpe": 5.143585015428357,
+            "sortino": 5.767878185237019,
+            "total_return": 0.009245372378271943,
+            "volatility": 0.009854549616318587
+          },
+          "reject_counts": {
+            "cooldown": 210,
+            "signal_missing": 471
+          },
+          "round_trips": 6
+        },
+        "train": {
+          "fills": 38,
+          "final_equity": 10238.415018976135,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.02384425603745166,
+            "calmar": 0.7300109193811107,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0326628758617287,
+            "min_equity": 9915.107447229033,
+            "raw_final_equity": 10238.415018976135,
+            "raw_max_drawdown": 0.0326628758617287,
+            "raw_total_return": 0.02384150189761347,
+            "sharpe": 0.6534955848728641,
+            "sortino": 0.40542014815140365,
+            "total_return": 0.02384150189761347,
+            "volatility": 0.03711379301913324
+          },
+          "reject_counts": {
+            "calendar_residual_veto": 1,
+            "cooldown": 798,
+            "signal_missing": 5359
+          },
+          "round_trips": 19
+        },
+        "val": {
+          "fills": 20,
+          "final_equity": 10196.436110267856,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.12798279818258607,
+            "calmar": 8.989516845688437,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.01423689397100016,
+            "min_equity": 9908.21415296322,
+            "raw_final_equity": 10196.436110267856,
+            "raw_max_drawdown": 0.01423689397100016,
+            "raw_total_return": 0.01964361102678569,
+            "sharpe": 2.4101903406918885,
+            "sortino": 2.675621075573831,
+            "total_return": 0.01964361102678569,
+            "volatility": 0.05049610926629281
+          },
+          "reject_counts": {
+            "cooldown": 378,
+            "signal_missing": 240
+          },
+          "round_trips": 10
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "failed_gates": [
+        "oos_return_beats_incumbent"
+      ],
+      "family": "calendar_rotation",
+      "filters": {
+        "adaptive_lookback_bars": 12,
+        "allow_long": true,
+        "allow_short": true,
+        "broad_min_abs": 0.0,
+        "calendar_long_months": [
+          3,
+          4,
+          5
+        ],
+        "calendar_long_symbol": "TRXUSDT",
+        "calendar_short_months": [
+          1,
+          2
+        ],
+        "calendar_short_symbol": "",
+        "calendar_veto_flow_abs": 0.06,
+        "calendar_veto_funding_abs": 0.0,
+        "calendar_veto_market_ret_abs": 0.0,
+        "calendar_veto_resid_z": 0.0,
+        "compression_lookback_bars": 24,
+        "compression_quantile": 0.0,
+        "cooldown_bars": 42,
+        "entry_days_of_month": [],
+        "entry_hours": [],
+        "family": "calendar_rotation",
+        "flow_lookback_bars": 6,
+        "flow_persistence_bars": 0,
+        "flow_persistence_threshold": 0.0,
+        "flow_threshold": 0.0,
+        "funding_abs_cap": 0.0,
+        "funding_rank_min": 0.0,
+        "hold_bars": 168,
+        "long_allocation_scale": 6.0,
+        "lookback_bars": 168,
+        "max_order_value": 175.0,
+        "max_rv": 0.0,
+        "min_abs_return": 0.018,
+        "name": "fresh_calendar_trx_veto_flow6_sweakest_thr180_h168",
+        "oi_rank_min": 0.0,
+        "rv_lookback_bars": 24,
+        "sharpe_lookback_bars": 0,
+        "sharpe_rank_min": 0.0,
+        "short_allocation_scale": 12.0,
+        "spread_hedge_ratio": 1.0,
+        "stop_loss_pct": 0.0,
+        "take_profit_pct": 0.06,
+        "target_allocation": 0.008,
+        "threshold": 0.018,
+        "trailing_stop_cap_pct": 0.0,
+        "trailing_stop_floor_pct": 0.0,
+        "trailing_stop_rv_multiple": 0.0
+      },
+      "gates": {
+        "liquidations_zero": true,
+        "not_incumbent_or_context_wrapper": true,
+        "oos_mdd_beats_shadow": true,
+        "oos_return_beats_incumbent": false,
+        "oos_sharpe_gt_1": true,
+        "oos_trades_not_starved": true,
+        "train_positive": true,
+        "val_positive": true
+      },
+      "name": "fresh_calendar_trx_veto_flow6_sweakest_thr180_h168",
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 12,
+          "final_equity": 10092.453723782719,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.05194312406636903,
+            "calmar": 34.35505018656783,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0015119501728068439,
+            "min_equity": 9994.541269962823,
+            "raw_final_equity": 10092.453723782719,
+            "raw_max_drawdown": 0.0015119501728068439,
+            "raw_total_return": 0.009245372378271943,
+            "sharpe": 5.143585015428357,
+            "sortino": 5.767878185237019,
+            "total_return": 0.009245372378271943,
+            "volatility": 0.009854549616318587
+          },
+          "reject_counts": {
+            "cooldown": 210,
+            "signal_missing": 471
+          },
+          "round_trips": 6
+        },
+        "train": {
+          "fills": 38,
+          "final_equity": 10243.7127054899,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.024374086612496626,
+            "calmar": 0.7462321050871058,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0326628758617287,
+            "min_equity": 9915.107447229033,
+            "raw_final_equity": 10243.7127054899,
+            "raw_max_drawdown": 0.0326628758617287,
+            "raw_total_return": 0.02437127054899002,
+            "sharpe": 0.6674816078789718,
+            "sortino": 0.4139324150566827,
+            "total_return": 0.02437127054899002,
+            "volatility": 0.037111071724841516
+          },
+          "reject_counts": {
+            "cooldown": 798,
+            "signal_missing": 5360
+          },
+          "round_trips": 19
+        },
+        "val": {
+          "fills": 20,
+          "final_equity": 10196.436110267856,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.12798279818258607,
+            "calmar": 8.989516845688437,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.01423689397100016,
+            "min_equity": 9908.21415296322,
+            "raw_final_equity": 10196.436110267856,
+            "raw_max_drawdown": 0.01423689397100016,
+            "raw_total_return": 0.01964361102678569,
+            "sharpe": 2.4101903406918885,
+            "sortino": 2.675621075573831,
+            "total_return": 0.01964361102678569,
+            "volatility": 0.05049610926629281
+          },
+          "reject_counts": {
+            "cooldown": 378,
+            "signal_missing": 240
+          },
+          "round_trips": 10
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "failed_gates": [
+        "oos_return_beats_incumbent"
+      ],
+      "family": "calendar_rotation",
+      "filters": {
+        "adaptive_lookback_bars": 12,
+        "allow_long": true,
+        "allow_short": true,
+        "broad_min_abs": 0.0,
+        "calendar_long_months": [
+          3,
+          4,
+          5
+        ],
+        "calendar_long_symbol": "TRXUSDT",
+        "calendar_short_months": [
+          1,
+          2
+        ],
+        "calendar_short_symbol": "ETHUSDT",
+        "calendar_veto_flow_abs": 0.0,
+        "calendar_veto_funding_abs": 0.0,
+        "calendar_veto_market_ret_abs": 0.0,
+        "calendar_veto_resid_z": 1.5,
+        "compression_lookback_bars": 24,
+        "compression_quantile": 0.0,
+        "cooldown_bars": 42,
+        "entry_days_of_month": [],
+        "entry_hours": [],
+        "family": "calendar_rotation",
+        "flow_lookback_bars": 0,
+        "flow_persistence_bars": 0,
+        "flow_persistence_threshold": 0.0,
+        "flow_threshold": 0.0,
+        "funding_abs_cap": 0.0,
+        "funding_rank_min": 0.0,
+        "hold_bars": 168,
+        "long_allocation_scale": 6.0,
+        "lookback_bars": 168,
+        "max_order_value": 175.0,
+        "max_rv": 0.0,
+        "min_abs_return": 0.018,
+        "name": "fresh_calendar_trx_veto_rz15_sethusdt_thr180_h168",
+        "oi_rank_min": 0.0,
+        "rv_lookback_bars": 24,
+        "sharpe_lookback_bars": 0,
+        "sharpe_rank_min": 0.0,
+        "short_allocation_scale": 12.0,
+        "spread_hedge_ratio": 1.0,
+        "stop_loss_pct": 0.0,
+        "take_profit_pct": 0.06,
+        "target_allocation": 0.008,
+        "threshold": 0.018,
+        "trailing_stop_cap_pct": 0.0,
+        "trailing_stop_floor_pct": 0.0,
+        "trailing_stop_rv_multiple": 0.0
+      },
+      "gates": {
+        "liquidations_zero": true,
+        "not_incumbent_or_context_wrapper": true,
+        "oos_mdd_beats_shadow": true,
+        "oos_return_beats_incumbent": false,
+        "oos_sharpe_gt_1": true,
+        "oos_trades_not_starved": true,
+        "train_positive": true,
+        "val_positive": true
+      },
+      "name": "fresh_calendar_trx_veto_rz15_sethusdt_thr180_h168",
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 12,
+          "final_equity": 10092.453723782719,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.05194312406636903,
+            "calmar": 34.35505018656783,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0015119501728068439,
+            "min_equity": 9994.541269962823,
+            "raw_final_equity": 10092.453723782719,
+            "raw_max_drawdown": 0.0015119501728068439,
+            "raw_total_return": 0.009245372378271943,
+            "sharpe": 5.143585015428357,
+            "sortino": 5.767878185237019,
+            "total_return": 0.009245372378271943,
+            "volatility": 0.009854549616318587
+          },
+          "reject_counts": {
+            "cooldown": 210,
+            "signal_missing": 471
+          },
+          "round_trips": 6
+        },
+        "train": {
+          "fills": 38,
+          "final_equity": 10428.91666472086,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.04289666689938576,
+            "calmar": 4.0756101727243985,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.010525213423616245,
+            "min_equity": 9968.051158951157,
+            "raw_final_equity": 10428.91666472086,
+            "raw_max_drawdown": 0.010525213423616245,
+            "raw_total_return": 0.042891666472085976,
+            "sharpe": 1.8038507058514412,
+            "sortino": 1.2423724135928775,
+            "total_return": 0.042891666472085976,
+            "volatility": 0.023436937611663468
+          },
+          "reject_counts": {
+            "calendar_residual_veto": 1,
+            "cooldown": 798,
+            "signal_missing": 5664
+          },
+          "round_trips": 19
+        },
+        "val": {
+          "fills": 18,
+          "final_equity": 10293.893654795487,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.1964055696733582,
+            "calmar": 21.39824123371191,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.009178584703677916,
+            "min_equity": 9908.21415296322,
+            "raw_final_equity": 10293.893654795487,
+            "raw_max_drawdown": 0.009178584703677916,
+            "raw_total_return": 0.029389365479548735,
+            "sharpe": 3.819250799129493,
+            "sortino": 3.7562123674534944,
+            "total_return": 0.029389365479548735,
+            "volatility": 0.047244500799617874
+          },
+          "reject_counts": {
+            "cooldown": 336,
+            "signal_missing": 361
+          },
+          "round_trips": 9
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "failed_gates": [
+        "oos_return_beats_incumbent"
+      ],
+      "family": "calendar_rotation",
+      "filters": {
+        "adaptive_lookback_bars": 12,
+        "allow_long": true,
+        "allow_short": true,
+        "broad_min_abs": 0.0,
+        "calendar_long_months": [
+          3,
+          4,
+          5
+        ],
+        "calendar_long_symbol": "TRXUSDT",
+        "calendar_short_months": [
+          1,
+          2
+        ],
+        "calendar_short_symbol": "ETHUSDT",
+        "calendar_veto_flow_abs": 0.06,
+        "calendar_veto_funding_abs": 0.0,
+        "calendar_veto_market_ret_abs": 0.0,
+        "calendar_veto_resid_z": 0.0,
+        "compression_lookback_bars": 24,
+        "compression_quantile": 0.0,
+        "cooldown_bars": 42,
+        "entry_days_of_month": [],
+        "entry_hours": [],
+        "family": "calendar_rotation",
+        "flow_lookback_bars": 6,
+        "flow_persistence_bars": 0,
+        "flow_persistence_threshold": 0.0,
+        "flow_threshold": 0.0,
+        "funding_abs_cap": 0.0,
+        "funding_rank_min": 0.0,
+        "hold_bars": 168,
+        "long_allocation_scale": 6.0,
+        "lookback_bars": 168,
+        "max_order_value": 175.0,
+        "max_rv": 0.0,
+        "min_abs_return": 0.018,
+        "name": "fresh_calendar_trx_veto_flow6_sethusdt_thr180_h168",
+        "oi_rank_min": 0.0,
+        "rv_lookback_bars": 24,
+        "sharpe_lookback_bars": 0,
+        "sharpe_rank_min": 0.0,
+        "short_allocation_scale": 12.0,
+        "spread_hedge_ratio": 1.0,
+        "stop_loss_pct": 0.0,
+        "take_profit_pct": 0.06,
+        "target_allocation": 0.008,
+        "threshold": 0.018,
+        "trailing_stop_cap_pct": 0.0,
+        "trailing_stop_floor_pct": 0.0,
+        "trailing_stop_rv_multiple": 0.0
+      },
+      "gates": {
+        "liquidations_zero": true,
+        "not_incumbent_or_context_wrapper": true,
+        "oos_mdd_beats_shadow": true,
+        "oos_return_beats_incumbent": false,
+        "oos_sharpe_gt_1": true,
+        "oos_trades_not_starved": true,
+        "train_positive": true,
+        "val_positive": true
+      },
+      "name": "fresh_calendar_trx_veto_flow6_sethusdt_thr180_h168",
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 12,
+          "final_equity": 10092.453723782719,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.05194312406636903,
+            "calmar": 34.35505018656783,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0015119501728068439,
+            "min_equity": 9994.541269962823,
+            "raw_final_equity": 10092.453723782719,
+            "raw_max_drawdown": 0.0015119501728068439,
+            "raw_total_return": 0.009245372378271943,
+            "sharpe": 5.143585015428357,
+            "sortino": 5.767878185237019,
+            "total_return": 0.009245372378271943,
+            "volatility": 0.009854549616318587
+          },
+          "reject_counts": {
+            "cooldown": 210,
+            "signal_missing": 471
+          },
+          "round_trips": 6
+        },
+        "train": {
+          "fills": 38,
+          "final_equity": 10434.312923779507,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.04343635701703086,
+            "calmar": 4.126886103760072,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.010525213423616245,
+            "min_equity": 9968.051158951157,
+            "raw_final_equity": 10434.312923779507,
+            "raw_max_drawdown": 0.010525213423616245,
+            "raw_total_return": 0.043431292377950736,
+            "sharpe": 1.8262602744813192,
+            "sortino": 1.257335134200715,
+            "total_return": 0.043431292377950736,
+            "volatility": 0.023432582462610367
+          },
+          "reject_counts": {
+            "cooldown": 798,
+            "signal_missing": 5665
+          },
+          "round_trips": 19
+        },
+        "val": {
+          "fills": 18,
+          "final_equity": 10293.893654795487,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.1964055696733582,
+            "calmar": 21.39824123371191,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.009178584703677916,
+            "min_equity": 9908.21415296322,
+            "raw_final_equity": 10293.893654795487,
+            "raw_max_drawdown": 0.009178584703677916,
+            "raw_total_return": 0.029389365479548735,
+            "sharpe": 3.819250799129493,
+            "sortino": 3.7562123674534944,
+            "total_return": 0.029389365479548735,
+            "volatility": 0.047244500799617874
+          },
+          "reject_counts": {
+            "cooldown": 336,
+            "signal_missing": 361
+          },
+          "round_trips": 9
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "failed_gates": [
+        "oos_return_beats_incumbent",
+        "oos_mdd_beats_shadow"
+      ],
+      "family": "calendar_rotation",
+      "filters": {
+        "adaptive_lookback_bars": 12,
+        "allow_long": true,
+        "allow_short": true,
+        "broad_min_abs": 0.0,
+        "calendar_long_months": [
+          3,
+          4,
+          5
+        ],
+        "calendar_long_symbol": "TRXUSDT",
+        "calendar_short_months": [
+          1,
+          2
+        ],
+        "calendar_short_symbol": "",
+        "calendar_veto_flow_abs": 0.0,
+        "calendar_veto_funding_abs": 0.0,
+        "calendar_veto_market_ret_abs": 0.0,
+        "calendar_veto_resid_z": 1.5,
+        "compression_lookback_bars": 24,
+        "compression_quantile": 0.0,
+        "cooldown_bars": 30,
+        "entry_days_of_month": [],
+        "entry_hours": [],
+        "family": "calendar_rotation",
+        "flow_lookback_bars": 0,
+        "flow_persistence_bars": 0,
+        "flow_persistence_threshold": 0.0,
+        "flow_threshold": 0.0,
+        "funding_abs_cap": 0.0,
+        "funding_rank_min": 0.0,
+        "hold_bars": 120,
+        "long_allocation_scale": 6.0,
+        "lookback_bars": 168,
+        "max_order_value": 175.0,
+        "max_rv": 0.0,
+        "min_abs_return": 0.015,
+        "name": "fresh_calendar_trx_veto_rz15_sweakest_thr150_h120",
+        "oi_rank_min": 0.0,
+        "rv_lookback_bars": 24,
+        "sharpe_lookback_bars": 0,
+        "sharpe_rank_min": 0.0,
+        "short_allocation_scale": 12.0,
+        "spread_hedge_ratio": 1.0,
+        "stop_loss_pct": 0.0,
+        "take_profit_pct": 0.06,
+        "target_allocation": 0.008,
+        "threshold": 0.015,
+        "trailing_stop_cap_pct": 0.0,
+        "trailing_stop_floor_pct": 0.0,
+        "trailing_stop_rv_multiple": 0.0
+      },
+      "gates": {
+        "liquidations_zero": true,
+        "not_incumbent_or_context_wrapper": true,
+        "oos_mdd_beats_shadow": false,
+        "oos_return_beats_incumbent": false,
+        "oos_sharpe_gt_1": true,
+        "oos_trades_not_starved": true,
+        "train_positive": true,
+        "val_positive": true
+      },
+      "name": "fresh_calendar_trx_veto_rz15_sweakest_thr150_h120",
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 16,
+          "final_equity": 10083.37193864887,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.046744983830299125,
+            "calmar": 20.82414483356565,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.002244749266003599,
+            "min_equity": 9999.23171235687,
+            "raw_final_equity": 10083.37193864887,
+            "raw_max_drawdown": 0.002244749266003599,
+            "raw_total_return": 0.008337193864887071,
+            "sharpe": 4.569036642211209,
+            "sortino": 5.001395413425739,
+            "total_return": 0.008337193864887071,
+            "volatility": 0.01000988133369986
+          },
+          "reject_counts": {
+            "calendar_residual_veto": 10,
+            "cooldown": 210,
+            "signal_missing": 436
+          },
+          "round_trips": 8
+        },
+        "train": {
+          "fills": 48,
+          "final_equity": 10175.611257655744,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.017563148193381117,
+            "calmar": 1.1131567001769256,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.01577778599418179,
+            "min_equity": 9867.067770637761,
+            "raw_final_equity": 10175.611257655744,
+            "raw_max_drawdown": 0.01577778599418179,
+            "raw_total_return": 0.017561125765574337,
+            "sharpe": 0.6983727395684437,
+            "sortino": 0.47468766699054216,
+            "total_return": 0.017561125765574337,
+            "volatility": 0.025391938999332703
+          },
+          "reject_counts": {
+            "calendar_residual_veto": 3,
+            "cooldown": 720,
+            "signal_missing": 5622
+          },
+          "round_trips": 24
+        },
+        "val": {
+          "fills": 24,
+          "final_equity": 10276.389204928873,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.18386611969759858,
+            "calmar": 10.042213284997214,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.01830932230570022,
+            "min_equity": 9906.185465152455,
+            "raw_final_equity": 10276.389204928873,
+            "raw_max_drawdown": 0.01830932230570022,
+            "raw_total_return": 0.027638920492887298,
+            "sharpe": 3.5180421839391895,
+            "sortino": 4.100646657362381,
+            "total_return": 0.027638920492887298,
+            "volatility": 0.0483088779644359
+          },
+          "reject_counts": {
+            "cooldown": 330,
+            "signal_missing": 294
+          },
+          "round_trips": 12
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "failed_gates": [
+        "oos_return_beats_incumbent",
+        "oos_mdd_beats_shadow"
+      ],
+      "family": "calendar_rotation",
+      "filters": {
+        "adaptive_lookback_bars": 12,
+        "allow_long": true,
+        "allow_short": true,
+        "broad_min_abs": 0.0,
+        "calendar_long_months": [
+          3,
+          4,
+          5
+        ],
+        "calendar_long_symbol": "TRXUSDT",
+        "calendar_short_months": [
+          1,
+          2
+        ],
+        "calendar_short_symbol": "ETHUSDT",
+        "calendar_veto_flow_abs": 0.0,
+        "calendar_veto_funding_abs": 0.0,
+        "calendar_veto_market_ret_abs": 0.0,
+        "calendar_veto_resid_z": 1.5,
+        "compression_lookback_bars": 24,
+        "compression_quantile": 0.0,
+        "cooldown_bars": 30,
+        "entry_days_of_month": [],
+        "entry_hours": [],
+        "family": "calendar_rotation",
+        "flow_lookback_bars": 0,
+        "flow_persistence_bars": 0,
+        "flow_persistence_threshold": 0.0,
+        "flow_threshold": 0.0,
+        "funding_abs_cap": 0.0,
+        "funding_rank_min": 0.0,
+        "hold_bars": 120,
+        "long_allocation_scale": 6.0,
+        "lookback_bars": 168,
+        "max_order_value": 175.0,
+        "max_rv": 0.0,
+        "min_abs_return": 0.015,
+        "name": "fresh_calendar_trx_veto_rz15_sethusdt_thr150_h120",
+        "oi_rank_min": 0.0,
+        "rv_lookback_bars": 24,
+        "sharpe_lookback_bars": 0,
+        "sharpe_rank_min": 0.0,
+        "short_allocation_scale": 12.0,
+        "spread_hedge_ratio": 1.0,
+        "stop_loss_pct": 0.0,
+        "take_profit_pct": 0.06,
+        "target_allocation": 0.008,
+        "threshold": 0.015,
+        "trailing_stop_cap_pct": 0.0,
+        "trailing_stop_floor_pct": 0.0,
+        "trailing_stop_rv_multiple": 0.0
+      },
+      "gates": {
+        "liquidations_zero": true,
+        "not_incumbent_or_context_wrapper": true,
+        "oos_mdd_beats_shadow": false,
+        "oos_return_beats_incumbent": false,
+        "oos_sharpe_gt_1": true,
+        "oos_trades_not_starved": true,
+        "train_positive": true,
+        "val_positive": true
+      },
+      "name": "fresh_calendar_trx_veto_rz15_sethusdt_thr150_h120",
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 16,
+          "final_equity": 10083.37193864887,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.046744983830299125,
+            "calmar": 20.82414483356565,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.002244749266003599,
+            "min_equity": 9999.23171235687,
+            "raw_final_equity": 10083.37193864887,
+            "raw_max_drawdown": 0.002244749266003599,
+            "raw_total_return": 0.008337193864887071,
+            "sharpe": 4.569036642211209,
+            "sortino": 5.001395413425739,
+            "total_return": 0.008337193864887071,
+            "volatility": 0.01000988133369986
+          },
+          "reject_counts": {
+            "calendar_residual_veto": 10,
+            "cooldown": 210,
+            "signal_missing": 436
+          },
+          "round_trips": 8
+        },
+        "train": {
+          "fills": 46,
+          "final_equity": 10232.01377164767,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.023204056523380423,
+            "calmar": 1.776593731044252,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.013060980750923549,
+            "min_equity": 9940.089842645715,
+            "raw_final_equity": 10232.01377164767,
+            "raw_max_drawdown": 0.013060980750923549,
+            "raw_total_return": 0.023201377164767,
+            "sharpe": 0.9482913127069386,
+            "sortino": 0.6525340954399297,
+            "total_return": 0.023201377164767,
+            "volatility": 0.024506334363803395
+          },
+          "reject_counts": {
+            "calendar_residual_veto": 3,
+            "cooldown": 690,
+            "signal_missing": 5737
+          },
+          "round_trips": 23
+        },
+        "val": {
+          "fills": 24,
+          "final_equity": 10341.079440446529,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.23076347840093359,
+            "calmar": 15.97062637807407,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.01444924406457512,
+            "min_equity": 9906.185465152455,
+            "raw_final_equity": 10341.079440446529,
+            "raw_max_drawdown": 0.01444924406457512,
+            "raw_total_return": 0.03410794404465278,
+            "sharpe": 4.496586173121624,
+            "sortino": 4.713668837809952,
+            "total_return": 0.03410794404465278,
+            "volatility": 0.04641594865995995
+          },
+          "reject_counts": {
+            "cooldown": 347,
+            "signal_missing": 350
+          },
+          "round_trips": 12
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "failed_gates": [
+        "train_positive",
+        "oos_return_beats_incumbent",
+        "oos_mdd_beats_shadow"
+      ],
+      "family": "calendar_rotation",
+      "filters": {
+        "adaptive_lookback_bars": 12,
+        "allow_long": true,
+        "allow_short": true,
+        "broad_min_abs": 0.0,
+        "calendar_long_months": [
+          3,
+          4,
+          5
+        ],
+        "calendar_long_symbol": "TRXUSDT",
+        "calendar_short_months": [
+          1,
+          2
+        ],
+        "calendar_short_symbol": "",
+        "calendar_veto_flow_abs": 0.0,
+        "calendar_veto_funding_abs": 0.0,
+        "calendar_veto_market_ret_abs": 0.0,
+        "calendar_veto_resid_z": 1.0,
+        "compression_lookback_bars": 24,
+        "compression_quantile": 0.0,
+        "cooldown_bars": 42,
+        "entry_days_of_month": [],
+        "entry_hours": [],
+        "family": "calendar_rotation",
+        "flow_lookback_bars": 0,
+        "flow_persistence_bars": 0,
+        "flow_persistence_threshold": 0.0,
+        "flow_threshold": 0.0,
+        "funding_abs_cap": 0.0,
+        "funding_rank_min": 0.0,
+        "hold_bars": 168,
+        "long_allocation_scale": 6.0,
+        "lookback_bars": 168,
+        "max_order_value": 175.0,
+        "max_rv": 0.0,
+        "min_abs_return": 0.015,
+        "name": "fresh_calendar_trx_veto_rz10_sweakest_thr150_h168",
+        "oi_rank_min": 0.0,
+        "rv_lookback_bars": 24,
+        "sharpe_lookback_bars": 0,
+        "sharpe_rank_min": 0.0,
+        "short_allocation_scale": 12.0,
+        "spread_hedge_ratio": 1.0,
+        "stop_loss_pct": 0.0,
+        "take_profit_pct": 0.06,
+        "target_allocation": 0.008,
+        "threshold": 0.015,
+        "trailing_stop_cap_pct": 0.0,
+        "trailing_stop_floor_pct": 0.0,
+        "trailing_stop_rv_multiple": 0.0
+      },
+      "gates": {
+        "liquidations_zero": true,
+        "not_incumbent_or_context_wrapper": true,
+        "oos_mdd_beats_shadow": false,
+        "oos_return_beats_incumbent": false,
+        "oos_sharpe_gt_1": true,
+        "oos_trades_not_starved": true,
+        "train_positive": false,
+        "val_positive": true
+      },
+      "name": "fresh_calendar_trx_veto_rz10_sweakest_thr150_h168",
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 14,
+          "final_equity": 10078.128100543301,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.04375315340025754,
+            "calmar": 16.14278078734028,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0027103851546178624,
+            "min_equity": 9997.092840427658,
+            "raw_final_equity": 10078.128100543301,
+            "raw_max_drawdown": 0.0027103851546178624,
+            "raw_total_return": 0.00781281005433021,
+            "sharpe": 4.188878226966878,
+            "sortino": 5.072507880847796,
+            "total_return": 0.00781281005433021,
+            "volatility": 0.010235548700145558
+          },
+          "reject_counts": {
+            "calendar_residual_veto": 9,
+            "cooldown": 252,
+            "signal_missing": 233
+          },
+          "round_trips": 7
+        },
+        "train": {
+          "fills": 36,
+          "final_equity": 9881.462401438543,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": -0.011855105125784804,
+            "calmar": -0.2836992857329467,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.04178757480885698,
+            "min_equity": 9631.24939190364,
+            "raw_final_equity": 9881.462401438543,
+            "raw_max_drawdown": 0.04178757480885698,
+            "raw_total_return": -0.011853759856145785,
+            "sharpe": -0.3183348386036343,
+            "sortino": -0.18109063920351015,
+            "total_return": -0.011853759856145785,
+            "volatility": 0.03548363882212516
+          },
+          "reject_counts": {
+            "calendar_residual_veto": 35,
+            "cooldown": 756,
+            "signal_missing": 5586
+          },
+          "round_trips": 18
+        },
+        "val": {
+          "fills": 20,
+          "final_equity": 10197.694362697544,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.1288448008589831,
+            "calmar": 9.050459063456314,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0142362724316636,
+            "min_equity": 9906.185465152455,
+            "raw_final_equity": 10197.694362697544,
+            "raw_max_drawdown": 0.0142362724316636,
+            "raw_total_return": 0.01976943626975447,
+            "sharpe": 2.4217529565817255,
+            "sortino": 2.711929759889064,
+            "total_return": 0.01976943626975447,
+            "volatility": 0.05057203994739024
+          },
+          "reject_counts": {
+            "cooldown": 378,
+            "signal_missing": 222
+          },
+          "round_trips": 10
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "failed_gates": [
+        "oos_return_beats_incumbent",
+        "oos_mdd_beats_shadow"
+      ],
+      "family": "calendar_rotation",
+      "filters": {
+        "adaptive_lookback_bars": 12,
+        "allow_long": true,
+        "allow_short": true,
+        "broad_min_abs": 0.0,
+        "calendar_long_months": [
+          3,
+          4,
+          5
+        ],
+        "calendar_long_symbol": "TRXUSDT",
+        "calendar_short_months": [
+          1,
+          2
+        ],
+        "calendar_short_symbol": "ETHUSDT",
+        "calendar_veto_flow_abs": 0.0,
+        "calendar_veto_funding_abs": 0.0,
+        "calendar_veto_market_ret_abs": 0.0,
+        "calendar_veto_resid_z": 1.0,
+        "compression_lookback_bars": 24,
+        "compression_quantile": 0.0,
+        "cooldown_bars": 42,
+        "entry_days_of_month": [],
+        "entry_hours": [],
+        "family": "calendar_rotation",
+        "flow_lookback_bars": 0,
+        "flow_persistence_bars": 0,
+        "flow_persistence_threshold": 0.0,
+        "flow_threshold": 0.0,
+        "funding_abs_cap": 0.0,
+        "funding_rank_min": 0.0,
+        "hold_bars": 168,
+        "long_allocation_scale": 6.0,
+        "lookback_bars": 168,
+        "max_order_value": 175.0,
+        "max_rv": 0.0,
+        "min_abs_return": 0.015,
+        "name": "fresh_calendar_trx_veto_rz10_sethusdt_thr150_h168",
+        "oi_rank_min": 0.0,
+        "rv_lookback_bars": 24,
+        "sharpe_lookback_bars": 0,
+        "sharpe_rank_min": 0.0,
+        "short_allocation_scale": 12.0,
+        "spread_hedge_ratio": 1.0,
+        "stop_loss_pct": 0.0,
+        "take_profit_pct": 0.06,
+        "target_allocation": 0.008,
+        "threshold": 0.015,
+        "trailing_stop_cap_pct": 0.0,
+        "trailing_stop_floor_pct": 0.0,
+        "trailing_stop_rv_multiple": 0.0
+      },
+      "gates": {
+        "liquidations_zero": true,
+        "not_incumbent_or_context_wrapper": true,
+        "oos_mdd_beats_shadow": false,
+        "oos_return_beats_incumbent": false,
+        "oos_sharpe_gt_1": true,
+        "oos_trades_not_starved": true,
+        "train_positive": true,
+        "val_positive": true
+      },
+      "name": "fresh_calendar_trx_veto_rz10_sethusdt_thr150_h168",
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 14,
+          "final_equity": 10078.128100543301,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.04375315340025754,
+            "calmar": 16.14278078734028,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0027103851546178624,
+            "min_equity": 9997.092840427658,
+            "raw_final_equity": 10078.128100543301,
+            "raw_max_drawdown": 0.0027103851546178624,
+            "raw_total_return": 0.00781281005433021,
+            "sharpe": 4.188878226966878,
+            "sortino": 5.072507880847796,
+            "total_return": 0.00781281005433021,
+            "volatility": 0.010235548700145558
+          },
+          "reject_counts": {
+            "calendar_residual_veto": 9,
+            "cooldown": 252,
+            "signal_missing": 233
+          },
+          "round_trips": 7
+        },
+        "train": {
+          "fills": 38,
+          "final_equity": 10421.117636629364,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.04211667134349373,
+            "calmar": 4.00150283404166,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.010525213423616245,
+            "min_equity": 9968.051158951157,
+            "raw_final_equity": 10421.117636629364,
+            "raw_max_drawdown": 0.010525213423616245,
+            "raw_total_return": 0.04211176366293645,
+            "sharpe": 1.7810497210562233,
+            "sortino": 1.1895966752993066,
+            "total_return": 0.04211176366293645,
+            "volatility": 0.023315290966455238
+          },
+          "reject_counts": {
+            "calendar_residual_veto": 35,
+            "cooldown": 798,
+            "signal_missing": 5823
+          },
+          "round_trips": 19
+        },
+        "val": {
+          "fills": 18,
+          "final_equity": 10295.214247006003,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.1973560863737973,
+            "calmar": 20.938815519744246,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.009425370130784164,
+            "min_equity": 9906.185465152455,
+            "raw_final_equity": 10295.214247006003,
+            "raw_max_drawdown": 0.009425370130784164,
+            "raw_total_return": 0.029521424700600152,
+            "sharpe": 3.7392872470761582,
+            "sortino": 3.822652400157684,
+            "total_return": 0.029521424700600152,
+            "volatility": 0.048483029872201114
+          },
+          "reject_counts": {
+            "calendar_residual_veto": 1,
+            "cooldown": 336,
+            "signal_missing": 332
+          },
+          "round_trips": 9
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "failed_gates": [
+        "oos_return_beats_incumbent",
+        "oos_mdd_beats_shadow"
+      ],
+      "family": "calendar_rotation",
+      "filters": {
+        "adaptive_lookback_bars": 12,
+        "allow_long": true,
+        "allow_short": true,
+        "broad_min_abs": 0.0,
+        "calendar_long_months": [
+          3,
+          4,
+          5
+        ],
+        "calendar_long_symbol": "TRXUSDT",
+        "calendar_short_months": [
+          1,
+          2
+        ],
+        "calendar_short_symbol": "",
+        "calendar_veto_flow_abs": 0.06,
+        "calendar_veto_funding_abs": 0.0,
+        "calendar_veto_market_ret_abs": 0.0,
+        "calendar_veto_resid_z": 0.0,
+        "compression_lookback_bars": 24,
+        "compression_quantile": 0.0,
+        "cooldown_bars": 30,
+        "entry_days_of_month": [],
+        "entry_hours": [],
+        "family": "calendar_rotation",
+        "flow_lookback_bars": 6,
+        "flow_persistence_bars": 0,
+        "flow_persistence_threshold": 0.0,
+        "flow_threshold": 0.0,
+        "funding_abs_cap": 0.0,
+        "funding_rank_min": 0.0,
+        "hold_bars": 120,
+        "long_allocation_scale": 6.0,
+        "lookback_bars": 168,
+        "max_order_value": 175.0,
+        "max_rv": 0.0,
+        "min_abs_return": 0.015,
+        "name": "fresh_calendar_trx_veto_flow6_sweakest_thr150_h120",
+        "oi_rank_min": 0.0,
+        "rv_lookback_bars": 24,
+        "sharpe_lookback_bars": 0,
+        "sharpe_rank_min": 0.0,
+        "short_allocation_scale": 12.0,
+        "spread_hedge_ratio": 1.0,
+        "stop_loss_pct": 0.0,
+        "take_profit_pct": 0.06,
+        "target_allocation": 0.008,
+        "threshold": 0.015,
+        "trailing_stop_cap_pct": 0.0,
+        "trailing_stop_floor_pct": 0.0,
+        "trailing_stop_rv_multiple": 0.0
+      },
+      "gates": {
+        "liquidations_zero": true,
+        "not_incumbent_or_context_wrapper": true,
+        "oos_mdd_beats_shadow": false,
+        "oos_return_beats_incumbent": false,
+        "oos_sharpe_gt_1": true,
+        "oos_trades_not_starved": true,
+        "train_positive": true,
+        "val_positive": true
+      },
+      "name": "fresh_calendar_trx_veto_flow6_sweakest_thr150_h120",
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 18,
+          "final_equity": 10077.916776206175,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.04363273080479391,
+            "calmar": 16.430264453745508,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.00265563168064816,
+            "min_equity": 9999.231712097862,
+            "raw_final_equity": 10077.916776206175,
+            "raw_max_drawdown": 0.00265563168064816,
+            "raw_total_return": 0.007791677620617499,
+            "sharpe": 4.2205192759314,
+            "sortino": 4.809121331590345,
+            "total_return": 0.007791677620617499,
+            "volatility": 0.010131223659792837
+          },
+          "reject_counts": {
+            "cooldown": 240,
+            "signal_missing": 296
+          },
+          "round_trips": 9
+        },
+        "train": {
+          "fills": 48,
+          "final_equity": 10175.19478944454,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.017521496534828485,
+            "calmar": 1.1105168076997434,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.01577778599418179,
+            "min_equity": 9867.067770637761,
+            "raw_final_equity": 10175.19478944454,
+            "raw_max_drawdown": 0.01577778599418179,
+            "raw_total_return": 0.017519478944453937,
+            "sharpe": 0.6967620922563047,
+            "sortino": 0.47348018877493625,
+            "total_return": 0.017519478944453937,
+            "volatility": 0.025391885063174576
+          },
+          "reject_counts": {
+            "cooldown": 720,
+            "signal_missing": 5625
+          },
+          "round_trips": 24
+        },
+        "val": {
+          "fills": 24,
+          "final_equity": 10276.427364733274,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.1838933354308414,
+            "calmar": 10.043736584576248,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.018309255114599365,
+            "min_equity": 9906.185465152455,
+            "raw_final_equity": 10276.427364733274,
+            "raw_max_drawdown": 0.018309255114599365,
+            "raw_total_return": 0.02764273647332738,
+            "sharpe": 3.5868532184096895,
+            "sortino": 4.138180790694072,
+            "total_return": 0.02764273647332738,
+            "volatility": 0.047376102076063034
+          },
+          "reject_counts": {
+            "cooldown": 330,
+            "signal_missing": 294
+          },
+          "round_trips": 12
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "failed_gates": [
+        "oos_return_beats_incumbent",
+        "oos_mdd_beats_shadow"
+      ],
+      "family": "calendar_rotation",
+      "filters": {
+        "adaptive_lookback_bars": 12,
+        "allow_long": true,
+        "allow_short": true,
+        "broad_min_abs": 0.0,
+        "calendar_long_months": [
+          3,
+          4,
+          5
+        ],
+        "calendar_long_symbol": "TRXUSDT",
+        "calendar_short_months": [
+          1,
+          2
+        ],
+        "calendar_short_symbol": "ETHUSDT",
+        "calendar_veto_flow_abs": 0.06,
+        "calendar_veto_funding_abs": 0.0,
+        "calendar_veto_market_ret_abs": 0.0,
+        "calendar_veto_resid_z": 0.0,
+        "compression_lookback_bars": 24,
+        "compression_quantile": 0.0,
+        "cooldown_bars": 30,
+        "entry_days_of_month": [],
+        "entry_hours": [],
+        "family": "calendar_rotation",
+        "flow_lookback_bars": 6,
+        "flow_persistence_bars": 0,
+        "flow_persistence_threshold": 0.0,
+        "flow_threshold": 0.0,
+        "funding_abs_cap": 0.0,
+        "funding_rank_min": 0.0,
+        "hold_bars": 120,
+        "long_allocation_scale": 6.0,
+        "lookback_bars": 168,
+        "max_order_value": 175.0,
+        "max_rv": 0.0,
+        "min_abs_return": 0.015,
+        "name": "fresh_calendar_trx_veto_flow6_sethusdt_thr150_h120",
+        "oi_rank_min": 0.0,
+        "rv_lookback_bars": 24,
+        "sharpe_lookback_bars": 0,
+        "sharpe_rank_min": 0.0,
+        "short_allocation_scale": 12.0,
+        "spread_hedge_ratio": 1.0,
+        "stop_loss_pct": 0.0,
+        "take_profit_pct": 0.06,
+        "target_allocation": 0.008,
+        "threshold": 0.015,
+        "trailing_stop_cap_pct": 0.0,
+        "trailing_stop_floor_pct": 0.0,
+        "trailing_stop_rv_multiple": 0.0
+      },
+      "gates": {
+        "liquidations_zero": true,
+        "not_incumbent_or_context_wrapper": true,
+        "oos_mdd_beats_shadow": false,
+        "oos_return_beats_incumbent": false,
+        "oos_sharpe_gt_1": true,
+        "oos_trades_not_starved": true,
+        "train_positive": true,
+        "val_positive": true
+      },
+      "name": "fresh_calendar_trx_veto_flow6_sethusdt_thr150_h120",
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 18,
+          "final_equity": 10077.916776206175,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.04363273080479391,
+            "calmar": 16.430264453745508,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.00265563168064816,
+            "min_equity": 9999.231712097862,
+            "raw_final_equity": 10077.916776206175,
+            "raw_max_drawdown": 0.00265563168064816,
+            "raw_total_return": 0.007791677620617499,
+            "sharpe": 4.2205192759314,
+            "sortino": 4.809121331590345,
+            "total_return": 0.007791677620617499,
+            "volatility": 0.010131223659792837
+          },
+          "reject_counts": {
+            "cooldown": 240,
+            "signal_missing": 296
+          },
+          "round_trips": 9
+        },
+        "train": {
+          "fills": 46,
+          "final_equity": 10220.906336640308,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.022093183370899494,
+            "calmar": 1.6915409181149947,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.013060980750923549,
+            "min_equity": 9940.089842645715,
+            "raw_final_equity": 10220.906336640308,
+            "raw_max_drawdown": 0.013060980750923549,
+            "raw_total_return": 0.022090633664030745,
+            "sharpe": 0.9031963182039994,
+            "sortino": 0.6216423827304627,
+            "total_return": 0.022090633664030745,
+            "volatility": 0.024527774641320662
+          },
+          "reject_counts": {
+            "calendar_flow_exhaustion_veto": 5,
+            "cooldown": 690,
+            "signal_missing": 5735
+          },
+          "round_trips": 23
+        },
+        "val": {
+          "fills": 24,
+          "final_equity": 10341.079440446529,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.23076347840093359,
+            "calmar": 15.97062637807407,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.01444924406457512,
+            "min_equity": 9906.185465152455,
+            "raw_final_equity": 10341.079440446529,
+            "raw_max_drawdown": 0.01444924406457512,
+            "raw_total_return": 0.03410794404465278,
+            "sharpe": 4.496586173121624,
+            "sortino": 4.713668837809952,
+            "total_return": 0.03410794404465278,
+            "volatility": 0.04641594865995995
+          },
+          "reject_counts": {
+            "cooldown": 347,
+            "signal_missing": 350
+          },
+          "round_trips": 12
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "failed_gates": [
+        "train_positive",
+        "oos_return_beats_incumbent",
+        "oos_mdd_beats_shadow"
+      ],
+      "family": "calendar_rotation",
+      "filters": {
+        "adaptive_lookback_bars": 12,
+        "allow_long": true,
+        "allow_short": true,
+        "broad_min_abs": 0.0,
+        "calendar_long_months": [
+          3,
+          4,
+          5
+        ],
+        "calendar_long_symbol": "TRXUSDT",
+        "calendar_short_months": [
+          1,
+          2
+        ],
+        "calendar_short_symbol": "",
+        "calendar_veto_flow_abs": 0.0,
+        "calendar_veto_funding_abs": 0.0,
+        "calendar_veto_market_ret_abs": 0.0,
+        "calendar_veto_resid_z": 1.5,
+        "compression_lookback_bars": 24,
+        "compression_quantile": 0.0,
+        "cooldown_bars": 42,
+        "entry_days_of_month": [],
+        "entry_hours": [],
+        "family": "calendar_rotation",
+        "flow_lookback_bars": 0,
+        "flow_persistence_bars": 0,
+        "flow_persistence_threshold": 0.0,
+        "flow_threshold": 0.0,
+        "funding_abs_cap": 0.0,
+        "funding_rank_min": 0.0,
+        "hold_bars": 168,
+        "long_allocation_scale": 6.0,
+        "lookback_bars": 168,
+        "max_order_value": 175.0,
+        "max_rv": 0.0,
+        "min_abs_return": 0.015,
+        "name": "fresh_calendar_trx_veto_rz15_sweakest_thr150_h168",
+        "oi_rank_min": 0.0,
+        "rv_lookback_bars": 24,
+        "sharpe_lookback_bars": 0,
+        "sharpe_rank_min": 0.0,
+        "short_allocation_scale": 12.0,
+        "spread_hedge_ratio": 1.0,
+        "stop_loss_pct": 0.0,
+        "take_profit_pct": 0.06,
+        "target_allocation": 0.008,
+        "threshold": 0.015,
+        "trailing_stop_cap_pct": 0.0,
+        "trailing_stop_floor_pct": 0.0,
+        "trailing_stop_rv_multiple": 0.0
+      },
+      "gates": {
+        "liquidations_zero": true,
+        "not_incumbent_or_context_wrapper": true,
+        "oos_mdd_beats_shadow": false,
+        "oos_return_beats_incumbent": false,
+        "oos_sharpe_gt_1": true,
+        "oos_trades_not_starved": true,
+        "train_positive": false,
+        "val_positive": true
+      },
+      "name": "fresh_calendar_trx_veto_rz15_sweakest_thr150_h168",
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 14,
+          "final_equity": 10076.555036807566,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.04285701996393332,
+            "calmar": 15.81215194131192,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0027103850331694646,
+            "min_equity": 9999.23171235687,
+            "raw_final_equity": 10076.555036807566,
+            "raw_max_drawdown": 0.0027103850331694646,
+            "raw_total_return": 0.007655503680756626,
+            "sharpe": 4.121969298909661,
+            "sortino": 4.9635179886712715,
+            "total_return": 0.007655503680756626,
+            "volatility": 0.010193208785896253
+          },
+          "reject_counts": {
+            "calendar_residual_veto": 6,
+            "cooldown": 252,
+            "signal_missing": 234
+          },
+          "round_trips": 7
+        },
+        "train": {
+          "fills": 36,
+          "final_equity": 9888.857573892332,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": -0.011115504426301381,
+            "calmar": -0.2660002279899101,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.04178757480885698,
+            "min_equity": 9631.24939190364,
+            "raw_final_equity": 9888.857573892332,
+            "raw_max_drawdown": 0.04178757480885698,
+            "raw_total_return": -0.011114242610766767,
+            "sharpe": -0.2964989223014039,
+            "sortino": -0.17389682433367867,
+            "total_return": -0.011114242610766767,
+            "volatility": 0.03556381526670325
+          },
+          "reject_counts": {
+            "calendar_residual_veto": 4,
+            "cooldown": 756,
+            "signal_missing": 5424
+          },
+          "round_trips": 18
+        },
+        "val": {
+          "fills": 20,
+          "final_equity": 10197.694362697544,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.1288448008589831,
+            "calmar": 9.050459063456314,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0142362724316636,
+            "min_equity": 9906.185465152455,
+            "raw_final_equity": 10197.694362697544,
+            "raw_max_drawdown": 0.0142362724316636,
+            "raw_total_return": 0.01976943626975447,
+            "sharpe": 2.4217529565817255,
+            "sortino": 2.711929759889064,
+            "total_return": 0.01976943626975447,
+            "volatility": 0.05057203994739024
+          },
+          "reject_counts": {
+            "cooldown": 378,
+            "signal_missing": 222
+          },
+          "round_trips": 10
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "failed_gates": [
+        "oos_return_beats_incumbent",
+        "oos_mdd_beats_shadow"
+      ],
+      "family": "calendar_rotation",
+      "filters": {
+        "adaptive_lookback_bars": 12,
+        "allow_long": true,
+        "allow_short": true,
+        "broad_min_abs": 0.0,
+        "calendar_long_months": [
+          3,
+          4,
+          5
+        ],
+        "calendar_long_symbol": "TRXUSDT",
+        "calendar_short_months": [
+          1,
+          2
+        ],
+        "calendar_short_symbol": "ETHUSDT",
+        "calendar_veto_flow_abs": 0.0,
+        "calendar_veto_funding_abs": 0.0,
+        "calendar_veto_market_ret_abs": 0.0,
+        "calendar_veto_resid_z": 1.5,
+        "compression_lookback_bars": 24,
+        "compression_quantile": 0.0,
+        "cooldown_bars": 42,
+        "entry_days_of_month": [],
+        "entry_hours": [],
+        "family": "calendar_rotation",
+        "flow_lookback_bars": 0,
+        "flow_persistence_bars": 0,
+        "flow_persistence_threshold": 0.0,
+        "flow_threshold": 0.0,
+        "funding_abs_cap": 0.0,
+        "funding_rank_min": 0.0,
+        "hold_bars": 168,
+        "long_allocation_scale": 6.0,
+        "lookback_bars": 168,
+        "max_order_value": 175.0,
+        "max_rv": 0.0,
+        "min_abs_return": 0.015,
+        "name": "fresh_calendar_trx_veto_rz15_sethusdt_thr150_h168",
+        "oi_rank_min": 0.0,
+        "rv_lookback_bars": 24,
+        "sharpe_lookback_bars": 0,
+        "sharpe_rank_min": 0.0,
+        "short_allocation_scale": 12.0,
+        "spread_hedge_ratio": 1.0,
+        "stop_loss_pct": 0.0,
+        "take_profit_pct": 0.06,
+        "target_allocation": 0.008,
+        "threshold": 0.015,
+        "trailing_stop_cap_pct": 0.0,
+        "trailing_stop_floor_pct": 0.0,
+        "trailing_stop_rv_multiple": 0.0
+      },
+      "gates": {
+        "liquidations_zero": true,
+        "not_incumbent_or_context_wrapper": true,
+        "oos_mdd_beats_shadow": false,
+        "oos_return_beats_incumbent": false,
+        "oos_sharpe_gt_1": true,
+        "oos_trades_not_starved": true,
+        "train_positive": true,
+        "val_positive": true
+      },
+      "name": "fresh_calendar_trx_veto_rz15_sethusdt_thr150_h168",
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 14,
+          "final_equity": 10076.555036807566,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.04285701996393332,
+            "calmar": 15.81215194131192,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0027103850331694646,
+            "min_equity": 9999.23171235687,
+            "raw_final_equity": 10076.555036807566,
+            "raw_max_drawdown": 0.0027103850331694646,
+            "raw_total_return": 0.007655503680756626,
+            "sharpe": 4.121969298909661,
+            "sortino": 4.9635179886712715,
+            "total_return": 0.007655503680756626,
+            "volatility": 0.010193208785896253
+          },
+          "reject_counts": {
+            "calendar_residual_veto": 6,
+            "cooldown": 252,
+            "signal_missing": 234
+          },
+          "round_trips": 7
+        },
+        "train": {
+          "fills": 38,
+          "final_equity": 10428.91666472086,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.04289666689938576,
+            "calmar": 4.0756101727243985,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.010525213423616245,
+            "min_equity": 9968.051158951157,
+            "raw_final_equity": 10428.91666472086,
+            "raw_max_drawdown": 0.010525213423616245,
+            "raw_total_return": 0.042891666472085976,
+            "sharpe": 1.8038507058514412,
+            "sortino": 1.2423724135928775,
+            "total_return": 0.042891666472085976,
+            "volatility": 0.023436937611663468
+          },
+          "reject_counts": {
+            "calendar_residual_veto": 4,
+            "cooldown": 798,
+            "signal_missing": 5661
+          },
+          "round_trips": 19
+        },
+        "val": {
+          "fills": 18,
+          "final_equity": 10255.267780779794,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.16888250234764302,
+            "calmar": 13.008206558524689,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.012982766039871113,
+            "min_equity": 9906.185465152455,
+            "raw_final_equity": 10255.267780779794,
+            "raw_max_drawdown": 0.012982766039871113,
+            "raw_total_return": 0.025526778077979317,
+            "sharpe": 3.107247823162793,
+            "sortino": 3.1464852429959347,
+            "total_return": 0.025526778077979317,
+            "volatility": 0.050633373616288974
+          },
+          "reject_counts": {
+            "cooldown": 336,
+            "signal_missing": 287
+          },
+          "round_trips": 9
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "failed_gates": [
+        "train_positive",
+        "oos_return_beats_incumbent",
+        "oos_mdd_beats_shadow"
+      ],
+      "family": "calendar_rotation",
+      "filters": {
+        "adaptive_lookback_bars": 12,
+        "allow_long": true,
+        "allow_short": true,
+        "broad_min_abs": 0.0,
+        "calendar_long_months": [
+          3,
+          4,
+          5
+        ],
+        "calendar_long_symbol": "TRXUSDT",
+        "calendar_short_months": [
+          1,
+          2
+        ],
+        "calendar_short_symbol": "",
+        "calendar_veto_flow_abs": 0.06,
+        "calendar_veto_funding_abs": 0.0,
+        "calendar_veto_market_ret_abs": 0.0,
+        "calendar_veto_resid_z": 0.0,
+        "compression_lookback_bars": 24,
+        "compression_quantile": 0.0,
+        "cooldown_bars": 42,
+        "entry_days_of_month": [],
+        "entry_hours": [],
+        "family": "calendar_rotation",
+        "flow_lookback_bars": 6,
+        "flow_persistence_bars": 0,
+        "flow_persistence_threshold": 0.0,
+        "flow_threshold": 0.0,
+        "funding_abs_cap": 0.0,
+        "funding_rank_min": 0.0,
+        "hold_bars": 168,
+        "long_allocation_scale": 6.0,
+        "lookback_bars": 168,
+        "max_order_value": 175.0,
+        "max_rv": 0.0,
+        "min_abs_return": 0.015,
+        "name": "fresh_calendar_trx_veto_flow6_sweakest_thr150_h168",
+        "oi_rank_min": 0.0,
+        "rv_lookback_bars": 24,
+        "sharpe_lookback_bars": 0,
+        "sharpe_rank_min": 0.0,
+        "short_allocation_scale": 12.0,
+        "spread_hedge_ratio": 1.0,
+        "stop_loss_pct": 0.0,
+        "take_profit_pct": 0.06,
+        "target_allocation": 0.008,
+        "threshold": 0.015,
+        "trailing_stop_cap_pct": 0.0,
+        "trailing_stop_floor_pct": 0.0,
+        "trailing_stop_rv_multiple": 0.0
+      },
+      "gates": {
+        "liquidations_zero": true,
+        "not_incumbent_or_context_wrapper": true,
+        "oos_mdd_beats_shadow": false,
+        "oos_return_beats_incumbent": false,
+        "oos_sharpe_gt_1": true,
+        "oos_trades_not_starved": true,
+        "train_positive": false,
+        "val_positive": true
+      },
+      "name": "fresh_calendar_trx_veto_flow6_sweakest_thr150_h168",
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 14,
+          "final_equity": 10072.654045983658,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.04063744325003982,
+            "calmar": 14.993241170695889,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.002710384151591266,
+            "min_equity": 9999.231712097862,
+            "raw_final_equity": 10072.654045983658,
+            "raw_max_drawdown": 0.002710384151591266,
+            "raw_total_return": 0.007265404598365777,
+            "sharpe": 3.9032753280975063,
+            "sortino": 4.706165682713875,
+            "total_return": 0.007265404598365777,
+            "volatility": 0.010218523915770423
+          },
+          "reject_counts": {
+            "cooldown": 252,
+            "signal_missing": 232
+          },
+          "round_trips": 7
+        },
+        "train": {
+          "fills": 36,
+          "final_equity": 9898.710705246784,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": -0.010130080000716468,
+            "calmar": -0.24241847120951782,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.04178757480885698,
+            "min_equity": 9631.24939190364,
+            "raw_final_equity": 9898.710705246784,
+            "raw_max_drawdown": 0.04178757480885698,
+            "raw_total_return": -0.010128929475321624,
+            "sharpe": -0.26851072171628404,
+            "sortino": -0.15731911764425272,
+            "total_return": -0.010128929475321624,
+            "volatility": 0.035561722090298536
+          },
+          "reject_counts": {
+            "cooldown": 756,
+            "signal_missing": 5427
+          },
+          "round_trips": 18
+        },
+        "val": {
+          "fills": 20,
+          "final_equity": 10197.694362697544,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.1288448008589831,
+            "calmar": 9.050459063456314,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0142362724316636,
+            "min_equity": 9906.185465152455,
+            "raw_final_equity": 10197.694362697544,
+            "raw_max_drawdown": 0.0142362724316636,
+            "raw_total_return": 0.01976943626975447,
+            "sharpe": 2.4217529565817255,
+            "sortino": 2.711929759889064,
+            "total_return": 0.01976943626975447,
+            "volatility": 0.05057203994739024
+          },
+          "reject_counts": {
+            "cooldown": 378,
+            "signal_missing": 222
+          },
+          "round_trips": 10
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "failed_gates": [
+        "oos_return_beats_incumbent",
+        "oos_mdd_beats_shadow"
+      ],
+      "family": "calendar_rotation",
+      "filters": {
+        "adaptive_lookback_bars": 12,
+        "allow_long": true,
+        "allow_short": true,
+        "broad_min_abs": 0.0,
+        "calendar_long_months": [
+          3,
+          4,
+          5
+        ],
+        "calendar_long_symbol": "TRXUSDT",
+        "calendar_short_months": [
+          1,
+          2
+        ],
+        "calendar_short_symbol": "ETHUSDT",
+        "calendar_veto_flow_abs": 0.06,
+        "calendar_veto_funding_abs": 0.0,
+        "calendar_veto_market_ret_abs": 0.0,
+        "calendar_veto_resid_z": 0.0,
+        "compression_lookback_bars": 24,
+        "compression_quantile": 0.0,
+        "cooldown_bars": 42,
+        "entry_days_of_month": [],
+        "entry_hours": [],
+        "family": "calendar_rotation",
+        "flow_lookback_bars": 6,
+        "flow_persistence_bars": 0,
+        "flow_persistence_threshold": 0.0,
+        "flow_threshold": 0.0,
+        "funding_abs_cap": 0.0,
+        "funding_rank_min": 0.0,
+        "hold_bars": 168,
+        "long_allocation_scale": 6.0,
+        "lookback_bars": 168,
+        "max_order_value": 175.0,
+        "max_rv": 0.0,
+        "min_abs_return": 0.015,
+        "name": "fresh_calendar_trx_veto_flow6_sethusdt_thr150_h168",
+        "oi_rank_min": 0.0,
+        "rv_lookback_bars": 24,
+        "sharpe_lookback_bars": 0,
+        "sharpe_rank_min": 0.0,
+        "short_allocation_scale": 12.0,
+        "spread_hedge_ratio": 1.0,
+        "stop_loss_pct": 0.0,
+        "take_profit_pct": 0.06,
+        "target_allocation": 0.008,
+        "threshold": 0.015,
+        "trailing_stop_cap_pct": 0.0,
+        "trailing_stop_floor_pct": 0.0,
+        "trailing_stop_rv_multiple": 0.0
+      },
+      "gates": {
+        "liquidations_zero": true,
+        "not_incumbent_or_context_wrapper": true,
+        "oos_mdd_beats_shadow": false,
+        "oos_return_beats_incumbent": false,
+        "oos_sharpe_gt_1": true,
+        "oos_trades_not_starved": true,
+        "train_positive": true,
+        "val_positive": true
+      },
+      "name": "fresh_calendar_trx_veto_flow6_sethusdt_thr150_h168",
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 14,
+          "final_equity": 10072.654045983658,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.04063744325003982,
+            "calmar": 14.993241170695889,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.002710384151591266,
+            "min_equity": 9999.231712097862,
+            "raw_final_equity": 10072.654045983658,
+            "raw_max_drawdown": 0.002710384151591266,
+            "raw_total_return": 0.007265404598365777,
+            "sharpe": 3.9032753280975063,
+            "sortino": 4.706165682713875,
+            "total_return": 0.007265404598365777,
+            "volatility": 0.010218523915770423
+          },
+          "reject_counts": {
+            "cooldown": 252,
+            "signal_missing": 232
+          },
+          "round_trips": 7
+        },
+        "train": {
+          "fills": 38,
+          "final_equity": 10439.307905533691,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.04393591465770408,
+            "calmar": 4.174349050169532,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.010525213423616245,
+            "min_equity": 9968.051158951157,
+            "raw_final_equity": 10439.307905533691,
+            "raw_max_drawdown": 0.010525213423616245,
+            "raw_total_return": 0.043930790553369015,
+            "sharpe": 1.8466151711112635,
+            "sortino": 1.2705466173669238,
+            "total_return": 0.043930790553369015,
+            "volatility": 0.023433504992822006
+          },
+          "reject_counts": {
+            "cooldown": 798,
+            "signal_missing": 5664
+          },
+          "round_trips": 19
+        },
+        "val": {
+          "fills": 18,
+          "final_equity": 10255.267780779794,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.16888250234764302,
+            "calmar": 13.008206558524689,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.012982766039871113,
+            "min_equity": 9906.185465152455,
+            "raw_final_equity": 10255.267780779794,
+            "raw_max_drawdown": 0.012982766039871113,
+            "raw_total_return": 0.025526778077979317,
+            "sharpe": 3.107247823162793,
+            "sortino": 3.1464852429959347,
+            "total_return": 0.025526778077979317,
+            "volatility": 0.050633373616288974
+          },
+          "reject_counts": {
+            "cooldown": 336,
+            "signal_missing": 287
+          },
+          "round_trips": 9
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "failed_gates": [
+        "oos_return_beats_incumbent",
+        "oos_mdd_beats_shadow"
+      ],
+      "family": "calendar_rotation",
+      "filters": {
+        "adaptive_lookback_bars": 24,
+        "allow_long": true,
+        "allow_short": true,
+        "broad_min_abs": 0.0,
+        "calendar_long_months": [
+          3,
+          4,
+          5
+        ],
+        "calendar_long_symbol": "TRXUSDT",
+        "calendar_short_months": [
+          1,
+          2
+        ],
+        "calendar_short_symbol": "",
+        "calendar_veto_flow_abs": 0.0,
+        "calendar_veto_funding_abs": 0.0,
+        "calendar_veto_market_ret_abs": 0.04,
+        "calendar_veto_resid_z": 0.0,
+        "compression_lookback_bars": 24,
+        "compression_quantile": 0.0,
+        "cooldown_bars": 30,
+        "entry_days_of_month": [],
+        "entry_hours": [],
+        "family": "calendar_rotation",
+        "flow_lookback_bars": 0,
+        "flow_persistence_bars": 0,
+        "flow_persistence_threshold": 0.0,
+        "flow_threshold": 0.0,
+        "funding_abs_cap": 0.0,
+        "funding_rank_min": 0.0,
+        "hold_bars": 120,
+        "long_allocation_scale": 6.0,
+        "lookback_bars": 168,
+        "max_order_value": 175.0,
+        "max_rv": 0.0,
+        "min_abs_return": 0.015,
+        "name": "fresh_calendar_trx_veto_mkt24_sweakest_thr150_h120",
+        "oi_rank_min": 0.0,
+        "rv_lookback_bars": 24,
+        "sharpe_lookback_bars": 0,
+        "sharpe_rank_min": 0.0,
+        "short_allocation_scale": 12.0,
+        "spread_hedge_ratio": 1.0,
+        "stop_loss_pct": 0.0,
+        "take_profit_pct": 0.06,
+        "target_allocation": 0.008,
+        "threshold": 0.015,
+        "trailing_stop_cap_pct": 0.0,
+        "trailing_stop_floor_pct": 0.0,
+        "trailing_stop_rv_multiple": 0.0
+      },
+      "gates": {
+        "liquidations_zero": true,
+        "not_incumbent_or_context_wrapper": true,
+        "oos_mdd_beats_shadow": false,
+        "oos_return_beats_incumbent": false,
+        "oos_sharpe_gt_1": true,
+        "oos_trades_not_starved": true,
+        "train_positive": true,
+        "val_positive": true
+      },
+      "name": "fresh_calendar_trx_veto_mkt24_sweakest_thr150_h120",
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 18,
+          "final_equity": 10072.230795833706,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.040396855998569015,
+            "calmar": 15.211768677782839,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0026556317581642964,
+            "min_equity": 9999.23171235687,
+            "raw_final_equity": 10072.230795833706,
+            "raw_max_drawdown": 0.0026556317581642964,
+            "raw_total_return": 0.00722307958337054,
+            "sharpe": 3.971973756707383,
+            "sortino": 4.615636922412659,
+            "total_return": 0.00722307958337054,
+            "volatility": 0.009982975171195401
+          },
+          "reject_counts": {
+            "calendar_market_extreme_veto": 10,
+            "cooldown": 240,
+            "signal_missing": 286
+          },
+          "round_trips": 9
+        },
+        "train": {
+          "fills": 46,
+          "final_equity": 10325.17275319236,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.03252104748308793,
+            "calmar": 1.842093977277113,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.017654391081153655,
+            "min_equity": 9866.262206812558,
+            "raw_final_equity": 10325.17275319236,
+            "raw_max_drawdown": 0.017654391081153655,
+            "raw_total_return": 0.03251727531923598,
+            "sharpe": 1.29251279830048,
+            "sortino": 0.9063848402242932,
+            "total_return": 0.03251727531923598,
+            "volatility": 0.025002408194373663
+          },
+          "reject_counts": {
+            "calendar_market_extreme_veto": 25,
+            "cooldown": 690,
+            "signal_missing": 5779
+          },
+          "round_trips": 23
+        },
+        "val": {
+          "fills": 22,
+          "final_equity": 10228.368454929743,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.15003051465387807,
+            "calmar": 15.91773188448738,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.009425370130784164,
+            "min_equity": 9906.185465152455,
+            "raw_final_equity": 10228.368454929743,
+            "raw_max_drawdown": 0.009425370130784164,
+            "raw_total_return": 0.022836845492974378,
+            "sharpe": 3.123095277318285,
+            "sortino": 3.4032439414212523,
+            "total_return": 0.022836845492974378,
+            "volatility": 0.0450850388937597
+          },
+          "reject_counts": {
+            "calendar_market_extreme_veto": 37,
+            "cooldown": 300,
+            "signal_missing": 333
+          },
+          "round_trips": 11
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "failed_gates": [
+        "oos_return_beats_incumbent",
+        "oos_mdd_beats_shadow"
+      ],
+      "family": "calendar_rotation",
+      "filters": {
+        "adaptive_lookback_bars": 24,
+        "allow_long": true,
+        "allow_short": true,
+        "broad_min_abs": 0.0,
+        "calendar_long_months": [
+          3,
+          4,
+          5
+        ],
+        "calendar_long_symbol": "TRXUSDT",
+        "calendar_short_months": [
+          1,
+          2
+        ],
+        "calendar_short_symbol": "ETHUSDT",
+        "calendar_veto_flow_abs": 0.0,
+        "calendar_veto_funding_abs": 0.0,
+        "calendar_veto_market_ret_abs": 0.04,
+        "calendar_veto_resid_z": 0.0,
+        "compression_lookback_bars": 24,
+        "compression_quantile": 0.0,
+        "cooldown_bars": 30,
+        "entry_days_of_month": [],
+        "entry_hours": [],
+        "family": "calendar_rotation",
+        "flow_lookback_bars": 0,
+        "flow_persistence_bars": 0,
+        "flow_persistence_threshold": 0.0,
+        "flow_threshold": 0.0,
+        "funding_abs_cap": 0.0,
+        "funding_rank_min": 0.0,
+        "hold_bars": 120,
+        "long_allocation_scale": 6.0,
+        "lookback_bars": 168,
+        "max_order_value": 175.0,
+        "max_rv": 0.0,
+        "min_abs_return": 0.015,
+        "name": "fresh_calendar_trx_veto_mkt24_sethusdt_thr150_h120",
+        "oi_rank_min": 0.0,
+        "rv_lookback_bars": 24,
+        "sharpe_lookback_bars": 0,
+        "sharpe_rank_min": 0.0,
+        "short_allocation_scale": 12.0,
+        "spread_hedge_ratio": 1.0,
+        "stop_loss_pct": 0.0,
+        "take_profit_pct": 0.06,
+        "target_allocation": 0.008,
+        "threshold": 0.015,
+        "trailing_stop_cap_pct": 0.0,
+        "trailing_stop_floor_pct": 0.0,
+        "trailing_stop_rv_multiple": 0.0
+      },
+      "gates": {
+        "liquidations_zero": true,
+        "not_incumbent_or_context_wrapper": true,
+        "oos_mdd_beats_shadow": false,
+        "oos_return_beats_incumbent": false,
+        "oos_sharpe_gt_1": true,
+        "oos_trades_not_starved": true,
+        "train_positive": true,
+        "val_positive": true
+      },
+      "name": "fresh_calendar_trx_veto_mkt24_sethusdt_thr150_h120",
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 18,
+          "final_equity": 10072.230795833706,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.040396855998569015,
+            "calmar": 15.211768677782839,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0026556317581642964,
+            "min_equity": 9999.23171235687,
+            "raw_final_equity": 10072.230795833706,
+            "raw_max_drawdown": 0.0026556317581642964,
+            "raw_total_return": 0.00722307958337054,
+            "sharpe": 3.971973756707383,
+            "sortino": 4.615636922412659,
+            "total_return": 0.00722307958337054,
+            "volatility": 0.009982975171195401
+          },
+          "reject_counts": {
+            "calendar_market_extreme_veto": 10,
+            "cooldown": 240,
+            "signal_missing": 286
+          },
+          "round_trips": 9
+        },
+        "train": {
+          "fills": 44,
+          "final_equity": 10272.95242012375,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.02729840041583098,
+            "calmar": 2.306102375870623,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.011837462508803414,
+            "min_equity": 9962.361197753535,
+            "raw_final_equity": 10272.95242012375,
+            "raw_max_drawdown": 0.011837462508803414,
+            "raw_total_return": 0.027295242012374876,
+            "sharpe": 1.1199661654867348,
+            "sortino": 0.7523363868902615,
+            "total_return": 0.027295242012374876,
+            "volatility": 0.024311363371432002
+          },
+          "reject_counts": {
+            "calendar_market_extreme_veto": 15,
+            "cooldown": 660,
+            "signal_missing": 5856
+          },
+          "round_trips": 22
+        },
+        "val": {
+          "fills": 22,
+          "final_equity": 10219.69124131926,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.14400388085516558,
+            "calmar": 9.962854201065484,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.01445407891643792,
+            "min_equity": 9906.185465152455,
+            "raw_final_equity": 10219.69124131926,
+            "raw_max_drawdown": 0.01445407891643792,
+            "raw_total_return": 0.021969124131925977,
+            "sharpe": 2.869596632245578,
+            "sortino": 2.9006056013857795,
+            "total_return": 0.021969124131925977,
+            "volatility": 0.047272013434291535
+          },
+          "reject_counts": {
+            "calendar_market_extreme_veto": 37,
+            "cooldown": 317,
+            "signal_missing": 352
+          },
+          "round_trips": 11
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "failed_gates": [
+        "oos_return_beats_incumbent",
+        "oos_mdd_beats_shadow"
+      ],
+      "family": "calendar_rotation",
+      "filters": {
+        "adaptive_lookback_bars": 24,
+        "allow_long": true,
+        "allow_short": true,
+        "broad_min_abs": 0.0,
+        "calendar_long_months": [
+          3,
+          4,
+          5
+        ],
+        "calendar_long_symbol": "TRXUSDT",
+        "calendar_short_months": [
+          1,
+          2
+        ],
+        "calendar_short_symbol": "",
+        "calendar_veto_flow_abs": 0.0,
+        "calendar_veto_funding_abs": 0.0,
+        "calendar_veto_market_ret_abs": 0.04,
+        "calendar_veto_resid_z": 0.0,
+        "compression_lookback_bars": 24,
+        "compression_quantile": 0.0,
+        "cooldown_bars": 42,
+        "entry_days_of_month": [],
+        "entry_hours": [],
+        "family": "calendar_rotation",
+        "flow_lookback_bars": 0,
+        "flow_persistence_bars": 0,
+        "flow_persistence_threshold": 0.0,
+        "flow_threshold": 0.0,
+        "funding_abs_cap": 0.0,
+        "funding_rank_min": 0.0,
+        "hold_bars": 168,
+        "long_allocation_scale": 6.0,
+        "lookback_bars": 168,
+        "max_order_value": 175.0,
+        "max_rv": 0.0,
+        "min_abs_return": 0.015,
+        "name": "fresh_calendar_trx_veto_mkt24_sweakest_thr150_h168",
+        "oi_rank_min": 0.0,
+        "rv_lookback_bars": 24,
+        "sharpe_lookback_bars": 0,
+        "sharpe_rank_min": 0.0,
+        "short_allocation_scale": 12.0,
+        "spread_hedge_ratio": 1.0,
+        "stop_loss_pct": 0.0,
+        "take_profit_pct": 0.06,
+        "target_allocation": 0.008,
+        "threshold": 0.015,
+        "trailing_stop_cap_pct": 0.0,
+        "trailing_stop_floor_pct": 0.0,
+        "trailing_stop_rv_multiple": 0.0
+      },
+      "gates": {
+        "liquidations_zero": true,
+        "not_incumbent_or_context_wrapper": true,
+        "oos_mdd_beats_shadow": false,
+        "oos_return_beats_incumbent": false,
+        "oos_sharpe_gt_1": true,
+        "oos_trades_not_starved": true,
+        "train_positive": true,
+        "val_positive": true
+      },
+      "name": "fresh_calendar_trx_veto_mkt24_sweakest_thr150_h168",
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 14,
+          "final_equity": 10069.47088938301,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.038829163549185974,
+            "calmar": 14.326071271112657,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.002710384641704372,
+            "min_equity": 9999.23171235687,
+            "raw_final_equity": 10069.47088938301,
+            "raw_max_drawdown": 0.002710384641704372,
+            "raw_total_return": 0.006947088938300983,
+            "sharpe": 3.728727803917211,
+            "sortino": 4.494836543420321,
+            "total_return": 0.006947088938300983,
+            "volatility": 0.01023047317256001
+          },
+          "reject_counts": {
+            "calendar_market_extreme_veto": 2,
+            "cooldown": 252,
+            "signal_missing": 231
+          },
+          "round_trips": 7
+        },
+        "train": {
+          "fills": 36,
+          "final_equity": 10052.198056246729,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.00522040311373817,
+            "calmar": 0.2396224627628204,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.02178595050542216,
+            "min_equity": 9824.766578153187,
+            "raw_final_equity": 10052.198056246729,
+            "raw_max_drawdown": 0.02178595050542216,
+            "raw_total_return": 0.005219805624672835,
+            "sharpe": 0.21124890114346337,
+            "sortino": 0.13104982264414025,
+            "total_return": 0.005219805624672835,
+            "volatility": 0.026283684365672362
+          },
+          "reject_counts": {
+            "calendar_market_extreme_veto": 41,
+            "cooldown": 756,
+            "signal_missing": 5517
+          },
+          "round_trips": 18
+        },
+        "val": {
+          "fills": 16,
+          "final_equity": 10037.616849382499,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.02351644730210678,
+            "calmar": 1.2351879101601861,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.019038760911331325,
+            "min_equity": 9906.185465152455,
+            "raw_final_equity": 10037.616849382499,
+            "raw_max_drawdown": 0.019038760911331325,
+            "raw_total_return": 0.0037616849382497985,
+            "sharpe": 0.4852725954823025,
+            "sortino": 0.5274971376605064,
+            "total_return": 0.0037616849382497985,
+            "volatility": 0.05052766529371822
+          },
+          "reject_counts": {
+            "calendar_market_extreme_veto": 25,
+            "cooldown": 294,
+            "signal_missing": 223
+          },
+          "round_trips": 8
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "failed_gates": [
+        "oos_return_beats_incumbent",
+        "oos_mdd_beats_shadow"
+      ],
+      "family": "calendar_rotation",
+      "filters": {
+        "adaptive_lookback_bars": 24,
+        "allow_long": true,
+        "allow_short": true,
+        "broad_min_abs": 0.0,
+        "calendar_long_months": [
+          3,
+          4,
+          5
+        ],
+        "calendar_long_symbol": "TRXUSDT",
+        "calendar_short_months": [
+          1,
+          2
+        ],
+        "calendar_short_symbol": "ETHUSDT",
+        "calendar_veto_flow_abs": 0.0,
+        "calendar_veto_funding_abs": 0.0,
+        "calendar_veto_market_ret_abs": 0.04,
+        "calendar_veto_resid_z": 0.0,
+        "compression_lookback_bars": 24,
+        "compression_quantile": 0.0,
+        "cooldown_bars": 42,
+        "entry_days_of_month": [],
+        "entry_hours": [],
+        "family": "calendar_rotation",
+        "flow_lookback_bars": 0,
+        "flow_persistence_bars": 0,
+        "flow_persistence_threshold": 0.0,
+        "flow_threshold": 0.0,
+        "funding_abs_cap": 0.0,
+        "funding_rank_min": 0.0,
+        "hold_bars": 168,
+        "long_allocation_scale": 6.0,
+        "lookback_bars": 168,
+        "max_order_value": 175.0,
+        "max_rv": 0.0,
+        "min_abs_return": 0.015,
+        "name": "fresh_calendar_trx_veto_mkt24_sethusdt_thr150_h168",
+        "oi_rank_min": 0.0,
+        "rv_lookback_bars": 24,
+        "sharpe_lookback_bars": 0,
+        "sharpe_rank_min": 0.0,
+        "short_allocation_scale": 12.0,
+        "spread_hedge_ratio": 1.0,
+        "stop_loss_pct": 0.0,
+        "take_profit_pct": 0.06,
+        "target_allocation": 0.008,
+        "threshold": 0.015,
+        "trailing_stop_cap_pct": 0.0,
+        "trailing_stop_floor_pct": 0.0,
+        "trailing_stop_rv_multiple": 0.0
+      },
+      "gates": {
+        "liquidations_zero": true,
+        "not_incumbent_or_context_wrapper": true,
+        "oos_mdd_beats_shadow": false,
+        "oos_return_beats_incumbent": false,
+        "oos_sharpe_gt_1": true,
+        "oos_trades_not_starved": true,
+        "train_positive": true,
+        "val_positive": true
+      },
+      "name": "fresh_calendar_trx_veto_mkt24_sethusdt_thr150_h168",
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 14,
+          "final_equity": 10069.47088938301,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.038829163549185974,
+            "calmar": 14.326071271112657,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.002710384641704372,
+            "min_equity": 9999.23171235687,
+            "raw_final_equity": 10069.47088938301,
+            "raw_max_drawdown": 0.002710384641704372,
+            "raw_total_return": 0.006947088938300983,
+            "sharpe": 3.728727803917211,
+            "sortino": 4.494836543420321,
+            "total_return": 0.006947088938300983,
+            "volatility": 0.01023047317256001
+          },
+          "reject_counts": {
+            "calendar_market_extreme_veto": 2,
+            "cooldown": 252,
+            "signal_missing": 231
+          },
+          "round_trips": 7
+        },
+        "train": {
+          "fills": 38,
+          "final_equity": 10368.667333396907,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.036871019010232375,
+            "calmar": 3.5031136686978703,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.010525213423616245,
+            "min_equity": 9968.051158951157,
+            "raw_final_equity": 10368.667333396907,
+            "raw_max_drawdown": 0.010525213423616245,
+            "raw_total_return": 0.036866733339690594,
+            "sharpe": 1.5556396454158643,
+            "sortino": 1.0804798135130302,
+            "total_return": 0.036866733339690594,
+            "volatility": 0.023451771704441987
+          },
+          "reject_counts": {
+            "calendar_market_extreme_veto": 28,
+            "cooldown": 798,
+            "signal_missing": 5606
+          },
+          "round_trips": 19
+        },
+        "val": {
+          "fills": 18,
+          "final_equity": 10185.112678916608,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.12025015134796346,
+            "calmar": 9.25096922451447,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.012998654349568945,
+            "min_equity": 9906.185465152455,
+            "raw_final_equity": 10185.112678916608,
+            "raw_max_drawdown": 0.012998654349568945,
+            "raw_total_return": 0.0185112678916608,
+            "sharpe": 2.390032220405916,
+            "sortino": 2.551155948617206,
+            "total_return": 0.0185112678916608,
+            "volatility": 0.04799241724091839
+          },
+          "reject_counts": {
+            "calendar_market_extreme_veto": 25,
+            "cooldown": 336,
+            "signal_missing": 260
+          },
+          "round_trips": 9
+        }
+      },
+      "success_candidate": false
+    },
+    {
+      "failed_gates": [
+        "train_positive",
+        "oos_return_beats_incumbent",
+        "oos_trades_not_starved"
+      ],
+      "family": "calendar_rotation",
+      "filters": {
+        "adaptive_lookback_bars": 12,
+        "allow_long": true,
+        "allow_short": true,
+        "broad_min_abs": 0.0,
+        "calendar_long_months": [
+          3,
+          4,
+          5
+        ],
+        "calendar_long_symbol": "TRXUSDT",
+        "calendar_short_months": [
+          1,
+          2
+        ],
+        "calendar_short_symbol": "",
+        "calendar_veto_flow_abs": 0.0,
+        "calendar_veto_funding_abs": 0.0,
+        "calendar_veto_market_ret_abs": 0.0,
+        "calendar_veto_resid_z": 0.0,
+        "compression_lookback_bars": 24,
+        "compression_quantile": 0.0,
+        "cooldown_bars": 42,
+        "entry_days_of_month": [
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20
+        ],
+        "entry_hours": [
+          2,
+          3,
+          10,
+          11,
+          18,
+          19
+        ],
+        "family": "calendar_rotation",
+        "flow_lookback_bars": 0,
+        "flow_persistence_bars": 0,
+        "flow_persistence_threshold": 0.0,
+        "flow_threshold": 0.0,
+        "funding_abs_cap": 0.0,
+        "funding_rank_min": 0.0,
+        "hold_bars": 168,
+        "long_allocation_scale": 6.0,
+        "lookback_bars": 168,
+        "max_order_value": 175.0,
+        "max_rv": 0.0,
+        "min_abs_return": 0.018,
+        "name": "fresh_calendar_trx_daywin_mid_postfund_sweakest_thr180_h168",
+        "oi_rank_min": 0.0,
+        "rv_lookback_bars": 24,
+        "sharpe_lookback_bars": 0,
+        "sharpe_rank_min": 0.0,
+        "short_allocation_scale": 12.0,
+        "spread_hedge_ratio": 1.0,
+        "stop_loss_pct": 0.0,
+        "take_profit_pct": 0.06,
+        "target_allocation": 0.008,
+        "threshold": 0.018,
+        "trailing_stop_cap_pct": 0.0,
+        "trailing_stop_floor_pct": 0.0,
+        "trailing_stop_rv_multiple": 0.0
+      },
+      "gates": {
+        "liquidations_zero": true,
+        "not_incumbent_or_context_wrapper": true,
+        "oos_mdd_beats_shadow": true,
+        "oos_return_beats_incumbent": false,
+        "oos_sharpe_gt_1": true,
+        "oos_trades_not_starved": false,
+        "train_positive": false,
+        "val_positive": true
+      },
+      "name": "fresh_calendar_trx_daywin_mid_postfund_sweakest_thr180_h168",
+      "replay_survivor": false,
+      "split_results": {
+        "oos": {
+          "fills": 6,
+          "final_equity": 10064.95093344091,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.03626589644345346,
+            "calmar": 32.24268151865325,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.0011247791664744967,
+            "min_equity": 9999.231712315093,
+            "raw_final_equity": 10064.95093344091,
+            "raw_max_drawdown": 0.0011247791664744967,
+            "raw_total_return": 0.006495093344091041,
+            "sharpe": 6.420741681890303,
+            "sortino": 5.626010597334608,
+            "total_return": 0.006495093344091041,
+            "volatility": 0.005550641240764277
+          },
+          "reject_counts": {
+            "cooldown": 126,
+            "entry_day_block": 244,
+            "entry_hour_block": 805,
+            "signal_missing": 20
+          },
+          "round_trips": 3
+        },
+        "train": {
+          "fills": 18,
+          "final_equity": 9977.456936945624,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": -0.0022545633853732205,
+            "calmar": -0.1530072564031126,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.014735009556888938,
+            "min_equity": 9908.55134877588,
+            "raw_final_equity": 9977.456936945624,
+            "raw_max_drawdown": 0.014735009556888938,
+            "raw_total_return": -0.002254306305437659,
+            "sharpe": -0.12241182472413357,
+            "sortino": -0.05638439124577377,
+            "total_return": -0.002254306305437659,
+            "volatility": 0.017226805647933285
+          },
+          "reject_counts": {
+            "cooldown": 378,
+            "entry_day_block": 1358,
+            "entry_hour_block": 5533,
+            "signal_missing": 475
+          },
+          "round_trips": 9
+        },
+        "val": {
+          "fills": 6,
+          "final_equity": 10026.6574396259,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.016617727694991036,
+            "calmar": 2.062597612443733,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.008056698793179837,
+            "min_equity": 9926.4402287676,
+            "raw_final_equity": 10026.6574396259,
+            "raw_max_drawdown": 0.008056698793179837,
+            "raw_total_return": 0.002665743962590117,
+            "sharpe": 0.7026821322492376,
+            "sortino": 0.5790890692458901,
+            "total_return": 0.002665743962590117,
+            "volatility": 0.023859301400647688
+          },
+          "reject_counts": {
+            "cooldown": 126,
+            "entry_day_block": 209,
+            "entry_hour_block": 678,
+            "signal_missing": 12
+          },
+          "round_trips": 3
+        }
+      },
+      "success_candidate": false
+    }
+  ]
+}

@@ -1,0 +1,1241 @@
+{
+  "artifact_kind": "live_equivalent_raw_first_backfill",
+  "generated_at_utc": "2026-05-03T04:28:47.079988+00:00",
+  "db_path": "data/market_parquet",
+  "exchange_id": "binance",
+  "start": "2026-03-01",
+  "end": "2026-05-03",
+  "chunk_days": 3,
+  "raw_chunk_days": 3,
+  "max_rss_mb": 6500,
+  "symbols": [
+    {
+      "symbol": "BTC/USDT",
+      "required_days": 64,
+      "raw_present_before": 54,
+      "raw_missing_before": 10,
+      "raw_present_after": 64,
+      "raw_missing_after": 0,
+      "materialized_present_before": 0,
+      "materialized_missing_before": 64,
+      "materialized_present_after": 17,
+      "materialized_missing_after": 47,
+      "first_raw_missing_after": [],
+      "first_materialized_missing_after": [
+        "2026-03-18",
+        "2026-03-19",
+        "2026-03-20",
+        "2026-03-21",
+        "2026-03-22",
+        "2026-03-23",
+        "2026-03-24",
+        "2026-03-25",
+        "2026-03-26",
+        "2026-03-27"
+      ],
+      "raw_runs": [
+        {
+          "start": "2026-03-08",
+          "end": "2026-03-10",
+          "days": 3,
+          "elapsed_sec": 32.622,
+          "fetched_rows": 7223441,
+          "upserted_rows": 7223441,
+          "first_timestamp_ms": 1772928002458,
+          "last_timestamp_ms": 1773187199938,
+          "peak_rss_mb": 607.355
+        },
+        {
+          "start": "2026-03-11",
+          "end": "2026-03-13",
+          "days": 3,
+          "elapsed_sec": 31.63,
+          "fetched_rows": 7128346,
+          "upserted_rows": 7128346,
+          "first_timestamp_ms": 1773187200102,
+          "last_timestamp_ms": 1773446399902,
+          "peak_rss_mb": 629.43
+        },
+        {
+          "start": "2026-03-14",
+          "end": "2026-03-16",
+          "days": 3,
+          "elapsed_sec": 22.18,
+          "fetched_rows": 4738871,
+          "upserted_rows": 4738871,
+          "first_timestamp_ms": 1773446400060,
+          "last_timestamp_ms": 1773705599824,
+          "peak_rss_mb": 587.562
+        },
+        {
+          "start": "2026-03-17",
+          "end": "2026-03-17",
+          "days": 1,
+          "elapsed_sec": 11.1,
+          "fetched_rows": 2326407,
+          "upserted_rows": 2326407,
+          "first_timestamp_ms": 1773705600288,
+          "last_timestamp_ms": 1773791999759,
+          "peak_rss_mb": 541.102
+        }
+      ],
+      "materialize_runs": [
+        {
+          "start": "2026-03-01",
+          "end": "2026-03-03",
+          "days": 3,
+          "elapsed_sec": 7.609,
+          "peak_rss_mb": 3561.293,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:20:32.297357+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"BTC/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T042025Z-BTC-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-03-01\", \"commit_id\": \"20260301-2abaf73ee90c3c7c\", \"row_count\": 86400, \"canonical_row_checksum\": \"2abaf73ee90c3c7c69b80c229f029d2663bb57d87a0aaa40b70c01654c65dd30\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-03-01/manifest.json\"}, {\"partition\": \"2026-03-02\", \"commit_id\": \"20260302-9196c7fc871ec01d\", \"row_count\": 86400, \"canonical_row_checksum\": \"9196c7fc871ec01d47b2bff14d5bec99961e4b962013add0918784a837788725\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-03-02/manifest.json\"}, {\"partition\": \"2026-03-03\", \"commit_id\": \"20260303-9bf6fc5b598a12fa\", \"row_count\": 86399, \"canonical_row_checksum\": \"9bf6fc5b598a12fac92e6f7c48a8130368faf3ec5c7f898075220f7b22138085\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-03-03/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-03-04",
+          "end": "2026-03-06",
+          "days": 3,
+          "elapsed_sec": 5.518,
+          "peak_rss_mb": 3556.941,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:20:37.795658+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"BTC/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T042033Z-BTC-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-03-04\", \"commit_id\": \"20260304-5d3f7578f0562656\", \"row_count\": 86400, \"canonical_row_checksum\": \"5d3f7578f0562656a4a555ede131e99c86b22895c767ae7c5344163a0e2c28e0\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-03-04/manifest.json\"}, {\"partition\": \"2026-03-05\", \"commit_id\": \"20260305-f79d49cfcaeb8b5d\", \"row_count\": 86400, \"canonical_row_checksum\": \"f79d49cfcaeb8b5d4bba28186011215e67ce038e88a46e1a0ecd80ad8526a2ef\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-03-05/manifest.json\"}, {\"partition\": \"2026-03-06\", \"commit_id\": \"20260306-78f5602a7ad6b3cb\", \"row_count\": 86399, \"canonical_row_checksum\": \"78f5602a7ad6b3cb4ff4db18d4ede9e84a06e26328574320bb9ee0b75ed9a4b6\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-03-06/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-03-07",
+          "end": "2026-03-09",
+          "days": 3,
+          "elapsed_sec": 4.027,
+          "peak_rss_mb": 2361.32,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:20:42.125595+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"BTC/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T042038Z-BTC-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-03-07\", \"commit_id\": \"20260307-0e19608e4b4b525e\", \"row_count\": 86400, \"canonical_row_checksum\": \"0e19608e4b4b525e5c4b21d672030afeb0349ef736c3871016b9987048cc1a11\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-03-07/manifest.json\"}, {\"partition\": \"2026-03-08\", \"commit_id\": \"20260308-08f1a349d0c92f65\", \"row_count\": 86400, \"canonical_row_checksum\": \"08f1a349d0c92f65baa114e3653385e1451ef7617f6a080aa833a45516e155e9\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-03-08/manifest.json\"}, {\"partition\": \"2026-03-09\", \"commit_id\": \"20260309-703f9a0ecd91a4ab\", \"row_count\": 86398, \"canonical_row_checksum\": \"703f9a0ecd91a4ab8c89a8a62bd301740b7f788b9be9648314e67407772ce559\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-03-09/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-03-10",
+          "end": "2026-03-12",
+          "days": 3,
+          "elapsed_sec": 4.541,
+          "peak_rss_mb": 2676.922,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:20:46.504237+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"BTC/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T042042Z-BTC-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-03-10\", \"commit_id\": \"20260310-4a73462e077a12fd\", \"row_count\": 86400, \"canonical_row_checksum\": \"4a73462e077a12fd453c43dd9814e89fedcf2063c50fb526f7f446a13def1989\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-03-10/manifest.json\"}, {\"partition\": \"2026-03-11\", \"commit_id\": \"20260311-b019f9b311784915\", \"row_count\": 86400, \"canonical_row_checksum\": \"b019f9b3117849154014d8aa4354226cdf1eacab97c5d0e6aa57ef2815bb4ca4\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-03-11/manifest.json\"}, {\"partition\": \"2026-03-12\", \"commit_id\": \"20260312-7eb0c8d1dedc2cc6\", \"row_count\": 86398, \"canonical_row_checksum\": \"7eb0c8d1dedc2cc605f14208b60368f773deb8fe2f7a2e9cc6466d6a10034475\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-03-12/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-03-13",
+          "end": "2026-03-15",
+          "days": 3,
+          "elapsed_sec": 4.012,
+          "peak_rss_mb": 2325.609,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:20:48.046008+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"BTC/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T042047Z-BTC-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-03-13\", \"commit_id\": \"20260313-a2d3152c9382718a\", \"row_count\": 86400, \"canonical_row_checksum\": \"a2d3152c9382718a73cad23f14250a2d96801166ab981f8d3b7346f499b78428\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-03-13/manifest.json\"}, {\"partition\": \"2026-03-14\", \"commit_id\": \"20260314-b732336137f1406f\", \"row_count\": 86400, \"canonical_row_checksum\": \"b732336137f1406f758d1e15602a000a6d96a2bc27cbb0cd1a7900ece440e93b\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-03-14/manifest.json\"}, {\"partition\": \"2026-03-15\", \"commit_id\": \"20260315-e7bf92e217dad6cd\", \"row_count\": 86398, \"canonical_row_checksum\": \"e7bf92e217dad6cdccb19bebb050c9a5cf3c214f7993608936b6ab34acaa5102\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-03-15/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-03-16",
+          "end": "2026-03-18",
+          "days": 3,
+          "elapsed_sec": 3.519,
+          "peak_rss_mb": 2408.492,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:20:51.672170+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"BTC/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T042048Z-BTC-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-03-16\", \"commit_id\": \"20260316-5f896e6f96fcd312\", \"row_count\": 86400, \"canonical_row_checksum\": \"5f896e6f96fcd312b3a97fe873870da5ebde0454d84073a1046f55165c41dd1c\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-03-16/manifest.json\"}, {\"partition\": \"2026-03-17\", \"commit_id\": \"20260317-51a028f123c4dd48\", \"row_count\": 86400, \"canonical_row_checksum\": \"51a028f123c4dd480aabbdad003bd6094f065f87578bc72f93881f79834db1f2\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-03-17/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-03-19",
+          "end": "2026-03-21",
+          "days": 3,
+          "elapsed_sec": 3.013,
+          "peak_rss_mb": 2584.469,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:20:54.316669+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"BTC/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:BTC/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-03-22",
+          "end": "2026-03-24",
+          "days": 3,
+          "elapsed_sec": 4.009,
+          "peak_rss_mb": 2564.922,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:20:58.431698+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"BTC/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:BTC/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-03-25",
+          "end": "2026-03-27",
+          "days": 3,
+          "elapsed_sec": 3.013,
+          "peak_rss_mb": 2254.32,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:21:01.353191+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"BTC/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:BTC/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-03-28",
+          "end": "2026-03-30",
+          "days": 3,
+          "elapsed_sec": 2.543,
+          "peak_rss_mb": 1529.738,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:21:03.842371+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"BTC/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:BTC/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-03-31",
+          "end": "2026-04-02",
+          "days": 3,
+          "elapsed_sec": 3.011,
+          "peak_rss_mb": 2424.504,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:21:07.145326+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"BTC/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:BTC/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-03",
+          "end": "2026-04-05",
+          "days": 3,
+          "elapsed_sec": 2.033,
+          "peak_rss_mb": 1416.789,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:21:09.121556+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"BTC/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:BTC/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-06",
+          "end": "2026-04-08",
+          "days": 3,
+          "elapsed_sec": 3.023,
+          "peak_rss_mb": 2367.086,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:21:11.948322+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"BTC/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:BTC/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-09",
+          "end": "2026-04-11",
+          "days": 3,
+          "elapsed_sec": 2.509,
+          "peak_rss_mb": 2101.035,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:21:14.782501+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"BTC/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:BTC/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-12",
+          "end": "2026-04-14",
+          "days": 3,
+          "elapsed_sec": 3.012,
+          "peak_rss_mb": 2301.52,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:21:17.745071+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"BTC/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:BTC/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-15",
+          "end": "2026-04-17",
+          "days": 3,
+          "elapsed_sec": 2.543,
+          "peak_rss_mb": 2502.371,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:21:17.868741+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"BTC/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:BTC/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-18",
+          "end": "2026-04-20",
+          "days": 3,
+          "elapsed_sec": 2.553,
+          "peak_rss_mb": 2216.148,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:21:20.365418+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"BTC/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:BTC/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-21",
+          "end": "2026-04-23",
+          "days": 3,
+          "elapsed_sec": 3.532,
+          "peak_rss_mb": 2616.848,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:21:23.787154+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"BTC/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:BTC/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-24",
+          "end": "2026-04-26",
+          "days": 3,
+          "elapsed_sec": 2.507,
+          "peak_rss_mb": 1523.676,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:21:26.437623+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"BTC/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:BTC/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-27",
+          "end": "2026-04-29",
+          "days": 3,
+          "elapsed_sec": 3.008,
+          "peak_rss_mb": 2158.074,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:21:29.059621+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"BTC/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:BTC/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-30",
+          "end": "2026-05-02",
+          "days": 3,
+          "elapsed_sec": 3.034,
+          "peak_rss_mb": 1544.988,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:21:32.251205+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"BTC/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:BTC/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-05-03",
+          "end": "2026-05-03",
+          "days": 1,
+          "elapsed_sec": 1.503,
+          "peak_rss_mb": 581.988,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:21:34.084961+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"BTC/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:BTC/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        }
+      ]
+    },
+    {
+      "symbol": "ETH/USDT",
+      "required_days": 64,
+      "raw_present_before": 46,
+      "raw_missing_before": 18,
+      "raw_present_after": 64,
+      "raw_missing_after": 0,
+      "materialized_present_before": 0,
+      "materialized_missing_before": 64,
+      "materialized_present_after": 18,
+      "materialized_missing_after": 46,
+      "first_raw_missing_after": [],
+      "first_materialized_missing_after": [
+        "2026-03-19",
+        "2026-03-20",
+        "2026-03-21",
+        "2026-03-22",
+        "2026-03-23",
+        "2026-03-24",
+        "2026-03-25",
+        "2026-03-26",
+        "2026-03-27",
+        "2026-03-28"
+      ],
+      "raw_runs": [
+        {
+          "start": "2026-03-01",
+          "end": "2026-03-03",
+          "days": 3,
+          "elapsed_sec": 39.218,
+          "fetched_rows": 8347310,
+          "upserted_rows": 8347310,
+          "first_timestamp_ms": 1772323200607,
+          "last_timestamp_ms": 1772582399718,
+          "peak_rss_mb": 601.699
+        },
+        {
+          "start": "2026-03-04",
+          "end": "2026-03-06",
+          "days": 3,
+          "elapsed_sec": 40.831,
+          "fetched_rows": 8020396,
+          "upserted_rows": 8020396,
+          "first_timestamp_ms": 1772582400009,
+          "last_timestamp_ms": 1772841599787,
+          "peak_rss_mb": 584.285
+        },
+        {
+          "start": "2026-03-07",
+          "end": "2026-03-09",
+          "days": 3,
+          "elapsed_sec": 25.241,
+          "fetched_rows": 4738635,
+          "upserted_rows": 4738635,
+          "first_timestamp_ms": 1772841601813,
+          "last_timestamp_ms": 1773100799939,
+          "peak_rss_mb": 591.883
+        },
+        {
+          "start": "2026-03-10",
+          "end": "2026-03-12",
+          "days": 3,
+          "elapsed_sec": 30.75,
+          "fetched_rows": 5846342,
+          "upserted_rows": 5846342,
+          "first_timestamp_ms": 1773100800081,
+          "last_timestamp_ms": 1773359999913,
+          "peak_rss_mb": 589.645
+        },
+        {
+          "start": "2026-03-13",
+          "end": "2026-03-15",
+          "days": 3,
+          "elapsed_sec": 22.617,
+          "fetched_rows": 4294575,
+          "upserted_rows": 4294575,
+          "first_timestamp_ms": 1773360000021,
+          "last_timestamp_ms": 1773619199947,
+          "peak_rss_mb": 578.871
+        },
+        {
+          "start": "2026-03-16",
+          "end": "2026-03-18",
+          "days": 3,
+          "elapsed_sec": 36.256,
+          "fetched_rows": 7371781,
+          "upserted_rows": 7371781,
+          "first_timestamp_ms": 1773619200094,
+          "last_timestamp_ms": 1773878398692,
+          "peak_rss_mb": 585.477
+        }
+      ],
+      "materialize_runs": [
+        {
+          "start": "2026-03-01",
+          "end": "2026-03-03",
+          "days": 3,
+          "elapsed_sec": 6.028,
+          "peak_rss_mb": 3363.223,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:24:39.636683+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"ETH/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T042434Z-ETH-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-03-01\", \"commit_id\": \"20260301-aef92a9445845343\", \"row_count\": 86400, \"canonical_row_checksum\": \"aef92a9445845343ae9f3e654b48d262d0082762382435fdc7f676be7ff325eb\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-03-01/manifest.json\"}, {\"partition\": \"2026-03-02\", \"commit_id\": \"20260302-a6fc66380e9d7cf5\", \"row_count\": 86400, \"canonical_row_checksum\": \"a6fc66380e9d7cf526c94486bce3c96c6d84d803c69496ef80e345d144618110\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-03-02/manifest.json\"}, {\"partition\": \"2026-03-03\", \"commit_id\": \"20260303-9c81d54eab427070\", \"row_count\": 86399, \"canonical_row_checksum\": \"9c81d54eab4270701f2cea5d7b08dd1741349b729651332dd2ff6fc15d8ee602\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-03-03/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-03-04",
+          "end": "2026-03-06",
+          "days": 3,
+          "elapsed_sec": 5.008,
+          "peak_rss_mb": 3407.219,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:24:44.915961+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"ETH/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T042440Z-ETH-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-03-04\", \"commit_id\": \"20260304-0d0b73a42bec3e20\", \"row_count\": 86400, \"canonical_row_checksum\": \"0d0b73a42bec3e203e5888ed5718714ba5081b0e2b2b51ff5b2ed2fd3d0c5276\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-03-04/manifest.json\"}, {\"partition\": \"2026-03-05\", \"commit_id\": \"20260305-822f656a0ebe88c2\", \"row_count\": 86400, \"canonical_row_checksum\": \"822f656a0ebe88c2852a2064d5b7a49ed413e42c541c16afcf4d17a0e0c6c3c8\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-03-05/manifest.json\"}, {\"partition\": \"2026-03-06\", \"commit_id\": \"20260306-9e683356b6a70bb4\", \"row_count\": 86399, \"canonical_row_checksum\": \"9e683356b6a70bb4113d162c5cdcbcbf3346cee3292a6448cedfa1987f091761\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-03-06/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-03-07",
+          "end": "2026-03-09",
+          "days": 3,
+          "elapsed_sec": 4.073,
+          "peak_rss_mb": 2261.562,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:24:46.425615+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"ETH/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T042445Z-ETH-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-03-07\", \"commit_id\": \"20260307-02105debf8db0a1c\", \"row_count\": 86399, \"canonical_row_checksum\": \"02105debf8db0a1c69c1e99db0232271288ad80042aed34b6a5dbd4ae01582ba\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-03-07/manifest.json\"}, {\"partition\": \"2026-03-08\", \"commit_id\": \"20260308-720d35b4081172d0\", \"row_count\": 86400, \"canonical_row_checksum\": \"720d35b4081172d03e8207120d436b92d19c30b0d778952e238b3dc4af7b07c2\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-03-08/manifest.json\"}, {\"partition\": \"2026-03-09\", \"commit_id\": \"20260309-1335eb88128f71a5\", \"row_count\": 86399, \"canonical_row_checksum\": \"1335eb88128f71a53ed32847ff3437ce5eaca9a80bf562c3cb26c274172b4d1c\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-03-09/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-03-10",
+          "end": "2026-03-12",
+          "days": 3,
+          "elapsed_sec": 4.511,
+          "peak_rss_mb": 2485.578,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:24:50.949913+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"ETH/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T042447Z-ETH-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-03-10\", \"commit_id\": \"20260310-d5626c93783e055b\", \"row_count\": 86400, \"canonical_row_checksum\": \"d5626c93783e055bb385d7745b7d786a7e3b6c0ff7edb51d08dcbb20015cdb0a\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-03-10/manifest.json\"}, {\"partition\": \"2026-03-11\", \"commit_id\": \"20260311-d6b8a6c2578a7673\", \"row_count\": 86400, \"canonical_row_checksum\": \"d6b8a6c2578a767382ca3caca94da15aad5c3e6a5a49c7e3ee1ca76d7e70901f\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-03-11/manifest.json\"}, {\"partition\": \"2026-03-12\", \"commit_id\": \"20260312-f6fee00001d978a4\", \"row_count\": 86399, \"canonical_row_checksum\": \"f6fee00001d978a4e0bfab7c032d67029cbfc19191f438ec97c578365e3a0359\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-03-12/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-03-13",
+          "end": "2026-03-15",
+          "days": 3,
+          "elapsed_sec": 4.028,
+          "peak_rss_mb": 2216.008,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:24:55.095449+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"ETH/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T042451Z-ETH-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-03-13\", \"commit_id\": \"20260313-b4bc975c4a6d66ff\", \"row_count\": 86400, \"canonical_row_checksum\": \"b4bc975c4a6d66ffeaee0559cea4d67b2094394ae7bca513409b44e8be862deb\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-03-13/manifest.json\"}, {\"partition\": \"2026-03-14\", \"commit_id\": \"20260314-64989a53fdf27f55\", \"row_count\": 86400, \"canonical_row_checksum\": \"64989a53fdf27f55fee82cd31f15bd3de7a4eaea10fbf14cfcfcc3cb1b69c07e\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-03-14/manifest.json\"}, {\"partition\": \"2026-03-15\", \"commit_id\": \"20260315-cbd30297ab6c659b\", \"row_count\": 86399, \"canonical_row_checksum\": \"cbd30297ab6c659b7b944c8d9ab25a25755903d4dc38f8e95118e3b4bcf2662b\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-03-15/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-03-16",
+          "end": "2026-03-18",
+          "days": 3,
+          "elapsed_sec": 6.018,
+          "peak_rss_mb": 3292.527,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:25:00.867253+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"ETH/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T042455Z-ETH-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-03-16\", \"commit_id\": \"20260316-945083183ab98ca0\", \"row_count\": 86400, \"canonical_row_checksum\": \"945083183ab98ca01253322f9b7a2e665f6cf47c3741689d692d8eff151cd6d7\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-03-16/manifest.json\"}, {\"partition\": \"2026-03-17\", \"commit_id\": \"20260317-e762f301a5607464\", \"row_count\": 86400, \"canonical_row_checksum\": \"e762f301a560746402cf74c197fe7a5d8963409475d5198df11771646a28fdc3\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-03-17/manifest.json\"}, {\"partition\": \"2026-03-18\", \"commit_id\": \"20260318-e784ea91761e487e\", \"row_count\": 86398, \"canonical_row_checksum\": \"e784ea91761e487e974b7dd585ccabc4c494cce57b9b5cb466a8b78a859c5ffa\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/ETHUSDT/timeframe=1s/date=2026-03-18/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-03-19",
+          "end": "2026-03-21",
+          "days": 3,
+          "elapsed_sec": 3.599,
+          "peak_rss_mb": 2323.324,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:25:04.503617+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"ETH/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:ETH/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-03-22",
+          "end": "2026-03-24",
+          "days": 3,
+          "elapsed_sec": 4.523,
+          "peak_rss_mb": 2481.887,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:25:09.080171+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"ETH/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:ETH/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-03-25",
+          "end": "2026-03-27",
+          "days": 3,
+          "elapsed_sec": 3.532,
+          "peak_rss_mb": 2274.098,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:25:12.384414+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"ETH/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:ETH/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-03-28",
+          "end": "2026-03-30",
+          "days": 3,
+          "elapsed_sec": 2.512,
+          "peak_rss_mb": 1615.844,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:25:15.250923+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"ETH/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:ETH/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-03-31",
+          "end": "2026-04-02",
+          "days": 3,
+          "elapsed_sec": 3.544,
+          "peak_rss_mb": 2443.461,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:25:16.258176+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"ETH/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:ETH/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-03",
+          "end": "2026-04-05",
+          "days": 3,
+          "elapsed_sec": 3.019,
+          "peak_rss_mb": 1323.691,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:25:18.918708+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"ETH/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:ETH/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-06",
+          "end": "2026-04-08",
+          "days": 3,
+          "elapsed_sec": 3.516,
+          "peak_rss_mb": 2473.387,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:25:22.837139+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"ETH/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:ETH/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-09",
+          "end": "2026-04-11",
+          "days": 3,
+          "elapsed_sec": 3.521,
+          "peak_rss_mb": 1671.52,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:25:25.980164+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"ETH/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:ETH/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-12",
+          "end": "2026-04-14",
+          "days": 3,
+          "elapsed_sec": 3.508,
+          "peak_rss_mb": 2278.676,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:25:29.683666+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"ETH/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:ETH/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-15",
+          "end": "2026-04-17",
+          "days": 3,
+          "elapsed_sec": 4.024,
+          "peak_rss_mb": 2260.031,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:25:33.676953+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"ETH/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:ETH/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-18",
+          "end": "2026-04-20",
+          "days": 3,
+          "elapsed_sec": 3.013,
+          "peak_rss_mb": 1990.297,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:25:36.974560+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"ETH/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:ETH/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-21",
+          "end": "2026-04-23",
+          "days": 3,
+          "elapsed_sec": 3.515,
+          "peak_rss_mb": 2194.148,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:25:40.225470+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"ETH/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:ETH/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-24",
+          "end": "2026-04-26",
+          "days": 3,
+          "elapsed_sec": 3.01,
+          "peak_rss_mb": 1426.305,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:25:43.257887+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"ETH/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:ETH/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-27",
+          "end": "2026-04-29",
+          "days": 3,
+          "elapsed_sec": 3.005,
+          "peak_rss_mb": 1717.809,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:25:46.527026+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"ETH/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:ETH/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-30",
+          "end": "2026-05-02",
+          "days": 3,
+          "elapsed_sec": 2.514,
+          "peak_rss_mb": 1445.797,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:25:46.490354+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"ETH/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:ETH/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-05-03",
+          "end": "2026-05-03",
+          "days": 1,
+          "elapsed_sec": 2.507,
+          "peak_rss_mb": 673.387,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:25:48.858776+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"ETH/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:ETH/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        }
+      ]
+    },
+    {
+      "symbol": "BNB/USDT",
+      "required_days": 64,
+      "raw_present_before": 46,
+      "raw_missing_before": 18,
+      "raw_present_after": 64,
+      "raw_missing_after": 0,
+      "materialized_present_before": 34,
+      "materialized_missing_before": 30,
+      "materialized_present_after": 34,
+      "materialized_missing_after": 30,
+      "first_raw_missing_after": [],
+      "first_materialized_missing_after": [
+        "2026-04-04",
+        "2026-04-05",
+        "2026-04-06",
+        "2026-04-07",
+        "2026-04-08",
+        "2026-04-09",
+        "2026-04-10",
+        "2026-04-11",
+        "2026-04-12",
+        "2026-04-13"
+      ],
+      "raw_runs": [
+        {
+          "start": "2026-03-01",
+          "end": "2026-03-03",
+          "days": 3,
+          "elapsed_sec": 8.102,
+          "fetched_rows": 1315630,
+          "upserted_rows": 1315630,
+          "first_timestamp_ms": 1772323200088,
+          "last_timestamp_ms": 1772582399674,
+          "peak_rss_mb": 505.844
+        },
+        {
+          "start": "2026-03-04",
+          "end": "2026-03-06",
+          "days": 3,
+          "elapsed_sec": 7.559,
+          "fetched_rows": 1173725,
+          "upserted_rows": 1173725,
+          "first_timestamp_ms": 1772582400156,
+          "last_timestamp_ms": 1772841599893,
+          "peak_rss_mb": 442.5
+        },
+        {
+          "start": "2026-03-07",
+          "end": "2026-03-09",
+          "days": 3,
+          "elapsed_sec": 5.59,
+          "fetched_rows": 806936,
+          "upserted_rows": 806936,
+          "first_timestamp_ms": 1772841601260,
+          "last_timestamp_ms": 1773100799630,
+          "peak_rss_mb": 459.098
+        },
+        {
+          "start": "2026-03-10",
+          "end": "2026-03-12",
+          "days": 3,
+          "elapsed_sec": 6.037,
+          "fetched_rows": 896885,
+          "upserted_rows": 896885,
+          "first_timestamp_ms": 1773100800129,
+          "last_timestamp_ms": 1773359998295,
+          "peak_rss_mb": 438.715
+        },
+        {
+          "start": "2026-03-13",
+          "end": "2026-03-15",
+          "days": 3,
+          "elapsed_sec": 5.512,
+          "fetched_rows": 762074,
+          "upserted_rows": 762074,
+          "first_timestamp_ms": 1773360000021,
+          "last_timestamp_ms": 1773619199525,
+          "peak_rss_mb": 421.016
+        },
+        {
+          "start": "2026-03-16",
+          "end": "2026-03-18",
+          "days": 3,
+          "elapsed_sec": 6.048,
+          "fetched_rows": 998302,
+          "upserted_rows": 998302,
+          "first_timestamp_ms": 1773619201944,
+          "last_timestamp_ms": 1773878398214,
+          "peak_rss_mb": 442.266
+        }
+      ],
+      "materialize_runs": [
+        {
+          "start": "2026-04-04",
+          "end": "2026-04-06",
+          "days": 3,
+          "elapsed_sec": 2.009,
+          "peak_rss_mb": 599.449,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:26:27.092495+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"BNB/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:BNB/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-07",
+          "end": "2026-04-09",
+          "days": 3,
+          "elapsed_sec": 2.004,
+          "peak_rss_mb": 642.355,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:26:29.465544+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"BNB/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:BNB/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-10",
+          "end": "2026-04-12",
+          "days": 3,
+          "elapsed_sec": 2.011,
+          "peak_rss_mb": 907.449,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:26:31.266622+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"BNB/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:BNB/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-13",
+          "end": "2026-04-15",
+          "days": 3,
+          "elapsed_sec": 2.507,
+          "peak_rss_mb": 644.562,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:26:33.595877+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"BNB/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:BNB/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-16",
+          "end": "2026-04-18",
+          "days": 3,
+          "elapsed_sec": 2.028,
+          "peak_rss_mb": 882.301,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:26:35.905332+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"BNB/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:BNB/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-19",
+          "end": "2026-04-21",
+          "days": 3,
+          "elapsed_sec": 2.007,
+          "peak_rss_mb": 606.0,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:26:37.692619+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"BNB/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:BNB/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-22",
+          "end": "2026-04-24",
+          "days": 3,
+          "elapsed_sec": 2.005,
+          "peak_rss_mb": 908.922,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:26:39.879901+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"BNB/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:BNB/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-25",
+          "end": "2026-04-27",
+          "days": 3,
+          "elapsed_sec": 2.005,
+          "peak_rss_mb": 599.758,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:26:41.657523+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"BNB/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:BNB/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-28",
+          "end": "2026-04-30",
+          "days": 3,
+          "elapsed_sec": 2.006,
+          "peak_rss_mb": 855.844,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:26:43.835813+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"BNB/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:BNB/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-05-01",
+          "end": "2026-05-03",
+          "days": 3,
+          "elapsed_sec": 2.006,
+          "peak_rss_mb": 776.137,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:26:45.852121+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"BNB/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:BNB/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        }
+      ]
+    },
+    {
+      "symbol": "SOL/USDT",
+      "required_days": 64,
+      "raw_present_before": 47,
+      "raw_missing_before": 17,
+      "raw_present_after": 64,
+      "raw_missing_after": 0,
+      "materialized_present_before": 0,
+      "materialized_missing_before": 64,
+      "materialized_present_after": 17,
+      "materialized_missing_after": 47,
+      "first_raw_missing_after": [],
+      "first_materialized_missing_after": [
+        "2026-03-18",
+        "2026-03-19",
+        "2026-03-20",
+        "2026-03-21",
+        "2026-03-22",
+        "2026-03-23",
+        "2026-03-24",
+        "2026-03-25",
+        "2026-03-26",
+        "2026-03-27"
+      ],
+      "raw_runs": [
+        {
+          "start": "2026-03-01",
+          "end": "2026-03-03",
+          "days": 3,
+          "elapsed_sec": 8.597,
+          "fetched_rows": 1359875,
+          "upserted_rows": 1359875,
+          "first_timestamp_ms": 1772323200010,
+          "last_timestamp_ms": 1772582399964,
+          "peak_rss_mb": 491.84
+        },
+        {
+          "start": "2026-03-04",
+          "end": "2026-03-06",
+          "days": 3,
+          "elapsed_sec": 8.061,
+          "fetched_rows": 1321587,
+          "upserted_rows": 1321587,
+          "first_timestamp_ms": 1772582400009,
+          "last_timestamp_ms": 1772841599537,
+          "peak_rss_mb": 418.453
+        },
+        {
+          "start": "2026-03-07",
+          "end": "2026-03-09",
+          "days": 3,
+          "elapsed_sec": 6.07,
+          "fetched_rows": 913158,
+          "upserted_rows": 913158,
+          "first_timestamp_ms": 1772841601084,
+          "last_timestamp_ms": 1773100799630,
+          "peak_rss_mb": 459.539
+        },
+        {
+          "start": "2026-03-10",
+          "end": "2026-03-12",
+          "days": 3,
+          "elapsed_sec": 6.535,
+          "fetched_rows": 1039536,
+          "upserted_rows": 1039536,
+          "first_timestamp_ms": 1773100800107,
+          "last_timestamp_ms": 1773359998850,
+          "peak_rss_mb": 436.582
+        },
+        {
+          "start": "2026-03-13",
+          "end": "2026-03-15",
+          "days": 3,
+          "elapsed_sec": 6.087,
+          "fetched_rows": 989923,
+          "upserted_rows": 989923,
+          "first_timestamp_ms": 1773360000024,
+          "last_timestamp_ms": 1773619199871,
+          "peak_rss_mb": 502.125
+        },
+        {
+          "start": "2026-03-16",
+          "end": "2026-03-17",
+          "days": 2,
+          "elapsed_sec": 5.033,
+          "fetched_rows": 807573,
+          "upserted_rows": 807573,
+          "first_timestamp_ms": 1773619200008,
+          "last_timestamp_ms": 1773791999222,
+          "peak_rss_mb": 458.699
+        }
+      ],
+      "materialize_runs": [
+        {
+          "start": "2026-03-01",
+          "end": "2026-03-03",
+          "days": 3,
+          "elapsed_sec": 3.033,
+          "peak_rss_mb": 1178.461,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:27:24.669686+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"SOL/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T042722Z-SOL-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-03-01\", \"commit_id\": \"20260301-732a9b1755412f3e\", \"row_count\": 86400, \"canonical_row_checksum\": \"732a9b1755412f3e1551f92cfe4ea27036e2236455d690ed12ba7b8df940c342\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-03-01/manifest.json\"}, {\"partition\": \"2026-03-02\", \"commit_id\": \"20260302-2851ad26563abe42\", \"row_count\": 86400, \"canonical_row_checksum\": \"2851ad26563abe42e2c5797e70587e147bd06fb8c06bd1c2c6e74a6e5758c09a\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-03-02/manifest.json\"}, {\"partition\": \"2026-03-03\", \"commit_id\": \"20260303-68bc3af044c62855\", \"row_count\": 86399, \"canonical_row_checksum\": \"68bc3af044c628552fcf712320438b7d98c222d63cfc6ad3464eacd55adc3807\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-03-03/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-03-04",
+          "end": "2026-03-06",
+          "days": 3,
+          "elapsed_sec": 3.012,
+          "peak_rss_mb": 1197.43,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:27:27.442748+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"SOL/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T042725Z-SOL-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-03-04\", \"commit_id\": \"20260304-667d18fc59488ea1\", \"row_count\": 86400, \"canonical_row_checksum\": \"667d18fc59488ea10180596a11bfc3f9b90a5b86230dd626e938b3b29347e8a0\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-03-04/manifest.json\"}, {\"partition\": \"2026-03-05\", \"commit_id\": \"20260305-a76e566497e6a4ea\", \"row_count\": 86400, \"canonical_row_checksum\": \"a76e566497e6a4ea19300c527a831c33887b2952b14ec0e4ec950378cd590cb8\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-03-05/manifest.json\"}, {\"partition\": \"2026-03-06\", \"commit_id\": \"20260306-14d188691a771737\", \"row_count\": 86399, \"canonical_row_checksum\": \"14d188691a771737e62ce54bd39a35802439e1ddf59203ed4c3f44a57b3060e1\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-03-06/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-03-07",
+          "end": "2026-03-09",
+          "days": 3,
+          "elapsed_sec": 3.008,
+          "peak_rss_mb": 1006.832,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:27:30.443003+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"SOL/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T042728Z-SOL-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-03-07\", \"commit_id\": \"20260307-bde900e50087a833\", \"row_count\": 86399, \"canonical_row_checksum\": \"bde900e50087a8338d911ce76591e9c71978310c47b526a79edfce40a158e9d6\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-03-07/manifest.json\"}, {\"partition\": \"2026-03-08\", \"commit_id\": \"20260308-de303eef9857669c\", \"row_count\": 86400, \"canonical_row_checksum\": \"de303eef9857669c248fc63f9131bf19e8b51a1807cbcdc4ad1ff181982ab53f\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-03-08/manifest.json\"}, {\"partition\": \"2026-03-09\", \"commit_id\": \"20260309-a756879240c74e9a\", \"row_count\": 86399, \"canonical_row_checksum\": \"a756879240c74e9aa4d5bada2a903b728a38d89c13369d3ca513daad1164cfb4\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-03-09/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-03-10",
+          "end": "2026-03-12",
+          "days": 3,
+          "elapsed_sec": 3.02,
+          "peak_rss_mb": 1159.312,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:27:33.337329+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"SOL/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T042731Z-SOL-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-03-10\", \"commit_id\": \"20260310-dc598b6b2745ebde\", \"row_count\": 86400, \"canonical_row_checksum\": \"dc598b6b2745ebde225706bef01ace335d23a3c3bb09403e3aa032e6a31159a9\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-03-10/manifest.json\"}, {\"partition\": \"2026-03-11\", \"commit_id\": \"20260311-96188a0ca7ac5e1f\", \"row_count\": 86400, \"canonical_row_checksum\": \"96188a0ca7ac5e1f1c08431ebc323fa102efce6ba04eec44380ad10061b17535\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-03-11/manifest.json\"}, {\"partition\": \"2026-03-12\", \"commit_id\": \"20260312-43d19d47311b14f0\", \"row_count\": 86398, \"canonical_row_checksum\": \"43d19d47311b14f0d30d38d08cc221eaf646c08bf2a8a1d7054cdb0739983e5f\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-03-12/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-03-13",
+          "end": "2026-03-15",
+          "days": 3,
+          "elapsed_sec": 2.527,
+          "peak_rss_mb": 1174.836,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:27:36.170516+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"SOL/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T042734Z-SOL-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-03-13\", \"commit_id\": \"20260313-6fd4929163b7485f\", \"row_count\": 86400, \"canonical_row_checksum\": \"6fd4929163b7485ffdea02768b307edd5e96d1910ff61ab55be7642d7b13354d\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-03-13/manifest.json\"}, {\"partition\": \"2026-03-14\", \"commit_id\": \"20260314-aa9d18eef93db076\", \"row_count\": 86400, \"canonical_row_checksum\": \"aa9d18eef93db0761d03968060a8099ffc7605788808c534293f01c911c9f44d\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-03-14/manifest.json\"}, {\"partition\": \"2026-03-15\", \"commit_id\": \"20260315-bbb09d78f3f6b747\", \"row_count\": 86399, \"canonical_row_checksum\": \"bbb09d78f3f6b747cf4ab4dd4013dee942de74e6f1bd09be6074cb9333640527\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-03-15/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-03-16",
+          "end": "2026-03-18",
+          "days": 3,
+          "elapsed_sec": 2.504,
+          "peak_rss_mb": 999.859,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:27:38.357230+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"SOL/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T042736Z-SOL-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-03-16\", \"commit_id\": \"20260316-b704af8c0f710399\", \"row_count\": 86400, \"canonical_row_checksum\": \"b704af8c0f710399b8016653e4eabc32502b36b3ac7d7a43bd427457150a9e1c\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-03-16/manifest.json\"}, {\"partition\": \"2026-03-17\", \"commit_id\": \"20260317-43faf82d19b8e72b\", \"row_count\": 86400, \"canonical_row_checksum\": \"43faf82d19b8e72b0c6e23562bd9c340a701dbd58a17b48f6b60dde46ad244fc\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-03-17/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-03-19",
+          "end": "2026-03-21",
+          "days": 3,
+          "elapsed_sec": 2.512,
+          "peak_rss_mb": 942.102,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:27:40.990740+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"SOL/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:SOL/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-03-22",
+          "end": "2026-03-24",
+          "days": 3,
+          "elapsed_sec": 2.52,
+          "peak_rss_mb": 642.801,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:27:43.328114+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"SOL/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:SOL/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-03-25",
+          "end": "2026-03-27",
+          "days": 3,
+          "elapsed_sec": 2.508,
+          "peak_rss_mb": 1127.762,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:27:46.031785+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"SOL/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:SOL/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-03-28",
+          "end": "2026-03-30",
+          "days": 3,
+          "elapsed_sec": 2.023,
+          "peak_rss_mb": 1016.031,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:27:48.067104+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"SOL/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:SOL/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-03-31",
+          "end": "2026-04-02",
+          "days": 3,
+          "elapsed_sec": 2.019,
+          "peak_rss_mb": 989.379,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:27:47.733279+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"SOL/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:SOL/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-03",
+          "end": "2026-04-05",
+          "days": 3,
+          "elapsed_sec": 2.028,
+          "peak_rss_mb": 619.75,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:27:49.843893+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"SOL/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:SOL/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-06",
+          "end": "2026-04-08",
+          "days": 3,
+          "elapsed_sec": 2.015,
+          "peak_rss_mb": 1062.223,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:27:51.765380+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"SOL/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:SOL/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-09",
+          "end": "2026-04-11",
+          "days": 3,
+          "elapsed_sec": 2.515,
+          "peak_rss_mb": 619.516,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:27:53.953742+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"SOL/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:SOL/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-12",
+          "end": "2026-04-14",
+          "days": 3,
+          "elapsed_sec": 2.515,
+          "peak_rss_mb": 1100.82,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:27:56.672296+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"SOL/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:SOL/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-15",
+          "end": "2026-04-17",
+          "days": 3,
+          "elapsed_sec": 2.529,
+          "peak_rss_mb": 622.039,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:27:58.961608+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"SOL/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:SOL/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-18",
+          "end": "2026-04-20",
+          "days": 3,
+          "elapsed_sec": 2.505,
+          "peak_rss_mb": 636.598,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:28:01.474283+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"SOL/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:SOL/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-21",
+          "end": "2026-04-23",
+          "days": 3,
+          "elapsed_sec": 2.504,
+          "peak_rss_mb": 978.797,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:28:04.085315+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"SOL/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:SOL/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-24",
+          "end": "2026-04-26",
+          "days": 3,
+          "elapsed_sec": 2.513,
+          "peak_rss_mb": 867.102,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:28:06.704762+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"SOL/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:SOL/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-27",
+          "end": "2026-04-29",
+          "days": 3,
+          "elapsed_sec": 2.56,
+          "peak_rss_mb": 949.547,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:28:09.159157+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"SOL/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:SOL/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-30",
+          "end": "2026-05-02",
+          "days": 3,
+          "elapsed_sec": 2.032,
+          "peak_rss_mb": 635.934,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:28:11.472007+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"SOL/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:SOL/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-05-03",
+          "end": "2026-05-03",
+          "days": 1,
+          "elapsed_sec": 2.003,
+          "peak_rss_mb": 665.008,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:28:13.277157+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"SOL/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:SOL/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        }
+      ]
+    },
+    {
+      "symbol": "TRX/USDT",
+      "required_days": 64,
+      "raw_present_before": 46,
+      "raw_missing_before": 18,
+      "raw_present_after": 64,
+      "raw_missing_after": 0,
+      "materialized_present_before": 34,
+      "materialized_missing_before": 30,
+      "materialized_present_after": 34,
+      "materialized_missing_after": 30,
+      "first_raw_missing_after": [],
+      "first_materialized_missing_after": [
+        "2026-04-04",
+        "2026-04-05",
+        "2026-04-06",
+        "2026-04-07",
+        "2026-04-08",
+        "2026-04-09",
+        "2026-04-10",
+        "2026-04-11",
+        "2026-04-12",
+        "2026-04-13"
+      ],
+      "raw_runs": [
+        {
+          "start": "2026-03-01",
+          "end": "2026-03-03",
+          "days": 3,
+          "elapsed_sec": 3.013,
+          "fetched_rows": 228422,
+          "upserted_rows": 228422,
+          "first_timestamp_ms": 1772323200690,
+          "last_timestamp_ms": 1772582399674,
+          "peak_rss_mb": 192.273
+        },
+        {
+          "start": "2026-03-04",
+          "end": "2026-03-06",
+          "days": 3,
+          "elapsed_sec": 3.019,
+          "fetched_rows": 271681,
+          "upserted_rows": 271681,
+          "first_timestamp_ms": 1772582401511,
+          "last_timestamp_ms": 1772841598345,
+          "peak_rss_mb": 210.215
+        },
+        {
+          "start": "2026-03-07",
+          "end": "2026-03-09",
+          "days": 3,
+          "elapsed_sec": 3.009,
+          "fetched_rows": 201280,
+          "upserted_rows": 201280,
+          "first_timestamp_ms": 1772841600086,
+          "last_timestamp_ms": 1773100799786,
+          "peak_rss_mb": 176.207
+        },
+        {
+          "start": "2026-03-10",
+          "end": "2026-03-12",
+          "days": 3,
+          "elapsed_sec": 3.062,
+          "fetched_rows": 217640,
+          "upserted_rows": 217640,
+          "first_timestamp_ms": 1773100800309,
+          "last_timestamp_ms": 1773359999707,
+          "peak_rss_mb": 183.754
+        },
+        {
+          "start": "2026-03-13",
+          "end": "2026-03-15",
+          "days": 3,
+          "elapsed_sec": 3.02,
+          "fetched_rows": 206626,
+          "upserted_rows": 206626,
+          "first_timestamp_ms": 1773360000278,
+          "last_timestamp_ms": 1773619199768,
+          "peak_rss_mb": 177.684
+        },
+        {
+          "start": "2026-03-16",
+          "end": "2026-03-18",
+          "days": 3,
+          "elapsed_sec": 3.005,
+          "fetched_rows": 247422,
+          "upserted_rows": 247422,
+          "first_timestamp_ms": 1773619200554,
+          "last_timestamp_ms": 1773878398799,
+          "peak_rss_mb": 205.73
+        }
+      ],
+      "materialize_runs": [
+        {
+          "start": "2026-04-04",
+          "end": "2026-04-06",
+          "days": 3,
+          "elapsed_sec": 2.004,
+          "peak_rss_mb": 646.578,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:28:31.076863+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"TRX/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:TRX/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-07",
+          "end": "2026-04-09",
+          "days": 3,
+          "elapsed_sec": 2.02,
+          "peak_rss_mb": 817.738,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:28:32.969339+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"TRX/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:TRX/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-10",
+          "end": "2026-04-12",
+          "days": 3,
+          "elapsed_sec": 2.024,
+          "peak_rss_mb": 745.828,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:28:34.914331+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"TRX/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:TRX/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-13",
+          "end": "2026-04-15",
+          "days": 3,
+          "elapsed_sec": 2.008,
+          "peak_rss_mb": 778.926,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:28:36.981236+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"TRX/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:TRX/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-16",
+          "end": "2026-04-18",
+          "days": 3,
+          "elapsed_sec": 2.014,
+          "peak_rss_mb": 775.082,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:28:39.031790+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"TRX/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:TRX/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-19",
+          "end": "2026-04-21",
+          "days": 3,
+          "elapsed_sec": 2.009,
+          "peak_rss_mb": 793.254,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:28:41.053487+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"TRX/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:TRX/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-22",
+          "end": "2026-04-24",
+          "days": 3,
+          "elapsed_sec": 2.004,
+          "peak_rss_mb": 781.73,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:28:42.989748+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"TRX/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:TRX/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-25",
+          "end": "2026-04-27",
+          "days": 3,
+          "elapsed_sec": 2.004,
+          "peak_rss_mb": 640.852,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:28:45.164180+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"TRX/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:TRX/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-04-28",
+          "end": "2026-04-30",
+          "days": 3,
+          "elapsed_sec": 2.003,
+          "peak_rss_mb": 778.062,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:28:46.981478+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"TRX/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:TRX/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        },
+        {
+          "start": "2026-05-01",
+          "end": "2026-05-03",
+          "days": 3,
+          "elapsed_sec": 2.008,
+          "peak_rss_mb": 695.504,
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:28:46.567519+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": false, \"symbols\": [{\"symbol\": \"TRX/USDT\", \"status\": \"skipped_incomplete_required_timeframes\", \"error\": \"Raw aggTrades could not be materialized into OHLCV for binance:TRX/USDT:1s.\"}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        }
+      ]
+    }
+  ],
+  "success": false
+}

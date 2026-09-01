@@ -1,0 +1,34 @@
+{"end_inclusive": "2025-12-31", "event": "live_equivalent_split_start", "generated_at": "2026-05-03T06:47:52.960094Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train", "start": "2025-01-01", "symbols": ["BTC/USDT", "ETH/USDT", "SOL/USDT"]}
+{"chunk_days": 7, "chunk_end": "2025-01-07T23:59:59.999999", "chunk_start": "2025-01-01T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T06:47:52.961171Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+[Realism] Partial Fill: Req 0.028 > Limit 0.0243. Filling 0.024300000000000002 and keeping remainder.
+[Realism] Partial Fill: Req 0.443 > Limit 0.0000. Filling 0.0 and keeping remainder.
+[Realism] Partial Fill: Req 0.443 > Limit 0.2000. Filling 0.2 and keeping remainder.
+[Realism] Partial Fill: Req 0.243 > Limit 0.1000. Filling 0.1 and keeping remainder.
+[Realism] Partial Fill: Req 0.143 > Limit 0.1000. Filling 0.1 and keeping remainder.
+[Realism] Partial Fill: Req 0.398 > Limit 0.0000. Filling 0.0 and keeping remainder.
+{"chunk_days": 7, "chunk_end": "2025-01-14T23:59:59.999999", "chunk_start": "2025-01-08T00:00:00", "event": "live_equivalent_chunk_load", "generated_at": "2026-05-03T06:48:37.544899Z", "mode": "profit_moonshot_derivatives_taker_flow_mode", "split": "train"}
+Command exited with non-zero status 143
+	Command being timed: "uv run python scripts/research/revalidate_live_equivalent_candidates.py --portfolio-modes profit_moonshot_derivatives_taker_flow_mode --output-dir var/reports/profit_moonshot_20260501/derivatives_oos/profit_moonshot_derivatives_taker_flow_mode --backtest-checkpoint-path var/reports/profit_moonshot_20260501/derivatives_oos/profit_moonshot_derivatives_taker_flow_mode_checkpoint.json --execute-backtests --chunk-days 7 --no-live-decision-update"
+	User time (seconds): 51.45
+	System time (seconds): 60.67
+	Percent of CPU this job got: 148%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:15.62
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 9064676
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 300
+	Minor (reclaiming a frame) page faults: 2857518
+	Voluntary context switches: 182047
+	Involuntary context switches: 3038
+	Swaps: 0
+	File system inputs: 25088
+	File system outputs: 16
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 143
+aborted_due_to_rss_risk_after_observed_rss_kb_8037928

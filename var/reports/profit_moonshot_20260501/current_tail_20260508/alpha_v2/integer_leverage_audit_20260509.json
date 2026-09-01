@@ -1,0 +1,161 @@
+{
+  "artifact_kind": "profit_moonshot_integer_leverage_audit",
+  "generated_at_utc": "2026-05-09T13:25:00Z",
+  "policy": {
+    "selection": "train_validation_only",
+    "locked_oos": "report_only_gate_only",
+    "leverage": "integer_grid_only_for_train_val_monthly_return_budget",
+    "continuous_required_leverage": "diagnostic_only",
+    "minimum_buffered_train_monthly_return": 0.0225,
+    "minimum_raw_train_monthly_return": 0.01,
+    "minimum_raw_val_monthly_return": 0.02,
+    "maximum_oos_mdd": 0.25
+  },
+  "runs": {
+    "default_all_family_top30": {
+      "artifact": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/integer_leverage_20260509/fresh_portfolio_tuning_latest.json",
+      "selection_outcome": "no_improvement_current_base_retained",
+      "success_candidate_count": 0,
+      "portfolio_spec_count": 73465,
+      "candidate_sleeve_count": 30,
+      "peak_rss_mib": 1308.7265625,
+      "selected_by_validation": {
+        "mode": "train_val_monthly_return_budget",
+        "leverage": 3.0,
+        "train_monthlyized_return": 0.02750954857318466,
+        "validation_monthlyized_return": 0.11876666923997181,
+        "locked_oos_monthlyized_return": 0.030553638082192025,
+        "raw_train_monthlyized_return": 0.010110934730711119,
+        "raw_val_monthlyized_return": 0.04100157698293461,
+        "locked_oos_total_return": 0.06783623241388637,
+        "locked_oos_max_drawdown": 0.03943104532234614,
+        "locked_oos_return_risk": 1.7203762126854547,
+        "failed_gates": [
+          "oos_return_risk_beats_current_champion",
+          "oos_smart_sortino_high",
+          "oos_return_beats_current_base",
+          "oos_return_risk_beats_current_base"
+        ]
+      }
+    },
+    "alpha_v2_top30": {
+      "artifact": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/integer_leverage_alpha_v2_20260509/fresh_portfolio_tuning_latest.json",
+      "selection_outcome": "no_improvement_current_base_retained",
+      "success_candidate_count": 0,
+      "portfolio_spec_count": 73465,
+      "candidate_sleeve_count": 30,
+      "peak_rss_mib": 1319.5859375,
+      "selected_by_validation": {
+        "mode": "train_val_monthly_return_budget",
+        "leverage": 6.0,
+        "train_monthlyized_return": 0.031263708238856935,
+        "validation_monthlyized_return": 0.18717701277624443,
+        "locked_oos_monthlyized_return": 0.03570671710399531,
+        "raw_train_monthlyized_return": 0.006004436658977541,
+        "raw_val_monthlyized_return": 0.03340262340147793,
+        "locked_oos_total_return": 0.07951512574938158,
+        "locked_oos_max_drawdown": 0.019971486182914406,
+        "locked_oos_return_risk": 3.981432579484581,
+        "failed_gates": [
+          "raw_train_monthly_return_gte_1pct",
+          "oos_return_risk_beats_current_champion",
+          "oos_return_risk_beats_current_base"
+        ]
+      }
+    },
+    "alpha_v2_top40": {
+      "artifact": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/integer_leverage_alpha_v2_top40_20260509/fresh_portfolio_tuning_latest.json",
+      "selection_outcome": "no_improvement_current_base_retained",
+      "success_candidate_count": 0,
+      "portfolio_spec_count": 158620,
+      "candidate_sleeve_count": 40,
+      "peak_rss_mib": 2523.5234375,
+      "time_max_rss_kb": 2584088,
+      "wall_time": "22:34.38",
+      "forced_current_base_integer_row": {
+        "mode": "train_val_monthly_return_budget",
+        "leverage": 5.0,
+        "train_monthlyized_return": 0.03844303223780643,
+        "validation_monthlyized_return": 0.20101387720072306,
+        "locked_oos_monthlyized_return": 0.06464086775344802,
+        "raw_train_monthlyized_return": 0.009074645454400176,
+        "raw_val_monthlyized_return": 0.04310833990528251,
+        "train_sharpe": 1.7049815243677782,
+        "train_sortino": 1.4814397638885402,
+        "train_calmar": 4.1000316073403,
+        "locked_oos_total_return": 0.14637099461686787,
+        "locked_oos_max_drawdown": 0.016918682292253916,
+        "locked_oos_return_risk": 8.651441766471534,
+        "locked_oos_sharpe": 5.721536797198937,
+        "locked_oos_sortino": 7.482842996878129,
+        "locked_oos_smart_sortino": 6.976443623650137,
+        "locked_oos_calmar": 66.22836615816557,
+        "train_val_stability_score": 19.7225902186273,
+        "failed_gates": [
+          "raw_train_monthly_return_gte_1pct",
+          "train_sortino_high"
+        ]
+      },
+      "selected_by_validation": {
+        "mode": "train_val_monthly_return_budget",
+        "leverage": 3.0,
+        "train_monthlyized_return": 0.02750954857318466,
+        "validation_monthlyized_return": 0.11876666923997181,
+        "locked_oos_monthlyized_return": 0.030553638082192025,
+        "raw_train_monthlyized_return": 0.010110934730711119,
+        "raw_val_monthlyized_return": 0.04100157698293461,
+        "locked_oos_total_return": 0.06783623241388637,
+        "locked_oos_max_drawdown": 0.03943104532234614,
+        "locked_oos_return_risk": 1.7203762126854547,
+        "failed_gates": [
+          "oos_return_risk_beats_current_champion",
+          "oos_smart_sortino_high",
+          "oos_return_beats_current_base",
+          "oos_return_risk_beats_current_base"
+        ]
+      },
+      "diagnostic_best_oos": {
+        "mode": "train_val_monthly_return_budget",
+        "leverage": 6.0,
+        "train_monthlyized_return": 0.04264435963201141,
+        "validation_monthlyized_return": 0.2245951714727259,
+        "locked_oos_monthlyized_return": 0.08071187503660582,
+        "raw_train_monthlyized_return": 0.008615308000015975,
+        "raw_val_monthlyized_return": 0.0405875163823759,
+        "locked_oos_total_return": 0.1844462034506904,
+        "locked_oos_max_drawdown": 0.02230476996691963,
+        "locked_oos_return_risk": 8.269361384324696,
+        "locked_oos_sharpe": 5.822771905506648,
+        "locked_oos_sortino": 7.4759313225306405,
+        "locked_oos_smart_sortino": 6.8089356087805,
+        "failed_gates": [
+          "raw_train_monthly_return_gte_1pct",
+          "train_sortino_high",
+          "oos_return_risk_beats_current_base"
+        ]
+      },
+      "top_failed_gate_counts_before_csv_prune": [
+        ["oos_return_risk_beats_current_base", 158586],
+        ["oos_return_risk_beats_current_champion", 156570],
+        ["raw_train_monthly_return_gte_1pct", 146596],
+        ["oos_return_beats_current_base", 138125],
+        ["train_monthly_return_buffer_gte_2_25pct", 137323],
+        ["train_monthly_return_gte_2pct", 136490],
+        ["oos_monthly_return_gte_2pct", 136315],
+        ["train_sortino_high", 134306],
+        ["train_val_stability_beats_current_base", 129489],
+        ["oos_smart_sortino_high", 126724],
+        ["raw_val_monthly_return_gte_2pct", 113794],
+        ["oos_return_beats_current_champion", 105798]
+      ],
+      "near_pass_count_before_csv_prune": 21,
+      "near_pass_note": "Rows with OOS return and return/risk above current base but failing only raw_train>=1% and train_sortino>=1.5 were retained as diagnostics, not promoted."
+    }
+  },
+  "decision": {
+    "selection_outcome": "no_improvement_current_base_retained",
+    "promoted_success_candidate_count": 0,
+    "current_base_retained_as_reference": true,
+    "leverage_artifact_verdict": "Higher integer leverage can inflate OOS return, but the strict raw-train/train-quality/current-base gates prevent automatic promotion."
+  }
+}

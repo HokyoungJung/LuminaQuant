@@ -1,0 +1,206 @@
+{
+  "approved_product_verification": {
+    "broad_suite": "5790 passed, 36 skipped, 3 xfailed, 41 subtests; one unrelated frozen ignored uv.lock hash mismatch",
+    "product_commit": "f518dc7bed5cb416dba27886b2337f4a31ea7650",
+    "publisher_tests": "23 passed",
+    "review_refs": [
+      "agent://44-FinalEvidenceProtocolReview",
+      "agent://45-FinalRecoveryControlsReview"
+    ],
+    "storage_tests": "158 passed, 1 skipped",
+    "terminal_policy_affected_tests": "91 passed, 1 deselected"
+  },
+  "authoritative_session": {
+    "counts": {
+      "active": 1,
+      "blocked": 0,
+      "complete": 0,
+      "failed": 0,
+      "pending": 0,
+      "review_blocked": 0,
+      "superseded": 0
+    },
+    "durable_status": "active",
+    "files": [
+      {
+        "bytes": 223,
+        "lines": 6,
+        "path": ".gjc/_session-019fad7d-536a-7000-b794-52ccaa961746/.session-activity.json",
+        "sha256": "e383d7e43e5b07ed217790bb3630c96b3497468fcf94c4968657bb58599f0d7c"
+      },
+      {
+        "bytes": 51591,
+        "lines": 166,
+        "path": ".gjc/_session-019fad7d-536a-7000-b794-52ccaa961746/state/audit.jsonl",
+        "sha256": "f4343816fcd9297184fd74b5af4051ab7d7f5babf0cf01fe17993c5e6b8d57a6"
+      },
+      {
+        "bytes": 640,
+        "lines": 14,
+        "path": ".gjc/_session-019fad7d-536a-7000-b794-52ccaa961746/state/goal-mode-request.json",
+        "sha256": "b1a9ddba1ba53795bcc40241cba25c0466bfeba041062e2f76bf9675e494bee1"
+      },
+      {
+        "bytes": 1994,
+        "lines": 65,
+        "path": ".gjc/_session-019fad7d-536a-7000-b794-52ccaa961746/state/skill-active-state.json",
+        "sha256": "aea05cf0bdb5a9b28af90fc0fc2adfe4c6d12855f811a419925b3c5bafbd9fa7"
+      },
+      {
+        "bytes": 2857,
+        "lines": 64,
+        "path": ".gjc/_session-019fad7d-536a-7000-b794-52ccaa961746/state/ultragoal-state.json",
+        "sha256": "ac36d130c76fa15a6c8321d717352233cb14d20f6666230a524223f2d1789795"
+      },
+      {
+        "bytes": 1497,
+        "lines": 52,
+        "path": ".gjc/_session-019fad7d-536a-7000-b794-52ccaa961746/state/active/ultragoal.json",
+        "sha256": "9db1687393349978a6fce427aae1d0ae69382e03d4a5b26aaf42030bf055fa8a"
+      },
+      {
+        "bytes": 14139,
+        "lines": 200,
+        "path": ".gjc/_session-019fad7d-536a-7000-b794-52ccaa961746/ultragoal/brief.md",
+        "sha256": "e20e4139be0d77c152c387d10b1d64dcce4510a1f386be283ce58deb02e75059"
+      },
+      {
+        "bytes": 30741,
+        "lines": 45,
+        "path": ".gjc/_session-019fad7d-536a-7000-b794-52ccaa961746/ultragoal/goals.json",
+        "sha256": "048cf3dfef4ba9c94502ccb0fab2affb93a222f1b5a2611f5bc937275a7e2795"
+      },
+      {
+        "bytes": 35944,
+        "lines": 34,
+        "path": ".gjc/_session-019fad7d-536a-7000-b794-52ccaa961746/ultragoal/ledger.jsonl",
+        "sha256": "e9f172483223f106199864f13a006b4818f194634182fdc2771e5ce36d0a32f8"
+      }
+    ],
+    "gjc_objective": "Complete the durable ultragoal plan in .gjc/ultragoal/goals.json, including later accepted/appended stories, under the original brief constraints; use .gjc/ultragoal/ledger.jsonl as the audit trail.",
+    "goal_id": "G001",
+    "id": "019fad7d-536a-7000-b794-52ccaa961746",
+    "inline_goal_status": "paused",
+    "nudge_goal_id": "G001",
+    "nudge_target_kind": "story",
+    "paths": {
+      "briefPath": "/home/hoky/Quants-agent/LuminaQuant/.gjc/_session-019fad7d-536a-7000-b794-52ccaa961746/ultragoal/brief.md",
+      "dir": "/home/hoky/Quants-agent/LuminaQuant/.gjc/_session-019fad7d-536a-7000-b794-52ccaa961746/ultragoal",
+      "goalsPath": "/home/hoky/Quants-agent/LuminaQuant/.gjc/_session-019fad7d-536a-7000-b794-52ccaa961746/ultragoal/goals.json",
+      "ledgerPath": "/home/hoky/Quants-agent/LuminaQuant/.gjc/_session-019fad7d-536a-7000-b794-52ccaa961746/ultragoal/ledger.jsonl"
+    }
+  },
+  "canonical": {
+    "identity": [
+      2096,
+      195868,
+      493,
+      7
+    ],
+    "measured_bytes": 26909667462,
+    "mutated_by_interrupted_run": false,
+    "path": "data/market_parquet",
+    "publication_pending": true
+  },
+  "evidence": {
+    "interrupted_key_retirement": {
+      "path": "/home/hoky/quants-recovery-runs/luminaquant-recovery-631242a65e5d9732/interrupted-key-retirement-47eeac483e70-complete-v1.json",
+      "sha256": "659d39023564496a3176bf88fc7d3a0af741ac8f4b0aeef1112b719349ee8a7e"
+    },
+    "interrupted_source_cleanup": {
+      "path": "/home/hoky/quants-recovery-runs/luminaquant-recovery-631242a65e5d9732/interrupted-source-cleanup-47eeac483e70-complete-v1.json",
+      "sha256": "e4ddb91f1c63760f232d16e45447dd3c14905d6e81c9714d5131fbe21765e621"
+    },
+    "interruption_receipt": {
+      "path": "/home/hoky/quants-recovery-runs/luminaquant-recovery-631242a65e5d9732/user-interrupted-acquisition-47eeac483e70-v1.json",
+      "sha256": "73a4c20623bc29e2af7a3853c9d5071f0bb5ea7e6d07e88e4ffcb35df55d0c43"
+    },
+    "prior_disqualified_source_cleanup": {
+      "path": "/home/hoky/quants-recovery-runs/luminaquant-recovery-631242a65e5d9732/disqualified-source-cleanup-6fefca9931a5-complete-v1.json",
+      "sha256": "f9f09370bebe66954099da5a387cb7d590f5344920eebffa78f0e68c1c62e7f2"
+    },
+    "terminal_journal": {
+      "path": "/home/hoky/quants-recovery-runs/g056v8-acquisition-evidence-47eeac483e70d6af0784b873895024c8a2d01793a2447d3d3fbaa776d63bd2ad/terminal-observer.journal.jsonl",
+      "sha256": "49fcdfc01244dbb226f14bc2bba4c3840e3daf9cf28347553e319c3eba95b3b7"
+    },
+    "terminal_receipt": {
+      "path": "/home/hoky/quants-recovery-runs/g056v8-acquisition-evidence-47eeac483e70d6af0784b873895024c8a2d01793a2447d3d3fbaa776d63bd2ad/terminal-authority.receipt.json",
+      "sha256": "c8cda120cb0bd41da6da706281bfa4213fa0ad620773211423712effe0a543cc"
+    }
+  },
+  "handoff_documents": [
+    {
+      "bytes": 10125,
+      "lines": 172,
+      "path": "docs/research_note/alpha_max_recovery_session_handoff_20260802.md",
+      "sha256": "4e7bcd64a8c0dee451e49adcbdd176b52acc1e695248f25ffbecc0261a44c892"
+    },
+    {
+      "bytes": 10343,
+      "lines": 145,
+      "path": "docs/research_note/alpha_max_recovery_resume_plan_20260802.md",
+      "sha256": "f0511b57e4e7ef0544d017ff42915dad1fdf57e216ba2b528c8e40e8bf319884"
+    },
+    {
+      "bytes": 6427,
+      "lines": 75,
+      "path": "docs/research_note/alpha_max_recovery_new_session_prompt_20260802.md",
+      "sha256": "d0bf41bf3ef48c0b684e9c825db33aaf819bfead36a641471130782e3c38553c"
+    }
+  ],
+  "interrupted_run": {
+    "funding_partitions_at_stop": 7668,
+    "private_keys_retired": true,
+    "publication_eligible": false,
+    "raw_partitions_at_stop": 260,
+    "request_id": "1e39b62b2f7bfe9d27c5304cf2ce2fc0ee78f604920d10a4759d5000fe46ab94",
+    "return_code": -15,
+    "reusable": false,
+    "run_id": "47eeac483e70d6af0784b873895024c8a2d01793a2447d3d3fbaa776d63bd2ad",
+    "source_deleted": true,
+    "terminal_state": "FAILED"
+  },
+  "remaining_phases": [
+    "create and validate wholly fresh IDs, credentials, controls, and capacity gate",
+    "complete official acquisition to raw 415 and funding 12347 partitions with signed SUCCEEDED terminal state",
+    "seal independent fresh staging audit",
+    "rehearse and execute ten-symbol WAL transition",
+    "recompute and sign conflict authorization",
+    "audit exact atomic merge capacity",
+    "atomically publish and prove idempotent replay",
+    "verify loaders, downsampling, funding, features, chunk/panel, and legacy backtest",
+    "run focused and broad regressions",
+    "clean temporary artifacts, restore sleep, update evidence/ledger, commit, and complete G001"
+  ],
+  "repository": {
+    "approved_repair_branch": "recovery/conflict-authorized-publication-20260802",
+    "approved_repair_worktree": "/tmp/luminaquant-conflict-repair-47ee",
+    "branch": "recovery/strategy-plan-20260714",
+    "clean_before_snapshot": true,
+    "path": "/home/hoky/Quants-agent/LuminaQuant",
+    "required_handoff_ref": "recovery-session-handoff-20260802",
+    "required_product_ancestor": "f518dc7bed5cb416dba27886b2337f4a31ea7650",
+    "snapshot_parent_head": "118d2914be3528187d4b81c661cef274891b9d7e"
+  },
+  "resume_constraints": {
+    "do_not_create_goals": true,
+    "do_not_reuse_interrupted_or_disqualified_output": true,
+    "do_not_run_complete_goals": true,
+    "do_not_run_create_goals": true,
+    "preserve_windows_reserve_bytes": 21474836480,
+    "real_money_execution": false,
+    "set_GJC_SESSION_ID": "019fad7d-536a-7000-b794-52ccaa961746",
+    "start_wholly_fresh_run": true
+  },
+  "runtime_stop": {
+    "acquisition_units_active": false,
+    "capacity_guards_active": false,
+    "private_credentials_present": false,
+    "publication_started": false,
+    "windows_c_free_bytes_after_cleanup": 63068917760,
+    "windows_sleep_ac_seconds": 900,
+    "windows_sleep_dc_seconds": 600
+  },
+  "schema_version": 1,
+  "snapshot_utc": "2026-08-02T14:32:50.976022+00:00"
+}

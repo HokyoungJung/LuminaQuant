@@ -1,0 +1,153 @@
+{
+  "artifact_kind": "execution_cost_turnover_theory_verification",
+  "candidate_cost_labels": [
+    {
+      "annualized_oos_return_approx": 1.1045586655533284,
+      "candidate_id": "clean_input_meta_selector",
+      "compounded_oos_return": 0.859091921450454,
+      "final_label": "shadow_freeze_only",
+      "hard_gate_result": "fail_current_promotion_due_post_oos_selector_grid_ranking",
+      "max_oos_mdd": 0.19289743503240053,
+      "monthly_equity_mdd": 0.06318080417560568,
+      "positive_oos_folds": 5,
+      "real_money_allowed": false,
+      "reason": "110%+ annualized historical report label exists, but selector grid ranking used historical locked-OOS context; requires fresh-forward and paper telemetry.",
+      "small_sleeve_allowed": false,
+      "source_artifact": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_meta_selector_research_20260607/clean_meta_selector_research_latest.json",
+      "source_role": "historical_shadow_freeze_only_not_current_promotion"
+    },
+    {
+      "annualized_oos_return_approx": 1.6090069034937464,
+      "candidate_id": "relaxed_efficiency_hybrid_v3_5_69_asset_historical_incumbent",
+      "compounded_oos_return": 1.2236308475960955,
+      "final_label": "paper_control",
+      "hard_gate_result": "not_current_promotion_evidence_under_no_nested_oos_mining",
+      "max_oos_mdd": 0.1665845901603561,
+      "monthly_equity_mdd": 0.14658908347931976,
+      "positive_oos_folds": 6,
+      "real_money_allowed": false,
+      "reason": "Prior high-return historical OOS control; cannot be promoted from existing OOS artifacts in this audit and lacks fresh-forward/paper-fill telemetry.",
+      "small_sleeve_allowed": false,
+      "source_artifact": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_no_nested_clean_recompute_20260604/no_nested_clean_recompute_latest.json",
+      "source_role": "historical_control_only"
+    },
+    {
+      "annualized_oos_return_approx": null,
+      "candidate_id": "strict_no_leak_best_single_10bps",
+      "compounded_oos_return": 0.5456,
+      "final_label": "paper_control",
+      "hard_gate_result": "fails_real_money_due_drawdown_tail_and_missing_15bps_paper_telemetry",
+      "max_oos_mdd": 0.3063,
+      "real_money_allowed": false,
+      "reason": "Best stricter no-leak control remains below 100% target and high drawdown/tail cost stress blocks live use.",
+      "small_sleeve_allowed": false,
+      "source_artifact": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/deep_research_strict_no_leak_20260606/strict_no_leak_selector_latest.json",
+      "source_role": "strict_no_leak_control",
+      "twenty_bps_mdd": 0.4363,
+      "twenty_bps_total_return": 0.271
+    },
+    {
+      "annualized_oos_return_approx": 0.425721927391973,
+      "candidate_id": "dynamic_conviction_switch_85_symbol_baseline",
+      "compounded_oos_return": 0.343885776755972,
+      "final_label": "paper_control",
+      "hard_gate_result": "below_100pct_and_cost_telemetry_missing",
+      "max_oos_mdd": 0.27690078457641154,
+      "monthly_equity_mdd": 0.0,
+      "positive_oos_folds": 3,
+      "real_money_allowed": false,
+      "reason": "Best clean-mechanics 85-symbol baseline is useful as paper/control, but below 100% and high MDD/sparse folds block promotion.",
+      "small_sleeve_allowed": false,
+      "source_artifact": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_85_asset_non_nested_augmented_selectors_latest_20260606/alpha_zoo_85_asset_non_nested_augmented_selectors_latest_20260606.json",
+      "source_role": "clean_mechanics_baseline_control"
+    },
+    {
+      "annualized_oos_return_approx": 0.030140209223393777,
+      "candidate_id": "clean_new_alpha_discovery_full",
+      "compounded_oos_return": 0.025054483041021536,
+      "final_label": "rejected",
+      "hard_gate_result": "clean_promotion_eligible_false_and_low_return",
+      "max_oos_mdd": 0.08773789287262324,
+      "monthly_equity_mdd": 0.10284237335219204,
+      "positive_oos_folds": 5,
+      "real_money_allowed": false,
+      "reason": "Train/validation first artifact reports only 3.01% annualized OOS and is clean_promotion_eligible=false.",
+      "small_sleeve_allowed": false,
+      "source_artifact": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_new_alpha_discovery_20260607/clean_new_alpha_discovery_latest.json",
+      "source_role": "pre_existing_diagnostic_train_val_clean_search"
+    },
+    {
+      "annualized_oos_return_approx": -0.005715372151040787,
+      "candidate_id": "clean_new_alpha_discovery_feature_bounded",
+      "compounded_oos_return": -0.0023853868449449367,
+      "final_label": "rejected",
+      "hard_gate_result": "clean_promotion_eligible_false_and_negative_return",
+      "max_oos_mdd": 0.08315392481708694,
+      "monthly_equity_mdd": 0.08716671516123264,
+      "positive_oos_folds": 3,
+      "real_money_allowed": false,
+      "reason": "Feature-bounded variant reports -0.57% annualized OOS and is not a promotion candidate.",
+      "small_sleeve_allowed": false,
+      "source_artifact": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_new_alpha_discovery_20260607_feature_bounded/clean_new_alpha_discovery_latest.json",
+      "source_role": "pre_existing_diagnostic_train_val_clean_search"
+    }
+  ],
+  "cost_gate_verdict": {
+    "real_money": "fail",
+    "reasons": [
+      "15bps stress not uniformly available",
+      "20bps stress only diagnostic for strict_no_leak and shows tail risk",
+      "paper fill telemetry absent",
+      "capacity/liquidity proxy missing/incomplete for final candidates"
+    ],
+    "report_only_audit": "pass_with_gaps_documented",
+    "small_sleeve": "fail"
+  },
+  "cost_grid_bps": [
+    10,
+    15,
+    20
+  ],
+  "generated_at_utc": "2026-06-07T07:11:42Z",
+  "goal_reference": ".omx/ultragoal G006-independent-cost-turnover-theory-ver",
+  "manifest_path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/clean_100pct_live_strategy_search_20260607/immutable_manifest_clean_100pct_live_strategy_search_20260607.json",
+  "schema_version": "1.0",
+  "theory_plausibility": {
+    "accepted_families": [
+      "time_series_momentum",
+      "lagged_volatility_managed_exposure",
+      "execution_cost_aware_implementation"
+    ],
+    "rejected_usage": [
+      "hardcoded calendar/symbol exceptions",
+      "parameters justified by locked OOS",
+      "100pct headline used as optimization target"
+    ],
+    "sources": [
+      {
+        "title": "Time Series Momentum",
+        "url": "https://www.aqr.com/insights/research/journal-article/time-series-momentum"
+      },
+      {
+        "title": "Volatility Managed Portfolios",
+        "url": "https://www.nber.org/papers/w22208"
+      },
+      {
+        "title": "Trading Costs",
+        "url": "https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3229719"
+      },
+      {
+        "title": "Pseudo-Mathematics and Financial Charlatanism",
+        "url": "https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2308659"
+      }
+    ]
+  },
+  "turnover_capacity_requirements": [
+    "return_per_turnover",
+    "monthly turnover",
+    "trade/event count",
+    "symbol liquidity/ADV or crypto depth proxy",
+    "max participation",
+    "BBO spread/slippage/fees/cancel/partial/reject telemetry"
+  ]
+}

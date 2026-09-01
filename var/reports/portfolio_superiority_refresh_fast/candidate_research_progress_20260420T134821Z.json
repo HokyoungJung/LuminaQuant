@@ -1,0 +1,644 @@
+{
+  "artifact_kind": "candidate_research_progress",
+  "status": "running",
+  "started_at": "2026-04-20T13:48:21.577727Z",
+  "updated_at": "2026-04-20T13:49:10.859929Z",
+  "current_stage": "resource_bundle_symbol_window_loaded",
+  "manifest_path": "",
+  "score_config_path": "",
+  "base_timeframe": "1s",
+  "strategy_timeframes": [
+    "1h",
+    "4h",
+    "1d"
+  ],
+  "symbol_universe": [
+    "BTC/USDT",
+    "ETH/USDT",
+    "BNB/USDT",
+    "SOL/USDT",
+    "TRX/USDT",
+    "XAU/USDT",
+    "XAG/USDT",
+    "XPT/USDT",
+    "XPD/USDT"
+  ],
+  "requested_split": {
+    "train_start": "2025-01-01T00:00:00Z",
+    "train_end": "2026-01-01T00:00:00Z",
+    "val_start": "2026-01-01T00:00:00Z",
+    "val_end": "2026-02-01T00:00:00Z",
+    "oos_start": "2026-02-01T00:00:00Z",
+    "oos_end": "2026-04-20T13:26:24Z"
+  },
+  "progress": {
+    "candidate_count": 0,
+    "evaluated_count": 0,
+    "keep_count": 0,
+    "selected_count": 0
+  },
+  "resources": {},
+  "resource_load": {
+    "overall": {
+      "completed_units": 0,
+      "total_units": 27,
+      "completion_ratio": 0.0,
+      "active_detail": {
+        "phase": "bundle_symbol_fetch",
+        "symbol": "BTC/USDT",
+        "symbol_index": 1,
+        "symbol_count": 9,
+        "timeframe": "1h",
+        "data_mode": "legacy"
+      }
+    },
+    "bundle": {
+      "status": "running",
+      "loaded_count": 0,
+      "total_count": 27,
+      "elapsed_seconds": 0.0,
+      "source_counts": {},
+      "current_timeframe": {
+        "timeframe": "1h",
+        "timeframe_index": 1,
+        "timeframe_count": 3,
+        "symbol_count": 9,
+        "loaded_count": 0,
+        "total_count": 27
+      },
+      "current_symbol_fetch": {
+        "symbol": "BTC/USDT",
+        "symbol_index": 1,
+        "symbol_count": 9,
+        "timeframe": "1h",
+        "data_mode": "legacy"
+      },
+      "recent_timeframes": [],
+      "latest_symbol_fetch": {},
+      "latest_window": {
+        "symbol": "BTC/USDT",
+        "symbol_index": 1,
+        "symbol_count": 9,
+        "timeframe": "1h",
+        "data_mode": "legacy",
+        "unit_kind": "chunk",
+        "unit_index": 25,
+        "unit_count": 68,
+        "window_start": "2025-06-18T00:00:00",
+        "window_end": "2025-06-24T23:59:59.999999",
+        "query_start": "2025-06-18T00:00:00",
+        "row_count": 168,
+        "elapsed_seconds": 1.912793
+      },
+      "recent_windows": [
+        {
+          "symbol": "BTC/USDT",
+          "symbol_index": 1,
+          "symbol_count": 9,
+          "timeframe": "1h",
+          "data_mode": "legacy",
+          "unit_kind": "chunk",
+          "unit_index": 18,
+          "unit_count": 68,
+          "window_start": "2025-04-30T00:00:00",
+          "window_end": "2025-05-06T23:59:59.999999",
+          "query_start": "2025-04-30T00:00:00",
+          "row_count": 168,
+          "elapsed_seconds": 1.941266
+        },
+        {
+          "symbol": "BTC/USDT",
+          "symbol_index": 1,
+          "symbol_count": 9,
+          "timeframe": "1h",
+          "data_mode": "legacy",
+          "unit_kind": "chunk",
+          "unit_index": 19,
+          "unit_count": 68,
+          "window_start": "2025-05-07T00:00:00",
+          "window_end": "2025-05-13T23:59:59.999999",
+          "query_start": "2025-05-07T00:00:00",
+          "row_count": 168,
+          "elapsed_seconds": 1.916167
+        },
+        {
+          "symbol": "BTC/USDT",
+          "symbol_index": 1,
+          "symbol_count": 9,
+          "timeframe": "1h",
+          "data_mode": "legacy",
+          "unit_kind": "chunk",
+          "unit_index": 20,
+          "unit_count": 68,
+          "window_start": "2025-05-14T00:00:00",
+          "window_end": "2025-05-20T23:59:59.999999",
+          "query_start": "2025-05-14T00:00:00",
+          "row_count": 168,
+          "elapsed_seconds": 1.920563
+        },
+        {
+          "symbol": "BTC/USDT",
+          "symbol_index": 1,
+          "symbol_count": 9,
+          "timeframe": "1h",
+          "data_mode": "legacy",
+          "unit_kind": "chunk",
+          "unit_index": 21,
+          "unit_count": 68,
+          "window_start": "2025-05-21T00:00:00",
+          "window_end": "2025-05-27T23:59:59.999999",
+          "query_start": "2025-05-21T00:00:00",
+          "row_count": 168,
+          "elapsed_seconds": 1.954948
+        },
+        {
+          "symbol": "BTC/USDT",
+          "symbol_index": 1,
+          "symbol_count": 9,
+          "timeframe": "1h",
+          "data_mode": "legacy",
+          "unit_kind": "chunk",
+          "unit_index": 22,
+          "unit_count": 68,
+          "window_start": "2025-05-28T00:00:00",
+          "window_end": "2025-06-03T23:59:59.999999",
+          "query_start": "2025-05-28T00:00:00",
+          "row_count": 168,
+          "elapsed_seconds": 1.883165
+        },
+        {
+          "symbol": "BTC/USDT",
+          "symbol_index": 1,
+          "symbol_count": 9,
+          "timeframe": "1h",
+          "data_mode": "legacy",
+          "unit_kind": "chunk",
+          "unit_index": 23,
+          "unit_count": 68,
+          "window_start": "2025-06-04T00:00:00",
+          "window_end": "2025-06-10T23:59:59.999999",
+          "query_start": "2025-06-04T00:00:00",
+          "row_count": 168,
+          "elapsed_seconds": 1.883922
+        },
+        {
+          "symbol": "BTC/USDT",
+          "symbol_index": 1,
+          "symbol_count": 9,
+          "timeframe": "1h",
+          "data_mode": "legacy",
+          "unit_kind": "chunk",
+          "unit_index": 24,
+          "unit_count": 68,
+          "window_start": "2025-06-11T00:00:00",
+          "window_end": "2025-06-17T23:59:59.999999",
+          "query_start": "2025-06-11T00:00:00",
+          "row_count": 168,
+          "elapsed_seconds": 1.943051
+        },
+        {
+          "symbol": "BTC/USDT",
+          "symbol_index": 1,
+          "symbol_count": 9,
+          "timeframe": "1h",
+          "data_mode": "legacy",
+          "unit_kind": "chunk",
+          "unit_index": 25,
+          "unit_count": 68,
+          "window_start": "2025-06-18T00:00:00",
+          "window_end": "2025-06-24T23:59:59.999999",
+          "query_start": "2025-06-18T00:00:00",
+          "row_count": 168,
+          "elapsed_seconds": 1.912793
+        }
+      ],
+      "latest_item": {},
+      "slowest_items": [],
+      "symbol_count": 9,
+      "timeframe_count": 3,
+      "normalized_timeframes": [
+        "1h",
+        "4h",
+        "1d"
+      ],
+      "symbol_universe": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "BNB/USDT",
+        "SOL/USDT",
+        "TRX/USDT",
+        "XAU/USDT",
+        "XAG/USDT",
+        "XPT/USDT",
+        "XPD/USDT"
+      ]
+    },
+    "feature": {
+      "status": "pending",
+      "loaded_count": 0,
+      "symbol_count": 0,
+      "elapsed_seconds": 0.0,
+      "current_symbol": {},
+      "latest_partition_scan": {},
+      "latest_collect": {},
+      "latest_symbol": {},
+      "slowest_symbols": []
+    },
+    "benchmark": {
+      "status": "pending",
+      "built_count": 0,
+      "timeframe_count": 0,
+      "elapsed_seconds": 0.0,
+      "current_timeframe": {},
+      "latest_timeframe": {},
+      "slowest_timeframes": []
+    }
+  },
+  "latest_candidate": {},
+  "top_stage1_candidates": [],
+  "selected_candidates": [],
+  "report_preview": {},
+  "recent_events": [
+    {
+      "timestamp": "2026-04-20T13:48:34.076304Z",
+      "event": "resource_bundle_symbol_window_loaded",
+      "context": {
+        "symbol": "BTC/USDT",
+        "symbol_index": 1,
+        "symbol_count": 9,
+        "timeframe": "1h",
+        "data_mode": "legacy",
+        "unit_kind": "chunk",
+        "unit_index": 6,
+        "unit_count": 68,
+        "window_start": "2025-02-05T00:00:00",
+        "window_end": "2025-02-11T23:59:59.999999",
+        "query_start": "2025-02-05T00:00:00",
+        "row_count": 168,
+        "elapsed_seconds": 1.905165
+      }
+    },
+    {
+      "timestamp": "2026-04-20T13:48:36.049640Z",
+      "event": "resource_bundle_symbol_window_loaded",
+      "context": {
+        "symbol": "BTC/USDT",
+        "symbol_index": 1,
+        "symbol_count": 9,
+        "timeframe": "1h",
+        "data_mode": "legacy",
+        "unit_kind": "chunk",
+        "unit_index": 7,
+        "unit_count": 68,
+        "window_start": "2025-02-12T00:00:00",
+        "window_end": "2025-02-18T23:59:59.999999",
+        "query_start": "2025-02-12T00:00:00",
+        "row_count": 168,
+        "elapsed_seconds": 1.96772
+      }
+    },
+    {
+      "timestamp": "2026-04-20T13:48:38.038234Z",
+      "event": "resource_bundle_symbol_window_loaded",
+      "context": {
+        "symbol": "BTC/USDT",
+        "symbol_index": 1,
+        "symbol_count": 9,
+        "timeframe": "1h",
+        "data_mode": "legacy",
+        "unit_kind": "chunk",
+        "unit_index": 8,
+        "unit_count": 68,
+        "window_start": "2025-02-19T00:00:00",
+        "window_end": "2025-02-25T23:59:59.999999",
+        "query_start": "2025-02-19T00:00:00",
+        "row_count": 168,
+        "elapsed_seconds": 1.987865
+      }
+    },
+    {
+      "timestamp": "2026-04-20T13:48:54.092624Z",
+      "event": "resource_bundle_symbol_window_loaded",
+      "context": {
+        "symbol": "BTC/USDT",
+        "symbol_index": 1,
+        "symbol_count": 9,
+        "timeframe": "1h",
+        "data_mode": "legacy",
+        "unit_kind": "chunk",
+        "unit_index": 9,
+        "unit_count": 68,
+        "window_start": "2025-02-26T00:00:00",
+        "window_end": "2025-03-04T23:59:59.999999",
+        "query_start": "2025-02-26T00:00:00",
+        "row_count": 168,
+        "elapsed_seconds": 1.939112
+      }
+    },
+    {
+      "timestamp": "2026-04-20T13:48:41.932126Z",
+      "event": "resource_bundle_symbol_window_loaded",
+      "context": {
+        "symbol": "BTC/USDT",
+        "symbol_index": 1,
+        "symbol_count": 9,
+        "timeframe": "1h",
+        "data_mode": "legacy",
+        "unit_kind": "chunk",
+        "unit_index": 10,
+        "unit_count": 68,
+        "window_start": "2025-03-05T00:00:00",
+        "window_end": "2025-03-11T23:59:59.999999",
+        "query_start": "2025-03-05T00:00:00",
+        "row_count": 168,
+        "elapsed_seconds": 1.959845
+      }
+    },
+    {
+      "timestamp": "2026-04-20T13:48:43.827566Z",
+      "event": "resource_bundle_symbol_window_loaded",
+      "context": {
+        "symbol": "BTC/USDT",
+        "symbol_index": 1,
+        "symbol_count": 9,
+        "timeframe": "1h",
+        "data_mode": "legacy",
+        "unit_kind": "chunk",
+        "unit_index": 11,
+        "unit_count": 68,
+        "window_start": "2025-03-12T00:00:00",
+        "window_end": "2025-03-18T23:59:59.999999",
+        "query_start": "2025-03-12T00:00:00",
+        "row_count": 168,
+        "elapsed_seconds": 1.894885
+      }
+    },
+    {
+      "timestamp": "2026-04-20T13:48:45.794918Z",
+      "event": "resource_bundle_symbol_window_loaded",
+      "context": {
+        "symbol": "BTC/USDT",
+        "symbol_index": 1,
+        "symbol_count": 9,
+        "timeframe": "1h",
+        "data_mode": "legacy",
+        "unit_kind": "chunk",
+        "unit_index": 12,
+        "unit_count": 68,
+        "window_start": "2025-03-19T00:00:00",
+        "window_end": "2025-03-25T23:59:59.999999",
+        "query_start": "2025-03-19T00:00:00",
+        "row_count": 168,
+        "elapsed_seconds": 1.964254
+      }
+    },
+    {
+      "timestamp": "2026-04-20T13:48:47.717167Z",
+      "event": "resource_bundle_symbol_window_loaded",
+      "context": {
+        "symbol": "BTC/USDT",
+        "symbol_index": 1,
+        "symbol_count": 9,
+        "timeframe": "1h",
+        "data_mode": "legacy",
+        "unit_kind": "chunk",
+        "unit_index": 13,
+        "unit_count": 68,
+        "window_start": "2025-03-26T00:00:00",
+        "window_end": "2025-04-01T23:59:59.999999",
+        "query_start": "2025-03-26T00:00:00",
+        "row_count": 168,
+        "elapsed_seconds": 1.921719
+      }
+    },
+    {
+      "timestamp": "2026-04-20T13:48:49.659618Z",
+      "event": "resource_bundle_symbol_window_loaded",
+      "context": {
+        "symbol": "BTC/USDT",
+        "symbol_index": 1,
+        "symbol_count": 9,
+        "timeframe": "1h",
+        "data_mode": "legacy",
+        "unit_kind": "chunk",
+        "unit_index": 14,
+        "unit_count": 68,
+        "window_start": "2025-04-02T00:00:00",
+        "window_end": "2025-04-08T23:59:59.999999",
+        "query_start": "2025-04-02T00:00:00",
+        "row_count": 168,
+        "elapsed_seconds": 1.941033
+      }
+    },
+    {
+      "timestamp": "2026-04-20T13:48:51.581817Z",
+      "event": "resource_bundle_symbol_window_loaded",
+      "context": {
+        "symbol": "BTC/USDT",
+        "symbol_index": 1,
+        "symbol_count": 9,
+        "timeframe": "1h",
+        "data_mode": "legacy",
+        "unit_kind": "chunk",
+        "unit_index": 15,
+        "unit_count": 68,
+        "window_start": "2025-04-09T00:00:00",
+        "window_end": "2025-04-15T23:59:59.999999",
+        "query_start": "2025-04-09T00:00:00",
+        "row_count": 168,
+        "elapsed_seconds": 1.921143
+      }
+    },
+    {
+      "timestamp": "2026-04-20T13:48:53.504304Z",
+      "event": "resource_bundle_symbol_window_loaded",
+      "context": {
+        "symbol": "BTC/USDT",
+        "symbol_index": 1,
+        "symbol_count": 9,
+        "timeframe": "1h",
+        "data_mode": "legacy",
+        "unit_kind": "chunk",
+        "unit_index": 16,
+        "unit_count": 68,
+        "window_start": "2025-04-16T00:00:00",
+        "window_end": "2025-04-22T23:59:59.999999",
+        "query_start": "2025-04-16T00:00:00",
+        "row_count": 168,
+        "elapsed_seconds": 1.921771
+      }
+    },
+    {
+      "timestamp": "2026-04-20T13:48:55.493435Z",
+      "event": "resource_bundle_symbol_window_loaded",
+      "context": {
+        "symbol": "BTC/USDT",
+        "symbol_index": 1,
+        "symbol_count": 9,
+        "timeframe": "1h",
+        "data_mode": "legacy",
+        "unit_kind": "chunk",
+        "unit_index": 17,
+        "unit_count": 68,
+        "window_start": "2025-04-23T00:00:00",
+        "window_end": "2025-04-29T23:59:59.999999",
+        "query_start": "2025-04-23T00:00:00",
+        "row_count": 168,
+        "elapsed_seconds": 1.98676
+      }
+    },
+    {
+      "timestamp": "2026-04-20T13:48:57.435254Z",
+      "event": "resource_bundle_symbol_window_loaded",
+      "context": {
+        "symbol": "BTC/USDT",
+        "symbol_index": 1,
+        "symbol_count": 9,
+        "timeframe": "1h",
+        "data_mode": "legacy",
+        "unit_kind": "chunk",
+        "unit_index": 18,
+        "unit_count": 68,
+        "window_start": "2025-04-30T00:00:00",
+        "window_end": "2025-05-06T23:59:59.999999",
+        "query_start": "2025-04-30T00:00:00",
+        "row_count": 168,
+        "elapsed_seconds": 1.941266
+      }
+    },
+    {
+      "timestamp": "2026-04-20T13:48:59.352192Z",
+      "event": "resource_bundle_symbol_window_loaded",
+      "context": {
+        "symbol": "BTC/USDT",
+        "symbol_index": 1,
+        "symbol_count": 9,
+        "timeframe": "1h",
+        "data_mode": "legacy",
+        "unit_kind": "chunk",
+        "unit_index": 19,
+        "unit_count": 68,
+        "window_start": "2025-05-07T00:00:00",
+        "window_end": "2025-05-13T23:59:59.999999",
+        "query_start": "2025-05-07T00:00:00",
+        "row_count": 168,
+        "elapsed_seconds": 1.916167
+      }
+    },
+    {
+      "timestamp": "2026-04-20T13:49:01.272993Z",
+      "event": "resource_bundle_symbol_window_loaded",
+      "context": {
+        "symbol": "BTC/USDT",
+        "symbol_index": 1,
+        "symbol_count": 9,
+        "timeframe": "1h",
+        "data_mode": "legacy",
+        "unit_kind": "chunk",
+        "unit_index": 20,
+        "unit_count": 68,
+        "window_start": "2025-05-14T00:00:00",
+        "window_end": "2025-05-20T23:59:59.999999",
+        "query_start": "2025-05-14T00:00:00",
+        "row_count": 168,
+        "elapsed_seconds": 1.920563
+      }
+    },
+    {
+      "timestamp": "2026-04-20T13:49:03.228498Z",
+      "event": "resource_bundle_symbol_window_loaded",
+      "context": {
+        "symbol": "BTC/USDT",
+        "symbol_index": 1,
+        "symbol_count": 9,
+        "timeframe": "1h",
+        "data_mode": "legacy",
+        "unit_kind": "chunk",
+        "unit_index": 21,
+        "unit_count": 68,
+        "window_start": "2025-05-21T00:00:00",
+        "window_end": "2025-05-27T23:59:59.999999",
+        "query_start": "2025-05-21T00:00:00",
+        "row_count": 168,
+        "elapsed_seconds": 1.954948
+      }
+    },
+    {
+      "timestamp": "2026-04-20T13:49:19.232163Z",
+      "event": "resource_bundle_symbol_window_loaded",
+      "context": {
+        "symbol": "BTC/USDT",
+        "symbol_index": 1,
+        "symbol_count": 9,
+        "timeframe": "1h",
+        "data_mode": "legacy",
+        "unit_kind": "chunk",
+        "unit_index": 22,
+        "unit_count": 68,
+        "window_start": "2025-05-28T00:00:00",
+        "window_end": "2025-06-03T23:59:59.999999",
+        "query_start": "2025-05-28T00:00:00",
+        "row_count": 168,
+        "elapsed_seconds": 1.883165
+      }
+    },
+    {
+      "timestamp": "2026-04-20T13:49:07.000570Z",
+      "event": "resource_bundle_symbol_window_loaded",
+      "context": {
+        "symbol": "BTC/USDT",
+        "symbol_index": 1,
+        "symbol_count": 9,
+        "timeframe": "1h",
+        "data_mode": "legacy",
+        "unit_kind": "chunk",
+        "unit_index": 23,
+        "unit_count": 68,
+        "window_start": "2025-06-04T00:00:00",
+        "window_end": "2025-06-10T23:59:59.999999",
+        "query_start": "2025-06-04T00:00:00",
+        "row_count": 168,
+        "elapsed_seconds": 1.883922
+      }
+    },
+    {
+      "timestamp": "2026-04-20T13:49:08.944326Z",
+      "event": "resource_bundle_symbol_window_loaded",
+      "context": {
+        "symbol": "BTC/USDT",
+        "symbol_index": 1,
+        "symbol_count": 9,
+        "timeframe": "1h",
+        "data_mode": "legacy",
+        "unit_kind": "chunk",
+        "unit_index": 24,
+        "unit_count": 68,
+        "window_start": "2025-06-11T00:00:00",
+        "window_end": "2025-06-17T23:59:59.999999",
+        "query_start": "2025-06-11T00:00:00",
+        "row_count": 168,
+        "elapsed_seconds": 1.943051
+      }
+    },
+    {
+      "timestamp": "2026-04-20T13:49:10.859929Z",
+      "event": "resource_bundle_symbol_window_loaded",
+      "context": {
+        "symbol": "BTC/USDT",
+        "symbol_index": 1,
+        "symbol_count": 9,
+        "timeframe": "1h",
+        "data_mode": "legacy",
+        "unit_kind": "chunk",
+        "unit_index": 25,
+        "unit_count": 68,
+        "window_start": "2025-06-18T00:00:00",
+        "window_end": "2025-06-24T23:59:59.999999",
+        "query_start": "2025-06-18T00:00:00",
+        "row_count": 168,
+        "elapsed_seconds": 1.912793
+      }
+    }
+  ],
+  "final_artifacts": {}
+}

@@ -1,0 +1,2531 @@
+{
+  "artifact_kind": "profit_moonshot_candidate_hybrid",
+  "best_candidate_hybrid": {
+    "default_candidate": "candidate_hybrid_input_05_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+    "hybrid_config": {
+      "default_boost": 0.0,
+      "disagreement_cash_scale": 0.856739550695035,
+      "disagreement_threshold": 0.22293874953018045,
+      "diversified_weight_cap": 0.75,
+      "lookback_days": 21,
+      "min_positive_score": 0.1,
+      "mixed_health_floor": 0.5897144969917639,
+      "negative_health_floor": 0.09432330421001382,
+      "pair_pbo_penalty_scale": 1.8475128599670687,
+      "pair_score_boost": 0.00015054198515658535,
+      "pair_sparsity_penalty_scale": 2.732355465712022,
+      "pair_weight_cap": 0.2,
+      "score_temperature": 0.9,
+      "sticky_default_bonus": 0.09538352712472187,
+      "switch_margin": 0.09865009243733545,
+      "use_current_health_priors": false,
+      "variant": "disagreement_switching",
+      "warmup_days": 21,
+      "warmup_ratio": 0.6
+    },
+    "leverage": 1.0,
+    "liquidation_evidence_note": "candidate-hybrid allocator uses reconstructed candidate portfolio return streams; no dynamic-weight liquidation replay is claimed, so final live writer must keep this row non-promotable until a dedicated margin replay exists.",
+    "locked_oos_policy": {
+      "oos_is_gate_only": true,
+      "oos_is_report_only": true,
+      "uses_locked_oos_for_selection": false
+    },
+    "mode": "candidate_online_hybrid",
+    "name": "candidate_hybrid_online_rank_01_candidate_hybrid_input_05_fresh_portfolio_train_val_monthly_",
+    "selected_by_train_validation": true,
+    "selection_policy": {
+      "locked_oos": "report_only_gate_only",
+      "selection_basis": "train_validation_only_candidate_hybrid_grid",
+      "selection_inputs": [
+        "train",
+        "validation"
+      ],
+      "uses_locked_oos_for_selection": false
+    },
+    "sleeve_count": 12,
+    "sleeves": [
+      "candidate_hybrid_input_01_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+      "candidate_hybrid_input_02_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+      "candidate_hybrid_input_04_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+      "candidate_hybrid_input_05_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+      "candidate_hybrid_input_06_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+      "candidate_hybrid_input_07_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+      "candidate_hybrid_input_08_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+      "candidate_hybrid_input_09_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+      "candidate_hybrid_input_10_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+      "candidate_hybrid_input_11_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+      "candidate_hybrid_input_12_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+      "candidate_hybrid_input_13_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se"
+    ],
+    "splits": {
+      "oos": {
+        "fills": 0,
+        "liquidation_count": 0,
+        "liquidation_event_count_total": 0,
+        "liquidation_events": [],
+        "metrics": {
+          "cagr": 0.47218720038258866,
+          "calmar": 17.580833695950442,
+          "max_drawdown": 0.026858066491542543,
+          "monthlyized_return": 0.03275408099343058,
+          "return_mdd": 2.739325146934937,
+          "sharpe": 3.550497987364354,
+          "smart_sortino": 4.446438374459078,
+          "sortino": 4.981625713002248,
+          "total_return": 0.07357297693833309,
+          "volatility": 0.11068502996149061
+        },
+        "round_trips": 0
+      },
+      "train": {
+        "fills": 0,
+        "liquidation_count": 0,
+        "liquidation_event_count_total": 0,
+        "liquidation_events": [],
+        "metrics": {
+          "cagr": 0.33552376456045585,
+          "calmar": 4.774075761437123,
+          "max_drawdown": 0.07028036028893148,
+          "monthlyized_return": 0.0244032988972811,
+          "return_mdd": 4.774075761437123,
+          "sharpe": 1.5648949961208845,
+          "smart_sortino": 1.2509860724557533,
+          "sortino": 1.7401911033025346,
+          "total_return": 0.33552376456045585,
+          "volatility": 0.19704030370314796
+        },
+        "round_trips": 0
+      },
+      "validation": {
+        "fills": 0,
+        "liquidation_count": 0,
+        "liquidation_event_count_total": 0,
+        "liquidation_events": [],
+        "metrics": {
+          "cagr": 1.9535613734543555,
+          "calmar": 54.45627530967264,
+          "max_drawdown": 0.035873944046763695,
+          "monthlyized_return": 0.09444892741504707,
+          "return_mdd": 5.333126190837212,
+          "sharpe": 4.202553864658776,
+          "smart_sortino": 6.783176566683105,
+          "sortino": 7.919606673375268,
+          "total_return": 0.19132027056442413,
+          "volatility": 0.266267982826619
+        },
+        "round_trips": 0
+      }
+    },
+    "train_val_stability_score": 24.434215721810112
+  },
+  "candidate_basis": {
+    "active_hybrid_input_count": 12,
+    "available_sleeve_count": 16,
+    "candidate_portfolio_json": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_portfolio/fresh_portfolio_tuning_latest.json",
+    "default_candidates": [
+      "candidate_hybrid_input_02_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+      "candidate_hybrid_input_04_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+      "candidate_hybrid_input_05_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se"
+    ],
+    "liquidation_json": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/liquidation_validation/liquidation_aware_current_base_latest.json",
+    "missing_sleeves": [],
+    "source_candidate_rows": 22
+  },
+  "data_metadata": {
+    "feature_points": [
+      {
+        "funding_rows": 1481,
+        "open_interest_rows": 18145,
+        "rows": 2112510,
+        "symbol": "BTC/USDT",
+        "taker_flow_rows": 2101668
+      },
+      {
+        "funding_rows": 1482,
+        "open_interest_rows": 18433,
+        "rows": 2113782,
+        "symbol": "ETH/USDT",
+        "taker_flow_rows": 2102583
+      },
+      {
+        "funding_rows": 1482,
+        "open_interest_rows": 18433,
+        "rows": 2111685,
+        "symbol": "SOL/USDT",
+        "taker_flow_rows": 2099436
+      },
+      {
+        "funding_rows": 1482,
+        "open_interest_rows": 18433,
+        "rows": 712059,
+        "symbol": "BNB/USDT",
+        "taker_flow_rows": 0
+      },
+      {
+        "funding_rows": 1482,
+        "open_interest_rows": 18433,
+        "rows": 712059,
+        "symbol": "TRX/USDT",
+        "taker_flow_rows": 0
+      }
+    ],
+    "panel_cache": {
+      "cache_hit": true,
+      "cache_key": "9c2a95e4ee6a94f0492d7d6d4b6fd9b885f75109d0310d4d96b23cadf918526e",
+      "end": "2026-05-09",
+      "exchange": "binance",
+      "market_root": "/home/hoky/Quants-agent/LuminaQuant/data/market_parquet",
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/cache/profit_moonshot_fresh_start/joined_panel_9c2a95e4ee6a94f0492d7d6d.parquet",
+      "schema": 2,
+      "source_count": 7460,
+      "source_latest_mtime_ns": 1778392435140551597,
+      "source_total_bytes": 3564960010,
+      "start": "2025-01-01",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT"
+      ]
+    },
+    "rows": 11769
+  },
+  "final_allocation": {
+    "cash_weight": 1.27675647831893e-14,
+    "date": "2026-05-06",
+    "default_sleeve": "candidate_hybrid_input_12_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+    "split": "oos",
+    "weights": {
+      "candidate_hybrid_input_01_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se": 0.08892319529051397,
+      "candidate_hybrid_input_07_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se": 0.06509640586892164,
+      "candidate_hybrid_input_08_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se": 0.06509640586892164,
+      "candidate_hybrid_input_09_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se": 0.055721867342838294,
+      "candidate_hybrid_input_10_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se": 0.055721867342838294,
+      "candidate_hybrid_input_11_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se": 0.04771187562582557,
+      "candidate_hybrid_input_12_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se": 0.3524742607595016,
+      "candidate_hybrid_input_13_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se": 0.26925412190062625
+    }
+  },
+  "full_tuning_result_count": 108,
+  "generated_at_utc": "2026-05-10T06:50:14.291085Z",
+  "memory_policy": {
+    "disk_budget_gib": 30.0,
+    "exact_window_hard_fraction": 0.8,
+    "exact_window_soft_fraction": 0.6,
+    "explicit_budget_bytes": 6979321856,
+    "explicit_budget_gib": 6.5,
+    "heavy_lock_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/exact_window_backtests/followup_status/portfolio_followup_heavy_run.lock",
+    "heavy_run_cap_gib": 6.5,
+    "heavy_run_parallelism": 1,
+    "light_worker_parallelism": 2,
+    "rss_limit_fraction": 0.9,
+    "rss_limit_gib": 7.2,
+    "session_memory_lease_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/exact_window_backtests/followup_status/session_memory_budget.lock",
+    "total_memory_cap_bytes": 8589934592,
+    "total_memory_cap_gib": 8.0
+  },
+  "memory_summary": {
+    "artifact_kind": "portfolio_followup_memory_summary",
+    "budget_bytes": 6979321856,
+    "budget_mib": 6656.0,
+    "context": {
+      "full_tuning_result_count": 108,
+      "selected": "candidate_hybrid_online_rank_01_candidate_hybrid_input_05_fresh_portfolio_train_val_monthly_"
+    },
+    "error": null,
+    "generated_at": "2026-05-10T06:50:14.303758+00:00",
+    "hard_limit_bytes": 5583457484,
+    "hard_limit_mib": 5324.799999237061,
+    "hard_trigger_count": 0,
+    "label": "portfolio_followup::profit_moonshot_candidate_hybrid",
+    "memory_policy": {
+      "disk_budget_gib": 30.0,
+      "exact_window_hard_fraction": 0.8,
+      "exact_window_soft_fraction": 0.6,
+      "explicit_budget_bytes": 6979321856,
+      "explicit_budget_gib": 6.5,
+      "heavy_lock_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/exact_window_backtests/followup_status/portfolio_followup_heavy_run.lock",
+      "heavy_run_cap_gib": 6.5,
+      "heavy_run_parallelism": 1,
+      "light_worker_parallelism": 2,
+      "rss_limit_fraction": 0.9,
+      "rss_limit_gib": 7.2,
+      "session_memory_lease_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/exact_window_backtests/followup_status/session_memory_budget.lock",
+      "total_memory_cap_bytes": 8589934592,
+      "total_memory_cap_gib": 8.0
+    },
+    "output_dir": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_hybrid",
+    "peak_rss_bytes": 57147392,
+    "peak_rss_mib": 54.5,
+    "rss_log_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_hybrid/_memory_guard/profit_moonshot_candidate_hybrid_rss_latest.jsonl",
+    "run_name": "profit_moonshot_candidate_hybrid",
+    "sample_count": 1,
+    "schema_version": "1.0",
+    "soft_limit_bytes": 4187593113,
+    "soft_limit_mib": 3993.5999994277954,
+    "soft_trigger_count": 0,
+    "status": "completed",
+    "summary_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_hybrid/_memory_guard/profit_moonshot_candidate_hybrid_memory_latest.json"
+  },
+  "memory_summary_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_hybrid/_memory_guard/profit_moonshot_candidate_hybrid_memory_latest.json",
+  "oos_end_date": "2026-05-09",
+  "peak_rss_mib": 320.171875,
+  "rss_log_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_hybrid/_memory_guard/profit_moonshot_candidate_hybrid_rss_latest.jsonl",
+  "selected_by_train_validation": {
+    "default_candidate": "candidate_hybrid_input_05_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+    "hybrid_config": {
+      "default_boost": 0.0,
+      "disagreement_cash_scale": 0.856739550695035,
+      "disagreement_threshold": 0.22293874953018045,
+      "diversified_weight_cap": 0.75,
+      "lookback_days": 21,
+      "min_positive_score": 0.1,
+      "mixed_health_floor": 0.5897144969917639,
+      "negative_health_floor": 0.09432330421001382,
+      "pair_pbo_penalty_scale": 1.8475128599670687,
+      "pair_score_boost": 0.00015054198515658535,
+      "pair_sparsity_penalty_scale": 2.732355465712022,
+      "pair_weight_cap": 0.2,
+      "score_temperature": 0.9,
+      "sticky_default_bonus": 0.09538352712472187,
+      "switch_margin": 0.09865009243733545,
+      "use_current_health_priors": false,
+      "variant": "disagreement_switching",
+      "warmup_days": 21,
+      "warmup_ratio": 0.6
+    },
+    "leverage": 1.0,
+    "liquidation_evidence_note": "candidate-hybrid allocator uses reconstructed candidate portfolio return streams; no dynamic-weight liquidation replay is claimed, so final live writer must keep this row non-promotable until a dedicated margin replay exists.",
+    "locked_oos_policy": {
+      "oos_is_gate_only": true,
+      "oos_is_report_only": true,
+      "uses_locked_oos_for_selection": false
+    },
+    "mode": "candidate_online_hybrid",
+    "name": "candidate_hybrid_online_rank_01_candidate_hybrid_input_05_fresh_portfolio_train_val_monthly_",
+    "selected_by_train_validation": true,
+    "selection_policy": {
+      "locked_oos": "report_only_gate_only",
+      "selection_basis": "train_validation_only_candidate_hybrid_grid",
+      "selection_inputs": [
+        "train",
+        "validation"
+      ],
+      "uses_locked_oos_for_selection": false
+    },
+    "sleeve_count": 12,
+    "sleeves": [
+      "candidate_hybrid_input_01_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+      "candidate_hybrid_input_02_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+      "candidate_hybrid_input_04_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+      "candidate_hybrid_input_05_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+      "candidate_hybrid_input_06_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+      "candidate_hybrid_input_07_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+      "candidate_hybrid_input_08_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+      "candidate_hybrid_input_09_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+      "candidate_hybrid_input_10_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+      "candidate_hybrid_input_11_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+      "candidate_hybrid_input_12_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+      "candidate_hybrid_input_13_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se"
+    ],
+    "splits": {
+      "oos": {
+        "fills": 0,
+        "liquidation_count": 0,
+        "liquidation_event_count_total": 0,
+        "liquidation_events": [],
+        "metrics": {
+          "cagr": 0.47218720038258866,
+          "calmar": 17.580833695950442,
+          "max_drawdown": 0.026858066491542543,
+          "monthlyized_return": 0.03275408099343058,
+          "return_mdd": 2.739325146934937,
+          "sharpe": 3.550497987364354,
+          "smart_sortino": 4.446438374459078,
+          "sortino": 4.981625713002248,
+          "total_return": 0.07357297693833309,
+          "volatility": 0.11068502996149061
+        },
+        "round_trips": 0
+      },
+      "train": {
+        "fills": 0,
+        "liquidation_count": 0,
+        "liquidation_event_count_total": 0,
+        "liquidation_events": [],
+        "metrics": {
+          "cagr": 0.33552376456045585,
+          "calmar": 4.774075761437123,
+          "max_drawdown": 0.07028036028893148,
+          "monthlyized_return": 0.0244032988972811,
+          "return_mdd": 4.774075761437123,
+          "sharpe": 1.5648949961208845,
+          "smart_sortino": 1.2509860724557533,
+          "sortino": 1.7401911033025346,
+          "total_return": 0.33552376456045585,
+          "volatility": 0.19704030370314796
+        },
+        "round_trips": 0
+      },
+      "validation": {
+        "fills": 0,
+        "liquidation_count": 0,
+        "liquidation_event_count_total": 0,
+        "liquidation_events": [],
+        "metrics": {
+          "cagr": 1.9535613734543555,
+          "calmar": 54.45627530967264,
+          "max_drawdown": 0.035873944046763695,
+          "monthlyized_return": 0.09444892741504707,
+          "return_mdd": 5.333126190837212,
+          "sharpe": 4.202553864658776,
+          "smart_sortino": 6.783176566683105,
+          "sortino": 7.919606673375268,
+          "total_return": 0.19132027056442413,
+          "volatility": 0.266267982826619
+        },
+        "round_trips": 0
+      }
+    },
+    "train_val_stability_score": 24.434215721810112
+  },
+  "selection_basis": "candidate_derived_online_hybrid_train_validation_only",
+  "selection_policy": {
+    "locked_oos": "report_only_gate_only",
+    "selection_inputs": [
+      "train",
+      "validation"
+    ],
+    "tuning_objective": "frozen_weighted_train_validation_score_v1",
+    "uses_locked_oos_for_selection": false
+  },
+  "source_sleeve_metrics": {
+    "candidate_hybrid_input_01_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se": {
+      "leverage": 5.0,
+      "mode": "train_val_monthly_return_budget",
+      "oos": {
+        "cagr": 1.1533638443425578,
+        "calmar": 63.21414630852705,
+        "equity_breach_count": 0.0,
+        "equity_breach_observed": false,
+        "fills": 42,
+        "max_drawdown": 0.018245343988565085,
+        "min_equity": 9945.932716246754,
+        "monthlyized_return": 0.06600633288509572,
+        "raw_final_equity": 11495.798610372123,
+        "raw_max_drawdown": 0.018245343988565085,
+        "raw_total_return": 0.14957986103721232,
+        "return_mdd": 8.198248338368332,
+        "round_trips": 21,
+        "sharpe": 5.662952604682912,
+        "smart_sortino": 6.53823735114552,
+        "sortino": 7.05297302724192,
+        "total_return": 0.14957986103721232,
+        "volatility": 0.1371087124534722
+      },
+      "sleeves": [
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss100_tp600"
+      ],
+      "source_kind": "liquidation",
+      "source_name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600__fr_liquidation_aware_5x",
+      "train": {
+        "cagr": 0.5400875342675149,
+        "calmar": 4.019687886053644,
+        "equity_breach_count": 0.0,
+        "equity_breach_observed": false,
+        "fills": 122,
+        "max_drawdown": 0.1343605646949245,
+        "min_equity": 9519.421232330229,
+        "monthlyized_return": 0.0366419601679735,
+        "raw_final_equity": 15400.116148769685,
+        "raw_max_drawdown": 0.1343605646949245,
+        "raw_total_return": 0.5400116148769685,
+        "return_mdd": 4.019122843842644,
+        "round_trips": 61,
+        "sharpe": 1.6985347327150466,
+        "smart_sortino": 0.5829171085894959,
+        "sortino": 1.2602039845915591,
+        "total_return": 0.5400116148769685,
+        "volatility": 0.2767552612056535
+      },
+      "validation": {
+        "cagr": 6.918285954482618,
+        "calmar": 52.8525000187573,
+        "equity_breach_count": 0.0,
+        "equity_breach_observed": false,
+        "fills": 60,
+        "max_drawdown": 0.13089798878061257,
+        "min_equity": 8693.419547022948,
+        "monthlyized_return": 0.1881901062207605,
+        "raw_final_equity": 13968.687688189366,
+        "raw_max_drawdown": 0.13089798878061257,
+        "raw_total_return": 0.3968687688189365,
+        "return_mdd": 3.0318935570820407,
+        "round_trips": 30,
+        "sharpe": 4.086621607091421,
+        "smart_sortino": 2.170518571446624,
+        "sortino": 4.55600738649262,
+        "total_return": 0.3968687688189365,
+        "volatility": 0.5423183884947577
+      }
+    },
+    "candidate_hybrid_input_02_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se": {
+      "leverage": 4.0,
+      "mode": "train_val_monthly_return_budget",
+      "oos": {
+        "cagr": 0.6103580384766467,
+        "calmar": 11.813195637648008,
+        "equity_breach_count": 0.0,
+        "equity_breach_observed": false,
+        "fills": 56,
+        "max_drawdown": 0.051667479080044106,
+        "min_equity": 9783.713604697683,
+        "monthlyized_return": 0.0405034801489188,
+        "raw_final_equity": 10904.483098851819,
+        "raw_max_drawdown": 0.051667479080044106,
+        "raw_total_return": 0.09044830988518182,
+        "return_mdd": 1.750584922965911,
+        "round_trips": 28,
+        "sharpe": 2.423201536650255,
+        "smart_sortino": 2.592758145997575,
+        "sortino": 3.268195924162097,
+        "total_return": 0.09044830988518182,
+        "volatility": 0.2053081478305688
+      },
+      "sleeves": [
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600",
+        "fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0",
+        "fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0"
+      ],
+      "source_kind": "liquidation",
+      "source_name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600__fr_liquidation_aware_4x",
+      "train": {
+        "cagr": 0.5132538599240595,
+        "calmar": 5.785547221960403,
+        "equity_breach_count": 0.0,
+        "equity_breach_observed": false,
+        "fills": 126,
+        "max_drawdown": 0.08871310530071969,
+        "min_equity": 9534.212226467882,
+        "monthlyized_return": 0.035124646166452056,
+        "raw_final_equity": 15131.82299529018,
+        "raw_max_drawdown": 0.08871310530071969,
+        "raw_total_return": 0.5131822995290181,
+        "return_mdd": 5.784740572313782,
+        "round_trips": 63,
+        "sharpe": 2.0105792220314087,
+        "smart_sortino": 1.0698918750843038,
+        "sortino": 1.6583676514435952,
+        "total_return": 0.5131822995290181,
+        "volatility": 0.21782565142080887
+      },
+      "validation": {
+        "cagr": 4.683451822994793,
+        "calmar": 75.29147803584428,
+        "equity_breach_count": 0.0,
+        "equity_breach_observed": false,
+        "fills": 54,
+        "max_drawdown": 0.0622042752403549,
+        "min_equity": 9387.69957525142,
+        "monthlyized_return": 0.15580441368561826,
+        "raw_final_equity": 13240.130469768694,
+        "raw_max_drawdown": 0.0622042752403549,
+        "raw_total_return": 0.3240130469768694,
+        "return_mdd": 5.208854949678227,
+        "round_trips": 27,
+        "sharpe": 5.008039573658364,
+        "smart_sortino": 4.732657485224159,
+        "sortino": 6.3002731974880755,
+        "total_return": 0.3240130469768694,
+        "volatility": 0.3598805028516178
+      }
+    },
+    "candidate_hybrid_input_04_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se": {
+      "leverage": 3.0,
+      "mode": "train_val_monthly_return_budget",
+      "oos": {
+        "cagr": 0.4349844980691109,
+        "calmar": 11.031523372336236,
+        "equity_breach_count": 0.0,
+        "equity_breach_observed": false,
+        "fills": 56,
+        "max_drawdown": 0.03943104532234614,
+        "min_equity": 9837.785203523263,
+        "monthlyized_return": 0.030553638082192025,
+        "raw_final_equity": 10678.362324138863,
+        "raw_max_drawdown": 0.03943104532234614,
+        "raw_total_return": 0.06783623241388637,
+        "return_mdd": 1.7203762126854547,
+        "round_trips": 28,
+        "sharpe": 2.397947893814281,
+        "smart_sortino": 2.721914082440202,
+        "sortino": 3.2316184579619076,
+        "total_return": 0.06783623241388637,
+        "volatility": 0.1556563119058576
+      },
+      "sleeves": [
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600",
+        "fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0",
+        "fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0"
+      ],
+      "source_kind": "liquidation",
+      "source_name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600__fr_liquidation_aware_3x",
+      "train": {
+        "cagr": 0.3849382091667979,
+        "calmar": 5.721594889108867,
+        "equity_breach_count": 0.0,
+        "equity_breach_observed": false,
+        "fills": 126,
+        "max_drawdown": 0.0672781307707634,
+        "min_equity": 9650.659169850911,
+        "monthlyized_return": 0.02750954857318466,
+        "raw_final_equity": 13848.867246467635,
+        "raw_max_drawdown": 0.0672781307707634,
+        "raw_total_return": 0.38488672464676355,
+        "return_mdd": 5.7208296401424565,
+        "round_trips": 63,
+        "sharpe": 2.0207763598251898,
+        "smart_sortino": 1.2237198708365478,
+        "sortino": 1.674293115540142,
+        "total_return": 0.38488672464676355,
+        "volatility": 0.1681424499814324
+      },
+      "validation": {
+        "cagr": 2.8448042235254944,
+        "calmar": 59.74748277665767,
+        "equity_breach_count": 0.0,
+        "equity_breach_observed": false,
+        "fills": 54,
+        "max_drawdown": 0.04761379210166342,
+        "min_equity": 9540.774681438565,
+        "monthlyized_return": 0.11876666923997181,
+        "raw_final_equity": 12430.09785232652,
+        "raw_max_drawdown": 0.04761379210166342,
+        "raw_total_return": 0.24300978523265204,
+        "return_mdd": 5.103768771741294,
+        "round_trips": 27,
+        "sharpe": 4.984183233973598,
+        "smart_sortino": 5.089896058373223,
+        "sortino": 6.28735538753955,
+        "total_return": 0.24300978523265204,
+        "volatility": 0.27795099000601287
+      }
+    },
+    "candidate_hybrid_input_05_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se": {
+      "leverage": 2.0,
+      "mode": "train_val_monthly_return_budget",
+      "oos": {
+        "cagr": 0.2755578855668477,
+        "calmar": 10.298456296369727,
+        "equity_breach_count": 0.0,
+        "equity_breach_observed": false,
+        "fills": 56,
+        "max_drawdown": 0.026757202986236264,
+        "min_equity": 9891.856802348842,
+        "monthlyized_return": 0.020489046777521613,
+        "raw_final_equity": 10452.24154942591,
+        "raw_max_drawdown": 0.026757202986236264,
+        "raw_total_return": 0.04522415494259091,
+        "return_mdd": 1.6901675024050133,
+        "round_trips": 28,
+        "sharpe": 2.3718688861122006,
+        "smart_sortino": 2.8519841506454457,
+        "sortino": 3.193814300836782,
+        "total_return": 0.04522415494259091,
+        "volatility": 0.10493205421875838
+      },
+      "sleeves": [
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600",
+        "fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0",
+        "fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0"
+      ],
+      "source_kind": "liquidation",
+      "source_name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h120_ls620_ss120_tp600__fr_liquidation_aware_2x",
+      "train": {
+        "cagr": 0.2566239174834737,
+        "calmar": 5.442879271192616,
+        "equity_breach_count": 0.0,
+        "equity_breach_observed": false,
+        "fills": 126,
+        "max_drawdown": 0.047148559557751046,
+        "min_equity": 9767.10611323394,
+        "monthlyized_return": 0.01921805904768248,
+        "raw_final_equity": 12565.911497645091,
+        "raw_max_drawdown": 0.047148559557751046,
+        "raw_total_return": 0.25659114976450903,
+        "return_mdd": 5.442184282432153,
+        "round_trips": 63,
+        "sharpe": 2.0307860092458214,
+        "smart_sortino": 1.317395487285855,
+        "sortino": 1.689657017555034,
+        "total_return": 0.25659114976450903,
+        "volatility": 0.11578166261497257
+      },
+      "validation": {
+        "cagr": 1.5333431534603217,
+        "calmar": 44.84722265052535,
+        "equity_breach_count": 0.0,
+        "equity_breach_observed": false,
+        "fills": 54,
+        "max_drawdown": 0.034190370391696034,
+        "min_equity": 9693.84978762571,
+        "monthlyized_return": 0.08054079607456188,
+        "raw_final_equity": 11620.065234884347,
+        "raw_max_drawdown": 0.034190370391696034,
+        "raw_total_return": 0.1620065234884347,
+        "return_mdd": 4.738367020667957,
+        "round_trips": 27,
+        "sharpe": 4.951627925457333,
+        "smart_sortino": 5.403844404799784,
+        "sortino": 6.259966729250915,
+        "total_return": 0.1620065234884347,
+        "volatility": 0.1914270569552861
+      }
+    },
+    "candidate_hybrid_input_06_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se": {
+      "leverage": 4.0,
+      "mode": "train_val_monthly_return_budget",
+      "oos": {
+        "cagr": 1.0839931942078356,
+        "calmar": 39.20538746862054,
+        "equity_breach_count": 0.0,
+        "equity_breach_observed": false,
+        "fills": 64,
+        "max_drawdown": 0.027649087643259462,
+        "min_equity": 9844.670714372109,
+        "monthlyized_return": 0.06310140315131352,
+        "raw_final_equity": 11427.590501049139,
+        "raw_max_drawdown": 0.027649087643259462,
+        "raw_total_return": 0.14275905010491385,
+        "return_mdd": 5.163246322875211,
+        "round_trips": 32,
+        "sharpe": 4.714483667421152,
+        "smart_sortino": 5.938320383150439,
+        "sortino": 6.676743891231463,
+        "total_return": 0.14275905010491385,
+        "volatility": 0.15841407486573875
+      },
+      "sleeves": [
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr120_h168_ls530_ss120_tp450",
+        "fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0"
+      ],
+      "source_kind": "liquidation",
+      "source_name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600__fr_liquidation_aware_4x",
+      "train": {
+        "cagr": 0.630324833673934,
+        "calmar": 4.794837630286476,
+        "equity_breach_count": 0.0,
+        "equity_breach_observed": false,
+        "fills": 162,
+        "max_drawdown": 0.13145905706848182,
+        "min_equity": 9453.556215767858,
+        "monthlyized_return": 0.04157251685781205,
+        "raw_final_equity": 16302.338694311818,
+        "raw_max_drawdown": 0.13145905706848182,
+        "raw_total_return": 0.6302338694311818,
+        "return_mdd": 4.794145671552093,
+        "round_trips": 81,
+        "sharpe": 1.8723702723993767,
+        "smart_sortino": 0.6992313379229985,
+        "sortino": 1.474662088538786,
+        "total_return": 0.6302338694311818,
+        "volatility": 0.2822919055554624
+      },
+      "validation": {
+        "cagr": 7.013750354366682,
+        "calmar": 51.134756238599635,
+        "equity_breach_count": 0.0,
+        "equity_breach_observed": false,
+        "fills": 80,
+        "max_drawdown": 0.13716209620008465,
+        "min_equity": 8632.190463201712,
+        "monthlyized_return": 0.1893773144982338,
+        "raw_final_equity": 13995.754288673377,
+        "raw_max_drawdown": 0.13716209620008465,
+        "raw_total_return": 0.39957542886733766,
+        "return_mdd": 2.913162163142058,
+        "round_trips": 40,
+        "sharpe": 4.149960697496183,
+        "smart_sortino": 2.2337223657292764,
+        "sortino": 4.948962827442546,
+        "total_return": 0.39957542886733766,
+        "volatility": 0.5361375164072072
+      }
+    },
+    "candidate_hybrid_input_07_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se": {
+      "leverage": 5.0,
+      "mode": "train_val_monthly_return_budget",
+      "oos": {
+        "cagr": 1.1374697290211513,
+        "calmar": 62.973282655774334,
+        "equity_breach_count": 0.0,
+        "equity_breach_observed": false,
+        "fills": 42,
+        "max_drawdown": 0.018062735195794197,
+        "min_equity": 9946.84251110355,
+        "monthlyized_return": 0.06534841581118478,
+        "raw_final_equity": 11480.331383798994,
+        "raw_max_drawdown": 0.018062735195794197,
+        "raw_total_return": 0.1480331383798994,
+        "return_mdd": 8.195499561681448,
+        "round_trips": 21,
+        "sharpe": 5.66489535337928,
+        "smart_sortino": 6.547839262301637,
+        "sortino": 7.0577697678606315,
+        "total_return": 0.1480331383798994,
+        "volatility": 0.13572048128522202
+      },
+      "sleeves": [
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls600_ss100_tp600"
+      ],
+      "source_kind": "liquidation",
+      "source_name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600__fr_liquidation_aware_5x",
+      "train": {
+        "cagr": 0.5386799100472301,
+        "calmar": 4.009211417578829,
+        "equity_breach_count": 0.0,
+        "equity_breach_observed": false,
+        "fills": 122,
+        "max_drawdown": 0.1343605646949245,
+        "min_equity": 9519.421232330229,
+        "monthlyized_return": 0.03656297039558942,
+        "raw_final_equity": 15386.042206525599,
+        "raw_max_drawdown": 0.1343605646949245,
+        "raw_total_return": 0.5386042206525599,
+        "return_mdd": 4.008648087148935,
+        "round_trips": 61,
+        "sharpe": 1.6965015852070502,
+        "smart_sortino": 0.5818622666515737,
+        "sortino": 1.2579235299716898,
+        "total_return": 0.5386042206525599,
+        "volatility": 0.2765074701017653
+      },
+      "validation": {
+        "cagr": 6.918285954482618,
+        "calmar": 52.8525000187573,
+        "equity_breach_count": 0.0,
+        "equity_breach_observed": false,
+        "fills": 60,
+        "max_drawdown": 0.13089798878061257,
+        "min_equity": 8693.419547022948,
+        "monthlyized_return": 0.1881901062207605,
+        "raw_final_equity": 13968.687688189366,
+        "raw_max_drawdown": 0.13089798878061257,
+        "raw_total_return": 0.3968687688189365,
+        "return_mdd": 3.0318935570820407,
+        "round_trips": 30,
+        "sharpe": 4.086621607091421,
+        "smart_sortino": 2.170518571446624,
+        "sortino": 4.55600738649262,
+        "total_return": 0.3968687688189365,
+        "volatility": 0.5423183884947577
+      }
+    },
+    "candidate_hybrid_input_08_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se": {
+      "leverage": 5.0,
+      "mode": "train_val_monthly_return_budget",
+      "oos": {
+        "cagr": 1.1374697290211513,
+        "calmar": 62.973282655774334,
+        "equity_breach_count": 0.0,
+        "equity_breach_observed": false,
+        "fills": 42,
+        "max_drawdown": 0.018062735195794197,
+        "min_equity": 9946.84251110355,
+        "monthlyized_return": 0.06534841581118478,
+        "raw_final_equity": 11480.331383798994,
+        "raw_max_drawdown": 0.018062735195794197,
+        "raw_total_return": 0.1480331383798994,
+        "return_mdd": 8.195499561681448,
+        "round_trips": 21,
+        "sharpe": 5.66489535337928,
+        "smart_sortino": 6.547839262301637,
+        "sortino": 7.0577697678606315,
+        "total_return": 0.1480331383798994,
+        "volatility": 0.13572048128522202
+      },
+      "sleeves": [
+        "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls600_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss100_tp600"
+      ],
+      "source_kind": "liquidation",
+      "source_name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600__fr_liquidation_aware_5x",
+      "train": {
+        "cagr": 0.5386718595930846,
+        "calmar": 4.009151500785804,
+        "equity_breach_count": 0.0,
+        "equity_breach_observed": false,
+        "fills": 122,
+        "max_drawdown": 0.1343605646949245,
+        "min_equity": 9519.421232330229,
+        "monthlyized_return": 0.036562518448511216,
+        "raw_final_equity": 15385.961715133792,
+        "raw_max_drawdown": 0.1343605646949245,
+        "raw_total_return": 0.5385961715133791,
+        "return_mdd": 4.0085881801427465,
+        "round_trips": 61,
+        "sharpe": 1.696489913747229,
+        "smart_sortino": 0.5818562112404692,
+        "sortino": 1.2579104388252988,
+        "total_return": 0.5385961715133791,
+        "volatility": 0.2765060578076085
+      },
+      "validation": {
+        "cagr": 6.918285954482618,
+        "calmar": 52.8525000187573,
+        "equity_breach_count": 0.0,
+        "equity_breach_observed": false,
+        "fills": 60,
+        "max_drawdown": 0.13089798878061257,
+        "min_equity": 8693.419547022948,
+        "monthlyized_return": 0.1881901062207605,
+        "raw_final_equity": 13968.687688189366,
+        "raw_max_drawdown": 0.13089798878061257,
+        "raw_total_return": 0.3968687688189365,
+        "return_mdd": 3.0318935570820407,
+        "round_trips": 30,
+        "sharpe": 4.086621607091421,
+        "smart_sortino": 2.170518571446624,
+        "sortino": 4.55600738649262,
+        "total_return": 0.3968687688189365,
+        "volatility": 0.5423183884947577
+      }
+    },
+    "candidate_hybrid_input_09_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se": {
+      "leverage": 5.0,
+      "mode": "train_val_monthly_return_budget",
+      "oos": {
+        "cagr": 1.1295602492894696,
+        "calmar": 62.853416578160115,
+        "equity_breach_count": 0.0,
+        "equity_breach_observed": false,
+        "fills": 42,
+        "max_drawdown": 0.01797134206514975,
+        "min_equity": 9947.29740038536,
+        "monthlyized_return": 0.06501933993101883,
+        "raw_final_equity": 11472.5992420747,
+        "raw_max_drawdown": 0.01797134206514975,
+        "raw_total_return": 0.14725992420747014,
+        "return_mdd": 8.194152872591436,
+        "round_trips": 21,
+        "sharpe": 5.66587850820877,
+        "smart_sortino": 6.55265819248345,
+        "sortino": 7.060181973645822,
+        "total_return": 0.14725992420747014,
+        "volatility": 0.135026024875992
+      },
+      "sleeves": [
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls590_ss100_tp600"
+      ],
+      "source_kind": "liquidation",
+      "source_name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600__fr_liquidation_aware_5x",
+      "train": {
+        "cagr": 0.5379761843181541,
+        "calmar": 4.003973826246328,
+        "equity_breach_count": 0.0,
+        "equity_breach_observed": false,
+        "fills": 122,
+        "max_drawdown": 0.1343605646949245,
+        "min_equity": 9519.421232330229,
+        "monthlyized_return": 0.036523455517611714,
+        "raw_final_equity": 15379.006098522088,
+        "raw_max_drawdown": 0.1343605646949245,
+        "raw_total_return": 0.5379006098522088,
+        "return_mdd": 4.0034113511918585,
+        "round_trips": 61,
+        "sharpe": 1.6954782627527523,
+        "smart_sortino": 0.581331953883271,
+        "sortino": 1.2567770509031444,
+        "total_return": 0.5379006098522088,
+        "volatility": 0.2763844577131928
+      },
+      "validation": {
+        "cagr": 6.918285954482618,
+        "calmar": 52.8525000187573,
+        "equity_breach_count": 0.0,
+        "equity_breach_observed": false,
+        "fills": 60,
+        "max_drawdown": 0.13089798878061257,
+        "min_equity": 8693.419547022948,
+        "monthlyized_return": 0.1881901062207605,
+        "raw_final_equity": 13968.687688189366,
+        "raw_max_drawdown": 0.13089798878061257,
+        "raw_total_return": 0.3968687688189365,
+        "return_mdd": 3.0318935570820407,
+        "round_trips": 30,
+        "sharpe": 4.086621607091421,
+        "smart_sortino": 2.170518571446624,
+        "sortino": 4.55600738649262,
+        "total_return": 0.3968687688189365,
+        "volatility": 0.5423183884947577
+      }
+    },
+    "candidate_hybrid_input_10_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se": {
+      "leverage": 5.0,
+      "mode": "train_val_monthly_return_budget",
+      "oos": {
+        "cagr": 1.1295602492894696,
+        "calmar": 62.853416578160115,
+        "equity_breach_count": 0.0,
+        "equity_breach_observed": false,
+        "fills": 42,
+        "max_drawdown": 0.01797134206514975,
+        "min_equity": 9947.29740038536,
+        "monthlyized_return": 0.06501933993101883,
+        "raw_final_equity": 11472.5992420747,
+        "raw_max_drawdown": 0.01797134206514975,
+        "raw_total_return": 0.14725992420747014,
+        "return_mdd": 8.194152872591436,
+        "round_trips": 21,
+        "sharpe": 5.66587850820877,
+        "smart_sortino": 6.55265819248345,
+        "sortino": 7.060181973645822,
+        "total_return": 0.14725992420747014,
+        "volatility": 0.135026024875992
+      },
+      "sleeves": [
+        "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls590_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss100_tp600"
+      ],
+      "source_kind": "liquidation",
+      "source_name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600__fr_liquidation_aware_5x",
+      "train": {
+        "cagr": 0.5379641027883872,
+        "calmar": 4.003883907528032,
+        "equity_breach_count": 0.0,
+        "equity_breach_observed": false,
+        "fills": 122,
+        "max_drawdown": 0.1343605646949245,
+        "min_equity": 9519.421232330229,
+        "monthlyized_return": 0.0365227769833687,
+        "raw_final_equity": 15378.88530295212,
+        "raw_max_drawdown": 0.1343605646949245,
+        "raw_total_return": 0.5378885302952119,
+        "return_mdd": 4.003321447156218,
+        "round_trips": 61,
+        "sharpe": 1.6954606574690587,
+        "smart_sortino": 0.5813228323013813,
+        "sortino": 1.2567573310258688,
+        "total_return": 0.5378885302952119,
+        "volatility": 0.27638235029337804
+      },
+      "validation": {
+        "cagr": 6.918285954482618,
+        "calmar": 52.8525000187573,
+        "equity_breach_count": 0.0,
+        "equity_breach_observed": false,
+        "fills": 60,
+        "max_drawdown": 0.13089798878061257,
+        "min_equity": 8693.419547022948,
+        "monthlyized_return": 0.1881901062207605,
+        "raw_final_equity": 13968.687688189366,
+        "raw_max_drawdown": 0.13089798878061257,
+        "raw_total_return": 0.3968687688189365,
+        "return_mdd": 3.0318935570820407,
+        "round_trips": 30,
+        "sharpe": 4.086621607091421,
+        "smart_sortino": 2.170518571446624,
+        "sortino": 4.55600738649262,
+        "total_return": 0.3968687688189365,
+        "volatility": 0.5423183884947577
+      }
+    },
+    "candidate_hybrid_input_11_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se": {
+      "leverage": 5.0,
+      "mode": "train_val_monthly_return_budget",
+      "oos": {
+        "cagr": 1.1216757851570063,
+        "calmar": 62.73394525753784,
+        "equity_breach_count": 0.0,
+        "equity_breach_observed": false,
+        "fills": 42,
+        "max_drawdown": 0.017879885930213047,
+        "min_equity": 9947.75228966718,
+        "monthlyized_return": 0.06469018786467129,
+        "raw_final_equity": 11464.868131832276,
+        "raw_max_drawdown": 0.017879885930213047,
+        "raw_total_return": 0.14648681318322754,
+        "return_mdd": 8.192827054656835,
+        "round_trips": 21,
+        "sharpe": 5.666869653502359,
+        "smart_sortino": 6.557489523351859,
+        "sortino": 7.062603718801755,
+        "total_return": 0.14648681318322754,
+        "volatility": 0.13433134594180368
+      },
+      "sleeves": [
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls580_ss100_tp600"
+      ],
+      "source_kind": "liquidation",
+      "source_name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600__fr_liquidation_aware_5x",
+      "train": {
+        "cagr": 0.537272517216336,
+        "calmar": 3.998736671256574,
+        "equity_breach_count": 0.0,
+        "equity_breach_observed": false,
+        "fills": 122,
+        "max_drawdown": 0.1343605646949245,
+        "min_equity": 9519.421232330229,
+        "monthlyized_return": 0.03648392735626027,
+        "raw_final_equity": 15371.970576327934,
+        "raw_max_drawdown": 0.1343605646949245,
+        "raw_total_return": 0.5371970576327934,
+        "return_mdd": 3.9981750512327676,
+        "round_trips": 61,
+        "sharpe": 1.694450424588378,
+        "smart_sortino": 0.580799715352641,
+        "sortino": 1.2556264085439313,
+        "total_return": 0.5371970576327934,
+        "volatility": 0.27626203760400186
+      },
+      "validation": {
+        "cagr": 6.918285954482618,
+        "calmar": 52.8525000187573,
+        "equity_breach_count": 0.0,
+        "equity_breach_observed": false,
+        "fills": 60,
+        "max_drawdown": 0.13089798878061257,
+        "min_equity": 8693.419547022948,
+        "monthlyized_return": 0.1881901062207605,
+        "raw_final_equity": 13968.687688189366,
+        "raw_max_drawdown": 0.13089798878061257,
+        "raw_total_return": 0.3968687688189365,
+        "return_mdd": 3.0318935570820407,
+        "round_trips": 30,
+        "sharpe": 4.086621607091421,
+        "smart_sortino": 2.170518571446624,
+        "sortino": 4.55600738649262,
+        "total_return": 0.3968687688189365,
+        "volatility": 0.5423183884947577
+      }
+    },
+    "candidate_hybrid_input_12_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se": {
+      "leverage": 5.0,
+      "mode": "train_val_monthly_return_budget",
+      "oos": {
+        "cagr": 1.1800763223149766,
+        "calmar": 63.971066406242805,
+        "equity_breach_count": 0.0,
+        "equity_breach_observed": false,
+        "fills": 98,
+        "max_drawdown": 0.01844703220704502,
+        "min_equity": 9932.571144530175,
+        "monthlyized_return": 0.06710210065420386,
+        "raw_final_equity": 11521.58446884929,
+        "raw_max_drawdown": 0.01844703220704502,
+        "raw_total_return": 0.15215844688492908,
+        "return_mdd": 8.248397095919795,
+        "round_trips": 35,
+        "sharpe": 5.801514594546115,
+        "smart_sortino": 6.906204171893559,
+        "sortino": 7.456397814417994,
+        "total_return": 0.15215844688492908,
+        "volatility": 0.13593172955379895
+      },
+      "sleeves": [
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+        "fresh_pair_resid_revert_spread_lb24_z150_h72_sc10_st100_tp240_asiaus",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls600_ss100_tp600"
+      ],
+      "source_kind": "liquidation",
+      "source_name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600__fr_liquidation_aware_5x",
+      "train": {
+        "cagr": 0.5407329790905249,
+        "calmar": 4.00719216996233,
+        "equity_breach_count": 0.0,
+        "equity_breach_observed": false,
+        "fills": 354,
+        "max_drawdown": 0.13494061581169642,
+        "min_equity": 9490.0477862542,
+        "monthlyized_return": 0.036678157607100026,
+        "raw_final_equity": 15406.569541897321,
+        "raw_max_drawdown": 0.13494061581169642,
+        "raw_total_return": 0.5406569541897321,
+        "return_mdd": 4.006628774721132,
+        "round_trips": 119,
+        "sharpe": 1.6967569884068943,
+        "smart_sortino": 0.6520422577646007,
+        "sortino": 1.4167515808564626,
+        "total_return": 0.5406569541897321,
+        "volatility": 0.27739518361479104
+      },
+      "validation": {
+        "cagr": 7.059034176922879,
+        "calmar": 52.92000091793064,
+        "equity_breach_count": 0.0,
+        "equity_breach_observed": false,
+        "fills": 112,
+        "max_drawdown": 0.13339066618441986,
+        "min_equity": 8698.122676107541,
+        "monthlyized_return": 0.18993594349766396,
+        "raw_final_equity": 14008.498982507792,
+        "raw_max_drawdown": 0.13339066618441986,
+        "raw_total_return": 0.4008498982507791,
+        "return_mdd": 3.0050820624629186,
+        "round_trips": 43,
+        "sharpe": 4.103118375853458,
+        "smart_sortino": 2.224437187220678,
+        "sortino": 4.768994716020476,
+        "total_return": 0.4008498982507791,
+        "volatility": 0.5447648923208775
+      }
+    },
+    "candidate_hybrid_input_13_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se": {
+      "leverage": 5.0,
+      "mode": "train_val_monthly_return_budget",
+      "oos": {
+        "cagr": 1.1720380222071682,
+        "calmar": 63.854570156852695,
+        "equity_breach_count": 0.0,
+        "equity_breach_observed": false,
+        "fills": 98,
+        "max_drawdown": 0.018354802472683913,
+        "min_equity": 9933.024637861983,
+        "monthlyized_return": 0.06677366348940628,
+        "raw_final_equity": 11513.852327124998,
+        "raw_max_drawdown": 0.018354802472683913,
+        "raw_total_return": 0.15138523271249982,
+        "return_mdd": 8.247717889516665,
+        "round_trips": 35,
+        "sharpe": 5.803119684810724,
+        "smart_sortino": 6.9122359038290435,
+        "sortino": 7.4599387097307925,
+        "total_return": 0.15138523271249982,
+        "volatility": 0.13524145153960201
+      },
+      "sleeves": [
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+        "fresh_pair_resid_revert_spread_lb24_z150_h72_sc10_st100_tp240_asiaus",
+        "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls590_ss100_tp600"
+      ],
+      "source_kind": "liquidation",
+      "source_name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600__fr_liquidation_aware_5x",
+      "train": {
+        "cagr": 0.5400292532543056,
+        "calmar": 4.001977091966826,
+        "equity_breach_count": 0.0,
+        "equity_breach_observed": false,
+        "fills": 354,
+        "max_drawdown": 0.13494061581169642,
+        "min_equity": 9490.0477862542,
+        "monthlyized_return": 0.03663869100359429,
+        "raw_final_equity": 15399.53343389381,
+        "raw_max_drawdown": 0.13494061581169642,
+        "raw_total_return": 0.5399533433893811,
+        "return_mdd": 4.0014145492181665,
+        "round_trips": 119,
+        "sharpe": 1.6957338347950448,
+        "smart_sortino": 0.6515339521735307,
+        "sortino": 1.4156471390183285,
+        "total_return": 0.5399533433893811,
+        "volatility": 0.2772731553901564
+      },
+      "validation": {
+        "cagr": 7.059034176922879,
+        "calmar": 52.92000091793064,
+        "equity_breach_count": 0.0,
+        "equity_breach_observed": false,
+        "fills": 112,
+        "max_drawdown": 0.13339066618441986,
+        "min_equity": 8698.122676107541,
+        "monthlyized_return": 0.18993594349766396,
+        "raw_final_equity": 14008.498982507792,
+        "raw_max_drawdown": 0.13339066618441986,
+        "raw_total_return": 0.4008498982507791,
+        "return_mdd": 3.0050820624629186,
+        "round_trips": 43,
+        "sharpe": 4.103118375853458,
+        "smart_sortino": 2.224437187220678,
+        "sortino": 4.768994716020476,
+        "total_return": 0.4008498982507791,
+        "volatility": 0.5447648923208775
+      }
+    }
+  },
+  "split_windows": {
+    "oos_end_inclusive": "2026-05-09",
+    "oos_start": "2026-03-01",
+    "pre_oos_days": 424,
+    "train_end_inclusive": "2025-12-31",
+    "train_start": "2025-01-01",
+    "val_end_inclusive": "2026-02-28",
+    "val_start": "2026-01-01"
+  },
+  "tuning_results": [
+    {
+      "default_candidate": "candidate_hybrid_input_05_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+      "hybrid_config": {
+        "default_boost": 0.0,
+        "disagreement_cash_scale": 0.856739550695035,
+        "disagreement_threshold": 0.22293874953018045,
+        "diversified_weight_cap": 0.75,
+        "lookback_days": 21,
+        "min_positive_score": 0.1,
+        "mixed_health_floor": 0.5897144969917639,
+        "negative_health_floor": 0.09432330421001382,
+        "pair_pbo_penalty_scale": 1.8475128599670687,
+        "pair_score_boost": 0.00015054198515658535,
+        "pair_sparsity_penalty_scale": 2.732355465712022,
+        "pair_weight_cap": 0.2,
+        "score_temperature": 0.9,
+        "sticky_default_bonus": 0.09538352712472187,
+        "switch_margin": 0.09865009243733545,
+        "use_current_health_priors": false,
+        "variant": "disagreement_switching",
+        "warmup_days": 21,
+        "warmup_ratio": 0.6
+      },
+      "leverage": 1.0,
+      "liquidation_evidence_note": "candidate-hybrid allocator uses reconstructed candidate portfolio return streams; no dynamic-weight liquidation replay is claimed, so final live writer must keep this row non-promotable until a dedicated margin replay exists.",
+      "locked_oos_policy": {
+        "oos_is_gate_only": true,
+        "oos_is_report_only": true,
+        "uses_locked_oos_for_selection": false
+      },
+      "mode": "candidate_online_hybrid",
+      "name": "candidate_hybrid_online_rank_01_candidate_hybrid_input_05_fresh_portfolio_train_val_monthly_",
+      "selected_by_train_validation": true,
+      "selection_policy": {
+        "locked_oos": "report_only_gate_only",
+        "selection_basis": "train_validation_only_candidate_hybrid_grid",
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "uses_locked_oos_for_selection": false
+      },
+      "sleeve_count": 0,
+      "sleeves": [],
+      "splits": {
+        "oos": {
+          "fills": 0,
+          "liquidation_count": 0,
+          "liquidation_event_count_total": 0,
+          "liquidation_events": [],
+          "metrics": {
+            "cagr": 0.47218720038258866,
+            "calmar": 17.580833695950442,
+            "max_drawdown": 0.026858066491542543,
+            "monthlyized_return": 0.03275408099343058,
+            "return_mdd": 2.739325146934937,
+            "sharpe": 3.550497987364354,
+            "smart_sortino": 4.446438374459078,
+            "sortino": 4.981625713002248,
+            "total_return": 0.07357297693833309,
+            "volatility": 0.11068502996149061
+          },
+          "round_trips": 0
+        },
+        "train": {
+          "fills": 0,
+          "liquidation_count": 0,
+          "liquidation_event_count_total": 0,
+          "liquidation_events": [],
+          "metrics": {
+            "cagr": 0.33552376456045585,
+            "calmar": 4.774075761437123,
+            "max_drawdown": 0.07028036028893148,
+            "monthlyized_return": 0.0244032988972811,
+            "return_mdd": 4.774075761437123,
+            "sharpe": 1.5648949961208845,
+            "smart_sortino": 1.2509860724557533,
+            "sortino": 1.7401911033025346,
+            "total_return": 0.33552376456045585,
+            "volatility": 0.19704030370314796
+          },
+          "round_trips": 0
+        },
+        "validation": {
+          "fills": 0,
+          "liquidation_count": 0,
+          "liquidation_event_count_total": 0,
+          "liquidation_events": [],
+          "metrics": {
+            "cagr": 1.9535613734543555,
+            "calmar": 54.45627530967264,
+            "max_drawdown": 0.035873944046763695,
+            "monthlyized_return": 0.09444892741504707,
+            "return_mdd": 5.333126190837212,
+            "sharpe": 4.202553864658776,
+            "smart_sortino": 6.783176566683105,
+            "sortino": 7.919606673375268,
+            "total_return": 0.19132027056442413,
+            "volatility": 0.266267982826619
+          },
+          "round_trips": 0
+        }
+      },
+      "train_val_stability_score": 24.434215721810112
+    },
+    {
+      "default_candidate": "candidate_hybrid_input_05_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+      "hybrid_config": {
+        "default_boost": 0.0,
+        "disagreement_cash_scale": 0.856739550695035,
+        "disagreement_threshold": 0.22293874953018045,
+        "diversified_weight_cap": 0.75,
+        "lookback_days": 21,
+        "min_positive_score": 0.0,
+        "mixed_health_floor": 0.5897144969917639,
+        "negative_health_floor": 0.09432330421001382,
+        "pair_pbo_penalty_scale": 1.8475128599670687,
+        "pair_score_boost": 0.00015054198515658535,
+        "pair_sparsity_penalty_scale": 2.732355465712022,
+        "pair_weight_cap": 0.2,
+        "score_temperature": 0.9,
+        "sticky_default_bonus": 0.09538352712472187,
+        "switch_margin": 0.09865009243733545,
+        "use_current_health_priors": false,
+        "variant": "disagreement_switching",
+        "warmup_days": 21,
+        "warmup_ratio": 0.6
+      },
+      "leverage": 1.0,
+      "liquidation_evidence_note": "candidate-hybrid allocator uses reconstructed candidate portfolio return streams; no dynamic-weight liquidation replay is claimed, so final live writer must keep this row non-promotable until a dedicated margin replay exists.",
+      "locked_oos_policy": {
+        "oos_is_gate_only": true,
+        "oos_is_report_only": true,
+        "uses_locked_oos_for_selection": false
+      },
+      "mode": "candidate_online_hybrid",
+      "name": "candidate_hybrid_online_rank_02_candidate_hybrid_input_05_fresh_portfolio_train_val_monthly_",
+      "selected_by_train_validation": false,
+      "selection_policy": {
+        "locked_oos": "report_only_gate_only",
+        "selection_basis": "train_validation_only_candidate_hybrid_grid",
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "uses_locked_oos_for_selection": false
+      },
+      "sleeve_count": 0,
+      "sleeves": [],
+      "splits": {
+        "oos": {
+          "fills": 0,
+          "liquidation_count": 0,
+          "liquidation_event_count_total": 0,
+          "liquidation_events": [],
+          "metrics": {
+            "cagr": 0.47230739309984626,
+            "calmar": 17.59486246539609,
+            "max_drawdown": 0.026843483092222842,
+            "monthlyized_return": 0.03276110709687119,
+            "return_mdd": 2.741412697209997,
+            "sharpe": 3.5512592977226562,
+            "smart_sortino": 4.447652817025689,
+            "sortino": 4.98266068884709,
+            "total_return": 0.07358906538636156,
+            "volatility": 0.11068429241600719
+          },
+          "round_trips": 0
+        },
+        "train": {
+          "fills": 0,
+          "liquidation_count": 0,
+          "liquidation_event_count_total": 0,
+          "liquidation_events": [],
+          "metrics": {
+            "cagr": 0.3355233742679471,
+            "calmar": 4.774070208071898,
+            "max_drawdown": 0.07028036028893148,
+            "monthlyized_return": 0.024403273949703763,
+            "return_mdd": 4.774070208071898,
+            "sharpe": 1.5648935637114445,
+            "smart_sortino": 1.2509848798912082,
+            "sortino": 1.7401894443790202,
+            "total_return": 0.3355233742679471,
+            "volatility": 0.19704029622337177
+          },
+          "round_trips": 0
+        },
+        "validation": {
+          "fills": 0,
+          "liquidation_count": 0,
+          "liquidation_event_count_total": 0,
+          "liquidation_events": [],
+          "metrics": {
+            "cagr": 1.9535613734543555,
+            "calmar": 54.45627530967264,
+            "max_drawdown": 0.035873944046763695,
+            "monthlyized_return": 0.09444892741504707,
+            "return_mdd": 5.333126190837212,
+            "sharpe": 4.202553864658776,
+            "smart_sortino": 6.783176566683105,
+            "sortino": 7.919606673375268,
+            "total_return": 0.19132027056442413,
+            "volatility": 0.266267982826619
+          },
+          "round_trips": 0
+        }
+      },
+      "train_val_stability_score": 24.434212584384852
+    },
+    {
+      "default_candidate": "candidate_hybrid_input_04_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+      "hybrid_config": {
+        "default_boost": 0.0,
+        "disagreement_cash_scale": 0.856739550695035,
+        "disagreement_threshold": 0.22293874953018045,
+        "diversified_weight_cap": 0.75,
+        "lookback_days": 21,
+        "min_positive_score": 0.1,
+        "mixed_health_floor": 0.5897144969917639,
+        "negative_health_floor": 0.09432330421001382,
+        "pair_pbo_penalty_scale": 1.8475128599670687,
+        "pair_score_boost": 0.00015054198515658535,
+        "pair_sparsity_penalty_scale": 2.732355465712022,
+        "pair_weight_cap": 0.2,
+        "score_temperature": 0.9,
+        "sticky_default_bonus": 0.09538352712472187,
+        "switch_margin": 0.09865009243733545,
+        "use_current_health_priors": false,
+        "variant": "disagreement_switching",
+        "warmup_days": 21,
+        "warmup_ratio": 0.6
+      },
+      "leverage": 1.0,
+      "liquidation_evidence_note": "candidate-hybrid allocator uses reconstructed candidate portfolio return streams; no dynamic-weight liquidation replay is claimed, so final live writer must keep this row non-promotable until a dedicated margin replay exists.",
+      "locked_oos_policy": {
+        "oos_is_gate_only": true,
+        "oos_is_report_only": true,
+        "uses_locked_oos_for_selection": false
+      },
+      "mode": "candidate_online_hybrid",
+      "name": "candidate_hybrid_online_rank_03_candidate_hybrid_input_04_fresh_portfolio_train_val_monthly_",
+      "selected_by_train_validation": false,
+      "selection_policy": {
+        "locked_oos": "report_only_gate_only",
+        "selection_basis": "train_validation_only_candidate_hybrid_grid",
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "uses_locked_oos_for_selection": false
+      },
+      "sleeve_count": 0,
+      "sleeves": [],
+      "splits": {
+        "oos": {
+          "fills": 0,
+          "liquidation_count": 0,
+          "liquidation_event_count_total": 0,
+          "liquidation_events": [],
+          "metrics": {
+            "cagr": 0.47218720038258866,
+            "calmar": 17.580833695950442,
+            "max_drawdown": 0.026858066491542543,
+            "monthlyized_return": 0.03275408099343058,
+            "return_mdd": 2.739325146934937,
+            "sharpe": 3.550497987364354,
+            "smart_sortino": 4.446438374459078,
+            "sortino": 4.981625713002248,
+            "total_return": 0.07357297693833309,
+            "volatility": 0.11068502996149061
+          },
+          "round_trips": 0
+        },
+        "train": {
+          "fills": 0,
+          "liquidation_count": 0,
+          "liquidation_event_count_total": 0,
+          "liquidation_events": [],
+          "metrics": {
+            "cagr": 0.33487676632365804,
+            "calmar": 4.764869800708721,
+            "max_drawdown": 0.07028036028893148,
+            "monthlyized_return": 0.024361933457172746,
+            "return_mdd": 4.764869800708721,
+            "sharpe": 1.5092879197312883,
+            "smart_sortino": 1.1236354936877022,
+            "sortino": 1.5630393755158694,
+            "total_return": 0.33487676632365804,
+            "volatility": 0.20506030316720955
+          },
+          "round_trips": 0
+        },
+        "validation": {
+          "fills": 0,
+          "liquidation_count": 0,
+          "liquidation_event_count_total": 0,
+          "liquidation_events": [],
+          "metrics": {
+            "cagr": 1.9535613734543555,
+            "calmar": 54.45627530967264,
+            "max_drawdown": 0.035873944046763695,
+            "monthlyized_return": 0.09444892741504707,
+            "return_mdd": 5.333126190837212,
+            "sharpe": 4.202553864658776,
+            "smart_sortino": 6.783176566683105,
+            "sortino": 7.919606673375268,
+            "total_return": 0.19132027056442413,
+            "volatility": 0.266267982826619
+          },
+          "round_trips": 0
+        }
+      },
+      "train_val_stability_score": 24.346680803979467
+    },
+    {
+      "default_candidate": "candidate_hybrid_input_04_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+      "hybrid_config": {
+        "default_boost": 0.0,
+        "disagreement_cash_scale": 0.856739550695035,
+        "disagreement_threshold": 0.22293874953018045,
+        "diversified_weight_cap": 0.75,
+        "lookback_days": 21,
+        "min_positive_score": 0.0,
+        "mixed_health_floor": 0.5897144969917639,
+        "negative_health_floor": 0.09432330421001382,
+        "pair_pbo_penalty_scale": 1.8475128599670687,
+        "pair_score_boost": 0.00015054198515658535,
+        "pair_sparsity_penalty_scale": 2.732355465712022,
+        "pair_weight_cap": 0.2,
+        "score_temperature": 0.9,
+        "sticky_default_bonus": 0.09538352712472187,
+        "switch_margin": 0.09865009243733545,
+        "use_current_health_priors": false,
+        "variant": "disagreement_switching",
+        "warmup_days": 21,
+        "warmup_ratio": 0.6
+      },
+      "leverage": 1.0,
+      "liquidation_evidence_note": "candidate-hybrid allocator uses reconstructed candidate portfolio return streams; no dynamic-weight liquidation replay is claimed, so final live writer must keep this row non-promotable until a dedicated margin replay exists.",
+      "locked_oos_policy": {
+        "oos_is_gate_only": true,
+        "oos_is_report_only": true,
+        "uses_locked_oos_for_selection": false
+      },
+      "mode": "candidate_online_hybrid",
+      "name": "candidate_hybrid_online_rank_04_candidate_hybrid_input_04_fresh_portfolio_train_val_monthly_",
+      "selected_by_train_validation": false,
+      "selection_policy": {
+        "locked_oos": "report_only_gate_only",
+        "selection_basis": "train_validation_only_candidate_hybrid_grid",
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "uses_locked_oos_for_selection": false
+      },
+      "sleeve_count": 0,
+      "sleeves": [],
+      "splits": {
+        "oos": {
+          "fills": 0,
+          "liquidation_count": 0,
+          "liquidation_event_count_total": 0,
+          "liquidation_events": [],
+          "metrics": {
+            "cagr": 0.47230739309984626,
+            "calmar": 17.59486246539609,
+            "max_drawdown": 0.026843483092222842,
+            "monthlyized_return": 0.03276110709687119,
+            "return_mdd": 2.741412697209997,
+            "sharpe": 3.5512592977226562,
+            "smart_sortino": 4.447652817025689,
+            "sortino": 4.98266068884709,
+            "total_return": 0.07358906538636156,
+            "volatility": 0.11068429241600719
+          },
+          "round_trips": 0
+        },
+        "train": {
+          "fills": 0,
+          "liquidation_count": 0,
+          "liquidation_event_count_total": 0,
+          "liquidation_events": [],
+          "metrics": {
+            "cagr": 0.3348763762202276,
+            "calmar": 4.764864250033841,
+            "max_drawdown": 0.07028036028893148,
+            "monthlyized_return": 0.024361908510603048,
+            "return_mdd": 4.764864250033841,
+            "sharpe": 1.5092865391292956,
+            "smart_sortino": 1.123634426498439,
+            "sortino": 1.5630378909963352,
+            "total_return": 0.3348763762202276,
+            "volatility": 0.20506029598449035
+          },
+          "round_trips": 0
+        },
+        "validation": {
+          "fills": 0,
+          "liquidation_count": 0,
+          "liquidation_event_count_total": 0,
+          "liquidation_events": [],
+          "metrics": {
+            "cagr": 1.9535613734543555,
+            "calmar": 54.45627530967264,
+            "max_drawdown": 0.035873944046763695,
+            "monthlyized_return": 0.09444892741504707,
+            "return_mdd": 5.333126190837212,
+            "sharpe": 4.202553864658776,
+            "smart_sortino": 6.783176566683105,
+            "sortino": 7.919606673375268,
+            "total_return": 0.19132027056442413,
+            "volatility": 0.266267982826619
+          },
+          "round_trips": 0
+        }
+      },
+      "train_val_stability_score": 24.34667774889192
+    },
+    {
+      "default_candidate": "candidate_hybrid_input_05_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+      "hybrid_config": {
+        "default_boost": 0.12,
+        "disagreement_cash_scale": 0.856739550695035,
+        "disagreement_threshold": 0.22293874953018045,
+        "diversified_weight_cap": 0.75,
+        "lookback_days": 21,
+        "min_positive_score": 0.1,
+        "mixed_health_floor": 0.5897144969917639,
+        "negative_health_floor": 0.09432330421001382,
+        "pair_pbo_penalty_scale": 1.8475128599670687,
+        "pair_score_boost": 0.00015054198515658535,
+        "pair_sparsity_penalty_scale": 2.732355465712022,
+        "pair_weight_cap": 0.2,
+        "score_temperature": 0.9,
+        "sticky_default_bonus": 0.09538352712472187,
+        "switch_margin": 0.09865009243733545,
+        "use_current_health_priors": false,
+        "variant": "disagreement_switching",
+        "warmup_days": 21,
+        "warmup_ratio": 0.6
+      },
+      "leverage": 1.0,
+      "liquidation_evidence_note": "candidate-hybrid allocator uses reconstructed candidate portfolio return streams; no dynamic-weight liquidation replay is claimed, so final live writer must keep this row non-promotable until a dedicated margin replay exists.",
+      "locked_oos_policy": {
+        "oos_is_gate_only": true,
+        "oos_is_report_only": true,
+        "uses_locked_oos_for_selection": false
+      },
+      "mode": "candidate_online_hybrid",
+      "name": "candidate_hybrid_online_rank_05_candidate_hybrid_input_05_fresh_portfolio_train_val_monthly_",
+      "selected_by_train_validation": false,
+      "selection_policy": {
+        "locked_oos": "report_only_gate_only",
+        "selection_basis": "train_validation_only_candidate_hybrid_grid",
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "uses_locked_oos_for_selection": false
+      },
+      "sleeve_count": 0,
+      "sleeves": [],
+      "splits": {
+        "oos": {
+          "fills": 0,
+          "liquidation_count": 0,
+          "liquidation_event_count_total": 0,
+          "liquidation_events": [],
+          "metrics": {
+            "cagr": 0.47761546583160164,
+            "calmar": 18.40756756579822,
+            "max_drawdown": 0.025946690898966174,
+            "monthlyized_return": 0.03307087785769003,
+            "return_mdd": 2.8635062937562217,
+            "sharpe": 3.60699913025163,
+            "smart_sortino": 4.625448850192154,
+            "sortino": 5.161103030290851,
+            "total_return": 0.07429851269133692,
+            "volatility": 0.10995017785690495
+          },
+          "round_trips": 0
+        },
+        "train": {
+          "fills": 0,
+          "liquidation_count": 0,
+          "liquidation_event_count_total": 0,
+          "liquidation_events": [],
+          "metrics": {
+            "cagr": 0.3307432113560951,
+            "calmar": 4.744774073258576,
+            "max_drawdown": 0.06970684088419621,
+            "monthlyized_return": 0.024097222516539674,
+            "return_mdd": 4.744774073258576,
+            "sharpe": 1.559295211507405,
+            "smart_sortino": 1.2383035715404052,
+            "sortino": 1.7170695460844307,
+            "total_return": 0.3307432113560951,
+            "volatility": 0.19523641119184829
+          },
+          "round_trips": 0
+        },
+        "validation": {
+          "fills": 0,
+          "liquidation_count": 0,
+          "liquidation_event_count_total": 0,
+          "liquidation_events": [],
+          "metrics": {
+            "cagr": 1.9480548918919562,
+            "calmar": 53.37885478625767,
+            "max_drawdown": 0.03649487984881761,
+            "monthlyized_return": 0.09427874533403768,
+            "return_mdd": 5.232541462172736,
+            "sharpe": 4.191106910404192,
+            "smart_sortino": 6.696714887486645,
+            "sortino": 7.841398467100835,
+            "total_return": 0.1909609719659504,
+            "volatility": 0.2665679178962545
+          },
+          "round_trips": 0
+        }
+      },
+      "train_val_stability_score": 24.018674283376424
+    },
+    {
+      "default_candidate": "candidate_hybrid_input_05_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+      "hybrid_config": {
+        "default_boost": 0.12,
+        "disagreement_cash_scale": 0.856739550695035,
+        "disagreement_threshold": 0.22293874953018045,
+        "diversified_weight_cap": 0.75,
+        "lookback_days": 21,
+        "min_positive_score": 0.0,
+        "mixed_health_floor": 0.5897144969917639,
+        "negative_health_floor": 0.09432330421001382,
+        "pair_pbo_penalty_scale": 1.8475128599670687,
+        "pair_score_boost": 0.00015054198515658535,
+        "pair_sparsity_penalty_scale": 2.732355465712022,
+        "pair_weight_cap": 0.2,
+        "score_temperature": 0.9,
+        "sticky_default_bonus": 0.09538352712472187,
+        "switch_margin": 0.09865009243733545,
+        "use_current_health_priors": false,
+        "variant": "disagreement_switching",
+        "warmup_days": 21,
+        "warmup_ratio": 0.6
+      },
+      "leverage": 1.0,
+      "liquidation_evidence_note": "candidate-hybrid allocator uses reconstructed candidate portfolio return streams; no dynamic-weight liquidation replay is claimed, so final live writer must keep this row non-promotable until a dedicated margin replay exists.",
+      "locked_oos_policy": {
+        "oos_is_gate_only": true,
+        "oos_is_report_only": true,
+        "uses_locked_oos_for_selection": false
+      },
+      "mode": "candidate_online_hybrid",
+      "name": "candidate_hybrid_online_rank_06_candidate_hybrid_input_05_fresh_portfolio_train_val_monthly_",
+      "selected_by_train_validation": false,
+      "selection_policy": {
+        "locked_oos": "report_only_gate_only",
+        "selection_basis": "train_validation_only_candidate_hybrid_grid",
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "uses_locked_oos_for_selection": false
+      },
+      "sleeve_count": 0,
+      "sleeves": [],
+      "splits": {
+        "oos": {
+          "fills": 0,
+          "liquidation_count": 0,
+          "liquidation_event_count_total": 0,
+          "liquidation_events": [],
+          "metrics": {
+            "cagr": 0.4777228814916854,
+            "calmar": 18.420935001744777,
+            "max_drawdown": 0.02593369345510621,
+            "monthlyized_return": 0.03307713592999706,
+            "return_mdd": 2.8654941843337216,
+            "sharpe": 3.60768263206819,
+            "smart_sortino": 4.6265651036900985,
+            "sortino": 5.162049099473958,
+            "total_return": 0.07431284777390035,
+            "volatility": 0.10994949787283352
+          },
+          "round_trips": 0
+        },
+        "train": {
+          "fills": 0,
+          "liquidation_count": 0,
+          "liquidation_event_count_total": 0,
+          "liquidation_events": [],
+          "metrics": {
+            "cagr": 0.33074286417828547,
+            "calmar": 4.744769092717137,
+            "max_drawdown": 0.06970684088419621,
+            "monthlyized_return": 0.02409720025179629,
+            "return_mdd": 4.744769092717137,
+            "sharpe": 1.559293922738399,
+            "smart_sortino": 1.2383025039869489,
+            "sortino": 1.7170680657822086,
+            "total_return": 0.33074286417828547,
+            "volatility": 0.19523640424098426
+          },
+          "round_trips": 0
+        },
+        "validation": {
+          "fills": 0,
+          "liquidation_count": 0,
+          "liquidation_event_count_total": 0,
+          "liquidation_events": [],
+          "metrics": {
+            "cagr": 1.9480548918919562,
+            "calmar": 53.37885478625767,
+            "max_drawdown": 0.03649487984881761,
+            "monthlyized_return": 0.09427874533403768,
+            "return_mdd": 5.232541462172736,
+            "sharpe": 4.191106910404192,
+            "smart_sortino": 6.696714887486645,
+            "sortino": 7.841398467100835,
+            "total_return": 0.1909609719659504,
+            "volatility": 0.2665679178962545
+          },
+          "round_trips": 0
+        }
+      },
+      "train_val_stability_score": 24.018671474388736
+    },
+    {
+      "default_candidate": "candidate_hybrid_input_04_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+      "hybrid_config": {
+        "default_boost": 0.12,
+        "disagreement_cash_scale": 0.856739550695035,
+        "disagreement_threshold": 0.22293874953018045,
+        "diversified_weight_cap": 0.75,
+        "lookback_days": 21,
+        "min_positive_score": 0.1,
+        "mixed_health_floor": 0.5897144969917639,
+        "negative_health_floor": 0.09432330421001382,
+        "pair_pbo_penalty_scale": 1.8475128599670687,
+        "pair_score_boost": 0.00015054198515658535,
+        "pair_sparsity_penalty_scale": 2.732355465712022,
+        "pair_weight_cap": 0.2,
+        "score_temperature": 0.9,
+        "sticky_default_bonus": 0.09538352712472187,
+        "switch_margin": 0.09865009243733545,
+        "use_current_health_priors": false,
+        "variant": "disagreement_switching",
+        "warmup_days": 21,
+        "warmup_ratio": 0.6
+      },
+      "leverage": 1.0,
+      "liquidation_evidence_note": "candidate-hybrid allocator uses reconstructed candidate portfolio return streams; no dynamic-weight liquidation replay is claimed, so final live writer must keep this row non-promotable until a dedicated margin replay exists.",
+      "locked_oos_policy": {
+        "oos_is_gate_only": true,
+        "oos_is_report_only": true,
+        "uses_locked_oos_for_selection": false
+      },
+      "mode": "candidate_online_hybrid",
+      "name": "candidate_hybrid_online_rank_07_candidate_hybrid_input_04_fresh_portfolio_train_val_monthly_",
+      "selected_by_train_validation": false,
+      "selection_policy": {
+        "locked_oos": "report_only_gate_only",
+        "selection_basis": "train_validation_only_candidate_hybrid_grid",
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "uses_locked_oos_for_selection": false
+      },
+      "sleeve_count": 0,
+      "sleeves": [],
+      "splits": {
+        "oos": {
+          "fills": 0,
+          "liquidation_count": 0,
+          "liquidation_event_count_total": 0,
+          "liquidation_events": [],
+          "metrics": {
+            "cagr": 0.47761546583160164,
+            "calmar": 18.40756756579822,
+            "max_drawdown": 0.025946690898966174,
+            "monthlyized_return": 0.03307087785769003,
+            "return_mdd": 2.8635062937562217,
+            "sharpe": 3.60699913025163,
+            "smart_sortino": 4.625448850192154,
+            "sortino": 5.161103030290851,
+            "total_return": 0.07429851269133692,
+            "volatility": 0.10995017785690495
+          },
+          "round_trips": 0
+        },
+        "train": {
+          "fills": 0,
+          "liquidation_count": 0,
+          "liquidation_event_count_total": 0,
+          "liquidation_events": [],
+          "metrics": {
+            "cagr": 0.330098529071714,
+            "calmar": 4.73552559382381,
+            "max_drawdown": 0.06970684088419599,
+            "monthlyized_return": 0.024055869435805954,
+            "return_mdd": 4.73552559382381,
+            "sharpe": 1.502888933520227,
+            "smart_sortino": 1.1124044938208082,
+            "sortino": 1.5424940403677492,
+            "total_return": 0.330098529071714,
+            "volatility": 0.20332763609822438
+          },
+          "round_trips": 0
+        },
+        "validation": {
+          "fills": 0,
+          "liquidation_count": 0,
+          "liquidation_event_count_total": 0,
+          "liquidation_events": [],
+          "metrics": {
+            "cagr": 1.9480548918919562,
+            "calmar": 53.37885478625767,
+            "max_drawdown": 0.03649487984881761,
+            "monthlyized_return": 0.09427874533403768,
+            "return_mdd": 5.232541462172736,
+            "sharpe": 4.191106910404192,
+            "smart_sortino": 6.696714887486645,
+            "sortino": 7.841398467100835,
+            "total_return": 0.1909609719659504,
+            "volatility": 0.2665679178962545
+          },
+          "round_trips": 0
+        }
+      },
+      "train_val_stability_score": 23.931713291468093
+    },
+    {
+      "default_candidate": "candidate_hybrid_input_04_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+      "hybrid_config": {
+        "default_boost": 0.12,
+        "disagreement_cash_scale": 0.856739550695035,
+        "disagreement_threshold": 0.22293874953018045,
+        "diversified_weight_cap": 0.75,
+        "lookback_days": 21,
+        "min_positive_score": 0.0,
+        "mixed_health_floor": 0.5897144969917639,
+        "negative_health_floor": 0.09432330421001382,
+        "pair_pbo_penalty_scale": 1.8475128599670687,
+        "pair_score_boost": 0.00015054198515658535,
+        "pair_sparsity_penalty_scale": 2.732355465712022,
+        "pair_weight_cap": 0.2,
+        "score_temperature": 0.9,
+        "sticky_default_bonus": 0.09538352712472187,
+        "switch_margin": 0.09865009243733545,
+        "use_current_health_priors": false,
+        "variant": "disagreement_switching",
+        "warmup_days": 21,
+        "warmup_ratio": 0.6
+      },
+      "leverage": 1.0,
+      "liquidation_evidence_note": "candidate-hybrid allocator uses reconstructed candidate portfolio return streams; no dynamic-weight liquidation replay is claimed, so final live writer must keep this row non-promotable until a dedicated margin replay exists.",
+      "locked_oos_policy": {
+        "oos_is_gate_only": true,
+        "oos_is_report_only": true,
+        "uses_locked_oos_for_selection": false
+      },
+      "mode": "candidate_online_hybrid",
+      "name": "candidate_hybrid_online_rank_08_candidate_hybrid_input_04_fresh_portfolio_train_val_monthly_",
+      "selected_by_train_validation": false,
+      "selection_policy": {
+        "locked_oos": "report_only_gate_only",
+        "selection_basis": "train_validation_only_candidate_hybrid_grid",
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "uses_locked_oos_for_selection": false
+      },
+      "sleeve_count": 0,
+      "sleeves": [],
+      "splits": {
+        "oos": {
+          "fills": 0,
+          "liquidation_count": 0,
+          "liquidation_event_count_total": 0,
+          "liquidation_events": [],
+          "metrics": {
+            "cagr": 0.4777228814916854,
+            "calmar": 18.420935001744777,
+            "max_drawdown": 0.02593369345510621,
+            "monthlyized_return": 0.03307713592999706,
+            "return_mdd": 2.8654941843337216,
+            "sharpe": 3.60768263206819,
+            "smart_sortino": 4.6265651036900985,
+            "sortino": 5.162049099473958,
+            "total_return": 0.07431284777390035,
+            "volatility": 0.10994949787283352
+          },
+          "round_trips": 0
+        },
+        "train": {
+          "fills": 0,
+          "liquidation_count": 0,
+          "liquidation_event_count_total": 0,
+          "liquidation_events": [],
+          "metrics": {
+            "cagr": 0.3300981820620976,
+            "calmar": 4.735520615695236,
+            "max_drawdown": 0.06970684088419599,
+            "monthlyized_return": 0.02405584717196163,
+            "return_mdd": 4.735520615695236,
+            "sharpe": 1.5028876920336698,
+            "smart_sortino": 1.1124035384079032,
+            "sortino": 1.5424927155630401,
+            "total_return": 0.3300981820620976,
+            "volatility": 0.20332762942803287
+          },
+          "round_trips": 0
+        },
+        "validation": {
+          "fills": 0,
+          "liquidation_count": 0,
+          "liquidation_event_count_total": 0,
+          "liquidation_events": [],
+          "metrics": {
+            "cagr": 1.9480548918919562,
+            "calmar": 53.37885478625767,
+            "max_drawdown": 0.03649487984881761,
+            "monthlyized_return": 0.09427874533403768,
+            "return_mdd": 5.232541462172736,
+            "sharpe": 4.191106910404192,
+            "smart_sortino": 6.696714887486645,
+            "sortino": 7.841398467100835,
+            "total_return": 0.1909609719659504,
+            "volatility": 0.2665679178962545
+          },
+          "round_trips": 0
+        }
+      },
+      "train_val_stability_score": 23.931710556331552
+    },
+    {
+      "default_candidate": "candidate_hybrid_input_02_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+      "hybrid_config": {
+        "default_boost": 0.0,
+        "disagreement_cash_scale": 0.856739550695035,
+        "disagreement_threshold": 0.22293874953018045,
+        "diversified_weight_cap": 0.75,
+        "lookback_days": 21,
+        "min_positive_score": 0.1,
+        "mixed_health_floor": 0.5897144969917639,
+        "negative_health_floor": 0.09432330421001382,
+        "pair_pbo_penalty_scale": 1.8475128599670687,
+        "pair_score_boost": 0.00015054198515658535,
+        "pair_sparsity_penalty_scale": 2.732355465712022,
+        "pair_weight_cap": 0.2,
+        "score_temperature": 0.9,
+        "sticky_default_bonus": 0.09538352712472187,
+        "switch_margin": 0.09865009243733545,
+        "use_current_health_priors": false,
+        "variant": "disagreement_switching",
+        "warmup_days": 21,
+        "warmup_ratio": 0.6
+      },
+      "leverage": 1.0,
+      "liquidation_evidence_note": "candidate-hybrid allocator uses reconstructed candidate portfolio return streams; no dynamic-weight liquidation replay is claimed, so final live writer must keep this row non-promotable until a dedicated margin replay exists.",
+      "locked_oos_policy": {
+        "oos_is_gate_only": true,
+        "oos_is_report_only": true,
+        "uses_locked_oos_for_selection": false
+      },
+      "mode": "candidate_online_hybrid",
+      "name": "candidate_hybrid_online_rank_09_candidate_hybrid_input_02_fresh_portfolio_train_val_monthly_",
+      "selected_by_train_validation": false,
+      "selection_policy": {
+        "locked_oos": "report_only_gate_only",
+        "selection_basis": "train_validation_only_candidate_hybrid_grid",
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "uses_locked_oos_for_selection": false
+      },
+      "sleeve_count": 0,
+      "sleeves": [],
+      "splits": {
+        "oos": {
+          "fills": 0,
+          "liquidation_count": 0,
+          "liquidation_event_count_total": 0,
+          "liquidation_events": [],
+          "metrics": {
+            "cagr": 0.47218720038258866,
+            "calmar": 17.580833695950442,
+            "max_drawdown": 0.026858066491542543,
+            "monthlyized_return": 0.03275408099343058,
+            "return_mdd": 2.739325146934937,
+            "sharpe": 3.550497987364354,
+            "smart_sortino": 4.446438374459078,
+            "sortino": 4.981625713002248,
+            "total_return": 0.07357297693833309,
+            "volatility": 0.11068502996149061
+          },
+          "round_trips": 0
+        },
+        "train": {
+          "fills": 0,
+          "liquidation_count": 0,
+          "liquidation_event_count_total": 0,
+          "liquidation_events": [],
+          "metrics": {
+            "cagr": 0.33422976808685934,
+            "calmar": 4.244714544738299,
+            "max_drawdown": 0.07874022259074331,
+            "monthlyized_return": 0.02432054963444008,
+            "return_mdd": 4.244714544738299,
+            "sharpe": 1.4430817061841323,
+            "smart_sortino": 0.9472981489868989,
+            "sortino": 1.382838053565777,
+            "total_return": 0.33422976808685934,
+            "volatility": 0.21571215286226259
+          },
+          "round_trips": 0
+        },
+        "validation": {
+          "fills": 0,
+          "liquidation_count": 0,
+          "liquidation_event_count_total": 0,
+          "liquidation_events": [],
+          "metrics": {
+            "cagr": 1.9535613734543555,
+            "calmar": 54.45627530967264,
+            "max_drawdown": 0.035873944046763695,
+            "monthlyized_return": 0.09444892741504707,
+            "return_mdd": 5.333126190837212,
+            "sharpe": 4.202553864658776,
+            "smart_sortino": 6.783176566683105,
+            "sortino": 7.919606673375268,
+            "total_return": 0.19132027056442413,
+            "volatility": 0.266267982826619
+          },
+          "round_trips": 0
+        }
+      },
+      "train_val_stability_score": 23.855553190324926
+    },
+    {
+      "default_candidate": "candidate_hybrid_input_02_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+      "hybrid_config": {
+        "default_boost": 0.0,
+        "disagreement_cash_scale": 0.856739550695035,
+        "disagreement_threshold": 0.22293874953018045,
+        "diversified_weight_cap": 0.75,
+        "lookback_days": 21,
+        "min_positive_score": 0.0,
+        "mixed_health_floor": 0.5897144969917639,
+        "negative_health_floor": 0.09432330421001382,
+        "pair_pbo_penalty_scale": 1.8475128599670687,
+        "pair_score_boost": 0.00015054198515658535,
+        "pair_sparsity_penalty_scale": 2.732355465712022,
+        "pair_weight_cap": 0.2,
+        "score_temperature": 0.9,
+        "sticky_default_bonus": 0.09538352712472187,
+        "switch_margin": 0.09865009243733545,
+        "use_current_health_priors": false,
+        "variant": "disagreement_switching",
+        "warmup_days": 21,
+        "warmup_ratio": 0.6
+      },
+      "leverage": 1.0,
+      "liquidation_evidence_note": "candidate-hybrid allocator uses reconstructed candidate portfolio return streams; no dynamic-weight liquidation replay is claimed, so final live writer must keep this row non-promotable until a dedicated margin replay exists.",
+      "locked_oos_policy": {
+        "oos_is_gate_only": true,
+        "oos_is_report_only": true,
+        "uses_locked_oos_for_selection": false
+      },
+      "mode": "candidate_online_hybrid",
+      "name": "candidate_hybrid_online_rank_10_candidate_hybrid_input_02_fresh_portfolio_train_val_monthly_",
+      "selected_by_train_validation": false,
+      "selection_policy": {
+        "locked_oos": "report_only_gate_only",
+        "selection_basis": "train_validation_only_candidate_hybrid_grid",
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "uses_locked_oos_for_selection": false
+      },
+      "sleeve_count": 0,
+      "sleeves": [],
+      "splits": {
+        "oos": {
+          "fills": 0,
+          "liquidation_count": 0,
+          "liquidation_event_count_total": 0,
+          "liquidation_events": [],
+          "metrics": {
+            "cagr": 0.47230739309984626,
+            "calmar": 17.59486246539609,
+            "max_drawdown": 0.026843483092222842,
+            "monthlyized_return": 0.03276110709687119,
+            "return_mdd": 2.741412697209997,
+            "sharpe": 3.5512592977226562,
+            "smart_sortino": 4.447652817025689,
+            "sortino": 4.98266068884709,
+            "total_return": 0.07358906538636156,
+            "volatility": 0.11068429241600719
+          },
+          "round_trips": 0
+        },
+        "train": {
+          "fills": 0,
+          "liquidation_count": 0,
+          "liquidation_event_count_total": 0,
+          "liquidation_events": [],
+          "metrics": {
+            "cagr": 0.33422937817250653,
+            "calmar": 4.244709592830113,
+            "max_drawdown": 0.07874022259074331,
+            "monthlyized_return": 0.02432052468887802,
+            "return_mdd": 4.244709592830113,
+            "sharpe": 1.4430803891339203,
+            "smart_sortino": 0.9472972544652752,
+            "sortino": 1.382836747769347,
+            "total_return": 0.33422937817250653,
+            "volatility": 0.21571214604094613
+          },
+          "round_trips": 0
+        },
+        "validation": {
+          "fills": 0,
+          "liquidation_count": 0,
+          "liquidation_event_count_total": 0,
+          "liquidation_events": [],
+          "metrics": {
+            "cagr": 1.9535613734543555,
+            "calmar": 54.45627530967264,
+            "max_drawdown": 0.035873944046763695,
+            "monthlyized_return": 0.09444892741504707,
+            "return_mdd": 5.333126190837212,
+            "sharpe": 4.202553864658776,
+            "smart_sortino": 6.783176566683105,
+            "sortino": 7.919606673375268,
+            "total_return": 0.19132027056442413,
+            "volatility": 0.266267982826619
+          },
+          "round_trips": 0
+        }
+      },
+      "train_val_stability_score": 23.855550342999784
+    },
+    {
+      "default_candidate": "candidate_hybrid_input_05_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+      "hybrid_config": {
+        "default_boost": 0.25,
+        "disagreement_cash_scale": 0.856739550695035,
+        "disagreement_threshold": 0.22293874953018045,
+        "diversified_weight_cap": 0.75,
+        "lookback_days": 21,
+        "min_positive_score": 0.1,
+        "mixed_health_floor": 0.5897144969917639,
+        "negative_health_floor": 0.09432330421001382,
+        "pair_pbo_penalty_scale": 1.8475128599670687,
+        "pair_score_boost": 0.00015054198515658535,
+        "pair_sparsity_penalty_scale": 2.732355465712022,
+        "pair_weight_cap": 0.2,
+        "score_temperature": 0.9,
+        "sticky_default_bonus": 0.09538352712472187,
+        "switch_margin": 0.09865009243733545,
+        "use_current_health_priors": false,
+        "variant": "disagreement_switching",
+        "warmup_days": 21,
+        "warmup_ratio": 0.6
+      },
+      "leverage": 1.0,
+      "liquidation_evidence_note": "candidate-hybrid allocator uses reconstructed candidate portfolio return streams; no dynamic-weight liquidation replay is claimed, so final live writer must keep this row non-promotable until a dedicated margin replay exists.",
+      "locked_oos_policy": {
+        "oos_is_gate_only": true,
+        "oos_is_report_only": true,
+        "uses_locked_oos_for_selection": false
+      },
+      "mode": "candidate_online_hybrid",
+      "name": "candidate_hybrid_online_rank_11_candidate_hybrid_input_05_fresh_portfolio_train_val_monthly_",
+      "selected_by_train_validation": false,
+      "selection_policy": {
+        "locked_oos": "report_only_gate_only",
+        "selection_basis": "train_validation_only_candidate_hybrid_grid",
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "uses_locked_oos_for_selection": false
+      },
+      "sleeve_count": 0,
+      "sleeves": [],
+      "splits": {
+        "oos": {
+          "fills": 0,
+          "liquidation_count": 0,
+          "liquidation_event_count_total": 0,
+          "liquidation_events": [],
+          "metrics": {
+            "cagr": 0.4830057893201254,
+            "calmar": 19.20007807637528,
+            "max_drawdown": 0.025156449228945554,
+            "monthlyized_return": 0.03338440649801355,
+            "return_mdd": 2.9820117424288197,
+            "sharpe": 3.661088014853456,
+            "smart_sortino": 4.763283689317754,
+            "sortino": 5.296220052768979,
+            "total_return": 0.07501682699853007,
+            "volatility": 0.1093020477511387
+          },
+          "round_trips": 0
+        },
+        "train": {
+          "fills": 0,
+          "liquidation_count": 0,
+          "liquidation_event_count_total": 0,
+          "liquidation_events": [],
+          "metrics": {
+            "cagr": 0.3258030349063765,
+            "calmar": 4.710032879551589,
+            "max_drawdown": 0.06917213599948246,
+            "monthlyized_return": 0.023779865416851287,
+            "return_mdd": 4.710032879551589,
+            "sharpe": 1.551600918573155,
+            "smart_sortino": 1.2249187598729987,
+            "sortino": 1.693487293348625,
+            "total_return": 0.3258030349063765,
+            "volatility": 0.1936171528713841
+          },
+          "round_trips": 0
+        },
+        "validation": {
+          "fills": 0,
+          "liquidation_count": 0,
+          "liquidation_event_count_total": 0,
+          "liquidation_events": [],
+          "metrics": {
+            "cagr": 1.9427206708070606,
+            "calmar": 52.45914186644066,
+            "max_drawdown": 0.0370330242105974,
+            "monthlyized_return": 0.09411360901649046,
+            "return_mdd": 5.147091833375309,
+            "sharpe": 4.17985984148024,
+            "smart_sortino": 6.619795812143839,
+            "sortino": 7.770918222891492,
+            "total_return": 0.19061237647955598,
+            "volatility": 0.26686993901174244
+          },
+          "round_trips": 0
+        }
+      },
+      "train_val_stability_score": 23.654927829295357
+    },
+    {
+      "default_candidate": "candidate_hybrid_input_05_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+      "hybrid_config": {
+        "default_boost": 0.25,
+        "disagreement_cash_scale": 0.856739550695035,
+        "disagreement_threshold": 0.22293874953018045,
+        "diversified_weight_cap": 0.75,
+        "lookback_days": 21,
+        "min_positive_score": 0.0,
+        "mixed_health_floor": 0.5897144969917639,
+        "negative_health_floor": 0.09432330421001382,
+        "pair_pbo_penalty_scale": 1.8475128599670687,
+        "pair_score_boost": 0.00015054198515658535,
+        "pair_sparsity_penalty_scale": 2.732355465712022,
+        "pair_weight_cap": 0.2,
+        "score_temperature": 0.9,
+        "sticky_default_bonus": 0.09538352712472187,
+        "switch_margin": 0.09865009243733545,
+        "use_current_health_priors": false,
+        "variant": "disagreement_switching",
+        "warmup_days": 21,
+        "warmup_ratio": 0.6
+      },
+      "leverage": 1.0,
+      "liquidation_evidence_note": "candidate-hybrid allocator uses reconstructed candidate portfolio return streams; no dynamic-weight liquidation replay is claimed, so final live writer must keep this row non-promotable until a dedicated margin replay exists.",
+      "locked_oos_policy": {
+        "oos_is_gate_only": true,
+        "oos_is_report_only": true,
+        "uses_locked_oos_for_selection": false
+      },
+      "mode": "candidate_online_hybrid",
+      "name": "candidate_hybrid_online_rank_12_candidate_hybrid_input_05_fresh_portfolio_train_val_monthly_",
+      "selected_by_train_validation": false,
+      "selection_policy": {
+        "locked_oos": "report_only_gate_only",
+        "selection_basis": "train_validation_only_candidate_hybrid_grid",
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "uses_locked_oos_for_selection": false
+      },
+      "sleeve_count": 0,
+      "sleeves": [],
+      "splits": {
+        "oos": {
+          "fills": 0,
+          "liquidation_count": 0,
+          "liquidation_event_count_total": 0,
+          "liquidation_events": [],
+          "metrics": {
+            "cagr": 0.4831023860131676,
+            "calmar": 19.21281948195389,
+            "max_drawdown": 0.025144793894874895,
+            "monthlyized_return": 0.03339001551951859,
+            "return_mdd": 2.9839051506535075,
+            "sharpe": 3.661705004997668,
+            "smart_sortino": 4.764305997328664,
+            "sortino": 5.29708215328272,
+            "total_return": 0.07502968001503807,
+            "volatility": 0.1093014193836145
+          },
+          "round_trips": 0
+        },
+        "train": {
+          "fills": 0,
+          "liquidation_count": 0,
+          "liquidation_event_count_total": 0,
+          "liquidation_events": [],
+          "metrics": {
+            "cagr": 0.3258027250287421,
+            "calmar": 4.710028399747258,
+            "max_drawdown": 0.06917213599948246,
+            "monthlyized_return": 0.02377984547632539,
+            "return_mdd": 4.710028399747258,
+            "sharpe": 1.5515997556880257,
+            "smart_sortino": 1.2249178010397077,
+            "sortino": 1.693485967732553,
+            "total_return": 0.3258027250287421,
+            "volatility": 0.19361714642420091
+          },
+          "round_trips": 0
+        },
+        "validation": {
+          "fills": 0,
+          "liquidation_count": 0,
+          "liquidation_event_count_total": 0,
+          "liquidation_events": [],
+          "metrics": {
+            "cagr": 1.9427206708070606,
+            "calmar": 52.45914186644066,
+            "max_drawdown": 0.0370330242105974,
+            "monthlyized_return": 0.09411360901649046,
+            "return_mdd": 5.147091833375309,
+            "sharpe": 4.17985984148024,
+            "smart_sortino": 6.619795812143839,
+            "sortino": 7.770918222891492,
+            "total_return": 0.19061237647955598,
+            "volatility": 0.26686993901174244
+          },
+          "round_trips": 0
+        }
+      },
+      "train_val_stability_score": 23.65492530629641
+    }
+  ]
+}

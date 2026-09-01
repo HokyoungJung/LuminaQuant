@@ -1,0 +1,138 @@
+{
+  "artifact_kind": "strategy_performance_improvement_wf_report",
+  "chunk_sizes": {
+    "fold_candidate_row_count": 1733,
+    "fold_count": 11,
+    "fold_summary_count": 11,
+    "rows_by_fold": {
+      "2025-09": 161,
+      "2025-10": 157,
+      "2025-11": 159,
+      "2025-12": 158,
+      "2026-01": 156,
+      "2026-02": 151,
+      "2026-03": 158,
+      "2026-04": 158,
+      "2026-05": 156,
+      "2026-06": 160,
+      "2026-07": 159
+    },
+    "source": "fold_candidate_rows"
+  },
+  "command_log_exists": true,
+  "command_log_path": "var/reports/strategy_performance_improvement_20260707/command_log.md",
+  "data_coverage_counts": {
+    "global_latest_utc": "2026-07-04T06:30:00",
+    "loaded_symbol_count": 110,
+    "missing_symbol_count": 0,
+    "missing_symbols_sample": [],
+    "requested_symbol_count": 110,
+    "source": "walkforward_payload",
+    "timeframes": {
+      "12h": {
+        "latest": "2026-07-03T12:00:00",
+        "symbols_with_rows": 110,
+        "symbols_without_rows": 0,
+        "total_rows": 22803
+      },
+      "1d": {
+        "latest": "2026-07-03T00:00:00",
+        "symbols_with_rows": 110,
+        "symbols_without_rows": 0,
+        "total_rows": 11378
+      },
+      "1h": {
+        "latest": "2026-07-04T06:00:00",
+        "symbols_with_rows": 110,
+        "symbols_without_rows": 0,
+        "total_rows": 276042
+      },
+      "2h": {
+        "latest": "2026-07-04T04:00:00",
+        "symbols_with_rows": 110,
+        "symbols_without_rows": 0,
+        "total_rows": 137898
+      },
+      "30m": {
+        "latest": "2026-07-04T06:30:00",
+        "symbols_with_rows": 110,
+        "symbols_without_rows": 0,
+        "total_rows": 552136
+      },
+      "4h": {
+        "latest": "2026-07-04T00:00:00",
+        "symbols_with_rows": 110,
+        "symbols_without_rows": 0,
+        "total_rows": 68853
+      },
+      "6h": {
+        "latest": "2026-07-04T00:00:00",
+        "symbols_with_rows": 110,
+        "symbols_without_rows": 0,
+        "total_rows": 45884
+      },
+      "8h": {
+        "latest": "2026-07-03T16:00:00",
+        "symbols_with_rows": 110,
+        "symbols_without_rows": 0,
+        "total_rows": 34349
+      }
+    }
+  },
+  "full_universe_claim_status": "claimed_loaded_all_requested_symbols_completed_walkforward",
+  "generated_at_utc": "2026-07-08T11:48:04.880345Z",
+  "leak_checks": {
+    "bridge_protocol_audit": {
+      "current_fold_oos_used_for_bridge_weighting": false,
+      "manifest_frozen_before_bridge_evaluation": true,
+      "post_oos_expansion_for_same_protocol": false,
+      "same_month_dynamic_self_feeding": false
+    },
+    "bridge_protocol_audit_pass": true,
+    "current_fold_oos_used_for_weighting_true": 0,
+    "dynamic_self_feed_audit": {
+      "no_same_month_dynamic_self_feeding": true,
+      "rule": "same_fold_dynamic_switch_label_oos_utility_or_oracle_rank_not_used",
+      "violations": []
+    },
+    "dynamic_self_feed_audit_pass": true,
+    "pass": true,
+    "real_money_execution_true": 0,
+    "row_count": 1733,
+    "same_month_self_feeding_true": 0,
+    "status": "evaluated",
+    "uses_locked_oos_for_selection_true": 0
+  },
+  "native_backend_status": {
+    "backend": "numba",
+    "mode": "numba",
+    "pyo3_available": "True",
+    "pyo3_load_error": ""
+  },
+  "output_paths": {
+    "json": "var/reports/strategy_performance_improvement_20260707/wf_report_normalized_latest.json",
+    "markdown": "var/reports/strategy_performance_improvement_20260707/wf_report_normalized_latest.md"
+  },
+  "peak_rss_mb": 1834.56640625,
+  "peak_rss_mib": 1834.56640625,
+  "peak_rss_source": "runner_peak_rss_mib_or_blocker_peak_rss_mb",
+  "source_error": null,
+  "source_json_exists": true,
+  "source_json_path": "var/reports/strategy_performance_improvement_20260707/full_universe_walkforward/full_universe_walkforward_summary_latest.json",
+  "source_json_sha256": "4f80fe52794f2c1f3eec2cfc4122b1fd2fe33efbb56210baedfabbddad4d60bc",
+  "source_status": "loaded",
+  "walkforward_summary": {
+    "aggregate_ranking_count": 165,
+    "clean_promotion_count": 131,
+    "completed_at_utc": "2026-07-08T11:47:52.322849Z",
+    "fold_count": 11,
+    "output_paths": {
+      "json": "/home/hoky/Quants-agent/LuminaQuant/var/reports/strategy_performance_improvement_20260707/full_universe_walkforward/full_universe_walkforward_summary_latest.json",
+      "markdown": "/home/hoky/Quants-agent/LuminaQuant/var/reports/strategy_performance_improvement_20260707/full_universe_walkforward/full_universe_walkforward_summary_latest.md"
+    },
+    "pass_fail_decision": null,
+    "selected_variant_count": 0,
+    "status": null
+  },
+  "worker_count": 2
+}

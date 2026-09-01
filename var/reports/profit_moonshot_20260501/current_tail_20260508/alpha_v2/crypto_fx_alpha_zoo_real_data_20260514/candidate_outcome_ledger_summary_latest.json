@@ -1,0 +1,18 @@
+{
+  "artifact_kind": "candidate_outcome_ledger_summary",
+  "calendar_primary": false,
+  "enabled": true,
+  "locked_oos_record_count": 21948,
+  "locked_oos_role": "gate_report_only",
+  "mean_net_pnl_bps": 0.5678890566256154,
+  "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/crypto_fx_alpha_zoo_real_data_20260514/candidate_outcome_ledger_latest.jsonl",
+  "record_count": 67259,
+  "split_counts": {
+    "locked_oos": 21948,
+    "train": 22906,
+    "validation": 22405
+  },
+  "strategy": "CryptoFxAlphaZooStateStrategy",
+  "train_validation_record_count": 45311,
+  "uses_locked_oos_for_selection": false
+}

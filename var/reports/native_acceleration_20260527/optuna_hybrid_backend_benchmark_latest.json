@@ -1,0 +1,42 @@
+{
+  "backend_diagnostics": {
+    "native_available": true,
+    "native_library_path": "/home/hoky/Quants-agent/LuminaQuant/native/rust_hybrid_optuna/target/release/liblumina_hybrid_optuna.so",
+    "native_load_error": null,
+    "requested_backend": "rust",
+    "resolved_backend": "rust"
+  },
+  "columns": 3,
+  "evals": 10,
+  "parity": {
+    "checked": true,
+    "max_abs_return_diff": 1.0041722011203125e-11,
+    "max_abs_weight_diff": 9.144549673045788e-09,
+    "passed": true,
+    "reason": null
+  },
+  "peak_memory_note": "synthetic matrix benchmark; keep rows bounded for <8GB sessions",
+  "python": {
+    "backend": "python",
+    "columns": 3,
+    "elapsed_seconds": 25.492777956999817,
+    "evals": 10,
+    "rows": 20000,
+    "rows_per_second": 7845.359196920473,
+    "seconds_per_eval": 2.5492777956999815
+  },
+  "rows": 20000,
+  "rust": {
+    "backend": "rust",
+    "columns": 3,
+    "elapsed_seconds": 0.10707889799959958,
+    "evals": 10,
+    "rows": 20000,
+    "rows_per_second": 1867781.6426607966,
+    "seconds_per_eval": 0.010707889799959958
+  },
+  "rust_available": true,
+  "rust_speedup_vs_python": 238.07471344256032,
+  "status": "pass",
+  "version": "v3_5"
+}

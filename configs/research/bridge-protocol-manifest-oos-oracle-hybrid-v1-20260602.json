@@ -1,0 +1,67 @@
+{
+  "manifest_version": "hybrid_oracle_bridge_v1_20260602",
+  "created_at_utc": "2026-06-02T04:30:00Z",
+  "deployable_expert_roster": [
+    "dynamic_conviction_switch:t0.85_risk_capped_fallback",
+    "dynamic_conviction_switch:t0.90_risk_capped_fallback",
+    "dynamic_conviction_switch:t0.95_risk_capped_fallback",
+    "cross_candidate_hybrid:hybrid_v3_6_train_validation_fit",
+    "cross_candidate_hybrid:hybrid_v3_5",
+    "cross_candidate_hybrid:hybrid_v3_6",
+    "cross_candidate_hybrid:hybrid_v3_5_train_validation_fit",
+    "strict_efficiency:balanced_mdd12_gross5_69_asset_efficiency_repair_optuna",
+    "strict_efficiency:growth_mdd20_gross8_69_asset_efficiency_repair_optuna",
+    "individual_robust:selected_train_validation_legal",
+    "individual_robust:selected_optuna",
+    "individual_robust:hybrid_v3_5",
+    "individual_robust:hybrid_v3_6",
+    "profile_optuna:selected_train_validation_legal",
+    "profile_optuna:selected_optuna"
+  ],
+  "allowed_pre_oos_features": [
+    "train_return",
+    "train_mdd",
+    "validation_return",
+    "validation_mdd",
+    "validation_calmar",
+    "validation_sharpe",
+    "validation_sortino",
+    "candidate_family",
+    "gross_notional_fraction",
+    "prior_completed_month_utility"
+  ],
+  "fixed_grids": {
+    "bridge_learning_rates": [0.15, 0.3, 0.45],
+    "weight_caps": [0.25, 0.3, 0.4],
+    "dynamic_thresholds": [0.85, 0.9, 0.95, 1.0],
+    "risk_caps": [0.1, 0.15, 0.2]
+  },
+  "objective_utility": {
+    "formula": "validation_return - drawdown_penalty * validation_mdd + lagged_prior_utility",
+    "drawdown_penalty_grid": [0.75, 1.0, 1.5],
+    "current_fold_oos_weight": 0.0
+  },
+  "fallback_rules": {
+    "insufficient_experts": "no_emit",
+    "negative_validation": "fallback_to_strict_efficiency",
+    "entropy_floor": 0.05
+  },
+  "negative_controls": {
+    "randomized_oracle_labels": true,
+    "shifted_oos_labels": true,
+    "forbidden_oos_feature_ablation": true
+  },
+  "hard_no_leakage_rules": [
+    "current_fold_oos_return_not_used_for_current_selection",
+    "current_fold_oracle_rank_not_used_for_current_selection",
+    "month_m_online_weights_use_only_months_before_m",
+    "dynamic_switch_same_fold_selected_label_not_used_as_feature_or_target",
+    "post_oos_expansion_for_same_protocol_forbidden"
+  ],
+  "promotion_thresholds": {
+    "current_challenger_oos_comp": 0.5338,
+    "current_challenger_max_oos_mdd": 0.188,
+    "robust_default_oos_comp": 0.2701,
+    "robust_default_max_oos_mdd_limit": 0.15
+  }
+}

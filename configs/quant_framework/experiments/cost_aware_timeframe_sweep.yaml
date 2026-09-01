@@ -1,0 +1,6 @@
+base_config: ../base.yaml
+experiment_id: cost_aware_timeframe_sweep
+timeframes: ["5m", "1h", "1d"]
+strategies:
+  - config: ../strategies/trend_momentum.yaml
+  - config: ../strategies/xs_mean_reversion.yaml

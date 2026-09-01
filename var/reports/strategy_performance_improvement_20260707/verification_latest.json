@@ -1,0 +1,120 @@
+{
+  "blockers": [],
+  "checks": {
+    "full_universe_walkforward_current": {
+      "command": "uv run python scripts/research/run_alpha_zoo_69_asset_monthly_refit_walkforward.py --output-json var/reports/strategy_performance_improvement_20260707/full_universe_walkforward/full_universe_walkforward_summary_latest.json --output-md var/reports/strategy_performance_improvement_20260707/full_universe_walkforward/full_universe_walkforward_summary_latest.md --source-symbol-workers 2 --checkpoint-interval 0 --checkpoint-markdown-interval 0",
+      "exit_code": 0,
+      "peak_rss_mb": 1834.56640625,
+      "status": "PASS",
+      "summary": "11 folds completed; 110/110 symbols loaded; 1733 fold-candidate rows; full-universe output is diagnostic/report-only and not a promotion."
+    },
+    "normalized_wf_report_current": {
+      "command": "uv run python scripts/research/build_strategy_performance_improvement_report.py --source-json var/reports/strategy_performance_improvement_20260707/full_universe_walkforward/full_universe_walkforward_summary_latest.json --output-json var/reports/strategy_performance_improvement_20260707/wf_report_normalized_latest.json --output-md var/reports/strategy_performance_improvement_20260707/wf_report_normalized_latest.md --command-log-path var/reports/strategy_performance_improvement_20260707/command_log.md --worker-count 2",
+      "exit_code": 0,
+      "status": "PASS",
+      "summary": "full_universe_claim_status=claimed_loaded_all_requested_symbols_completed_walkforward; leak checks pass."
+    },
+    "ruff_format_check_current": {
+      "command": "uv run --extra dev ruff format --check .",
+      "exit_code": 0,
+      "status": "PASS",
+      "summary": "1033 files already formatted"
+    },
+    "ruff_check_current": {
+      "command": "uv run --extra dev ruff check .",
+      "exit_code": 0,
+      "status": "PASS",
+      "summary": "All checks passed!"
+    },
+    "focused_clean_env_pytest_current": {
+      "command": "uv run --extra dev pytest -q tests/test_strategy_performance_improvement_report.py tests/test_alpha_zoo_69_asset_monthly_refit_walkforward.py tests/integration/test_engine_golden.py tests/test_research_selection_flags_config.py with local .env temporarily hidden",
+      "exit_code": 0,
+      "status": "PASS",
+      "summary": "70 passed in 33.53s"
+    },
+    "full_clean_env_pytest_current": {
+      "command": "uv run --extra dev pytest -q with local .env temporarily hidden",
+      "exit_code": 0,
+      "status": "PASS",
+      "summary": "3574 passed, 20 skipped, 3 xfailed in 201.01s"
+    },
+    "native_backend_build_current": {
+      "command": "uv run python scripts/build_native_backends.py",
+      "exit_code": 0,
+      "status": "PASS",
+      "summary": "lumina_compute built successfully for CPython 3.14; source hash 729fce3d4dca4fab"
+    },
+    "native_parity_version_current": {
+      "command": "uv run --extra dev pytest -q tests/test_native_backend_parity.py tests/test_native_kernel_version.py",
+      "exit_code": 0,
+      "status": "PASS",
+      "summary": "32 passed in 0.24s"
+    },
+    "leader_final_ci_equivalent": {
+      "artifact": "var/reports/strategy_performance_improvement_20260707/final_ci_summary_latest.json",
+      "command": "see final_ci_summary_latest.json",
+      "status": "PASS",
+      "summary": "Current ruff, full pytest, native build/parity, and full-universe walk-forward gates passed; prior dashboard/coverage/architecture/8GB gates remain recorded."
+    }
+  },
+  "chunk_sizes": {
+    "checkpoint_interval": 0,
+    "checkpoint_markdown_interval": 0,
+    "fold_candidate_row_count": 1733,
+    "fold_count": 11
+  },
+  "command_log_path": "var/reports/strategy_performance_improvement_20260707/command_log_latest.txt",
+  "created_at": "2026-07-07T11:45:32.284151Z",
+  "data_coverage_counts": {
+    "basis": "WF runner loaded existing local direct 1m-derived market_parquet data.",
+    "global_latest_utc": "2026-07-04T06:30:00",
+    "loaded": 110,
+    "missing": 0,
+    "monitor_only": 0,
+    "requested": 110,
+    "train_eligible": 110
+  },
+  "final_ci_summary_path": "var/reports/strategy_performance_improvement_20260707/final_ci_summary_latest.json",
+  "full_universe_claim_status": "claimed_loaded_all_requested_symbols_completed_walkforward",
+  "git_head": "8f6d739e",
+  "git_status_tracked_before_artifact_add": [],
+  "leak_checks": {
+    "basis": "Normalized report over completed WF rows reports zero locked-OOS selection/weighting/sizing/tiebreak use and no same-month self-feed violations.",
+    "uses_locked_oos_for_selection": false,
+    "uses_locked_oos_for_sizing": false,
+    "uses_locked_oos_for_tiebreak": false,
+    "uses_locked_oos_for_weighting": false
+  },
+  "native_backend_status": {
+    "build_command": "uv run python scripts/build_native_backends.py",
+    "parity_command": "uv run --extra dev pytest -q tests/test_native_backend_parity.py tests/test_native_kernel_version.py",
+    "status": "PASS_EXISTING_NATIVE_NO_NEW_RUST",
+    "summary": "Existing pyo3/native backend built and parity/version tests passed; no new Rust hot-path was added."
+  },
+  "notes": [
+    "Initial focused pytest with local .env loaded failed because machine-local secrets/config mutate RuntimeConfig; rerun with .env temporarily hidden passed and .env was restored.",
+    "No live/paper/testnet/order execution was run.",
+    "Full-universe walk-forward completed on 2026-07-08 after existing local market_parquet data was available; this supersedes the earlier worker4 no-data blocker artifact.",
+    "Track A strict gates remain hard gates; Track B lagged-shadow headline artifacts remain research_only/diagnostic-only and not deployable.",
+    "Raw WF row-level candidate_tier labels may contain legacy paper/testnet/live wording; artifact-level promotability=false, final claims, and verification notes are authoritative and do not approve execution.",
+    "Full clean-env pytest passed: 3574 passed, 20 skipped, 3 xfailed in 201.01s.",
+    "Full-universe WF peak RSS was 1834.566 MiB; prior benchmark/8GB gate remains 254.19 MiB < 7372.80 MiB."
+  ],
+  "peak_rss_mb": 1834.56640625,
+  "peak_rss_source": "runner_peak_rss_mib from full_universe_walkforward_summary_latest.json",
+  "resolved_blockers": [
+    {
+      "details": "Current leader rerun loaded 110/110 requested symbols from existing local market_parquet and completed all 11 WF folds.",
+      "fixed_at": "2026-07-08T11:47:52Z",
+      "id": "missing_market_parquet_bars",
+      "status": "SUPERSEDED_BY_COMPLETED_WF_RERUN"
+    }
+  ],
+  "schema_version": "1.0",
+  "task_id": "GJC-G001",
+  "updated_at_utc": "2026-07-08T11:48:05Z",
+  "worker": "gjc-leader",
+  "worker_count": {
+    "source_symbol_workers": 2
+  }
+}

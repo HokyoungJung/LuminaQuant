@@ -1,0 +1,24 @@
+{"csv": "var/reports/profit_moonshot_20260501/current_tail_20260508/all_family_expansion/fresh_start_overhaul_replay_candidates.csv", "json": "var/reports/profit_moonshot_20260501/current_tail_20260508/all_family_expansion/fresh_start_overhaul_replay_latest.json", "markdown": "var/reports/profit_moonshot_20260501/current_tail_20260508/all_family_expansion/fresh_start_overhaul_replay_latest.md", "peak_rss_mib": 277.4765625, "replay_survivor_count": 63, "spec_count": 5581, "success_candidate_count": 63}
+	Command being timed: "uv run python scripts/research/replay_profit_moonshot_fresh_start.py --output-dir var/reports/profit_moonshot_20260501/current_tail_20260508/all_family_expansion --panel-cache-dir var/cache/profit_moonshot_fresh_start --oos-end-date 2026-05-08"
+	User time (seconds): 253.66
+	System time (seconds): 0.91
+	Percent of CPU this job got: 100%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 4:13.47
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 284136
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 1
+	Minor (reclaiming a frame) page faults: 53815
+	Voluntary context switches: 59
+	Involuntary context switches: 881
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 18376
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

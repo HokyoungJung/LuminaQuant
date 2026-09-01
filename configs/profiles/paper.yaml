@@ -1,0 +1,7 @@
+profile: paper
+live:
+  is_testnet: true
+  enable_live_real: false
+data:
+  # paper profile: all kinds enabled, including aggtrades_tick (testnet/replay only)
+  kinds: [ohlcv, funding, feature_points, aggtrades_tick]

@@ -1,0 +1,63 @@
+{
+  "phase": "0a",
+  "generated": "2026-06-10",
+  "branch": "refactor/overhaul",
+  "command": "uv run pytest tests -q --tb=no -p no:warnings",
+  "python_version": "3.11.15",
+  "uv_version": "0.11.7",
+  "pytest_version": "9.0.3",
+
+  "summary": {
+    "passed": 1670,
+    "failed": 1,
+    "skipped": 9,
+    "total_items": 1680,
+    "duration_seconds": 93.90,
+    "duration_human": "1m33.90s",
+    "exit_note": "1 pre-existing deterministic failure (see failures section)"
+  },
+
+  "test_files": {
+    "total_py_files": 343,
+    "test_files_test_prefix": 342,
+    "conftest_files": 1,
+    "location_breakdown": {
+      "tests_top_level": 309,
+      "tests_unit": 33,
+      "tests_integration": 0,
+      "tests_fixtures": 0
+    },
+    "note": "tests/integration/ exists but is empty (0 test files) — to be populated in Phase 1"
+  },
+
+  "failures": [
+    {
+      "test_id": "tests/unit/test_artifact_portfolio_mode.py::test_profit_moonshot_synthetic_modes_resolve_no_aggregator_strategy_families",
+      "file": "tests/unit/test_artifact_portfolio_mode.py",
+      "reason": "pre-existing deterministic float comparison: sum(weights) == 0.9999999999999999 not == 1.0",
+      "assertion": "assert sum(component.weight for component in hybrid_safe.components) == 1.0",
+      "actual": "0.9999999999999999",
+      "expected": "1.0",
+      "root_cause": "floating-point summation epsilon; test uses exact == instead of pytest.approx(1.0)",
+      "flaky": false,
+      "confirmed_deterministic_runs": 3,
+      "pre_existing": true,
+      "phase0_disposition": "KNOWN-FAILING BASELINE — pre-existing deterministic failure carried forward; fix scheduled for Phase 1 (exact-float-equality test bug, precisely what the tolerance contract addresses; docs/divergences/ note to accompany fix)",
+      "phase05_gate_policy": "Phase 0.5 'full suite passes' gate means NO NEW failures vs this baseline; this 1 documented failure is carried (not a Phase 0.5 regression). Do NOT fix in Phase 0 (read-only)."
+    }
+  ],
+
+  "skipped_tests": {
+    "count": 9,
+    "note": "9 tests skipped in full run; majority appear to be platform/dependency conditional skips (e.g. MetaTrader5 Windows-only, optional extras not installed). Exact skip reasons not captured in -q mode; run with -v to enumerate if needed."
+  },
+
+  "flakiness_assessment": {
+    "method": "full suite run once; failing test re-run 3x to confirm determinism",
+    "seed_dependent_flakiness_detected": false,
+    "known_deterministic_failures": 1,
+    "note": "No seed-dependent or environment-dependent flakiness detected. The single failure (float comparison) is deterministic and pre-existing."
+  },
+
+  "raw_summary_line": "1 failed, 1670 passed, 9 skipped in 93.90s (0:01:33)"
+}

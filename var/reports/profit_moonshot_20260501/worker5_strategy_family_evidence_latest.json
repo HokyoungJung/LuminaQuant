@@ -1,0 +1,51 @@
+{
+  "artifact_kind": "profit_moonshot_worker5_strategy_family_evidence",
+  "bounded_backtest_smoke": [
+    {
+      "command": "LQ__OPTIMIZATION__STRATEGY=PanicReboundMeanReversionStrategy uv run python scripts/minimum_viable_run.py --days 45",
+      "status": "PASS",
+      "summary": "legacy CSV synthetic no-infra backtest completed; final_equity=10000.0000 trade_count=0"
+    },
+    {
+      "command": "LQ__OPTIMIZATION__STRATEGY=SessionFilteredPairCarryStrategy uv run python scripts/minimum_viable_run.py --days 45",
+      "status": "PASS",
+      "summary": "legacy CSV synthetic no-infra backtest completed; final_equity=10000.0000 trade_count=0"
+    }
+  ],
+  "candidate_generation": {
+    "new_candidate_names": [
+      "panic_rebound_mr_5m_fast_confirm_18_0.018",
+      "panic_rebound_mr_5m_volume_strict_32_0.025",
+      "panic_rebound_mr_15m_slow_confirm_24_0.030",
+      "session_filtered_pair_carry_1h_bnbtrx_overlap_2.2_0.50",
+      "session_filtered_pair_carry_1h_bnbtrx_strict_2.6_0.65",
+      "session_filtered_pair_carry_4h_bnbtrx_asia_us_1.8_0.45"
+    ],
+    "new_profit_reboot_candidate_count": 6,
+    "symbols": [
+      "BTC/USDT",
+      "ETH/USDT",
+      "BNB/USDT",
+      "SOL/USDT",
+      "TRX/USDT"
+    ],
+    "timeframes": [
+      "5m",
+      "15m",
+      "1h",
+      "4h"
+    ],
+    "total_candidates_bounded_dry_run": 80
+  },
+  "generated_at": "2026-05-01T08:12:31.804594Z",
+  "implemented_strategy_families": [
+    "PanicReboundMeanReversionStrategy",
+    "SessionFilteredPairCarryStrategy"
+  ],
+  "promotion_note": "No new family is promoted as high-return alpha from synthetic smoke only; live-equivalent exact-window promotion still requires raw-first train/validation evidence.",
+  "source_plan_status": {
+    "fallback_context": "/home/hoky/Quants-agent/LuminaQuant/.omx/context/profit-moonshot-strategy-factory-20260501T080337Z.md",
+    "requested_prd": "/home/hoky/Quants-agent/LuminaQuant/.omx/plans/prd-profit-moonshot-strategy-factory-20260501.md is empty",
+    "requested_test_spec": "/home/hoky/Quants-agent/LuminaQuant/.omx/plans/test-spec-profit-moonshot-strategy-factory-20260501.md is missing"
+  }
+}

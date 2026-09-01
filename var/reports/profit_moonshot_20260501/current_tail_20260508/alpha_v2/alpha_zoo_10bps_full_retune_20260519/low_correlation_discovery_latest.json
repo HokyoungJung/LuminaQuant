@@ -1,0 +1,106 @@
+{
+  "discovery_policy": {
+    "candidate_freeze_inputs": [
+      "train",
+      "validation"
+    ],
+    "correlation_inputs": [
+      "train",
+      "validation"
+    ],
+    "correlation_split_inputs": [
+      "train",
+      "validation"
+    ],
+    "correlation_threshold_abs": 0.35,
+    "locked_oos_role": "gate_report_only_after_candidate_freeze",
+    "objective_inputs": [
+      "train",
+      "validation"
+    ],
+    "optimization_input_splits": [
+      "train",
+      "validation"
+    ],
+    "parameter_fit_inputs": [
+      "train",
+      "validation"
+    ],
+    "pruning_inputs": [
+      "train",
+      "validation"
+    ],
+    "reference_model_id": "fresh_tv10_filter_abs_score_ge_1p5_alpha_zoo_quality_single_pair_7p0x_0p2alloc",
+    "selection_inputs": [
+      "train",
+      "validation"
+    ],
+    "uses_locked_oos_for_correlation": false,
+    "uses_locked_oos_for_discovery": false,
+    "uses_locked_oos_for_objective": false,
+    "uses_locked_oos_for_parameter_fitting": false,
+    "uses_locked_oos_for_pruning": false,
+    "uses_locked_oos_for_selection": false
+  },
+  "reference_model_id": "fresh_tv10_filter_abs_score_ge_1p5_alpha_zoo_quality_single_pair_7p0x_0p2alloc",
+  "reference_profile": "higher_risk_train_return_tilt_v1",
+  "selection_profile": "higher_risk_train_return_tilt_v1",
+  "summary": {
+    "candidate_stream_count": 775,
+    "correlation_threshold": 0.35,
+    "deployable_candidates": 0,
+    "discovery_policy": {
+      "candidate_freeze_inputs": [
+        "train",
+        "validation"
+      ],
+      "correlation_inputs": [
+        "train",
+        "validation"
+      ],
+      "correlation_split_inputs": [
+        "train",
+        "validation"
+      ],
+      "correlation_threshold_abs": 0.35,
+      "locked_oos_role": "gate_report_only_after_candidate_freeze",
+      "objective_inputs": [
+        "train",
+        "validation"
+      ],
+      "optimization_input_splits": [
+        "train",
+        "validation"
+      ],
+      "parameter_fit_inputs": [
+        "train",
+        "validation"
+      ],
+      "pruning_inputs": [
+        "train",
+        "validation"
+      ],
+      "reference_model_id": "fresh_tv10_filter_abs_score_ge_1p5_alpha_zoo_quality_single_pair_7p0x_0p2alloc",
+      "selection_inputs": [
+        "train",
+        "validation"
+      ],
+      "uses_locked_oos_for_correlation": false,
+      "uses_locked_oos_for_discovery": false,
+      "uses_locked_oos_for_objective": false,
+      "uses_locked_oos_for_parameter_fitting": false,
+      "uses_locked_oos_for_pruning": false,
+      "uses_locked_oos_for_selection": false
+    },
+    "locked_oos_role": "gate_report_only_after_candidate_freeze",
+    "low_correlation_candidates": 423,
+    "reference_candidate_name": "alpha_zoo_quality_single_pair",
+    "reference_model_id": "fresh_tv10_filter_abs_score_ge_1p5_alpha_zoo_quality_single_pair_7p0x_0p2alloc",
+    "research_candidates": 775,
+    "selection_inputs": [
+      "train",
+      "validation"
+    ],
+    "uses_locked_oos_for_selection": false
+  }
+}

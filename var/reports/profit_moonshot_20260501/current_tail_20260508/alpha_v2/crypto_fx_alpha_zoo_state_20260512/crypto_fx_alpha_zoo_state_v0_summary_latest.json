@@ -1,0 +1,20 @@
+{
+  "artifact_kind": "crypto_fx_alpha_zoo_state_v0_summary",
+  "calendar_primary": false,
+  "calibration_bucket_count": 2,
+  "decision": "research_scaffold_only_no_live_promotion",
+  "factor_count": 63,
+  "locked_oos_role": "gate_report_only",
+  "memory_bound": "<8GiB by local full pytest/runtime checks",
+  "screen_row_count": 720,
+  "smoke_signal_count": 21,
+  "source_artifacts": {
+    "edge_calibration": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/crypto_fx_alpha_zoo_state_20260512/edge_calibration_smoke_latest.json",
+    "replay": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/crypto_fx_alpha_zoo_state_20260512/crypto_fx_alpha_zoo_state_replay_smoke_latest.json",
+    "screen": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/crypto_fx_alpha_zoo_state_20260512/crypto_fx_alpha_zoo_screen_latest.json"
+  },
+  "strategy_id": "crypto_fx_alpha_zoo_state",
+  "strict_live_promotion": false,
+  "strict_live_promotion_reason": "foundation and smoke artifacts only; real train/validation/OOS/live-equivalent replay remains next step",
+  "uses_locked_oos_for_selection": false
+}

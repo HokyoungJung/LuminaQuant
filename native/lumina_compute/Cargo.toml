@@ -1,0 +1,16 @@
+[package]
+name = "lumina_compute"
+version = "0.2.0"
+edition = "2021"
+
+[lib]
+name = "_compute"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = ">=0.27", features = ["extension-module"] }
+numpy = ">=0.27"
+
+[profile.release]
+codegen-units = 1
+lto = true

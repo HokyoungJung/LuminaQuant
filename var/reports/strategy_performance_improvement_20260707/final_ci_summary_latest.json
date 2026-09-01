@@ -1,0 +1,132 @@
+{
+  "artifact_kind": "final_ci_summary",
+  "checks": [
+    {
+      "command": "uv run --extra dev ruff format --check .",
+      "name": "ruff_format_check_current",
+      "status": "PASS",
+      "summary": "1033 files already formatted"
+    },
+    {
+      "command": "uv run --extra dev ruff check .",
+      "name": "ruff_check_current",
+      "status": "PASS",
+      "summary": "All checks passed!"
+    },
+    {
+      "command": "uv run --extra dev pytest -q tests/test_strategy_performance_improvement_report.py tests/test_alpha_zoo_69_asset_monthly_refit_walkforward.py tests/integration/test_engine_golden.py tests/test_research_selection_flags_config.py with local .env temporarily hidden",
+      "name": "focused_current_clean_env_pytest",
+      "status": "PASS",
+      "summary": "70 passed in 33.53s"
+    },
+    {
+      "command": "uv run --extra dev pytest -q with local .env temporarily hidden",
+      "name": "full_current_clean_env_pytest",
+      "status": "PASS",
+      "summary": "3574 passed, 20 skipped, 3 xfailed in 201.01s"
+    },
+    {
+      "command": "uv run python scripts/build_native_backends.py",
+      "name": "native_backend_build_current",
+      "status": "PASS",
+      "summary": "lumina_compute built successfully for CPython 3.14; source hash 729fce3d4dca4fab"
+    },
+    {
+      "command": "uv run --extra dev pytest -q tests/test_native_backend_parity.py tests/test_native_kernel_version.py",
+      "name": "native_parity_version_current",
+      "status": "PASS",
+      "summary": "32 passed in 0.24s"
+    },
+    {
+      "command": "uv run python scripts/research/run_alpha_zoo_69_asset_monthly_refit_walkforward.py --output-json var/reports/strategy_performance_improvement_20260707/full_universe_walkforward/full_universe_walkforward_summary_latest.json --output-md var/reports/strategy_performance_improvement_20260707/full_universe_walkforward/full_universe_walkforward_summary_latest.md --source-symbol-workers 2 --checkpoint-interval 0 --checkpoint-markdown-interval 0",
+      "name": "full_universe_walkforward_current",
+      "status": "PASS",
+      "summary": "11 folds completed; 110/110 symbols loaded; 1733 fold-candidate rows; 165 aggregate rankings; 131 clean ranking rows; peak RSS 1834.566 MiB; no live/paper/testnet/order execution"
+    },
+    {
+      "command": "uv run python scripts/research/build_strategy_performance_improvement_report.py --source-json var/reports/strategy_performance_improvement_20260707/full_universe_walkforward/full_universe_walkforward_summary_latest.json --output-json var/reports/strategy_performance_improvement_20260707/wf_report_normalized_latest.json --output-md var/reports/strategy_performance_improvement_20260707/wf_report_normalized_latest.md --command-log-path var/reports/strategy_performance_improvement_20260707/command_log.md --worker-count 2",
+      "name": "normalized_wf_report_current",
+      "status": "PASS",
+      "summary": "full_universe_claim_status=claimed_loaded_all_requested_symbols_completed_walkforward; leak checks pass with zero locked-OOS selection/weighting/sizing/tiebreak use"
+    },
+    {
+      "command": "uv sync --extra optimize --extra dev --extra live --extra dashboard",
+      "name": "uv_sync_full_extras_20260707",
+      "status": "PASS"
+    },
+    {
+      "command": "bash scripts/ci/architecture_gate_live_data.sh",
+      "name": "architecture_gate_live_data_20260707",
+      "status": "PASS"
+    },
+    {
+      "command": "bash scripts/ci/architecture_gate_market_window_contract.sh",
+      "name": "architecture_gate_market_window_contract_20260707",
+      "status": "PASS"
+    },
+    {
+      "command": "uv run python scripts/check_architecture.py",
+      "name": "architecture_check_20260707",
+      "status": "PASS"
+    },
+    {
+      "command": "uv run python scripts/audit_hardcoded_params.py",
+      "name": "hardcoded_param_audit_20260707",
+      "status": "PASS",
+      "summary": "total=1135, new=0"
+    },
+    {
+      "command": "uv run python scripts/verify_docs.py",
+      "name": "docs_verification_20260707",
+      "status": "PASS",
+      "summary": "140 markdown files verified"
+    },
+    {
+      "command": "npm install --no-fund --no-audit && npm run lint && npm run test && npm run typecheck && npm run build",
+      "name": "dashboard_ci_20260707",
+      "status": "PASS",
+      "summary": "dashboard install/lint/test/typecheck/build passed; dashboard tests reported 60 tests"
+    },
+    {
+      "command": "uv run pytest -q --cov=... --cov-branch --cov-report=term-missing and coverage reports",
+      "name": "coverage_gates_20260707",
+      "status": "PASS",
+      "summary": "3571 passed, 20 skipped, 3 xfailed; total coverage 79%; financial core 83% >= 70%; live/exchanges/core 70% >= 65%"
+    },
+    {
+      "command": "uv run python scripts/benchmark_backtest.py --iters 1 --warmup 0 --output <tmp>/luminaquant-final-ci-20260707/benchmarks/ci_smoke.json && uv run python scripts/verify_8gb_baseline.py --benchmark <tmp>/luminaquant-final-ci-20260707/benchmarks/ci_smoke.json --skip-dmesg ...",
+      "name": "benchmark_8gb_gate_20260707",
+      "status": "PASS",
+      "summary": "median 0.05218s, 12149 bars/sec; peak_rss 254.19 MiB < 7372.80 MiB"
+    },
+    {
+      "command": "bash scripts/ci/architecture_gate_binance_native.sh",
+      "name": "binance_native_gate_20260707",
+      "status": "PASS"
+    }
+  ],
+  "environment": {
+    "node_package_manager": "npm",
+    "notes": [
+      "Python verification commands that import settings were executed with local .env temporarily hidden and restored to prevent machine-local secret/config injection.",
+      "No real-money, paper, testnet, live, or order execution command was run.",
+      "The 2026-07-08 full-universe walk-forward used existing local direct 1m-derived market_parquet data and did not run a collector/backfill write."
+    ],
+    "package_manager": "uv"
+  },
+  "final_claims": {
+    "ci_equivalent_passed": true,
+    "dashboard_ci_passed": true,
+    "full_universe_walkforward_success_claimed": true,
+    "full_universe_walkforward_status": "completed_existing_local_data",
+    "full_universe_walkforward_summary": "110/110 requested symbols loaded; 11 folds; 1733 fold-candidate rows; normalized claim status claimed_loaded_all_requested_symbols_completed_walkforward.",
+    "native_backend_build_passed": true,
+    "native_rust_decision": "existing pyo3/native backend built and parity/version tests passed; no new Rust hot-path code was introduced because no measured bottleneck required it.",
+    "strategy_candidate_promotion": "no clean/live promotion; integrated lagged-shadow candidate remains research/shadow-only and requires fresh-forward shadow evidence",
+    "row_label_caveat": "Raw WF row-level candidate_tier labels may contain legacy paper/testnet/live wording; artifact-level promotability and final claims are authoritative and do not approve paper/testnet/live/real-money execution.",
+    "track_separation": "Track A strict gates remain hard gates; Track B lagged-shadow headline artifacts are research_only/diagnostic-only and not deployable."
+  },
+  "generated_at_utc": "2026-07-08T11:48:05Z",
+  "schema_version": "1.0",
+  "scope": "strategy performance improvement / TradFi discovery / full-universe WF report final gate"
+}

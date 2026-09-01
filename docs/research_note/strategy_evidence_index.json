@@ -1,0 +1,4017 @@
+{
+  "artifacts": {
+    "artifact:g003-allocation-input": {
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/named_quant_full_suite/g003_20260820/selection-v11/allocation_input.json",
+      "sha256": "07df53f1ce4042687714240de91f4d4db64132827d1ed61e695e114066605d2b"
+    },
+    "artifact:g003-selection-rejected": {
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/named_quant_full_suite/g003_20260820/selection-v11/SELECTION_REJECTED.json",
+      "sha256": "dabe08d331a0ff2b0132b436d06d2ca254c46fc1dadddf603024cc86d8881b87"
+    },
+    "artifact:g003-suite-results": {
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/named_quant_full_suite/g003_20260820/selection-v11/suite_results.json",
+      "sha256": "f60a2b6efa13e1a610fd1103bd044eb7334992a362fa82f96d3eff348f3c25b1"
+    },
+    "artifact:literature-priors": {
+      "path": "docs/research_note/strategy_evidence_20260812.json",
+      "performance_evidence": false,
+      "sha256": null
+    },
+    "artifact:parity-candidate-v10": {
+      "capsule_sha256": "7f5374685ef7a0a0acb3a1353ca87c4976ceba9f80e63ededf6e8a1a8644c222",
+      "native_finalization_sha256": "a5e30170bf43d17ce8714c987644b2d853ba8f9f1ddb7e5480ae2b4808cdd1e6",
+      "path": "/home/hoky/alpha-max-g003-evaluation/g003-338e7b38f48e06951d6552f4943101b4-163ec5c670e28959/logs/PARITY_CANDIDATE_V10_SEALED.json",
+      "performance_evidence": false,
+      "sha256": "437911de1532db5a0d76dc3c1d6cfd9000bf75cbd047f06c324f6ccd9fae6aa7"
+    },
+    "artifact:parity-v10-superseded": {
+      "official_output_eligible": false,
+      "path": "/home/hoky/alpha-max-g003-evaluation/g003-338e7b38f48e06951d6552f4943101b4-163ec5c670e28959/logs/parity-v10-oracle-224ff6b64078406da73316bb3a3e92ac-aadf62342a01468e94ac16a582178168-SUPERSEDED/SUPERSEDED.json",
+      "sha256": "f1793acc435a626f2e42fdbad739a12decfa8f8c33f1a39c9fed57e86161dd24"
+    },
+    "artifact:source-canonical-clearance": {
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/alpha_max_full_completion/source_canonical_deep_clearance_20260822.json",
+      "sha256": "03b670f27a2b2847ff588c65565f444e69eeef7b57f87225391d4cd2a54141bb"
+    },
+    "artifact:strategy-smoke-latest19": {
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/alpha_max_full_completion/post_activation_latest_strategies/latest_alpha_sleeves_backtest_20260815T041940_656988Z.json",
+      "sha256": "7099b8cc0e3f70a973a7c6918eb8f7239e4f2db5af04f041d9b403316ec6e696"
+    },
+    "artifact:strategy-smoke-registry": {
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/alpha_max_full_completion/post_activation_all_strategies/latest_alpha_sleeves_backtest_20260815T042739_810818Z.json",
+      "sha256": "8c570fca57aeb41393ef89de6b369bb47798d75468e268608bbad590102f22ba"
+    }
+  },
+  "as_of_utc": "2026-08-23T00:00:00Z",
+  "evaluations": [
+    {
+      "active_return_panels": 20,
+      "allocator_emitted": false,
+      "allowed_exclusions": 16,
+      "artifact_refs": [
+        "artifact:g003-selection-rejected",
+        "artifact:g003-suite-results",
+        "artifact:g003-allocation-input"
+      ],
+      "candidate_runs_completed": 24,
+      "evaluation_outcome": "suite_rejected",
+      "execution_status": "completed",
+      "id": "eval:g003-selection-v11",
+      "locked_oos_launched": false,
+      "order_routing_enabled": false,
+      "quality_survivors": 1,
+      "required_survivors": 6,
+      "suite_family_labels": 14,
+      "survivor_id": "crypto_turtle_20_10_atr_v1",
+      "survivor_metrics": {
+        "hit_rate": 0.3571428571,
+        "net_calmar": 0.8298548399,
+        "net_sharpe": 0.1604078053,
+        "observations": 28,
+        "turnover": 0.01376170885
+      }
+    },
+    {
+      "artifact_refs": [
+        "artifact:strategy-smoke-latest19"
+      ],
+      "evaluation_outcome": "execution_pass",
+      "execution_status": "completed",
+      "failures": 0,
+      "id": "eval:post-activation-latest19",
+      "independent_oos": false,
+      "passed": 19,
+      "promotion_authority": false,
+      "requested": 19,
+      "window": {
+        "end_utc": "2026-05-03T00:00:00Z",
+        "start_utc": "2026-05-01T00:00:00Z"
+      }
+    },
+    {
+      "allowed_exclusions": 16,
+      "artifact_refs": [
+        "artifact:strategy-smoke-registry"
+      ],
+      "evaluated": 143,
+      "evaluation_outcome": "execution_pass",
+      "execution_status": "completed",
+      "failures": 0,
+      "id": "eval:post-activation-registry",
+      "independent_oos": false,
+      "passed": 127,
+      "promotion_authority": false,
+      "window": {
+        "end_utc": "2026-05-03T00:00:00Z",
+        "start_utc": "2026-05-01T00:00:00Z"
+      }
+    },
+    {
+      "duration_days": 42,
+      "evaluation_outcome": "inconclusive",
+      "evidence_class": "secondary_summary_evidence",
+      "execution_status": "completed",
+      "id": "eval:common-period-screen",
+      "independent_oos": false,
+      "primary_artifact_in_scope": false,
+      "promotion_authority": false,
+      "recent_nested_days": 11
+    },
+    {
+      "artifact_refs": [
+        "artifact:parity-candidate-v10",
+        "artifact:parity-v10-superseded"
+      ],
+      "economic_counters_zero": true,
+      "evaluation_outcome": "not_performance",
+      "execution_status": "superseded",
+      "id": "eval:exact-native-parity-v10",
+      "logical_windows": 31622400,
+      "official_acceptance": false
+    }
+  ],
+  "evidence_contract": "docs/research_note/evaluation_contract.md",
+  "order_routing_enabled": false,
+  "schema": "luminaquant.strategy_evidence_index.v1",
+  "snapshot_flags": [
+    "MISSING_FULL_STRATEGY_SOURCE_HASH_MANIFEST",
+    "SNAPSHOT_COUNT_MISMATCH_143_VS_144",
+    "COMMON_SCREEN_PRIMARY_ARTIFACT_OUTSIDE_SCOPED_ROOTS",
+    "G003_LOCKED_OOS_NOT_RUN",
+    "G003_EXCLUDED_PERFORMANCE_NOT_AVAILABLE",
+    "G003_ONE_SURVIVOR_INSUFFICIENT_FOR_PORTFOLIO",
+    "FEATURE_COVERAGE_MISSING",
+    "CADENCE_UNVERIFIED_24",
+    "CANDIDATE_LIBRARY_NOT_REGISTERED_12",
+    "DACAPOGO_EVENT_RUNNER_INCOMPATIBLE",
+    "NO_MATCHED_REBALANCING_CONTROL",
+    "PARITY_IS_NOT_PERFORMANCE",
+    "INTERRUPTED_OUTPUT_NONREUSABLE",
+    "NON_ADMITTED_OUTPUT_NONREUSABLE"
+  ],
+  "strategies": [
+    {
+      "cadence_status": "unknown",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": null,
+          "full_return": null,
+          "full_sharpe": null,
+          "recent_return": -725.8226110282245,
+          "recent_sharpe": 14.05148719160941
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "event_alpha",
+      "id": "strategy:AbnormalReturnContinuationStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "scope_unverified",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/AbnormalReturnContinuationStrategy--4d595b20a560.md",
+      "snapshot_sha256": "c098970a85f0b2dbf7d5bedd98d93a5c9de75c4a425876712a91d93b11eb1c6c",
+      "source_module": "lumina_quant.strategies.abnormal_return_continuation",
+      "strategy": "AbnormalReturnContinuationStrategy",
+      "tier": "live_opt_in"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": null,
+          "full_return": 0.0,
+          "full_sharpe": null,
+          "recent_return": -717.6969314656604,
+          "recent_sharpe": -0.6413078069313817
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "trend_momentum",
+      "id": "strategy:AccelerationRiderStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/AccelerationRiderStrategy--497eb8271e62.md",
+      "snapshot_sha256": "956752d9b8c271092d35e10d679e74b3c907e1ccc0e75de782bd5258b3849066",
+      "source_module": "lumina_quant.strategies.return_rider_alpha_sleeves",
+      "strategy": "AccelerationRiderStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.4405673413225667,
+          "full_return": -0.4208127572919671,
+          "full_sharpe": -6.615988812637713,
+          "recent_return": -0.05397815707270437,
+          "recent_sharpe": -4.727945911564713
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "cross_sectional",
+      "id": "strategy:AdaptiveRegimeMomentumStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/AdaptiveRegimeMomentumStrategy--c5a55cf3f7d8.md",
+      "snapshot_sha256": "1aee1ab77137f1dc0914e9507770f53f3293a8109c2e90a251bb2d39c0a69f1c",
+      "source_module": "lumina_quant.strategies.adaptive_regime_momentum",
+      "strategy": "AdaptiveRegimeMomentumStrategy",
+      "tier": "live_opt_in"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": null,
+          "full_return": 0.0,
+          "full_sharpe": null,
+          "recent_return": -202.43171202768744,
+          "recent_sharpe": 5.471107002652944
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "trend_momentum",
+      "id": "strategy:AdaptiveTrendRiderStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/AdaptiveTrendRiderStrategy--e37196988ead.md",
+      "snapshot_sha256": "ef18884cd675b64b890adb2db8f5187303f8e3906ad5e5f5d1816917600eeaed",
+      "source_module": "lumina_quant.strategies.return_rider_alpha_sleeves",
+      "strategy": "AdaptiveTrendRiderStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.7595806863529568,
+          "full_return": -0.7593212348990007,
+          "full_sharpe": -35.19452267308919,
+          "recent_return": -0.2933387185393086,
+          "recent_sharpe": -44.4876748486089
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "mean_reversion_relative_value",
+      "id": "strategy:AdfGatedReversionRiderStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/AdfGatedReversionRiderStrategy--bb0472056f50.md",
+      "snapshot_sha256": "ce4ca70d878fc263443accd7d416d4c4336b5c5096fbbcf1da7e88c4c9660427",
+      "source_module": "lumina_quant.strategies.stationarity_reversion_alpha_sleeves",
+      "strategy": "AdfGatedReversionRiderStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "unknown",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": null,
+          "full_return": 0.0,
+          "full_sharpe": null,
+          "recent_return": null,
+          "recent_sharpe": null
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "formulaic_alpha",
+      "id": "strategy:Alpha101FormulaStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "scope_unverified",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/Alpha101FormulaStrategy--59b9d68c552a.md",
+      "snapshot_sha256": "854112ad90929fabf9eb51c2937a57b1fa4188cfce0763e9e311e015619c3998",
+      "source_module": "lumina_quant.strategies.alpha101_formula",
+      "strategy": "Alpha101FormulaStrategy",
+      "tier": "research_only"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.0,
+          "full_return": 0.0,
+          "full_sharpe": -999.0,
+          "recent_return": 0.0,
+          "recent_sharpe": -999.0
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "ensemble_regime_router",
+      "id": "strategy:AlphaZooOptunaHybridLiveStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/AlphaZooOptunaHybridLiveStrategy--0407feadb5bf.md",
+      "snapshot_sha256": "ab28dc18d110f4c4f6bebc74d8c1aaef4175bee742d8b452bc3aa44607e4fc2f",
+      "source_module": "lumina_quant.alpha_zoo.optuna_hybrid_live_strategy",
+      "strategy": "AlphaZooOptunaHybridLiveStrategy",
+      "tier": "live_opt_in"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": null,
+          "full_return": 0.0,
+          "full_sharpe": null,
+          "recent_return": -274.92542029494547,
+          "recent_sharpe": 6.780847476936039
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "trend_momentum",
+      "id": "strategy:AmihudIlliquidityMomentumRiderStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/AmihudIlliquidityMomentumRiderStrategy--5cd2dcab3744.md",
+      "snapshot_sha256": "fafef437c219f4822061b2aad18e224e7e8c0bc91bb4f656cb63f464ac131dc0",
+      "source_module": "lumina_quant.strategies.entropy_amihud_alpha_sleeves",
+      "strategy": "AmihudIlliquidityMomentumRiderStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.0,
+          "full_return": 0.0,
+          "full_sharpe": -999.0,
+          "recent_return": 0.0,
+          "recent_sharpe": -999.0
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "volatility_risk_overlay",
+      "id": "strategy:AvgCorrelationCrashGuardOverlayStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/AvgCorrelationCrashGuardOverlayStrategy--7c66574e9fa5.md",
+      "snapshot_sha256": "e7a204e88ecb92060bf2a3cd51326cd895092becab9b126a5e89e44e0d088531",
+      "source_module": "lumina_quant.strategies.correlation_crash_guard_overlay",
+      "strategy": "AvgCorrelationCrashGuardOverlayStrategy",
+      "tier": "research_only"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.010091908988180149,
+          "full_return": -0.010091908988180132,
+          "full_sharpe": -15.198559857224717,
+          "recent_return": -0.0004803143263241161,
+          "recent_sharpe": -8.298843304755927
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "microstructure_intraday",
+      "id": "strategy:BenchmarkLeadLagContinuationStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/BenchmarkLeadLagContinuationStrategy--51a81520a33b.md",
+      "snapshot_sha256": "cc35365fbd05dbad214460e57cf21bc79665b6b1e76f10556fb4c7c1fe2be187",
+      "source_module": "lumina_quant.strategies.adaptive_crypto_alpha_sleeves",
+      "strategy": "BenchmarkLeadLagContinuationStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.21300278504526818,
+          "full_return": -0.21274711672625157,
+          "full_sharpe": -47.48739942661201,
+          "recent_return": -0.05244856849031876,
+          "recent_sharpe": -40.44715896419464
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "cross_sectional",
+      "id": "strategy:BettingAgainstBetaStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/BettingAgainstBetaStrategy--ab4658689ed6.md",
+      "snapshot_sha256": "9fb10666c5d2de884beee9f935a4791e6904377d05a61b5de727600bb90b9e19",
+      "source_module": "lumina_quant.strategies.equity_xs_factor_alpha_sleeves",
+      "strategy": "BettingAgainstBetaStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "unknown",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.008012763273965917,
+          "full_return": 0.007440733698004909,
+          "full_sharpe": 1.8769521909393445,
+          "recent_return": 0.0008156961220093795,
+          "recent_sharpe": 1.1826639507913892
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "benchmark",
+      "id": "strategy:BitcoinBuyHoldStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "scope_unverified",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/BitcoinBuyHoldStrategy--1c76a1710d6b.md",
+      "snapshot_sha256": "fe723dd207e661cd3da2f98f8a633c0ffcdfd83041a5cd4b9369017d8f189b0f",
+      "source_module": "lumina_quant.strategies.bitcoin_buy_hold",
+      "strategy": "BitcoinBuyHoldStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.4520801038915966,
+          "full_return": -0.45165886847538195,
+          "full_sharpe": -96.78209973043663,
+          "recent_return": -0.14116437493220857,
+          "recent_sharpe": -114.47666543160486
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "cross_sectional",
+      "id": "strategy:BreadthRegimeTrendTimerStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/BreadthRegimeTrendTimerStrategy--02a5f04a24d3.md",
+      "snapshot_sha256": "c54c8e25e129b92eb7fa3cd429312cf48e455db8691d3541154450985fe1dba7",
+      "source_module": "lumina_quant.strategies.vol_term_breadth_alpha_sleeves",
+      "strategy": "BreadthRegimeTrendTimerStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.005590534717403244,
+          "full_return": -0.004855255906949463,
+          "full_sharpe": -3.9242394667156253,
+          "recent_return": 0.0,
+          "recent_sharpe": -999.0
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "cross_sectional",
+      "id": "strategy:BullBearRegimeRotationStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/BullBearRegimeRotationStrategy--3d8714901093.md",
+      "snapshot_sha256": "a6b1c173c0c5512786d66c1d08f99f1fec618f11c68c7614f770e33d09d3aff7",
+      "source_module": "lumina_quant.strategies.bull_bear_regime_rotation",
+      "strategy": "BullBearRegimeRotationStrategy",
+      "tier": "research_only"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.0,
+          "full_return": 0.0,
+          "full_sharpe": -999.0,
+          "recent_return": 0.0,
+          "recent_sharpe": -999.0
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "seasonality",
+      "id": "strategy:CalendarSeasonalityOverlayStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/CalendarSeasonalityOverlayStrategy--f8db8b01a5ab.md",
+      "snapshot_sha256": "2ad6007d452270acfe8d68cc8a3617e0cfa7327ccb8a91e9d56c3b0415c7618b",
+      "source_module": "lumina_quant.strategies.calendar_overlay_alpha_sleeves",
+      "strategy": "CalendarSeasonalityOverlayStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": null,
+          "full_return": 0.0,
+          "full_sharpe": null,
+          "recent_return": 0.0,
+          "recent_sharpe": null
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "derivatives_directional_crowding",
+      "id": "strategy:CarryTrendConfluenceRiderStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/CarryTrendConfluenceRiderStrategy--2e2f809eec11.md",
+      "snapshot_sha256": "1827c6481788ee2817e46e06ffe9f44a0f17c1587664f938d1a521f76785374e",
+      "source_module": "lumina_quant.strategies.carry_trend_squeeze_alpha_sleeves",
+      "strategy": "CarryTrendConfluenceRiderStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "unknown",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.7796472662614963,
+          "full_return": -0.7796343577454963,
+          "full_sharpe": -86.7945153035583,
+          "recent_return": -0.32713870258381195,
+          "recent_sharpe": -112.7299963166334
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "trend_momentum",
+      "id": "strategy:CompositeTrendStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "scope_unverified",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/CompositeTrendStrategy--22788bbbd126.md",
+      "snapshot_sha256": "d4b372a6e9a9f0b0e375a4acd8016e186e2ab8e11fb5986d83da5be88d4ffe87",
+      "source_module": "lumina_quant.strategies.composite_trend",
+      "strategy": "CompositeTrendStrategy",
+      "tier": "live_opt_in"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.0033706458862403626,
+          "full_return": 0.003395950274097226,
+          "full_sharpe": 1.6719839552238787,
+          "recent_return": 0.0,
+          "recent_sharpe": -999.0
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "breakout",
+      "id": "strategy:CompressionBreakoutContinuationStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/CompressionBreakoutContinuationStrategy--55f8b328ab40.md",
+      "snapshot_sha256": "b0ddc05dc8d429563d0af518966b2892ca41877085a073fc5d6fd4c9130b2c04",
+      "source_module": "lumina_quant.strategies.compression_breakout_continuation",
+      "strategy": "CompressionBreakoutContinuationStrategy",
+      "tier": "live_opt_in"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.25063843728114915,
+          "full_return": -0.2504292459975457,
+          "full_sharpe": -95.22800579711755,
+          "recent_return": -0.07901922652755478,
+          "recent_sharpe": -124.9633909585369
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "trend_momentum",
+      "id": "strategy:ConfidenceGatedTrendStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/ConfidenceGatedTrendStrategy--eefb17ab9b1b.md",
+      "snapshot_sha256": "4513576a56f1f7c4aee38340c8fd0a3192e1887cb18907ad10061540ff32553d",
+      "source_module": "lumina_quant.strategies.robust_meta_overlays",
+      "strategy": "ConfidenceGatedTrendStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.021127475745538277,
+          "full_return": -0.01790033866325813,
+          "full_sharpe": -5.903277933364133,
+          "recent_return": -0.0006213151767840985,
+          "recent_sharpe": -0.7889441101467418
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "trend_momentum",
+      "id": "strategy:CrossAssetDiversifiedTrendStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/CrossAssetDiversifiedTrendStrategy--bd03be18fa06.md",
+      "snapshot_sha256": "e20a9ddfa8e33a10f71b104667d2f7e332c858de8b6784baf9ecefbd0ce506ca",
+      "source_module": "lumina_quant.strategies.cross_asset_trend_alpha_sleeves",
+      "strategy": "CrossAssetDiversifiedTrendStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.0,
+          "full_return": 0.0,
+          "full_sharpe": -999.0,
+          "recent_return": 0.0,
+          "recent_sharpe": -999.0
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "intermarket",
+      "id": "strategy:CrossCryptoSlowDiffusionStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/CrossCryptoSlowDiffusionStrategy--99d31720bf37.md",
+      "snapshot_sha256": "ea968e2fa0045ecc1891112fbfe5f99a91d899a1ba35c888b0ab55e478f14adb",
+      "source_module": "lumina_quant.strategies.cross_crypto_slow_diffusion",
+      "strategy": "CrossCryptoSlowDiffusionStrategy",
+      "tier": "live_opt_in"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.6222202538406485,
+          "full_return": -0.6221703754477816,
+          "full_sharpe": -240.73316925139807,
+          "recent_return": -0.23329061419516506,
+          "recent_sharpe": -242.44934821490736
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "cross_sectional",
+      "id": "strategy:CrossSectionalCapitalGainsOverhangStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/CrossSectionalCapitalGainsOverhangStrategy--0159cc03e01f.md",
+      "snapshot_sha256": "7fc90c878eff9522d8081c2a365b75378c2282319b0d9a8c38949f11cb068362",
+      "source_module": "lumina_quant.strategies.cgo_disposition_alpha_sleeves",
+      "strategy": "CrossSectionalCapitalGainsOverhangStrategy",
+      "tier": "research_only"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.535235478985268,
+          "full_return": -0.5352282622722679,
+          "full_sharpe": -238.47234197120318,
+          "recent_return": -0.19033966070040176,
+          "recent_sharpe": -242.40707859826458
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "cross_sectional",
+      "id": "strategy:CrossSectionalCloseLocationAccumulationStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/CrossSectionalCloseLocationAccumulationStrategy--95f674105c59.md",
+      "snapshot_sha256": "4d6b9f06d060f0324adb9f9e52e74dea7fbdd74aef14b1e55bd1d99bc52d7bd8",
+      "source_module": "lumina_quant.strategies.clv_accumulation_alpha_sleeves",
+      "strategy": "CrossSectionalCloseLocationAccumulationStrategy",
+      "tier": "research_only"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.19110696376887673,
+          "full_return": -0.18784574018318723,
+          "full_sharpe": -39.38455043713964,
+          "recent_return": -0.05609236436279719,
+          "recent_sharpe": -45.76610898191777
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "cross_sectional",
+      "id": "strategy:CrossSectionalDownsideBetaAsymmetryStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/CrossSectionalDownsideBetaAsymmetryStrategy--8a63b8191ae1.md",
+      "snapshot_sha256": "0b8ac459c7e46cf4d29056b7bedb3537c6be8f8f24155ec1a36be27926b292a1",
+      "source_module": "lumina_quant.strategies.downside_beta_asymmetry_alpha_sleeves",
+      "strategy": "CrossSectionalDownsideBetaAsymmetryStrategy",
+      "tier": "research_only"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.23054567087381247,
+          "full_return": -0.23044367143371325,
+          "full_sharpe": -62.96757296142759,
+          "recent_return": -0.05927533435411203,
+          "recent_sharpe": -56.53443006022733
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "cross_sectional",
+      "id": "strategy:CrossSectionalEquityMomentumStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/CrossSectionalEquityMomentumStrategy--ebb23ef003b6.md",
+      "snapshot_sha256": "4293ebd232bc789ddd978f01a320eb4209d302a27659843f654ea7658bb61215",
+      "source_module": "lumina_quant.strategies.equity_xs_factor_alpha_sleeves",
+      "strategy": "CrossSectionalEquityMomentumStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "unknown",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.9920849717601443,
+          "full_return": -0.992084358445429,
+          "full_sharpe": -518.5199563202851,
+          "recent_return": -0.8456497465531101,
+          "recent_sharpe": -728.9430436887195
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "cross_sectional",
+      "id": "strategy:CrossSectionalFlowShareRotationStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "scope_unverified",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/CrossSectionalFlowShareRotationStrategy--277c3c06f4db.md",
+      "snapshot_sha256": "24c29da827b55b298cf53ad341f30a2f6aeed6956e25b8f7139221ec657dfcc3",
+      "source_module": "lumina_quant.strategies.flow_share_rotation_alpha_sleeves",
+      "strategy": "CrossSectionalFlowShareRotationStrategy",
+      "tier": "research_only"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": null,
+          "full_return": 0.0,
+          "full_sharpe": null,
+          "recent_return": 0.0,
+          "recent_sharpe": null
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "derivatives_directional_crowding",
+      "id": "strategy:CrossSectionalFundingMomentumCarryStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/CrossSectionalFundingMomentumCarryStrategy--5ea2cfeff932.md",
+      "snapshot_sha256": "9970debe43701e612c800f02c8e9cf50b9f30b8b43904a224a824da4da1915a1",
+      "source_module": "lumina_quant.strategies.cross_sectional_funding_momentum_carry",
+      "strategy": "CrossSectionalFundingMomentumCarryStrategy",
+      "tier": "research_only"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.008099466557876049,
+          "full_return": 0.0028939500196512036,
+          "full_sharpe": 0.808884501331443,
+          "recent_return": 0.0015764091685950277,
+          "recent_sharpe": 1.653218254825803
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "cross_sectional",
+      "id": "strategy:CrossSectionalIntermediateEchoMomentumStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/CrossSectionalIntermediateEchoMomentumStrategy--5d2634f5418b.md",
+      "snapshot_sha256": "99080e4988045c561ebacaa391c497fafd4e42bcd2a51d4d2101be2ad9bf7f16",
+      "source_module": "lumina_quant.strategies.momentum_echo_alpha_sleeves",
+      "strategy": "CrossSectionalIntermediateEchoMomentumStrategy",
+      "tier": "research_only"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.0170566373681636,
+          "full_return": -0.01331029669059336,
+          "full_sharpe": -7.4155081540498715,
+          "recent_return": 0.0006182812638702018,
+          "recent_sharpe": 1.4919700643488623
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "cross_sectional",
+      "id": "strategy:CrossSectionalNearHighAnchoringStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/CrossSectionalNearHighAnchoringStrategy--4826024e19b0.md",
+      "snapshot_sha256": "4c94e41e30cb6dcd3efdb650d7cbf68d065ce131538c6d22e0a5b40853f86b9f",
+      "source_module": "lumina_quant.strategies.near_high_anchoring_alpha_sleeves",
+      "strategy": "CrossSectionalNearHighAnchoringStrategy",
+      "tier": "research_only"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.25261432939376993,
+          "full_return": -0.25224876176132893,
+          "full_sharpe": -123.84516938304519,
+          "recent_return": -0.07238118491681966,
+          "recent_sharpe": -123.57561765931266
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "cross_sectional",
+      "id": "strategy:CrossSectionalNearLowRecoveryStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/CrossSectionalNearLowRecoveryStrategy--0e31dbe0aeaf.md",
+      "snapshot_sha256": "cb172434842603e679b1e86f562a832b543356d2882f1614e003656e35107b2d",
+      "source_module": "lumina_quant.strategies.near_low_recovery_alpha_sleeves",
+      "strategy": "CrossSectionalNearLowRecoveryStrategy",
+      "tier": "research_only"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.0,
+          "full_return": 0.0,
+          "full_sharpe": -999.0,
+          "recent_return": 0.0,
+          "recent_sharpe": -999.0
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "cross_sectional",
+      "id": "strategy:CrossSectionalOffSessionTugOfWarStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/CrossSectionalOffSessionTugOfWarStrategy--f6fc16efbe84.md",
+      "snapshot_sha256": "6bc98dbb51eea8ad86b68deae1f43b850dd2780b5180ebb45e723437f0bb4969",
+      "source_module": "lumina_quant.strategies.offsession_tugofwar_alpha_sleeves",
+      "strategy": "CrossSectionalOffSessionTugOfWarStrategy",
+      "tier": "research_only"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.0077539708600752235,
+          "full_return": 0.004570253680427516,
+          "full_sharpe": 1.0375170404843945,
+          "recent_return": -0.005268013755649892,
+          "recent_sharpe": -4.157116290421409
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "cross_sectional",
+      "id": "strategy:CrossSectionalPathConvexityStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/CrossSectionalPathConvexityStrategy--c941a941d57e.md",
+      "snapshot_sha256": "59a7cd64825aac3aed233219950f33c992213ebc759133d2c43fefec00e6ab54",
+      "source_module": "lumina_quant.strategies.path_convexity_alpha_sleeves",
+      "strategy": "CrossSectionalPathConvexityStrategy",
+      "tier": "research_only"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.013064324148779255,
+          "full_return": -0.004415287726902917,
+          "full_sharpe": -1.4689774932940338,
+          "recent_return": 0.0004533199489971107,
+          "recent_sharpe": 1.2750885326902532
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "cross_sectional",
+      "id": "strategy:CrossSectionalPriceDelayPremiumStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/CrossSectionalPriceDelayPremiumStrategy--1886f2ee5b8b.md",
+      "snapshot_sha256": "3045c12b19b5ed4119db9a7c8773bff9ed043d641aba991b3b821cb40b92bf6b",
+      "source_module": "lumina_quant.strategies.price_delay_premium_alpha_sleeves",
+      "strategy": "CrossSectionalPriceDelayPremiumStrategy",
+      "tier": "research_only"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.01542202557504198,
+          "full_return": -0.005159223441076777,
+          "full_sharpe": -1.2700107595496715,
+          "recent_return": 0.0008650269668319943,
+          "recent_sharpe": 1.4205276952829564
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "cross_sectional",
+      "id": "strategy:CrossSectionalRegressionTrendQualityStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/CrossSectionalRegressionTrendQualityStrategy--077c08527e1f.md",
+      "snapshot_sha256": "66de37570268127b9e68001137d31ef777539295637a8e980178876471d9fef2",
+      "source_module": "lumina_quant.strategies.trend_quality_xs_alpha_sleeves",
+      "strategy": "CrossSectionalRegressionTrendQualityStrategy",
+      "tier": "research_only"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.0,
+          "full_return": 0.0,
+          "full_sharpe": -999.0,
+          "recent_return": 0.0,
+          "recent_sharpe": -999.0
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "cross_sectional",
+      "id": "strategy:CrossSectionalSeasonalPersistenceStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/CrossSectionalSeasonalPersistenceStrategy--0c6c8e170d18.md",
+      "snapshot_sha256": "f87a16c33ab39fa0cfba94b58e952cf32e915ed3ab8fd65184187bffed9dba12",
+      "source_module": "lumina_quant.strategies.seasonal_xs_persistence_alpha_sleeves",
+      "strategy": "CrossSectionalSeasonalPersistenceStrategy",
+      "tier": "research_only"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.7923101734303535,
+          "full_return": -0.7922794084303536,
+          "full_sharpe": -174.13529460981252,
+          "recent_return": -0.23451239466305696,
+          "recent_sharpe": -189.43927257376603
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "cross_sectional",
+      "id": "strategy:CrossSectionalShortTermReversalStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/CrossSectionalShortTermReversalStrategy--113213c962d6.md",
+      "snapshot_sha256": "e4de5270fd08e71d7c4f3c38b294cc01537bd01a421f1492e8057d4453e8208e",
+      "source_module": "lumina_quant.strategies.robust_alpha_sleeves",
+      "strategy": "CrossSectionalShortTermReversalStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.0,
+          "full_return": 0.0,
+          "full_sharpe": -999.0,
+          "recent_return": 0.0,
+          "recent_sharpe": -999.0
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "cross_sectional",
+      "id": "strategy:CrossSectionalTimeUnderWaterStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/CrossSectionalTimeUnderWaterStrategy--4c35e86eaffd.md",
+      "snapshot_sha256": "157bebd0533cbc283583023a51475e199c5b4c15c5419581ce75436255629404",
+      "source_module": "lumina_quant.strategies.time_under_water_alpha_sleeves",
+      "strategy": "CrossSectionalTimeUnderWaterStrategy",
+      "tier": "research_only"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": null,
+          "full_return": 0.0,
+          "full_sharpe": null,
+          "recent_return": 0.0,
+          "recent_sharpe": null
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "formulaic_alpha",
+      "id": "strategy:CryptoFxAlphaZooStateStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/CryptoFxAlphaZooStateStrategy--cc3a7cee65c8.md",
+      "snapshot_sha256": "0644a1ca38910eff2b86a17d370acc0ab7211eff18afaee2e91f0864825aa9f5",
+      "source_module": "lumina_quant.strategies.crypto_fx_alpha_zoo_state",
+      "strategy": "CryptoFxAlphaZooStateStrategy",
+      "tier": "live_opt_in"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.9148008211098473,
+          "full_return": -0.9142440771929853,
+          "full_sharpe": -55.38439021627312,
+          "recent_return": -0.5000906229888655,
+          "recent_sharpe": -71.71300810187071
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "trend_momentum",
+      "id": "strategy:CusumChangePointTrendRiderStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/CusumChangePointTrendRiderStrategy--28d369b8acb7.md",
+      "snapshot_sha256": "8f67c8a260c809ecb67e19153eb423886c544e0dcd36684c5faa3afd4bfc7ab2",
+      "source_module": "lumina_quant.strategies.cusum_varratio_alpha_sleeves",
+      "strategy": "CusumChangePointTrendRiderStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "not_evaluated_in_supplied_comparison",
+        "metrics": {
+          "full_max_drawdown": null,
+          "full_return": null,
+          "full_sharpe": null,
+          "recent_return": null,
+          "recent_sharpe": null
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "polars_batch",
+      "family": "breakout",
+      "id": "strategy:DacapogoDailySourceStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "dedicated_dacapogo_daily_research",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/DacapogoDailySourceStrategy--5ac5aaf8505a.md",
+      "snapshot_sha256": "ec3c5186bbdd575bad7438abe7c322fc6b1f97360d83e706b6a3127f5f2169af",
+      "source_module": "lumina_quant.strategies.dacapogo_daily_source",
+      "strategy": "DacapogoDailySourceStrategy",
+      "tier": "research_only"
+    },
+    {
+      "cadence_status": "unknown",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": null,
+          "full_return": 0.0,
+          "full_sharpe": null,
+          "recent_return": 0.0,
+          "recent_sharpe": null
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "ensemble_regime_router",
+      "id": "strategy:DeepLearningForecastGateStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "scope_unverified",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/DeepLearningForecastGateStrategy--f33bd90a3c3d.md",
+      "snapshot_sha256": "f91fc5944115de663c811fadbf86d2075de59f6da32df596635dd23143efd39d",
+      "source_module": "lumina_quant.strategies.deep_learning_forecast_gate",
+      "strategy": "DeepLearningForecastGateStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": null,
+          "full_return": 0.0,
+          "full_sharpe": null,
+          "recent_return": 0.0,
+          "recent_sharpe": null
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "derivatives_directional_crowding",
+      "id": "strategy:DerivativesFlowSqueezeStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/DerivativesFlowSqueezeStrategy--21a0b9ac2a7f.md",
+      "snapshot_sha256": "44a820fd1680112f10b8a1027bdbdbee1f5e4b2727a2ee0a5b2579ed54d230b8",
+      "source_module": "lumina_quant.strategies.derivatives_flow_squeeze",
+      "strategy": "DerivativesFlowSqueezeStrategy",
+      "tier": "live_opt_in"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.02588807554786459,
+          "full_return": 0.020665116846928955,
+          "full_sharpe": 2.126597796503889,
+          "recent_return": -0.002701057483374125,
+          "recent_sharpe": -0.7293267683804295
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "ensemble_regime_router",
+      "id": "strategy:DisagreementGatedEnsembleStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/DisagreementGatedEnsembleStrategy--492a7da15f51.md",
+      "snapshot_sha256": "c2dc4185d1ba4325e226ff9f2b644f4600c13ee445691dfa08bbc8c2faf365be",
+      "source_module": "lumina_quant.strategies.disagreement_ensemble_alpha_sleeves",
+      "strategy": "DisagreementGatedEnsembleStrategy",
+      "tier": "research_only"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.0,
+          "full_return": 0.0,
+          "full_sharpe": -999.0,
+          "recent_return": 0.0,
+          "recent_sharpe": -999.0
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "cross_sectional",
+      "id": "strategy:DispersionConditionedReversionStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/DispersionConditionedReversionStrategy--644340078354.md",
+      "snapshot_sha256": "db224a66fea3f24bab7753dbf74fdb0c9a398b96ca282f07d8805132e2782ba8",
+      "source_module": "lumina_quant.strategies.cross_sectional_anomaly_alpha_sleeves",
+      "strategy": "DispersionConditionedReversionStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": null,
+          "full_return": 0.0,
+          "full_sharpe": null,
+          "recent_return": 0.0,
+          "recent_sharpe": null
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "cross_sectional",
+      "id": "strategy:DiversifiedMultiFactorEnsembleStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/DiversifiedMultiFactorEnsembleStrategy--210e57c5c3eb.md",
+      "snapshot_sha256": "d9e89cb5c0137252c5006f9d270aa2e840b208a7ec13e3977c336aa61074218c",
+      "source_module": "lumina_quant.strategies.diversified_multifactor_ensemble",
+      "strategy": "DiversifiedMultiFactorEnsembleStrategy",
+      "tier": "research_only"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.17152274635667572,
+          "full_return": -0.1713239398987496,
+          "full_sharpe": -98.5067906730278,
+          "recent_return": -0.047358431713975024,
+          "recent_sharpe": -108.61324524488862
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "trend_momentum",
+      "id": "strategy:DonchianAtrTrendStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/DonchianAtrTrendStrategy--b2db2c59afbd.md",
+      "snapshot_sha256": "9329c40fa2b6fbc89dad5d1c1ca6484ac9a3ac2fd917ef0d3e4ed1e8c13d0100",
+      "source_module": "lumina_quant.strategies.robust_alpha_sleeves",
+      "strategy": "DonchianAtrTrendStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.32148137868030185,
+          "full_return": -0.32139450383376367,
+          "full_sharpe": -137.5182276688108,
+          "recent_return": -0.10947597889047012,
+          "recent_sharpe": -144.4509706049627
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "cross_sectional",
+      "id": "strategy:DownsideTailRiskPremiumStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/DownsideTailRiskPremiumStrategy--45d8f9386e22.md",
+      "snapshot_sha256": "1fa419fa967e6e9f99e77e74137336bf424850a33bd543ab0e1ba57ff955f1b6",
+      "source_module": "lumina_quant.strategies.downside_tail_risk_alpha_sleeves",
+      "strategy": "DownsideTailRiskPremiumStrategy",
+      "tier": "research_only"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.19952588680792985,
+          "full_return": -0.1967280822153763,
+          "full_sharpe": -53.796452141245375,
+          "recent_return": -0.06573281974355794,
+          "recent_sharpe": -70.67538026874114
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "cross_sectional",
+      "id": "strategy:DualMomentumDefensiveRotationStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/DualMomentumDefensiveRotationStrategy--d55178289de5.md",
+      "snapshot_sha256": "ee065f4e2cbe20c60d96976fe566edbee3cf3d0807db36ddcf9c494e53324980",
+      "source_module": "lumina_quant.strategies.equity_return_alpha_sleeves",
+      "strategy": "DualMomentumDefensiveRotationStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.19952588680792985,
+          "full_return": -0.1967280822153763,
+          "full_sharpe": -53.796452141245375,
+          "recent_return": -0.06573281974355794,
+          "recent_sharpe": -70.67538026874114
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "cross_sectional",
+      "id": "strategy:DualMomentumIndexRotationStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/DualMomentumIndexRotationStrategy--fdf990dce22e.md",
+      "snapshot_sha256": "9af7bbcdf66970cb5e18098461d6884df16a50d456c3e81b69c140bb65a203df",
+      "source_module": "lumina_quant.strategies.index_rotation_alpha_sleeves",
+      "strategy": "DualMomentumIndexRotationStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.1410808401065813,
+          "full_return": -0.14108084010658128,
+          "full_sharpe": -101.28448565648453,
+          "recent_return": -0.03687096425836278,
+          "recent_sharpe": -107.09142215348676
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "mean_reversion_relative_value",
+      "id": "strategy:EquityBenchmarkResidualReversalStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/EquityBenchmarkResidualReversalStrategy--5ff41117f3ac.md",
+      "snapshot_sha256": "0c5d8847ae58e1ec8036f7ea32d43d2a04ad0d18aff934263aaa7a3065e18f11",
+      "source_module": "lumina_quant.strategies.cross_asset_tradfi_alpha_sleeves",
+      "strategy": "EquityBenchmarkResidualReversalStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.0024451744043770306,
+          "full_return": -0.0020469550975845685,
+          "full_sharpe": -8.66406361514768,
+          "recent_return": 0.0002999964699226254,
+          "recent_sharpe": 7.579733292871249
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "ensemble_regime_router",
+      "id": "strategy:EquityMetalRiskRegimeRotationStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/EquityMetalRiskRegimeRotationStrategy--3a95d5074065.md",
+      "snapshot_sha256": "64a6f8b1f6770652621c134c8ec901c6c739bdd0635eb381a767c698db38dbe0",
+      "source_module": "lumina_quant.strategies.cross_asset_tradfi_alpha_sleeves",
+      "strategy": "EquityMetalRiskRegimeRotationStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.0011475531156280678,
+          "full_return": 0.00033460063884116487,
+          "full_sharpe": 0.8243160816242129,
+          "recent_return": -0.0003252350206505161,
+          "recent_sharpe": -3.063879586827552
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "mean_reversion_relative_value",
+      "id": "strategy:FalseBreakoutReversalStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/FalseBreakoutReversalStrategy--80e7891370af.md",
+      "snapshot_sha256": "b98a0be3c5323195ae50a347b3503ccb47c090d5851c49a3c2c99f146b916871",
+      "source_module": "lumina_quant.strategies.adaptive_crypto_alpha_sleeves",
+      "strategy": "FalseBreakoutReversalStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": null,
+          "full_return": 0.0,
+          "full_sharpe": null,
+          "recent_return": 0.0,
+          "recent_sharpe": null
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "derivatives_directional_crowding",
+      "id": "strategy:FundingDislocationTrendCarryStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/FundingDislocationTrendCarryStrategy--84655fcb669e.md",
+      "snapshot_sha256": "559600684f380420db0d90b3b2d75e4a0348e9ffc92ef96f868ae21cf97d8fea",
+      "source_module": "lumina_quant.strategies.external_alpha_sleeves",
+      "strategy": "FundingDislocationTrendCarryStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": null,
+          "full_return": 0.0,
+          "full_sharpe": null,
+          "recent_return": 0.0,
+          "recent_sharpe": null
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "derivatives_directional_crowding",
+      "id": "strategy:FundingHarvestCarryStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/FundingHarvestCarryStrategy--a287210810ad.md",
+      "snapshot_sha256": "1c5f48af3941ab0e50116f59dacbc72e8e10f894c949d4dfc89c08e7435b361f",
+      "source_module": "lumina_quant.strategies.aggressive_return_alpha_sleeves",
+      "strategy": "FundingHarvestCarryStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": null,
+          "full_return": 0.0,
+          "full_sharpe": null,
+          "recent_return": -0.9324058379584305,
+          "recent_sharpe": -138.16673061310007
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "breakout",
+      "id": "strategy:GarchInnovationRiderStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/GarchInnovationRiderStrategy--f00ec6226fda.md",
+      "snapshot_sha256": "04ef4efcf08de16a51b6b3f33497145a51fe8186388cb4ec952538b4ead12266",
+      "source_module": "lumina_quant.strategies.garch_innovation_alpha_sleeves",
+      "strategy": "GarchInnovationRiderStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.014954055087098883,
+          "full_return": -0.0149520977141121,
+          "full_sharpe": -50.336637829153254,
+          "recent_return": -0.004486265199460826,
+          "recent_sharpe": -55.82792895726337
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "mean_reversion_relative_value",
+      "id": "strategy:GoldSilverRatioMeanReversionStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/GoldSilverRatioMeanReversionStrategy--03790c0faf35.md",
+      "snapshot_sha256": "4fe5adddfa84181ed6c3dc35cf23975e5eace992087c63ceca4d4ce7e7ea59d4",
+      "source_module": "lumina_quant.strategies.cross_asset_tradfi_alpha_sleeves",
+      "strategy": "GoldSilverRatioMeanReversionStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.003686662430346223,
+          "full_return": -0.0036704792542852083,
+          "full_sharpe": -25.39252294528607,
+          "recent_return": -0.0005590501827485994,
+          "recent_sharpe": -15.683024361392002
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "breakout",
+      "id": "strategy:GoldSilverRatioTrendStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/GoldSilverRatioTrendStrategy--426c9be91c69.md",
+      "snapshot_sha256": "b4750bd7dfbe9534b349ef8592358ab84fe97c49e829fb4006a9137445aa1053",
+      "source_module": "lumina_quant.strategies.cross_asset_tradfi_alpha_sleeves",
+      "strategy": "GoldSilverRatioTrendStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.0,
+          "full_return": 0.0,
+          "full_sharpe": -999.0,
+          "recent_return": 0.0,
+          "recent_sharpe": -999.0
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "mean_reversion_relative_value",
+      "id": "strategy:HourlyShockReversionStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/HourlyShockReversionStrategy--612c9aa592f0.md",
+      "snapshot_sha256": "7abe41dac8ca6ad486ef0fdd90488609b9c1e0b281ab0989f018740be2e54308",
+      "source_module": "lumina_quant.strategies.hourly_shock_reversion",
+      "strategy": "HourlyShockReversionStrategy",
+      "tier": "live_opt_in"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": null,
+          "full_return": 0.0,
+          "full_sharpe": null,
+          "recent_return": -188.35555345074198,
+          "recent_sharpe": -3.263348262315316
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "cross_sectional",
+      "id": "strategy:HurstRegimeGatedStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/HurstRegimeGatedStrategy--a823d8cbfe2a.md",
+      "snapshot_sha256": "2f1aaec08e7045d5da6c8f1fd04644a45b66e911ac45f0b6ed9818d26912781e",
+      "source_module": "lumina_quant.strategies.robust_meta_overlays",
+      "strategy": "HurstRegimeGatedStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.014145493772297988,
+          "full_return": -0.005077633214468746,
+          "full_sharpe": -1.1368188266443133,
+          "recent_return": -0.004120964805923166,
+          "recent_sharpe": -5.439779216445363
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "cross_sectional",
+      "id": "strategy:IdiosyncraticSkewInnovationStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/IdiosyncraticSkewInnovationStrategy--91ba6631032d.md",
+      "snapshot_sha256": "9177fd8bb0c7190df4a1ba5245b5a7b8f132364e50c135cbb6793662cc794a91",
+      "source_module": "lumina_quant.strategies.skew_innovation_alpha_sleeves",
+      "strategy": "IdiosyncraticSkewInnovationStrategy",
+      "tier": "research_only"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.3294571633615735,
+          "full_return": -0.3294204136705734,
+          "full_sharpe": -63.16892369698044,
+          "recent_return": -0.09466375770087876,
+          "recent_sharpe": -70.62865560756252
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "cross_sectional",
+      "id": "strategy:IdiosyncraticVolatilityStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/IdiosyncraticVolatilityStrategy--c26bc4e04d5d.md",
+      "snapshot_sha256": "50d1ec154157601d28ced8ba5b3b4dc1f0b8a81c4523706d0f147ebd20498a25",
+      "source_module": "lumina_quant.strategies.cross_sectional_anomaly_alpha_sleeves",
+      "strategy": "IdiosyncraticVolatilityStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.009639660659406303,
+          "full_return": -0.0018689867372517766,
+          "full_sharpe": -0.7197848794360724,
+          "recent_return": 0.003097122912016026,
+          "recent_sharpe": 4.901557183825376
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "cross_sectional",
+      "id": "strategy:InformationDiscretenessMomentumStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/InformationDiscretenessMomentumStrategy--4f4d30446024.md",
+      "snapshot_sha256": "760b7986d39945ef9cc72d8b87d8fca718900363b9b67b0d0187d01b657d979c",
+      "source_module": "lumina_quant.strategies.information_discreteness_alpha_sleeves",
+      "strategy": "InformationDiscretenessMomentumStrategy",
+      "tier": "research_only"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.0,
+          "full_return": 0.0,
+          "full_sharpe": -999.0,
+          "recent_return": 0.0,
+          "recent_sharpe": -999.0
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "intermarket",
+      "id": "strategy:IntermarketLeadLagContinuationStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/IntermarketLeadLagContinuationStrategy--c97315c106a5.md",
+      "snapshot_sha256": "a2ef499aa7e229dfb8bd9e9dfe0d4f40299a1de4866795c93a686491adec905c",
+      "source_module": "lumina_quant.strategies.cross_asset_trend_alpha_sleeves",
+      "strategy": "IntermarketLeadLagContinuationStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.0,
+          "full_return": 0.0,
+          "full_sharpe": -999.0,
+          "recent_return": 0.0,
+          "recent_sharpe": -999.0
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "microstructure_intraday",
+      "id": "strategy:IntradayFlowPressureRiderStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/IntradayFlowPressureRiderStrategy--e5c21329ef81.md",
+      "snapshot_sha256": "226bd2dbccdf1af681fad9cca68e93dbd9d3e2a3b5a35e97e213f1db470d0ce7",
+      "source_module": "lumina_quant.strategies.micro_signal_alpha_sleeves",
+      "strategy": "IntradayFlowPressureRiderStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.9565268964596845,
+          "full_return": -0.9551521007995103,
+          "full_sharpe": -49.180180477148134,
+          "recent_return": -0.6285232766415224,
+          "recent_sharpe": -60.606942466115974
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "trend_momentum",
+      "id": "strategy:IntradaySeasonalMomentumRiderStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/IntradaySeasonalMomentumRiderStrategy--4b2d4346a92f.md",
+      "snapshot_sha256": "8fb61cf74443c3590589f1a27a8decbdf693e9d303874b7806f7952c7651ac52",
+      "source_module": "lumina_quant.strategies.intraday_overnight_alpha_sleeves",
+      "strategy": "IntradaySeasonalMomentumRiderStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.0,
+          "full_return": 0.0,
+          "full_sharpe": -999.0,
+          "recent_return": 0.0,
+          "recent_sharpe": -999.0
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "trend_momentum",
+      "id": "strategy:KalmanTrendRiderStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/KalmanTrendRiderStrategy--f08ea8d29112.md",
+      "snapshot_sha256": "45b9ceea1da5ea3d6b20671061adead718c8fbec48250d90fe596554ca5a36e8",
+      "source_module": "lumina_quant.strategies.kalman_semivar_alpha_sleeves",
+      "strategy": "KalmanTrendRiderStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "unknown",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.0,
+          "full_return": 0.0,
+          "full_sharpe": -999.0,
+          "recent_return": 0.0,
+          "recent_sharpe": -999.0
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "intermarket",
+      "id": "strategy:LagConvergenceStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "scope_unverified",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/LagConvergenceStrategy--ee9bb4839510.md",
+      "snapshot_sha256": "58b95fc1864931fc8f09ffa3ce617b801181f6dafd26bebf49b7da4784a2e7e5",
+      "source_module": "lumina_quant.strategies.lag_convergence",
+      "strategy": "LagConvergenceStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "unknown",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.06956999196187899,
+          "full_return": -0.06956999196187896,
+          "full_sharpe": -18.12554829307831,
+          "recent_return": -0.010268942232493083,
+          "recent_sharpe": -8.60043202180284
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "cross_sectional",
+      "id": "strategy:LastDayLiquidityRegimeStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "scope_unverified",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/LastDayLiquidityRegimeStrategy--128def6c03d5.md",
+      "snapshot_sha256": "e78454ba7d9818626702bab2ce854ca3578be7c2fafe4c284417dce1e73ab3e7",
+      "source_module": "lumina_quant.strategies.last_day_liquidity_regime",
+      "strategy": "LastDayLiquidityRegimeStrategy",
+      "tier": "live_opt_in"
+    },
+    {
+      "cadence_status": "unknown",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.0,
+          "full_return": 0.0,
+          "full_sharpe": -999.0,
+          "recent_return": 0.0,
+          "recent_sharpe": -999.0
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "microstructure_intraday",
+      "id": "strategy:LeadLagSpilloverStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "scope_unverified",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/LeadLagSpilloverStrategy--b411a4087909.md",
+      "snapshot_sha256": "5f467b72487f84dbd8c42af25527de139f531e0d62d90a2de18d91b56e47faf3",
+      "source_module": "lumina_quant.strategies.leadlag_spillover",
+      "strategy": "LeadLagSpilloverStrategy",
+      "tier": "live_opt_in"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": null,
+          "full_return": 0.0,
+          "full_sharpe": null,
+          "recent_return": -146.13048607290534,
+          "recent_sharpe": 4.269809347156271
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "trend_momentum",
+      "id": "strategy:LeveragedTrendTimingRiderStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/LeveragedTrendTimingRiderStrategy--c2d7611b31da.md",
+      "snapshot_sha256": "a7b8d588f271815b99a935445ed9ffb7cb74813dd835f77c5343a0c1ace9a27c",
+      "source_module": "lumina_quant.strategies.equity_return_alpha_sleeves",
+      "strategy": "LeveragedTrendTimingRiderStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": null,
+          "full_return": 0.0,
+          "full_sharpe": null,
+          "recent_return": 0.0,
+          "recent_sharpe": null
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "cross_sectional",
+      "id": "strategy:LiquidationCascadeReversionStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/LiquidationCascadeReversionStrategy--8123916af0e3.md",
+      "snapshot_sha256": "39861345f6278d06caf2b4ae53f72522b803a660f2055cc246b4e23a676ca170",
+      "source_module": "lumina_quant.strategies.derivatives_flow_squeeze",
+      "strategy": "LiquidationCascadeReversionStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.00553515674257643,
+          "full_return": -0.0016710224880942537,
+          "full_sharpe": -0.6193040152118351,
+          "recent_return": -0.005056836784156804,
+          "recent_sharpe": -12.198401460926128
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "mean_reversion_relative_value",
+      "id": "strategy:LiquidityShockReversionStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/LiquidityShockReversionStrategy--e7f2f7c03fbf.md",
+      "snapshot_sha256": "d69cbf507a8fd805182bb442c2d29e95ed8f77c7b8a41ae79a47de3ffe7cb59f",
+      "source_module": "lumina_quant.strategies.external_alpha_sleeves",
+      "strategy": "LiquidityShockReversionStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.14666241522242254,
+          "full_return": -0.14664846646242236,
+          "full_sharpe": -52.475617476239194,
+          "recent_return": -0.04888102265061112,
+          "recent_sharpe": -60.2963684733467
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "cross_sectional",
+      "id": "strategy:LongRunOverreactionReversalStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/LongRunOverreactionReversalStrategy--31e4de69d5ae.md",
+      "snapshot_sha256": "2a2571728ceef7840a901b9ce511eabcf92037b0001dd4fe4cb7b18eea92c27f",
+      "source_module": "lumina_quant.strategies.longrun_overreaction_alpha_sleeves",
+      "strategy": "LongRunOverreactionReversalStrategy",
+      "tier": "research_only"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.7886440196724198,
+          "full_return": -0.7884815398233738,
+          "full_sharpe": -175.06902986953486,
+          "recent_return": -0.28902519252254844,
+          "recent_sharpe": -176.94472951263458
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "cross_sectional",
+      "id": "strategy:LotterySkewnessStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/LotterySkewnessStrategy--dba824f935f0.md",
+      "snapshot_sha256": "3bcfdede3187c0deed1da8aa8110d841a75db9f64a49b0b2d18ef778cebf9e8e",
+      "source_module": "lumina_quant.strategies.cross_sectional_anomaly_alpha_sleeves",
+      "strategy": "LotterySkewnessStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.008464551800410435,
+          "full_return": 0.002496019664714133,
+          "full_sharpe": 0.6767865858973792,
+          "recent_return": -0.001230807291157321,
+          "recent_sharpe": -1.364772924518774
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "trend_momentum",
+      "id": "strategy:LowTurnoverTrendPersistenceStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/LowTurnoverTrendPersistenceStrategy--bb32f3bdd8ac.md",
+      "snapshot_sha256": "b9a09dc1bc9e2a3bc2c1e776042722d8723f9826347e926561f103271b2ab7bb",
+      "source_module": "lumina_quant.strategies.low_turnover_trend_alpha_sleeves",
+      "strategy": "LowTurnoverTrendPersistenceStrategy",
+      "tier": "research_only"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.06363990747945839,
+          "full_return": -0.06205589142179868,
+          "full_sharpe": -27.418998718966673,
+          "recent_return": -0.012341203200727069,
+          "recent_sharpe": -25.998634788081155
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "cross_sectional",
+      "id": "strategy:LowVolatilityMomentumStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/LowVolatilityMomentumStrategy--a383c59fcc9e.md",
+      "snapshot_sha256": "0cf4feeec1b4158f19c3a6eaf6c3c67d5b1b69252a67ce3b3541793d6414c7c3",
+      "source_module": "lumina_quant.strategies.adaptive_crypto_alpha_sleeves",
+      "strategy": "LowVolatilityMomentumStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "unknown",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.9297133930114906,
+          "full_return": -0.9297007874667236,
+          "full_sharpe": -102.60216937271822,
+          "recent_return": -0.500422611467612,
+          "recent_sharpe": -131.97080700665603
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "mean_reversion_relative_value",
+      "id": "strategy:MeanReversionStdStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "scope_unverified",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/MeanReversionStdStrategy--fff0afa9ac8b.md",
+      "snapshot_sha256": "a566b0346f0c23998d112ed02bf1e2957b57e56f5ee72b82d578dd1624e6e292",
+      "source_module": "lumina_quant.strategies.mean_reversion_std",
+      "strategy": "MeanReversionStdStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.0,
+          "full_return": 0.0,
+          "full_sharpe": -999.0,
+          "recent_return": 0.0,
+          "recent_sharpe": -999.0
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "mean_reversion_relative_value",
+      "id": "strategy:MetalEquityDivergenceReversalStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/MetalEquityDivergenceReversalStrategy--f3cb73f956a5.md",
+      "snapshot_sha256": "bb32ab058754a19fb0f64f409d63094e08fbe165b599e8d9a45b0d34c2cf6eba",
+      "source_module": "lumina_quant.strategies.cross_asset_tradfi_alpha_sleeves",
+      "strategy": "MetalEquityDivergenceReversalStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.02569209069510852,
+          "full_return": -0.025684093774050787,
+          "full_sharpe": -103.9205521045522,
+          "recent_return": -0.006168398144531406,
+          "recent_sharpe": -101.7175376012545
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "cross_sectional",
+      "id": "strategy:MetalsRelativeValueBasketStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/MetalsRelativeValueBasketStrategy--9cda25c14b24.md",
+      "snapshot_sha256": "dd6b6e4e0b9270391a81b05cdef1387c5d958ba462ec6664b8fb1ae23ce431fe",
+      "source_module": "lumina_quant.strategies.cross_asset_tradfi_alpha_sleeves",
+      "strategy": "MetalsRelativeValueBasketStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.004431473398322002,
+          "full_return": 0.004840951414113004,
+          "full_sharpe": 1.7904358509378209,
+          "recent_return": -0.0008129850324756216,
+          "recent_sharpe": -1.5641135331792257
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "volatility_risk_overlay",
+      "id": "strategy:MomentumCrashDynamicScalingOverlayStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/MomentumCrashDynamicScalingOverlayStrategy--6988a37ba84b.md",
+      "snapshot_sha256": "adf4c9adf60f2ad675596217a596bdd33da7adbff295ffd895c2c4dbf59f2f4d",
+      "source_module": "lumina_quant.strategies.momentum_crash_scaling_overlay",
+      "strategy": "MomentumCrashDynamicScalingOverlayStrategy",
+      "tier": "research_only"
+    },
+    {
+      "cadence_status": "unknown",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": null,
+          "full_return": 0.0,
+          "full_sharpe": null,
+          "recent_return": -0.8230072260099377,
+          "recent_sharpe": -235.82489360542408
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "trend_momentum",
+      "id": "strategy:MovingAverageCrossStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "scope_unverified",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/MovingAverageCrossStrategy--54ca82945cda.md",
+      "snapshot_sha256": "1a50ae860304dcd4f8633bd4aab4f5a74fa73175cf659456bc78e7a5ae08668a",
+      "source_module": "lumina_quant.strategies.moving_average",
+      "strategy": "MovingAverageCrossStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": null,
+          "full_return": 0.0,
+          "full_sharpe": null,
+          "recent_return": -185.62607521255006,
+          "recent_sharpe": 13.1192197734317
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "trend_momentum",
+      "id": "strategy:MultiTimeframeTrendEnsembleStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/MultiTimeframeTrendEnsembleStrategy--b65a5353444c.md",
+      "snapshot_sha256": "c0c5d5779ad9aee57550c21fe7b95166c88a800e2003fd19d71659369a902d16",
+      "source_module": "lumina_quant.strategies.aggressive_return_alpha_sleeves",
+      "strategy": "MultiTimeframeTrendEnsembleStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.050177070941435746,
+          "full_return": -0.046926657754707946,
+          "full_sharpe": -12.92747132427939,
+          "recent_return": -0.010611978983579906,
+          "recent_sharpe": -11.766429740862794
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "cross_sectional",
+      "id": "strategy:NearHighMomentumStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/NearHighMomentumStrategy--e1e3a0115984.md",
+      "snapshot_sha256": "faab281a952f5c78ddc030db66abafbf57540e43b92c5d5022999b5a9246e8c5",
+      "source_module": "lumina_quant.strategies.adaptive_crypto_alpha_sleeves",
+      "strategy": "NearHighMomentumStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": null,
+          "full_return": 0.0,
+          "full_sharpe": null,
+          "recent_return": 0.0,
+          "recent_sharpe": null
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "trend_momentum",
+      "id": "strategy:OpenInterestTrendConfirmationRiderStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/OpenInterestTrendConfirmationRiderStrategy--8e2d15521ad8.md",
+      "snapshot_sha256": "839f83a268f3daf6c36a1ad83a8a8fad8ee4211c6022015667049d36b8532941",
+      "source_module": "lumina_quant.strategies.orb_oi_trend_alpha_sleeves",
+      "strategy": "OpenInterestTrendConfirmationRiderStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.4291500114555926,
+          "full_return": -0.4221444501413282,
+          "full_sharpe": -11.6557340754716,
+          "recent_return": -0.1050526412554289,
+          "recent_sharpe": -10.786451559071674
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "breakout",
+      "id": "strategy:OpeningRangeBreakoutRiderStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/OpeningRangeBreakoutRiderStrategy--a84316460e69.md",
+      "snapshot_sha256": "af45a723dd2767b7f7da716491fa2296d0b2a67277c4171e305c50efb7a427cf",
+      "source_module": "lumina_quant.strategies.orb_oi_trend_alpha_sleeves",
+      "strategy": "OpeningRangeBreakoutRiderStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.02025598827135344,
+          "full_return": -0.018644183863282482,
+          "full_sharpe": -6.284069548399634,
+          "recent_return": -0.00683301390606883,
+          "recent_sharpe": -9.74425261215669
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "breakout",
+      "id": "strategy:OpeningRangeContinuationStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/OpeningRangeContinuationStrategy--54d646e42831.md",
+      "snapshot_sha256": "3af9e9eb926b3eaf9f5c5e230c2baa2d968fb33c26e24e4e618e13e4d9842a0d",
+      "source_module": "lumina_quant.strategies.external_alpha_sleeves",
+      "strategy": "OpeningRangeContinuationStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": null,
+          "full_return": 0.0,
+          "full_sharpe": null,
+          "recent_return": 0.0,
+          "recent_sharpe": null
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "microstructure_intraday",
+      "id": "strategy:OrderBookImbalanceReversionStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/OrderBookImbalanceReversionStrategy--a343f578af30.md",
+      "snapshot_sha256": "d9346a5fdafc95e1306486124c64f268568e22d8e0a2c9e109b379acf163bfd1",
+      "source_module": "lumina_quant.strategies.orderbook_imbalance_reversion",
+      "strategy": "OrderBookImbalanceReversionStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": null,
+          "full_return": null,
+          "full_sharpe": null,
+          "recent_return": -0.4326034277397234,
+          "recent_sharpe": -41.171846147815145
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "seasonality",
+      "id": "strategy:OvernightSessionReturnRiderStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/OvernightSessionReturnRiderStrategy--d36e1d02f6b6.md",
+      "snapshot_sha256": "fc7c7576c4f12747b33684c935631077a192efdf2ac9351f91960c39d41be7a5",
+      "source_module": "lumina_quant.strategies.intraday_overnight_alpha_sleeves",
+      "strategy": "OvernightSessionReturnRiderStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "unknown",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.0317644970575424,
+          "full_return": -0.03176449705754236,
+          "full_sharpe": -62.727989384232615,
+          "recent_return": -0.008617781481519482,
+          "recent_sharpe": -69.13366400721637
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "mean_reversion_relative_value",
+      "id": "strategy:PairSpreadZScoreStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "scope_unverified",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/PairSpreadZScoreStrategy--2d63aaef1a13.md",
+      "snapshot_sha256": "2419137da6106be84c41085736fbaa4813c8b241a77d64f02b9def2545982010",
+      "source_module": "lumina_quant.strategies.pair_spread_zscore",
+      "strategy": "PairSpreadZScoreStrategy",
+      "tier": "live_opt_in"
+    },
+    {
+      "cadence_status": "unknown",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.0317644970575424,
+          "full_return": -0.03176449705754236,
+          "full_sharpe": -62.727989384232615,
+          "recent_return": -0.008617781481519482,
+          "recent_sharpe": -69.13366400721637
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "mean_reversion_relative_value",
+      "id": "strategy:PairTradingZScoreStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "scope_unverified",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/PairTradingZScoreStrategy--a96830f8e4dc.md",
+      "snapshot_sha256": "ba4d4a667a8b457d8db8783a338f7e635c828e16fd6a1edbdf541d4d7a2c6a50",
+      "source_module": "lumina_quant.strategies.pair_trading_zscore",
+      "strategy": "PairTradingZScoreStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.006488482231481757,
+          "full_return": -0.006474509633745407,
+          "full_sharpe": -25.382072963613552,
+          "recent_return": -0.0013116573981407642,
+          "recent_sharpe": -28.20613803256011
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "mean_reversion_relative_value",
+      "id": "strategy:PairsSpreadMeanReversionStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/PairsSpreadMeanReversionStrategy--7980bf37d43a.md",
+      "snapshot_sha256": "16922b61ee7fda45248e9d2336bd283dd2930d389a03398db8210a7a8945b667",
+      "source_module": "lumina_quant.strategies.robust_alpha_sleeves",
+      "strategy": "PairsSpreadMeanReversionStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.0,
+          "full_return": 0.0,
+          "full_sharpe": -999.0,
+          "recent_return": 0.0,
+          "recent_sharpe": -999.0
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "mean_reversion_relative_value",
+      "id": "strategy:PanicReboundMeanReversionStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/PanicReboundMeanReversionStrategy--a39c00a59354.md",
+      "snapshot_sha256": "b178a2d8711f8d46460cc0dc9d7f608b019ddc208d041ec7dfda653118eb4025",
+      "source_module": "lumina_quant.strategies.panic_rebound_mean_reversion",
+      "strategy": "PanicReboundMeanReversionStrategy",
+      "tier": "live_opt_in"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": null,
+          "full_return": 0.0,
+          "full_sharpe": null,
+          "recent_return": 640.0419253232491,
+          "recent_sharpe": -5.725624295458344
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "trend_momentum",
+      "id": "strategy:PermutationEntropyTrendRiderStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/PermutationEntropyTrendRiderStrategy--b37b7ba1d81e.md",
+      "snapshot_sha256": "243695b6c9d13697a65f097e5c1d33c308333d8e5471613f7ae7d1f6705ebfd4",
+      "source_module": "lumina_quant.strategies.entropy_amihud_alpha_sleeves",
+      "strategy": "PermutationEntropyTrendRiderStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.2791572648389618,
+          "full_return": -0.2785674869204783,
+          "full_sharpe": -134.79408126262254,
+          "recent_return": -0.08763490575317268,
+          "recent_sharpe": -162.1642546325775
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "derivatives_directional_crowding",
+      "id": "strategy:PerpCrowdingCarryStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/PerpCrowdingCarryStrategy--d61eae95703d.md",
+      "snapshot_sha256": "a21d4bac3d7a0438cb240e148931a9d745f7cb631d22b8a8026095a37dbca62e",
+      "source_module": "lumina_quant.strategies.perp_crowding_carry",
+      "strategy": "PerpCrowdingCarryStrategy",
+      "tier": "live_opt_in"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.0043610792517429445,
+          "full_return": 0.010656390553370754,
+          "full_sharpe": 4.688627109260254,
+          "recent_return": 0.005910798192789057,
+          "recent_sharpe": 4.634141182130412
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "trend_momentum",
+      "id": "strategy:PriceVolumeCorrContinuationStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/PriceVolumeCorrContinuationStrategy--fad34109d7a1.md",
+      "snapshot_sha256": "cb4e1e16d06998ddc23892737e66a802c57c1243cbf2edcf0c8fa0e9e3637209",
+      "source_module": "lumina_quant.strategies.price_volume_continuation_alpha_sleeves",
+      "strategy": "PriceVolumeCorrContinuationStrategy",
+      "tier": "research_only"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.08627532036949231,
+          "full_return": -0.0332942973646162,
+          "full_sharpe": -2.287966541137662,
+          "recent_return": 0.00381555563508984,
+          "recent_sharpe": 0.7468716172997513
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "breakout",
+      "id": "strategy:ProfitMoonshotBreakoutStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/ProfitMoonshotBreakoutStrategy--5304c2fe5b07.md",
+      "snapshot_sha256": "8eb83dba371b82481268f241f2385477b6d07683ff7eaef9fc44dc8e9f870204",
+      "source_module": "lumina_quant.strategies.profit_moonshot",
+      "strategy": "ProfitMoonshotBreakoutStrategy",
+      "tier": "live_opt_in"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.9125628676715388,
+          "full_return": -0.9125605945073776,
+          "full_sharpe": -17.926356007065337,
+          "recent_return": -0.2708841884411791,
+          "recent_sharpe": -19.071977632226798
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "mean_reversion_relative_value",
+      "id": "strategy:ProfitMoonshotReversionStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/ProfitMoonshotReversionStrategy--8a1885669605.md",
+      "snapshot_sha256": "19e0e8bcdd10684d3f53f35fd4a0570a40b2cc37e3b15d317d388c4fa87afcb7",
+      "source_module": "lumina_quant.strategies.profit_moonshot",
+      "strategy": "ProfitMoonshotReversionStrategy",
+      "tier": "live_opt_in"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.12763161521232708,
+          "full_return": -0.09784142541270013,
+          "full_sharpe": -4.601778564271209,
+          "recent_return": 0.0031371469827403686,
+          "recent_sharpe": 0.6432373390314727
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "cross_sectional",
+      "id": "strategy:ProfitMoonshotTrendStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/ProfitMoonshotTrendStrategy--1e7f6f74ab9f.md",
+      "snapshot_sha256": "7ad8c900cd3c41fc7a9185dcce988bc67e0592628596d1112dc87865f0fa3f2a",
+      "source_module": "lumina_quant.strategies.profit_moonshot",
+      "strategy": "ProfitMoonshotTrendStrategy",
+      "tier": "live_opt_in"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": null,
+          "full_return": 0.0,
+          "full_sharpe": null,
+          "recent_return": -416.99398731728985,
+          "recent_sharpe": -4.657848852192149
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "trend_momentum",
+      "id": "strategy:PullbackTrendContinuationStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/PullbackTrendContinuationStrategy--dd34c5a3bb57.md",
+      "snapshot_sha256": "63ee7be96adf60ec862ef3c85f9662b6b7e3dc1a8e10744769441985c66070bb",
+      "source_module": "lumina_quant.strategies.aggressive_return_alpha_sleeves",
+      "strategy": "PullbackTrendContinuationStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "unknown",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.0,
+          "full_return": 0.0,
+          "full_sharpe": -999.0,
+          "recent_return": 0.0,
+          "recent_sharpe": -999.0
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "mean_reversion_relative_value",
+      "id": "strategy:RareEventScoreStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "scope_unverified",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/RareEventScoreStrategy--c594b25c23c9.md",
+      "snapshot_sha256": "49963582a6eaae1bc75d9b44caae67eec1a509568e96632e73769d009b40c42b",
+      "source_module": "lumina_quant.strategies.rare_event_score",
+      "strategy": "RareEventScoreStrategy",
+      "tier": "live_opt_in"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": null,
+          "full_return": 0.0,
+          "full_sharpe": null,
+          "recent_return": -44.691279747865785,
+          "recent_sharpe": 5.848167150930983
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "trend_momentum",
+      "id": "strategy:RealizedSemivarianceTrendRiderStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/RealizedSemivarianceTrendRiderStrategy--1e7de1d2f39f.md",
+      "snapshot_sha256": "cb1b1b230d8a0720acc6701940a2f60a6c80110b0bf1154e938cdc0eca94ff62",
+      "source_module": "lumina_quant.strategies.kalman_semivar_alpha_sleeves",
+      "strategy": "RealizedSemivarianceTrendRiderStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": null,
+          "full_return": 0.0,
+          "full_sharpe": null,
+          "recent_return": -30.526089405519183,
+          "recent_sharpe": 3.7392042932724445
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "mean_reversion_relative_value",
+      "id": "strategy:RealizedVolTermStructureStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/RealizedVolTermStructureStrategy--939c353b055d.md",
+      "snapshot_sha256": "ada4c458528115d6c03423f7aea61a76c9f01b95da657c6a84af6ea9c31b1362",
+      "source_module": "lumina_quant.strategies.vol_term_breadth_alpha_sleeves",
+      "strategy": "RealizedVolTermStructureStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "unknown",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": null,
+          "full_return": null,
+          "full_sharpe": null,
+          "recent_return": null,
+          "recent_sharpe": null
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "rebalancing_diversification",
+      "id": "strategy:RebalancingPremiumHarvestStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "scope_unverified",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/RebalancingPremiumHarvestStrategy--1282608a6b52.md",
+      "snapshot_sha256": "d1849b879b545dae851a35697d6e61aab78e5ebdc4ef97f716a446552ef27d08",
+      "source_module": "lumina_quant.strategies.rebalancing_premium_alpha_sleeves",
+      "strategy": "RebalancingPremiumHarvestStrategy",
+      "tier": "research_only"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.9066941004925475,
+          "full_return": -0.9064379259540358,
+          "full_sharpe": -45.60646164922785,
+          "recent_return": -0.49242081608252664,
+          "recent_sharpe": -62.99015218462369
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "ensemble_regime_router",
+      "id": "strategy:RegimeAdaptiveDisagreementEnsembleStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/RegimeAdaptiveDisagreementEnsembleStrategy--b86b10af504b.md",
+      "snapshot_sha256": "38251e514fec110ab02294c58d804ee1e89f4f9439d7e90c5118c6b995404351",
+      "source_module": "lumina_quant.strategies.regime_adaptive_disagreement_alpha_sleeves",
+      "strategy": "RegimeAdaptiveDisagreementEnsembleStrategy",
+      "tier": "research_only"
+    },
+    {
+      "cadence_status": "unknown",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": null,
+          "full_return": 0.0,
+          "full_sharpe": null,
+          "recent_return": -0.8293774097924537,
+          "recent_sharpe": -58.786500218580315
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "trend_momentum",
+      "id": "strategy:RegimeBreakoutCandidateStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "scope_unverified",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/RegimeBreakoutCandidateStrategy--11dc957e978c.md",
+      "snapshot_sha256": "d403101eb212cd37aaffc6c666e066824a1649ecff1338a88a0d420fb1508870",
+      "source_module": "lumina_quant.strategies.candidate_regime_breakout",
+      "strategy": "RegimeBreakoutCandidateStrategy",
+      "tier": "research_only"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.00417900630812801,
+          "full_return": -0.0030193134234419716,
+          "full_sharpe": -2.7800912277378735,
+          "recent_return": 0.0,
+          "recent_sharpe": -999.0
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "cross_sectional",
+      "id": "strategy:RegimeRouterConfirmedRotationStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/RegimeRouterConfirmedRotationStrategy--d4d1495f8b36.md",
+      "snapshot_sha256": "78bdb5faa214ba8f80adac5533785a2dce67af4895b6c62f1f8b90ad7dc6cd0c",
+      "source_module": "lumina_quant.strategies.regime_router_confirmed_alpha_sleeves",
+      "strategy": "RegimeRouterConfirmedRotationStrategy",
+      "tier": "research_only"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.24531555300679148,
+          "full_return": -0.2447870041936867,
+          "full_sharpe": -60.75110528913988,
+          "recent_return": -0.05385321778366836,
+          "recent_sharpe": -45.25419414891631
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "cross_sectional",
+      "id": "strategy:ResidualEquityMomentumStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/ResidualEquityMomentumStrategy--6fb0a359e4a0.md",
+      "snapshot_sha256": "21179368da5f359c54bfcf58f30d7f4d9c731eda6dc94be44dd524b580dec97c",
+      "source_module": "lumina_quant.strategies.equity_xs_factor_alpha_sleeves",
+      "strategy": "ResidualEquityMomentumStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.4505470743611737,
+          "full_return": -0.4505470743611737,
+          "full_sharpe": -79.51058075316769,
+          "recent_return": -0.1257160639834135,
+          "recent_sharpe": -86.2422173075378
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "cross_sectional",
+      "id": "strategy:ResidualMomentumRotationStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/ResidualMomentumRotationStrategy--63f698bf7ef1.md",
+      "snapshot_sha256": "774d8bb902f2d8995707d1d05e30be019233cc91bdc315f55892feddb655a3f8",
+      "source_module": "lumina_quant.strategies.adaptive_crypto_alpha_sleeves",
+      "strategy": "ResidualMomentumRotationStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "unknown",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.5955096885211034,
+          "full_return": -0.5919074596410685,
+          "full_sharpe": -52.32078360090419,
+          "recent_return": -0.199572364260158,
+          "recent_sharpe": -62.09481822846832
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "trend_momentum",
+      "id": "strategy:RollingBreakoutStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "scope_unverified",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/RollingBreakoutStrategy--8c2366ab83eb.md",
+      "snapshot_sha256": "2f248a1178c38922057acd1e4b70886916fb9b3800a898c52dd2655e45ba241e",
+      "source_module": "lumina_quant.strategies.rolling_breakout",
+      "strategy": "RollingBreakoutStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.004020495584170292,
+          "full_return": -0.0039191060597809635,
+          "full_sharpe": -13.200467278899204,
+          "recent_return": -0.0007700885829375892,
+          "recent_sharpe": -7.967823734257289
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "mean_reversion_relative_value",
+      "id": "strategy:RoundNumberBarrierStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/RoundNumberBarrierStrategy--6eeed65cf66e.md",
+      "snapshot_sha256": "41e3c6b84182bf131cf490393ee8b9fcb658c019206beb714bd2ede450426898",
+      "source_module": "lumina_quant.strategies.round_number_barrier_alpha_sleeves",
+      "strategy": "RoundNumberBarrierStrategy",
+      "tier": "research_only"
+    },
+    {
+      "cadence_status": "unknown",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.6695324826438942,
+          "full_return": -0.6672161309399551,
+          "full_sharpe": -34.18173888102168,
+          "recent_return": -0.26125676353254357,
+          "recent_sharpe": -45.634960689913605
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "mean_reversion_relative_value",
+      "id": "strategy:RsiStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "scope_unverified",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/RsiStrategy--5975c309e676.md",
+      "snapshot_sha256": "a673efd2f00e24130c01c23be709c6dbed4a34d071a0373684eea71a1a1b851f",
+      "source_module": "lumina_quant.strategies.rsi_strategy",
+      "strategy": "RsiStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.9980043089203099,
+          "full_return": -0.998002761204066,
+          "full_sharpe": -81.19201093570182,
+          "recent_return": -0.863121311195667,
+          "recent_sharpe": -108.94812040693567
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "breakout",
+      "id": "strategy:SeasonalMicroBreakoutRiderStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/SeasonalMicroBreakoutRiderStrategy--6812176fc2c9.md",
+      "snapshot_sha256": "4be8de2c24d48c10371b9bf0f8f58aaa31dab44e0d2255b18df1cdff7de4a18e",
+      "source_module": "lumina_quant.strategies.micro_signal_alpha_sleeves",
+      "strategy": "SeasonalMicroBreakoutRiderStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.4360950795295548,
+          "full_return": -0.4341139079252836,
+          "full_sharpe": -58.61969154188685,
+          "recent_return": -0.11381383521663069,
+          "recent_sharpe": -63.35623003899419
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "cross_sectional",
+      "id": "strategy:SelectionGatedMomentumStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/SelectionGatedMomentumStrategy--2202fbb2f2a1.md",
+      "snapshot_sha256": "d2b4b0e4ce1edf271ef8c545f0aa0bbdb55dd529c2ac1b7eb57e256cb6fb5705",
+      "source_module": "lumina_quant.strategies.selection_aware_alpha_sleeves",
+      "strategy": "SelectionGatedMomentumStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.8713942483259526,
+          "full_return": -0.871348135827049,
+          "full_sharpe": -139.9054541612322,
+          "recent_return": -0.3236000672646653,
+          "recent_sharpe": -150.55447045890972
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "cross_sectional",
+      "id": "strategy:SelectionGatedReversionStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/SelectionGatedReversionStrategy--09676aee4c64.md",
+      "snapshot_sha256": "5acdf7582423116ca9b4c82014e65864e0c2b2e44b03240937e00a370cf0692a",
+      "source_module": "lumina_quant.strategies.selection_aware_alpha_sleeves",
+      "strategy": "SelectionGatedReversionStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.0,
+          "full_return": 0.0,
+          "full_sharpe": -999.0,
+          "recent_return": 0.0,
+          "recent_sharpe": -999.0
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "cross_sectional",
+      "id": "strategy:SemisLeadLagRotationStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/SemisLeadLagRotationStrategy--236a0163960e.md",
+      "snapshot_sha256": "68490c9463853fd636c017d945caf4aba8b7c63cb965ea654df340afd0d50596",
+      "source_module": "lumina_quant.strategies.equity_xs_factor_alpha_sleeves",
+      "strategy": "SemisLeadLagRotationStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "unknown",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.0,
+          "full_return": 0.0,
+          "full_sharpe": -999.0,
+          "recent_return": 0.0,
+          "recent_sharpe": -999.0
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "mean_reversion_relative_value",
+      "id": "strategy:SessionFilteredPairCarryStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "scope_unverified",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/SessionFilteredPairCarryStrategy--0b5895437aa2.md",
+      "snapshot_sha256": "39a9635b5e063e7d1c982a629bd4fdcfbe68fc290b72816f0ccb35059da5adf5",
+      "source_module": "lumina_quant.strategies.session_filtered_pair_carry",
+      "strategy": "SessionFilteredPairCarryStrategy",
+      "tier": "live_opt_in"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.02754915290351455,
+          "full_return": -0.027548680903514478,
+          "full_sharpe": -45.96221711728631,
+          "recent_return": -0.006685120185791149,
+          "recent_sharpe": -58.05645173510032
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "trend_momentum",
+      "id": "strategy:SilentVolumeShockResolutionStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/SilentVolumeShockResolutionStrategy--0b3f995e2ac3.md",
+      "snapshot_sha256": "f58208282c69657da6a39a0290a6dd2beb42777f1f8db054874b7e98d150ae8c",
+      "source_module": "lumina_quant.strategies.silent_volume_shock_alpha_sleeves",
+      "strategy": "SilentVolumeShockResolutionStrategy",
+      "tier": "research_only"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.0,
+          "full_return": 0.0,
+          "full_sharpe": -999.0,
+          "recent_return": 0.0,
+          "recent_sharpe": -999.0
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "microstructure_intraday",
+      "id": "strategy:SlowCrossSectionalLeadLagStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/SlowCrossSectionalLeadLagStrategy--f50c0d4d8588.md",
+      "snapshot_sha256": "920ba1ee59200215d8c70db4d862bd8ffee0eb9986d99d28012449105d06370f",
+      "source_module": "lumina_quant.strategies.slow_leadlag_xs_alpha_sleeves",
+      "strategy": "SlowCrossSectionalLeadLagStrategy",
+      "tier": "research_only"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.03663269396929925,
+          "full_return": -0.025919281690469642,
+          "full_sharpe": -4.859434041873299,
+          "recent_return": -0.005667075837419211,
+          "recent_sharpe": -2.306228241846933
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "seasonality",
+      "id": "strategy:SpectralCycleRiderStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/SpectralCycleRiderStrategy--143f66dcedf3.md",
+      "snapshot_sha256": "25b31f7fc9090fdb47341e29f3223cddb599337aad5dac3bbe4226164305af74",
+      "source_module": "lumina_quant.strategies.spectral_cycle_alpha_sleeves",
+      "strategy": "SpectralCycleRiderStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.24822897456234982,
+          "full_return": -0.2482147502224744,
+          "full_sharpe": -186.53972203276558,
+          "recent_return": -0.07105664864872085,
+          "recent_sharpe": -196.67196704257512
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "mean_reversion_relative_value",
+      "id": "strategy:SpreadStressLiquidityReversionStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/SpreadStressLiquidityReversionStrategy--9e42d24107e9.md",
+      "snapshot_sha256": "db8cabb01c4863ae12d1b3e4905d7329d804cb4b87df1aa0b8d7371ecc8df892",
+      "source_module": "lumina_quant.strategies.spread_stress_reversion_alpha_sleeves",
+      "strategy": "SpreadStressLiquidityReversionStrategy",
+      "tier": "research_only"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.4384928312120808,
+          "full_return": -0.43835183438823333,
+          "full_sharpe": -119.51732820180479,
+          "recent_return": -0.1322804879686721,
+          "recent_sharpe": -135.13490857099964
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "cross_sectional",
+      "id": "strategy:StationarityGatedResidualReversionStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/StationarityGatedResidualReversionStrategy--d4b6a16ac833.md",
+      "snapshot_sha256": "807717ac0578094b219a159c63e4649e74f79f7b56152510c7a5911537ff4f3c",
+      "source_module": "lumina_quant.strategies.residual_reversion_alpha_sleeves",
+      "strategy": "StationarityGatedResidualReversionStrategy",
+      "tier": "research_only"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.294358238492357,
+          "full_return": -0.29319981492135205,
+          "full_sharpe": -70.15772220996584,
+          "recent_return": -0.07872313843530299,
+          "recent_sharpe": -71.32618714725656
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "cross_sectional",
+      "id": "strategy:SystematicCoskewnessPremiumStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/SystematicCoskewnessPremiumStrategy--5d743680b890.md",
+      "snapshot_sha256": "1db07ca07a10118c590a85a740dd5aeddf87a56091e4e4e95ddabbce27ac2722",
+      "source_module": "lumina_quant.strategies.coskewness_premium_alpha_sleeves",
+      "strategy": "SystematicCoskewnessPremiumStrategy",
+      "tier": "research_only"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.9980149485029343,
+          "full_return": -0.9980076153057388,
+          "full_sharpe": -72.88280807424913,
+          "recent_return": -52.07588540239893,
+          "recent_sharpe": -1.5074175400598622
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "trend_momentum",
+      "id": "strategy:TailIndexRegimeRiderStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/TailIndexRegimeRiderStrategy--e21fab92d124.md",
+      "snapshot_sha256": "1be73cf8e00e5ad83162db98402a643a1320b37cbcf9237a8f80911cbbb608bd",
+      "source_module": "lumina_quant.strategies.tail_index_alpha_sleeves",
+      "strategy": "TailIndexRegimeRiderStrategy",
+      "tier": "research_only"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": null,
+          "full_return": 0.0,
+          "full_sharpe": null,
+          "recent_return": 0.0,
+          "recent_sharpe": null
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "microstructure_intraday",
+      "id": "strategy:TakerFlowExhaustionReversalStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/TakerFlowExhaustionReversalStrategy--3b7b68f33993.md",
+      "snapshot_sha256": "865b66842cb056507297b7dc7247606ff7311f98f607d46620d6b4a21870adcf",
+      "source_module": "lumina_quant.strategies.taker_flow_exhaustion_reversal",
+      "strategy": "TakerFlowExhaustionReversalStrategy",
+      "tier": "live_opt_in"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.06441413891710832,
+          "full_return": -0.06428561687039547,
+          "full_sharpe": -99.61934099364063,
+          "recent_return": -0.015463442118810233,
+          "recent_sharpe": -111.14771482739256
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "microstructure_intraday",
+      "id": "strategy:TakerFlowImbalanceContinuationStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/TakerFlowImbalanceContinuationStrategy--a7dbed49cf4d.md",
+      "snapshot_sha256": "88168a490a7a84e42d711081f8fbbfd4c89e2a06a21f106fd9ba669511a8e64e",
+      "source_module": "lumina_quant.strategies.robust_alpha_sleeves",
+      "strategy": "TakerFlowImbalanceContinuationStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.0,
+          "full_return": 0.0,
+          "full_sharpe": -999.0,
+          "recent_return": 0.0,
+          "recent_sharpe": -999.0
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "mean_reversion_relative_value",
+      "id": "strategy:TimeframePairZScoreReversionStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/TimeframePairZScoreReversionStrategy--38539a356af7.md",
+      "snapshot_sha256": "0cfd2dda572738d957c6b48cdd896e388fad1e81774acc4f2c7b488f81027c6b",
+      "source_module": "lumina_quant.strategies.timeframe_pair_zscore_reversion",
+      "strategy": "TimeframePairZScoreReversionStrategy",
+      "tier": "live_opt_in"
+    },
+    {
+      "cadence_status": "unknown",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.0,
+          "full_return": 0.0,
+          "full_sharpe": -999.0,
+          "recent_return": 0.0,
+          "recent_sharpe": -999.0
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "cross_sectional",
+      "id": "strategy:TopCapTimeSeriesMomentumStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "scope_unverified",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/TopCapTimeSeriesMomentumStrategy--cd68d9d5cd74.md",
+      "snapshot_sha256": "8aa5bf84c54b929c59d88ab2681b821eeb1b8a150ea2362034de83a492c26088",
+      "source_module": "lumina_quant.strategies.topcap_tsmom",
+      "strategy": "TopCapTimeSeriesMomentumStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.9456389257635123,
+          "full_return": -0.9456376323581493,
+          "full_sharpe": -150.39634162417613,
+          "recent_return": -5.765235335792201,
+          "recent_sharpe": 7.676788385927663
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "cross_sectional",
+      "id": "strategy:TrendEfficiencyMomentumStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/TrendEfficiencyMomentumStrategy--acb2e77903d1.md",
+      "snapshot_sha256": "a2498308c322462f52a45c51e464ffbd3d4e25b1a6d04e946e956f8f63d052dc",
+      "source_module": "lumina_quant.strategies.cross_sectional_anomaly_alpha_sleeves",
+      "strategy": "TrendEfficiencyMomentumStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.0035485996879256283,
+          "full_return": 0.0005454606902608461,
+          "full_sharpe": 0.47578373301397814,
+          "recent_return": 0.0010493942647264998,
+          "recent_sharpe": 2.8686977928837014
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "cross_sectional",
+      "id": "strategy:TrendGatedResidualMomentumStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/TrendGatedResidualMomentumStrategy--d8a908323048.md",
+      "snapshot_sha256": "a44491995717ebdf934dad233a484ac4c4cd060666e36344373a03118060806b",
+      "source_module": "lumina_quant.strategies.residual_momentum_alpha_sleeves",
+      "strategy": "TrendGatedResidualMomentumStrategy",
+      "tier": "research_only"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.0,
+          "full_return": 0.0,
+          "full_sharpe": -999.0,
+          "recent_return": 0.0,
+          "recent_sharpe": -999.0
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "mean_reversion_relative_value",
+      "id": "strategy:VWAPCompressionReversionStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/VWAPCompressionReversionStrategy--cd7ee8ec4627.md",
+      "snapshot_sha256": "7769c3266b80490888741d402a0acb24bbeb238d3c082f87e0bdadd2523060cb",
+      "source_module": "lumina_quant.strategies.micro_signal_alpha_sleeves",
+      "strategy": "VWAPCompressionReversionStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.9980110002099063,
+          "full_return": -0.9980098526043274,
+          "full_sharpe": -54.93843940752785,
+          "recent_return": -97.65236900543164,
+          "recent_sharpe": -8.16047142561139
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "trend_momentum",
+      "id": "strategy:VarianceRatioTrendRiderStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/VarianceRatioTrendRiderStrategy--b52988c2a939.md",
+      "snapshot_sha256": "bf77080e4e2745ad9d92d6bf6ee0de345446d3a4d4393cbb70e3ce1882e61d2f",
+      "source_module": "lumina_quant.strategies.cusum_varratio_alpha_sleeves",
+      "strategy": "VarianceRatioTrendRiderStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "unknown",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.8918481084722429,
+          "full_return": -0.8915038071787265,
+          "full_sharpe": -148.86878170711722,
+          "recent_return": -0.41748571572994,
+          "recent_sharpe": -165.7909915715497
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "mean_reversion_relative_value",
+      "id": "strategy:VolCompressionVWAPReversionStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "scope_unverified",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/VolCompressionVWAPReversionStrategy--bbb1819e31a0.md",
+      "snapshot_sha256": "ddb8074cc893c0d039b252e904391377442c8c41164c8cdfb19201bdb6cfccc0",
+      "source_module": "lumina_quant.strategies.vol_compression_vwap_reversion",
+      "strategy": "VolCompressionVWAPReversionStrategy",
+      "tier": "live_opt_in"
+    },
+    {
+      "cadence_status": "unknown",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.8918481084722429,
+          "full_return": -0.8915038071787265,
+          "full_sharpe": -148.86878170711722,
+          "recent_return": -0.41748571572994,
+          "recent_sharpe": -165.7909915715497
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "mean_reversion_relative_value",
+      "id": "strategy:VolCompressionVwapReversionStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "scope_unverified",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/VolCompressionVwapReversionStrategy--5de13cfd8639.md",
+      "snapshot_sha256": "d2f9fbf36ca2aea0ac86e52602b504b29aadfbdeba09c8b16135bc12f586f19e",
+      "source_module": "lumina_quant.strategies.vol_compression_vwap_reversion",
+      "strategy": "VolCompressionVwapReversionStrategy",
+      "tier": "live_opt_in"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.6128513979099075,
+          "full_return": -0.6116279489804874,
+          "full_sharpe": -66.31642225561481,
+          "recent_return": -0.18354254996243557,
+          "recent_sharpe": -57.697081261256464
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "trend_momentum",
+      "id": "strategy:VolManagedMomentumCrashGateStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/VolManagedMomentumCrashGateStrategy--c18f260b9c3e.md",
+      "snapshot_sha256": "7dc65a0a93a4d144c9d9139e4c20aed49988dc4c3acc77af1f11754967a0b624",
+      "source_module": "lumina_quant.strategies.external_alpha_sleeves",
+      "strategy": "VolManagedMomentumCrashGateStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.0,
+          "full_return": 0.0,
+          "full_sharpe": -999.0,
+          "recent_return": 0.0,
+          "recent_sharpe": -999.0
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "volatility_risk_overlay",
+      "id": "strategy:VolManagedRiskOverlayStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/VolManagedRiskOverlayStrategy--1e1feff35776.md",
+      "snapshot_sha256": "5aae9246a95344d3666dc3346b18ed08e5b9e16fac35b6c2e5a2fc2a61040ce4",
+      "source_module": "lumina_quant.strategies.vol_managed_risk_overlay",
+      "strategy": "VolManagedRiskOverlayStrategy",
+      "tier": "research_only"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.0,
+          "full_return": 0.0,
+          "full_sharpe": -999.0,
+          "recent_return": 0.0,
+          "recent_sharpe": -999.0
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "trend_momentum",
+      "id": "strategy:VolOfVolRegimeTrendGateStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/VolOfVolRegimeTrendGateStrategy--a487034e3c07.md",
+      "snapshot_sha256": "c60db38f306fd862c478c0163d18ebf54bfb5d3e69780885333fa04f5b49eb9c",
+      "source_module": "lumina_quant.strategies.micro_signal_alpha_sleeves",
+      "strategy": "VolOfVolRegimeTrendGateStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.9980073039459699,
+          "full_return": -0.9980027856808209,
+          "full_sharpe": -62.49607587122401,
+          "recent_return": -0.9619833666218432,
+          "recent_sharpe": -109.17883441232446
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "breakout",
+      "id": "strategy:VolatilityBreakoutRiderStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/VolatilityBreakoutRiderStrategy--aff4b0633b4f.md",
+      "snapshot_sha256": "1408347119a1ebc17130c0732cb745e43611368526ef4669d86e66124615f818",
+      "source_module": "lumina_quant.strategies.return_rider_alpha_sleeves",
+      "strategy": "VolatilityBreakoutRiderStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "unknown",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.8918481084722429,
+          "full_return": -0.8915038071787265,
+          "full_sharpe": -148.86878170711722,
+          "recent_return": -0.41748571572994,
+          "recent_sharpe": -165.7909915715497
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "mean_reversion_relative_value",
+      "id": "strategy:VolatilityCompressionReversionStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "scope_unverified",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/VolatilityCompressionReversionStrategy--c5f2c8b465f5.md",
+      "snapshot_sha256": "faaff4874d1695765bc21c0b636f35414b957d8923201619a361e577aded8a09",
+      "source_module": "lumina_quant.strategies.candidate_vol_compression_reversion",
+      "strategy": "VolatilityCompressionReversionStrategy",
+      "tier": "research_only"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.8810918149323179,
+          "full_return": -0.8793440001103431,
+          "full_sharpe": -46.80146697371714,
+          "recent_return": -0.44364276487415577,
+          "recent_sharpe": -58.20822938000458
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "breakout",
+      "id": "strategy:VolatilitySqueezeBreakoutRiderStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/VolatilitySqueezeBreakoutRiderStrategy--42158dda3518.md",
+      "snapshot_sha256": "f3e46f1f2ccde4bd4237221e0325736617ec6a50dded31e2d7b115b4700635f8",
+      "source_module": "lumina_quant.strategies.carry_trend_squeeze_alpha_sleeves",
+      "strategy": "VolatilitySqueezeBreakoutRiderStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.027719234781142587,
+          "full_return": -0.02771128269314227,
+          "full_sharpe": -30.286613670786572,
+          "recent_return": -0.0063084041174455985,
+          "recent_sharpe": -31.263033215080263
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "breakout",
+      "id": "strategy:VolatilitySqueezeBreakoutStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/VolatilitySqueezeBreakoutStrategy--2bc6fb263bbc.md",
+      "snapshot_sha256": "f248538059f96d6e5daa98de58eccd64efbfd2442ef6f42ca32bde3069e6ee6a",
+      "source_module": "lumina_quant.strategies.robust_alpha_sleeves",
+      "strategy": "VolatilitySqueezeBreakoutStrategy",
+      "tier": "live_default"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.005021846540385015,
+          "full_return": -0.0027510834269680595,
+          "full_sharpe": -1.7950020936549886,
+          "recent_return": 0.0,
+          "recent_sharpe": -999.0
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "trend_momentum",
+      "id": "strategy:VolumeClockMomentumRiderStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/VolumeClockMomentumRiderStrategy--4f4962960192.md",
+      "snapshot_sha256": "220eb33e2564b62db11fc55d3dc35b31e35aa421a2f197e5d0648dc30be80f5e",
+      "source_module": "lumina_quant.strategies.volume_clock_alpha_sleeves",
+      "strategy": "VolumeClockMomentumRiderStrategy",
+      "tier": "research_only"
+    },
+    {
+      "cadence_status": "explicit_in_scope",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": null,
+          "full_return": 0.0,
+          "full_sharpe": null,
+          "recent_return": -32.114188108935444,
+          "recent_sharpe": -7.964966739160407
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "microstructure_intraday",
+      "id": "strategy:VpinToxicityRiderStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "verified_in_scope",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/VpinToxicityRiderStrategy--051f590da91e.md",
+      "snapshot_sha256": "8fbefd2ff2a758802893e71aca31908af5d49a94d310cd30e3fcaa38384e9529",
+      "source_module": "lumina_quant.strategies.vpin_toxicity_alpha_sleeves",
+      "strategy": "VpinToxicityRiderStrategy",
+      "tier": "research_only"
+    },
+    {
+      "cadence_status": "unknown",
+      "common_period_diagnostic": {
+        "evidence_class": "secondary_summary_evidence",
+        "independent_oos": false,
+        "metric_provenance": "common_period_1m_cold_start_strategy_screen",
+        "metrics": {
+          "full_max_drawdown": 0.011294666692433428,
+          "full_return": -0.004974689838649127,
+          "full_sharpe": -1.7096390916871094,
+          "recent_return": -0.0038737105380676207,
+          "recent_sharpe": -4.469120149743061
+        },
+        "promotion_authority": false
+      },
+      "execution_interface": "event_driven",
+      "family": "mean_reversion_relative_value",
+      "id": "strategy:VwapReversionStrategy",
+      "registration_status": "generated_snapshot_strategy",
+      "runner_kind": "event_backtest_engine",
+      "scope_status": "scope_unverified",
+      "snapshot_path": "/mnt/c/Users/hoky1/Downloads/Obsidian/MyDB/LuminaQuant/Strategy Research Generated/Strategies/VwapReversionStrategy--56e2a9f0be8f.md",
+      "snapshot_sha256": "597c6df4a942f337c7dfeee6c40f81caf45f6eeafa3bfc536c151456b4a6d19b",
+      "source_module": "lumina_quant.strategies.vwap_reversion",
+      "strategy": "VwapReversionStrategy",
+      "tier": "live_default"
+    }
+  ],
+  "strategy_snapshot_count": 143,
+  "strategy_snapshot_sha256": "5fcea46b3617ddd399555b3dbb94ff550f63e6d72e18cbe3c41ad10020fb6cb0"
+}

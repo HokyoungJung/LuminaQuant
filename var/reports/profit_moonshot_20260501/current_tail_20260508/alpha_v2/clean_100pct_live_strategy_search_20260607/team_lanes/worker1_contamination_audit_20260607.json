@@ -1,0 +1,46 @@
+{
+  "created_at": "2026-06-07T07:03:30Z",
+  "ultragoal_story": "G002-contamination-and-eligibility-audit",
+  "completion_mode": "leader_backup_due_worker1_subagent_wait_stall",
+  "candidates": [
+    {
+      "name": "clean_input_meta_selector",
+      "observed_ann_pct": 110.46,
+      "observed_comp_pct": 85.91,
+      "observed_mdd_pct": 19.29,
+      "label": "shadow_freeze_only",
+      "promotion": "rejected_current_promotion",
+      "reason": "post_oos_selector_grid_ranking_contamination; fresh_forward_required"
+    },
+    {
+      "name": "strict_no_leak_best_single_10bps",
+      "observed_return_pct": 54.56,
+      "stress_20bps_return_pct": 27.1,
+      "label": "paper_control",
+      "promotion": "no_real_money",
+      "reason": "high drawdown and no fresh-forward/paper telemetry"
+    },
+    {
+      "name": "85_symbol_dynamic_conviction_baseline",
+      "observed_ann_pct": 42.57,
+      "observed_comp_pct": 34.39,
+      "label": "paper_control_monitor",
+      "promotion": "no_real_money",
+      "reason": "monitor/backfill only"
+    },
+    {
+      "name": "clean_new_alpha_diagnostics",
+      "observed_ann_pct": 3.01,
+      "label": "diagnostic_only",
+      "promotion": "none",
+      "reason": "no 100pct label and diagnostic-only split policy"
+    }
+  ],
+  "hard_gate_checklist": {
+    "no_nested_oos_mining": "existing artifacts diagnostic/freeze only; no promotion from historical OOS",
+    "execution_cost_gate": "covered by worker4 verifier; requires 10/15/20bps and telemetry",
+    "theory_plausibility_gate": "covered by source-backed theory artifact",
+    "real_money_approval": "blocked absent fresh-forward and paper fill telemetry"
+  },
+  "artifact_hashes": {}
+}

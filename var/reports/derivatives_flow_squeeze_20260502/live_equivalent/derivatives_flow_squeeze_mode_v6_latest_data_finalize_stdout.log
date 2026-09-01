@@ -1,0 +1,9 @@
+{"event": "live_equivalent_split_resume", "generated_at": "2026-05-02T12:22:53.479309Z", "mode": "derivatives_flow_squeeze_mode", "split": "train"}
+{"event": "live_equivalent_split_resume", "generated_at": "2026-05-02T12:22:53.479381Z", "mode": "derivatives_flow_squeeze_mode", "split": "val"}
+{
+  "artifact_reset_csv": "/home/hoky/Quants-agent/LuminaQuant/var/reports/derivatives_flow_squeeze_20260502/live_equivalent/derivatives_flow_squeeze_mode_v6_latest_data/live_equivalent_revalidation_artifact_reset_20260426.csv",
+  "json": "/home/hoky/Quants-agent/LuminaQuant/var/reports/derivatives_flow_squeeze_20260502/live_equivalent/derivatives_flow_squeeze_mode_v6_latest_data/live_equivalent_revalidation_latest.json",
+  "live_decision": "",
+  "markdown": "/home/hoky/Quants-agent/LuminaQuant/var/reports/derivatives_flow_squeeze_20260502/live_equivalent/derivatives_flow_squeeze_mode_v6_latest_data/live_equivalent_revalidation_latest.md",
+  "mode_csv": "/home/hoky/Quants-agent/LuminaQuant/var/reports/derivatives_flow_squeeze_20260502/live_equivalent/derivatives_flow_squeeze_mode_v6_latest_data/live_equivalent_revalidation_candidates_20260426.csv"
+}

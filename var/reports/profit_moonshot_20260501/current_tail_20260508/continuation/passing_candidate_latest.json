@@ -1,0 +1,422 @@
+{
+  "artifact_kind": "profit_moonshot_under_8gb_latest_tail_continuation_candidate",
+  "data_refresh": {
+    "canonical_source": "binance_raw_aggtrades",
+    "collection_cutoff_utc": "2026-05-08T10:53:10Z",
+    "max_ohlcv_utc": "2026-05-08T10:53:09Z",
+    "ohlcv_derivation": "derived_from_raw_aggtrades",
+    "peak_rss_mib": 4102.43359375,
+    "selected_workers": 1,
+    "status": "completed",
+    "symbols": [
+      "BTC/USDT",
+      "ETH/USDT",
+      "BNB/USDT",
+      "SOL/USDT",
+      "TRX/USDT"
+    ]
+  },
+  "generated_at_utc": "2026-05-08T11:11:00.068875Z",
+  "labels": {
+    "latest_available_tail": true,
+    "live_equivalent_selection_eligible": true,
+    "locked_oos_report_only": true,
+    "memory_under_8gb": true,
+    "research_success_candidate": true
+  },
+  "live_equivalent_selection_eligible": true,
+  "locked_oos_policy": "report-only locked OOS through 2026-05-08 latest available tail; no train/val leakage from OOS selection",
+  "memory_evidence": {
+    "budget_bytes": 8589934592,
+    "data_refresh_peak_rss_mib": 4102.43359375,
+    "guard_logs": [
+      "var/reports/profit_moonshot_20260501/current_tail_20260508/continuation/data_refresh_rss.jsonl",
+      "var/reports/profit_moonshot_20260501/current_tail_20260508/continuation/_memory_guard/profit_moonshot_fresh_start_replay_memory_latest.json",
+      "var/reports/profit_moonshot_20260501/current_tail_20260508/continuation/_memory_guard/profit_moonshot_fresh_portfolio_tuning_memory_latest.json",
+      "var/reports/profit_moonshot_20260501/current_tail_20260508/continuation/_memory_guard/profit_moonshot_fresh_start_replay_rss_latest.jsonl",
+      "var/reports/profit_moonshot_20260501/current_tail_20260508/continuation/_memory_guard/profit_moonshot_fresh_portfolio_tuning_rss_latest.jsonl"
+    ],
+    "optuna_peak_rss_mib": 243.5859375,
+    "portfolio_peak_rss_mib": 318.19140625,
+    "replay_peak_rss_mib": 2129.16015625,
+    "time_logs": [
+      "var/reports/profit_moonshot_20260501/current_tail_20260508/continuation/logs/data_refresh_20260508T105310Z.log",
+      "var/reports/profit_moonshot_20260501/current_tail_20260508/continuation/logs/fresh_start_replay_20260508T110341Z.log",
+      "var/reports/profit_moonshot_20260501/current_tail_20260508/continuation/logs/fresh_portfolio_tuning_20260508T110731Z.log",
+      "var/reports/profit_moonshot_20260501/current_tail_20260508/continuation/logs/calendar_optuna_24_20260508T110826Z.log"
+    ]
+  },
+  "optuna_candidate": {
+    "objective": 6.40165343120691,
+    "params": {
+      "hold_bars": 120,
+      "long_scale": 6.2,
+      "short_scale": 10.0,
+      "short_symbol": "ETHUSDT",
+      "take_profit_pct": 0.018,
+      "threshold": 0.015
+    },
+    "result": {
+      "failed_gates": [],
+      "family": "calendar_rotation",
+      "filters": {
+        "adaptive_lookback_bars": 12,
+        "allow_long": true,
+        "allow_short": true,
+        "broad_min_abs": 0.0,
+        "calendar_long_months": [
+          3,
+          4,
+          5
+        ],
+        "calendar_long_symbol": "TRXUSDT",
+        "calendar_short_months": [
+          1,
+          2
+        ],
+        "calendar_short_symbol": "ETHUSDT",
+        "compression_lookback_bars": 24,
+        "compression_quantile": 0.0,
+        "cooldown_bars": 30,
+        "entry_hours": [],
+        "family": "calendar_rotation",
+        "flow_lookback_bars": 0,
+        "flow_persistence_bars": 0,
+        "flow_persistence_threshold": 0.0,
+        "flow_threshold": 0.0,
+        "funding_abs_cap": 0.0,
+        "funding_rank_min": 0.0,
+        "hold_bars": 120,
+        "long_allocation_scale": 6.2,
+        "lookback_bars": 168,
+        "max_order_value": 175.0,
+        "max_rv": 0.0,
+        "min_abs_return": 0.015,
+        "name": "optuna_calendar_trx_sethusdt_t0_thr150_h120_ls620_ss100_tp180",
+        "oi_rank_min": 0.0,
+        "rv_lookback_bars": 24,
+        "sharpe_lookback_bars": 0,
+        "sharpe_rank_min": 0.0,
+        "short_allocation_scale": 10.0,
+        "stop_loss_pct": 0.0,
+        "take_profit_pct": 0.018,
+        "target_allocation": 0.008,
+        "threshold": 0.015,
+        "trailing_stop_cap_pct": 0.0,
+        "trailing_stop_floor_pct": 0.0,
+        "trailing_stop_rv_multiple": 0.0
+      },
+      "gates": {
+        "liquidations_zero": true,
+        "oos_mdd_beats_shadow": true,
+        "oos_return_beats_incumbent": true,
+        "oos_sharpe_gt_1": true,
+        "oos_trades_not_starved": true,
+        "train_positive": true,
+        "val_positive": true
+      },
+      "name": "optuna_calendar_trx_sethusdt_t0_thr150_h120_ls620_ss100_tp180",
+      "replay_survivor": true,
+      "split_results": {
+        "oos": {
+          "fills": 30,
+          "final_equity": 10100.73529587426,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.05670164109932507,
+            "calmar": 37.01156944153708,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.001531997749754712,
+            "min_equity": 9999.206102546423,
+            "raw_final_equity": 10100.73529587426,
+            "raw_max_drawdown": 0.001531997749754712,
+            "raw_total_return": 0.010073529587425911,
+            "sharpe": 7.949855447013018,
+            "sortino": 8.133893979846018,
+            "total_return": 0.010073529587425911,
+            "volatility": 0.006940584185714629
+          },
+          "reject_counts": {
+            "cooldown": 428,
+            "signal_missing": 458
+          },
+          "round_trips": 15
+        },
+        "train": {
+          "fills": 84,
+          "final_equity": 10225.57742245568,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.02256034645898941,
+            "calmar": 2.3105858667212846,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.009763907407173093,
+            "min_equity": 9938.943557606754,
+            "raw_final_equity": 10225.57742245568,
+            "raw_max_drawdown": 0.009763907407173093,
+            "raw_total_return": 0.022557742245568058,
+            "sharpe": 1.2968327340236367,
+            "sortino": 0.7017451991288494,
+            "total_return": 0.022557742245568058,
+            "volatility": 0.017318814320541706
+          },
+          "reject_counts": {
+            "cooldown": 1260,
+            "signal_missing": 5894
+          },
+          "round_trips": 42
+        },
+        "val": {
+          "fills": 38,
+          "final_equity": 10068.237387164612,
+          "liquidations": 0,
+          "metrics": {
+            "cagr": 0.04299982488064891,
+            "calmar": 3.4459384422834125,
+            "equity_breach_count": 0.0,
+            "equity_breach_observed": false,
+            "max_drawdown": 0.01247840772575019,
+            "min_equity": 9921.871496702526,
+            "raw_final_equity": 10068.237387164612,
+            "raw_max_drawdown": 0.01247840772575019,
+            "raw_total_return": 0.006823738716461136,
+            "sharpe": 1.398135269164284,
+            "sortino": 1.1437377113933471,
+            "total_return": 0.006823738716461136,
+            "volatility": 0.03044352476775682
+          },
+          "reject_counts": {
+            "cooldown": 540,
+            "signal_missing": 362
+          },
+          "round_trips": 19
+        }
+      },
+      "success_candidate": true
+    },
+    "state": "TrialState.COMPLETE",
+    "trial_number": 0
+  },
+  "portfolio_candidate": {
+    "failed_gates": "",
+    "leverage": "1.0",
+    "mode": "validation_return_risk_weight",
+    "name": "fresh_portfolio_validation_return_risk_weight_fresh_calendar_trx_takeprofit_sweakest_thr120_h120_ls540_ss120_tp450__fresh_calendar_trx_takeprofit_sweakest_thr120_h120_ls530_ss120_tp450",
+    "oos_max_drawdown": "0.0017595207819405903",
+    "oos_round_trips": "20",
+    "oos_sharpe": "5.617720301945223",
+    "oos_sortino": "6.620948435869671",
+    "oos_total_return": "0.008788937658458673",
+    "oos_volatility": "0.008577651421219131",
+    "sleeve_count": "2",
+    "sleeves": "fresh_calendar_trx_takeprofit_sweakest_thr120_h120_ls540_ss120_tp450,fresh_calendar_trx_takeprofit_sweakest_thr120_h120_ls530_ss120_tp450",
+    "success_candidate": "True",
+    "train_max_drawdown": "0.018881485993264596",
+    "train_round_trips": "56",
+    "train_sharpe": "0.2958024717763787",
+    "train_sortino": "0.19303857108447914",
+    "train_total_return": "0.006940459114758157",
+    "train_volatility": "0.024390190112635334",
+    "val_max_drawdown": "0.01347577964961995",
+    "val_round_trips": "28",
+    "val_sharpe": "3.7850144481433774",
+    "val_sortino": "3.9781519168409174",
+    "val_total_return": "0.03036972739297683",
+    "val_volatility": "0.049254380425406925",
+    "validation_score": "3.1381203602070107",
+    "weights": "0.500114,0.499886"
+  },
+  "portfolio_diagnostic_best_oos": {
+    "failed_gates": "oos_mdd_beats_shadow",
+    "leverage": "1.0",
+    "mode": "additive_sleeves",
+    "name": "fresh_portfolio_additive_sleeves_fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0__fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0__fresh_calendar_rot_lstrongest_sethusdt_lb336_thr100_h120_sc80_st0__fresh_calendar_rot_ltrxusdt_sethusdt_lb168_thr100_h336_sc80_st0__fresh_calendar_rot_lbtcusdt_sweakest_lb168_thr200_h336_sc80_st0__fresh_calendar_rot_lbtcusdt_sweakest_lb168_thr100_h336_sc80_st0",
+    "oos_max_drawdown": "0.025541559673365893",
+    "oos_round_trips": "41",
+    "oos_sharpe": "3.4644334266806505",
+    "oos_sortino": "5.011703189672712",
+    "oos_total_return": "0.06965251071848422",
+    "oos_volatility": "0.10864869205659403",
+    "sleeve_count": "6",
+    "sleeves": "fresh_calendar_rot_lethusdt_sweakest_lb168_thr200_h120_sc80_st0,fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0,fresh_calendar_rot_lstrongest_sethusdt_lb336_thr100_h120_sc80_st0,fresh_calendar_rot_ltrxusdt_sethusdt_lb168_thr100_h336_sc80_st0,fresh_calendar_rot_lbtcusdt_sweakest_lb168_thr200_h336_sc80_st0,fresh_calendar_rot_lbtcusdt_sweakest_lb168_thr100_h336_sc80_st0",
+    "success_candidate": "False",
+    "train_max_drawdown": "0.043651723021554165",
+    "train_round_trips": "86",
+    "train_sharpe": "1.9907728733976513",
+    "train_sortino": "1.8035152306275795",
+    "train_total_return": "0.21581246842970048",
+    "train_volatility": "0.10071607602988704",
+    "val_max_drawdown": "0.027046393650384134",
+    "val_round_trips": "31",
+    "val_sharpe": "4.81057617370789",
+    "val_sortino": "6.014131270982611",
+    "val_total_return": "0.1463144849586595",
+    "val_volatility": "0.17906838505653427",
+    "validation_score": "19.430684309173436",
+    "weights": ""
+  },
+  "replay_candidate": {
+    "failed_gates": [],
+    "family": "calendar_rotation",
+    "filters": {
+      "adaptive_lookback_bars": 12,
+      "allow_long": true,
+      "allow_short": true,
+      "broad_min_abs": 0.0,
+      "calendar_long_months": [
+        3,
+        4,
+        5
+      ],
+      "calendar_long_symbol": "TRXUSDT",
+      "calendar_short_months": [
+        1,
+        2
+      ],
+      "calendar_short_symbol": "ETHUSDT",
+      "compression_lookback_bars": 24,
+      "compression_quantile": 0.0,
+      "cooldown_bars": 30,
+      "entry_hours": [],
+      "family": "calendar_rotation",
+      "flow_lookback_bars": 0,
+      "flow_persistence_bars": 0,
+      "flow_persistence_threshold": 0.0,
+      "flow_threshold": 0.0,
+      "funding_abs_cap": 0.0,
+      "funding_rank_min": 0.0,
+      "hold_bars": 120,
+      "long_allocation_scale": 6.2,
+      "lookback_bars": 168,
+      "max_order_value": 175.0,
+      "max_rv": 0.0,
+      "min_abs_return": 0.015,
+      "name": "fresh_calendar_trx_takeprofit_sethusdt_thr150_h120_ls620_ss80_tp180",
+      "oi_rank_min": 0.0,
+      "rv_lookback_bars": 24,
+      "sharpe_lookback_bars": 0,
+      "sharpe_rank_min": 0.0,
+      "short_allocation_scale": 8.0,
+      "stop_loss_pct": 0.0,
+      "take_profit_pct": 0.018,
+      "target_allocation": 0.008,
+      "threshold": 0.015,
+      "trailing_stop_cap_pct": 0.0,
+      "trailing_stop_floor_pct": 0.0,
+      "trailing_stop_rv_multiple": 0.0
+    },
+    "gates": {
+      "liquidations_zero": true,
+      "not_incumbent_or_context_wrapper": true,
+      "oos_mdd_beats_shadow": true,
+      "oos_return_beats_incumbent": true,
+      "oos_sharpe_gt_1": true,
+      "oos_trades_not_starved": true,
+      "train_positive": true,
+      "val_positive": true
+    },
+    "name": "fresh_calendar_trx_takeprofit_sethusdt_thr150_h120_ls620_ss80_tp180",
+    "replay_survivor": true,
+    "split_results": {
+      "oos": {
+        "fills": 30,
+        "final_equity": 10100.73529587426,
+        "liquidations": 0,
+        "metrics": {
+          "cagr": 0.05670164109932507,
+          "calmar": 37.01156944153708,
+          "equity_breach_count": 0.0,
+          "equity_breach_observed": false,
+          "max_drawdown": 0.001531997749754712,
+          "min_equity": 9999.206102546423,
+          "raw_final_equity": 10100.73529587426,
+          "raw_max_drawdown": 0.001531997749754712,
+          "raw_total_return": 0.010073529587425911,
+          "sharpe": 7.949855447013018,
+          "sortino": 8.133893979846018,
+          "total_return": 0.010073529587425911,
+          "volatility": 0.006940584185714629
+        },
+        "reject_counts": {
+          "cooldown": 428,
+          "signal_missing": 458
+        },
+        "round_trips": 15
+      },
+      "train": {
+        "fills": 84,
+        "final_equity": 10194.485490143947,
+        "liquidations": 0,
+        "metrics": {
+          "cagr": 0.01945079087754853,
+          "calmar": 2.4903913969574516,
+          "equity_breach_count": 0.0,
+          "equity_breach_observed": false,
+          "max_drawdown": 0.00781033491414717,
+          "min_equity": 9951.096886863457,
+          "raw_final_equity": 10194.485490143947,
+          "raw_max_drawdown": 0.00781033491414717,
+          "raw_total_return": 0.019448549014394745,
+          "sharpe": 1.3413547955993488,
+          "sortino": 0.7452357786804013,
+          "total_return": 0.019448549014394745,
+          "volatility": 0.014439354833316542
+        },
+        "reject_counts": {
+          "cooldown": 1260,
+          "signal_missing": 5894
+        },
+        "round_trips": 42
+      },
+      "val": {
+        "fills": 38,
+        "final_equity": 10054.64115614755,
+        "liquidations": 0,
+        "metrics": {
+          "cagr": 0.034310719698463776,
+          "calmar": 3.4393785058515958,
+          "equity_breach_count": 0.0,
+          "equity_breach_observed": false,
+          "max_drawdown": 0.00997584872967286,
+          "min_equity": 9937.557528252599,
+          "raw_final_equity": 10054.64115614755,
+          "raw_max_drawdown": 0.00997584872967286,
+          "raw_total_return": 0.005464115614755016,
+          "sharpe": 1.3987862019830175,
+          "sortino": 1.1444835252771484,
+          "total_return": 0.005464115614755016,
+          "volatility": 0.024328970588253968
+        },
+        "reject_counts": {
+          "cooldown": 540,
+          "signal_missing": 362
+        },
+        "round_trips": 19
+      }
+    },
+    "success_candidate": true
+  },
+  "research_success_candidate": true,
+  "source_artifacts": {
+    "calendar_optuna_csv": "var/reports/profit_moonshot_20260501/current_tail_20260508/continuation/calendar_optuna_trials.csv",
+    "calendar_optuna_json": "var/reports/profit_moonshot_20260501/current_tail_20260508/continuation/calendar_optuna_latest.json",
+    "data_refresh_json": "var/reports/profit_moonshot_20260501/current_tail_20260508/continuation/data_refresh_latest.json",
+    "mission_validation_json": "var/reports/profit_moonshot_20260501/current_tail_20260508/continuation/mission_validation_latest.json",
+    "portfolio_csv": "var/reports/profit_moonshot_20260501/current_tail_20260508/continuation/fresh_portfolio_tuning_candidates.csv",
+    "portfolio_json": "var/reports/profit_moonshot_20260501/current_tail_20260508/continuation/fresh_portfolio_tuning_latest.json",
+    "replay_csv": "var/reports/profit_moonshot_20260501/current_tail_20260508/continuation/fresh_start_overhaul_replay_candidates.csv",
+    "replay_json": "var/reports/profit_moonshot_20260501/current_tail_20260508/continuation/fresh_start_overhaul_replay_latest.json"
+  },
+  "verification": {
+    "compileall": "python3 -m compileall -q src scripts tests passed",
+    "full_pytest": "1191 passed in 283.20s (0:04:43)",
+    "full_ruff": "All checks passed for uv run --extra dev ruff check .",
+    "mission_validator": "passed",
+    "py_compile": "scripts/research replay/tuning/optuna/validator compiled with python3 -m py_compile",
+    "pytest": "16 passed in 0.34s: profit moonshot replay/portfolio/optuna/validator tests",
+    "ruff": "All checks passed on touched research scripts/tests",
+    "targeted_pytest": "16 passed in 0.34s: profit moonshot replay/portfolio/optuna/validator tests"
+  }
+}

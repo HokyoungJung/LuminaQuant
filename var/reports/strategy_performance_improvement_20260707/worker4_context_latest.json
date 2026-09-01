@@ -1,0 +1,10 @@
+{
+  "scope": "verification/perf lane evidence; no .omx/ultragoal mutation",
+  "source_plans": {
+    "leader_execution_handoff": ".omx/plans/execution-handoff-strategy-performance-improvement-20260707T020500Z.md",
+    "leader_prd": ".omx/plans/prd-strategy-performance-improvement-20260707T020500Z.md",
+    "leader_test_spec": ".omx/plans/test-spec-strategy-performance-improvement-20260707T020500Z.md"
+  },
+  "task_id": "4",
+  "worker": "worker-4"
+}

@@ -1,0 +1,218 @@
+{
+  "artifact_kind": "profit_moonshot_oos_repair_and_gate_report",
+  "generated_at_utc": "2026-05-03T06:16:42.518917+00:00",
+  "decision": "no_deployment_ready_candidate",
+  "conservative_research_candidate": "profit_moonshot_momentum_hybrid_safe_mode",
+  "oos_window": {
+    "start": "2026-03-01",
+    "end_inclusive": "2026-05-02",
+    "reason": "latest fully complete UTC day; 2026-05-03 current tail is refreshed but not a complete daily materialized OOS partition"
+  },
+  "data_refresh": {
+    "collection_cutoff_utc": "2026-05-03T04:10:03Z",
+    "status": "completed",
+    "peak_rss_mib": 2584.52734375,
+    "selected_workers": 1,
+    "ohlcv_after_max_utc": {
+      "BTC/USDT": "2026-05-03T04:10:02Z",
+      "ETH/USDT": "2026-05-03T04:10:02Z",
+      "BNB/USDT": "2026-05-03T04:10:02Z",
+      "SOL/USDT": "2026-05-03T04:10:02Z",
+      "TRX/USDT": "2026-05-03T04:10:02Z"
+    },
+    "feature_last_timestamp_utc": {
+      "BTC/USDT": "2026-05-03T04:10:00Z",
+      "ETH/USDT": "2026-05-03T04:10:00Z",
+      "BNB/USDT": "2026-05-03T04:10:00Z",
+      "SOL/USDT": "2026-05-03T04:10:00Z",
+      "TRX/USDT": "2026-05-03T04:10:00Z"
+    }
+  },
+  "coverage_repair": {
+    "before_inventory_path": "var/reports/profit_moonshot_20260501/oos_probe/raw_first_oos_inventory_20260503.json",
+    "after_preflight_path": "var/reports/profit_moonshot_20260501/oos_probe/profit_moonshot_momentum_hybrid_safe_mode_preflight_after_repair/live_equivalent_revalidation_latest.json",
+    "backfill_paths": [
+      "var/reports/profit_moonshot_20260501/oos_probe/raw_first_oos_backfill_20260503.json",
+      "var/reports/profit_moonshot_20260501/oos_probe/raw_first_oos_materialize_repair_20260503.json",
+      "var/reports/profit_moonshot_20260501/oos_probe/raw_first_oos_materialize_btc_sol_20260319_20.json"
+    ],
+    "after_oos_coverage": [
+      {
+        "symbol": "BNB/USDT",
+        "committed_day_count": 63,
+        "complete_raw_first": true,
+        "first_missing_days": [],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/BNBUSDT/2026-03.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/BNBUSDT/2026-04.parquet"
+        ],
+        "legacy_monthly_files_present": 2,
+        "missing_day_count": 0,
+        "required_day_count": 63
+      },
+      {
+        "symbol": "BTC/USDT",
+        "committed_day_count": 63,
+        "complete_raw_first": true,
+        "first_missing_days": [],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/BTCUSDT/2026-03.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/BTCUSDT/2026-04.parquet"
+        ],
+        "legacy_monthly_files_present": 2,
+        "missing_day_count": 0,
+        "required_day_count": 63
+      },
+      {
+        "symbol": "ETH/USDT",
+        "committed_day_count": 63,
+        "complete_raw_first": true,
+        "first_missing_days": [],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/ETHUSDT/2026-03.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/ETHUSDT/2026-04.parquet"
+        ],
+        "legacy_monthly_files_present": 2,
+        "missing_day_count": 0,
+        "required_day_count": 63
+      },
+      {
+        "symbol": "SOL/USDT",
+        "committed_day_count": 63,
+        "complete_raw_first": true,
+        "first_missing_days": [],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/SOLUSDT/2026-03.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/SOLUSDT/2026-04.parquet"
+        ],
+        "legacy_monthly_files_present": 2,
+        "missing_day_count": 0,
+        "required_day_count": 63
+      },
+      {
+        "symbol": "TRX/USDT",
+        "committed_day_count": 63,
+        "complete_raw_first": true,
+        "first_missing_days": [],
+        "legacy_monthly_files": [
+          "data/market_parquet/market_ohlcv_1s/binance/TRXUSDT/2026-03.parquet",
+          "data/market_parquet/market_ohlcv_1s/binance/TRXUSDT/2026-04.parquet"
+        ],
+        "legacy_monthly_files_present": 2,
+        "missing_day_count": 0,
+        "required_day_count": 63
+      }
+    ]
+  },
+  "candidate_results": [
+    {
+      "mode": "profit_moonshot_momentum_hybrid_safe_mode",
+      "label": "conservative hybrid candidate",
+      "train_total_return": -0.013551486496041987,
+      "train_max_drawdown": 0.1236949840884687,
+      "train_sharpe": 0.004175236857947524,
+      "train_sortino": 0.004367273527303323,
+      "train_trades": 1185,
+      "train_liquidations": 0,
+      "val_total_return": 0.002837148217925023,
+      "val_max_drawdown": 0.010438136911899503,
+      "val_sharpe": 0.010167858124343822,
+      "val_sortino": 0.009833095226985623,
+      "val_trades": 183,
+      "val_liquidations": 0,
+      "oos_total_return": -0.003832463588937074,
+      "oos_max_drawdown": 0.033917370307692,
+      "oos_sharpe": -0.0037504499025209966,
+      "oos_sortino": -0.0037765214494177015,
+      "oos_trades": 136,
+      "oos_liquidations": 0,
+      "train_gate_pass": true,
+      "val_gate_pass": true,
+      "oos_gate_pass": false,
+      "deployment_ready": false,
+      "failure_reasons": [
+        "oos_total_return_not_positive",
+        "oos_sharpe_not_positive",
+        "oos_sortino_not_positive"
+      ],
+      "wall_clock": "40:14.27",
+      "max_rss_kb": 5123720,
+      "artifact": "var/reports/profit_moonshot_20260501/oos_full/profit_moonshot_momentum_hybrid_safe_mode/live_equivalent_revalidation_latest.json"
+    },
+    {
+      "mode": "profit_moonshot_adaptive_momentum_vol_target_132_mode",
+      "label": "high-val volatility-target candidate",
+      "train_total_return": -0.021161320975395026,
+      "train_max_drawdown": 0.1409003884761726,
+      "train_sharpe": 0.004968583255203795,
+      "train_sortino": 0.005250448786616857,
+      "train_trades": 361,
+      "train_liquidations": 0,
+      "val_total_return": 0.004175913820192889,
+      "val_max_drawdown": 0.01191134114891354,
+      "val_sharpe": 0.013067944076798019,
+      "val_sortino": 0.012660743582919977,
+      "val_trades": 54,
+      "val_liquidations": 0,
+      "oos_total_return": -0.004719683883217307,
+      "oos_max_drawdown": 0.0432586717310817,
+      "oos_sharpe": -0.0031348508725288814,
+      "oos_sortino": -0.003162596597670614,
+      "oos_trades": 37,
+      "oos_liquidations": 0,
+      "train_gate_pass": true,
+      "val_gate_pass": true,
+      "oos_gate_pass": false,
+      "deployment_ready": false,
+      "failure_reasons": [
+        "oos_total_return_not_positive",
+        "oos_sharpe_not_positive",
+        "oos_sortino_not_positive"
+      ],
+      "wall_clock": "28:53.81",
+      "max_rss_kb": 6325604,
+      "artifact": "var/reports/profit_moonshot_20260501/oos_full/profit_moonshot_adaptive_momentum_vol_target_132_mode/live_equivalent_revalidation_latest.json"
+    },
+    {
+      "mode": "profit_moonshot_adaptive_momentum_boost_mode",
+      "label": "raw validation leader comparator",
+      "train_total_return": -0.029947955184373543,
+      "train_max_drawdown": 0.18021085399613682,
+      "train_sharpe": 0.007080880835991556,
+      "train_sortino": 0.007647827757362831,
+      "train_trades": 361,
+      "train_liquidations": 0,
+      "val_total_return": 0.005090819951180325,
+      "val_max_drawdown": 0.013582698473351862,
+      "val_sharpe": 0.014751419665942234,
+      "val_sortino": 0.014526512459382655,
+      "val_trades": 56,
+      "val_liquidations": 0,
+      "oos_total_return": -0.005279358550725144,
+      "oos_max_drawdown": 0.0541343504218718,
+      "oos_sharpe": -0.002252612669944843,
+      "oos_sortino": -0.002286539859740664,
+      "oos_trades": 37,
+      "oos_liquidations": 0,
+      "train_gate_pass": false,
+      "val_gate_pass": true,
+      "oos_gate_pass": false,
+      "deployment_ready": false,
+      "failure_reasons": [
+        "train_total_return_below_-2.5%",
+        "train_mdd_above_15%",
+        "oos_total_return_not_positive",
+        "oos_sharpe_not_positive",
+        "oos_sortino_not_positive"
+      ],
+      "wall_clock": "28:06.94",
+      "max_rss_kb": 6269180,
+      "artifact": "var/reports/profit_moonshot_20260501/oos_full/profit_moonshot_adaptive_momentum_boost_mode/live_equivalent_revalidation_latest.json"
+    }
+  ],
+  "notes": [
+    "No gross exposure increase was implemented; this session repaired raw-first OOS coverage and revalidated existing candidates.",
+    "The repository summary script remains train/val-selection oriented; this report applies the stricter user OOS deployment gate.",
+    "Funding/OI/taker-flow/liquidation alpha remains deferred until feature replay is wired through live-equivalent MARKET_WINDOW backtests."
+  ]
+}

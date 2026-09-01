@@ -1,0 +1,125 @@
+{
+  "artifact_kind": "worker2_runner_evidence",
+  "artifact_validator": {
+    "checks": [
+      {
+        "detail": "result has passed=true and status=passed",
+        "name": "declared_pass_status",
+        "passed": true
+      },
+      {
+        "detail": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/passing_candidate_latest.json",
+        "name": "passing_candidate_artifact_exists",
+        "passed": true
+      },
+      {
+        "detail": "research/live-equivalent success label present",
+        "name": "candidate_lifecycle_label",
+        "passed": true
+      },
+      {
+        "detail": "{\"current_champion_oos_return\": 0.012181, \"locked_oos_calmar\": 53.73501485217365, \"locked_oos_max_drawdown\": 0.008197728267604966, \"locked_oos_monthlyized_return\": 0.030883445250837083, \"locked_oos_sharpe\": 5.653697867183353, \"locked_oos_smart_sortino\": 7.153592515941036, \"locked_oos_sortino\": 7.396117977603192, \"locked_oos_total_return\": 0.06858164444753312, \"maximum_acceptable_oos_mdd\": 0.25, \"minimum_oos_calmar\": 1.0, \"minimum_oos_sharpe\": 2.0, \"minimum_oos_smart_sortino\": 3.0, \"minimum_oos_sortino\": 3.0, \"minimum_stable_monthly_return\": 0.02, \"minimum_train_calmar\": 1.0, \"minimum_train_sharpe\": 1.5, \"minimum_train_sortino\": 1.5, \"minimum_val_calmar\": 3.0, \"minimum_val_sharpe\": 3.0, \"minimum_val_sortino\": 3.0, \"train_calmar\": 3.8842110332761934, \"train_monthlyized_return\": 0.020000000000000018, \"train_sharpe\": 1.7212556285918195, \"train_sortino\": 1.51511166991183, \"val_calmar\": 32.1417458698937, \"val_monthlyized_return\": 0.09848998131232078, \"val_sharpe\": 4.09640969448007, \"val_sortino\": 4.885875261022447}",
+        "name": "candidate_return_quality_contract",
+        "passed": true
+      },
+      {
+        "detail": "[{\"exists\": true, \"path\": \"var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/portfolio_monthly_budget_v1/_memory_guard/profit_moonshot_fresh_portfolio_tuning_memory_latest.json\", \"peak_rss_bytes\": 955871232, \"under_8gib\": true}, {\"exists\": true, \"path\": \"var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/portfolio_monthly_budget_v1/_memory_guard/profit_moonshot_fresh_portfolio_tuning_rss_latest.jsonl\", \"peak_rss_bytes\": 955871232, \"under_8gib\": true}]",
+        "name": "rss_under_8gib_evidence",
+        "passed": true
+      },
+      {
+        "detail": "10 test evidence item(s)",
+        "name": "local_tests_evidence",
+        "passed": true
+      },
+      {
+        "detail": "4 CI evidence item(s)",
+        "name": "ci_success_evidence",
+        "passed": true
+      },
+      {
+        "detail": "source unchanged or push evidence present",
+        "name": "git_push_evidence_if_source_changed",
+        "passed": true
+      }
+    ],
+    "command": "uv run python scripts/research/validate_profit_moonshot_pass_under_8gb.py --result-path .omx/specs/autoresearch-profit-moonshot-alpha-v2/result.json",
+    "output_path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/runner_evidence_20260509/worker2_validation_latest.json",
+    "passed": true,
+    "status": "passed"
+  },
+  "bounded_smoke_run": {
+    "command": "uv run python scripts/minimum_viable_run.py --days 30",
+    "elapsed_wall_clock": "0:01.06",
+    "exit_status": 0,
+    "max_rss_kb": 134272,
+    "output_path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/runner_evidence_20260509/worker2_minimum_viable_run_output.txt",
+    "time_path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/runner_evidence_20260509/worker2_minimum_viable_run_time.txt"
+  },
+  "candidate": {
+    "artifact": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/passing_candidate_latest.json",
+    "failed_gates": [],
+    "leverage": 2.3427334297703024,
+    "metrics": {
+      "current_champion_oos_return": 0.012181,
+      "locked_oos_calmar": 53.73501485217365,
+      "locked_oos_max_drawdown": 0.008197728267604966,
+      "locked_oos_monthlyized_return": 0.030883445250837083,
+      "locked_oos_round_trips": 33,
+      "locked_oos_sharpe": 5.653697867183353,
+      "locked_oos_smart_sortino": 7.153592515941036,
+      "locked_oos_sortino": 7.396117977603192,
+      "locked_oos_total_return": 0.06858164444753312,
+      "oos_return_excess_vs_champion": 0.05640064444753312,
+      "train_calmar": 3.8842110332761934,
+      "train_max_drawdown": 0.06905953159200336,
+      "train_monthlyized_return": 0.020000000000000018,
+      "train_sharpe": 1.7212556285918195,
+      "train_sortino": 1.51511166991183,
+      "train_total_return": 0.26820739157769213,
+      "validation_calmar": 32.1417458698937,
+      "validation_max_drawdown": 0.06493479922326455,
+      "validation_monthlyized_return": 0.09848998131232078,
+      "validation_sharpe": 4.09640969448007,
+      "validation_sortino": 4.885875261022447,
+      "validation_total_return": 0.19971302124703927
+    },
+    "mode": "train_val_monthly_return_budget",
+    "name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600__fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all__fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600",
+    "promotion_status": "improved_success_candidate",
+    "selection_basis": "train_val_only",
+    "success_candidate": true,
+    "uses_locked_oos_for_selection": false
+  },
+  "generated_at_utc": "2026-05-09T07:59:51.153166Z",
+  "memory_evidence": {
+    "budget_bytes": 8589934592,
+    "hard_trigger_count": 0,
+    "memory_summary_path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/portfolio_monthly_budget_v1/_memory_guard/profit_moonshot_fresh_portfolio_tuning_memory_latest.json",
+    "peak_rss_bytes": 955871232,
+    "peak_rss_mib": 911.58984375,
+    "portfolio_spec_count": 73465,
+    "soft_trigger_count": 0,
+    "status": "completed",
+    "success_candidate_count": 8,
+    "under_8gib": true
+  },
+  "portfolio_artifact": {
+    "path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/portfolio_monthly_budget_v1/fresh_portfolio_tuning_latest.json",
+    "peak_rss_mib_payload": 920.51171875,
+    "portfolio_spec_count": 73465,
+    "success_candidate_count": 8
+  },
+  "runner_policy": {
+    "bounded_runs_only": true,
+    "heavy_replay_authorized": false,
+    "heavy_replay_started": false,
+    "pre_run_heavy_job_check": "no matching heavy runner processes before smoke run"
+  },
+  "schema_version": "1.0",
+  "subagent_compliance": {
+    "line": "Subagent skip reason: serial runner/evidence work was safer because the task forbids overlapping heavy jobs and the required checks were bounded artifact/smoke reads.",
+    "serial_searches_before_skip": 3
+  },
+  "task_id": "3"
+}

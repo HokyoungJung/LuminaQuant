@@ -1,0 +1,334 @@
+{
+  "allocator_policy": {
+    "cluster_cap": 0.5,
+    "correlation_threshold": 0.85,
+    "integer_leverage_grid": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "integer_leverage_only": true,
+    "minimum_buffered_train_monthly_return": 0.0225,
+    "minimum_raw_train_monthly_return": 0.01,
+    "minimum_raw_val_monthly_return": 0.02,
+    "modes": [
+      "equal_weight",
+      "additive_sleeves",
+      "train_val_target_return_budget",
+      "train_val_monthly_return_budget",
+      "validation_return_risk_weight",
+      "validation_drawdown_budget",
+      "cluster_capped_validation_weight"
+    ],
+    "selection_basis": "train_val_stability_only",
+    "sleeve_cap": 0.35,
+    "train_val_stability_components": [
+      "train_monthlyized_return",
+      "validation_monthlyized_return",
+      "train_sharpe",
+      "validation_sharpe",
+      "train_sortino",
+      "validation_sortino",
+      "train_calmar",
+      "validation_calmar",
+      "train_max_drawdown",
+      "validation_max_drawdown",
+      "leverage",
+      "sleeve_count"
+    ],
+    "train_val_stability_formula": "frozen_weighted_train_validation_score_v1",
+    "uses_locked_oos_for_selection": false
+  },
+  "artifact_kind": "profit_moonshot_fresh_portfolio_tuning",
+  "base_policy": {
+    "current_base_artifact": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/passing_candidate_latest.json",
+    "current_base_available": true,
+    "current_base_gate_keys": [
+      "train_val_stability_beats_current_base",
+      "oos_return_beats_current_base",
+      "oos_return_risk_beats_current_base"
+    ],
+    "current_base_name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600__fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all__fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600",
+    "current_base_train_val_stability_score": 16.576134102067016,
+    "locked_oos_use": [
+      "report",
+      "gate"
+    ],
+    "selection_inputs": [
+      "train",
+      "validation"
+    ],
+    "status": "loaded",
+    "train_val_stability_components": [
+      "train_monthlyized_return",
+      "validation_monthlyized_return",
+      "train_sharpe",
+      "validation_sharpe",
+      "train_sortino",
+      "validation_sortino",
+      "train_calmar",
+      "validation_calmar",
+      "train_max_drawdown",
+      "validation_max_drawdown",
+      "leverage",
+      "sleeve_count"
+    ],
+    "train_val_stability_formula": "frozen_weighted_train_validation_score_v1",
+    "uses_locked_oos_for_selection": false
+  },
+  "best_success_candidate": {},
+  "candidate_csv": "var/reports/profit_moonshot_20260501/dynamic_restart_20260510/replay/fresh_start_overhaul_replay_candidates.csv",
+  "candidate_pool_policy": {
+    "calendar_neighborhood_reps": 0,
+    "calendar_neighborhoods": [],
+    "current_base_anchor_added": [],
+    "current_base_anchor_names": [
+      "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600",
+      "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+      "fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all",
+      "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600"
+    ],
+    "current_base_anchor_selection_basis": "current_base_train_val_recheck_only",
+    "family_quota": 3,
+    "pool_order": "validation_score_descending_after_calendar_neighborhood_reps",
+    "selected_names": [],
+    "selection_basis": "train_val_only",
+    "uses_locked_oos_for_selection": false
+  },
+  "candidate_sleeve_count": 0,
+  "combo_limit_policy": {
+    "family_quota": 3,
+    "forced_current_base_combos": [],
+    "limit_hits_by_size": {},
+    "max_combos_per_size": 500,
+    "pool_order": "validation_score_descending_after_calendar_neighborhood_reps"
+  },
+  "current_base_candidate": {
+    "candidate_artifact": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/passing_candidate_latest.json",
+    "leverage": 2.3427334297703024,
+    "locked_oos": {
+      "max_drawdown": 0.008197728267604966,
+      "return_risk": 8.365932879057214,
+      "total_return": 0.06858164444753312
+    },
+    "mode": "train_val_monthly_return_budget",
+    "name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600__fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all__fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600",
+    "sleeves": [
+      "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600",
+      "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+      "fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all",
+      "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600"
+    ],
+    "source_artifact": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/portfolio_monthly_budget_v1/fresh_portfolio_tuning_latest.json",
+    "train_val_stability": {
+      "leverage": 2.3427334297703024,
+      "sleeve_count": 4.0,
+      "train_calmar": 3.8842110332761934,
+      "train_max_drawdown": 0.06905953159200336,
+      "train_monthlyized_return": 0.020000000000000018,
+      "train_sharpe": 1.7212556285918195,
+      "train_sortino": 1.51511166991183,
+      "validation_calmar": 32.1417458698937,
+      "validation_max_drawdown": 0.06493479922326455,
+      "validation_monthlyized_return": 0.09848998131232078,
+      "validation_sharpe": 4.09640969448007,
+      "validation_sortino": 4.885875261022447
+    },
+    "train_val_stability_score": 16.576134102067016
+  },
+  "data_metadata": {
+    "feature_points": [
+      {
+        "funding_rows": 1481,
+        "open_interest_rows": 18145,
+        "rows": 2112510,
+        "symbol": "BTC/USDT",
+        "taker_flow_rows": 2101668
+      },
+      {
+        "funding_rows": 1482,
+        "open_interest_rows": 18433,
+        "rows": 2113782,
+        "symbol": "ETH/USDT",
+        "taker_flow_rows": 2102583
+      },
+      {
+        "funding_rows": 1482,
+        "open_interest_rows": 18433,
+        "rows": 2111685,
+        "symbol": "SOL/USDT",
+        "taker_flow_rows": 2099436
+      },
+      {
+        "funding_rows": 1482,
+        "open_interest_rows": 18433,
+        "rows": 712059,
+        "symbol": "BNB/USDT",
+        "taker_flow_rows": 0
+      },
+      {
+        "funding_rows": 1482,
+        "open_interest_rows": 18433,
+        "rows": 712059,
+        "symbol": "TRX/USDT",
+        "taker_flow_rows": 0
+      }
+    ],
+    "panel_cache": {
+      "cache_hit": true,
+      "cache_key": "9c2a95e4ee6a94f0492d7d6d4b6fd9b885f75109d0310d4d96b23cadf918526e",
+      "end": "2026-05-09",
+      "exchange": "binance",
+      "market_root": "/home/hoky/Quants-agent/LuminaQuant/data/market_parquet",
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/cache/profit_moonshot_fresh_start/joined_panel_9c2a95e4ee6a94f0492d7d6d.parquet",
+      "schema": 2,
+      "source_count": 7460,
+      "source_latest_mtime_ns": 1778392435140551597,
+      "source_total_bytes": 3564960010,
+      "start": "2025-01-01",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT"
+      ]
+    },
+    "rows": 11769
+  },
+  "diagnostic_best_oos": {},
+  "diagnostic_quarantine": [],
+  "generated_at_utc": "2026-05-10T11:23:41.435812Z",
+  "lockbox_policy": {
+    "current_base_oos_return": 0.06858164444753312,
+    "current_base_oos_return_risk": 8.365932879057214,
+    "current_champion_oos_return": 0.012181,
+    "diagnostic_best_oos_label": "diagnostic_locked_oos_not_selection_authority",
+    "diagnostic_not_promoted_label": "diagnostic_not_promoted",
+    "improved_label": "train_val_ranked_locked_oos_gate_passed",
+    "locked_oos_gate_label": "locked_oos_gate_only",
+    "locked_oos_label": "locked_oos_report_only",
+    "maximum_acceptable_oos_mdd": 0.25,
+    "minimum_stable_monthly_return": 0.02,
+    "oos_is_gate_only": true,
+    "oos_is_report_only": true,
+    "selection_label": "train_val_validation_only"
+  },
+  "memory_policy": {
+    "disk_budget_gib": 30.0,
+    "exact_window_hard_fraction": 0.8,
+    "exact_window_soft_fraction": 0.6,
+    "explicit_budget_bytes": 6979321856,
+    "explicit_budget_gib": 6.5,
+    "heavy_lock_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/exact_window_backtests/followup_status/portfolio_followup_heavy_run.lock",
+    "heavy_run_cap_gib": 6.5,
+    "heavy_run_parallelism": 1,
+    "light_worker_parallelism": 2,
+    "rss_limit_fraction": 0.9,
+    "rss_limit_gib": 7.2,
+    "session_memory_lease_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/exact_window_backtests/followup_status/session_memory_budget.lock",
+    "total_memory_cap_bytes": 8589934592,
+    "total_memory_cap_gib": 8.0
+  },
+  "memory_summary": {
+    "artifact_kind": "portfolio_followup_memory_summary",
+    "budget_bytes": 6979321856,
+    "budget_mib": 6656.0,
+    "context": {
+      "csv_path": "var/reports/profit_moonshot_20260501/dynamic_restart_20260510/tuning/fresh_portfolio_tuning_candidates.csv",
+      "json_path": "var/reports/profit_moonshot_20260501/dynamic_restart_20260510/tuning/fresh_portfolio_tuning_latest.json",
+      "markdown_path": "var/reports/profit_moonshot_20260501/dynamic_restart_20260510/tuning/fresh_portfolio_tuning_latest.md",
+      "portfolio_spec_count": 0,
+      "success_candidate_count": 0
+    },
+    "error": null,
+    "generated_at": "2026-05-10T11:23:41.438796+00:00",
+    "hard_limit_bytes": 5583457484,
+    "hard_limit_mib": 5324.799999237061,
+    "hard_trigger_count": 0,
+    "label": "portfolio_followup::profit_moonshot_fresh_portfolio_tuning",
+    "memory_policy": {
+      "disk_budget_gib": 30.0,
+      "exact_window_hard_fraction": 0.8,
+      "exact_window_soft_fraction": 0.6,
+      "explicit_budget_bytes": 6979321856,
+      "explicit_budget_gib": 6.5,
+      "heavy_lock_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/exact_window_backtests/followup_status/portfolio_followup_heavy_run.lock",
+      "heavy_run_cap_gib": 6.5,
+      "heavy_run_parallelism": 1,
+      "light_worker_parallelism": 2,
+      "rss_limit_fraction": 0.9,
+      "rss_limit_gib": 7.2,
+      "session_memory_lease_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/exact_window_backtests/followup_status/session_memory_budget.lock",
+      "total_memory_cap_bytes": 8589934592,
+      "total_memory_cap_gib": 8.0
+    },
+    "output_dir": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/dynamic_restart_20260510/tuning",
+    "peak_rss_bytes": 236285952,
+    "peak_rss_mib": 225.33984375,
+    "rss_log_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/dynamic_restart_20260510/tuning/_memory_guard/profit_moonshot_fresh_portfolio_tuning_rss_latest.jsonl",
+    "run_name": "profit_moonshot_fresh_portfolio_tuning",
+    "sample_count": 2,
+    "schema_version": "1.0",
+    "soft_limit_bytes": 4187593113,
+    "soft_limit_mib": 3993.5999994277954,
+    "soft_trigger_count": 0,
+    "status": "completed",
+    "summary_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/dynamic_restart_20260510/tuning/_memory_guard/profit_moonshot_fresh_portfolio_tuning_memory_latest.json"
+  },
+  "memory_summary_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/dynamic_restart_20260510/tuning/_memory_guard/profit_moonshot_fresh_portfolio_tuning_memory_latest.json",
+  "no_improvement_lifecycle": {
+    "best_improvement_candidate_name": "",
+    "current_base_name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600__fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all__fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600",
+    "current_base_retained": true,
+    "no_improvement": true,
+    "selected_by_train_val_name": "",
+    "selection_basis": "train_val_stability_then_locked_oos_current_base_gates",
+    "status": "no_improvement_current_base_retained",
+    "success_candidate_count": 0
+  },
+  "oos_end_date": "2026-05-09",
+  "peak_rss_mib": 251.9765625,
+  "portfolio_spec_count": 0,
+  "rss_log_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/dynamic_restart_20260510/tuning/_memory_guard/profit_moonshot_fresh_portfolio_tuning_rss_latest.jsonl",
+  "selected_best_candidate": {
+    "candidate_artifact": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/passing_candidate_latest.json",
+    "leverage": 2.3427334297703024,
+    "locked_oos": {
+      "max_drawdown": 0.008197728267604966,
+      "return_risk": 8.365932879057214,
+      "total_return": 0.06858164444753312
+    },
+    "mode": "train_val_monthly_return_budget",
+    "name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600__fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all__fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600",
+    "sleeves": [
+      "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600",
+      "fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600",
+      "fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all",
+      "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls530_ss120_tp600"
+    ],
+    "source_artifact": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/portfolio_monthly_budget_v1/fresh_portfolio_tuning_latest.json",
+    "train_val_stability": {
+      "leverage": 2.3427334297703024,
+      "sleeve_count": 4.0,
+      "train_calmar": 3.8842110332761934,
+      "train_max_drawdown": 0.06905953159200336,
+      "train_monthlyized_return": 0.020000000000000018,
+      "train_sharpe": 1.7212556285918195,
+      "train_sortino": 1.51511166991183,
+      "validation_calmar": 32.1417458698937,
+      "validation_max_drawdown": 0.06493479922326455,
+      "validation_monthlyized_return": 0.09848998131232078,
+      "validation_sharpe": 4.09640969448007,
+      "validation_sortino": 4.885875261022447
+    },
+    "train_val_stability_score": 16.576134102067016
+  },
+  "selected_by_train_val_stability": {},
+  "selected_by_validation": {},
+  "selection_outcome": "no_improvement_current_base_retained",
+  "success_candidate_count": 0
+}

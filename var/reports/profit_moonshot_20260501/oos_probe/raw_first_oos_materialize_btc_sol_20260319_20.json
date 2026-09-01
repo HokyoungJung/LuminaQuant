@@ -1,0 +1,74 @@
+{
+  "artifact_kind": "live_equivalent_raw_first_backfill",
+  "generated_at_utc": "2026-05-03T04:37:01.852987+00:00",
+  "db_path": "data/market_parquet",
+  "exchange_id": "binance",
+  "start": "2026-03-19",
+  "end": "2026-03-20",
+  "chunk_days": 2,
+  "raw_chunk_days": 2,
+  "max_rss_mb": 6500,
+  "symbols": [
+    {
+      "symbol": "BTC/USDT",
+      "required_days": 2,
+      "raw_present_before": 2,
+      "raw_missing_before": 0,
+      "raw_present_after": 2,
+      "raw_missing_after": 0,
+      "materialized_present_before": 0,
+      "materialized_missing_before": 2,
+      "materialized_present_after": 2,
+      "materialized_missing_after": 0,
+      "first_raw_missing_after": [],
+      "first_materialized_missing_after": [],
+      "raw_runs": [],
+      "materialize_runs": [
+        {
+          "start": "2026-03-19",
+          "end": "2026-03-20",
+          "days": 2,
+          "elapsed_sec": 5.017,
+          "peak_rss_mb": 2103.898,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:36:58.021153+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"BTC/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043654Z-BTC-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-03-19\", \"commit_id\": \"20260319-99990f7fab3b9174\", \"row_count\": 86400, \"canonical_row_checksum\": \"99990f7fab3b9174eaa0e779833e590e5e717ea5f9142efdc94e7b6197151790\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-03-19/manifest.json\"}, {\"partition\": \"2026-03-20\", \"commit_id\": \"20260320-843ecd70b6e592ac\", \"row_count\": 86399, \"canonical_row_checksum\": \"843ecd70b6e592ac46460b75a6693a0096be2a959a84fcd367d8b26e127166d4\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/BTCUSDT/timeframe=1s/date=2026-03-20/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        }
+      ]
+    },
+    {
+      "symbol": "SOL/USDT",
+      "required_days": 2,
+      "raw_present_before": 2,
+      "raw_missing_before": 0,
+      "raw_present_after": 2,
+      "raw_missing_after": 0,
+      "materialized_present_before": 0,
+      "materialized_missing_before": 2,
+      "materialized_present_after": 2,
+      "materialized_missing_after": 0,
+      "first_raw_missing_after": [],
+      "first_materialized_missing_after": [],
+      "raw_runs": [],
+      "materialize_runs": [
+        {
+          "start": "2026-03-19",
+          "end": "2026-03-20",
+          "days": 2,
+          "elapsed_sec": 3.016,
+          "peak_rss_mb": 1071.734,
+          "materializer_success": true,
+          "materializer_statuses": [
+            "committed"
+          ],
+          "stdout_tail": "{\"generated_at_utc\": \"2026-05-03T04:37:01.437225+00:00\", \"db_path\": \"data/market_parquet\", \"exchange\": \"binance\", \"required_timeframes\": [\"1s\"], \"success\": true, \"symbols\": [{\"symbol\": \"SOL/USDT\", \"status\": \"committed\", \"bundle_id\": \"bundle-20260503T043659Z-SOL-USDT\", \"timeframes\": {\"1s\": [{\"partition\": \"2026-03-19\", \"commit_id\": \"20260319-40f65e4e64b40524\", \"row_count\": 86400, \"canonical_row_checksum\": \"40f65e4e64b4052490d75b7cebb4da27ac9e69e143dde20508b02f5d37d7a5b2\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-03-19/manifest.json\"}, {\"partition\": \"2026-03-20\", \"commit_id\": \"20260320-34dddf408c8adf37\", \"row_count\": 86399, \"canonical_row_checksum\": \"34dddf408c8adf37f9f45bdfd02054078771e183dff62e02710e38b0148108b9\", \"manifest_path\": \"data/market_parquet/market_data_materialized/binance/SOLUSDT/timeframe=1s/date=2026-03-20/manifest.json\"}]}}], \"cycle\": 1}\n",
+          "stderr_tail": ""
+        }
+      ]
+    }
+  ],
+  "success": true
+}

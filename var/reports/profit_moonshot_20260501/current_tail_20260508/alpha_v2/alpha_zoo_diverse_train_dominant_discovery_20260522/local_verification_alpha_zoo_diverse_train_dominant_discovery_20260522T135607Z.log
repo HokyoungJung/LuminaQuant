@@ -1,0 +1,80 @@
+# Local verification: alpha_zoo_diverse_train_dominant_discovery_20260522T135607Z
+started_utc=2026-05-22T13:59:21Z
+repo_head=19035a82cee0eb1cddae993388db3241c8148495
+
+## artifact invariant check
+artifact invariants passed: var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_diverse_train_dominant_discovery_20260522/alpha_zoo_diverse_train_dominant_discovery_latest.json
+candidate_count 22800
+train_return_gte_validation_return_count 7968
+train_dominant_sample_gate_pass_count 50
+paper_candidate_gate_pass_count 0
+runner_peak_rss_mib 7073.75390625
+
+## targeted pytest
+......................                                                   [100%]
+22 passed in 0.53s
+
+## ruff check .
+All checks passed!
+
+## compileall
+
+## hardcoded parameter audit
+Hardcoded parameter audit: total=567 new=0 baselined=567
+JSON report: reports/quality/hardcoded_params_report.json
+Markdown report: reports/quality/hardcoded_params_report.md
+
+## git diff --check
+
+finished_pre_full_pytest_utc=2026-05-22T13:59:24Z
+
+## full pytest
+........................................................................ [  5%]
+........................................................................ [ 10%]
+........................................................................ [ 15%]
+........................................................................ [ 20%]
+........................................................................ [ 25%]
+........................................................................ [ 30%]
+........................................................................ [ 36%]
+........................................................................ [ 41%]
+........................................................................ [ 46%]
+........................................................................ [ 51%]
+........................................................................ [ 56%]
+........................................................................ [ 61%]
+........................................................................ [ 66%]
+........................................................................ [ 72%]
+........................................................................ [ 77%]
+........................................................................ [ 82%]
+........................................................................ [ 87%]
+........................................................................ [ 92%]
+........................................................................ [ 97%]
+................................                                         [100%]
+1400 passed in 60.22s (0:01:00)
+	Command being timed: "uv run --extra dev pytest -q"
+	User time (seconds): 63.60
+	System time (seconds): 13.63
+	Percent of CPU this job got: 136%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:56.71
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 2763076
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 308
+	Minor (reclaiming a frame) page faults: 1895350
+	Voluntary context switches: 317125
+	Involuntary context switches: 3353
+	Swaps: 0
+	File system inputs: 34944
+	File system outputs: 210480
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+finished_full_pytest_utc=2026-05-22T14:00:26Z
+
+## post-doc-update git diff --check
+post_doc_diff_check_utc=2026-05-22T14:01:10Z
