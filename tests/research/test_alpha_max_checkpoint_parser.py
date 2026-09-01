@@ -16,6 +16,7 @@ from lumina_quant.backtesting.execution_model import ExecutionModel, ExecutionMo
 from lumina_quant.backtesting.portfolio_backtest import FillApplicationAttribution
 from lumina_quant.research import alpha_max_evidence as evidence
 from lumina_quant.research import alpha_max_engine_runner as runner
+from lumina_quant.utils.artifact_read_receipt import read_artifact_bytes
 
 _CONFIG_PATH = (
     Path(__file__).resolve().parents[2]
@@ -25,6 +26,24 @@ _CONFIG_PATH = (
 
 def _sha256(payload: bytes) -> str:
     return hashlib.sha256(payload).hexdigest()
+
+
+def test_actual_engine_config_receipt_accepts_pinned_proc_fd_path() -> None:
+    descriptor = os.open(_CONFIG_PATH.parent, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC)
+    requested_path = f"/proc/self/fd/{descriptor}/{_CONFIG_PATH.name}"
+    try:
+        receipt, payload = read_artifact_bytes(
+            requested_path,
+            artifact_id="alpha_max_config",
+        )
+        result = evidence._alpha_max_artifact_receipt_payload(receipt)
+    finally:
+        os.close(descriptor)
+
+    assert result["requested_path"] == requested_path
+    assert result["canonical_path"] == str(_CONFIG_PATH)
+    assert result["byte_count"] == len(payload)
+    assert result["sha256"] == _sha256(payload)
 
 
 def _indicator_day_descriptor(root: Path) -> dict[str, object]:

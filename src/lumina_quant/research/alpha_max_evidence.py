@@ -6804,9 +6804,16 @@ def alpha_max_seed_schedule_sha256(domain: str) -> str:
 def _alpha_max_artifact_receipt_payload(receipt: ArtifactReadReceipt) -> dict[str, Any]:
     if type(receipt) is not ArtifactReadReceipt:
         raise TypeError("alpha_max_config_receipt_identity_invalid")
+    requested = Path(receipt.requested_path)
+    path_identity_valid = receipt.requested_path == receipt.canonical_path
+    if _is_proc_fd_anchored_path(requested):
+        try:
+            path_identity_valid = str(requested.resolve(strict=True)) == receipt.canonical_path
+        except OSError:
+            path_identity_valid = False
     if (
         receipt.artifact_id != "alpha_max_config"
-        or receipt.requested_path != receipt.canonical_path
+        or not path_identity_valid
         or receipt.pre_fstat_identity != receipt.post_fstat_identity
         or type(receipt.byte_count) is not int
         or receipt.byte_count <= 0
