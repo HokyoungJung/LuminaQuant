@@ -67,7 +67,7 @@ mt5 = [
     "MetaTrader5>=5.0.0; platform_system == 'Windows'",
 ]
 terminal-authority = [
-    "cryptography==49.0.0",
+    "cryptography==50.0.1",
 ]
 research-ml = [
     "lightgbm>=4.7,<5",
