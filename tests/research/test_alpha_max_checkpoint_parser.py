@@ -37,6 +37,10 @@ def test_actual_engine_config_receipt_accepts_pinned_proc_fd_path() -> None:
             artifact_id="alpha_max_config",
         )
         result = evidence._alpha_max_artifact_receipt_payload(receipt)
+        fresh_receipt, fresh_payload = read_artifact_bytes(
+            receipt.canonical_path,
+            artifact_id="alpha_max_config",
+        )
     finally:
         os.close(descriptor)
 
@@ -44,6 +48,8 @@ def test_actual_engine_config_receipt_accepts_pinned_proc_fd_path() -> None:
     assert result["canonical_path"] == str(_CONFIG_PATH)
     assert result["byte_count"] == len(payload)
     assert result["sha256"] == _sha256(payload)
+    assert fresh_payload == payload
+    assert evidence._alpha_max_artifact_receipts_match(receipt, fresh_receipt)
 
 
 def _indicator_day_descriptor(root: Path) -> dict[str, object]:

@@ -6831,6 +6831,20 @@ def _alpha_max_artifact_receipt_payload(receipt: ArtifactReadReceipt) -> dict[st
     }
 
 
+def _alpha_max_artifact_receipts_match(
+    observed: ArtifactReadReceipt,
+    fresh: ArtifactReadReceipt,
+) -> bool:
+    return (
+        observed.artifact_id == fresh.artifact_id
+        and observed.canonical_path == fresh.canonical_path
+        and observed.sha256 == fresh.sha256
+        and observed.byte_count == fresh.byte_count
+        and observed.pre_fstat_identity == fresh.pre_fstat_identity
+        and observed.post_fstat_identity == fresh.post_fstat_identity
+    )
+
+
 def _alpha_max_validate_effective_config_bytes(
     effective_config_bytes: bytes,
     effective_config_sha256: str,
@@ -7929,7 +7943,10 @@ def build_alpha_max_actual_engine_run_receipt(
         config_receipt.canonical_path,
         artifact_id="alpha_max_config",
     )
-    if fresh_config_receipt != config_receipt or fresh_config_bytes != config_bytes:
+    if (
+        not _alpha_max_artifact_receipts_match(config_receipt, fresh_config_receipt)
+        or fresh_config_bytes != config_bytes
+    ):
         raise ValueError("alpha_max_actual_run_config_receipt_stale")
     try:
         runtime_payload = json.loads(runtime_contract_bytes)
