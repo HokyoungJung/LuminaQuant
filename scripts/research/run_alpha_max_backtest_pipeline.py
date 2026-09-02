@@ -208,16 +208,70 @@ def _write_atomic(path: Path, payload: Mapping[str, Any]) -> None:
     os.replace(temporary, path)
 
 
-def run_pipeline(plan_path: Path) -> dict[str, Any]:
+def _load_resume_receipt(
+    receipt_path: Path,
+    *,
+    plan_path: Path,
+    plan_sha256: str,
+) -> dict[str, Any]:
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    if (
+        type(receipt) is not dict
+        or receipt.get("artifact_kind") != "alpha_max_backtest_pipeline_receipt.v1"
+        or receipt.get("plan_path") != str(plan_path.resolve())
+        or receipt.get("plan_sha256") != plan_sha256
+        or receipt.get("order_routing_enabled") is not False
+        or receipt.get("status") not in {"running", "failed"}
+        or type(receipt.get("stages")) is not list
+    ):
+        raise ValueError("alpha_max_backtest_pipeline_resume_receipt_invalid")
+    completed = receipt["stages"]
+    if completed and isinstance(completed[-1], dict) and completed[-1].get("return_code") != 0:
+        failed = completed.pop()
+        receipt.setdefault("failed_attempts", []).append(failed)
+    if any(
+        type(row) is not dict or row.get("return_code") != 0 or row.get("stage") != STAGES[index]
+        for index, row in enumerate(completed)
+    ):
+        raise ValueError("alpha_max_backtest_pipeline_resume_prefix_invalid")
+    receipt["status"] = "running"
+    receipt.pop("failed_stage", None)
+    receipt.pop("completed_at_utc", None)
+    receipt["resume_count"] = int(receipt.get("resume_count", 0)) + 1
+    return receipt
+
+
+def run_pipeline(plan_path: Path, *, resume: bool = False) -> dict[str, Any]:
     repository = Path(__file__).resolve().parents[2]
     plan = load_plan(plan_path)
     run_root = _absolute(plan["run_root"], field="run_root", must_exist=False)
-    if run_root.exists():
+    plan_sha256 = _sha256(plan_path.read_bytes())
+    receipt_path = run_root / "pipeline_receipt.json"
+    if run_root.exists() and not resume:
         raise ValueError("alpha_max_backtest_pipeline_run_root_exists")
-    run_root.mkdir(parents=True, mode=0o700)
-    (run_root / "logs").mkdir(mode=0o700)
-    (run_root / "observability").mkdir(mode=0o700)
-    (run_root / "checkpoints").mkdir(mode=0o700)
+    if resume:
+        receipt = _load_resume_receipt(
+            receipt_path,
+            plan_path=plan_path,
+            plan_sha256=plan_sha256,
+        )
+    else:
+        run_root.mkdir(parents=True, mode=0o700)
+        (run_root / "logs").mkdir(mode=0o700)
+        (run_root / "observability").mkdir(mode=0o700)
+        (run_root / "checkpoints").mkdir(mode=0o700)
+        receipt = {
+            "artifact_kind": "alpha_max_backtest_pipeline_receipt.v1",
+            "schema_version": SCHEMA,
+            "plan_path": str(plan_path.resolve()),
+            "plan_sha256": plan_sha256,
+            "repository": str(repository),
+            "order_routing_enabled": False,
+            "stages": [],
+            "status": "running",
+            "started_at_utc": datetime.now(UTC).isoformat(),
+            "resume_count": 0,
+        }
     commands = build_commands(
         plan,
         python=Path(sys.executable).absolute(),
@@ -225,21 +279,12 @@ def run_pipeline(plan_path: Path) -> dict[str, Any]:
     )
     environment = {key: value for key, value in os.environ.items() if not key.startswith("LQ_")}
     environment["PYTHONPATH"] = str(repository / "src")
-    receipt: dict[str, Any] = {
-        "artifact_kind": "alpha_max_backtest_pipeline_receipt.v1",
-        "schema_version": SCHEMA,
-        "plan_path": str(plan_path.resolve()),
-        "plan_sha256": _sha256(plan_path.read_bytes()),
-        "repository": str(repository),
-        "order_routing_enabled": False,
-        "stages": [],
-        "status": "running",
-        "started_at_utc": datetime.now(UTC).isoformat(),
-    }
-    receipt_path = run_root / "pipeline_receipt.json"
-    for stage, argv in commands:
-        stdout_path = run_root / "logs" / f"{stage}.stdout.log"
-        stderr_path = run_root / "logs" / f"{stage}.stderr.log"
+    completed_count = len(receipt["stages"])
+    attempt = int(receipt["resume_count"])
+    for stage, argv in commands[completed_count:]:
+        suffix = "" if attempt == 0 else f".resume-{attempt}"
+        stdout_path = run_root / "logs" / f"{stage}{suffix}.stdout.log"
+        stderr_path = run_root / "logs" / f"{stage}{suffix}.stderr.log"
         started = datetime.now(UTC)
         with stdout_path.open("xb") as stdout, stderr_path.open("xb") as stderr:
             completed = subprocess.run(
@@ -279,12 +324,13 @@ def run_pipeline(plan_path: Path) -> dict[str, Any]:
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__, allow_abbrev=False)
     parser.add_argument("--plan", required=True, type=Path)
+    parser.add_argument("--resume", action="store_true")
     return parser.parse_args(argv)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
-    receipt = run_pipeline(args.plan.resolve())
+    receipt = run_pipeline(args.plan.resolve(), resume=bool(args.resume))
     print(json.dumps({"status": receipt["status"], "stages": STAGES}, sort_keys=True))
     return 0
 

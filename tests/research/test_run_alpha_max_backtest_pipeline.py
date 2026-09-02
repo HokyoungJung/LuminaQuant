@@ -113,3 +113,30 @@ def test_pipeline_creates_checkpoint_parent_before_running(
 
     assert receipt["status"] == "complete"
     assert len(observed) == len(subject.STAGES)
+
+
+def test_pipeline_resumes_completed_prefix_and_existing_checkpoints(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    plan_path, _plan_payload = _plan(tmp_path)
+    calls: list[str] = []
+
+    def first_run(argv: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        calls.append(Path(argv[1]).name)
+        return subprocess.CompletedProcess(argv, 0 if len(calls) == 1 else 2)
+
+    monkeypatch.setattr(subject.subprocess, "run", first_run)
+    with pytest.raises(RuntimeError, match="prelock_validation"):
+        subject.run_pipeline(plan_path)
+
+    def resumed(argv: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        calls.append(Path(argv[1]).name)
+        return subprocess.CompletedProcess(argv, 0)
+
+    monkeypatch.setattr(subject.subprocess, "run", resumed)
+    receipt = subject.run_pipeline(plan_path, resume=True)
+
+    assert receipt["status"] == "complete"
+    assert receipt["resume_count"] == 1
+    assert calls.count("verify_alpha_max_canonical_pipeline.py") == 1
+    assert calls.count("run_alpha_max_prelock.py") == 2
