@@ -217,6 +217,7 @@ def run_pipeline(plan_path: Path) -> dict[str, Any]:
     run_root.mkdir(parents=True, mode=0o700)
     (run_root / "logs").mkdir(mode=0o700)
     (run_root / "observability").mkdir(mode=0o700)
+    (run_root / "checkpoints").mkdir(mode=0o700)
     commands = build_commands(
         plan,
         python=Path(sys.executable).absolute(),

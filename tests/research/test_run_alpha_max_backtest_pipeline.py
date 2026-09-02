@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -92,3 +93,23 @@ def test_plan_rejects_order_routing_and_incomplete_phase_inventory(tmp_path: Pat
     plan_path.write_text(json.dumps(plan), encoding="utf-8")
     with pytest.raises(ValueError, match="phase_roots_invalid"):
         subject.load_plan(plan_path)
+
+
+def test_pipeline_creates_checkpoint_parent_before_running(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    plan_path, plan = _plan(tmp_path)
+    observed: list[Path] = []
+
+    def complete(argv: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        run_root = Path(str(plan["run_root"]))
+        observed.append(run_root / "checkpoints")
+        assert observed[-1].is_dir()
+        return subprocess.CompletedProcess(argv, 0)
+
+    monkeypatch.setattr(subject.subprocess, "run", complete)
+
+    receipt = subject.run_pipeline(plan_path)
+
+    assert receipt["status"] == "complete"
+    assert len(observed) == len(subject.STAGES)
