@@ -48,6 +48,30 @@ A lower class cannot override a higher class. Missing metrics remain `null` or `
 - Smoke results cannot select parameters, promote a candidate, or authorize allocation.
 - Infrastructure failure, interruption, supersession, and non-admission cannot reject a strategy.
 
+## Alpha-Max backtest pipeline order
+
+Alpha-Max parity/precompute, prelock validation, exposed historical evaluation,
+and observability export are one research backtest pipeline, not independent
+operational goals. The required order is:
+
+1. integrate the current strategy, loader, funding, feature, routing-disabled,
+   lineage, and storage contracts;
+2. refresh and canonically audit the official market-data and TradFi research
+   universe evidence;
+3. materialize one immutable pipeline input snapshot;
+4. run parity/precompute, the 816 validation folds, and the 680
+   historical-report-only folds through that snapshot;
+5. export observability acceptance from the completed backtest artifacts; and
+6. update the canonical research note, history, evidence graph, and Obsidian
+   projection.
+
+Precompute is a reusable execution optimization inside the pipeline. Prelock and
+historical folds are backtest evaluation phases. Observability is an acceptance
+projection of those completed phases, not a third performance test. A wrapper
+receipt failure cannot be repaired by repeatedly launching a new evaluation
+version against unchanged code or data; repair the shared integration boundary,
+refresh the immutable input snapshot, then launch the pipeline once.
+
 ## Comparability
 
 Metrics are comparable only when domain, point-in-time universe, start/end, cadence, execution model, costs/funding, fold construction, and evidence class match. Nested recent windows are sensitivity checks, not independent OOS. Cross-family combination claims require common aligned net-return panels and incremental-correlation or factor evidence.
@@ -63,4 +87,4 @@ Metrics are comparable only when domain, point-in-time universe, start/end, cade
 
 ## Safety
 
-Parity, source/canonical audit, checkpoint, and observability artifacts establish execution provenance, not alpha performance. Official acceptance remains wrapper-owned. `order_routing_enabled=false` throughout this research graph.
+Parity, source/canonical audit, checkpoint, and observability artifacts establish execution provenance, not alpha performance. Official acceptance is pipeline-owned. `order_routing_enabled=false` throughout this research graph.

@@ -1,4 +1,56 @@
 # Research Note
+## 2026-09-02 KST — Alpha-Max를 단일 백테스트 파이프라인으로 재정렬하고 TradFi canonical snapshot 갱신
+
+반복된 `prelock-vNN` supervisor 재기동은 연구 진척이 아니었다. 1,588-unit
+precompute/parity, 816 validation folds, 680 historical report-only folds는
+각각 별도 goal이 아니라 **같은 Alpha-Max 백테스트 파이프라인의 내부 단계**다.
+Observability는 추가 백테스트가 아니라 완료된 두 평가 단계의 acceptance
+projection이다. 따라서 실행 순서를
+`통합 → 공식 데이터/TradFi 증거 갱신 → immutable input snapshot → precompute/parity
+→ prelock 816 folds → historical 680 folds → observability → 연구노트/graph/Obsidian`
+으로 고정했다. wrapper receipt 문제를 새 버전 번호로 반복 재시도하는 경로는
+폐기하고 shared integration boundary를 먼저 수정한다.
+
+Binance USD-M `/fapi/v1/exchangeInfo`를 2026-09-02T10:09:40Z에 다시 읽어
+`TRADIFI_PERPETUAL + USDT + TRADING`을 엄격 적용했다. 현재 canonical
+research-only snapshot은 기존 100개에서 **182개**로 늘었고, static snapshot과
+공식 응답의 집합 차이는 0이다. `SPCXUSD1`은 trading TradFi 계약이지만 quote가
+`USD1`이므로 USDT universe에서 명시적으로 제외했다. 앞선 임시 v2 audit의
+185개 수치는 `ALLUSDT`, `BTCDOMUSDT`, `SPCXUSD1`을 잘못 포함한 값이라
+superseded다. 정정 증거:
+`var/g003-data-refresh/TRADFI_UNIVERSE_REFRESH_AUDIT_20260902.json`,
+tracked canonical:
+`docs/research_note/tradfi_universe_refresh_audit_20260902.json`,
+runtime mirror:
+`var/reports/tradfi_universe_refresh/TRADFI_UNIVERSE_REFRESH_AUDIT.json`,
+source SHA-256:
+`78780e56d0a49a88ab8d326d68cd4198fc9ef9ffd3ef0278310993c0173a13aa`.
+이 갱신은 연구 universe/coverage 기본값만 바꾸며 주문 라우팅과
+paper/testnet/live/real-money 승인을 열지 않는다.
+
+통합 선행 감사도 실제 canonical DB에서 통과했다. Deep contract audit는
+raw `1,066,681,730/1,066,681,730` rows, `415/415` partitions,
+funding `39,569/39,569` rows, missing/extra/duplicate/jitter/error 전부 0을
+재계산했다. Public loader/downsampling/feature/funding 검증도 `complete`다.
+증거:
+`var/g003-data-refresh/alpha_max_canonical_contract_audit_20260902.json`,
+`var/g003-data-refresh/alpha_max_canonical_pipeline_verification_20260902.json`.
+
+전략 카탈로그도 현재 registry로 재생성했다(`163` registry, `161` in-scope,
+`2` excluded). 관계 그래프에서 누락돼 Obsidian publish를 막던 신규 전략
+15개와 `derivatives_carry` family를 canonical graph에 편입한 뒤 generated
+namespace를 원자 교체했다(`215` notes, `2,294` links). vault 전체의 다른
+프로젝트 노트가 LuminaQuant ID gate를 오염시키지 않도록 audit authority를
+`LuminaQuant/` namespace로 한정하되 wikilink 해석은 vault 전체를 유지했다.
+실제 vault readback audit는 `408` authoritative notes, `4,136` wikilinks,
+broken/ambiguous/duplicate/missing ID 모두 0으로 통과했다. 영수증:
+`docs/research_note/obsidian_strategy_graph_audit_20260902.json`
+(SHA-256
+`b9df4b33133fc5b15a4704f0885b8ead76e63f5a46f8855c0789eb5d59689711`).
+
+판정: **integration_first / research_only_no_execution /
+order_routing_enabled=false**.
+
 ## 2026-08-20 KST — 적대 리뷰 라운드: 25건 발견 → 23건 확정 → 전건 수정·회귀봉인
 
 배치 전체 diff에 대해 5-차원 헌터 → 발견별 회의론자 반증 검증(런타임 재현 의무) 라운드를 돌렸다. 25건 발견, **23건 CONFIRMED / 2건 REFUTED**, 확정 전건을 당일 수정하고 회귀 테스트로 봉인했다(전체 스위트 **4946 passed**, 골든·manifest 스냅샷 바이트 불변, ruff/format/architecture/docs 그린). 핵심 수정:

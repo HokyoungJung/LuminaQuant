@@ -20,6 +20,16 @@ then reconcile any conclusion against the current canonical graph.
 
 ## Manual addenda after generated ledger
 
+### 2026-09-02 — alpha_max_pipeline_reorder_and_tradfi_snapshot_refresh
+- Research dates: 2026-09-02
+- Source type: `official_exchange_info + canonical_integration_contract`
+- Title/path: Alpha-Max integration-first pipeline order and Binance TradFi snapshot refresh — `docs/research_note/evaluation_contract.md`, `var/g003-data-refresh/TRADFI_UNIVERSE_REFRESH_AUDIT_20260902.json`
+- Content summary: Reclassified 1,588-unit precompute/parity, 816 validation folds, and 680 historical report-only folds as stages of one backtest pipeline; observability is the acceptance projection. Refreshed the static research-only TradFi snapshot from 100 to 182 symbols using strict `TRADIFI_PERPETUAL + USDT + TRADING` filtering.
+- What was used: Binance USD-M `/fapi/v1/exchangeInfo` fetched at `2026-09-02T10:09:40Z`, source SHA-256 `78780e56d0a49a88ab8d326d68cd4198fc9ef9ffd3ef0278310993c0173a13aa`.
+- Decision impact: Integration, current data evidence, lineage/storage/routing audit, and immutable input materialization must precede the single Alpha-Max backtest launch. No paper/testnet/live/real-money execution or allocation is authorized.
+- Staleness/recheck: Recheck when Binance changes the active TradFi contract roster or before a new full-universe evaluation. / `True`
+- Do-not-repeat note: Do not create sequential goals or supervisor version churn for pipeline-internal stages, and do not include non-USDT or non-TRADIFI contracts in the canonical TradFi snapshot.
+
 ### 2026-08-12 — one_minute_strategy_inventory_evidence_and_common_screen
 - Research dates: 2026-08-12
 - Source type: `registry_inventory + exact_1m_common_screen + primary_literature + generated_knowledge_graph`
