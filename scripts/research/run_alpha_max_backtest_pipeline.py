@@ -217,7 +217,11 @@ def run_pipeline(plan_path: Path) -> dict[str, Any]:
     run_root.mkdir(parents=True, mode=0o700)
     (run_root / "logs").mkdir(mode=0o700)
     (run_root / "observability").mkdir(mode=0o700)
-    commands = build_commands(plan, python=Path(sys.executable).resolve(), repository=repository)
+    commands = build_commands(
+        plan,
+        python=Path(sys.executable).absolute(),
+        repository=repository,
+    )
     environment = {key: value for key, value in os.environ.items() if not key.startswith("LQ_")}
     environment["PYTHONPATH"] = str(repository / "src")
     receipt: dict[str, Any] = {
