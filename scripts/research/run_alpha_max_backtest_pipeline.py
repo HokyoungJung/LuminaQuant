@@ -58,6 +58,8 @@ def load_plan(path: Path) -> dict[str, Any]:
         raise ValueError("alpha_max_backtest_pipeline_plan_invalid")
     if plan.get("exchange") != "binance" or plan.get("order_routing_enabled") is not False:
         raise ValueError("alpha_max_backtest_pipeline_safety_invalid")
+    if plan.get("max_training_workers", 2) not in {1, 2, 3}:
+        raise ValueError("alpha_max_backtest_pipeline_worker_count_invalid")
     phase_roots = plan.get("phase_roots")
     required = {
         "warmup_raw",
@@ -141,6 +143,8 @@ def build_commands(
                 str(phase["embargo_raw"]),
                 "--embargo-feature-root",
                 str(phase["embargo_feature"]),
+                "--max-training-workers",
+                str(plan.get("max_training_workers", 2)),
             ],
         ),
         (

@@ -29,6 +29,7 @@ import stat
 import sys
 import tempfile
 import types
+import zlib
 from collections.abc import Mapping, Sequence
 from contextlib import contextmanager
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
@@ -6978,10 +6979,15 @@ def _alpha_max_training_day_checkpoint_bytes(
         "handler_timestamps_ms": carry.handler_timestamps_ms,
         "funding_ledger": ledger,
     }
+    carry_bytes = _canonical_bytes(_alpha_max_indicator_checkpoint_encode(state))
+    compressed_carry = zlib.compress(carry_bytes, level=3)
     value = {
-        "artifact_kind": "alpha_max_training_component_day_checkpoint.v1",
+        "artifact_kind": "alpha_max_training_component_day_checkpoint.v2",
         "calendar_day": calendar_day,
-        "carry": _alpha_max_indicator_checkpoint_encode(state),
+        "carry_encoding": "zlib-level-3+base64",
+        "carry_sha256": _sha256(carry_bytes),
+        "carry_uncompressed_bytes": len(carry_bytes),
+        "carry_zlib_base64": base64.b64encode(compressed_carry).decode("ascii"),
         "component_id": component_id,
         "day_start_utc": day_start.isoformat().replace("+00:00", "Z"),
         "daily_return_hex": daily_return.hex(),
@@ -7146,7 +7152,10 @@ def _alpha_max_training_day_from_checkpoint(
     if payload != _canonical_bytes(value) + b"\n" or set(value) != {
         "artifact_kind",
         "calendar_day",
-        "carry",
+        "carry_encoding",
+        "carry_sha256",
+        "carry_uncompressed_bytes",
+        "carry_zlib_base64",
         "component_id",
         "day_start_utc",
         "daily_return_hex",
@@ -7159,7 +7168,7 @@ def _alpha_max_training_day_from_checkpoint(
     }:
         raise AlphaMaxRuntimeContractError("alpha_max_training_day_checkpoint_invalid")
     if (
-        value["artifact_kind"] != "alpha_max_training_component_day_checkpoint.v1"
+        value["artifact_kind"] != "alpha_max_training_component_day_checkpoint.v2"
         or value["component_id"] != component_id
         or value["manifest"] != _alpha_max_manifest_checkpoint_identity(manifest)
         or value["prefix_sha256"] != prefix_sha256
@@ -7186,7 +7195,37 @@ def _alpha_max_training_day_from_checkpoint(
         or daily_return.hex() != value["daily_return_hex"]
     ):
         raise AlphaMaxRuntimeContractError("alpha_max_training_day_checkpoint_float_invalid")
-    state = _alpha_max_indicator_checkpoint_decode(value["carry"])
+    if (
+        value["carry_encoding"] != "zlib-level-3+base64"
+        or type(value["carry_sha256"]) is not str
+        or re.fullmatch(r"[0-9a-f]{64}", value["carry_sha256"]) is None
+        or type(value["carry_uncompressed_bytes"]) is not int
+        or not 0 < value["carry_uncompressed_bytes"] <= 256 * 1024 * 1024
+        or type(value["carry_zlib_base64"]) is not str
+    ):
+        raise AlphaMaxRuntimeContractError("alpha_max_training_day_checkpoint_carry_invalid")
+    try:
+        compressed = base64.b64decode(value["carry_zlib_base64"], validate=True)
+        decompressor = zlib.decompressobj()
+        carry_bytes = decompressor.decompress(
+            compressed,
+            value["carry_uncompressed_bytes"] + 1,
+        )
+        carry_bytes += decompressor.flush()
+    except (ValueError, zlib.error) as exc:
+        raise AlphaMaxRuntimeContractError(
+            "alpha_max_training_day_checkpoint_carry_invalid"
+        ) from exc
+    if (
+        len(carry_bytes) != value["carry_uncompressed_bytes"]
+        or len(carry_bytes) > 256 * 1024 * 1024
+        or not decompressor.eof
+        or decompressor.unused_data
+        or decompressor.unconsumed_tail
+        or _sha256(carry_bytes) != value["carry_sha256"]
+    ):
+        raise AlphaMaxRuntimeContractError("alpha_max_training_day_checkpoint_carry_invalid")
+    state = _alpha_max_indicator_checkpoint_decode(_strict_json_object(carry_bytes))
     if type(state) is not dict or set(state) != {
         "strategy_state",
         "portfolio_state",

@@ -40,6 +40,7 @@ def _plan(tmp_path: Path) -> tuple[Path, dict[str, object]]:
     plan: dict[str, object] = {
         "schema_version": subject.SCHEMA,
         "exchange": "binance",
+        "max_training_workers": 2,
         "order_routing_enabled": False,
         "contract_manifest": files["contract_manifest"],
         "canonical_db": str(canonical_db),
@@ -68,6 +69,7 @@ def test_plan_builds_one_integration_first_backtest_pipeline(tmp_path: Path) -> 
     assert commands[0][1][1].endswith("verify_alpha_max_canonical_pipeline.py")
     assert commands[1][1][1].endswith("run_alpha_max_prelock.py")
     assert "--validation-raw-root" in commands[1][1]
+    assert commands[1][1][-2:] == ["--max-training-workers", "2"]
     assert commands[2][1][1].endswith("run_alpha_max_historical_evaluation.py")
     assert commands[3][1][-2:] == [
         "--output",

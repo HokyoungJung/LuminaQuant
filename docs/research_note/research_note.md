@@ -1,4 +1,28 @@
 # Research Note
+## 2026-09-03 KST — Alpha-Max checkpoint 저장 병목 제거와 중복 실행물 정리
+
+통합 prelock의 daily continuation checkpoint가 매일 전체 timeframe history를
+canonical JSON으로 반복 저장해 checkpoint 하나당 약 48.6MB, 실패·재기동
+checkpoint 전체가 약 325.6GB까지 증가했다. 이 상태는 계산보다 저장과 memory
+pressure가 우선되는 잘못된 실행 구조였다.
+
+daily carry를 SHA-256과 원본 byte count에 결속한 deterministic
+`zlib-level-3+base64` payload로 바꿨다. 실제 표본은 48,645,453 bytes에서
+3,010,869 bytes로 줄어 약 93.8% 절감됐고, decode는 256MiB 상한,
+base64 strict validation, zlib EOF/trailing-data 검사, digest와 canonical
+roundtrip을 모두 요구한다. training worker 기본값은 2로 낮춰 8GB 시스템에서
+세 프로세스의 동시 Python state 확대를 피한다.
+
+실패한 pipeline run과 v40~v52/parity precompute 중복 checkpoint 18개,
+총 325,636,032,688 bytes를 제거했다. canonical DB, immutable phase roots,
+source/provenance receipts, logs는 보존했다. 정리 후
+`var/g003-evaluation`은 327GB에서 24GB로 감소했고 filesystem 여유 공간은
+505GB에서 808GB로 회복됐다. 삭제 영수증:
+`docs/research_note/alpha_max_checkpoint_cleanup_20260903.json`.
+
+판정: **storage_bottleneck_fixed / failed_checkpoints_retired /
+canonical_data_preserved / order_routing_enabled=false**.
+
 ## 2026-09-02 KST — Alpha-Max를 단일 백테스트 파이프라인으로 재정렬하고 TradFi canonical snapshot 갱신
 
 반복된 `prelock-vNN` supervisor 재기동은 연구 진척이 아니었다. 1,588-unit
