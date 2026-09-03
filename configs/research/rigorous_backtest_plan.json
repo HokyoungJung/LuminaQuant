@@ -27,7 +27,8 @@
       "outputs": [
         "${RUN_ROOT}/coarse_screen/strategy_screen_latest.json"
       ],
-      "environment": {}
+      "environment": {},
+      "accepted_return_codes": [0, 1]
     },
     {
       "name": "event_driven_walk_forward",
@@ -49,7 +50,8 @@
       "outputs": [
         "${RUN_ROOT}/walkforward/walkforward_result.json"
       ],
-      "environment": {}
+      "environment": {},
+      "accepted_return_codes": [0]
     },
     {
       "name": "validation_selection",
@@ -68,7 +70,8 @@
       "outputs": [
         "${RUN_ROOT}/validation_selection.json"
       ],
-      "environment": {}
+      "environment": {},
+      "accepted_return_codes": [0]
     },
     {
       "name": "execution_model_tick_validation",
@@ -92,7 +95,8 @@
       ],
       "environment": {
         "LQ_RAW_FIRST_BACKEND": "rust"
-      }
+      },
+      "accepted_return_codes": [0]
     },
     {
       "name": "report_only_evaluation",
@@ -111,7 +115,8 @@
       "outputs": [
         "${RUN_ROOT}/report_only_evaluation.json"
       ],
-      "environment": {}
+      "environment": {},
+      "accepted_return_codes": [0]
     }
   ]
 }

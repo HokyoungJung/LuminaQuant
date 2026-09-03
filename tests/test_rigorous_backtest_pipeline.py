@@ -28,6 +28,7 @@ def _plan(repository: Path) -> tuple[Path, dict]:
                 "inputs": [str(data_receipt)],
                 "outputs": [f"${{RUN_ROOT}}/{name}.json"],
                 "environment": {"LQ_RAW_FIRST_BACKEND": "rust"},
+                "accepted_return_codes": [0],
             }
         )
     value = {

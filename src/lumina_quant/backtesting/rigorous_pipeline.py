@@ -108,6 +108,7 @@ def _validate_stage(
         "inputs",
         "outputs",
         "environment",
+        "accepted_return_codes",
     }:
         raise ValueError(f"rigorous_pipeline_stage_invalid:{expected_name}")
     if value["name"] != expected_name:
@@ -133,6 +134,7 @@ def _validate_stage(
     inputs = value["inputs"]
     outputs = value["outputs"]
     environment = value["environment"]
+    accepted_return_codes = value["accepted_return_codes"]
     if type(arguments) is not list or not all(type(item) is str for item in arguments):
         raise ValueError(f"{expected_name}.arguments must be a string list")
     if type(inputs) is not list or not all(type(item) is str for item in inputs):
@@ -143,6 +145,13 @@ def _validate_stage(
         raise ValueError(f"{expected_name}.environment contains unsupported keys")
     if not all(type(key) is str and type(item) is str for key, item in environment.items()):
         raise ValueError(f"{expected_name}.environment must contain strings")
+    if (
+        type(accepted_return_codes) is not list
+        or not accepted_return_codes
+        or not all(type(code) is int and 0 <= code <= 255 for code in accepted_return_codes)
+        or len(set(accepted_return_codes)) != len(accepted_return_codes)
+    ):
+        raise ValueError(f"{expected_name}.accepted_return_codes is invalid")
     expanded_inputs = [
         _resolved_nonsymlink(
             _expand(item, data_root=data_root, run_root=run_root, repository=repository),
@@ -176,6 +185,7 @@ def _validate_stage(
         "inputs": expanded_inputs,
         "outputs": expanded_outputs,
         "environment": dict(environment),
+        "accepted_return_codes": tuple(accepted_return_codes),
     }
 
 
@@ -274,6 +284,7 @@ def _stage_fingerprint(
                 "script": _file_receipt(stage["script"]),
                 "arguments": stage["arguments"],
                 "environment": stage["environment"],
+                "accepted_return_codes": stage["accepted_return_codes"],
                 "inputs": inputs,
                 "data_receipt": _file_receipt(data_receipt),
                 "git_head": git_head,
@@ -368,7 +379,8 @@ def run_pipeline(
         outputs = [_file_receipt(path) for path in stage["outputs"] if path.is_file()]
         status = (
             "complete"
-            if completed.returncode == 0 and len(outputs) == len(stage["outputs"])
+            if completed.returncode in stage["accepted_return_codes"]
+            and len(outputs) == len(stage["outputs"])
             else "failed"
         )
         row = {
