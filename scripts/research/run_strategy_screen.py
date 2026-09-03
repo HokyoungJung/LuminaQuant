@@ -37,6 +37,7 @@ from lumina_quant.backtesting.portfolio_backtest import Portfolio
 from lumina_quant.configuration import get_default_runtime_config, load_runtime_config
 from lumina_quant.market_data import MarketDataRepository, normalize_symbol
 from lumina_quant.research_universe import research_symbols_for_strategy
+from lumina_quant.research.run_card import atomic_write_text
 from lumina_quant.strategies.registry import (
     get_strategy_names,
     get_strategy_tier,
@@ -761,7 +762,12 @@ def _markdown_report(payload: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def _write_outputs(payload: dict[str, Any], output_dir: Path) -> dict[str, str]:
+def _write_outputs(
+    payload: dict[str, Any],
+    output_dir: Path,
+    *,
+    canonical_only: bool = False,
+) -> dict[str, str]:
     output_dir.mkdir(parents=True, exist_ok=True)
     timestamp = str(payload["generated_at"]).replace(":", "").replace("-", "")
     timestamp = timestamp.replace(".", "_").replace("Z", "Z")
@@ -769,18 +775,22 @@ def _write_outputs(payload: dict[str, Any], output_dir: Path) -> dict[str, str]:
     md_path = output_dir / f"strategy_screen_{timestamp}.md"
     latest_json = output_dir / "strategy_screen_latest.json"
     latest_md = output_dir / "strategy_screen_latest.md"
-    payload["output_paths"] = {
-        "timestamped_json": str(json_path),
-        "timestamped_markdown": str(md_path),
-        "latest_json": str(latest_json),
-        "latest_markdown": str(latest_md),
-    }
+    payload["output_paths"] = {"latest_json": str(latest_json)}
+    if not canonical_only:
+        payload["output_paths"].update(
+            {
+                "timestamped_json": str(json_path),
+                "timestamped_markdown": str(md_path),
+                "latest_markdown": str(latest_md),
+            }
+        )
     text = json.dumps(payload, indent=2, sort_keys=True)
-    json_path.write_text(text + "\n", encoding="utf-8")
-    latest_json.write_text(text + "\n", encoding="utf-8")
-    markdown = _markdown_report(payload)
-    md_path.write_text(markdown, encoding="utf-8")
-    latest_md.write_text(markdown, encoding="utf-8")
+    atomic_write_text(latest_json, text + "\n")
+    if not canonical_only:
+        atomic_write_text(json_path, text + "\n")
+        markdown = _markdown_report(payload)
+        atomic_write_text(md_path, markdown)
+        atomic_write_text(latest_md, markdown)
     return dict(payload["output_paths"])
 
 
@@ -1011,7 +1021,11 @@ def run_strategy_screen(args: argparse.Namespace) -> dict[str, Any]:
             "execution_model": "repository Backtest + Portfolio + SimulatedExecutionHandler",
         },
     }
-    paths = _write_outputs(payload, Path(args.output_dir))
+    paths = _write_outputs(
+        payload,
+        Path(args.output_dir),
+        canonical_only=bool(getattr(args, "canonical_output_only", False)),
+    )
     print(json.dumps({"output_paths": paths, "issues": issues}, indent=2), flush=True)
     return payload
 
@@ -1053,6 +1067,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="Number of traded performers to show in the markdown top table.",
     )
     parser.add_argument("--output-dir", default="var/reports/latest_new_strategy_backtests")
+    parser.add_argument(
+        "--canonical-output-only",
+        action="store_true",
+        help="Write one atomic strategy_screen_latest.json without timestamp or Markdown copies.",
+    )
     parser.add_argument(
         "--config",
         type=Path,

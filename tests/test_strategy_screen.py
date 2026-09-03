@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any, cast
 
 import polars as pl
@@ -48,6 +49,17 @@ def test_strategy_research_universe_is_centralized():
         "SOL/USDT",
     )
     assert len(subject._strategy_specs(scope="all")) >= len(subject._strategy_specs(scope="live"))
+
+
+def test_canonical_output_mode_writes_no_timestamp_or_markdown_copies(
+    tmp_path: Path,
+) -> None:
+    payload = {"generated_at": "2026-09-03T00:00:00Z", "issues": []}
+
+    outputs = subject._write_outputs(payload, tmp_path, canonical_only=True)
+
+    assert outputs == {"latest_json": str(tmp_path / "strategy_screen_latest.json")}
+    assert [path.name for path in tmp_path.iterdir()] == ["strategy_screen_latest.json"]
 
 
 def test_strategy_specs_can_expand_live_scope_without_research_only_names():

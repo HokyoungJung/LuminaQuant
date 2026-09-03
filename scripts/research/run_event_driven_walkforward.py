@@ -183,6 +183,7 @@ def run_walkforward(
                         str(config),
                         "--no-exchange-audit",
                         "--allow-unavailable",
+                        "--canonical-output-only",
                     ]
                     with (
                         (cell_root / "stdout.log").open("wb") as stdout,

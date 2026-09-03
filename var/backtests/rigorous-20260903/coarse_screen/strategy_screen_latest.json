@@ -85093,10 +85093,7 @@
     "src/lumina_quant/indicators/alpha_features.py"
   ],
   "output_paths": {
-    "latest_json": "/home/hoky/Quants-agent/LuminaQuant/var/backtests/rigorous-20260903/coarse_screen/strategy_screen_latest.json",
-    "latest_markdown": "/home/hoky/Quants-agent/LuminaQuant/var/backtests/rigorous-20260903/coarse_screen/strategy_screen_latest.md",
-    "timestamped_json": "/home/hoky/Quants-agent/LuminaQuant/var/backtests/rigorous-20260903/coarse_screen/strategy_screen_20260903T135802_566688Z.json",
-    "timestamped_markdown": "/home/hoky/Quants-agent/LuminaQuant/var/backtests/rigorous-20260903/coarse_screen/strategy_screen_20260903T135802_566688Z.md"
+    "latest_json": "/home/hoky/Quants-agent/LuminaQuant/var/backtests/rigorous-20260903/coarse_screen/strategy_screen_latest.json"
   },
   "scope": "all",
   "start": "2026-05-01T00:00:00Z",

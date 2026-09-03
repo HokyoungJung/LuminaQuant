@@ -19,7 +19,8 @@
         "--output-dir", "${RUN_ROOT}/coarse_screen",
         "--config", "${REPOSITORY}/configs/profiles/backtest_cost_realistic.yaml",
         "--no-exchange-audit",
-        "--allow-unavailable"
+        "--allow-unavailable",
+        "--canonical-output-only"
       ],
       "inputs": [
         "configs/profiles/backtest_cost_realistic.yaml"
