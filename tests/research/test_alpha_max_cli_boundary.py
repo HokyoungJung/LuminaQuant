@@ -56,6 +56,7 @@ PRELOCK_OPTIONS = {
     "--validation-feature-root",
     "--embargo-raw-root",
     "--embargo-feature-root",
+    "--max-training-workers",
 }
 HISTORICAL_OPTIONS = {
     "--sealed-prelock-directory",
@@ -442,8 +443,9 @@ def test_clean_cli_main_delegates_exact_parsed_namespace(monkeypatch) -> None:
 
     assert module.main(argv) == 0
     assert seen["exchange"] == "binance"
+    assert seen["max_training_workers"] == 2
     assert seen["bootstrap_inventory"]
-    assert len(seen) == 17
+    assert len(seen) == 18
 
 
 def test_historical_cli_forwards_checkpoint_root_exactly(monkeypatch) -> None:

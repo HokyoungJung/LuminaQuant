@@ -1,4 +1,32 @@
 # Research Note
+## 2026-09-03 KST — 162-strategy bounded-memory canonical selection
+
+Alpha-Max의 1,588-unit precompute는 압축 checkpoint로 완주했지만 816-fold
+validation 진입 시 capsule을 `/proc/self/fd/...` 경로로 최초 읽은 receipt와
+canonical absolute path로 재검증한 receipt를 단순 객체 동등성으로 비교해
+두 번 같은 false negative를 냈다. 두 receipt의 SHA-256, byte count,
+canonical path, inode, mode, link count, mtime, ctime은 모두 같았고
+`requested_path` 문자열만 달랐다. 검증을 기존 semantic receipt comparator로
+수정하고 회귀 테스트를 추가했다. 지시대로 816/680은 처음부터 다시 계산하지
+않았고 실패 run/checkpoint는 cleanup receipt에 결속한 뒤 폐기했다.
+
+대신 기존 2026-07-01~2026-08-12 `[start,end)` 결과 141개를 SHA-256
+lineage로 재사용하고 registry에서 새로 생긴 21개만 독립 7GiB 제한
+프로세스로 실행했다. 통합 결과는 registry 162개와 정확히 일치한다:
+pass 120, input/feature excluded 14, fail 17, resource-excluded 11.
+resource-sensitive 종료 전략은 반복 실행하지 않았다.
+
+선별 규칙은 `pass`, 거래 수 양수, 총수익 양수, Sharpe 양수,
+절대 max drawdown 35% 이하이며 Sharpe와 총수익 순으로 정렬했다.
+상위 전략은 `PriceVolumeCorrContinuationStrategy`(Sharpe 4.689,
+수익 1.066%), `RebalancingPremiumHarvestStrategy`(3.141, 5.982%),
+`DisagreementGatedEnsembleStrategy`(2.127, 2.067%)다. 전체 lineage와
+선별 결과는 `all_strategy_selection_20260903.json`에 저장했다.
+
+2026-08-21~2026-09-02 시도는 canonical 1m OHLCV가 첫날 1,440개만 있고
+나머지 15,840개가 없어 162개 모두 data-audit fail이었다. 해당 구간은
+성과 증거로 사용하지 않았다. 주문 라우팅은 계속 비활성이다.
+
 ## 2026-09-03 KST — Alpha-Max checkpoint 저장 병목 제거와 중복 실행물 정리
 
 통합 prelock의 daily continuation checkpoint가 매일 전체 timeframe history를
@@ -19,6 +47,13 @@ source/provenance receipts, logs는 보존했다. 정리 후
 `var/g003-evaluation`은 327GB에서 24GB로 감소했고 filesystem 여유 공간은
 505GB에서 808GB로 회복됐다. 삭제 영수증:
 `docs/research_note/alpha_max_checkpoint_cleanup_20260903.json`.
+
+816/680 재실행을 폐기한 뒤 더는 필요한 입력이 아닌 runtime-v40~v54와
+phase-root 복제본, 불완전 구간 screen을 추가로 22,201,360,305 bytes
+제거했다. 최종 `var/g003-evaluation`은 3.3GB, 전체 `var`는 25GB이며
+Linux filesystem 여유 공간은 약 828GB다. Windows C:의 표시 여유 공간은
+약 52GB로 별개다. 삭제된 ext4 블록이 491GB sparse WSL VHDX에 아직
+반환되지 않았기 때문에 WSL 종료 후 VHDX compact가 필요하다.
 
 판정: **storage_bottleneck_fixed / failed_checkpoints_retired /
 canonical_data_preserved / order_routing_enabled=false**.

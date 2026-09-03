@@ -20,6 +20,19 @@ then reconcile any conclusion against the current canonical graph.
 
 ## Manual addenda after generated ledger
 
+### 2026-09-03 — alpha_max_retirement_and_bounded_strategy_selection
+
+- Alpha-Max precompute checkpoint 압축 완료 후 816-fold validation의
+  `/proc/self/fd` requested-path false negative를 semantic receipt 비교로 수정.
+- 동일 실패가 두 번 재현된 816/680 실행은 재계산하지 않고 checkpoint와 함께
+  폐기했으며 canonical DB와 phase roots는 보존.
+- 동일 기간 결과 141개를 재사용하고 누락 21개만 실행해 registry 162개를
+  통합: pass 120, excluded 14, fail 17, resource-excluded 11.
+- 상위 선별: PriceVolumeCorrContinuation, RebalancingPremiumHarvest,
+  DisagreementGatedEnsemble.
+- 2026-08-21~09-02 구간은 1m OHLCV 불완전으로 전부 fail-closed 처리하고
+  선별에서 제외.
+
 ### 2026-09-02 — alpha_max_pipeline_reorder_and_tradfi_snapshot_refresh
 - Research dates: 2026-09-02
 - Source type: `official_exchange_info + canonical_integration_contract`

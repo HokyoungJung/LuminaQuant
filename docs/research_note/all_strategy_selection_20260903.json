@@ -1,0 +1,867 @@
+{
+  "artifact_kind": "canonical_all_strategy_selection.v1",
+  "generated_at_utc": "2026-09-03T10:57:52.418629+00:00",
+  "lineage": [
+    {
+      "bytes": 22033,
+      "path": "var/reports/all_strategy_canonical_screen_20260903_missing/jobs/AbnormalReturnContinuationStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "8a3c26bd5ae0024109fa6295482826e6cc7c063783b789da2f337ae5a73d80dc"
+    },
+    {
+      "bytes": 56946,
+      "path": "var/reports/all_strategy_canonical_screen_20260903_missing/jobs/BasisFundingGapConvergenceStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "63f1ced30485952accdddf4df6b447889140d71fa0f138b49c04aaa712b6ba0b"
+    },
+    {
+      "bytes": 22075,
+      "path": "var/reports/all_strategy_canonical_screen_20260903_missing/jobs/NoiseFilteredVolatilityBreakoutStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "7f0ad3c183f3c499a594532f4182325010556508418a85d16589765963150ec8"
+    },
+    {
+      "bytes": 46797,
+      "path": "var/reports/all_strategy_canonical_screen_20260903_missing/jobs/OpenInterestGrowthPressureStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "149333430f5ad0dc550b762ec6b7acd005d9262e3044d57e0680c7e501115d6c"
+    },
+    {
+      "bytes": 22278,
+      "path": "var/reports/all_strategy_canonical_screen_20260903_missing/jobs/PcaResidualStatArbStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "a6a97daf32928343a6820f9dfb650e6bad93ee4017687def73e5f3934c310885"
+    },
+    {
+      "bytes": 22291,
+      "path": "var/reports/all_strategy_canonical_screen_20260903_missing/jobs/PrevDayBoxQuartileReversionStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "dd0b857928a6bab3cc25ac73f21caf74badd1388ddd8ff4a7708d514a9c000a2"
+    },
+    {
+      "bytes": 22437,
+      "path": "var/reports/all_strategy_canonical_screen_20260903_missing/jobs/ResearchOnlyDailyCrossSectionalNearHighAnchoringStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "1e96f0dab056df3f5920411100d7ff15b5b73c469ea830b22c37745cf028d37d"
+    },
+    {
+      "bytes": 22409,
+      "path": "var/reports/all_strategy_canonical_screen_20260903_missing/jobs/ResearchOnlyDailyLowTurnoverTrendPersistenceStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "4a7aa403e4a28d07661f5288e18563363cbd47066c82e0e54b72c5f7160db602"
+    },
+    {
+      "bytes": 22233,
+      "path": "var/reports/all_strategy_canonical_screen_20260903_missing/jobs/SalienceTheoryValueStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "990dc4bc45ebd40aaf835108aea39bb1c226430c04e92ee2abb0a529bf71b613"
+    },
+    {
+      "bytes": 22317,
+      "path": "var/reports/all_strategy_canonical_screen_20260903_missing/jobs/SessionHighBreakoutScalpStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "609a7c99f640484af0716be6ab429cc1af03028fb2191e493dba5530daf87b3a"
+    },
+    {
+      "bytes": 21973,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/AccelerationRiderStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "ea6011bc7dea6b57d77653bda51639d70bf4e3b97a173c8b33a6ecfa7c45456b"
+    },
+    {
+      "bytes": 22310,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/AdaptiveRegimeMomentumStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "df523793099a0775b5e4d9ac818669fddb176a3058c33dd1ff42f1573a322ce6"
+    },
+    {
+      "bytes": 21981,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/AdaptiveTrendRiderStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "d01d2f64f25d0ceda69d9bde1fa633a267a9a98f12368d57ea959f9624fae805"
+    },
+    {
+      "bytes": 22313,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/AdfGatedReversionRiderStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "374e227f400e37edb1a5dfc7108dc4a272edab34dbb2f0f9896fa8df5390594e"
+    },
+    {
+      "bytes": 21958,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/Alpha101FormulaStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "fa419de6f934f1df21af73291c4408e0157351442ca7d0c7b5c1b2dc87b0f558"
+    },
+    {
+      "bytes": 22278,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/AlphaZooOptunaHybridLiveStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "3da8a85ff2edc589aa740ae63f5a636d5dc7ca8547e06ca027b8d41b8fb9fb07"
+    },
+    {
+      "bytes": 22077,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/AmihudIlliquidityMomentumRiderStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "8377778dd3945287e53183d4349a6e6af407838ea72c2143124b83d8d5f9db78"
+    },
+    {
+      "bytes": 22329,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/AvgCorrelationCrashGuardOverlayStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "165d0205ca99f544cbbfb39746f94c647c8361a80e6567ca950df5a426a64cec"
+    },
+    {
+      "bytes": 22354,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/BenchmarkLeadLagContinuationStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "d889b48650fd8e63eebf69b979e019a66a9524242b3a26569c80d4ff17bdc3c4"
+    },
+    {
+      "bytes": 22283,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/BettingAgainstBetaStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "152b97178c137daafbebd04166ea6da7d13e45de94b4ce7a232593181d180cf5"
+    },
+    {
+      "bytes": 4598,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/BitcoinBuyHoldStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "67c84d5ebb7707f03fd866f3932943492b6af7c5d3f562cea41ce374a8f0bedd"
+    },
+    {
+      "bytes": 22324,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/BreadthRegimeTrendTimerStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "296bd76a8ac44b235bbef9ad5e8ca5246a3c48d8133c6514a3d170076c6d13eb"
+    },
+    {
+      "bytes": 22310,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/BullBearRegimeRotationStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "cd367aa1a85f3afbf0e6e3d2130915cc3661727d0dd5bd69308e510005bb2ea9"
+    },
+    {
+      "bytes": 22293,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/CalendarSeasonalityOverlayStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "82baf06fd4b9fbebe9ebd4410334dd977a3bfad2afc1130e1a85780544a37b8b"
+    },
+    {
+      "bytes": 37072,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/CarryTrendConfluenceRiderStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "24c1b6301b36ef9e5cc3dceae99a4989476e266fdeed69e69dd3eb1cb782c18f"
+    },
+    {
+      "bytes": 22257,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/CompositeTrendStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "2f5f1073020a7ca99ea195f2cbed330ddde7cc6d1ce62c335a980ec0260a059f"
+    },
+    {
+      "bytes": 22365,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/CompressionBreakoutContinuationStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "90c49eaf43077ceb649f055b0dbe2e10da6defda3afdcb415fc08c60b6060ede"
+    },
+    {
+      "bytes": 22300,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/ConfidenceGatedTrendStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "4ace5cf05aaf11a36c6a2eac9bf9ece1e4fddd723230b246eec501ccb721db0a"
+    },
+    {
+      "bytes": 22338,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/CrossAssetDiversifiedTrendStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "51ed67d7bb956cdfe1038e817f1dacdb7ce4fb0a5104effdd0475707fcd332d0"
+    },
+    {
+      "bytes": 7322,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/CrossCryptoSlowDiffusionStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "9aec2d0ca68695b6bd40cc04340797ba76af3f830220bfc91544d57ed944a52a"
+    },
+    {
+      "bytes": 22402,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/CrossSectionalCapitalGainsOverhangStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "e8972b016d4aefd9f93b2dcb6fc5f124d3592f3e6fbb2ba1b4d54e06de932fb3"
+    },
+    {
+      "bytes": 22432,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/CrossSectionalCloseLocationAccumulationStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "4ee8680835982d7d5990464bbe9a916feb4875e56ea5921a8cecb7a8b6a449ec"
+    },
+    {
+      "bytes": 22403,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/CrossSectionalDownsideBetaAsymmetryStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "96e1608b0aadd29a362a9d714890752a608077e7c56b51b31248e7238a812e09"
+    },
+    {
+      "bytes": 22355,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/CrossSectionalEquityMomentumStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "9002b8e7832bbf6abf13d5913317625a9ff2615b0d7d77ec5bd1c32aa2162946"
+    },
+    {
+      "bytes": 22364,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/CrossSectionalFlowShareRotationStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "fc86fa61a1badaeb0e031987386e67421e71a1f0ecad528063afd3f9029893a8"
+    },
+    {
+      "bytes": 37145,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/CrossSectionalFundingMomentumCarryStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "e873f94694c9e78546826efaeb2fe4005fe6bb84d43ba3bf510e5b055f3125e4"
+    },
+    {
+      "bytes": 22419,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/CrossSectionalIntermediateEchoMomentumStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "72e57f44fcbf22f1efec6a8ad33b1d5c1779266b672db7259c3d833b5326a281"
+    },
+    {
+      "bytes": 22372,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/CrossSectionalNearHighAnchoringStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "3f09b0af70350b05d86285e79c6dd124e1299b4ff9560f46f2a6b271532c2456"
+    },
+    {
+      "bytes": 22366,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/CrossSectionalNearLowRecoveryStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "fed00d48c12a71efb3f3caaf2d453430a509d5a229d8248ba522cf7998530c1f"
+    },
+    {
+      "bytes": 22336,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/CrossSectionalOffSessionTugOfWarStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "f077110aa71059bb0191ae431a0ca01a39efc1d1aa15341df2fa9d37735e534b"
+    },
+    {
+      "bytes": 22343,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/CrossSectionalPathConvexityStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "7e5139441e89662a1e936375eb44f8bb3af9b8114925cc93c87c00af91149139"
+    },
+    {
+      "bytes": 22372,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/CrossSectionalPriceDelayPremiumStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "e1c8a2008ba3c828596f99fb200076e798267e18e233be4fa46908bbf1fc97d0"
+    },
+    {
+      "bytes": 22406,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/CrossSectionalRegressionTrendQualityStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "956760deaf1b5daa36dc3b63253e93f621b5d65e8d0e6a462baab37a3a5d10ef"
+    },
+    {
+      "bytes": 22344,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/CrossSectionalSeasonalPersistenceStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "eb91853b03cff6045c285d8d1b0f8356f1a2cfba0c100cf21585e1e42112414b"
+    },
+    {
+      "bytes": 19881,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/CrossSectionalShortTermReversalStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "5fd25c136f75b32eab752ba69ed049d90795d1fbf1825143dcd1b2be070328a7"
+    },
+    {
+      "bytes": 22309,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/CrossSectionalTimeUnderWaterStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "bbebe6468ad2637e16e1dea7eb34de04d50708aff981a4cd54d60e2e57be425a"
+    },
+    {
+      "bytes": 30640,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/CryptoFxAlphaZooStateStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "6aeffdcb8f72b14dd7249aa12cee9fec7be176f53a8d3c0430bbf8445184078f"
+    },
+    {
+      "bytes": 22340,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/CusumChangePointTrendRiderStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "c93d924d3676f71cda443319845b372e7d02081b03f9545c7e9aa9ff54cef242"
+    },
+    {
+      "bytes": 36497,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/DeepLearningForecastGateStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "8b3d904e4ef4a83753042c08dbaab2e4b2685d43da3f5156de37fca817408955"
+    },
+    {
+      "bytes": 20469,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/DerivativesFlowSqueezeStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "e479a61a18a58df48ed04acc5e4746fb5872b9c0c0cd08995facd3f54e039532"
+    },
+    {
+      "bytes": 22326,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/DisagreementGatedEnsembleStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "c5d1dc69593a6b669d991d5b7852dab242ed07b6874326cb06060c5c6262ddc5"
+    },
+    {
+      "bytes": 22322,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/DispersionConditionedReversionStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "81d49206f1e0b7d98a60bf1528cde3bd53267c76ce0a860038423e242284b4b0"
+    },
+    {
+      "bytes": 68046,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/DiversifiedMultiFactorEnsembleStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "64b2e622ce3f9492cc911755571b15d411b527eca953d5c8ddd25e13354ef914"
+    },
+    {
+      "bytes": 22270,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/DonchianAtrTrendStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "82d87ad7299f4d9986c06725fbbf5a624eb658546b020704edc4740d5f0b5733"
+    },
+    {
+      "bytes": 22324,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/DownsideTailRiskPremiumStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "0318ad72edf46a7a816a10d95c573978692ab20f20f2270611f5de2789e2a9f1"
+    },
+    {
+      "bytes": 22361,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/DualMomentumDefensiveRotationStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "a510605fae5aa27f044c07a06ebbfa2af021664c2de5a5a7a388ea586ab767ca"
+    },
+    {
+      "bytes": 22333,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/DualMomentumIndexRotationStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "dd446fb18bf047d3e64efb20d5c57d4c4b1c30ad97f2cfc67ab925d326a0212c"
+    },
+    {
+      "bytes": 19878,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/EquityBenchmarkResidualReversalStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "5f0a6b57e49409422eed4e6350b896c5cc0e5a6e66a8435f508f2cc37ea3027b"
+    },
+    {
+      "bytes": 19859,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/EquityMetalRiskRegimeRotationStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "df0388a5a698af08946a9276f615b1fde357b05df867f8a2c0eeacb7f8697b0d"
+    },
+    {
+      "bytes": 22306,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/FalseBreakoutReversalStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "0cacb9e5165eab6a1486cd2297ecd2f750b3c390713c8776abde0b6e35c724cb"
+    },
+    {
+      "bytes": 20779,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/FundingDislocationTrendCarryStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "310e42d8763c0e4058bb1974c2836c00feec4f394f7841ebc849180fe2b7db95"
+    },
+    {
+      "bytes": 37024,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/FundingHarvestCarryStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "8d0e282775214d956002f3d6362538996ac5bc5d4d30f7ab94e2295ff51c737d"
+    },
+    {
+      "bytes": 21997,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/GarchInnovationRiderStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "7a9acee8dd7e93f882f09fbe7e1729cb8991d8f0168a9d6cb7b84abc072e3ef4"
+    },
+    {
+      "bytes": 6090,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/GoldSilverRatioMeanReversionStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "68a7f3c573357531a86ce78cb9428f0b9ad1d7af45611e9c41722183e388125f"
+    },
+    {
+      "bytes": 6031,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/GoldSilverRatioTrendStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "9c288e95391dd8842006746d815e29a3af1953d4b4eccd733b9ce0d5b34ca6f4"
+    },
+    {
+      "bytes": 7294,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/HourlyShockReversionStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "6449245f657fa6ef6411a041d5ef229017572b8a5c0fd674ab5e4b734059b342"
+    },
+    {
+      "bytes": 21965,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/HurstRegimeGatedStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "afda527041b3978dcb9562add440eceb6ddb259d6a06b61acdff3c25bcb487f8"
+    },
+    {
+      "bytes": 22342,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/IdiosyncraticSkewInnovationStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "a085339712767bcb902fe22ad498668df9691ff5d03d8ce47c9803680ab95644"
+    },
+    {
+      "bytes": 22320,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/IdiosyncraticVolatilityStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "f42206894ec9d77d8b232814a50cd8be42262919a92caf4899a14588c0a900ae"
+    },
+    {
+      "bytes": 22374,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/InformationDiscretenessMomentumStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "701889d0cd92d409704525cb14b06f091e1714fb0ec20b285003c614d47ea5f4"
+    },
+    {
+      "bytes": 22321,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/IntermarketLeadLagContinuationStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "a05db87b390409845d2b608dd75ad31c8e7f45301620a79030cae4fa42b46c16"
+    },
+    {
+      "bytes": 22287,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/IntradayFlowPressureRiderStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "ad5f820077a37bcdc249f2d458c370128d8342f861dd1f7d8c498b9c1c10feff"
+    },
+    {
+      "bytes": 22360,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/IntradaySeasonalMomentumRiderStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "19e259a8ed5036a2b471507202aec33e6c121b952cfb1187445414ca34315b36"
+    },
+    {
+      "bytes": 22224,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/KalmanTrendRiderStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "6298d3d9aabf800b1df61e28e7a3235e19e744bf060ea7c3156bd3c25046cd71"
+    },
+    {
+      "bytes": 22209,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/LagConvergenceStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "2461f48f29764c50f3caa973524f5e7c94720726deb70b2384e04dbc0ffe61a4"
+    },
+    {
+      "bytes": 22306,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/LastDayLiquidityRegimeStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "3c9748543199d2cb0882f59d20f800301b2530e46e4655a239cefd0dad22e708"
+    },
+    {
+      "bytes": 5923,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/LeadLagSpilloverStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "1e34b898f64c67c5f973e1ce3a77b5cfcf320fc67f91bfcce19f620bb805dabe"
+    },
+    {
+      "bytes": 22037,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/LeveragedTrendTimingRiderStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "29f8663086aa92f3662bdcc7a70106fdb3342630b46163d80bd58b8681d753f0"
+    },
+    {
+      "bytes": 57842,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/LiquidationCascadeReversionStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "e1d0da5434c5be17b1524fc6e0886e75e9bdbe6e7652104466a48dae8f1ee486"
+    },
+    {
+      "bytes": 22315,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/LiquidityShockReversionStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "28328f96166e15726cdee417bc5d7dad141beb87378649463b3d0ac61cb4cd4f"
+    },
+    {
+      "bytes": 22349,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/LongRunOverreactionReversalStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "aea5b45f9c20f1ed4409d980cdbe1b07cb58e324adc78c127dab158a22f9abe0"
+    },
+    {
+      "bytes": 22267,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/LotterySkewnessStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "1a2ccd3c1a23bcc39f10144fe4cbf99ccac76143b00dc9a68e2c0f56a9f0155d"
+    },
+    {
+      "bytes": 22340,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/LowTurnoverTrendPersistenceStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "f20ca09573df2c4fba840fa39be3d359e3ebdda99640422f4cba226720b345d1"
+    },
+    {
+      "bytes": 19811,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/LowVolatilityMomentumStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "2af20c8bc6e46409f87896f1d75de72b0229e90038be144c5526b474c6d9ecbf"
+    },
+    {
+      "bytes": 22273,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/MeanReversionStdStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "55b3aed7ff6988b50ac43453d5b4bdcf044d53553b65fcee703bd48295d5082a"
+    },
+    {
+      "bytes": 19819,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/MetalEquityDivergenceReversalStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "cfff6d92da372cb62b7f5b5057f3db24e6f4a41a698c6458e4e0baae24e6f98a"
+    },
+    {
+      "bytes": 22333,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/MetalsRelativeValueBasketStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "e47ead2132bcd5a5a2a408a9b9797d4def778b68ca7dc2ac9cc09146c02824ed"
+    },
+    {
+      "bytes": 22308,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/MicroRangeExpansion1sStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "f8360cddcbd6878dc316f5343cdbbc8bfac0823779591a02bcf901cc76598493"
+    },
+    {
+      "bytes": 22388,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/MomentumCrashDynamicScalingOverlayStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "39cbc5b9cc256252bb3e6a52be9d6ed3f17d357b936a53fa954e4630c0f51b80"
+    },
+    {
+      "bytes": 21981,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/MovingAverageCrossStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "8da8721cce9dec2c65eec8e1f943d55f34a5f72cc783db8106f2c8a85cfefe7c"
+    },
+    {
+      "bytes": 22053,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/MultiTimeframeTrendEnsembleStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "6b06ce0bedabcb04aa7f18597d8721db7aeca30489e22a0cbe6e56322fb3110c"
+    },
+    {
+      "bytes": 19774,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/NearHighMomentumStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "a6203ef94e55cdb3178e01ba3584c12b51893b73dbc3edd8ca9efd0f0765b66a"
+    },
+    {
+      "bytes": 36963,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/OpenInterestTrendConfirmationRiderStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "fda0a2b7f25a946c3d6cd95d3891c570591970466fb9df1de564954b5382cd50"
+    },
+    {
+      "bytes": 22330,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/OpeningRangeBreakoutRiderStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "9e5ebc3475a7097b76ac553dd591bf74c9af1ced6153818f47d9cd3ae2cb7b59"
+    },
+    {
+      "bytes": 22326,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/OpeningRangeContinuationStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "0a1e81735bd095695e67cb9037b19ac4aed451b54c8de9ed1a358b32868632f7"
+    },
+    {
+      "bytes": 45991,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/OrderBookImbalanceReversionStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "bcd062b456fefc8d149a3db6c1fc99a50e36959ad853a134314bb1866f0d30b5"
+    },
+    {
+      "bytes": 5970,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/PairSpreadZScoreStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "856224785d80d43ba672b90a84417ec77734a7eea276d78c7fdda8fa15f7cb92"
+    },
+    {
+      "bytes": 5977,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/PairTradingZScoreStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "c6870c7e5d8ce754f84d0fcd7c8ea8fc60c96f8b2f874722fe2ebd4efd77bc3d"
+    },
+    {
+      "bytes": 8755,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/PairsSpreadMeanReversionStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "e20a92c92385c1b7f7f9b57c88d116dbd6388bac345e86b2a5a70d66d701fefc"
+    },
+    {
+      "bytes": 22286,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/PanicReboundMeanReversionStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "5833a798872733feee635b4e6297a0eb6deab2ac9ebf78342f4c5691de06cb32"
+    },
+    {
+      "bytes": 22061,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/PermutationEntropyTrendRiderStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "7821d7bc1fcf64544ebc8e9be83656b802acd3d8fbf39552be8b230ffac2b4d3"
+    },
+    {
+      "bytes": 7322,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/PerpCrowdingCarryStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "6042c433c39cccd19e290c66709d6a6f76fd2dc348778f1979be61f51f2ba05b"
+    },
+    {
+      "bytes": 22341,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/PriceVolumeCorrContinuationStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "804014e825b2923307a000bbf764554dda279f544f3ab61d20ecdf7f623a832a"
+    },
+    {
+      "bytes": 22306,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/ProfitMoonshotBreakoutStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "9abc0705fbf24478ee89e3d91b5bfbbfb7c945e7161e49229cc69872606e39bc"
+    },
+    {
+      "bytes": 22321,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/ProfitMoonshotReversionStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "8e23a4b7a42a52cabff1f8241120b50b073c728aaa2a208370ca836a7dbd26a2"
+    },
+    {
+      "bytes": 22285,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/ProfitMoonshotTrendStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "090b366878e6b20e858a029319b12558c0210a2d67ed03fbe725ef6ec17482ac"
+    },
+    {
+      "bytes": 22037,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/PullbackTrendContinuationStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "6b162189f0e20128dc7562592b5bf319d938ced5a01e8cf59572c30783af8748"
+    },
+    {
+      "bytes": 22209,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/RareEventScoreStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "ec71827763e241b526b3645db7e835093a86cbfef8bbbcaf7ddd26f8e95365cf"
+    },
+    {
+      "bytes": 22077,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/RealizedSemivarianceTrendRiderStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "e91fe1c4808c853c86f50740a6b9eb1c7fd7c0527d7045d0330921edcf0e1f1c"
+    },
+    {
+      "bytes": 22029,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/RealizedVolTermStructureStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "ff8234003242f9eb1c369396c550178427dbe24b2eb2c8b8fd76b773d144db45"
+    },
+    {
+      "bytes": 22327,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/RebalancingPremiumHarvestStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "427d4e4494ee9eb02bcd794fad9fb9b69d50521d9e6daaa93e2055a4b5f54e6c"
+    },
+    {
+      "bytes": 22397,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/RegimeAdaptiveDisagreementEnsembleStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "631f539a141a69b85622f87ea60fe63a3c388b1512a3228602289b2d41bea6ba"
+    },
+    {
+      "bytes": 22022,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/RegimeBreakoutCandidateStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "ba599d060fde1d956367d95d0621f41390a8227f81c7fe7968d7c6855aa7e91d"
+    },
+    {
+      "bytes": 22354,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/RegimeRouterConfirmedRotationStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "383ee5a97d0f438ddb9720cfd86e6ebb7aeff143870ebc511f9c3a2384830fb1"
+    },
+    {
+      "bytes": 22311,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/ResidualEquityMomentumStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "05d3d2a262771fb8d9f7cc8fb84720fba4faf00586961ea83fa0050b6050c7b3"
+    },
+    {
+      "bytes": 19830,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/ResidualMomentumRotationStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "0dbab188284b79bdc66ff36341110116a4cd7b44cbc64a1345b86cbb3304c7b0"
+    },
+    {
+      "bytes": 22263,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/RollingBreakoutStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "edeb1aeb5944be60ac2ccf34dd8d5a1f964e88f794146c72787ce4820d9f2cef"
+    },
+    {
+      "bytes": 22285,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/RoundNumberBarrierStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "8cc57be71d17c9ca766162e3bd9d8b5a8e2acbc68fc57a10147c6ba82cb88f1b"
+    },
+    {
+      "bytes": 22182,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/RsiStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "2347b47d4338a5092f92be781b1cad13fdd68e4a19b633777cdae7105242b022"
+    },
+    {
+      "bytes": 22326,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/SeasonalMicroBreakoutRiderStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "7afd2b5f3f2c40664c1db5c990fca0c60b567c3751eb076f8f50d8d07ddd44cf"
+    },
+    {
+      "bytes": 22312,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/SelectionGatedMomentumStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "defb0cc727472e464b68b01911f0c6a51812ab6fadfebed70c2736216ea9e2ae"
+    },
+    {
+      "bytes": 22322,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/SelectionGatedReversionStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "48ba13c9126ef04464584a8eaa16a2ad7ba5f24429ae32f59912b6480595dfd5"
+    },
+    {
+      "bytes": 22251,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/SemisLeadLagRotationStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "0e00c3826da790fdcee3cca6ca7b4b6a34cde57b6645806a8692a3d2a0f7e244"
+    },
+    {
+      "bytes": 5978,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/SessionFilteredPairCarryStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "898584b6651c0ecfa02c6007d0f547fc35dcba0946fad57ac403c7d215ee2163"
+    },
+    {
+      "bytes": 22349,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/SilentVolumeShockResolutionStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "2d7e60af8221a48fda93c594926f1098f92f102f957130df5a1735118a4bdae1"
+    },
+    {
+      "bytes": 22288,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/SlowCrossSectionalLeadLagStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "b9f3dd45208b0e106622e92e357dc92086c823766f3794d7f6014e5430e4fd2b"
+    },
+    {
+      "bytes": 22278,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/SpectralCycleRiderStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "407fde5539b65be98505a908ebf4ea1e38490b6c2d920f0973d152379876773d"
+    },
+    {
+      "bytes": 22372,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/SpreadStressLiquidityReversionStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "1948bc443262fe327d40abcc2476a739caaa19219ec533d0134509cb1652bb47"
+    },
+    {
+      "bytes": 22402,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/StationarityGatedResidualReversionStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "d70da8af0e1aa0a7f044bed599e0ad72440ee375e2fd16a29ad3885be4a23c6f"
+    },
+    {
+      "bytes": 22346,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/SystematicCoskewnessPremiumStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "eb36a6c6078a240b14619566d0de886882b0953dd945409e5de9e095a09a3f15"
+    },
+    {
+      "bytes": 22287,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/TailIndexRegimeRiderStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "1709fb0a00402c869c98fecaca925d4d57c8c770f0765d929cbb4f9545d94f39"
+    },
+    {
+      "bytes": 13488,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/TakerFlowExhaustionReversalStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "df323a976ffa9f649ad4c4fad719b1bff4235ca0d2d255e6e80c292b5385d746"
+    },
+    {
+      "bytes": 11076,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/TakerFlowImbalanceContinuationStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "a73bc688464865c5749f102cffc5b23339d61acebea9300fecc81bc61871da02"
+    },
+    {
+      "bytes": 6007,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/TimeframePairZScoreReversionStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "a9b07c93ecea080c8f2d39a9bcb8904413ca85ada5662747a0cb4199265bac86"
+    },
+    {
+      "bytes": 22280,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/TopCapTimeSeriesMomentumStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "83a80e001cb0a65f9ab1260f16173d3dc26befcf493f38942b455385fd821bca"
+    },
+    {
+      "bytes": 22318,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/TrendEfficiencyMomentumStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "877765f91a30f2bbe4ef869b19ef0d42a313f6bfb4c9a0005c2f3ed51d696676"
+    },
+    {
+      "bytes": 22333,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/TrendGatedResidualMomentumStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "56dacc8508b4b756c32efd9ba63456a19905596d3d7459e2e8948ef7712cb4dc"
+    },
+    {
+      "bytes": 22272,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/VWAPCompressionReversionStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "e4a60f11a65d110d7e1016c0f66156f95329fd828c06582651692501286d0ca7"
+    },
+    {
+      "bytes": 22308,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/VarianceRatioTrendRiderStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "3f364957e69f2d45704ff3bec532a70be991501953c3f4e79fb28fd03dff24fa"
+    },
+    {
+      "bytes": 22349,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/VolCompressionVWAPReversionStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "f3c3901bb0cb2bbc32606c776a6127800b2ec4499fc22b851c2e9d81ef3dfc15"
+    },
+    {
+      "bytes": 22345,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/VolCompressionVwapReversionStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "79b72f1216790002b7c51cd13467b38d0b304c489f7b94ffd46a8a71693db61f"
+    },
+    {
+      "bytes": 22346,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/VolManagedMomentumCrashGateStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "097ed6af65054c7ad1816f46126585a5fe9d91bd266cb78c329b62836e136cf1"
+    },
+    {
+      "bytes": 22259,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/VolManagedRiskOverlayStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "24402c1b64659e80597035e24f76defa7584514082bf509448dc3f73e62f3195"
+    },
+    {
+      "bytes": 22272,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/VolOfVolRegimeTrendGateStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "5c5b11c03aa7450c6f7b7d090e82cbdbc5b3895c7ee387570b7d643dc8b12d98"
+    },
+    {
+      "bytes": 22306,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/VolatilityBreakoutRiderStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "3c1ff5fd288284f4536ebede1653c4e66a320aafd817d130f39803b3f663cc0f"
+    },
+    {
+      "bytes": 22372,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/VolatilityCompressionReversionStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "6c42353d02a566f60aa00a932759258c3630f064d5d7bed55c64075d3c69e17b"
+    },
+    {
+      "bytes": 22369,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/VolatilitySqueezeBreakoutRiderStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "816b0c43bb94c6d689142cf4d54f0e1caeed4a1c37ef4d3bd2dd27d9a007b3c5"
+    },
+    {
+      "bytes": 22336,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/VolatilitySqueezeBreakoutStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "c66bb620dbda865fe3ccbae42677a56d922ef03d3fe38528e5acb7125aaf0c40"
+    },
+    {
+      "bytes": 22319,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/VolumeClockMomentumRiderStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "1c07f86f40c82d47f423df3be319b75c52e85e23d0b82a69d09cf081cc923c09"
+    },
+    {
+      "bytes": 21974,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/VpinToxicityRiderStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "a612f0dc37c8fcad29a8ab07c2001122b776ff0bbacf751a517aec1bfa7d74de"
+    },
+    {
+      "bytes": 22246,
+      "path": "var/reports/common_period_reval_20260812/full/jobs/VwapReversionStrategy/latest_alpha_sleeves_backtest_latest.json",
+      "sha256": "31c70558ef8074a99d97db6dbe60143f664380806c6d0877c2bd230638bf837f"
+    }
+  ],
+  "order_routing_enabled": false,
+  "registry_count": 162,
+  "resource_excluded": [
+    "CrossSectionalResidualTakerFlowStrategy",
+    "EquityCurveKillSwitchOverlayStrategy",
+    "KalmanPairsStatArbStrategy",
+    "MaScoreVolTargetRotationStrategy",
+    "OffSessionBasisDislocationStrategy",
+    "OvernightSessionReturnRiderStrategy",
+    "ProspectTheoryValueStrategy",
+    "ResearchOnlyFourHourFundingHarvestCarryStrategy",
+    "RsiDivergenceScaleOutStrategy",
+    "TrendGatedIbsReversionStrategy",
+    "TurtleUnitPyramidingStrategy"
+  ],
+  "result_count": 162,
+  "selected": [
+    {
+      "max_drawdown": 0.0043610792517429445,
+      "sharpe": 4.688627109260254,
+      "strategy": "PriceVolumeCorrContinuationStrategy",
+      "total_return": 0.010656390553370754,
+      "trade_count": 10
+    },
+    {
+      "max_drawdown": 0.038929228196081044,
+      "sharpe": 3.1410090377852593,
+      "strategy": "RebalancingPremiumHarvestStrategy",
+      "total_return": 0.059815696423428655,
+      "trade_count": 45
+    },
+    {
+      "max_drawdown": 0.02588807554786459,
+      "sharpe": 2.126597796503889,
+      "strategy": "DisagreementGatedEnsembleStrategy",
+      "total_return": 0.020665116846928955,
+      "trade_count": 358
+    },
+    {
+      "max_drawdown": 0.008012763273965917,
+      "sharpe": 1.8769521909393445,
+      "strategy": "BitcoinBuyHoldStrategy",
+      "total_return": 0.007440733698004909,
+      "trade_count": 1
+    },
+    {
+      "max_drawdown": 0.004431473398322002,
+      "sharpe": 1.7904358509378209,
+      "strategy": "MomentumCrashDynamicScalingOverlayStrategy",
+      "total_return": 0.004840951414113004,
+      "trade_count": 10
+    },
+    {
+      "max_drawdown": 0.0033706458862403626,
+      "sharpe": 1.6719839552238787,
+      "strategy": "CompressionBreakoutContinuationStrategy",
+      "total_return": 0.003395950274097226,
+      "trade_count": 6
+    },
+    {
+      "max_drawdown": 0.0077539708600752235,
+      "sharpe": 1.0375170404843945,
+      "strategy": "CrossSectionalPathConvexityStrategy",
+      "total_return": 0.004570253680427516,
+      "trade_count": 18
+    },
+    {
+      "max_drawdown": 0.0011475531156280678,
+      "sharpe": 0.8243160816242129,
+      "strategy": "FalseBreakoutReversalStrategy",
+      "total_return": 0.00033460063884116487,
+      "trade_count": 178
+    },
+    {
+      "max_drawdown": 0.008099466557876049,
+      "sharpe": 0.808884501331443,
+      "strategy": "CrossSectionalIntermediateEchoMomentumStrategy",
+      "total_return": 0.0028939500196512036,
+      "trade_count": 35
+    },
+    {
+      "max_drawdown": 0.008464551800410435,
+      "sharpe": 0.6767865858973792,
+      "strategy": "LowTurnoverTrendPersistenceStrategy",
+      "total_return": 0.002496019664714133,
+      "trade_count": 10
+    },
+    {
+      "max_drawdown": 0.0035485996879256283,
+      "sharpe": 0.47578373301397814,
+      "strategy": "TrendGatedResidualMomentumStrategy",
+      "total_return": 0.0005454606902608461,
+      "trade_count": 5
+    }
+  ],
+  "selection_rule": "status=pass, trades>0, total_return>0, sharpe>0, abs(max_drawdown)<=0.35; rank by sharpe then return",
+  "status_counts": {
+    "excluded": 14,
+    "fail": 17,
+    "pass": 120,
+    "resource_excluded": 11
+  },
+  "window": {
+    "end_exclusive": "2026-08-12T00:00:00Z",
+    "start": "2026-07-01T00:00:00Z"
+  }
+}
