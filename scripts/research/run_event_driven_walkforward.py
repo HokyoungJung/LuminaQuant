@@ -128,6 +128,7 @@ def _valid_cell(path: Path, *, strategy: str, start: str, end: str) -> bool:
             and payload["end"] == end
             and len(rows) == 1
             and rows[0]["strategy"] == strategy
+            and rows[0]["status"] in {"pass", "excluded"}
         )
     except OSError, KeyError, TypeError, ValueError, json.JSONDecodeError:
         return False

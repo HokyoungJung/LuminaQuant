@@ -116,7 +116,7 @@ def test_frozen_acquirer_wrapper_and_lock_bytes_are_pinned() -> None:
         / "scripts/research/run_alpha_max_phase_preparation_from_eligible_source.py": EXPECTED_V3_PINS[
             "phase_wrapper_sha256"
         ],
-        ROOT / "uv.lock": "79a2ba8fa8d5fc5fc0b1da2ec504730a0136726668edee0eb044d4f705322f1d",
+        ROOT / "uv.lock": "0a82dec5f1cbc4cb2a7ef3395557c66025ca866a39408c0d62bd65e162240a56",
     }
     for path, expected_sha256 in frozen.items():
         assert hashlib.sha256(path.read_bytes()).hexdigest() == expected_sha256

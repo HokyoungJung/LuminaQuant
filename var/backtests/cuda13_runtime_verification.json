@@ -1,0 +1,21 @@
+{
+  "device": null,
+  "gpu_engine_attr": true,
+  "gpu_probe_ok": true,
+  "gpu_probe_reason": "gpu smoke test passed (nvidia-smi detected 1 GPU(s))",
+  "min_vram_gb": 0.0,
+  "nvidia_ok": true,
+  "nvidia_reason": "nvidia-smi detected 1 GPU(s)",
+  "reason": "strict GPU runtime smoke passed",
+  "requested_mode": "forced-gpu",
+  "require_gpu": true,
+  "resolved_engine": "gpu",
+  "resolved_reason": "gpu smoke test passed (nvidia-smi detected 1 GPU(s))",
+  "status": "passed",
+  "strict_query": {
+    "buckets": 32,
+    "cpu_rows": 32,
+    "gpu_rows": 32,
+    "matches_cpu": true
+  }
+}

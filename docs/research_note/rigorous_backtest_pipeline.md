@@ -13,9 +13,12 @@ and restart behavior. It never copies market data and it never enables order rou
    manifest candidates use `run_event_driven_candidate_evaluation.py`.
 3. `validation_selection` — `build_walkforward_evidence.py select` freezes finalists
    using validation cells only.
-4. `execution_model_tick_validation` — finalist execution-model feasibility against
+4. `portfolio_construction` — `build_walkforward_portfolios.py` compares equal
+   weight, ERC, threshold HRP, dendrogram HRP, HERC and NCO on aligned validation
+   returns; insufficient survivors or observations are recorded as an explicit skip.
+5. `execution_model_tick_validation` — finalist execution-model feasibility against
    canonical raw aggTrades via `validate_execution_model_ticks.py`; Rust is required.
-5. `report_only_evaluation` — `build_walkforward_evidence.py report` attaches the
+6. `report_only_evaluation` — `build_walkforward_evidence.py report` attaches the
    already-computed locked-OOS cells to the frozen selection. Its result cannot feed
    back into candidate or parameter selection.
 
@@ -37,10 +40,17 @@ Do not create version-suffixed checkpoint trees or private copies of canonical d
 A retry uses `--resume`. A completed stage is reused only when its command, script,
 git commit, explicit inputs, canonical data receipt and output hashes all match.
 
+Official funding refreshes live in
+`data/market_parquet/funding_settlements/` as immutable sparse overlays. The loader
+merges settlement-only fields over the base feature row at the same nominal
+timestamp while preserving the source timestamp; OHLCV and unrelated feature
+columns are not copied or replaced. `refresh_funding_settlements.py` records API
+receipts and rejects conflicting outputs.
+
 ## Resource contract
 
-- Use `uv sync --frozen`, then `uv run python scripts/build_native_backends.py`;
-  the CPU Rust/PyO3 backend is built into the uv environment.
+- Use `uv sync --frozen --extra native`; the CPU Rust/PyO3 backend is built
+  reproducibly into the uv environment.
 - The plan records one `memory_max_bytes` value, capped at 7 GiB. Production
   execution runs in a systemd cgroup with matching `MemoryMax`; Python
   `RLIMIT_AS` is deliberately not used because mapped Rust/Python libraries
@@ -48,7 +58,7 @@ git commit, explicit inputs, canonical data receipt and output hashes all match.
 - Every stage runs in a fresh child process, so Python/Polars allocations are returned
   between stages.
 - Stage inputs are hashed with streaming 1 MiB reads. The canonical database is bound
-  through its audit receipt instead of rescanning or copying 31 GiB per stage.
+  through its audit receipt instead of rescanning or copying the payload per stage.
 - `LQ_RAW_FIRST_BACKEND=rust` is the supported raw aggTrades/1-second path.
 - CUDA is optional and not required by this pipeline.
 
@@ -65,8 +75,7 @@ outside `var/backtests/<run-id>`, output inside the canonical DB, routing-enable
 plans, wrong stage order, and memory limits above 7 GiB.
 
 ```bash
-uv sync --frozen
-uv run python scripts/build_native_backends.py
+uv sync --frozen --extra native
 uv run python scripts/research/run_rigorous_backtest_pipeline.py \
   --plan configs/research/rigorous_backtest_plan.json
 

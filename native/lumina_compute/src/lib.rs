@@ -12,6 +12,9 @@
 //! Computation logic is bit-identical to the replaced ctypes crates.
 //! Module name: lumina_quant._compute  (set via pyproject.toml module-name)
 
+// PyO3 exports intentionally mirror their array-oriented Python contracts.
+#![allow(clippy::too_many_arguments, clippy::type_complexity)]
+
 use numpy::ndarray::{Array1, Array2};
 use numpy::{
     IntoPyArray, PyArray1, PyArray2, PyReadonlyArray1, PyReadonlyArray2, PyUntypedArrayMethods,
@@ -77,13 +80,13 @@ fn exact_fsum_finite(values: &[f64]) -> f64 {
             break;
         }
     }
-    if let Some(&next) = partials.last() {
-        if (low < 0.0 && next < 0.0) || (low > 0.0 && next > 0.0) {
-            let doubled = low * 2.0;
-            let corrected = high + doubled;
-            if doubled == corrected - high {
-                high = corrected;
-            }
+    if let Some(&next) = partials.last()
+        && ((low < 0.0 && next < 0.0) || (low > 0.0 && next > 0.0))
+    {
+        let doubled = low * 2.0;
+        let corrected = high + doubled;
+        if doubled == corrected - high {
+            high = corrected;
         }
     }
     high
@@ -322,11 +325,7 @@ fn mean_range_column(
         sum += row_value(returns, cols, row, col);
         count += 1;
     }
-    if count == 0 {
-        0.0
-    } else {
-        sum / count as f64
-    }
+    if count == 0 { 0.0 } else { sum / count as f64 }
 }
 
 fn mean_abs_tail(values: &[f64], end_count: usize, window: usize) -> f64 {
@@ -340,11 +339,7 @@ fn mean_abs_tail(values: &[f64], end_count: usize, window: usize) -> f64 {
         sum += value.abs();
         count += 1;
     }
-    if count == 0 {
-        0.0
-    } else {
-        sum / count as f64
-    }
+    if count == 0 { 0.0 } else { sum / count as f64 }
 }
 
 fn mean_tail(values: &[f64], end_count: usize, window: usize) -> f64 {
@@ -358,11 +353,7 @@ fn mean_tail(values: &[f64], end_count: usize, window: usize) -> f64 {
         sum += value;
         count += 1;
     }
-    if count == 0 {
-        0.0
-    } else {
-        sum / count as f64
-    }
+    if count == 0 { 0.0 } else { sum / count as f64 }
 }
 
 // ============================================================================
@@ -443,15 +434,15 @@ fn aggregate_present_buckets(
     let mut buckets: Vec<Bucket> = Vec::new();
     for idx in 0..timestamps_ms.len() {
         let ts_ms = timestamps_ms[idx];
-        if let Some(start_ms) = start_filter_ms {
-            if ts_ms < start_ms {
-                continue;
-            }
+        if let Some(start_ms) = start_filter_ms
+            && ts_ms < start_ms
+        {
+            continue;
         }
-        if let Some(end_ms) = end_filter_ms {
-            if ts_ms > end_ms {
-                continue;
-            }
+        if let Some(end_ms) = end_filter_ms
+            && ts_ms > end_ms
+        {
+            continue;
         }
         if ts_ms > effective_complete_through_ms {
             continue;
@@ -709,7 +700,7 @@ fn debounced_state_signal<'py>(
     let mut bars_held = 1_000_000_000_i32;
     let mut cooldown_remaining = 0_i32;
 
-    for idx in 0..len_usize {
+    for (idx, output) in out.iter_mut().enumerate() {
         let can_exit = bars_held >= min_hold;
         let mut exited = false;
         let long_exit_now = state > 0.0 && bool_at(lx, idx);
@@ -733,7 +724,7 @@ fn debounced_state_signal<'py>(
                 }
             }
         }
-        out[idx] = state;
+        *output = state;
         if state != 0.0 {
             bars_held += 1;
         }
@@ -1041,8 +1032,8 @@ fn evaluate_hybrid_optuna_portfolio<'py>(
         }
 
         let mut ret = 0.0;
-        for col in 0..cols {
-            ret += weights[col] * row_value(returns, cols, t, col);
+        for (col, weight) in weights.iter().enumerate() {
+            ret += weight * row_value(returns, cols, t, col);
         }
         ret *= exposure;
         if !ret.is_finite() {
@@ -1053,9 +1044,9 @@ fn evaluate_hybrid_optuna_portfolio<'py>(
         default_idx_out[t] = default_idx as i64;
         high_vol_feature_out[t] = high_vol_feature;
         exposure_out[t] = exposure;
-        for col in 0..cols {
-            raw_weights[t * cols + col] = weights[col];
-            exposed_weights[t * cols + col] = weights[col] * exposure;
+        for (col, weight) in weights.iter().enumerate() {
+            raw_weights[t * cols + col] = *weight;
+            exposed_weights[t * cols + col] = *weight * exposure;
         }
     }
 

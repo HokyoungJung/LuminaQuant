@@ -277,6 +277,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             },
             "exchange": str(args.exchange),
             "symbols": [],
+            "window": {"start_utc": str(args.start), "end_exclusive_utc": str(args.end)},
             "order_routing_enabled": False,
             "results": [],
             "completed_at_utc": datetime.now(UTC).isoformat(),

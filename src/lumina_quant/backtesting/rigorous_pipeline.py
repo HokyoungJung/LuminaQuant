@@ -24,6 +24,7 @@ STAGE_ORDER = (
     "coarse_screen",
     "event_driven_walk_forward",
     "validation_selection",
+    "portfolio_construction",
     "execution_model_tick_validation",
     "report_only_evaluation",
 )

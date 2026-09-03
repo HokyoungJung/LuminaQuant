@@ -1,0 +1,729 @@
+{
+  "artifact_kind": "lumina_quant.corrupt_raw_stream_retirement.v1",
+  "bytes": 16794323276,
+  "confirmed_corruption": {
+    "failure": "aggregate IDs are not strictly increasing; official Binance futures archive confirms the high-ID stream",
+    "foreign_interleaved_agg_trade_id": 28087235,
+    "official_futures_first_agg_trade_id": 560141960,
+    "sample_path": "data/market_parquet/market_data_raw_aggtrades/binance/ADAUSDT/date=2026-03-26/part-0000.parquet"
+  },
+  "control_receipts": [
+    {
+      "bytes": 406,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/WMTUSDT/checkpoint.json",
+      "sha256": "6e743873590b89e5559f17855ed6dca94f1ad96a3a6951d10a97492c2e86c1c4"
+    },
+    {
+      "bytes": 406,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/BZUSDT/checkpoint.json",
+      "sha256": "d11cb8bbfa9600962e8c5955ffdb9133e2f5aa3c864af095eb6ab9ccedbfe5b0"
+    },
+    {
+      "bytes": 409,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/AAPLUSDT/checkpoint.json",
+      "sha256": "54e844d1b431186652f96a3e404c48828c31468c2ce9f920f72b9fe97a89d920"
+    },
+    {
+      "bytes": 406,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/SPYUSDT/checkpoint.json",
+      "sha256": "6d4c8a18028b53ef6877cafda9d549375102d947567be1d1ae024baf2d225084"
+    },
+    {
+      "bytes": 408,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/TONUSDT/checkpoint.json",
+      "sha256": "0e44709aada628f5eb90a74419d2fb77a12de3faa8d0b4be0b637fe8eb7681c9"
+    },
+    {
+      "bytes": 152,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/TONUSDT/compaction.meta.json",
+      "sha256": "cde5a83f6a0200977766667e79c5dbfefdd5063525ba7d79d81f65f5c80f588c"
+    },
+    {
+      "bytes": 403,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/GMEUSDT/checkpoint.json",
+      "sha256": "0d1ca0fe9393b740979240b23f4d6a6921d643c0f1da48781e902300aa4e0251"
+    },
+    {
+      "bytes": 410,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/AAOIUSDT/checkpoint.json",
+      "sha256": "184de2bb72f384a364e7a0e748225d092a825dd16c11d8985e05f67bf5976c5d"
+    },
+    {
+      "bytes": 412,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/SOXLUSDT/checkpoint.json",
+      "sha256": "0f1328375b344679d6b3cefda94df40ead75d3356aa21fe6719fc2bf5b594c5e"
+    },
+    {
+      "bytes": 406,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/HIMSUSDT/checkpoint.json",
+      "sha256": "dc85b5e94f78354ca3ffdee914f7bd562cfd20fbba8701f79144f883dee3e5e2"
+    },
+    {
+      "bytes": 412,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/XAGUSDT/checkpoint.json",
+      "sha256": "087644d39c7914cfc5efa0fbfc7956d1a7ad4651e3b7378e38fea353e149b2e6"
+    },
+    {
+      "bytes": 152,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/XAGUSDT/compaction.meta.json",
+      "sha256": "8071a6e5e0414ee355cfe81d0e0b40caf08748dd1259a5083b1feb9f760f7114"
+    },
+    {
+      "bytes": 409,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/CLUSDT/checkpoint.json",
+      "sha256": "9138b3b644ddae80b1a09f096f6d9e3687d0635606f1940fb269e86413f66aea"
+    },
+    {
+      "bytes": 404,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/HDUSDT/checkpoint.json",
+      "sha256": "24f9153d4af3bf86c93a2f1bacac89a057e2521d35eeae495cf6947782948806"
+    },
+    {
+      "bytes": 411,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/DRAMUSDT/checkpoint.json",
+      "sha256": "8576149609152378107558e2e15908a248e1175f444ec3aa7e20dcdc0d5c16d5"
+    },
+    {
+      "bytes": 418,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/SKHYNIXUSDT/checkpoint.json",
+      "sha256": "fe92b4b6aa986923f8dfbb31fbc2b06aaec8ccca2ceebf502f4c8f77e5c7aa39"
+    },
+    {
+      "bytes": 411,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/GOOGLUSDT/checkpoint.json",
+      "sha256": "26d13e25157d9e778f07b5e37c5b37672dfe4835d3dc4828b6f86ba084c6483a"
+    },
+    {
+      "bytes": 404,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/DKNGUSDT/checkpoint.json",
+      "sha256": "eeedcfc259830f02dbbd7fa760e9309878811e1c14990ce81d631147ce5f0582"
+    },
+    {
+      "bytes": 406,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/NFLXUSDT/checkpoint.json",
+      "sha256": "c8698e35e389c1914a642295bb505333c3129e428c088d656f392a8b726c745c"
+    },
+    {
+      "bytes": 403,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/COSTUSDT/checkpoint.json",
+      "sha256": "493ea212584c2a0ce12b289c7001ec0e45cec18bcb52ef27229a40be4b4b0a14"
+    },
+    {
+      "bytes": 409,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/HYUNDAIUSDT/checkpoint.json",
+      "sha256": "331c0c4f04df7ffe656ff906d5d39ce1d9b6e4ca28dbfad82a512e2bdc140aed"
+    },
+    {
+      "bytes": 415,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/TRXUSDT/checkpoint.json",
+      "sha256": "1c2a158fbc8d76ec3c4e72b4c664b881a655287531ffbd351fa28129e1edc0a8"
+    },
+    {
+      "bytes": 152,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/TRXUSDT/compaction.meta.json",
+      "sha256": "1bbf8c4128ba6039a2edf840039cb53c5824c1c9cdfb648d1d80bb50603122f1"
+    },
+    {
+      "bytes": 408,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/QQQUSDT/checkpoint.json",
+      "sha256": "5abe3b4ba552a18313611f8a39173ec25f54e7222e831ad2db58ccee194cb9df"
+    },
+    {
+      "bytes": 410,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/AMDUSDT/checkpoint.json",
+      "sha256": "b20d42540751da6acb80b7d2b8395bd35b7416f53bd56a4f394751a9a5a5d60e"
+    },
+    {
+      "bytes": 405,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/EBAYUSDT/checkpoint.json",
+      "sha256": "8380820313aa549fb67080575e79d69567ab575129c34e5c8c0cb2756f3a7d96"
+    },
+    {
+      "bytes": 404,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/EWJUSDT/checkpoint.json",
+      "sha256": "ca8bec3d2c4857c49711370236784ce36b12cb3260efdcf8e5398504ef4a39fc"
+    },
+    {
+      "bytes": 405,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/MVLLUSDT/checkpoint.json",
+      "sha256": "c10f6cdf16d5788ebe4e49761c027d680a9f74942dab14c92cbec393211d01cf"
+    },
+    {
+      "bytes": 408,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/COHRUSDT/checkpoint.json",
+      "sha256": "2e4948f301aabda6c4e40c0646b132786458471ba7812fb211f7894ffd6ee0e0"
+    },
+    {
+      "bytes": 402,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/STRCUSDT/checkpoint.json",
+      "sha256": "683ac499a0b47cc825fec4df06120b525e91939573cc1a9ae2e8d8eb95f8ea9d"
+    },
+    {
+      "bytes": 410,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/AMZNUSDT/checkpoint.json",
+      "sha256": "23e442046928deb77adfc8672cbe86d772ae556d09fee025cf7d1c43f53698c7"
+    },
+    {
+      "bytes": 415,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/SNDKUSDT/checkpoint.json",
+      "sha256": "38e4405375ebe9a2f277543b4513e88aabd9384ebb8a4921ad9d7db27141b918"
+    },
+    {
+      "bytes": 412,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/MSTRUSDT/checkpoint.json",
+      "sha256": "ca52a7997611c29d9e435a2beb62e14bfda6b973c2cf9f8ed886eb1c04660cb2"
+    },
+    {
+      "bytes": 406,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/PAYPUSDT/checkpoint.json",
+      "sha256": "6bbf75384f73d248a8ea504629d558ecf751b7b719449157a6ea01ee6d594ef9"
+    },
+    {
+      "bytes": 402,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/KSTRUSDT/checkpoint.json",
+      "sha256": "bed61a0d730438646af06a560e8aee7e9e0daac462361df417cccd016f7c3919"
+    },
+    {
+      "bytes": 402,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/EWZUSDT/checkpoint.json",
+      "sha256": "7884d7918f8ce6bdd38fa99f8c169406337629422b0c0bec45186bcd3b092108"
+    },
+    {
+      "bytes": 411,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/METAUSDT/checkpoint.json",
+      "sha256": "374ca459dc437b8f3ab1e485b70efb9c8e7c3065987927f964039d8e00a5ed2e"
+    },
+    {
+      "bytes": 407,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/ASMLUSDT/checkpoint.json",
+      "sha256": "52b38d5b92211b38dfff8faa19f7ee426c29724897dea95270b696383753e0e6"
+    },
+    {
+      "bytes": 406,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/SMCIUSDT/checkpoint.json",
+      "sha256": "8f895169122a21bd3ca2a04d42a0e8ff918254030eb80ecd211d7f3be32bbfb8"
+    },
+    {
+      "bytes": 412,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/TSLAUSDT/checkpoint.json",
+      "sha256": "039def315309a6b4edc6eeda65e0c9485868414996e25525f5096b0e86cebf30"
+    },
+    {
+      "bytes": 413,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/MUUSDT/checkpoint.json",
+      "sha256": "749e9f4e738d4a7bdc95d28130beb2cc8748c251db8523cd282f6ea0e618bef3"
+    },
+    {
+      "bytes": 407,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/ASTSUSDT/checkpoint.json",
+      "sha256": "0c1e14eeaa4927a7282a5575d4c04dd4c1a76b41755b511b4e5d939327e3bde6"
+    },
+    {
+      "bytes": 410,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/COPPERUSDT/checkpoint.json",
+      "sha256": "316d66bbff03ae56ae172cd9dad3375aa2f49e37ca087f33c7e6425ec0b68800"
+    },
+    {
+      "bytes": 402,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/FLEXUSDT/checkpoint.json",
+      "sha256": "aa770aec77e83cc9121768e214eda0625a11fa7e026bc0426d437de377e9ba56"
+    },
+    {
+      "bytes": 409,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/BEUSDT/checkpoint.json",
+      "sha256": "aa43bc327e54d823a5beed7549f2bd60bc6821756d75523dea86b997756d2061"
+    },
+    {
+      "bytes": 405,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/FLNCUSDT/checkpoint.json",
+      "sha256": "65c47f88cba3cd0d7810d2fedeae9e44dde487dafb4764c5966928a68104c1ff"
+    },
+    {
+      "bytes": 413,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/INTCUSDT/checkpoint.json",
+      "sha256": "690ebce05a9291e56a1b5dd3b401e27d44b21cf5ac0640269846f1903dcddfcb"
+    },
+    {
+      "bytes": 410,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/NVDAUSDT/checkpoint.json",
+      "sha256": "6d1922ded5aad5fa2bef55d4520308d34f0678e42047c0de1ea9aa97dbe35939"
+    },
+    {
+      "bytes": 418,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/BTCUSDT/checkpoint.json",
+      "sha256": "3859fa67e604dde70cc6a3052735f269588a53e94ee6511a6060fb0f590227c1"
+    },
+    {
+      "bytes": 152,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/BTCUSDT/compaction.meta.json",
+      "sha256": "c6ee4979f0e78ec321bdac5989c925ab0abba515fe2e24722fc49004d56713f2"
+    },
+    {
+      "bytes": 411,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/XPDUSDT/checkpoint.json",
+      "sha256": "f0dcd7a097f033fc3cdf6a1a3b312d5aab9af5230a6521fedf1116da12a93e7f"
+    },
+    {
+      "bytes": 152,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/XPDUSDT/compaction.meta.json",
+      "sha256": "4d34733e55769c306054aece0b59aaf6a79b88c372199d3392b122c16124deba"
+    },
+    {
+      "bytes": 412,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/CRCLUSDT/checkpoint.json",
+      "sha256": "c25ed88a637527237f5d5a3a85f4dcd166d0df6e1f7638966187a3406262df48"
+    },
+    {
+      "bytes": 408,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/ORCLUSDT/checkpoint.json",
+      "sha256": "55332f60b6dba1ad0a48cdbd7fab2bfd071d9ad74595fde935d625a55aa1ef9e"
+    },
+    {
+      "bytes": 413,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/ADAUSDT/checkpoint.json",
+      "sha256": "adc8511a84407b95403f79c69ecb1e0b91a655920320e5c42e4c9040048caa15"
+    },
+    {
+      "bytes": 152,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/ADAUSDT/compaction.meta.json",
+      "sha256": "831b234472a48e7c52638d167e3efe1c449cb8bb37dbf4d7f399680e34b256ba"
+    },
+    {
+      "bytes": 404,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/DISUSDT/checkpoint.json",
+      "sha256": "a6f86eab1cf35658e7be2a8b1c365186439152b9f0e8a26cf569cd3521eb7a63"
+    },
+    {
+      "bytes": 409,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/QNTXUSDT/checkpoint.json",
+      "sha256": "006eaf60e19195ac29b791e712ac029f867f1f152dc374b1e964b039ac653f5e"
+    },
+    {
+      "bytes": 409,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/EWYUSDT/checkpoint.json",
+      "sha256": "26f5823017b94e06abea0228a57a0409f9ddbb1d918c2678a79174d997396b79"
+    },
+    {
+      "bytes": 406,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/URNMUSDT/checkpoint.json",
+      "sha256": "8ae5535cc6269311d2e73eb3289c5a2c6b3039181e423a002fc925b08b7246ba"
+    },
+    {
+      "bytes": 404,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/SQQQUSDT/checkpoint.json",
+      "sha256": "6b34f196d63b77604522ba93645f00c9f1d71b49d97ac74745aff11f7fff444b"
+    },
+    {
+      "bytes": 406,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/CRWDUSDT/checkpoint.json",
+      "sha256": "f27d352f9ac05fc36f2d4f9633ef1fff3d4b4838403318c37c437d30d206046c"
+    },
+    {
+      "bytes": 412,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/MRVLUSDT/checkpoint.json",
+      "sha256": "456239ac86946a72fac80a5ed2c2853060848230e0940bfac3ede2007ccf9e70"
+    },
+    {
+      "bytes": 405,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/CRMUSDT/checkpoint.json",
+      "sha256": "e260850a0948352d1b7c121425dfbbbc66482f0ebeda6eb7c64a8723870ef422"
+    },
+    {
+      "bytes": 410,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/AVGOUSDT/checkpoint.json",
+      "sha256": "86c324f6156507f08716698a0c2cf6ada6f18ad8f3beda80e78084edc242cf23"
+    },
+    {
+      "bytes": 407,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/CRDOUSDT/checkpoint.json",
+      "sha256": "f268462caddd3ae7079edc7feff08569524bb77137ecdcdcb61b962aeb3a14f3"
+    },
+    {
+      "bytes": 406,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/BBXUSDT/checkpoint.json",
+      "sha256": "a605dd2bc4d2bf186ee2b3791600c3aa40cd3d390a38c4ba70c86721d39f2568"
+    },
+    {
+      "bytes": 404,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/SONYUSDT/checkpoint.json",
+      "sha256": "fb301fe024d807216fe2c4d8879de1b8fd4a59da3a36c0fdbf184dfb80de8775"
+    },
+    {
+      "bytes": 407,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/AXTIUSDT/checkpoint.json",
+      "sha256": "163f3904b5bddd40449ed4a1fd383cd1d550c1d14964c34f79456ccfc62ef62a"
+    },
+    {
+      "bytes": 413,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/XPTUSDT/checkpoint.json",
+      "sha256": "e4249ea5451f2538e85a9a48a0388c5e4865374c328ebf4dccd3232075d48090"
+    },
+    {
+      "bytes": 152,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/XPTUSDT/compaction.meta.json",
+      "sha256": "c535f20c69f0c88bc0c5ebcba9ecc3fd04257a9f8dd9f30fc1bb64c64d3c892c"
+    },
+    {
+      "bytes": 411,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/CBRSUSDT/checkpoint.json",
+      "sha256": "8bc4eaec67065ec7d42fcdf3215f285a409b5ec108d26ecd50ddfbfefc04b0aa"
+    },
+    {
+      "bytes": 405,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/CSCOUSDT/checkpoint.json",
+      "sha256": "24b591bd0e13ae2fabb6e738c19735e3a73eda751d634fba38685758eff72030"
+    },
+    {
+      "bytes": 403,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/HPEUSDT/checkpoint.json",
+      "sha256": "f00885bb587903e5ad6a6c448fe8061faa71d43cb29086f1576905d094e4cc7a"
+    },
+    {
+      "bytes": 413,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/BNBUSDT/checkpoint.json",
+      "sha256": "c98a5fa009b2d958bc4215f5ba816315644df71e9c072d03fed05c8d1f49347d"
+    },
+    {
+      "bytes": 152,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/BNBUSDT/compaction.meta.json",
+      "sha256": "0daf256fcf258cde0df1de861cedcc2357a09f87cf13c42cd238cdff6d6a63c6"
+    },
+    {
+      "bytes": 406,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/EWTUSDT/checkpoint.json",
+      "sha256": "61e5fc4fb318e9bbdae6a841e00442abadfeb3d785af6fd0592ab8a046a816d3"
+    },
+    {
+      "bytes": 407,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/GLWUSDT/checkpoint.json",
+      "sha256": "43bee57879d60701f025e44397e694a2de03de713b960ee22f76f5dea3e6797c"
+    },
+    {
+      "bytes": 410,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/COINUSDT/checkpoint.json",
+      "sha256": "bd6cadb0e4b3d9dc43ca10512b558d79e8a6c1bba215102a7223b0d372a54759"
+    },
+    {
+      "bytes": 406,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/BABAUSDT/checkpoint.json",
+      "sha256": "dedb500fa951bc46f58cda78a98864d394b11a19e512bbabdbe544b21ac2e39f"
+    },
+    {
+      "bytes": 407,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/ADBEUSDT/checkpoint.json",
+      "sha256": "0f91ac3e008e748914f68c7644f6c88954967321128183b8edbe3d5f046ab675"
+    },
+    {
+      "bytes": 404,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/NVOUSDT/checkpoint.json",
+      "sha256": "af18ea6d37e395caaadac252099e63b48c4fa2643a2b66fd7e0274019a3eba3c"
+    },
+    {
+      "bytes": 401,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/TXNUSDT/checkpoint.json",
+      "sha256": "eb1e53d7a5f3c1c26b3462c0e667a6595e76c8a0d7bb864382495b5b49f139a2"
+    },
+    {
+      "bytes": 405,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/IWMUSDT/checkpoint.json",
+      "sha256": "aeef80d7aa25d56d1c53a9c81a32cc1e2fbc98c94ea2f875260b26c476db0118"
+    },
+    {
+      "bytes": 414,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/XRPUSDT/checkpoint.json",
+      "sha256": "ac9763d0651b0a73d98248012dd01e0ed2d58dcec2043084b351d0bfb76ea29c"
+    },
+    {
+      "bytes": 152,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/XRPUSDT/compaction.meta.json",
+      "sha256": "f3fe8081f18387d9e528cd2ace26be67d57dfb6c00b90a77dc0c7f3629bd556a"
+    },
+    {
+      "bytes": 410,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/WDCUSDT/checkpoint.json",
+      "sha256": "06a62da8eef69a1da92c1e113a3ca1db084ca568f5bdf631ad5cb3e0915a3caa"
+    },
+    {
+      "bytes": 404,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/ONDSUSDT/checkpoint.json",
+      "sha256": "e0df4b8b36aab549273ac06190f6506b68537db0fddb83c674ff9d226fab9067"
+    },
+    {
+      "bytes": 407,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/LLYUSDT/checkpoint.json",
+      "sha256": "be7ecfd0edc377f44bc5e7ed1d518372182439ef390d14f0f2d6701dd0ee8e78"
+    },
+    {
+      "bytes": 410,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/HOODUSDT/checkpoint.json",
+      "sha256": "a3f4c1d3a6a06f6f5d87b7779657780d9649fcd6470faa495e50478721079803"
+    },
+    {
+      "bytes": 416,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/SOLUSDT/checkpoint.json",
+      "sha256": "46f94201d71fe6b3e7f843667eab487917a02b4f869a517cb24ea6169e9247f5"
+    },
+    {
+      "bytes": 152,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/SOLUSDT/compaction.meta.json",
+      "sha256": "0eebdb15083fdfcdac1f9577368a0be2aab6d7667a89bd6b8bbff431e9c0fc6d"
+    },
+    {
+      "bytes": 402,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/XLEUSDT/checkpoint.json",
+      "sha256": "06dc4eb086a93629848092bdd43f55f5cdbb78e40bffdef55ecc3a569f07e51f"
+    },
+    {
+      "bytes": 405,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/JPMUSDT/checkpoint.json",
+      "sha256": "821ae02dbdce4f8aa5812c8a70db843fe90146f1c8d838b61cfb244adb6e16af"
+    },
+    {
+      "bytes": 408,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/DELLUSDT/checkpoint.json",
+      "sha256": "8234b7518878223a04f0ca84c47e301bce36635f65331c90f6fbeab7dcb14f43"
+    },
+    {
+      "bytes": 406,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/BMNRUSDT/checkpoint.json",
+      "sha256": "efea97b58230e45f7ea453073bc7cf4ae833fd95a410b602bc4058cf35f6b3f1"
+    },
+    {
+      "bytes": 405,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/NOKUSDT/checkpoint.json",
+      "sha256": "9ef9b4b695e6f982b59346eb91e5b01cf3126277e0fe2c284a3f08f0d6e657c4"
+    },
+    {
+      "bytes": 406,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/UBERUSDT/checkpoint.json",
+      "sha256": "c68eaaba32decd1a16beee47787612021d2aaa88ba28f80c597ff9d086081f90"
+    },
+    {
+      "bytes": 405,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/USARUSDT/checkpoint.json",
+      "sha256": "74698d2ceb241087d947ac68e5148ce3f063f17c48894d6e357a77ca47847a86"
+    },
+    {
+      "bytes": 402,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/RIVNUSDT/checkpoint.json",
+      "sha256": "eed97700d01737a777131c9f2d3d6e4cc5abb1bdc10ad31fafc20f875113dc00"
+    },
+    {
+      "bytes": 408,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/CRWVUSDT/checkpoint.json",
+      "sha256": "2a9b5ef66cbf46b59d0c642b7f645298469714b29b37cf73865ef828a2b40b2a"
+    },
+    {
+      "bytes": 406,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/BRKBUSDT/checkpoint.json",
+      "sha256": "fb8df6fff81274e2b3cb7d99b1c0a2b8bc9b7cd4d4e8c13f57ba7c783df38578"
+    },
+    {
+      "bytes": 410,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/QCOMUSDT/checkpoint.json",
+      "sha256": "2563da7b57deb4f20fa92270e14af50f4ae4cbcda58ca25a0442eb95bc093618"
+    },
+    {
+      "bytes": 406,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/TQQQUSDT/checkpoint.json",
+      "sha256": "c3a5677e3bf3215f626b01969283919a4e456bfbf754c4095b36de38f311d69d"
+    },
+    {
+      "bytes": 404,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/NOWUSDT/checkpoint.json",
+      "sha256": "7241c9ef3fd7fc79c8c6a22b74aab80870d57867cfed9aaab48b81f872fa0499"
+    },
+    {
+      "bytes": 406,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/ALABUSDT/checkpoint.json",
+      "sha256": "8d5bd2e9fde9fa3b4133e48abe2a247829e9016108d2fb1c6190290c7da94fdc"
+    },
+    {
+      "bytes": 402,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/CATUSDT/checkpoint.json",
+      "sha256": "2a0dede952d2ed89402bdfef78022e38335f14ed790708ead49320dea258f136"
+    },
+    {
+      "bytes": 411,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/OPENAIUSDT/checkpoint.json",
+      "sha256": "2f905b84f91b94e99fc1000f9d9444d25420dfacd12db2976268ad64d2a6f202"
+    },
+    {
+      "bytes": 408,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/AMATUSDT/checkpoint.json",
+      "sha256": "9e7ac9635219b78a838c100ba1b59c9245bcae13a84f53b3995cd4d5afae332d"
+    },
+    {
+      "bytes": 410,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/ARMUSDT/checkpoint.json",
+      "sha256": "5119bd18a0bafb3c28627319bf5fd08dc7f4dc82312f49083bd64eee897c5e57"
+    },
+    {
+      "bytes": 404,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/CIENUSDT/checkpoint.json",
+      "sha256": "dd1032df8a0caa95f354057df46ea94b621add7385f6b842cb325376920ddcb0"
+    },
+    {
+      "bytes": 404,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/BXUSDT/checkpoint.json",
+      "sha256": "46d1df68527d5c1819861c22237ee4a6c22992741ed3898906461503d2ef72a2"
+    },
+    {
+      "bytes": 406,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/STXXUSDT/checkpoint.json",
+      "sha256": "98c938352f842c73d7f581d7934d96f4ab9c866e9593b27cbe246f6af94b6dfe"
+    },
+    {
+      "bytes": 410,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/PLTRUSDT/checkpoint.json",
+      "sha256": "631fe11b711cd9ee808e4632fbd066e9853489d9e04aebee1482d951d11d6f5f"
+    },
+    {
+      "bytes": 411,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/LITEUSDT/checkpoint.json",
+      "sha256": "8db6c897d8beb531a451db87e23ec95b7f4b11ac9686489e8b83fab9e5e7bc29"
+    },
+    {
+      "bytes": 407,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/IBMUSDT/checkpoint.json",
+      "sha256": "1fc3db38c302dcafaf2af4c39144dc1e848e36781e935ee0cfa03a10a9a383a6"
+    },
+    {
+      "bytes": 399,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/BSPUSDT/checkpoint.json",
+      "sha256": "b6b542cf42a01186679fd95242bd9c79cd55167c19ec8f931b65582094e0094b"
+    },
+    {
+      "bytes": 411,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/KORUUSDT/checkpoint.json",
+      "sha256": "e41c71b5494b7571b25c08df6af353d2e409f9ebd7baa3dd2cdfea1c0edfd8af"
+    },
+    {
+      "bytes": 404,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/VUSDT/checkpoint.json",
+      "sha256": "91a0132cf07d0cb5d9b91d5c154c35b767fa6e742dc98d37c3e3d743f371085a"
+    },
+    {
+      "bytes": 414,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/XAUUSDT/checkpoint.json",
+      "sha256": "6b3db47cd4d5ec033a850acce295ea839fb1adba30aa4b706e42e85d6285e670"
+    },
+    {
+      "bytes": 152,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/XAUUSDT/compaction.meta.json",
+      "sha256": "cb8cf4bb3dd909cbb91bf0ada47ef17ab1ed83536d306aeaf29797afd4901ecc"
+    },
+    {
+      "bytes": 415,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/ETHUSDT/checkpoint.json",
+      "sha256": "1c125341e54ec15399671a33796f2d45814b80eefdc8af028a41664fd9df5262"
+    },
+    {
+      "bytes": 152,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/ETHUSDT/compaction.meta.json",
+      "sha256": "76f3c9c6a62987a249f1097c336ec25ebacdcaa81d933909eb46e6d98a0ffc69"
+    },
+    {
+      "bytes": 410,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/NATGASUSDT/checkpoint.json",
+      "sha256": "2df957110d27ad2f4527c85a66c7e9adac4ec14c96dd62349126efc29e8da378"
+    },
+    {
+      "bytes": 400,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/TERUSDT/checkpoint.json",
+      "sha256": "9feaeb22bc779b8fca80cb52e5cfd494ee74724c26626195b19a248ee8c9a35c"
+    },
+    {
+      "bytes": 406,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/IRENUSDT/checkpoint.json",
+      "sha256": "516b1f25df05d10bd2620d4a6784ade1ef52efbd178598c658002a79e6677d5b"
+    },
+    {
+      "bytes": 406,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/UVXYUSDT/checkpoint.json",
+      "sha256": "0ce4b545720627c03f8e733a09bab2bfe0c0e256d8febdbcbc7fe7cb7e4f6e72"
+    },
+    {
+      "bytes": 413,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/SPCXUSDT/checkpoint.json",
+      "sha256": "e4d2002dccbd0d3f566cdfbe231ff88d9a5628a75e3cc136f725806868c894d3"
+    },
+    {
+      "bytes": 402,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/ZMUSDT/checkpoint.json",
+      "sha256": "8f6bd39e38ba70a1ddd247d90c34d159c222cab9fb3b2e05765ceddfa747227e"
+    },
+    {
+      "bytes": 403,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/TTWOUSDT/checkpoint.json",
+      "sha256": "d231814fe322afa6245bc8837359f5aca19f73c9417e6a21d5618740c7377bf3"
+    },
+    {
+      "bytes": 420,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/DOGEUSDT/checkpoint.json",
+      "sha256": "4009ea29672dc8a99d86affae04870906c62b739a1af3d22fe0034e9b49faaf5"
+    },
+    {
+      "bytes": 152,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/DOGEUSDT/compaction.meta.json",
+      "sha256": "7d418717287b29e7dc77b5ca0356bf359dae6e6aaa3e7e807b6655d3a4b65889"
+    },
+    {
+      "bytes": 411,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/NBISUSDT/checkpoint.json",
+      "sha256": "f0f24c05c53c48acb1451d8e7b4a9020f2ea470794db54bc51940c3bff95cd8b"
+    },
+    {
+      "bytes": 409,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/MSFTUSDT/checkpoint.json",
+      "sha256": "aec74c77c701e264a93eba86b91f3e5124e29de276540119ce8be375a7a24feb"
+    },
+    {
+      "bytes": 411,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/AVAXUSDT/checkpoint.json",
+      "sha256": "b5840accb27f0936c04da375fb85c5d60d4e908b1e0426eceed6ccb7ee9d4c96"
+    },
+    {
+      "bytes": 152,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/AVAXUSDT/compaction.meta.json",
+      "sha256": "408cd8d23cb6ad3652d798f5cd0e4475e6999a23a480e613e3dbadc7aa8ade03"
+    },
+    {
+      "bytes": 406,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/LRCXUSDT/checkpoint.json",
+      "sha256": "4ff009272230f32dcb7c6836e615ebb58362098adb88025479ef58eea25d9fd9"
+    },
+    {
+      "bytes": 409,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/RKLBUSDT/checkpoint.json",
+      "sha256": "0c10846f05057c44fe68d5f7a7344b20c6ebb7389fed10ee5f553bb980416104"
+    },
+    {
+      "bytes": 408,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/KLACUSDT/checkpoint.json",
+      "sha256": "70ef42b442f28352cca8fb393a16af5c4874a6eea54d70cff2ceea7e201c17c2"
+    },
+    {
+      "bytes": 415,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/ANTHROPICUSDT/checkpoint.json",
+      "sha256": "40d7dc5cea022ded6d21d93693f4f9e3d5134ae1f6d9bfd233661048afffbfad"
+    },
+    {
+      "bytes": 413,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/SAMSUNGUSDT/checkpoint.json",
+      "sha256": "fdedcacbf2375d9bc7621583aa136cd0d9a1ad21290e9773431f193effaf611b"
+    },
+    {
+      "bytes": 408,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/TSMUSDT/checkpoint.json",
+      "sha256": "b4f026be35dd7d3a4c52f4aea2aae75c8267cfbd2c54f8521a421be24e27933d"
+    }
+  ],
+  "feature_points_deleted": false,
+  "file_count": 8099,
+  "ohlcv_deleted": false,
+  "replacement_policy": "reacquire only required recent partitions from Binance futures official daily aggTrades archives; do not copy the retired payload",
+  "retired_at_utc": "2026-09-03T22:26:47.577237+00:00",
+  "root": "/home/hoky/Quants-agent/LuminaQuant/data/market_parquet/market_data_raw_aggtrades/binance",
+  "status": "retired"
+}

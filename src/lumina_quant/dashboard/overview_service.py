@@ -101,7 +101,7 @@ def infer_periods_per_year(timestamps: pd.Series) -> float:
     valid = pd.to_datetime(timestamps, errors="coerce", utc=True).dropna()
     if valid.empty:
         return FALLBACK_PERIODS_PER_YEAR
-    epochs = valid.astype("int64").to_numpy(dtype="float64") / 1e9
+    epochs = valid.to_numpy(dtype="datetime64[ns]").astype("int64").astype("float64") / 1e9
     periods = bars_per_year_from_spacing(epochs)
     if periods is None:
         return FALLBACK_PERIODS_PER_YEAR

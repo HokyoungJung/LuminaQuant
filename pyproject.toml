@@ -11,12 +11,12 @@ requires-python = ">=3.14"
 dependencies = [
     "numpy>=2.0,<3",
     "polars>=1.35.2",
-    "pandas>=2.2.0,<3",
+    "pandas>=3.0.0,<4",
     "psycopg[binary]>=3.3.3",
     "python-dotenv>=1.2.2",
     "PyYAML>=6.0.3",
     "ta-lib>=0.6.8",
-    "cryptography>=49.0.0",
+    "cryptography>=50.0.1",
 ]
 
 [project.scripts]
@@ -30,6 +30,9 @@ backtest = [
 optimize = [
     "numba>=0.64.0",
     "optuna>=4.7.0",
+]
+native = [
+    "lumina-compute",
 ]
 live-binance = [
     "websockets>=12.0",
@@ -52,8 +55,8 @@ all = [
     "matplotlib>=3.8.0",
 ]
 gpu = [
-    "cudf-polars-cu12>=26.6; platform_system == 'Linux' and platform_machine == 'x86_64'",
-    "nvidia-nvjitlink-cu12>=12; platform_system == 'Linux' and platform_machine == 'x86_64'",
+    "cudf-polars-cu13>=26.8,<27; platform_system == 'Linux' and platform_machine == 'x86_64'",
+    "nvidia-cuda-nvrtc>=13.2,<14; platform_system == 'Linux' and platform_machine == 'x86_64'",
 ]
 dashboard = [
     "plotly>=5.24.0",
@@ -67,7 +70,7 @@ mt5 = [
     "MetaTrader5>=5.0.0; platform_system == 'Windows'",
 ]
 terminal-authority = [
-    "cryptography==49.0.0",
+    "cryptography==50.0.1",
 ]
 research-ml = [
     "lightgbm>=4.7,<5",
@@ -76,6 +79,9 @@ research-ml = [
 
 [tool.setuptools]
 include-package-data = true
+
+[tool.uv.sources]
+lumina-compute = { path = "native/lumina_compute", editable = true }
 
 [tool.setuptools.package-dir]
 "" = "src"

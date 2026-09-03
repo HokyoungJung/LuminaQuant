@@ -1,4 +1,46 @@
 # Research Note
+## 2026-09-04 KST — CUDA 13, canonical funding repair, and rigorous portfolio gate
+
+환경 baseline을 Python 3.14/Pandas 3, CUDA 13, RAPIDS cuDF 26.8,
+Rust 1.98/PyO3 0.28로 갱신했다. RTX 5070 Ti에서 forced-GPU Polars
+group-by 결과가 CPU 결과와 일치함을 확인했다. CUDA driver가 노출하는
+13.4 UMD는 프로젝트 최소 runtime 13.2와 호환되며, uv 환경은
+`nvidia-cuda-nvrtc 13.3.33`을 사용한다.
+
+기존 feature partition을 복제하거나 seal을 우회하지 않고
+`funding_settlements/` overlay를 도입했다. Binance 공식 funding history의
+원래 source timestamp를 보존하면서 nominal 8-hour boundary에 맞춘 rate,
+mark price, quote-per-unit fee를 immutable daily parquet으로 기록한다.
+14-symbol 2026-05-01–2026-07-01 구간에 847개 작은 partition(약 10MB)을
+추가한 뒤, 기존 funding 결측으로 실패했던 walk-forward cell만
+재실행했다. 66/66 cells가 실행 계약을 통과했고 최대 resident memory는
+약 2.31GiB였다.
+
+162개 등록 전략 모두 기존 동일 canonical window의 coarse screen에
+포함됐고, 그 결과(pass 120, excluded 14, fail 17, resource-excluded 11)에서
+고정한 11개만 3-fold validation/locked-OOS 정밀 평가했다. 비용과 funding을
+반영한 validation gate를 통과한 전략은 0개였다. 따라서 locked-OOS를
+선별에 되먹이지 않았고, raw tick replay와 HRP/ERC/HERC/NCO portfolio
+구성은 각각 `skip_no_finalists`, `skip_insufficient_survivors`로 명시적으로
+종료했다. 포트폴리오를 억지로 구성하거나 음수 validation 전략을 승격하지
+않았다.
+
+raw aggTrades DB 감사 중 한 parquet 안에 Binance Futures 공식 ID stream과
+다른 저-ID stream이 interleave된 사실을 확인했다. 예를 들어 ADAUSDT
+2026-03-26의 공식 첫 aggregate ID는 560141960인데 28087235 stream이
+섞여 strict monotonic contract와 inventory bootstrap을 깨뜨렸다. 해당
+16.79GB/8,099-file raw namespace는 증거 receipt를 남기고 폐기했으며,
+OHLCV와 feature data는 삭제하지 않았다. 필요한 최신 구간만 공식 Binance
+Futures daily aggTrades archive에서 다시 수집하므로 손상 payload나 데이터
+복제본을 유지하지 않는다.
+
+최신 재수집은 전체 등록 전략의 중앙 research universe 20개를 대상으로
+2026-08-22..2026-09-03 범위를 처리했다. 공식 archive 228 symbol-days에서
+63,825,045 raw rows와 19,699,181 canonical 1-second bars를 만들었고 peak
+RSS는 약 1.88GiB였다. TONUSDT는 delivery 이후 10 archive-days가 공식
+source에 없어 기존 마지막 시각을 유지하고 fail-closed 처리했다. 나머지
+19개 symbol은 2026-09-02T23:59:59Z까지 연속 갱신됐다.
+
 ## 2026-09-03 KST — strategy-agnostic rigorous backtest pipeline consolidation
 
 기존 `latest alpha sleeves`, `named quant`, `69 asset Alpha Zoo` 이름으로

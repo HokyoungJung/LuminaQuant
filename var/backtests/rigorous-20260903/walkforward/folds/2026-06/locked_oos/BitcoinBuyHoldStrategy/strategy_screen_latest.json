@@ -1,0 +1,122 @@
+{
+  "annual_periods": 525600,
+  "artifact_kind": "strategy_backtest_scoreboard",
+  "data_audits": {
+    "BitcoinBuyHoldStrategy": [
+      {
+        "buy_hold_return": -0.10781501367780133,
+        "configured_max_gap_ratio": 0.0,
+        "end": "2026-06-14T23:59:00Z",
+        "errors": [],
+        "expected_1m_bars": 20160,
+        "expected_last_bar": "2026-06-14T23:59:00Z",
+        "first_close": 73659.5,
+        "gap_ratio": 0.0,
+        "last_close": 65717.9,
+        "missing_1m_bars": 0,
+        "requested_end_exclusive": "2026-06-15T00:00:00Z",
+        "requested_start": "2026-06-01T00:00:00Z",
+        "rows": 20160,
+        "source_lineage": {
+          "direct_only_rows": 0,
+          "direct_rows": 20160,
+          "effective_direct_rows": 0,
+          "effective_resampled_rows": 20160,
+          "first_overlap_conflict_timestamp_ms": 1780272000000,
+          "overlap_conflict_rows": 16967,
+          "overlap_conflict_sha256": "39cf7514f1eb1a0f1854a56d317d6e789d8fcc5dca64c89dcc1b0601c2b44d26",
+          "overlap_equal_rows": 3193,
+          "overlap_rows": 20160,
+          "precedence": "resampled_1s_derived_over_direct_1m",
+          "resampled_only_rows": 0,
+          "resampled_rows": 20160
+        },
+        "start": "2026-06-01T00:00:00Z",
+        "status": "pass",
+        "symbol": "BTC/USDT",
+        "unique_timestamps": 20160,
+        "warnings": [],
+        "window_contract": "[start,end)"
+      }
+    ]
+  },
+  "data_root": "/home/hoky/Quants-agent/LuminaQuant/data/market_parquet",
+  "end": "2026-06-15T00:00:00Z",
+  "exchange": "binance",
+  "exchange_symbol_audit": {
+    "checked_symbols": [
+      "BTCUSDT"
+    ],
+    "enabled": false,
+    "status": "skipped",
+    "unmatched_symbols": []
+  },
+  "feature_audits": {
+    "BitcoinBuyHoldStrategy": {
+      "required_features": [],
+      "status": "not_required",
+      "symbols": {}
+    }
+  },
+  "generated_at": "2026-09-03T14:14:57.986393Z",
+  "git_commit": "da296b7161775a613bbafd5f1834e5ce0ed6aebe",
+  "integrity_policy": {
+    "duplicate_timestamp_policy": "fail_closed_before_simulation",
+    "execution_model": "repository Backtest + Portfolio + SimulatedExecutionHandler",
+    "feature_staleness_policy": "FeaturePointLookup bounded <= 8h forward-fill only",
+    "missing_bar_policy": "exact_[start,end)_minute_grid_fail_closed_before_simulation",
+    "no_gap_fill": true,
+    "no_interpolation": true,
+    "no_synthetic_rows": true
+  },
+  "issues": [],
+  "max_gap_ratio": 0.0,
+  "new_strategy_source_files": [
+    "src/lumina_quant/strategies/external_alpha_sleeves.py",
+    "src/lumina_quant/strategies/robust_alpha_sleeves.py",
+    "src/lumina_quant/strategies/adaptive_crypto_alpha_sleeves.py",
+    "src/lumina_quant/strategies/cross_asset_tradfi_alpha_sleeves.py",
+    "src/lumina_quant/indicators/alpha_features.py"
+  ],
+  "output_paths": {
+    "latest_json": "/home/hoky/Quants-agent/LuminaQuant/var/backtests/rigorous-20260903/walkforward/folds/2026-06/locked_oos/BitcoinBuyHoldStrategy/strategy_screen_latest.json"
+  },
+  "scope": "all",
+  "start": "2026-06-01T00:00:00Z",
+  "strategy_results": [
+    {
+      "benchmark_return_first_symbol": -0.10781501367780133,
+      "elapsed_seconds": 0.34042672100076743,
+      "end": "2026-06-15T00:00:00Z",
+      "equity_breach": false,
+      "fast_stats": {
+        "cagr": -0.03307254181458852,
+        "max_drawdown": 0.0014675842969809505,
+        "sharpe": -7.377309126340526,
+        "status": "ok"
+      },
+      "feature_audit_status": "not_required",
+      "fills": 2,
+      "final_equity": 9987.108446831357,
+      "initial_equity": 10000.0,
+      "market_events": 20160,
+      "min_equity": 9987.108446831357,
+      "orders": 1,
+      "risk_screen_status": "pass",
+      "signals": 1,
+      "start": "2026-06-01T00:00:00Z",
+      "status": "pass",
+      "strategy": "BitcoinBuyHoldStrategy",
+      "symbols": [
+        "BTC/USDT"
+      ],
+      "tier": "live_default",
+      "total_return": -0.0012891553168643544,
+      "trade_count": 2,
+      "zero_trade_reason": ""
+    }
+  ],
+  "timeframe": "1m",
+  "top_n": 20,
+  "window_contract": "[start,end)"
+}

@@ -9,7 +9,7 @@ uv python pin 3.13
 uv sync --group dev --extra optimize --extra live-binance --extra live-mt5 --extra live-polymarket
 ```
 
-Optional (Linux x86_64 + CUDA 12):
+Optional (Linux x86_64 + CUDA 13):
 
 ```bash
 uv sync --extra gpu

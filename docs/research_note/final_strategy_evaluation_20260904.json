@@ -1,0 +1,140 @@
+{
+  "artifact_kind": "lumina_quant.final_strategy_evaluation.v1",
+  "canonical_refresh": {
+    "archive_days_downloaded": 228,
+    "archive_days_missing": 10,
+    "cutoff": "2026-09-03T00:00:00Z",
+    "derived_1s_rows": 19699181,
+    "peak_rss_bytes": 2022813696,
+    "raw_rows": 63825045,
+    "status": "completed",
+    "symbols": 20
+  },
+  "coarse_screen": {
+    "registry_count": 162,
+    "result_count": 162,
+    "selected_count": 11,
+    "source": "docs/research_note/all_strategy_selection_20260903.json",
+    "status_counts": {
+      "excluded": 14,
+      "fail": 17,
+      "pass": 120,
+      "resource_excluded": 11
+    },
+    "window": {
+      "end_exclusive": "2026-08-12T00:00:00Z",
+      "start": "2026-07-01T00:00:00Z"
+    }
+  },
+  "generated_at_utc": "2026-09-03T23:20:07.968384+00:00",
+  "order_routing_enabled": false,
+  "portfolio": {
+    "methods_considered": [
+      "equal_weight",
+      "erc",
+      "hrp_threshold",
+      "hrp_dendrogram",
+      "herc",
+      "nco"
+    ],
+    "reason": "at least two validation-selected strategies are required",
+    "status": "skip_insufficient_survivors"
+  },
+  "promotion_authority": false,
+  "rigorous_walkforward": {
+    "cell_count": 66,
+    "rows": [
+      {
+        "locked_oos_mean_return": -0.0019545884169181646,
+        "strategy": "PriceVolumeCorrContinuationStrategy",
+        "total_trades": 60,
+        "validation_mean_return": -0.003706228584648493,
+        "validation_mean_sharpe": -340.3146415272868
+      },
+      {
+        "locked_oos_mean_return": -0.00946825578579639,
+        "strategy": "RebalancingPremiumHarvestStrategy",
+        "total_trades": 206,
+        "validation_mean_return": -0.0014144319937653786,
+        "validation_mean_sharpe": -5.809182324714027
+      },
+      {
+        "locked_oos_mean_return": -0.18901023594777788,
+        "strategy": "DisagreementGatedEnsembleStrategy",
+        "total_trades": 1517,
+        "validation_mean_return": -0.23147667121278123,
+        "validation_mean_sharpe": -32.434699264273284
+      },
+      {
+        "locked_oos_mean_return": -0.0012984934686375664,
+        "strategy": "BitcoinBuyHoldStrategy",
+        "total_trades": 11,
+        "validation_mean_return": 0.0011085085837125863,
+        "validation_mean_sharpe": -2.475531201041565
+      },
+      {
+        "locked_oos_mean_return": -0.0016155126437731686,
+        "strategy": "MomentumCrashDynamicScalingOverlayStrategy",
+        "total_trades": 42,
+        "validation_mean_return": -0.00342093247518697,
+        "validation_mean_sharpe": -10.034369412076758
+      },
+      {
+        "locked_oos_mean_return": -0.002067667064985401,
+        "strategy": "CompressionBreakoutContinuationStrategy",
+        "total_trades": 73,
+        "validation_mean_return": -0.0019430767939782416,
+        "validation_mean_sharpe": -6.295431244827946
+      },
+      {
+        "locked_oos_mean_return": -0.004185855646285486,
+        "strategy": "CrossSectionalPathConvexityStrategy",
+        "total_trades": 68,
+        "validation_mean_return": 0.0029519085943452796,
+        "validation_mean_sharpe": -4.541363726351075
+      },
+      {
+        "locked_oos_mean_return": -0.003328752512986477,
+        "strategy": "FalseBreakoutReversalStrategy",
+        "total_trades": 1055,
+        "validation_mean_return": -0.003953931502519177,
+        "validation_mean_sharpe": -10.427006543196152
+      },
+      {
+        "locked_oos_mean_return": -0.004150191821276332,
+        "strategy": "CrossSectionalIntermediateEchoMomentumStrategy",
+        "total_trades": 99,
+        "validation_mean_return": -0.0010359354550915079,
+        "validation_mean_sharpe": -3.329561902373388
+      },
+      {
+        "locked_oos_mean_return": -0.0017285002172707415,
+        "strategy": "LowTurnoverTrendPersistenceStrategy",
+        "total_trades": 42,
+        "validation_mean_return": -0.0042855933314435895,
+        "validation_mean_sharpe": -10.324843446694125
+      },
+      {
+        "locked_oos_mean_return": -0.0026976009765966222,
+        "strategy": "TrendGatedResidualMomentumStrategy",
+        "total_trades": 27,
+        "validation_mean_return": -0.0015736831960165103,
+        "validation_mean_sharpe": -335.2131627731008
+      }
+    ],
+    "shortlist_count": 11,
+    "status_counts": {
+      "pass": 66
+    }
+  },
+  "status": "complete_no_finalists",
+  "tick_validation": {
+    "status": "skip_no_finalists",
+    "symbols": [],
+    "window": {
+      "end_exclusive_utc": "2026-08-22T01:00:00Z",
+      "start_utc": "2026-08-22T00:00:00Z"
+    }
+  },
+  "validation_finalists": []
+}

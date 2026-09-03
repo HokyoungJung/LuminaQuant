@@ -38,18 +38,18 @@ cd LuminaQuant
 # Core + most extras
 uv sync --extra optimize --extra live-binance --extra dashboard --extra dev
 
-# Build the CPU Rust/PyO3 backend used by rigorous backtests
-uv run python scripts/build_native_backends.py
+# Install the CPU Rust/PyO3 backend used by rigorous backtests
+uv sync --frozen --extra native
 
 # Dashboard frontend (once)
 cd apps/dashboard_web && npm install && cd ../..
 
-# Optional: GPU runtime (Linux x86_64 + CUDA 12 only)
-# Key pins: polars>=1.35.2, GPU engine cudf-polars-cu12>=26.6
+# Optional: GPU runtime (Linux x86_64 + CUDA 13)
+# Key pins: cudf-polars-cu13>=26.8,<27 and nvidia-cuda-nvrtc>=13.2,<14
 uv sync --extra gpu
 ```
 
-**Available extras:** `backtest` · `optimize` · `gpu` · `live-binance` · `live-mt5` · `live-polymarket` · `dashboard` · `dev`
+**Available extras:** `backtest` · `optimize` · `native` · `gpu` · `live-binance` · `live-mt5` · `live-polymarket` · `dashboard` · `dev`
 
 ### Smoke test (no DB, no API keys)
 

@@ -31,7 +31,7 @@ from scripts.research import run_alpha_zoo_69_asset_optuna_hybrid_refit as broad
 def _legacy_periods_per_year(index: pd.DatetimeIndex) -> float:
     if len(index) < 2:
         return 365.0 * 24.0 * 2.0
-    diffs = np.diff(index.view("int64")) / 1_000_000_000.0
+    diffs = np.diff(index.to_numpy(dtype="datetime64[ns]").astype("int64")) / 1_000_000_000.0
     positive = diffs[diffs > 0]
     if positive.size == 0:
         return 365.0 * 24.0 * 2.0

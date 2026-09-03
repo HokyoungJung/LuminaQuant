@@ -821,7 +821,7 @@ def _prepared_returns(
         )
     else:
         index = pd.DatetimeIndex(returns.index)
-        index_ns = index.view("int64")
+        index_ns = index.to_numpy(dtype="datetime64[ns]").astype("int64")
         values = returns.to_numpy(dtype=float, copy=False)
         if not index.is_monotonic_increasing:
             order = np.argsort(index_ns, kind="mergesort")
@@ -855,7 +855,7 @@ def _periods_per_year_ns(index_ns: np.ndarray) -> float:
 def _periods_per_year(index: pd.DatetimeIndex) -> float:
     if len(index) < 2:
         return 365.0 * 24.0 * 2.0
-    diffs = np.diff(index.view("int64")) / 1_000_000_000.0
+    diffs = np.diff(index.to_numpy(dtype="datetime64[ns]").astype("int64")) / 1_000_000_000.0
     positive = diffs[diffs > 0]
     if positive.size == 0:
         return 365.0 * 24.0 * 2.0
@@ -969,7 +969,7 @@ def _window_turnover_sum(
         if turnover.empty:
             return 0.0
         index = pd.DatetimeIndex(turnover.index)
-        index_ns = index.view("int64")
+        index_ns = index.to_numpy(dtype="datetime64[ns]").astype("int64")
         values = turnover.to_numpy(dtype=float, copy=False)
         if not index.is_monotonic_increasing:
             order = np.argsort(index_ns, kind="mergesort")

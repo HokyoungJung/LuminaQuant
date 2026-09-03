@@ -1,7 +1,7 @@
 {
   "schema_version": "lumina_quant.rigorous_backtest_pipeline.v1",
   "data_root": "data/market_parquet",
-  "data_receipt": "docs/research_note/alpha_max_canonical_contract_audit_20260902.json",
+  "data_receipt": "docs/research_note/rigorous_backtest_data_refresh_20260904.json",
   "run_root": "var/backtests/rigorous-20260903",
   "order_routing_enabled": false,
   "memory_max_bytes": 7516192768,
@@ -38,7 +38,8 @@
       "inputs": [
         "${RUN_ROOT}/coarse_screen/strategy_shortlist.json",
         "configs/profiles/backtest_cost_realistic.yaml",
-        "configs/research/rigorous_backtest_folds.json"
+        "configs/research/rigorous_backtest_folds.json",
+        "docs/research_note/rigorous_backtest_data_refresh_20260904.json"
       ],
       "outputs": [
         "${RUN_ROOT}/walkforward/walkforward_result.json"
@@ -67,6 +68,25 @@
       "accepted_return_codes": [0]
     },
     {
+      "name": "portfolio_construction",
+      "script": "scripts/research/build_walkforward_portfolios.py",
+      "arguments": [
+        "--walkforward", "${RUN_ROOT}/walkforward/walkforward_result.json",
+        "--selection", "${RUN_ROOT}/validation_selection.json",
+        "--output", "${RUN_ROOT}/portfolio_candidates.json",
+        "--minimum-observations", "6"
+      ],
+      "inputs": [
+        "${RUN_ROOT}/walkforward/walkforward_result.json",
+        "${RUN_ROOT}/validation_selection.json"
+      ],
+      "outputs": [
+        "${RUN_ROOT}/portfolio_candidates.json"
+      ],
+      "environment": {},
+      "accepted_return_codes": [0]
+    },
+    {
       "name": "execution_model_tick_validation",
       "script": "scripts/research/validate_execution_model_ticks.py",
       "arguments": [
@@ -75,8 +95,8 @@
         "--exchange", "binance",
         "--selection-artifact", "${RUN_ROOT}/validation_selection.json",
         "--selection-limit", "10",
-        "--start", "2026-07-01T00:00:00Z",
-        "--end", "2026-07-01T01:00:00Z",
+        "--start", "2026-08-22T00:00:00Z",
+        "--end", "2026-08-22T01:00:00Z",
         "--output", "${RUN_ROOT}/tick_validation.json"
       ],
       "inputs": [
@@ -103,6 +123,7 @@
       "inputs": [
         "${RUN_ROOT}/walkforward/walkforward_result.json",
         "${RUN_ROOT}/validation_selection.json",
+        "${RUN_ROOT}/portfolio_candidates.json",
         "${RUN_ROOT}/tick_validation.json"
       ],
       "outputs": [

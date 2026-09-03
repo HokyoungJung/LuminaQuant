@@ -788,20 +788,48 @@ def _load_feature_points(
         start_date=start_date,
         end_date=end_date,
     )
-    partition_count = len({Path(path).parent.name for path in parquet_paths})
+    overlay_base = (
+        root
+        / "funding_settlements"
+        / f"exchange={_normalize_exchange(exchange)}"
+        / f"symbol={compact_symbol}"
+    )
+    overlay_paths = _partition_parquet_paths(
+        overlay_base,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    all_paths = [*parquet_paths, *overlay_paths]
+    partition_count = len(
+        {(Path(path).parent.parent.parent.name, Path(path).parent.name) for path in all_paths}
+    )
     if progress_callback is not None:
         progress_callback(
             "resource_feature_partition_scan_completed",
             {
                 "symbol": str(symbol),
                 "partition_count": partition_count,
-                "parquet_file_count": len(parquet_paths),
+                "parquet_file_count": len(all_paths),
+                "funding_overlay_file_count": len(overlay_paths),
                 "elapsed_seconds": round(max(0.0, perf_counter() - scan_started_at), 6),
             },
         )
-    if not parquet_paths:
+    if not parquet_paths and not overlay_paths:
         return pl.DataFrame()
-    lazy = pl.scan_parquet(parquet_paths)
+    scans = []
+    if parquet_paths:
+        scans.append(
+            pl.scan_parquet(parquet_paths).with_columns(
+                pl.lit(0, dtype=pl.Int8).alias("_overlay_priority")
+            )
+        )
+    if overlay_paths:
+        scans.append(
+            pl.scan_parquet(overlay_paths).with_columns(
+                pl.lit(1, dtype=pl.Int8).alias("_overlay_priority")
+            )
+        )
+    lazy = pl.concat(scans, how="diagonal_relaxed")
 
     start_ms = _coerce_timestamp_ms(start_date)
     end_ms = _coerce_timestamp_ms(end_date)
@@ -815,7 +843,8 @@ def _load_feature_points(
             {
                 "symbol": str(symbol),
                 "partition_count": partition_count,
-                "parquet_file_count": len(parquet_paths),
+                "parquet_file_count": len(all_paths),
+                "funding_overlay_file_count": len(overlay_paths),
             },
         )
     collect_started_at = perf_counter()
@@ -826,7 +855,8 @@ def _load_feature_points(
             {
                 "symbol": str(symbol),
                 "partition_count": partition_count,
-                "parquet_file_count": len(parquet_paths),
+                "parquet_file_count": len(all_paths),
+                "funding_overlay_file_count": len(overlay_paths),
                 "row_count": int(frame.height),
                 "elapsed_seconds": round(max(0.0, perf_counter() - collect_started_at), 6),
             },
@@ -834,8 +864,26 @@ def _load_feature_points(
 
     if frame.is_empty():
         return frame
-    return (
-        frame.sort("timestamp_ms").unique(subset=["timestamp_ms"], keep="last").sort("timestamp_ms")
+    if not overlay_paths:
+        return (
+            frame.drop("_overlay_priority")
+            .sort("timestamp_ms")
+            .unique(subset=["timestamp_ms"], keep="last")
+            .sort("timestamp_ms")
+        )
+    priorities = frame.select("timestamp_ms", "_overlay_priority")
+    aligned = _align_feature_frame(frame)
+    expressions = [
+        pl.col(column).drop_nulls().last().alias(column)
+        for column in _FEATURE_CANONICAL_COLUMNS
+        if column != "timestamp_ms"
+    ]
+    return _align_feature_frame(
+        aligned.with_columns(priorities["_overlay_priority"])
+        .sort("timestamp_ms", "_overlay_priority")
+        .group_by("timestamp_ms", maintain_order=True)
+        .agg(expressions)
+        .sort("timestamp_ms")
     )
 
 

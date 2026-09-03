@@ -1,0 +1,32 @@
+{
+  "artifact_kind": "lumina_quant.canonical_db_final_audit.v1",
+  "corrupt_raw_retirement": "docs/research_note/corrupt_raw_stream_retirement_20260904.json",
+  "feature_points": {
+    "bytes": 616190131,
+    "multi_file_partitions": 0,
+    "parquet_files": 21551
+  },
+  "funding_settlements": {
+    "bytes": 8695822,
+    "multi_file_partitions": 0,
+    "parquet_files": 2063
+  },
+  "generated_at_utc": "2026-09-03T23:24:06.097801+00:00",
+  "latest_refresh": "docs/research_note/canonical_data_refresh_20260904.json",
+  "ohlcv": {
+    "bytes": 434075590,
+    "multi_file_partitions": 0,
+    "parquet_files": 23663
+  },
+  "order_routing_enabled": false,
+  "raw": {
+    "bytes": 397283267,
+    "date_partitions": 228,
+    "inventories": 19,
+    "parquet_parts": 228,
+    "symbols": 20
+  },
+  "root": "/home/hoky/Quants-agent/LuminaQuant/data/market_parquet",
+  "status": "passed",
+  "total_bytes": 16911799118
+}

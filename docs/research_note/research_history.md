@@ -20,6 +20,21 @@ then reconcile any conclusion against the current canonical graph.
 
 ## Manual addenda after generated ledger
 
+### 2026-09-04 — cuda13_funding_overlay_and_rigorous_portfolio_gate
+
+- Python/Pandas/CUDA/RAPIDS/Rust/PyO3 환경을 최신 호환 baseline으로 갱신하고
+  RTX 5070 Ti forced-GPU parity를 통과.
+- sealed feature partition을 변경하지 않는 official funding settlement overlay로
+  14-symbol 2026-05-01..2026-07-01 funding/mark/fee evidence를 보강.
+- 162-strategy coarse evidence를 재사용하고 11개 shortlist의 66개
+  validation/locked-OOS cell을 선택적 재실행: execution complete 66/66,
+  validation finalist 0.
+- finalist 0이므로 tick replay는 `skip_no_finalists`, HRP/ERC/HERC/NCO
+  비교는 `skip_insufficient_survivors`; promotion/order routing 없음.
+- futures official aggregate-ID stream에 foreign low-ID stream이 interleave된
+  16.79GB raw namespace를 evidence receipt와 함께 폐기. OHLCV/features는
+  보존하고 최신 필요 구간만 Binance Futures 공식 archive로 재수집.
+
 ### 2026-09-03 — alpha_max_retirement_and_bounded_strategy_selection
 
 - Alpha-Max precompute checkpoint 압축 완료 후 816-fold validation의
