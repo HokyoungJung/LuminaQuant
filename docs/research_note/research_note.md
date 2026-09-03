@@ -55,6 +55,13 @@ Linux filesystem 여유 공간은 약 828GB다. Windows C:의 표시 여유 공�
 약 52GB로 별개다. 삭제된 ext4 블록이 491GB sparse WSL VHDX에 아직
 반환되지 않았기 때문에 WSL 종료 후 VHDX compact가 필요하다.
 
+canonical activation 이전 세대인
+`data/.market_parquet.g003-338e7b38f48e06951d6552f4943101b4*`
+네 개도 현재 `data/market_parquet`보다 파일 수와 데이터 범위가 작은 폐기
+세대임을 확인하고 24.4GB를 추가 제거했다. canonical DB 내부의 개별
+`checkpoint.json`은 백테스트 checkpoint가 아니라 수집 완료 범위를 기록해
+재다운로드와 중복 적재를 막는 작은 ingestion cursor이므로 보존했다.
+
 판정: **storage_bottleneck_fixed / failed_checkpoints_retired /
 canonical_data_preserved / order_routing_enabled=false**.
 

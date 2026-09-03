@@ -5,9 +5,11 @@
   "canonical_db": {
     "bytes": 32043395925,
     "mutated_by_cleanup": false,
+    "obsolete_generation_bytes_removed": 24401224956,
+    "obsolete_generations_removed": 4,
     "path": "/home/hoky/Quants-agent/LuminaQuant/data/market_parquet"
   },
-  "completed_at_utc": "2026-09-03T11:45:38.823880+00:00",
+  "completed_at_utc": "2026-09-03T12:04:03.108275+00:00",
   "created_at_utc": "2026-09-03T11:03:50.968114+00:00",
   "evidence": [
     {
@@ -16,15 +18,15 @@
       "sha256": "1722d78b98e2aa5d1cedf77e94a084cb3e09b6b9b01603be666e0d14e562c708"
     },
     {
-      "bytes": 20248,
+      "bytes": 21518,
       "path": "docs/research_note/alpha_max_checkpoint_cleanup_20260903.json",
-      "sha256": "bcd216681d7bb9d6b623cda11901910f8f6c907c6993f940f5434c7f97041b3b"
+      "sha256": "eaa8c346bc1db62b02a1ccde3f49a234d5f0d922d5936d1ecd063f717f73361a"
     }
   ],
   "filesystem": {
-    "free_bytes": 886024372224,
+    "free_bytes": 915862368256,
     "total_bytes": 1081101176832,
-    "used_bytes": 140084449280
+    "used_bytes": 110246453248
   },
   "order_routing_enabled": false,
   "path_checks": [

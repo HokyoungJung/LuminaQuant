@@ -3,6 +3,7 @@
   "artifact_kind": "alpha_max_generated_checkpoint_cleanup_receipt.v1",
   "canonical_db_mutated": false,
   "created_at_utc": "2026-09-02T23:53:20.823460+00:00",
+  "database_generation_cleanup_at_utc": "2026-09-03T12:03:10.851951+00:00",
   "followup_applied_at_utc": "2026-09-03T09:41:10.753484+00:00",
   "followup_targets": [
     {
@@ -123,6 +124,34 @@
       "classification": "retired_alpha_runtime_or_rejected_incomplete_screen",
       "file_count": 4,
       "path": "var/reports/all_strategy_canonical_screen_20260903"
+    },
+    {
+      "bytes": 27194157178,
+      "canonical_db_mutated": false,
+      "classification": "obsolete_pre_activation_or_quarantined_canonical_db_generation",
+      "file_count": 63705,
+      "path": "data/.market_parquet.g003-338e7b38f48e06951d6552f4943101b4"
+    },
+    {
+      "bytes": 1225,
+      "canonical_db_mutated": false,
+      "classification": "obsolete_pre_activation_or_quarantined_canonical_db_generation",
+      "file_count": 1,
+      "path": "data/.market_parquet.g003-338e7b38f48e06951d6552f4943101b4.125cc59348534cf4bd72edc3cbc94da7.g003-quarantine"
+    },
+    {
+      "bytes": 1225,
+      "canonical_db_mutated": false,
+      "classification": "obsolete_pre_activation_or_quarantined_canonical_db_generation",
+      "file_count": 1,
+      "path": "data/.market_parquet.g003-338e7b38f48e06951d6552f4943101b4.44f161c5a48d43d3bdcdcabf56340973.g003-quarantine"
+    },
+    {
+      "bytes": 1225,
+      "canonical_db_mutated": false,
+      "classification": "obsolete_pre_activation_or_quarantined_canonical_db_generation",
+      "file_count": 1,
+      "path": "data/.market_parquet.g003-338e7b38f48e06951d6552f4943101b4.7dfbd76579e7495eb7e360de0258cefe.g003-quarantine"
     }
   ],
   "preserved": [
@@ -536,5 +565,5 @@
       "path": "var/g003-evaluation/g003-338e7b38f48e06951d6552f4943101b4-163ec5c670e28959/integrated-backtest-final-20260902"
     }
   ],
-  "total_bytes": 357203647595
+  "total_bytes": 384397808448
 }
