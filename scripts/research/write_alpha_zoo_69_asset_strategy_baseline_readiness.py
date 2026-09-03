@@ -278,7 +278,7 @@ def _source_universe_symbols(loaded_sources: Mapping[str, Mapping[str, Any]]) ->
 def _leaf_rebuild_command(symbols: list[str]) -> str:
     symbol_arg = f" --symbols {','.join(symbols)}" if symbols else ""
     return (
-        "uv run python scripts/research/run_alpha_zoo_69_asset_monthly_refit_walkforward.py"
+        "uv run python scripts/research/run_monthly_refit_walkforward.py"
         f"{symbol_arg}"
         " --families relaxed_efficiency,strict_efficiency,teacher_leaf_blend"
         " --source-symbol-workers 1"

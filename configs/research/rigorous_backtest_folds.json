@@ -1,0 +1,26 @@
+{
+  "schema_version": "lumina_quant.event_driven_walkforward_folds.v1",
+  "folds": [
+    {
+      "fold_id": "2026-05",
+      "validation_start": "2026-05-01T00:00:00Z",
+      "validation_end": "2026-05-15T00:00:00Z",
+      "locked_oos_start": "2026-05-15T00:00:00Z",
+      "locked_oos_end": "2026-06-01T00:00:00Z"
+    },
+    {
+      "fold_id": "2026-06",
+      "validation_start": "2026-05-15T00:00:00Z",
+      "validation_end": "2026-06-01T00:00:00Z",
+      "locked_oos_start": "2026-06-01T00:00:00Z",
+      "locked_oos_end": "2026-06-15T00:00:00Z"
+    },
+    {
+      "fold_id": "2026-07",
+      "validation_start": "2026-06-01T00:00:00Z",
+      "validation_end": "2026-06-15T00:00:00Z",
+      "locked_oos_start": "2026-06-15T00:00:00Z",
+      "locked_oos_end": "2026-07-01T00:00:00Z"
+    }
+  ]
+}

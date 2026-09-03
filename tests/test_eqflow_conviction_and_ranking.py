@@ -22,7 +22,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from scripts.research import run_alpha_zoo_69_asset_monthly_refit_walkforward as module
+from scripts.research import run_monthly_refit_walkforward as module
 
 AGGRESSIVE_LABEL = "profile_optuna:growth_mdd20_gross8_69_asset_profile_optuna"
 FALLBACK_BALANCED = "strict_efficiency:balanced_mdd12_gross5_69_asset_efficiency_repair_optuna"

@@ -1,8 +1,0 @@
-generated_at_utc=2026-05-20T12:58:02.265127Z
-artifact_kind=alpha_zoo_four_lane_shadow_discovery
-research_primary_round_trip_cost_bps=10.0
-four_lane_count=4
-conservative_shadow_count=12
-side_family_shadow_count=12
-ready_for_real=false
-real_money_execution=false

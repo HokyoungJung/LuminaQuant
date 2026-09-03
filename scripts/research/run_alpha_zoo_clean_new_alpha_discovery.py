@@ -33,7 +33,7 @@ if str(REPO_ROOT) not in sys.path:
 from lumina_quant.alpha_zoo import native_alpha_fold_backend  # noqa: E402
 from lumina_quant.optimization.search_policy import optimization_search_policy_payload  # noqa: E402
 from lumina_quant.research_universe import BINANCE_CORE_CRYPTO_RESEARCH_SYMBOLS  # noqa: E402
-from scripts.research import run_alpha_zoo_69_asset_monthly_refit_walkforward as monthly  # noqa: E402
+from scripts.research import run_monthly_refit_walkforward as monthly  # noqa: E402
 from scripts.research import run_alpha_zoo_69_asset_optuna_hybrid_refit as broad69  # noqa: E402
 from scripts.research.run_alpha_zoo_htf_momentum_crowding_discovery import DEFAULT_FEATURE_ROOT  # noqa: E402
 

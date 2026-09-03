@@ -1,8 +1,0 @@
-generated_at_utc=2026-05-20T13:08:46.465415Z
-artifact_kind=alpha_zoo_expanded_filter_shadow_selection
-model_count=976
-positive_oos_shadow_candidate_count=20
-conservative_exit_positive_oos_count=0
-ready_for_paper=false
-ready_for_real=false
-real_money_execution=false

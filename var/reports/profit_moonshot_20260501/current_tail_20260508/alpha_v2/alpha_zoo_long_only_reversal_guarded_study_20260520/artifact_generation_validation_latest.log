@@ -1,9 +1,0 @@
-generated_at_utc=2026-05-20T13:35:51.732020Z
-artifact_kind=alpha_zoo_long_only_reversal_guarded_study
-target_family_model_count=43
-strict_paper_guard_pass_count=0
-max_validation_trade_event_count=18
-max_locked_oos_trade_event_count=13
-ready_for_paper=false
-ready_for_real=false
-real_money_execution=false

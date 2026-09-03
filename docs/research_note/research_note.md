@@ -1,4 +1,36 @@
 # Research Note
+## 2026-09-03 KST — strategy-agnostic rigorous backtest pipeline consolidation
+
+기존 `latest alpha sleeves`, `named quant`, `69 asset Alpha Zoo` 이름으로
+분산된 실행 표면을 전략 비종속 진입점으로 정리했다. 지원 흐름은
+`run_rigorous_backtest_pipeline.py` 하나이며 1분봉 registry screen,
+event-driven validation/locked-OOS folds, validation-only finalist freeze,
+Rust raw aggTrades execution-model validation, frozen report-only evaluation
+순서를 강제한다. 데이터는 모든 단계에서 `data/market_parquet` 하나를
+read-only로 공유하며 복제하지 않는다.
+
+공용 runner 이름은 `run_strategy_screen.py`,
+`run_event_driven_walkforward.py`,
+`run_event_driven_candidate_evaluation.py`,
+`run_monthly_refit_walkforward.py`로 정리했고 Alpha-Max 전용 상위
+orchestrator는 제거했다. 전략별 기본 연구 universe 하드코딩은 screen
+script에서 `research_universe.py`로 이동했다. stage는 각각 새 프로세스로
+실행되어 메모리가 반환되며, 7GiB RLIMIT, streaming file hash, git/data
+receipt/input/output digest 기반 resume를 사용한다.
+
+raw aggTrades tick validator는 날짜 partition만 lazy scan해 필요한
+`[start,end)` window만 읽고 Rust/PyO3 1초 aggregation을 필수화했다.
+복구/WAL write 경로에 의존하지 않아 backtest가 canonical DB를 변경하지
+않는다. 실제 BTC 1시간 tape smoke에서 현재 realistic-cost profile의 BUY
+market slippage가 tape high를 초과해 gate가 정상적으로 FAIL했다. 이는
+숨길 성능 문제가 아니라 엄밀 pipeline이 차단해야 할 execution-model
+calibration 결과다.
+
+생성된 대형 과거 run 중 현재 pipeline과 중복된 약 24GB를 제거했으며,
+테스트와 runtime contract가 직접 고정한 소형 frozen JSON fixture만
+복원했다. 최종 runtime 결과는 `var/backtests/`, durable evidence는
+`docs/research_note/`로 분리한다.
+
 ## 2026-09-03 KST — 162-strategy bounded-memory canonical selection
 
 Alpha-Max의 1,588-unit precompute는 압축 checkpoint로 완주했지만 816-fold

@@ -43,7 +43,7 @@ BALANCED_LABEL = "strict_efficiency:balanced_mdd12_gross5_69_asset_efficiency_re
 GROWTH_LABEL = "strict_efficiency:growth_mdd20_gross8_69_asset_efficiency_repair_optuna"
 PROFILE_SHA256 = "493e72694744258dbf763a9e1149ec68cd37139cb1da563d58b2e39cd59c7e96"
 ROUTER_SOURCE_PREDICATE = (
-    "scripts.research.run_alpha_zoo_69_asset_monthly_refit_walkforward._lagged_shadow_leaf_source"
+    "scripts.research.run_monthly_refit_walkforward._lagged_shadow_leaf_source"
 )
 RUNNER_SOURCE_PATH = "lumina_quant.strategy_factory.research_runner"
 SCALE_GRID_PPM = (
@@ -334,7 +334,7 @@ def _source_eligible(value: Any, name: str) -> None:
         raise ValueError(f"{name} identity is invalid")
     count = _integer(row["return_count"], f"{name} return count", 0, 100_000_000)
     predicate = importlib.import_module(
-        "scripts.research.run_alpha_zoo_69_asset_monthly_refit_walkforward"
+        "scripts.research.run_monthly_refit_walkforward"
     )._lagged_shadow_leaf_source
     candidate = _EligibilityCandidate(
         row["candidate_label"], row["family"], _EligibilityReturns(count), dict(row["row"])

@@ -38,8 +38,8 @@ cd LuminaQuant
 # Core + most extras
 uv sync --extra optimize --extra live-binance --extra dashboard --extra dev
 
-# Build the Rust pyo3 extension (required for backtest/optimize/live)
-python scripts/build_native_backends.py
+# Build the CPU Rust/PyO3 backend used by rigorous backtests
+uv run python scripts/build_native_backends.py
 
 # Dashboard frontend (once)
 cd apps/dashboard_web && npm install && cd ../..
@@ -62,6 +62,12 @@ uv run python scripts/minimum_viable_run.py
 ```bash
 uv run lq backtest
 ```
+
+The registry-wide filter is `scripts/research/run_strategy_screen.py`. The only
+supported multi-stage research path is
+`scripts/research/run_rigorous_backtest_pipeline.py`; its stage and directory
+contract is documented in
+[`docs/research_note/rigorous_backtest_pipeline.md`](docs/research_note/rigorous_backtest_pipeline.md).
 
 ### Walk-forward optimization
 

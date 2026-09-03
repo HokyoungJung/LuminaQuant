@@ -17,8 +17,8 @@
       "returns": null,
       "turnover": null,
       "returns_source": {
-        "artifact": "alpha_zoo_69_asset_monthly_refit_walkforward",
-        "artifact_script": "scripts/research/run_alpha_zoo_69_asset_monthly_refit_walkforward.py",
+        "artifact": "monthly_refit_walkforward",
+        "artifact_script": "scripts/research/run_monthly_refit_walkforward.py",
         "candidate_label": "codex_lagged_leaf_router_grid:h4_avg1_tr-0.02_tmdd0.50_val0.00_vmdd0.25_lagged_plus_val025_fallback_mdd20_cap2",
         "stream": "stitched monthly-refit locked-OOS per-fold NET return stream for this candidate label",
         "turnover_source": "per-fold turnover for the same candidate label in the same artifact"
@@ -30,8 +30,8 @@
       "returns": null,
       "turnover": null,
       "returns_source": {
-        "artifact": "alpha_zoo_69_asset_monthly_refit_walkforward",
-        "artifact_script": "scripts/research/run_alpha_zoo_69_asset_monthly_refit_walkforward.py",
+        "artifact": "monthly_refit_walkforward",
+        "artifact_script": "scripts/research/run_monthly_refit_walkforward.py",
         "candidate_label": "tradfi_intraday_session_v1:open_impulse_close_top10_mdd15",
         "stream": "stitched monthly-refit locked-OOS per-fold NET return stream for this candidate label",
         "turnover_source": "per-fold turnover for the same candidate label in the same artifact"
@@ -54,7 +54,7 @@
   "source_artifacts": [
     {
       "id": "monthly_refit_walkforward",
-      "path": "materialized by scripts/research/run_alpha_zoo_69_asset_monthly_refit_walkforward.py (default lumina_monthly_refit_walkforward_1m_oos_latest.json)",
+      "path": "materialized by scripts/research/run_monthly_refit_walkforward.py (default lumina_monthly_refit_walkforward_1m_oos_latest.json)",
       "sha256": null,
       "max_age_hours": 8760,
       "ready": false,

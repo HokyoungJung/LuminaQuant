@@ -1,5 +1,5 @@
 """Engine-side wiring of the anti-overfit selection gate in the monthly-refit
-walk-forward runner (``scripts/research/run_alpha_zoo_69_asset_monthly_refit_walkforward``).
+walk-forward runner (``scripts/research/run_monthly_refit_walkforward``).
 
 These pin the config-gated seam without running the (data-dependent) walk-forward:
 the OFF-path is a strict identity no-op (byte-identical admit boundary), basket
@@ -15,7 +15,7 @@ import importlib
 
 import pytest
 
-ENGINE = "scripts.research.run_alpha_zoo_69_asset_monthly_refit_walkforward"
+ENGINE = "scripts.research.run_monthly_refit_walkforward"
 
 
 @pytest.fixture

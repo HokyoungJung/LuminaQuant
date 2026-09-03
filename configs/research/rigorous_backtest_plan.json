@@ -1,0 +1,117 @@
+{
+  "schema_version": "lumina_quant.rigorous_backtest_pipeline.v1",
+  "data_root": "data/market_parquet",
+  "data_receipt": "docs/research_note/alpha_max_canonical_contract_audit_20260902.json",
+  "run_root": "var/backtests/rigorous-20260903",
+  "order_routing_enabled": false,
+  "memory_max_bytes": 7516192768,
+  "stages": [
+    {
+      "name": "coarse_screen",
+      "script": "scripts/research/run_strategy_screen.py",
+      "arguments": [
+        "--data-root", "${DATA_ROOT}",
+        "--exchange", "binance",
+        "--start", "2026-05-01T00:00:00Z",
+        "--end", "2026-05-03T00:00:00Z",
+        "--scope", "all",
+        "--top-n", "20",
+        "--output-dir", "${RUN_ROOT}/coarse_screen",
+        "--config", "${REPOSITORY}/configs/profiles/backtest_cost_realistic.yaml",
+        "--no-exchange-audit",
+        "--allow-unavailable"
+      ],
+      "inputs": [
+        "configs/profiles/backtest_cost_realistic.yaml"
+      ],
+      "outputs": [
+        "${RUN_ROOT}/coarse_screen/strategy_screen_latest.json"
+      ],
+      "environment": {}
+    },
+    {
+      "name": "event_driven_walk_forward",
+      "script": "scripts/research/run_event_driven_walkforward.py",
+      "arguments": [
+        "--data-root", "${DATA_ROOT}",
+        "--config", "${REPOSITORY}/configs/profiles/backtest_cost_realistic.yaml",
+        "--shortlist", "${RUN_ROOT}/coarse_screen/strategy_screen_latest.json",
+        "--fold-plan", "${REPOSITORY}/configs/research/rigorous_backtest_folds.json",
+        "--output-root", "${RUN_ROOT}/walkforward",
+        "--exchange", "binance",
+        "--limit", "20"
+      ],
+      "inputs": [
+        "${RUN_ROOT}/coarse_screen/strategy_screen_latest.json",
+        "configs/profiles/backtest_cost_realistic.yaml",
+        "configs/research/rigorous_backtest_folds.json"
+      ],
+      "outputs": [
+        "${RUN_ROOT}/walkforward/walkforward_result.json"
+      ],
+      "environment": {}
+    },
+    {
+      "name": "validation_selection",
+      "script": "scripts/research/build_walkforward_evidence.py",
+      "arguments": [
+        "select",
+        "--walkforward", "${RUN_ROOT}/walkforward/walkforward_result.json",
+        "--output", "${RUN_ROOT}/validation_selection.json",
+        "--top-n", "10",
+        "--minimum-pass-ratio", "0.75",
+        "--minimum-mean-sharpe", "0.35"
+      ],
+      "inputs": [
+        "${RUN_ROOT}/walkforward/walkforward_result.json"
+      ],
+      "outputs": [
+        "${RUN_ROOT}/validation_selection.json"
+      ],
+      "environment": {}
+    },
+    {
+      "name": "execution_model_tick_validation",
+      "script": "scripts/research/validate_execution_model_ticks.py",
+      "arguments": [
+        "--data-root", "${DATA_ROOT}",
+        "--config", "${REPOSITORY}/configs/profiles/backtest_cost_realistic.yaml",
+        "--exchange", "binance",
+        "--selection-artifact", "${RUN_ROOT}/validation_selection.json",
+        "--selection-limit", "10",
+        "--start", "2026-07-01T00:00:00Z",
+        "--end", "2026-07-01T01:00:00Z",
+        "--output", "${RUN_ROOT}/tick_validation.json"
+      ],
+      "inputs": [
+        "${RUN_ROOT}/validation_selection.json",
+        "configs/profiles/backtest_cost_realistic.yaml"
+      ],
+      "outputs": [
+        "${RUN_ROOT}/tick_validation.json"
+      ],
+      "environment": {
+        "LQ_RAW_FIRST_BACKEND": "rust"
+      }
+    },
+    {
+      "name": "report_only_evaluation",
+      "script": "scripts/research/build_walkforward_evidence.py",
+      "arguments": [
+        "report",
+        "--walkforward", "${RUN_ROOT}/walkforward/walkforward_result.json",
+        "--selection", "${RUN_ROOT}/validation_selection.json",
+        "--output", "${RUN_ROOT}/report_only_evaluation.json"
+      ],
+      "inputs": [
+        "${RUN_ROOT}/walkforward/walkforward_result.json",
+        "${RUN_ROOT}/validation_selection.json",
+        "${RUN_ROOT}/tick_validation.json"
+      ],
+      "outputs": [
+        "${RUN_ROOT}/report_only_evaluation.json"
+      ],
+      "environment": {}
+    }
+  ]
+}

@@ -234,7 +234,9 @@ def test_feature_point_lookup_rejects_duplicate_same_timestamp_funding_evidence(
 
 
 def test_named_suite_preflights_funding_when_strategy_declares_no_features():
-    from scripts.research.run_named_quant_suite import _preflight_required_features
+    from scripts.research.run_event_driven_candidate_evaluation import (
+        _preflight_required_features,
+    )
 
     class EmptyFeatureRepository:
         def load_futures_feature_points(self, **_kwargs):

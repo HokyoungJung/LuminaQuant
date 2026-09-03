@@ -8,7 +8,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts/research/build_named_quant_full_suite.py"
-RUNNER = ROOT / "scripts/research/run_named_quant_suite.py"
+RUNNER = ROOT / "scripts/research/run_event_driven_candidate_evaluation.py"
 MAIN = ROOT / "configs/research/named_quant_crypto_tradfi_suite_v1.json"
 CLAUDE = ROOT / "configs/research/named_quant_claude_suite_v1.json"
 OUTPUT = ROOT / "configs/research/named_quant_full_suite_v1.json"
@@ -23,7 +23,7 @@ def _module(name: str, path: Path):
 
 
 BUILDER = _module("build_named_quant_full_suite", SCRIPT)
-SUITE_RUNNER = _module("run_named_quant_suite_for_full_test", RUNNER)
+SUITE_RUNNER = _module("event_driven_candidate_evaluation_for_full_test", RUNNER)
 
 
 def _load(path: Path) -> dict:

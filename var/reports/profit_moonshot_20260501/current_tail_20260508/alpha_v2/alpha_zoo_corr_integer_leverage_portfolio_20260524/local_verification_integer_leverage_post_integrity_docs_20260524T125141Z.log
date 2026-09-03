@@ -1,8 +1,0 @@
-post-integrity docs verification UTC 2026-05-24T12:51:41Z
-artifact invariant: pass; paper profiles= ['aggressive_mdd30_gross10_shadow', 'balanced_mdd12_gross5', 'growth_mdd20_gross8']
-.....                                                                    [100%]
-5 passed in 0.14s
-All checks passed!
-Hardcoded parameter audit: total=567 new=0 baselined=567
-JSON report: reports/quality/hardcoded_params_report.json
-Markdown report: reports/quality/hardcoded_params_report.md

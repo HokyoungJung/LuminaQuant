@@ -417,7 +417,7 @@ def test_strict_env_guard_is_noop_when_env_unset():
 # and the emitted approx_pbo routes through the shared reject gate as the ``pbo``
 # alias. Data-free: a synthetic candidate on a deterministic daily return series.
 # --------------------------------------------------------------------------- #
-_ENGINE_MODULE = "scripts.research.run_alpha_zoo_69_asset_monthly_refit_walkforward"
+_ENGINE_MODULE = "scripts.research.run_monthly_refit_walkforward"
 
 
 def _emit_args(**overrides) -> argparse.Namespace:

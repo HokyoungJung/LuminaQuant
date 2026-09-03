@@ -241,6 +241,11 @@ BINANCE_EXTENDED_RESEARCH_SYMBOLS: tuple[str, ...] = (
     *BINANCE_TRADFI_PERP_RESEARCH_SYMBOLS,
 )
 
+CORE_CRYPTO_METAL_RESEARCH_SYMBOLS: tuple[str, ...] = (
+    *(f"{symbol[:-4]}/USDT" for symbol in BINANCE_CORE_CRYPTO_RESEARCH_SYMBOLS),
+    *(f"{symbol[:-4]}/USDT" for symbol in BINANCE_TRADFI_PRECIOUS_METAL_SYMBOLS),
+)
+
 
 def _compact_usdt_symbol(symbol: Any) -> str:
     return str(symbol or "").strip().upper().replace("/", "").replace("-", "")
@@ -325,6 +330,63 @@ BINANCE_EXTENDED_RESEARCH_SYMBOLS_SLASHED: tuple[str, ...] = tuple(
 BINANCE_TRADFI_PERP_RESEARCH_SYMBOLS_SLASHED: tuple[str, ...] = tuple(
     compact_to_slashed_usdt(symbol) for symbol in BINANCE_TRADFI_PERP_RESEARCH_SYMBOLS
 )
+FEATURE_RESEARCH_SYMBOLS = ("BTC/USDT", "ETH/USDT", "SOL/USDT")
+CRYPTO_PAIR_RESEARCH_SYMBOLS = ("BTC/USDT", "ETH/USDT")
+METAL_PAIR_RESEARCH_SYMBOLS = ("XAU/USDT", "XAG/USDT")
+CROSS_ASSET_RESEARCH_SYMBOLS = (
+    "BTC/USDT",
+    "ETH/USDT",
+    "XAU/USDT",
+    "XAG/USDT",
+    "XPT/USDT",
+    "XPD/USDT",
+    "SPY/USDT",
+    "QQQ/USDT",
+    "AAPL/USDT",
+    "MSFT/USDT",
+    "NVDA/USDT",
+    "TSLA/USDT",
+)
+STRATEGY_RESEARCH_SYMBOLS: Mapping[str, tuple[str, ...]] = {
+    "BitcoinBuyHoldStrategy": ("BTC/USDT",),
+    "PairTradingZScoreStrategy": CRYPTO_PAIR_RESEARCH_SYMBOLS,
+    "PairSpreadZScoreStrategy": CRYPTO_PAIR_RESEARCH_SYMBOLS,
+    "SessionFilteredPairCarryStrategy": CRYPTO_PAIR_RESEARCH_SYMBOLS,
+    "TimeframePairZScoreReversionStrategy": CRYPTO_PAIR_RESEARCH_SYMBOLS,
+    "LeadLagSpilloverStrategy": CRYPTO_PAIR_RESEARCH_SYMBOLS,
+    "CrossCryptoSlowDiffusionStrategy": FEATURE_RESEARCH_SYMBOLS,
+    "CryptoFxAlphaZooStateStrategy": FEATURE_RESEARCH_SYMBOLS,
+    "DerivativesFlowSqueezeStrategy": FEATURE_RESEARCH_SYMBOLS,
+    "HourlyShockReversionStrategy": FEATURE_RESEARCH_SYMBOLS,
+    "PerpCrowdingCarryStrategy": FEATURE_RESEARCH_SYMBOLS,
+    "TakerFlowExhaustionReversalStrategy": FEATURE_RESEARCH_SYMBOLS,
+    "FundingDislocationTrendCarryStrategy": FEATURE_RESEARCH_SYMBOLS,
+    "TakerFlowImbalanceContinuationStrategy": FEATURE_RESEARCH_SYMBOLS,
+    "PairsSpreadMeanReversionStrategy": (
+        "BTC/USDT",
+        "ETH/USDT",
+        "XAU/USDT",
+        "XAG/USDT",
+    ),
+    "GoldSilverRatioMeanReversionStrategy": METAL_PAIR_RESEARCH_SYMBOLS,
+    "GoldSilverRatioTrendStrategy": METAL_PAIR_RESEARCH_SYMBOLS,
+    "EquityMetalRiskRegimeRotationStrategy": CROSS_ASSET_RESEARCH_SYMBOLS,
+    "EquityBenchmarkResidualReversalStrategy": CROSS_ASSET_RESEARCH_SYMBOLS,
+    "MetalEquityDivergenceReversalStrategy": CROSS_ASSET_RESEARCH_SYMBOLS,
+    "ResidualMomentumRotationStrategy": CROSS_ASSET_RESEARCH_SYMBOLS,
+    "LowVolatilityMomentumStrategy": CROSS_ASSET_RESEARCH_SYMBOLS,
+    "NearHighMomentumStrategy": CROSS_ASSET_RESEARCH_SYMBOLS,
+    "CrossSectionalShortTermReversalStrategy": CROSS_ASSET_RESEARCH_SYMBOLS,
+}
+
+
+def research_symbols_for_strategy(strategy_name: str) -> tuple[str, ...]:
+    """Return the centralized default research universe for a registered strategy."""
+    return STRATEGY_RESEARCH_SYMBOLS.get(
+        str(strategy_name),
+        CORE_CRYPTO_METAL_RESEARCH_SYMBOLS,
+    )
+
 
 __all__ = [
     "BINANCE_CORE_CRYPTO_RESEARCH_SYMBOLS",
@@ -340,7 +402,14 @@ __all__ = [
     "BINANCE_TRADFI_PERP_RESEARCH_SYMBOLS_SLASHED",
     "BINANCE_TRADFI_PRECIOUS_METAL_SYMBOLS",
     "BINANCE_TRADFI_PREMARKET_SYMBOLS",
+    "CORE_CRYPTO_METAL_RESEARCH_SYMBOLS",
+    "CROSS_ASSET_RESEARCH_SYMBOLS",
+    "CRYPTO_PAIR_RESEARCH_SYMBOLS",
+    "FEATURE_RESEARCH_SYMBOLS",
+    "METAL_PAIR_RESEARCH_SYMBOLS",
+    "STRATEGY_RESEARCH_SYMBOLS",
     "binance_extended_research_symbols_from_exchange_info",
     "binance_tradfi_perp_symbols_from_exchange_info",
     "compact_to_slashed_usdt",
+    "research_symbols_for_strategy",
 ]

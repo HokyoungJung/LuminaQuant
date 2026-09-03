@@ -1,0 +1,1621 @@
+{
+  "artifact_kind": "raw_aggtrades_checkpoint_normalization.v1",
+  "canonical_db_mutated": true,
+  "compaction_metadata": [
+    {
+      "new_sha256": "4a88205baa1f6a9a14aa3aaab7c38c1e6e1200462eba03b6a30f8b624aee02f9",
+      "old_sha256": "9d454ea8d7cb9acd3ea0ab66642592cef7c86c259ddf5e7d65a63d155b65e890",
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/ADAUSDT/compaction.meta.json"
+    },
+    {
+      "new_sha256": "75ef36def206b8c9359312995c65ade749d7379f7c95b93e51c853959e8dd2b8",
+      "old_sha256": "02d1dc12b7be846ac80a179e8bcb0458685e5f26a2dbe38bba0db81c73f858f8",
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/AVAXUSDT/compaction.meta.json"
+    },
+    {
+      "new_sha256": "361eb7acf334d12c382e42ba3f26d355b64142b78787e834b7714665222c98cb",
+      "old_sha256": "fcd06baab9f9449ee4aa53f10bb3bdb2925a721346b1de6fce24dda00882cdf2",
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/BNBUSDT/compaction.meta.json"
+    },
+    {
+      "new_sha256": "9eeaff64d3a50411c07fa9b148ee908af2f40805dd24d61daba2d033014e93f2",
+      "old_sha256": "e21d2cca68359c9d2c3a0fa4629257438a6789994d8c36756fe6235478107508",
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/BTCUSDT/compaction.meta.json"
+    },
+    {
+      "new_sha256": "9821a7e7c1523394c2b66fa916b4a10da237d6a55f8704fc06a769e9c33c84db",
+      "old_sha256": "188ac8545c382f0e616dec7768355c39a84ac7ea967005e714c300d29435083e",
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/DOGEUSDT/compaction.meta.json"
+    },
+    {
+      "new_sha256": "83d08b6e1b2f5fc503c213066ffbc230941dc6750d10174b15cb51131aa2eea8",
+      "old_sha256": "9c2a8ccee95d56c65d0d39e883fd2b3fc4dedc4998c658e6d04a03977d127c4e",
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/ETHUSDT/compaction.meta.json"
+    },
+    {
+      "new_sha256": "b8c717e98831acc4ec7b53d9dab6071342ed50662d3acdb83a996084c18a814e",
+      "old_sha256": "aae207cbe563037861f9fbd1ddcd113d7c22dcb122f2069c6f6a33e9beee4304",
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/SOLUSDT/compaction.meta.json"
+    },
+    {
+      "new_sha256": "c2da7306f08cbe0eba2163cba63157b607f7d9d6527aa4eb652e65ac50802247",
+      "old_sha256": "333c571438785b8f28df15ad6e5fd264477592709081d7c70d416004107abcb3",
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/TONUSDT/compaction.meta.json"
+    },
+    {
+      "new_sha256": "7771f6fd069a02b9f1d91b04f86060b36668c23c64c5808662bda7e8634c2ce3",
+      "old_sha256": "6ec20459b528977f8826841b1eba24f523dc0bb92c702130f7148ffda64c27b7",
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/TRXUSDT/compaction.meta.json"
+    },
+    {
+      "new_sha256": "58fb41d356a25b2bf6b3ae70bbe61b71676a3f43bdf01f07ea41e733977e8450",
+      "old_sha256": "f036c7d0ee195ef58bf7632e54efe18ff4e5fe81708a5cffa51b1340512e522d",
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/XAGUSDT/compaction.meta.json"
+    },
+    {
+      "new_sha256": "148eeca5b3051ebcc2bc8ae8068763520083264221f166c66f3f73a327698dad",
+      "old_sha256": "3a5b2674a5826d46e392d4c6a977ac609a68c9c17174c86de6b50316af1b8880",
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/XAUUSDT/compaction.meta.json"
+    },
+    {
+      "new_sha256": "99ac1885f6dcd6f51ca472d9b88c5602cdf1b8de1e1089b9e49bf50413225a93",
+      "old_sha256": "be04a1e7eb8b8d8fc84f75cd1a0f8e2cabc84510a86845bdb6beef7d208534b7",
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/XPDUSDT/compaction.meta.json"
+    },
+    {
+      "new_sha256": "5f903ffd908eb70c07c697b2c4d8f31b808a68baf0996d723d45555e2ba7f68a",
+      "old_sha256": "879ef47c46cdd3feac6a0944707e777462392ffc3033492a916614b9cd237d28",
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/XPTUSDT/compaction.meta.json"
+    },
+    {
+      "new_sha256": "e5a0326a4c4c636f749c04ff1f54f3c87fddb3f0c9564c30f04652a45a0190a0",
+      "old_sha256": "0c51a31f8ac15bd9aa9df3e3e17aaf6a67892a456268d1afdb37906213c242ac",
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/XRPUSDT/compaction.meta.json"
+    }
+  ],
+  "count": 128,
+  "data_root": "data/market_parquet",
+  "mutation_scope": "ingestion cursors only; parquet payloads unchanged",
+  "retired_materialized_legacy_wal": [
+    {
+      "bytes": 2818,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/WMTUSDT/wal.bin",
+      "sha256": "ed3417eef49ee65923078463eb4d2cfa4478546494dcead254a7c7717237d095"
+    },
+    {
+      "bytes": 22304,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/BZUSDT/wal.bin",
+      "sha256": "0d981d4b8ccb68f1163911f2181938f989a873441fed7aed445da3f5c2e56639"
+    },
+    {
+      "bytes": 2843,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/AAPLUSDT/wal.bin",
+      "sha256": "16427ee57b85f4fc2db959f11ce608d6b84d77454efc943ba723403b95df12e5"
+    },
+    {
+      "bytes": 21009,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/SPYUSDT/wal.bin",
+      "sha256": "cf0ba6f5437e21ff380ab5ab1c2979828aa865c61685c1247ed0cd28652eb58c"
+    },
+    {
+      "bytes": 175497,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/TONUSDT/wal.bin",
+      "sha256": "a6c212fd13930cd7c1a30935586be80cfcafe4181ae6e62d7c2f636dfa554e9e"
+    },
+    {
+      "bytes": 2805,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/GMEUSDT/wal.bin",
+      "sha256": "7194311e9078a62ea6cbbfe5d49eb3254064edcf0a0ecab2531910e5581b5a98"
+    },
+    {
+      "bytes": 2851,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/AAOIUSDT/wal.bin",
+      "sha256": "1875b6eb63b2e97b5d5a4c2e78cf9b327c07f3853380cccd579c9057a3f3150a"
+    },
+    {
+      "bytes": 11671,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/SOXLUSDT/wal.bin",
+      "sha256": "c050b4d0fb44e7eb07e6f9ae1b527ef41ea2babc1009d652ff1bb7f40d463b3f"
+    },
+    {
+      "bytes": 2822,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/HIMSUSDT/wal.bin",
+      "sha256": "83d25ed7ffcf3902211d1b5556401b6faf0807a023034dd89ab013d0827a3c39"
+    },
+    {
+      "bytes": 117717,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/XAGUSDT/wal.bin",
+      "sha256": "2aaaf66321c2b4a27a78c6a62505f40540488dee7b20128cdfc91eb774a3b628"
+    },
+    {
+      "bytes": 22368,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/CLUSDT/wal.bin",
+      "sha256": "ab17f2c2c29d7bcbf8c484198694533c7429171d215863892ca3f6df008aa65a"
+    },
+    {
+      "bytes": 2822,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/HDUSDT/wal.bin",
+      "sha256": "beb3879f08f83ad28525761d32ed976c47309d1dd9afb61cc8035575f95fb391"
+    },
+    {
+      "bytes": 2852,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/DRAMUSDT/wal.bin",
+      "sha256": "84ca0263ee0e90f9d35e27a15f55476d4b32dde8ebd87bdabda5db29d85d44a7"
+    },
+    {
+      "bytes": 2873,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/SKHYNIXUSDT/wal.bin",
+      "sha256": "87e537b630096df8f184fb1f02db309725ea6413a1c484754fc47f8bcfc03a76"
+    },
+    {
+      "bytes": 2844,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/GOOGLUSDT/wal.bin",
+      "sha256": "9ac19fac0b60d1cadf4c44397214a90b7b8762abcd1a391764b328f4df79864d"
+    },
+    {
+      "bytes": 2807,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/DKNGUSDT/wal.bin",
+      "sha256": "c6c444eaffc0579762d557e2c81e7062b0e86f97ca874849fcb6c6f7b8d096dc"
+    },
+    {
+      "bytes": 2811,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/NFLXUSDT/wal.bin",
+      "sha256": "4d8e7b43e807a200a265f5082eb19372acce85d17ef7dab18bf342026deed9cc"
+    },
+    {
+      "bytes": 2805,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/COSTUSDT/wal.bin",
+      "sha256": "f3618c1c6936e0f0d4f692172484bb8a32f6c8508fc3993a0faef7b11ba22e1e"
+    },
+    {
+      "bytes": 2824,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/HYUNDAIUSDT/wal.bin",
+      "sha256": "da52d651290ab43d3ec19d394e84c347d17003822d05d11581dc6bcdd03388fa"
+    },
+    {
+      "bytes": 141463,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/TRXUSDT/wal.bin",
+      "sha256": "3f7dd37820cbd555c2845f8287fec99df1ec4a94f68abd081405005a7fd07f03"
+    },
+    {
+      "bytes": 21059,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/QQQUSDT/wal.bin",
+      "sha256": "a8238e0bd74b4c25bb8e220fd72fcd7e0903733d2ac0723e685b067fe15d4740"
+    },
+    {
+      "bytes": 2854,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/AMDUSDT/wal.bin",
+      "sha256": "af38650896c9bf114adca86fa18c8914684f08f1fc7225a1be3edcb35e782fa8"
+    },
+    {
+      "bytes": 2807,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/EBAYUSDT/wal.bin",
+      "sha256": "c3e90e63f5dd3f69ceb7cc130c3b2f994a9800f4dcdc4094000708609b69f144"
+    },
+    {
+      "bytes": 25147,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/EWJUSDT/wal.bin",
+      "sha256": "cf674279c273134fcd1f197044ced334689e959554ce42e0a979af86dd3af332"
+    },
+    {
+      "bytes": 944,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/MVLLUSDT/wal.bin",
+      "sha256": "6da84563d66fd36af2c2431a382d05c96934c49d5f246ad9174cc30dd1b842b9"
+    },
+    {
+      "bytes": 2842,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/COHRUSDT/wal.bin",
+      "sha256": "02026e7fcf7035a3685d2d6c81028e3c67eb66e77edb74fbe02b6b6ca7fea42b"
+    },
+    {
+      "bytes": 234,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/STRCUSDT/wal.bin",
+      "sha256": "668594cfe4406a53ea6e69a2bc6d580c5c046299bb4b2352c0a88419dea04b54"
+    },
+    {
+      "bytes": 34000,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/AMZNUSDT/wal.bin",
+      "sha256": "3a3c684a2e045d165d9dc71c6f62b778c272778d537c5a961fcd9420e5e44c48"
+    },
+    {
+      "bytes": 2876,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/SNDKUSDT/wal.bin",
+      "sha256": "e78ac5fd027069310b88b2ef02749bd4e8721f44def218c96f3733db44516e45"
+    },
+    {
+      "bytes": 34132,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/MSTRUSDT/wal.bin",
+      "sha256": "9dddfa29cb0875b492c5b4507c38e2509fe430acb0f719123f3c2ea9b1a3cb41"
+    },
+    {
+      "bytes": 2823,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/PAYPUSDT/wal.bin",
+      "sha256": "4644eda08a5ed2926ec5a945efece641c6eff3ea495aa13661f5b1917094d75f"
+    },
+    {
+      "bytes": 234,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/KSTRUSDT/wal.bin",
+      "sha256": "eb3f762a32be3ddd4781c4c9ed6e80aff73aba6a35120ddb85305f6db3dfe8ef"
+    },
+    {
+      "bytes": 5609,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/EWZUSDT/wal.bin",
+      "sha256": "07e4a82935bce2541c2a90e6b5acc34c50bcf8751464e4adf630910bd2036822"
+    },
+    {
+      "bytes": 2843,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/METAUSDT/wal.bin",
+      "sha256": "b976d5a8219bcbe404b34fae379b8bab9c60cf19f753649489f08277e734cf95"
+    },
+    {
+      "bytes": 2818,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/ASMLUSDT/wal.bin",
+      "sha256": "eecf73b14ea1955c1084d451678594a1096256f7204bcfc32b3f41335de03c8f"
+    },
+    {
+      "bytes": 1410,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/SMCIUSDT/wal.bin",
+      "sha256": "9c41ddbb8a763c4dd3d007865d68b54f7b9b233d9ab0ac9af71b5acdb816949a"
+    },
+    {
+      "bytes": 37036,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/TSLAUSDT/wal.bin",
+      "sha256": "b2d849df00a2aec788bdf9e4128fe3e6f9eb580e888efb6dc49f45581fd0ec78"
+    },
+    {
+      "bytes": 2874,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/MUUSDT/wal.bin",
+      "sha256": "d29e8465cbdc8d66c020d53ba589241a4327d2fa5738e036657528d45e2d8ad1"
+    },
+    {
+      "bytes": 2830,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/ASTSUSDT/wal.bin",
+      "sha256": "691cbf1711d632b3707b208ac52f2cc5dc7512ea179d2da137411bffa06f1d6e"
+    },
+    {
+      "bytes": 28326,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/COPPERUSDT/wal.bin",
+      "sha256": "14a1fbac475a4d97f148b5342c62cf4a6ab41974d64afeec8b8b55c9caa31cb8"
+    },
+    {
+      "bytes": 234,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/FLEXUSDT/wal.bin",
+      "sha256": "0f7d54f7a1e56b98c995ea099519a798da1b73907b64270421c46610a9063683"
+    },
+    {
+      "bytes": 2835,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/BEUSDT/wal.bin",
+      "sha256": "0daff8c3b2213644d0b7efe295d927eb931981a249460f246b5b4b82488dab18"
+    },
+    {
+      "bytes": 2829,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/FLNCUSDT/wal.bin",
+      "sha256": "a4bacd1cb76fa7c6cbb8f3a1b4e5c988f98fe925f7dfb70c37bb98f723776ea8"
+    },
+    {
+      "bytes": 35744,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/INTCUSDT/wal.bin",
+      "sha256": "2786d2cd0d930f3ea14e9cf13f1b20915ab825699d0c2fdb7ba1cb2a16a309b0"
+    },
+    {
+      "bytes": 2844,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/NVDAUSDT/wal.bin",
+      "sha256": "72b8579a5067d1e12a5f1d2875c16c532d745e03e7eef538afcbdae05e2a8766"
+    },
+    {
+      "bytes": 825648,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/BTCUSDT/wal.bin",
+      "sha256": "6ce63c2d5c5dc30c5f45cd500072539ff760e261efa60dc2b24703c23531cbdf"
+    },
+    {
+      "bytes": 117087,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/XPDUSDT/wal.bin",
+      "sha256": "ebe3e820534de1c72ae27914f6e316a117225426f4776c4c64fbcceeff2a81ed"
+    },
+    {
+      "bytes": 2866,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/CRCLUSDT/wal.bin",
+      "sha256": "d1d064384648144a73fbdab6028677d11cb010ec9ef1cb7e0c864cababfe9b93"
+    },
+    {
+      "bytes": 2843,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/ORCLUSDT/wal.bin",
+      "sha256": "a13ac5b736ea54ed00aa3af1c5593efed030ef939b69e5fc14600204dd9b1705"
+    },
+    {
+      "bytes": 174743,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/ADAUSDT/wal.bin",
+      "sha256": "edd871bd31ff29a94980978a19f60b75aea61e2d53effc3ca15b53275709f258"
+    },
+    {
+      "bytes": 2819,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/DISUSDT/wal.bin",
+      "sha256": "cb3be8a3c29b44ef30407867ed2f6c5e080f70842c0556500a8142f00053bc2f"
+    },
+    {
+      "bytes": 2843,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/QNTXUSDT/wal.bin",
+      "sha256": "da2b4ac156c16fddd0937b5d720148bb47cc8a34e50f0254a0d4bf98d7966d11"
+    },
+    {
+      "bytes": 26056,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/EWYUSDT/wal.bin",
+      "sha256": "15bbaf9cd64494efd472f9ae6722960e0a64dfb958b4bbad5a78346086afc51f"
+    },
+    {
+      "bytes": 5630,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/URNMUSDT/wal.bin",
+      "sha256": "29789959751b59c5d2e1764ebc4a3af04dabbbc7cfb04aee78c675e0e183a106"
+    },
+    {
+      "bytes": 939,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/SQQQUSDT/wal.bin",
+      "sha256": "ef3b6e97b3f75bc92cb391847cd98b518e157f8f3d0152d295c149e097acbec1"
+    },
+    {
+      "bytes": 2822,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/CRWDUSDT/wal.bin",
+      "sha256": "5a929391a368dff6a1194749b723b01b96ce69cfd98ce9b443dd1034fd6e1cf4"
+    },
+    {
+      "bytes": 2867,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/MRVLUSDT/wal.bin",
+      "sha256": "1dadbe20633fe3c23cb3c7adc9e3c6c57d8bb398d58d12320f9b379138c8a55a"
+    },
+    {
+      "bytes": 2819,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/CRMUSDT/wal.bin",
+      "sha256": "87a1571a980035111444b19e3c6a993dcabfc3845543aa04ab9b599a1e436f20"
+    },
+    {
+      "bytes": 2843,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/AVGOUSDT/wal.bin",
+      "sha256": "6b8de4743aef32c6a265b9e1932097044c05969d79dec4cfec634b1b14e7098b"
+    },
+    {
+      "bytes": 2829,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/CRDOUSDT/wal.bin",
+      "sha256": "862d2eb5fa56cd7b0df6ceda72d9968d00167b999d8ec42281f17c498c08ba8a"
+    },
+    {
+      "bytes": 2825,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/BBXUSDT/wal.bin",
+      "sha256": "08ce12f3bc4b6c8d8d289e625abab300ff569e89ed63c29c71ac4c195d474074"
+    },
+    {
+      "bytes": 1405,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/SONYUSDT/wal.bin",
+      "sha256": "d7a77e12895211fbe35245ffa17a0fc39821e31ae2bbf0fb64e0067163719bed"
+    },
+    {
+      "bytes": 2831,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/AXTIUSDT/wal.bin",
+      "sha256": "5578fa636ba920bb2785d1d43b666b73af0f1aaebaba9654f10b1b29629603bf"
+    },
+    {
+      "bytes": 118514,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/XPTUSDT/wal.bin",
+      "sha256": "64ae2a34afa9b1607f0a02969f3b8f3b22abe50143fea59a63e043c6bf546ee7"
+    },
+    {
+      "bytes": 2854,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/CBRSUSDT/wal.bin",
+      "sha256": "9f2f8ca258096042cbec3a9298ea7f6a401610a5c7a64c32b0bcd0598616c98c"
+    },
+    {
+      "bytes": 2820,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/CSCOUSDT/wal.bin",
+      "sha256": "512c27eef5d96fe849807fcb02122b006f590246e89830305598e0a49b4739b3"
+    },
+    {
+      "bytes": 2820,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/HPEUSDT/wal.bin",
+      "sha256": "76e9462ee8d4d91af27ab7defbc1bc25598b94fc5daea31e2e4f4b55889981bc"
+    },
+    {
+      "bytes": 184930,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/BNBUSDT/wal.bin",
+      "sha256": "cca24adccdef0067270d629b5af947fc5094a8b91846722944b9d48bb8cb4ce5"
+    },
+    {
+      "bytes": 7760,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/EWTUSDT/wal.bin",
+      "sha256": "13823345bd3a54cb3f6df7c59f90bb47c8a6c5d71483c9a0da60f7a2039f59d5"
+    },
+    {
+      "bytes": 2836,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/GLWUSDT/wal.bin",
+      "sha256": "52c772529b31c070e2decd9887faa3d7dedea50e4b68c882f73c1b57999cef59"
+    },
+    {
+      "bytes": 2851,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/COINUSDT/wal.bin",
+      "sha256": "bd6dba15c5c7e6b22618e5771a1ddcfe856b7c274d6901b9c7ebd202956e9201"
+    },
+    {
+      "bytes": 2830,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/BABAUSDT/wal.bin",
+      "sha256": "a2f308fcdc6f35f53278b09c27c2630d5db7f227d8d760ab825eba201783d349"
+    },
+    {
+      "bytes": 2813,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/ADBEUSDT/wal.bin",
+      "sha256": "3ae360c3cbd902f8f9f29a221798efe09b3b6856d6e9c2de085b720d4eb8fac8"
+    },
+    {
+      "bytes": 2819,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/NVOUSDT/wal.bin",
+      "sha256": "90ba64bb2f50bd99148cd05981b52db3c70e022997e03f673a25b264ffc75467"
+    },
+    {
+      "bytes": 234,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/TXNUSDT/wal.bin",
+      "sha256": "03ea36dc8b38fdcb257fd694cba0bb61c43f95593d52de33851108bf251d5ae4"
+    },
+    {
+      "bytes": 6095,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/IWMUSDT/wal.bin",
+      "sha256": "a46976c7ab6f521be5df48bf9a3a5e07948cb0288c2de7ef86bc94c6903d9329"
+    },
+    {
+      "bytes": 198779,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/XRPUSDT/wal.bin",
+      "sha256": "7e85a9473a2985555294929c484921b204de4f0447a41b0aed30dafad837675c"
+    },
+    {
+      "bytes": 2854,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/WDCUSDT/wal.bin",
+      "sha256": "1adaf82ecd910ee7da3880e2639f3d947149f200ef3893a74bf0e19e5813b064"
+    },
+    {
+      "bytes": 2818,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/ONDSUSDT/wal.bin",
+      "sha256": "f82948736516fc5db59e9b8efb83a63719697a2704d264e9021b75d7363ff826"
+    },
+    {
+      "bytes": 2823,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/LLYUSDT/wal.bin",
+      "sha256": "e974414b27917bb69c94776b0327019b8beef50e2c32a166af0eb87d73750855"
+    },
+    {
+      "bytes": 35951,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/HOODUSDT/wal.bin",
+      "sha256": "11bcf603001484c0ba8d9b3eff6af0e4942d0cf54f5e187c55c8f4508878ba1b"
+    },
+    {
+      "bytes": 481500,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/SOLUSDT/wal.bin",
+      "sha256": "5707806de09aa4139253e12434b806dad95bdb602f25b29810e1bbe28302bd23"
+    },
+    {
+      "bytes": 5378,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/XLEUSDT/wal.bin",
+      "sha256": "b164b1a24b8736f457068d45790a34a1f6bf13b613346689a88c7e39f85863d6"
+    },
+    {
+      "bytes": 2820,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/JPMUSDT/wal.bin",
+      "sha256": "43bba5680af85006fb3bac5cedb71caaba408d9de8dd48155abd97220f43d807"
+    },
+    {
+      "bytes": 2831,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/DELLUSDT/wal.bin",
+      "sha256": "9aa5a7e40ccd96bc2a7088b1f5ae3a71c985a67dadc0539e446b75d14380c6d8"
+    },
+    {
+      "bytes": 2817,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/BMNRUSDT/wal.bin",
+      "sha256": "d29a7de258e0122b6d4584ca95c2bcbfa556c41c64f53af3f293633743e5bb09"
+    },
+    {
+      "bytes": 2827,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/NOKUSDT/wal.bin",
+      "sha256": "bb52752474de8e49370796b3795d04c4524f2cac5862c9beaefc1eb83abc3928"
+    },
+    {
+      "bytes": 2822,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/UBERUSDT/wal.bin",
+      "sha256": "d0a3cf4f88a1b84642a00068efa8e8bfbcdd1ed720d7ef1fa593dfc6bd0b8fbd"
+    },
+    {
+      "bytes": 2825,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/USARUSDT/wal.bin",
+      "sha256": "82c7807ba2c8cba267a90e31443e517e183de1f5837c141b299e26080dac7ece"
+    },
+    {
+      "bytes": 2808,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/RIVNUSDT/wal.bin",
+      "sha256": "fd6e3d7737b8820d3a60b93b706e2117acbc4cc8103a474e27a34df272960a3c"
+    },
+    {
+      "bytes": 2838,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/CRWVUSDT/wal.bin",
+      "sha256": "cd02f1f55d5099ceebd3d6b911956b70b4b4a6cedc6bc5c21ccc9efd27b88639"
+    },
+    {
+      "bytes": 2821,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/BRKBUSDT/wal.bin",
+      "sha256": "41a9e576cc660649d5ca80959a5b23149d30542826faf602ec65f6a10f2d2139"
+    },
+    {
+      "bytes": 2847,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/QCOMUSDT/wal.bin",
+      "sha256": "e360e94ebdf3d311d707aea6f51ca7f485b229c6aaf19a094ea13978f30c1abc"
+    },
+    {
+      "bytes": 943,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/TQQQUSDT/wal.bin",
+      "sha256": "2fb21cc676b5e23e3ab92ba78e2ffc0f5c4089cdb586fc8989b9066a2ffa0785"
+    },
+    {
+      "bytes": 2821,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/NOWUSDT/wal.bin",
+      "sha256": "16ab81dd77915b43033ce67be3b3586f3946ab7baa869ee949c9035e8ea6f6bc"
+    },
+    {
+      "bytes": 1411,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/ALABUSDT/wal.bin",
+      "sha256": "3b4b07a68b31df740e3e3dcac3a305f5be96e50b82ae549f7768cdf3dd9d3f5e"
+    },
+    {
+      "bytes": 234,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/CATUSDT/wal.bin",
+      "sha256": "097d45db5d61cc58a2c703d6b3b182eb0632c5f46113b3603b50acb6704c0bbd"
+    },
+    {
+      "bytes": 2839,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/OPENAIUSDT/wal.bin",
+      "sha256": "5de2f48ac945d4ba3118639103179fd4eed711178f898a47f0bdff97c0fa509d"
+    },
+    {
+      "bytes": 2830,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/AMATUSDT/wal.bin",
+      "sha256": "8d7aece5d5f61c183ccc6748040a3542747368e3e9c99360a42f2a7cc89c2fa0"
+    },
+    {
+      "bytes": 2852,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/ARMUSDT/wal.bin",
+      "sha256": "74407381e8881cfb0a18da555d0c0c10550491061de9f40703a3813358a4a315"
+    },
+    {
+      "bytes": 1405,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/CIENUSDT/wal.bin",
+      "sha256": "718069612051d97c033edaffd821799dcbc9f92d993f23ed22a6f882a317cb6b"
+    },
+    {
+      "bytes": 2821,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/BXUSDT/wal.bin",
+      "sha256": "d5ae602cbf9b0300eb502c4d3cf722653fb6cd3126cf3efe3ab6cc5459599c31"
+    },
+    {
+      "bytes": 5179,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/STXXUSDT/wal.bin",
+      "sha256": "61657fe2611596565235e5f1d5c67e15329cb1d0b3a997a5290355a8a05faca8"
+    },
+    {
+      "bytes": 2843,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/PLTRUSDT/wal.bin",
+      "sha256": "9ee857ebae8624f2ba2804c183ed7659a313723d7ee83fd502e60bf05cf313f4"
+    },
+    {
+      "bytes": 2851,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/LITEUSDT/wal.bin",
+      "sha256": "e02d4da8a6ca302cbc57e78c27d0b0d23619a209fcdabf1f6d7f8a88d8ca895c"
+    },
+    {
+      "bytes": 2831,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/IBMUSDT/wal.bin",
+      "sha256": "aef74ecaa42b0b27df1d64f4244deebf17ce4c4a33b53ac1f71058f709cec3d7"
+    },
+    {
+      "bytes": 234,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/BSPUSDT/wal.bin",
+      "sha256": "d2e4aa214e4bbb232c4964adf5dc9d0a117d7edbff954bacf33754ef46323be2"
+    },
+    {
+      "bytes": 1431,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/KORUUSDT/wal.bin",
+      "sha256": "ecad67e32f1f4721ca899464ff85c7b04e575ace4844f29ce99815e0fbf77754"
+    },
+    {
+      "bytes": 2820,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/VUSDT/wal.bin",
+      "sha256": "a830910615cd53b09ed297307a7847f8ca098cc631fc4a095aaaeace59d0130a"
+    },
+    {
+      "bytes": 124997,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/XAUUSDT/wal.bin",
+      "sha256": "3417196ab162c015eb672877ac6c0facb6f3d2a271378b7308265ef9573572fc"
+    },
+    {
+      "bytes": 590087,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/ETHUSDT/wal.bin",
+      "sha256": "6d2487dfd19bf1b013bb259cdd48d82fca48c5dabe4ad8a7d8dfe20a08ab390c"
+    },
+    {
+      "bytes": 22188,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/NATGASUSDT/wal.bin",
+      "sha256": "04f5d848e7857b62b70a57f18e039189bb3435fc19dae9b953ef99244c137356"
+    },
+    {
+      "bytes": 234,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/TERUSDT/wal.bin",
+      "sha256": "0e5292f52082374904e74f5cf4e12c1d9321504fc5d2b9decf5d8e18315d1f74"
+    },
+    {
+      "bytes": 2824,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/IRENUSDT/wal.bin",
+      "sha256": "3445d2182b18018983eedb9675af8166014ccfa2895d236a307943120303d685"
+    },
+    {
+      "bytes": 5167,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/UVXYUSDT/wal.bin",
+      "sha256": "1f3ffa2be172443d973af72da2a209d8ab21047e6875482d926466b5bcf9a389"
+    },
+    {
+      "bytes": 2867,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/SPCXUSDT/wal.bin",
+      "sha256": "dcf18808c06494aae9c9624f2875c8a5c254903f9ef24f8488033f0a0b1279ad"
+    },
+    {
+      "bytes": 2808,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/ZMUSDT/wal.bin",
+      "sha256": "980b719fe1ae3fa54bc05fb2645928d735a7e7b4f032f4f113b156d6ef36f2d9"
+    },
+    {
+      "bytes": 234,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/TTWOUSDT/wal.bin",
+      "sha256": "1af500fac7c323abbe03f1effe2546e6304b03b54b8369ae56d2ddc91fd4a6d9"
+    },
+    {
+      "bytes": 193071,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/DOGEUSDT/wal.bin",
+      "sha256": "8ff642a7110507baa789b010ca28e8a31c74de401ab3ff1544ff6919254e9ae1"
+    },
+    {
+      "bytes": 2852,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/NBISUSDT/wal.bin",
+      "sha256": "889201f8f029b64f32b355445a0c4de6fc30157d22ca29805a650ea385846193"
+    },
+    {
+      "bytes": 2843,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/MSFTUSDT/wal.bin",
+      "sha256": "903beab2f35dd3ebc1e8f7edf911055090c5e1e7d7ec31aeb707e68c84637378"
+    },
+    {
+      "bytes": 162932,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/AVAXUSDT/wal.bin",
+      "sha256": "25dfcdfe5f62dd8084c2da218512b565a97cad8edab0079e0cedb868c5c37717"
+    },
+    {
+      "bytes": 1413,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/LRCXUSDT/wal.bin",
+      "sha256": "aab0b8b133c0643d0f7adafa3c2f7bc8b5f520e898a8a1759b4b7c7eba4d2190"
+    },
+    {
+      "bytes": 2845,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/RKLBUSDT/wal.bin",
+      "sha256": "f999c85c7feb74c66b0fe51265677ef0005450d71554750a5f6fe1cedb253592"
+    },
+    {
+      "bytes": 1411,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/KLACUSDT/wal.bin",
+      "sha256": "390ea93763f45126b30c3eb11e88f3301f0e600a40c0517e8af2f5fa42cfbbbc"
+    },
+    {
+      "bytes": 2839,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/ANTHROPICUSDT/wal.bin",
+      "sha256": "87d56c2e6772baeb582e9f64427d3b3ec37f3b5c9d3ed1475189186e7aa44939"
+    },
+    {
+      "bytes": 2852,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/SAMSUNGUSDT/wal.bin",
+      "sha256": "e355df346236d1c91b354418ec9ef19503d5a7f1ee97411a7233acb8413ecbb2"
+    },
+    {
+      "bytes": 2843,
+      "path": "data/market_parquet/market_data_raw_aggtrades/binance/TSMUSDT/wal.bin",
+      "sha256": "ef0c896c83c924f21ee8a2513c010504345d4c5256c2f50094876d1fbf36528a"
+    }
+  ],
+  "retired_wal_bytes": 4251892,
+  "rows": [
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/AAOIUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 96441,
+      "new_sha256": "184de2bb72f384a364e7a0e748225d092a825dd16c11d8985e05f67bf5976c5d",
+      "old_sha256": "fdaee2b570923442e3ae42ac6636d297cc9c5f2cb927b1f959f725d9d8e04215",
+      "symbol": "AAOI/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/AAPLUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 54849,
+      "new_sha256": "54e844d1b431186652f96a3e404c48828c31468c2ce9f920f72b9fe97a89d920",
+      "old_sha256": "261b53bf19666e6dca85300a137288276f39843c79c1d8a96757610e35208356",
+      "symbol": "AAPL/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/ADAUSDT/date=2026-07-02/part-0000.parquet",
+      "latest_rows": 42634,
+      "new_sha256": "adc8511a84407b95403f79c69ecb1e0b91a655920320e5c42e4c9040048caa15",
+      "old_sha256": "de46ead807efb02e9e2ac8fa6e6efc9db65de0e6932d081f87ae401f1248caa4",
+      "symbol": "ADA/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/ADBEUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 3361,
+      "new_sha256": "0f91ac3e008e748914f68c7644f6c88954967321128183b8edbe3d5f046ab675",
+      "old_sha256": "35f33feb087bac2d3110072484e5da342c095059d54d5a93e5f604eed03c4405",
+      "symbol": "ADBE/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/ALABUSDT/date=2026-07-02/part-0000.parquet",
+      "latest_rows": 9358,
+      "new_sha256": "8d5bd2e9fde9fa3b4133e48abe2a247829e9016108d2fb1c6190290c7da94fdc",
+      "old_sha256": "1c6d3a21ad45805f456fe32bbc7cbe3e69496a5418038537dceaeb3ecd18d127",
+      "symbol": "ALAB/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/AMATUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 59785,
+      "new_sha256": "9e7ac9635219b78a838c100ba1b59c9245bcae13a84f53b3995cd4d5afae332d",
+      "old_sha256": "172f303f9f050648cbdb3220a0abb0c343680416dd8bf613cf042186aa213f14",
+      "symbol": "AMAT/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/AMDUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 156071,
+      "new_sha256": "b20d42540751da6acb80b7d2b8395bd35b7416f53bd56a4f394751a9a5a5d60e",
+      "old_sha256": "6969cd688a2dbccfb5dab0114349189c69a6a06453cf9181219039a956ef56e7",
+      "symbol": "AMD/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/AMZNUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 27722,
+      "new_sha256": "23e442046928deb77adfc8672cbe86d772ae556d09fee025cf7d1c43f53698c7",
+      "old_sha256": "606563c29e27dba2553c65e05ad7662c240080728712de127ce8ca8ffb2748d4",
+      "symbol": "AMZN/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/ANTHROPICUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 11606,
+      "new_sha256": "40d7dc5cea022ded6d21d93693f4f9e3d5134ae1f6d9bfd233661048afffbfad",
+      "old_sha256": "54ed4846c11efe4e9b3b59c0702c32b896ee7811370378f32b896657d0e02e9c",
+      "symbol": "ANTHROPIC/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/ARMUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 173282,
+      "new_sha256": "5119bd18a0bafb3c28627319bf5fd08dc7f4dc82312f49083bd64eee897c5e57",
+      "old_sha256": "85dc0c0948110e2f4bc96bb190447b58da7c0a06a0fcf43f6357148dd85bcc0d",
+      "symbol": "ARM/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/ASMLUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 8294,
+      "new_sha256": "52b38d5b92211b38dfff8faa19f7ee426c29724897dea95270b696383753e0e6",
+      "old_sha256": "216553e8ad7de092937c094b6e167e2080131ea5ef6a46f1a29318a52a87165d",
+      "symbol": "ASML/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/ASTSUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 36183,
+      "new_sha256": "0c1e14eeaa4927a7282a5575d4c04dd4c1a76b41755b511b4e5d939327e3bde6",
+      "old_sha256": "08e363628dbdf11259ff52efe5b11cdc450de786f7396025d0206626eac302e9",
+      "symbol": "ASTS/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/AVAXUSDT/date=2026-07-02/part-0000.parquet",
+      "latest_rows": 47848,
+      "new_sha256": "b5840accb27f0936c04da375fb85c5d60d4e908b1e0426eceed6ccb7ee9d4c96",
+      "old_sha256": "6054e2a1f0061065738286f3e02191e3968f273910ad4f60bb905951959799aa",
+      "symbol": "AVAX/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/AVGOUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 24437,
+      "new_sha256": "86c324f6156507f08716698a0c2cf6ada6f18ad8f3beda80e78084edc242cf23",
+      "old_sha256": "69cda494be507f4852da2bb4adebb1e0c85315f1936920a4b8babc781584b30d",
+      "symbol": "AVGO/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/AXTIUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 20836,
+      "new_sha256": "163f3904b5bddd40449ed4a1fd383cd1d550c1d14964c34f79456ccfc62ef62a",
+      "old_sha256": "425a0a26b3bf1f830775905449b5447eb121a8656d08930bc5e66554f472f225",
+      "symbol": "AXTI/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/BABAUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 11131,
+      "new_sha256": "dedb500fa951bc46f58cda78a98864d394b11a19e512bbabdbe544b21ac2e39f",
+      "old_sha256": "42b9f39109f07ab0a3bfe50914d12d9f7af8018c46da9e4617af2e8c9455c0bf",
+      "symbol": "BABA/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/BBXUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 10857,
+      "new_sha256": "a605dd2bc4d2bf186ee2b3791600c3aa40cd3d390a38c4ba70c86721d39f2568",
+      "old_sha256": "44d424a4689116d4aa784c547b37bbb9e7e34eba30d24d8b59cee6ebc594670a",
+      "symbol": "BBX/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/BEUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 149135,
+      "new_sha256": "aa43bc327e54d823a5beed7549f2bd60bc6821756d75523dea86b997756d2061",
+      "old_sha256": "552eab045d8833d8566cccd6e9458fa6bd35d89bb3a328a65fe4870499b4a621",
+      "symbol": "BE/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/BMNRUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 7841,
+      "new_sha256": "efea97b58230e45f7ea453073bc7cf4ae833fd95a410b602bc4058cf35f6b3f1",
+      "old_sha256": "cc121eac2b96dbc3b0e967b53ab8e7276ae143cd7ac45e5cf763093bc3546966",
+      "symbol": "BMNR/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/BNBUSDT/date=2026-07-02/part-0000.parquet",
+      "latest_rows": 147751,
+      "new_sha256": "c98a5fa009b2d958bc4215f5ba816315644df71e9c072d03fed05c8d1f49347d",
+      "old_sha256": "cc5a45af2e7505e7e7214f6f4c80b8d854940b512945cf23d4f84e69bd3881fd",
+      "symbol": "BNB/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/BRKBUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 4816,
+      "new_sha256": "fb8df6fff81274e2b3cb7d99b1c0a2b8bc9b7cd4d4e8c13f57ba7c783df38578",
+      "old_sha256": "e3035813bd9e5edab7793da7daa97ce4c6b09230f1c47f2ed77541fe85a8657a",
+      "symbol": "BRKB/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/BSPUSDT/date=2026-07-02/part-0000.parquet",
+      "latest_rows": 7880,
+      "new_sha256": "b6b542cf42a01186679fd95242bd9c79cd55167c19ec8f931b65582094e0094b",
+      "old_sha256": "079cfeb1c5b71473a1c03202e8bc52002a546556da960a0d1550dde904887d04",
+      "symbol": "BSP/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/BTCUSDT/date=2026-07-02/part-0000.parquet",
+      "latest_rows": 989054,
+      "new_sha256": "3859fa67e604dde70cc6a3052735f269588a53e94ee6511a6060fb0f590227c1",
+      "old_sha256": "8689b8e26e19e1038bd0a17f009777e2572ef5083020e0d4d831e2b8aa09251d",
+      "symbol": "BTC/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/BXUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 3446,
+      "new_sha256": "46d1df68527d5c1819861c22237ee4a6c22992741ed3898906461503d2ef72a2",
+      "old_sha256": "c9e9cdc5dff633fe5fe4151449e66f239583b2abaf8e4a1f4bc7e670aec28775",
+      "symbol": "BX/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/BZUSDT/date=2026-07-02/part-0000.parquet",
+      "latest_rows": 18846,
+      "new_sha256": "d11cb8bbfa9600962e8c5955ffdb9133e2f5aa3c864af095eb6ab9ccedbfe5b0",
+      "old_sha256": "7019b5cca5931b9becf55931dc6cb1a7e143bb130ed78b9ff84cfc69e32646c2",
+      "symbol": "BZ/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/CATUSDT/date=2026-07-02/part-0000.parquet",
+      "latest_rows": 7896,
+      "new_sha256": "2a0dede952d2ed89402bdfef78022e38335f14ed790708ead49320dea258f136",
+      "old_sha256": "72d4662b79110f06766be85ee7d38d5533189be0a7952a8fe9a15186c07d9304",
+      "symbol": "CAT/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/CBRSUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 217955,
+      "new_sha256": "8bc4eaec67065ec7d42fcdf3215f285a409b5ec108d26ecd50ddfbfefc04b0aa",
+      "old_sha256": "cb4d87c583f3d2a6544e26fa7213149e49969d333b08cf884c942ac56a103e23",
+      "symbol": "CBRS/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/CIENUSDT/date=2026-07-02/part-0000.parquet",
+      "latest_rows": 4191,
+      "new_sha256": "dd1032df8a0caa95f354057df46ea94b621add7385f6b842cb325376920ddcb0",
+      "old_sha256": "0e1bfc04348e488d5391d7b0de7cc00dc5cae9fd51c18fbeadd11dfe9e7a096d",
+      "symbol": "CIEN/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/CLUSDT/date=2026-07-02/part-0000.parquet",
+      "latest_rows": 28315,
+      "new_sha256": "9138b3b644ddae80b1a09f096f6d9e3687d0635606f1940fb269e86413f66aea",
+      "old_sha256": "5ada947247f843396b66b19fc4db1563b8a191c6a553ebc00c79b467f0bc1a95",
+      "symbol": "CL/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/COHRUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 38666,
+      "new_sha256": "2e4948f301aabda6c4e40c0646b132786458471ba7812fb211f7894ffd6ee0e0",
+      "old_sha256": "d39ac7f0b7b03688f865557653866b65c9f981b7a4a2e30c2033bdf5aa50c9f0",
+      "symbol": "COHR/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/COINUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 132438,
+      "new_sha256": "bd6cadb0e4b3d9dc43ca10512b558d79e8a6c1bba215102a7223b0d372a54759",
+      "old_sha256": "da7e5343a62b145d733441e07c5129c019d284113933b3322c60ea19e0a86228",
+      "symbol": "COIN/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/COPPERUSDT/date=2026-07-02/part-0000.parquet",
+      "latest_rows": 5776,
+      "new_sha256": "316d66bbff03ae56ae172cd9dad3375aa2f49e37ca087f33c7e6425ec0b68800",
+      "old_sha256": "1ccf1d753f9bd9bdb63bf0006b6284b3220b6df1eefc3c82c9a75924965ee1cf",
+      "symbol": "COPPER/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/COSTUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 2439,
+      "new_sha256": "493ea212584c2a0ce12b289c7001ec0e45cec18bcb52ef27229a40be4b4b0a14",
+      "old_sha256": "8b748cfe737009ab7deb361463e537b85070c4d8467d95ee9f035db77c4b209f",
+      "symbol": "COST/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/CRCLUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 157302,
+      "new_sha256": "c25ed88a637527237f5d5a3a85f4dcd166d0df6e1f7638966187a3406262df48",
+      "old_sha256": "845c1a6d658cbba7ab8ac7ffff7b002108e7373007195263f161581f2461d992",
+      "symbol": "CRCL/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/CRDOUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 16123,
+      "new_sha256": "f268462caddd3ae7079edc7feff08569524bb77137ecdcdcb61b962aeb3a14f3",
+      "old_sha256": "68b2a5a7f687ef28b4e57be36348fbdbd982546c3cf4d7b98448d5c893b9084c",
+      "symbol": "CRDO/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/CRMUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 3235,
+      "new_sha256": "e260850a0948352d1b7c121425dfbbbc66482f0ebeda6eb7c64a8723870ef422",
+      "old_sha256": "36fba881bec6ed597c5c0946df3bed6b4ced10c42cb40c77f342ca01283840af",
+      "symbol": "CRM/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/CRWDUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 7196,
+      "new_sha256": "f27d352f9ac05fc36f2d4f9633ef1fff3d4b4838403318c37c437d30d206046c",
+      "old_sha256": "f10e3313fa432e12e3cc8e1db44b4d7134ea4a7a35a7691ffacb20c404f30cf6",
+      "symbol": "CRWD/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/CRWVUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 48182,
+      "new_sha256": "2a9b5ef66cbf46b59d0c642b7f645298469714b29b37cf73865ef828a2b40b2a",
+      "old_sha256": "c8cedba171c4fb693f096e43bb8a2fbecaf729cc8447d212d55908bc73724d7e",
+      "symbol": "CRWV/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/CSCOUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 3253,
+      "new_sha256": "24b591bd0e13ae2fabb6e738c19735e3a73eda751d634fba38685758eff72030",
+      "old_sha256": "6880d58e5b4fff1bd1da7d418e8b860980b87a825c3a185b453ebf2d6e2f21b5",
+      "symbol": "CSCO/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/DELLUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 25835,
+      "new_sha256": "8234b7518878223a04f0ca84c47e301bce36635f65331c90f6fbeab7dcb14f43",
+      "old_sha256": "8a97072dbc253291c4725c5ccfee2fa2e95cfb8f6a03716af1d8c569bd848850",
+      "symbol": "DELL/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/DISUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 2828,
+      "new_sha256": "a6f86eab1cf35658e7be2a8b1c365186439152b9f0e8a26cf569cd3521eb7a63",
+      "old_sha256": "7b182d79384b0fc8e16892a729c483144c42ceb7b272a6823b40bd43b0d15338",
+      "symbol": "DIS/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/DKNGUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 1663,
+      "new_sha256": "eeedcfc259830f02dbbd7fa760e9309878811e1c14990ce81d631147ce5f0582",
+      "old_sha256": "8f9b46046468abcda8056a2469df3e494b78edb505b656f4c82f5b154ce8d887",
+      "symbol": "DKNG/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/DOGEUSDT/date=2026-07-02/part-0000.parquet",
+      "latest_rows": 74145,
+      "new_sha256": "4009ea29672dc8a99d86affae04870906c62b739a1af3d22fe0034e9b49faaf5",
+      "old_sha256": "98616b2e78044210539875ec7781c035e90bbbd956d44747726f87e3a667e5f2",
+      "symbol": "DOGE/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/DRAMUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 140796,
+      "new_sha256": "8576149609152378107558e2e15908a248e1175f444ec3aa7e20dcdc0d5c16d5",
+      "old_sha256": "72212f8ce4cef2f9c36e31b2a107061903c127dd23bf99d7c3bc8a2d1aee712f",
+      "symbol": "DRAM/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/EBAYUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 3434,
+      "new_sha256": "8380820313aa549fb67080575e79d69567ab575129c34e5c8c0cb2756f3a7d96",
+      "old_sha256": "7e0b4863661c63984d0651b063c6e4391d8930ff7b23e58f6b1fbd487f8cfd00",
+      "symbol": "EBAY/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/ETHUSDT/date=2026-07-02/part-0000.parquet",
+      "latest_rows": 689607,
+      "new_sha256": "1c125341e54ec15399671a33796f2d45814b80eefdc8af028a41664fd9df5262",
+      "old_sha256": "944a08a10d1cae0fdaa3aaedcb95849a6f9df02b39c62bcd0055be5d95f420a4",
+      "symbol": "ETH/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/EWJUSDT/date=2026-07-02/part-0000.parquet",
+      "latest_rows": 2976,
+      "new_sha256": "ca8bec3d2c4857c49711370236784ce36b12cb3260efdcf8e5398504ef4a39fc",
+      "old_sha256": "c7117868401c68fdac029c075ce260e14729bc2a682cb77e23ee941f1df01b5e",
+      "symbol": "EWJ/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/EWTUSDT/date=2026-07-02/part-0000.parquet",
+      "latest_rows": 1991,
+      "new_sha256": "61e5fc4fb318e9bbdae6a841e00442abadfeb3d785af6fd0592ab8a046a816d3",
+      "old_sha256": "a5121ee9f21b4b54e152fc3332f056ad4b8379a132a79b1589ad8c5476c4bad7",
+      "symbol": "EWT/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/EWYUSDT/date=2026-07-02/part-0000.parquet",
+      "latest_rows": 141346,
+      "new_sha256": "26f5823017b94e06abea0228a57a0409f9ddbb1d918c2678a79174d997396b79",
+      "old_sha256": "9ebb80b4244a4345842d02f2c9d35f850b87eb280055c4398674284ba3486735",
+      "symbol": "EWY/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/EWZUSDT/date=2026-07-02/part-0000.parquet",
+      "latest_rows": 749,
+      "new_sha256": "7884d7918f8ce6bdd38fa99f8c169406337629422b0c0bec45186bcd3b092108",
+      "old_sha256": "0b763dbfa659fcf5015d1162aa689005c101aecb293c4b90f608d7aa7d16aed5",
+      "symbol": "EWZ/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/FLEXUSDT/date=2026-07-02/part-0000.parquet",
+      "latest_rows": 1880,
+      "new_sha256": "aa770aec77e83cc9121768e214eda0625a11fa7e026bc0426d437de377e9ba56",
+      "old_sha256": "99ddd8950abd6353e70f3b795355026345b2db897cb6a4a2fe0154042a0680ff",
+      "symbol": "FLEX/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/FLNCUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 10214,
+      "new_sha256": "65c47f88cba3cd0d7810d2fedeae9e44dde487dafb4764c5966928a68104c1ff",
+      "old_sha256": "0107b2372733683ccca960958c084cf3fd9d94ad68b0c08be522b7600a88c8d9",
+      "symbol": "FLNC/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/GLWUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 154057,
+      "new_sha256": "43bee57879d60701f025e44397e694a2de03de713b960ee22f76f5dea3e6797c",
+      "old_sha256": "8a0f38da6ab710ffd093f18835e53322b511e03a60f727f3d78c8b2906b4382c",
+      "symbol": "GLW/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/GMEUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 1157,
+      "new_sha256": "0d1ca0fe9393b740979240b23f4d6a6921d643c0f1da48781e902300aa4e0251",
+      "old_sha256": "b1a3f180fa64b9f50cd2117a7445bf0d3290419584d9c384338500af93470ef4",
+      "symbol": "GME/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/GOOGLUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 40966,
+      "new_sha256": "26d13e25157d9e778f07b5e37c5b37672dfe4835d3dc4828b6f86ba084c6483a",
+      "old_sha256": "305c3258756f80247b380946872b58a1ec07a6db22d76add8210e9899e1622d9",
+      "symbol": "GOOGL/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/HDUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 2876,
+      "new_sha256": "24f9153d4af3bf86c93a2f1bacac89a057e2521d35eeae495cf6947782948806",
+      "old_sha256": "47ee1222f8772d5a73a7fead5a7c5d0ebf80a9732f2bea0c31f9feab7e626584",
+      "symbol": "HD/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/HIMSUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 9760,
+      "new_sha256": "dc85b5e94f78354ca3ffdee914f7bd562cfd20fbba8701f79144f883dee3e5e2",
+      "old_sha256": "d5ae1992f3ffd61502bf571b67077f29e566a60cafcc6c69b85c70ba30a23447",
+      "symbol": "HIMS/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/HOODUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 69974,
+      "new_sha256": "a3f4c1d3a6a06f6f5d87b7779657780d9649fcd6470faa495e50478721079803",
+      "old_sha256": "de7bedf75268d31a7ccb54ae32386fbe9d4328d284dd4d616edbb41ea0d63623",
+      "symbol": "HOOD/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/HPEUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 2589,
+      "new_sha256": "f00885bb587903e5ad6a6c448fe8061faa71d43cb29086f1576905d094e4cc7a",
+      "old_sha256": "2134cfaacb42deccc50cd96fe73a1cb94edb345bd3d6ef33bf15c9b50a59a53d",
+      "symbol": "HPE/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/HYUNDAIUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 5555,
+      "new_sha256": "331c0c4f04df7ffe656ff906d5d39ce1d9b6e4ca28dbfad82a512e2bdc140aed",
+      "old_sha256": "fae69b5c99bf3f0f5dd5bee5bfe4bb313eafc8768a1793e6ed427645935e5df0",
+      "symbol": "HYUNDAI/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/IBMUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 17162,
+      "new_sha256": "1fc3db38c302dcafaf2af4c39144dc1e848e36781e935ee0cfa03a10a9a383a6",
+      "old_sha256": "82c71d29be2cdafc40b86ed369156095310c99adb17c628c3802579874869d9f",
+      "symbol": "IBM/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/INTCUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 141356,
+      "new_sha256": "690ebce05a9291e56a1b5dd3b401e27d44b21cf5ac0640269846f1903dcddfcb",
+      "old_sha256": "3990f149417b9bb744ba315f4f141c705d677ae15dd6740a7527485f6c6bdbce",
+      "symbol": "INTC/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/IRENUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 13885,
+      "new_sha256": "516b1f25df05d10bd2620d4a6784ade1ef52efbd178598c658002a79e6677d5b",
+      "old_sha256": "da7fb7dbeabfc9823e29a3d0ce02435946cb1bddc42b8b8a01144203c289e544",
+      "symbol": "IREN/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/IWMUSDT/date=2026-07-02/part-0000.parquet",
+      "latest_rows": 1440,
+      "new_sha256": "aeef80d7aa25d56d1c53a9c81a32cc1e2fbc98c94ea2f875260b26c476db0118",
+      "old_sha256": "609d6bbab9d4f9e39c69d564ba0637d1b54d77f49d99880df77b46844c0f8085",
+      "symbol": "IWM/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/JPMUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 3150,
+      "new_sha256": "821ae02dbdce4f8aa5812c8a70db843fe90146f1c8d838b61cfb244adb6e16af",
+      "old_sha256": "7ae042294c91ad5eec474058026b2b7ab86e2951101d274d40a3e86b3c57f3e6",
+      "symbol": "JPM/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/KLACUSDT/date=2026-07-02/part-0000.parquet",
+      "latest_rows": 38456,
+      "new_sha256": "70ef42b442f28352cca8fb393a16af5c4874a6eea54d70cff2ceea7e201c17c2",
+      "old_sha256": "316780898db6309b8d815f3172ad4115194d6c15e0bbb8f31164faea2e03d661",
+      "symbol": "KLAC/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/KORUUSDT/date=2026-07-02/part-0000.parquet",
+      "latest_rows": 1311889,
+      "new_sha256": "e41c71b5494b7571b25c08df6af353d2e409f9ebd7baa3dd2cdfea1c0edfd8af",
+      "old_sha256": "c71966f32f83e527255a164878f87a768ed7bfb69bb3e920dc0568e91f9f0aec",
+      "symbol": "KORU/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/KSTRUSDT/date=2026-07-02/part-0000.parquet",
+      "latest_rows": 2601,
+      "new_sha256": "bed61a0d730438646af06a560e8aee7e9e0daac462361df417cccd016f7c3919",
+      "old_sha256": "407b5e3c614d221c7e890e974dfdba0a4961caca17ca31ec93d7341776f4d1ed",
+      "symbol": "KSTR/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/LITEUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 119450,
+      "new_sha256": "8db6c897d8beb531a451db87e23ec95b7f4b11ac9686489e8b83fab9e5e7bc29",
+      "old_sha256": "1ade99c2b242f8426b34bbae9fc212f81c8367fd0520f3b8d4ad42a99b02dd53",
+      "symbol": "LITE/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/LLYUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 9935,
+      "new_sha256": "be7ecfd0edc377f44bc5e7ed1d518372182439ef390d14f0f2d6701dd0ee8e78",
+      "old_sha256": "ab9a632eefeded1ba538862f3ff78cb0a80e29d22f72d317a38e3fd3b3efff98",
+      "symbol": "LLY/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/LRCXUSDT/date=2026-07-02/part-0000.parquet",
+      "latest_rows": 13621,
+      "new_sha256": "4ff009272230f32dcb7c6836e615ebb58362098adb88025479ef58eea25d9fd9",
+      "old_sha256": "91b0cfaa5aab77918f9aa2a4dca4b95a2a297130eef3ad25a70e6865d4f7e43e",
+      "symbol": "LRCX/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/METAUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 118821,
+      "new_sha256": "374ca459dc437b8f3ab1e485b70efb9c8e7c3065987927f964039d8e00a5ed2e",
+      "old_sha256": "cfc1545522198ce091b62a9017dc3177639e1b41a785bd5ea41aed39309b11e6",
+      "symbol": "META/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/MRVLUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 295096,
+      "new_sha256": "456239ac86946a72fac80a5ed2c2853060848230e0940bfac3ede2007ccf9e70",
+      "old_sha256": "08465b7edcc947513bf0effaefa16772602b0d83a4469486aaeed131962e5a23",
+      "symbol": "MRVL/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/MSFTUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 57725,
+      "new_sha256": "aec74c77c701e264a93eba86b91f3e5124e29de276540119ce8be375a7a24feb",
+      "old_sha256": "ccd781220e4bf6e2d76045ad9c74199d58ac48d888a51898b9f828fc5eb174ca",
+      "symbol": "MSFT/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/MSTRUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 234273,
+      "new_sha256": "ca52a7997611c29d9e435a2beb62e14bfda6b973c2cf9f8ed886eb1c04660cb2",
+      "old_sha256": "6201bb5160f3950c6d4ee871bfd50c755549d8b2212d58cc2b553d1fd85c5c29",
+      "symbol": "MSTR/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/MUUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 1186225,
+      "new_sha256": "749e9f4e738d4a7bdc95d28130beb2cc8748c251db8523cd282f6ea0e618bef3",
+      "old_sha256": "28272e3e4c0bc32c4060c3b97c25a31aef7b58815213c2fc0a73248a7c62a149",
+      "symbol": "MU/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/MVLLUSDT/date=2026-07-02/part-0000.parquet",
+      "latest_rows": 25391,
+      "new_sha256": "c10f6cdf16d5788ebe4e49761c027d680a9f74942dab14c92cbec393211d01cf",
+      "old_sha256": "12767a2ab243f4682ca229c34b82ff3984abb99245d3542d9d2a7c0a84d1909f",
+      "symbol": "MVLL/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/NATGASUSDT/date=2026-07-02/part-0000.parquet",
+      "latest_rows": 4098,
+      "new_sha256": "2df957110d27ad2f4527c85a66c7e9adac4ec14c96dd62349126efc29e8da378",
+      "old_sha256": "877146416e0c622e73a3dfd7edf9d0f0c261f1e41e358a4b89a40f3c4cda2b0d",
+      "symbol": "NATGAS/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/NBISUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 282745,
+      "new_sha256": "f0f24c05c53c48acb1451d8e7b4a9020f2ea470794db54bc51940c3bff95cd8b",
+      "old_sha256": "3ac1412ec5dae8ee370ac9f46f7b757563da0985f2f2efb0a664a6dd19674bf1",
+      "symbol": "NBIS/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/NFLXUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 5379,
+      "new_sha256": "c8698e35e389c1914a642295bb505333c3129e428c088d656f392a8b726c745c",
+      "old_sha256": "15c921e53387a29a4340efeee19bb54d6bc897a15c26ce7c57762168250b5ed4",
+      "symbol": "NFLX/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/NOKUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 7595,
+      "new_sha256": "9ef9b4b695e6f982b59346eb91e5b01cf3126277e0fe2c284a3f08f0d6e657c4",
+      "old_sha256": "24b5d1ff560c820c8750f0df43bba2150430d0ea3fb78e2bc7efc0dfdc20b5d4",
+      "symbol": "NOK/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/NOWUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 7142,
+      "new_sha256": "7241c9ef3fd7fc79c8c6a22b74aab80870d57867cfed9aaab48b81f872fa0499",
+      "old_sha256": "c82fa7f7b6ec8b444d2702120d021a8e07075ccd83accd34dc47d76cbff01732",
+      "symbol": "NOW/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/NVDAUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 56489,
+      "new_sha256": "6d1922ded5aad5fa2bef55d4520308d34f0678e42047c0de1ea9aa97dbe35939",
+      "old_sha256": "387f7efa9584ea33055b4034a6b8f0c0ee1b0fe577a6a75860341e27aa34221b",
+      "symbol": "NVDA/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/NVOUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 2492,
+      "new_sha256": "af18ea6d37e395caaadac252099e63b48c4fa2643a2b66fd7e0274019a3eba3c",
+      "old_sha256": "dacf0367b15307276abc60003ee1653a8486dc5520b513286b1c6eaa122b2e4f",
+      "symbol": "NVO/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/ONDSUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 3136,
+      "new_sha256": "e0df4b8b36aab549273ac06190f6506b68537db0fddb83c674ff9d226fab9067",
+      "old_sha256": "398a69a285b79852d4674f6a3b501d06c7ea45c4adcc13e7052167372c3942a9",
+      "symbol": "ONDS/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/OPENAIUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 9530,
+      "new_sha256": "2f905b84f91b94e99fc1000f9d9444d25420dfacd12db2976268ad64d2a6f202",
+      "old_sha256": "5505d6df6a9451737a16aa712270a9f2822b9ec69112bac5ff5389d0dc3362f0",
+      "symbol": "OPENAI/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/ORCLUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 45011,
+      "new_sha256": "55332f60b6dba1ad0a48cdbd7fab2bfd071d9ad74595fde935d625a55aa1ef9e",
+      "old_sha256": "85fb9a2594b0585ac28534aef16c58a64834965f7b535dcb30d133c42222236e",
+      "symbol": "ORCL/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/PAYPUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 2651,
+      "new_sha256": "6bbf75384f73d248a8ea504629d558ecf751b7b719449157a6ea01ee6d594ef9",
+      "old_sha256": "3c78b2d073e6ff41041b1f6d4b96df2bd522560dce02ad3655c9e04db127955a",
+      "symbol": "PAYP/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/PLTRUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 34147,
+      "new_sha256": "631fe11b711cd9ee808e4632fbd066e9853489d9e04aebee1482d951d11d6f5f",
+      "old_sha256": "cbca2cd4b4581c553e29e086c65ba4bcb8c19f4cfa1cb9d3ab8296a580043d05",
+      "symbol": "PLTR/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/QCOMUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 90162,
+      "new_sha256": "2563da7b57deb4f20fa92270e14af50f4ae4cbcda58ca25a0442eb95bc093618",
+      "old_sha256": "e95854aeb4beb340b20661da13c7e67dc3ca13e8bad60175250b248e6d4a486c",
+      "symbol": "QCOM/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/QNTXUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 28671,
+      "new_sha256": "006eaf60e19195ac29b791e712ac029f867f1f152dc374b1e964b039ac653f5e",
+      "old_sha256": "e2336abd8cace7c565324a7c23e5833096ab848f6d68888f6cafeccfc8ea1708",
+      "symbol": "QNTX/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/QQQUSDT/date=2026-07-02/part-0000.parquet",
+      "latest_rows": 38366,
+      "new_sha256": "5abe3b4ba552a18313611f8a39173ec25f54e7222e831ad2db58ccee194cb9df",
+      "old_sha256": "fffac4934a34b72f350f3e8d7c677c414cc851544cdfc518771d2a93199119ec",
+      "symbol": "QQQ/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/RIVNUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 2442,
+      "new_sha256": "eed97700d01737a777131c9f2d3d6e4cc5abb1bdc10ad31fafc20f875113dc00",
+      "old_sha256": "d57c8cafcc4d0978e6817d100ae01b80dd36ef92749b9f8df296f7a834b6e1d4",
+      "symbol": "RIVN/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/RKLBUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 70634,
+      "new_sha256": "0c10846f05057c44fe68d5f7a7344b20c6ebb7389fed10ee5f553bb980416104",
+      "old_sha256": "091e8b3a3b9c4cb2ea80459be7a34638d7b2affd50b2f93d831c4ef15cca9f26",
+      "symbol": "RKLB/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/SAMSUNGUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 160381,
+      "new_sha256": "fdedcacbf2375d9bc7621583aa136cd0d9a1ad21290e9773431f193effaf611b",
+      "old_sha256": "d86ee78ba189274c2a8d66b61088c9f141398caff8bc5a62de3e530786a3870a",
+      "symbol": "SAMSUNG/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/SKHYNIXUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 1193817,
+      "new_sha256": "fe92b4b6aa986923f8dfbb31fbc2b06aaec8ccca2ceebf502f4c8f77e5c7aa39",
+      "old_sha256": "a72286aced60883ead54fa0bf86cb5420e4503a4dfdd602e68b6172c4d9d7490",
+      "symbol": "SKHYNIX/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/SMCIUSDT/date=2026-07-02/part-0000.parquet",
+      "latest_rows": 4856,
+      "new_sha256": "8f895169122a21bd3ca2a04d42a0e8ff918254030eb80ecd211d7f3be32bbfb8",
+      "old_sha256": "b2b700453c56d2eb1356d24bd3c5ec4d5e289ee4d4b45fe4df2431700709a6ed",
+      "symbol": "SMCI/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/SNDKUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 1185131,
+      "new_sha256": "38e4405375ebe9a2f277543b4513e88aabd9384ebb8a4921ad9d7db27141b918",
+      "old_sha256": "75ffae951183f34e0799bd0bcb87fb52482ed1a35a6db4718b75b7fb4f05d2d5",
+      "symbol": "SNDK/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/SOLUSDT/date=2026-07-02/part-0000.parquet",
+      "latest_rows": 227493,
+      "new_sha256": "46f94201d71fe6b3e7f843667eab487917a02b4f869a517cb24ea6169e9247f5",
+      "old_sha256": "2b08384f1f544b365717b81e15feb7a33f2fda14f3de47b3d12d6af030ea4371",
+      "symbol": "SOL/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/SONYUSDT/date=2026-07-02/part-0000.parquet",
+      "latest_rows": 3546,
+      "new_sha256": "fb301fe024d807216fe2c4d8879de1b8fd4a59da3a36c0fdbf184dfb80de8775",
+      "old_sha256": "852b3a694f40c2608db6aab48f2709c71fd0930913fb7f66f2cf3fa588cb3ce4",
+      "symbol": "SONY/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/SOXLUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 920311,
+      "new_sha256": "0f1328375b344679d6b3cefda94df40ead75d3356aa21fe6719fc2bf5b594c5e",
+      "old_sha256": "19d178565b094b1c65d891102140ab5c6369e521ddd412bbf634362c9784bb42",
+      "symbol": "SOXL/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/SPCXUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 453128,
+      "new_sha256": "e4d2002dccbd0d3f566cdfbe231ff88d9a5628a75e3cc136f725806868c894d3",
+      "old_sha256": "97a6863e44a9dabfaa066227e9917db2dee1ade7053ff828c354602cc0f51d18",
+      "symbol": "SPCX/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/SPYUSDT/date=2026-07-02/part-0000.parquet",
+      "latest_rows": 9077,
+      "new_sha256": "6d4c8a18028b53ef6877cafda9d549375102d947567be1d1ae024baf2d225084",
+      "old_sha256": "8b3a25add79c5065c0ef51e6bb7330a1fcdfa40b636ed95f04e4b7ff9058aad7",
+      "symbol": "SPY/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/SQQQUSDT/date=2026-07-02/part-0000.parquet",
+      "latest_rows": 4217,
+      "new_sha256": "6b34f196d63b77604522ba93645f00c9f1d71b49d97ac74745aff11f7fff444b",
+      "old_sha256": "d2554ab884296066dbd314fa527a6a5ddf1cd7b75682838bcf95b7a41e04b282",
+      "symbol": "SQQQ/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/STRCUSDT/date=2026-07-02/part-0000.parquet",
+      "latest_rows": 2351,
+      "new_sha256": "683ac499a0b47cc825fec4df06120b525e91939573cc1a9ae2e8d8eb95f8ea9d",
+      "old_sha256": "c6a36c0ce5df2d550ba9289e78ddc382c6ed88571ab1ed46b535970c8cba20a7",
+      "symbol": "STRC/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/STXXUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 9122,
+      "new_sha256": "98c938352f842c73d7f581d7934d96f4ab9c866e9593b27cbe246f6af94b6dfe",
+      "old_sha256": "1cafa923435f1d19718836ac99c5287e3ebe8484c38ec58d3eb7b012f7d7479c",
+      "symbol": "STXX/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/TERUSDT/date=2026-07-02/part-0000.parquet",
+      "latest_rows": 3319,
+      "new_sha256": "9feaeb22bc779b8fca80cb52e5cfd494ee74724c26626195b19a248ee8c9a35c",
+      "old_sha256": "6e6c4962dffb4eb192ea1a6402b9e0536933f72ae3aa19d98c6c1032f28cc018",
+      "symbol": "TER/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/TONUSDT/date=2026-06-26/part-0005.parquet",
+      "latest_rows": 999,
+      "new_sha256": "0e44709aada628f5eb90a74419d2fb77a12de3faa8d0b4be0b637fe8eb7681c9",
+      "old_sha256": "9664703605f1307824799a6c268dbbe12fe26665fdc0752dc8bfaae27a154ff1",
+      "symbol": "TON/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/TQQQUSDT/date=2026-07-02/part-0000.parquet",
+      "latest_rows": 22013,
+      "new_sha256": "c3a5677e3bf3215f626b01969283919a4e456bfbf754c4095b36de38f311d69d",
+      "old_sha256": "903f3ee2a116eedd5837bd66f8e14b5a709431e56a53c3975a4fac5be24d8f3a",
+      "symbol": "TQQQ/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/TRXUSDT/date=2026-07-02/part-0000.parquet",
+      "latest_rows": 38786,
+      "new_sha256": "1c2a158fbc8d76ec3c4e72b4c664b881a655287531ffbd351fa28129e1edc0a8",
+      "old_sha256": "19d2fd5f47a8c6c0d97422d5dd2e77ea2e651fb5024de72376b1e46b5d5ea10d",
+      "symbol": "TRX/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/TSLAUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 95942,
+      "new_sha256": "039def315309a6b4edc6eeda65e0c9485868414996e25525f5096b0e86cebf30",
+      "old_sha256": "c966904a9ae42f9195b6c76364a9a7d92daa77f38692c12083add0f1232ac213",
+      "symbol": "TSLA/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/TSMUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 63702,
+      "new_sha256": "b4f026be35dd7d3a4c52f4aea2aae75c8267cfbd2c54f8521a421be24e27933d",
+      "old_sha256": "26a501dc8530d0cc5e5eb17b46d874773648a90085be13ae3b9c6b108ca83428",
+      "symbol": "TSM/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/TTWOUSDT/date=2026-07-02/part-0000.parquet",
+      "latest_rows": 3647,
+      "new_sha256": "d231814fe322afa6245bc8837359f5aca19f73c9417e6a21d5618740c7377bf3",
+      "old_sha256": "fde3da962524881af815bed7cd18383a3823230c7d3760660c01502d824b5856",
+      "symbol": "TTWO/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/TXNUSDT/date=2026-07-02/part-0000.parquet",
+      "latest_rows": 3425,
+      "new_sha256": "eb1e53d7a5f3c1c26b3462c0e667a6595e76c8a0d7bb864382495b5b49f139a2",
+      "old_sha256": "cf9760db90e23f642483e4d67ae05903028ebdef6ef878a54657679d21305410",
+      "symbol": "TXN/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/UBERUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 2624,
+      "new_sha256": "c68eaaba32decd1a16beee47787612021d2aaa88ba28f80c597ff9d086081f90",
+      "old_sha256": "5f0c3ab180fc770b10d049d9c24a36985383db6a806672421380107d80d63cae",
+      "symbol": "UBER/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/URNMUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 3604,
+      "new_sha256": "8ae5535cc6269311d2e73eb3289c5a2c6b3039181e423a002fc925b08b7246ba",
+      "old_sha256": "59ecb7ecbc1deffd894fd642483565e37e6260179b294f3c19921c4e8b7be01f",
+      "symbol": "URNM/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/USARUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 6900,
+      "new_sha256": "74698d2ceb241087d947ac68e5148ce3f063f17c48894d6e357a77ca47847a86",
+      "old_sha256": "c8f3267268f3b156d3d560b43291554241f407922ef14affdd804eb8338a5364",
+      "symbol": "USAR/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/UVXYUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 4716,
+      "new_sha256": "0ce4b545720627c03f8e733a09bab2bfe0c0e256d8febdbcbc7fe7cb7e4f6e72",
+      "old_sha256": "c5425cda2cc95eb73ad481a05392c8ac9b227421809f23013e30927051b5d5ae",
+      "symbol": "UVXY/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/VUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 3846,
+      "new_sha256": "91a0132cf07d0cb5d9b91d5c154c35b767fa6e742dc98d37c3e3d743f371085a",
+      "old_sha256": "ab081a0cee6bca2a25a101b55434359cae0c64492a72b3042c27d29feebf0a1d",
+      "symbol": "V/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/WDCUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 176343,
+      "new_sha256": "06a62da8eef69a1da92c1e113a3ca1db084ca568f5bdf631ad5cb3e0915a3caa",
+      "old_sha256": "f04bfe687229806287df8ebbd38db8a289861df7319a1c5520c12647d20b9078",
+      "symbol": "WDC/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/WMTUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 3883,
+      "new_sha256": "6e743873590b89e5559f17855ed6dca94f1ad96a3a6951d10a97492c2e86c1c4",
+      "old_sha256": "80406bbbd16087fa78198a66be1408b9e9fc70f907fdd9f175ad4f56b97570d5",
+      "symbol": "WMT/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/XAGUSDT/date=2026-07-02/part-0000.parquet",
+      "latest_rows": 59972,
+      "new_sha256": "087644d39c7914cfc5efa0fbfc7956d1a7ad4651e3b7378e38fea353e149b2e6",
+      "old_sha256": "e07bed64702091e58c404c69b13cab19c0f04e26c407a1e6ec3e01013dd40b14",
+      "symbol": "XAG/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/XAUUSDT/date=2026-07-02/part-0000.parquet",
+      "latest_rows": 245038,
+      "new_sha256": "6b3db47cd4d5ec033a850acce295ea839fb1adba30aa4b706e42e85d6285e670",
+      "old_sha256": "3a2038be06a87910241445673a17a140db7ab6c9a007061c2e85f52d7e888385",
+      "symbol": "XAU/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/XLEUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 1057,
+      "new_sha256": "06dc4eb086a93629848092bdd43f55f5cdbb78e40bffdef55ecc3a569f07e51f",
+      "old_sha256": "a0dd81d639301a0dbdc722ef874165431894be97672bc45e62cd259ade8a5f45",
+      "symbol": "XLE/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/XPDUSDT/date=2026-07-02/part-0000.parquet",
+      "latest_rows": 11482,
+      "new_sha256": "f0dcd7a097f033fc3cdf6a1a3b312d5aab9af5230a6521fedf1116da12a93e7f",
+      "old_sha256": "74ebc18d392cc79223681f202b2597e59c0c6dfc9ee89860993f06cc61326583",
+      "symbol": "XPD/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/XPTUSDT/date=2026-07-02/part-0000.parquet",
+      "latest_rows": 20498,
+      "new_sha256": "e4249ea5451f2538e85a9a48a0388c5e4865374c328ebf4dccd3232075d48090",
+      "old_sha256": "dea4130dd0375528df76ed8b6137d9bc354920f86ffc6516c2ae98de293d265e",
+      "symbol": "XPT/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/XRPUSDT/date=2026-07-02/part-0000.parquet",
+      "latest_rows": 104358,
+      "new_sha256": "ac9763d0651b0a73d98248012dd01e0ed2d58dcec2043084b351d0bfb76ea29c",
+      "old_sha256": "f4af21a4493f0e43237885e91a08fa5d479e777715c88881ade4e35779d9e5f3",
+      "symbol": "XRP/USDT"
+    },
+    {
+      "latest_partition": "market_parquet/market_data_raw_aggtrades/binance/ZMUSDT/date=2026-07-01/part-0000.parquet",
+      "latest_rows": 2534,
+      "new_sha256": "8f6bd39e38ba70a1ddd247d90c34d159c222cab9fb3b2e05765ceddfa747227e",
+      "old_sha256": "7597b90249e039a00541c824f5d48f11611f25ca3195be07fed15e8940bd8ae3",
+      "symbol": "ZM/USDT"
+    }
+  ],
+  "status": "complete"
+}
