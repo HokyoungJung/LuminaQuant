@@ -225,6 +225,13 @@
       "classification": "superseded_generated_research_run",
       "file_count": 4,
       "path": "var/reports/latest_full_walkforward_20260628"
+    },
+    {
+      "bytes": 3359477,
+      "canonical_db_mutated": false,
+      "classification": "superseded_zero-finalist_pipeline_run",
+      "file_count": 39,
+      "path": "var/backtests/rigorous-20260903"
     }
   ],
   "frozen_fixture_closure_restored": [
@@ -665,5 +672,6 @@
       "path": "var/g003-evaluation/g003-338e7b38f48e06951d6552f4943101b4-163ec5c670e28959/integrated-backtest-final-20260902"
     }
   ],
-  "total_bytes": 392964966511
+  "total_bytes": 392968325988,
+  "zero_finalist_run_cleanup_at_utc": "2026-09-03T14:08:25.923030+00:00"
 }

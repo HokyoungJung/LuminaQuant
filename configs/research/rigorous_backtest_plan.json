@@ -8,28 +8,20 @@
   "stages": [
     {
       "name": "coarse_screen",
-      "script": "scripts/research/run_strategy_screen.py",
+      "script": "scripts/research/freeze_strategy_shortlist.py",
       "arguments": [
-        "--data-root", "${DATA_ROOT}",
-        "--exchange", "binance",
-        "--start", "2026-05-01T00:00:00Z",
-        "--end", "2026-05-03T00:00:00Z",
-        "--scope", "all",
-        "--top-n", "20",
-        "--output-dir", "${RUN_ROOT}/coarse_screen",
-        "--config", "${REPOSITORY}/configs/profiles/backtest_cost_realistic.yaml",
-        "--no-exchange-audit",
-        "--allow-unavailable",
-        "--canonical-output-only"
+        "--source", "${REPOSITORY}/docs/research_note/all_strategy_selection_20260903.json",
+        "--output", "${RUN_ROOT}/coarse_screen/strategy_shortlist.json",
+        "--limit", "20"
       ],
       "inputs": [
-        "configs/profiles/backtest_cost_realistic.yaml"
+        "docs/research_note/all_strategy_selection_20260903.json"
       ],
       "outputs": [
-        "${RUN_ROOT}/coarse_screen/strategy_screen_latest.json"
+        "${RUN_ROOT}/coarse_screen/strategy_shortlist.json"
       ],
       "environment": {},
-      "accepted_return_codes": [0, 1]
+      "accepted_return_codes": [0]
     },
     {
       "name": "event_driven_walk_forward",
@@ -37,14 +29,14 @@
       "arguments": [
         "--data-root", "${DATA_ROOT}",
         "--config", "${REPOSITORY}/configs/profiles/backtest_cost_realistic.yaml",
-        "--shortlist", "${RUN_ROOT}/coarse_screen/strategy_screen_latest.json",
+        "--shortlist", "${RUN_ROOT}/coarse_screen/strategy_shortlist.json",
         "--fold-plan", "${REPOSITORY}/configs/research/rigorous_backtest_folds.json",
         "--output-root", "${RUN_ROOT}/walkforward",
         "--exchange", "binance",
         "--limit", "20"
       ],
       "inputs": [
-        "${RUN_ROOT}/coarse_screen/strategy_screen_latest.json",
+        "${RUN_ROOT}/coarse_screen/strategy_shortlist.json",
         "configs/profiles/backtest_cost_realistic.yaml",
         "configs/research/rigorous_backtest_folds.json"
       ],
