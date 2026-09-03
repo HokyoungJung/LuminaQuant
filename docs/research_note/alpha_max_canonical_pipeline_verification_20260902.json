@@ -1,0 +1,408 @@
+{
+  "artifact_kind": "alpha_max_canonical_pipeline_verification",
+  "contract_sha256": "ae272f70f65797b4c8a87c29b7f8e64511617f8e0f2d4bd841b2d1addb7d1220",
+  "db_path": "/home/hoky/Quants-agent/LuminaQuant/data/market_parquet",
+  "order_routing": false,
+  "pinned_generation_identity": {
+    "dev": 2096,
+    "ino": 429694,
+    "mode": 448
+  },
+  "pinned_generation_path": "/home/hoky/Quants-agent/LuminaQuant/data/market_parquet",
+  "raw_first_precedence": true,
+  "status": "complete",
+  "symbol_count": 10,
+  "symbols": [
+    {
+      "funding_query_ms": 1727654401000,
+      "funding_rate": 0.0001,
+      "funding_settlement_ms": 1727654400000,
+      "public_1m_source_audit": {
+        "direct_only_rows": 0,
+        "direct_rows": 0,
+        "effective_direct_rows": 0,
+        "effective_resampled_rows": 120,
+        "first_overlap_conflict_timestamp_ms": null,
+        "overlap_conflict_rows": 0,
+        "overlap_conflict_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "overlap_equal_rows": 0,
+        "overlap_rows": 0,
+        "precedence": "resampled_1s_derived_over_direct_1m",
+        "resampled_only_rows": 120,
+        "resampled_rows": 120
+      },
+      "raw_1s_rows": 7200,
+      "raw_1s_sha256": "338d0a59290b2ba3f8bfb5ac86c388a04801c5000efa4d84eb5c86feccffb5da",
+      "sample_end_ms_exclusive": 1672452000000,
+      "sample_start_ms": 1672444800000,
+      "status": "complete",
+      "symbol": "ADAUSDT",
+      "timeframes": {
+        "1h": {
+          "rows": 2,
+          "sha256": "6d41e6392c24c46fd7edd0df2bb01dbe20b8192a15ebe1bbd660d5b576dab92f"
+        },
+        "1m": {
+          "rows": 120,
+          "sha256": "d92658a3bd24a5c00c9374b6b2673f56b615a07dd91668801526663719f01cff"
+        },
+        "5m": {
+          "rows": 24,
+          "sha256": "490e4c8898be3cfba8607f3bad3ea8882dc25e71ee1aaa6406d71c6f0801bde7"
+        }
+      }
+    },
+    {
+      "funding_query_ms": 1727654401000,
+      "funding_rate": -6.796e-05,
+      "funding_settlement_ms": 1727654400000,
+      "public_1m_source_audit": {
+        "direct_only_rows": 0,
+        "direct_rows": 0,
+        "effective_direct_rows": 0,
+        "effective_resampled_rows": 120,
+        "first_overlap_conflict_timestamp_ms": null,
+        "overlap_conflict_rows": 0,
+        "overlap_conflict_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "overlap_equal_rows": 0,
+        "overlap_rows": 0,
+        "precedence": "resampled_1s_derived_over_direct_1m",
+        "resampled_only_rows": 120,
+        "resampled_rows": 120
+      },
+      "raw_1s_rows": 7200,
+      "raw_1s_sha256": "e2714e1c24489c5def454519df2f81354c57a00127848bf9c7a2ca63f466b9b4",
+      "sample_end_ms_exclusive": 1672452000000,
+      "sample_start_ms": 1672444800000,
+      "status": "complete",
+      "symbol": "AVAXUSDT",
+      "timeframes": {
+        "1h": {
+          "rows": 2,
+          "sha256": "115f06c4030908ccce33ad2c639bf7b6ecf2e30ac1fdc54ef005d8d6838efce0"
+        },
+        "1m": {
+          "rows": 120,
+          "sha256": "0f3bbc29e4064dbe4446b0f6e55ea861ef215f374da18c17d9aa1c42583c7f3b"
+        },
+        "5m": {
+          "rows": 24,
+          "sha256": "99865e3301ff950f6ac1b73f63a9a8e56e118848f094b26291608d3c26a53446"
+        }
+      }
+    },
+    {
+      "funding_query_ms": 1727654401000,
+      "funding_rate": 0.0,
+      "funding_settlement_ms": 1727654400000,
+      "public_1m_source_audit": {
+        "direct_only_rows": 0,
+        "direct_rows": 0,
+        "effective_direct_rows": 0,
+        "effective_resampled_rows": 120,
+        "first_overlap_conflict_timestamp_ms": null,
+        "overlap_conflict_rows": 0,
+        "overlap_conflict_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "overlap_equal_rows": 0,
+        "overlap_rows": 0,
+        "precedence": "resampled_1s_derived_over_direct_1m",
+        "resampled_only_rows": 120,
+        "resampled_rows": 120
+      },
+      "raw_1s_rows": 7200,
+      "raw_1s_sha256": "8a890e90fe94eae99aef5bdd1618eec0d2f600ad5ffc8da693c5ec2a0c41349f",
+      "sample_end_ms_exclusive": 1672452000000,
+      "sample_start_ms": 1672444800000,
+      "status": "complete",
+      "symbol": "BNBUSDT",
+      "timeframes": {
+        "1h": {
+          "rows": 2,
+          "sha256": "e2247899452c9e2bf5c3db82cc33865d7ffffd7ecb20316d3ec16d776beb0c96"
+        },
+        "1m": {
+          "rows": 120,
+          "sha256": "1a16a2af6bc8121064ba23a1fd993866df6eff3d09c7b05d8fb716e7d7bf806b"
+        },
+        "5m": {
+          "rows": 24,
+          "sha256": "48cb5edd7e94375b6f86abe513b9427530699fe1e863fa2c2885db060e6b51cd"
+        }
+      }
+    },
+    {
+      "funding_query_ms": 1727654401000,
+      "funding_rate": 3.077e-05,
+      "funding_settlement_ms": 1727654400000,
+      "public_1m_source_audit": {
+        "direct_only_rows": 0,
+        "direct_rows": 0,
+        "effective_direct_rows": 0,
+        "effective_resampled_rows": 120,
+        "first_overlap_conflict_timestamp_ms": null,
+        "overlap_conflict_rows": 0,
+        "overlap_conflict_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "overlap_equal_rows": 0,
+        "overlap_rows": 0,
+        "precedence": "resampled_1s_derived_over_direct_1m",
+        "resampled_only_rows": 120,
+        "resampled_rows": 120
+      },
+      "raw_1s_rows": 7200,
+      "raw_1s_sha256": "233fe4746202f65310c1c3a80cfc0e5bbaab53399b39d008b0db8c1cb19f34b7",
+      "sample_end_ms_exclusive": 1672452000000,
+      "sample_start_ms": 1672444800000,
+      "status": "complete",
+      "symbol": "BTCUSDT",
+      "timeframes": {
+        "1h": {
+          "rows": 2,
+          "sha256": "1861e678276d82af6ac809cafd39d0a7ae9a00459b2f306fefd521a6f4222862"
+        },
+        "1m": {
+          "rows": 120,
+          "sha256": "31d07f94a493144a51bb077c6a3e661a951b2cc0dcfa9497ce501968791efcff"
+        },
+        "5m": {
+          "rows": 24,
+          "sha256": "687aabe18cf94e995e138deab3008f3a2cdc525a10ee73aea78aa3d15d9c6d5a"
+        }
+      }
+    },
+    {
+      "funding_query_ms": 1727654401000,
+      "funding_rate": 7.794e-05,
+      "funding_settlement_ms": 1727654400000,
+      "public_1m_source_audit": {
+        "direct_only_rows": 0,
+        "direct_rows": 0,
+        "effective_direct_rows": 0,
+        "effective_resampled_rows": 120,
+        "first_overlap_conflict_timestamp_ms": null,
+        "overlap_conflict_rows": 0,
+        "overlap_conflict_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "overlap_equal_rows": 0,
+        "overlap_rows": 0,
+        "precedence": "resampled_1s_derived_over_direct_1m",
+        "resampled_only_rows": 120,
+        "resampled_rows": 120
+      },
+      "raw_1s_rows": 7200,
+      "raw_1s_sha256": "6c8ce51f6be9ef94cf51516932359e3144d1e2837037921d1b9c8419b05d0c8d",
+      "sample_end_ms_exclusive": 1672452000000,
+      "sample_start_ms": 1672444800000,
+      "status": "complete",
+      "symbol": "DOGEUSDT",
+      "timeframes": {
+        "1h": {
+          "rows": 2,
+          "sha256": "431ccc8be85c9a5fa18b9d90f1ca717a395131ffc23a7a881c39dcab7ddd0b8f"
+        },
+        "1m": {
+          "rows": 120,
+          "sha256": "3dd20a7f131e20985db4d322951b29573b44c44eafbbc9644628b5fe45b89a56"
+        },
+        "5m": {
+          "rows": 24,
+          "sha256": "0eba82f5e07df3038b74badd70a8fecb05b10ecc8e8133358e0fec2756f51d5e"
+        }
+      }
+    },
+    {
+      "funding_query_ms": 1727654401000,
+      "funding_rate": 6.161e-05,
+      "funding_settlement_ms": 1727654400000,
+      "public_1m_source_audit": {
+        "direct_only_rows": 0,
+        "direct_rows": 0,
+        "effective_direct_rows": 0,
+        "effective_resampled_rows": 120,
+        "first_overlap_conflict_timestamp_ms": null,
+        "overlap_conflict_rows": 0,
+        "overlap_conflict_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "overlap_equal_rows": 0,
+        "overlap_rows": 0,
+        "precedence": "resampled_1s_derived_over_direct_1m",
+        "resampled_only_rows": 120,
+        "resampled_rows": 120
+      },
+      "raw_1s_rows": 7200,
+      "raw_1s_sha256": "f74eeb406fb5b93ea55199a413c05d7b886841e6fdca7954bfcd3f11b3f7289a",
+      "sample_end_ms_exclusive": 1672452000000,
+      "sample_start_ms": 1672444800000,
+      "status": "complete",
+      "symbol": "ETHUSDT",
+      "timeframes": {
+        "1h": {
+          "rows": 2,
+          "sha256": "1bb9a0e4294f41ba09afdca088089ea309e31db699987ca504bdf0b05967956d"
+        },
+        "1m": {
+          "rows": 120,
+          "sha256": "e65b9705b74dbcb2ebb7aea6cb7653300a5698f771d5bbd2ef56bc0418f31c3e"
+        },
+        "5m": {
+          "rows": 24,
+          "sha256": "a5209b551e5f129c0bfeb9c8d8e1b6cd10435740643da2aa6b1ca329ee979b83"
+        }
+      }
+    },
+    {
+      "funding_query_ms": 1727654401000,
+      "funding_rate": 0.0001,
+      "funding_settlement_ms": 1727654400000,
+      "public_1m_source_audit": {
+        "direct_only_rows": 0,
+        "direct_rows": 0,
+        "effective_direct_rows": 0,
+        "effective_resampled_rows": 120,
+        "first_overlap_conflict_timestamp_ms": null,
+        "overlap_conflict_rows": 0,
+        "overlap_conflict_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "overlap_equal_rows": 0,
+        "overlap_rows": 0,
+        "precedence": "resampled_1s_derived_over_direct_1m",
+        "resampled_only_rows": 120,
+        "resampled_rows": 120
+      },
+      "raw_1s_rows": 7200,
+      "raw_1s_sha256": "95c73565844f9979a778df712a0f19da2e35dfb3d87051109c82f5182a1c6445",
+      "sample_end_ms_exclusive": 1672452000000,
+      "sample_start_ms": 1672444800000,
+      "status": "complete",
+      "symbol": "SOLUSDT",
+      "timeframes": {
+        "1h": {
+          "rows": 2,
+          "sha256": "1db64025b7a52f1c8f0ffc3fe69506308931f157dd18ed2090f0914e6c95032a"
+        },
+        "1m": {
+          "rows": 120,
+          "sha256": "c6b20fbb3b047aa754aff8f9c5da48c97e118ea414243a5d45dfe5a66744051a"
+        },
+        "5m": {
+          "rows": 24,
+          "sha256": "1760e09dd732982f4813c7dc2dd3aa621b41b31be535cfddf783a3ae59b9dfc5"
+        }
+      }
+    },
+    {
+      "funding_query_ms": 1745755201000,
+      "funding_rate": 2.72e-06,
+      "funding_settlement_ms": 1745755200000,
+      "public_1m_source_audit": {
+        "direct_only_rows": 0,
+        "direct_rows": 0,
+        "effective_direct_rows": 0,
+        "effective_resampled_rows": 120,
+        "first_overlap_conflict_timestamp_ms": null,
+        "overlap_conflict_rows": 0,
+        "overlap_conflict_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "overlap_equal_rows": 0,
+        "overlap_rows": 0,
+        "precedence": "resampled_1s_derived_over_direct_1m",
+        "resampled_only_rows": 120,
+        "resampled_rows": 120
+      },
+      "raw_1s_rows": 7200,
+      "raw_1s_sha256": "b546ef06421463a2d8eb509eb8f40a704a87c51170151fc0232c5a06f7f05a1b",
+      "sample_end_ms_exclusive": 1709305200000,
+      "sample_start_ms": 1709298000000,
+      "status": "complete",
+      "symbol": "TONUSDT",
+      "timeframes": {
+        "1h": {
+          "rows": 2,
+          "sha256": "95814d90de472f5f8b1947e0a1fe75bd2921d200f2b8696ff76f01b4fbd59156"
+        },
+        "1m": {
+          "rows": 120,
+          "sha256": "63b3c383dde8fe5fa7ccf043a36e731c2232606d0297f1ff871f0587e155ae6b"
+        },
+        "5m": {
+          "rows": 24,
+          "sha256": "c1e8e4d988e5183cc80e65f0b856bea84db96e3bb4cedffafa4126252e88294e"
+        }
+      }
+    },
+    {
+      "funding_query_ms": 1727654401000,
+      "funding_rate": 0.0001,
+      "funding_settlement_ms": 1727654400000,
+      "public_1m_source_audit": {
+        "direct_only_rows": 0,
+        "direct_rows": 0,
+        "effective_direct_rows": 0,
+        "effective_resampled_rows": 120,
+        "first_overlap_conflict_timestamp_ms": null,
+        "overlap_conflict_rows": 0,
+        "overlap_conflict_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "overlap_equal_rows": 0,
+        "overlap_rows": 0,
+        "precedence": "resampled_1s_derived_over_direct_1m",
+        "resampled_only_rows": 120,
+        "resampled_rows": 120
+      },
+      "raw_1s_rows": 7200,
+      "raw_1s_sha256": "ac3eceb1fa72e103fe52249683372821e048c8267774705fee812205de88b3ec",
+      "sample_end_ms_exclusive": 1672452000000,
+      "sample_start_ms": 1672444800000,
+      "status": "complete",
+      "symbol": "TRXUSDT",
+      "timeframes": {
+        "1h": {
+          "rows": 2,
+          "sha256": "bfa1fb6142f02ca922497f3dec7643ba2d5e82cd85138102e27258b7d4a6f3aa"
+        },
+        "1m": {
+          "rows": 120,
+          "sha256": "0ea36ac7c638b0dcff877f15ff6fc2a9a434830c8e51d9ad7c1c0e9b524164a2"
+        },
+        "5m": {
+          "rows": 24,
+          "sha256": "f77aff8d4daccdc0c569d9cf53e52f801c92134b9a575342d8dbd1b8574cafbd"
+        }
+      }
+    },
+    {
+      "funding_query_ms": 1727654401000,
+      "funding_rate": 0.0001,
+      "funding_settlement_ms": 1727654400000,
+      "public_1m_source_audit": {
+        "direct_only_rows": 0,
+        "direct_rows": 0,
+        "effective_direct_rows": 0,
+        "effective_resampled_rows": 120,
+        "first_overlap_conflict_timestamp_ms": null,
+        "overlap_conflict_rows": 0,
+        "overlap_conflict_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "overlap_equal_rows": 0,
+        "overlap_rows": 0,
+        "precedence": "resampled_1s_derived_over_direct_1m",
+        "resampled_only_rows": 120,
+        "resampled_rows": 120
+      },
+      "raw_1s_rows": 7200,
+      "raw_1s_sha256": "cf156dd4d474e70710b2a875719099e7cd1a05d6d90eb240fe7cc7b5a72cda5c",
+      "sample_end_ms_exclusive": 1672452000000,
+      "sample_start_ms": 1672444800000,
+      "status": "complete",
+      "symbol": "XRPUSDT",
+      "timeframes": {
+        "1h": {
+          "rows": 2,
+          "sha256": "8eb5c37c327fecf8b4b133afd89df66e6a1a3cf3dbf84353bb3640de918f22c7"
+        },
+        "1m": {
+          "rows": 120,
+          "sha256": "8aec5c76d976b669b615d303f513585e217a032f4ad5662b9f79df74f92a3da1"
+        },
+        "5m": {
+          "rows": 24,
+          "sha256": "f07e20d043c5f0d0c8f6deb65df02936793e51e873fd0c0f0738e9c1b8de9b50"
+        }
+      }
+    }
+  ],
+  "verified_at_utc": "2026-09-02T10:47:45.089052+00:00"
+}
