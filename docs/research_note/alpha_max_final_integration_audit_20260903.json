@@ -1,0 +1,86 @@
+{
+  "active_lq_services": [],
+  "alpha_max_816_680_status": "retired_without_restart_after_two_identical_receipt_false-negatives",
+  "artifact_kind": "alpha_max_final_integration_audit.v1",
+  "canonical_db": {
+    "bytes": 32043395925,
+    "mutated_by_cleanup": false,
+    "path": "/home/hoky/Quants-agent/LuminaQuant/data/market_parquet"
+  },
+  "completed_at_utc": "2026-09-03T11:43:07.123129+00:00",
+  "created_at_utc": "2026-09-03T11:03:50.968114+00:00",
+  "evidence": [
+    {
+      "bytes": 43102,
+      "path": "docs/research_note/all_strategy_selection_20260903.json",
+      "sha256": "1722d78b98e2aa5d1cedf77e94a084cb3e09b6b9b01603be666e0d14e562c708"
+    },
+    {
+      "bytes": 20248,
+      "path": "docs/research_note/alpha_max_checkpoint_cleanup_20260903.json",
+      "sha256": "bcd216681d7bb9d6b623cda11901910f8f6c907c6993f940f5434c7f97041b3b"
+    }
+  ],
+  "filesystem": {
+    "free_bytes": 886024372224,
+    "total_bytes": 1081101176832,
+    "used_bytes": 140084449280
+  },
+  "order_routing_enabled": false,
+  "path_checks": [
+    {
+      "exists": true,
+      "inside_repo": true,
+      "path": "/home/hoky/Quants-agent/LuminaQuant/data/market_parquet",
+      "symlink": false
+    },
+    {
+      "exists": true,
+      "inside_repo": true,
+      "path": "/home/hoky/Quants-agent/LuminaQuant/docs/research_note/all_strategy_selection_20260903.json",
+      "symlink": false
+    },
+    {
+      "exists": true,
+      "inside_repo": true,
+      "path": "/home/hoky/Quants-agent/LuminaQuant/docs/research_note/alpha_max_checkpoint_cleanup_20260903.json",
+      "symlink": false
+    },
+    {
+      "exists": true,
+      "inside_repo": true,
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/common_period_reval_20260812/full/jobs",
+      "symlink": false
+    },
+    {
+      "exists": true,
+      "inside_repo": true,
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/all_strategy_canonical_screen_20260903_missing",
+      "symlink": false
+    }
+  ],
+  "registry_count": 162,
+  "result_count": 162,
+  "status": "passed",
+  "strategy_result_roots": {
+    "incremental": "/home/hoky/Quants-agent/LuminaQuant/var/reports/all_strategy_canonical_screen_20260903_missing",
+    "reused": "/home/hoky/Quants-agent/LuminaQuant/var/reports/common_period_reval_20260812/full/jobs"
+  },
+  "verification": {
+    "obsidian_audit": {
+      "ambiguous": 0,
+      "authoritative_notes": 409,
+      "broken": 0,
+      "status": "passed",
+      "wikilinks": 4141
+    },
+    "pytest": {
+      "duration_seconds": 723.46,
+      "passed": 7640,
+      "skipped": 20,
+      "subtests_passed": 44,
+      "xfailed": 3
+    },
+    "ruff": "passed"
+  }
+}

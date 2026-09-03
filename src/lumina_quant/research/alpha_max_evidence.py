@@ -7872,7 +7872,7 @@ def _alpha_max_verify_file_receipt(
         activation_receipt.canonical_path,
         artifact_id=artifact_id,
     )
-    if receipt != activation_receipt:
+    if not _alpha_max_artifact_receipts_match(activation_receipt, receipt):
         raise ValueError("alpha_max_actual_run_artifact_bytes_mismatch")
 
 

@@ -43,10 +43,10 @@ def test_binance_extended_research_universe_is_unique_and_complete() -> None:
     assert len(BINANCE_TRADFI_ENERGY_INDUSTRIAL_COMMODITY_SYMBOLS) == 4
     assert len(BINANCE_TRADFI_COMMODITY_SYMBOLS) == 8
     assert len(BINANCE_TRADFI_ETF_INDEX_SYMBOLS) == 12
-    assert len(BINANCE_TRADFI_EQUITY_SYMBOLS) == 76
+    assert len(BINANCE_TRADFI_EQUITY_SYMBOLS) == 158
     assert len(BINANCE_TRADFI_PREMARKET_SYMBOLS) == 4
-    assert len(BINANCE_TRADFI_PERP_RESEARCH_SYMBOLS) == 100
-    assert len(BINANCE_EXTENDED_RESEARCH_SYMBOLS) == 110
+    assert len(BINANCE_TRADFI_PERP_RESEARCH_SYMBOLS) == 182
+    assert len(BINANCE_EXTENDED_RESEARCH_SYMBOLS) == 192
 
     counts = Counter(BINANCE_EXTENDED_RESEARCH_SYMBOLS)
     assert [symbol for symbol, count in counts.items() if count > 1] == []
@@ -63,6 +63,8 @@ def test_binance_extended_research_universe_is_unique_and_complete() -> None:
     assert "SKHYNIXUSDT" in BINANCE_TRADFI_EQUITY_SYMBOLS
     assert "NFLXUSDT" in BINANCE_TRADFI_EQUITY_SYMBOLS
     assert "CRWDUSDT" in BINANCE_TRADFI_EQUITY_SYMBOLS
+    assert "KODEX200USDT" in BINANCE_TRADFI_EQUITY_SYMBOLS
+    assert "HK0625USDT" in BINANCE_TRADFI_EQUITY_SYMBOLS
 
 
 def test_compact_to_slashed_usdt_handles_short_and_long_bases() -> None:

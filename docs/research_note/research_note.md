@@ -1,4 +1,115 @@
 # Research Note
+## 2026-09-03 KST — 162-strategy bounded-memory canonical selection
+
+Alpha-Max의 1,588-unit precompute는 압축 checkpoint로 완주했지만 816-fold
+validation 진입 시 capsule을 `/proc/self/fd/...` 경로로 최초 읽은 receipt와
+canonical absolute path로 재검증한 receipt를 단순 객체 동등성으로 비교해
+두 번 같은 false negative를 냈다. 두 receipt의 SHA-256, byte count,
+canonical path, inode, mode, link count, mtime, ctime은 모두 같았고
+`requested_path` 문자열만 달랐다. 검증을 기존 semantic receipt comparator로
+수정하고 회귀 테스트를 추가했다. 지시대로 816/680은 처음부터 다시 계산하지
+않았고 실패 run/checkpoint는 cleanup receipt에 결속한 뒤 폐기했다.
+
+대신 기존 2026-07-01~2026-08-12 `[start,end)` 결과 141개를 SHA-256
+lineage로 재사용하고 registry에서 새로 생긴 21개만 독립 7GiB 제한
+프로세스로 실행했다. 통합 결과는 registry 162개와 정확히 일치한다:
+pass 120, input/feature excluded 14, fail 17, resource-excluded 11.
+resource-sensitive 종료 전략은 반복 실행하지 않았다.
+
+선별 규칙은 `pass`, 거래 수 양수, 총수익 양수, Sharpe 양수,
+절대 max drawdown 35% 이하이며 Sharpe와 총수익 순으로 정렬했다.
+상위 전략은 `PriceVolumeCorrContinuationStrategy`(Sharpe 4.689,
+수익 1.066%), `RebalancingPremiumHarvestStrategy`(3.141, 5.982%),
+`DisagreementGatedEnsembleStrategy`(2.127, 2.067%)다. 전체 lineage와
+선별 결과는 `all_strategy_selection_20260903.json`에 저장했다.
+
+2026-08-21~2026-09-02 시도는 canonical 1m OHLCV가 첫날 1,440개만 있고
+나머지 15,840개가 없어 162개 모두 data-audit fail이었다. 해당 구간은
+성과 증거로 사용하지 않았다. 주문 라우팅은 계속 비활성이다.
+
+## 2026-09-03 KST — Alpha-Max checkpoint 저장 병목 제거와 중복 실행물 정리
+
+통합 prelock의 daily continuation checkpoint가 매일 전체 timeframe history를
+canonical JSON으로 반복 저장해 checkpoint 하나당 약 48.6MB, 실패·재기동
+checkpoint 전체가 약 325.6GB까지 증가했다. 이 상태는 계산보다 저장과 memory
+pressure가 우선되는 잘못된 실행 구조였다.
+
+daily carry를 SHA-256과 원본 byte count에 결속한 deterministic
+`zlib-level-3+base64` payload로 바꿨다. 실제 표본은 48,645,453 bytes에서
+3,010,869 bytes로 줄어 약 93.8% 절감됐고, decode는 256MiB 상한,
+base64 strict validation, zlib EOF/trailing-data 검사, digest와 canonical
+roundtrip을 모두 요구한다. training worker 기본값은 2로 낮춰 8GB 시스템에서
+세 프로세스의 동시 Python state 확대를 피한다.
+
+실패한 pipeline run과 v40~v52/parity precompute 중복 checkpoint 18개,
+총 325,636,032,688 bytes를 제거했다. canonical DB, immutable phase roots,
+source/provenance receipts, logs는 보존했다. 정리 후
+`var/g003-evaluation`은 327GB에서 24GB로 감소했고 filesystem 여유 공간은
+505GB에서 808GB로 회복됐다. 삭제 영수증:
+`docs/research_note/alpha_max_checkpoint_cleanup_20260903.json`.
+
+816/680 재실행을 폐기한 뒤 더는 필요한 입력이 아닌 runtime-v40~v54와
+phase-root 복제본, 불완전 구간 screen을 추가로 22,201,360,305 bytes
+제거했다. 최종 `var/g003-evaluation`은 3.3GB, 전체 `var`는 25GB이며
+Linux filesystem 여유 공간은 약 828GB다. Windows C:의 표시 여유 공간은
+약 52GB로 별개다. 삭제된 ext4 블록이 491GB sparse WSL VHDX에 아직
+반환되지 않았기 때문에 WSL 종료 후 VHDX compact가 필요하다.
+
+판정: **storage_bottleneck_fixed / failed_checkpoints_retired /
+canonical_data_preserved / order_routing_enabled=false**.
+
+## 2026-09-02 KST — Alpha-Max를 단일 백테스트 파이프라인으로 재정렬하고 TradFi canonical snapshot 갱신
+
+반복된 `prelock-vNN` supervisor 재기동은 연구 진척이 아니었다. 1,588-unit
+precompute/parity, 816 validation folds, 680 historical report-only folds는
+각각 별도 goal이 아니라 **같은 Alpha-Max 백테스트 파이프라인의 내부 단계**다.
+Observability는 추가 백테스트가 아니라 완료된 두 평가 단계의 acceptance
+projection이다. 따라서 실행 순서를
+`통합 → 공식 데이터/TradFi 증거 갱신 → immutable input snapshot → precompute/parity
+→ prelock 816 folds → historical 680 folds → observability → 연구노트/graph/Obsidian`
+으로 고정했다. wrapper receipt 문제를 새 버전 번호로 반복 재시도하는 경로는
+폐기하고 shared integration boundary를 먼저 수정한다.
+
+Binance USD-M `/fapi/v1/exchangeInfo`를 2026-09-02T10:09:40Z에 다시 읽어
+`TRADIFI_PERPETUAL + USDT + TRADING`을 엄격 적용했다. 현재 canonical
+research-only snapshot은 기존 100개에서 **182개**로 늘었고, static snapshot과
+공식 응답의 집합 차이는 0이다. `SPCXUSD1`은 trading TradFi 계약이지만 quote가
+`USD1`이므로 USDT universe에서 명시적으로 제외했다. 앞선 임시 v2 audit의
+185개 수치는 `ALLUSDT`, `BTCDOMUSDT`, `SPCXUSD1`을 잘못 포함한 값이라
+superseded다. 정정 증거:
+`var/g003-data-refresh/TRADFI_UNIVERSE_REFRESH_AUDIT_20260902.json`,
+tracked canonical:
+`docs/research_note/tradfi_universe_refresh_audit_20260902.json`,
+runtime mirror:
+`var/reports/tradfi_universe_refresh/TRADFI_UNIVERSE_REFRESH_AUDIT.json`,
+source SHA-256:
+`78780e56d0a49a88ab8d326d68cd4198fc9ef9ffd3ef0278310993c0173a13aa`.
+이 갱신은 연구 universe/coverage 기본값만 바꾸며 주문 라우팅과
+paper/testnet/live/real-money 승인을 열지 않는다.
+
+통합 선행 감사도 실제 canonical DB에서 통과했다. Deep contract audit는
+raw `1,066,681,730/1,066,681,730` rows, `415/415` partitions,
+funding `39,569/39,569` rows, missing/extra/duplicate/jitter/error 전부 0을
+재계산했다. Public loader/downsampling/feature/funding 검증도 `complete`다.
+증거:
+`var/g003-data-refresh/alpha_max_canonical_contract_audit_20260902.json`,
+`var/g003-data-refresh/alpha_max_canonical_pipeline_verification_20260902.json`.
+
+전략 카탈로그도 현재 registry로 재생성했다(`163` registry, `161` in-scope,
+`2` excluded). 관계 그래프에서 누락돼 Obsidian publish를 막던 신규 전략
+15개와 `derivatives_carry` family를 canonical graph에 편입한 뒤 generated
+namespace를 원자 교체했다(`215` notes, `2,294` links). vault 전체의 다른
+프로젝트 노트가 LuminaQuant ID gate를 오염시키지 않도록 audit authority를
+`LuminaQuant/` namespace로 한정하되 wikilink 해석은 vault 전체를 유지했다.
+실제 vault readback audit는 `408` authoritative notes, `4,136` wikilinks,
+broken/ambiguous/duplicate/missing ID 모두 0으로 통과했다. 영수증:
+`docs/research_note/obsidian_strategy_graph_audit_20260902.json`
+(SHA-256
+`b9df4b33133fc5b15a4704f0885b8ead76e63f5a46f8855c0789eb5d59689711`).
+
+판정: **integration_first / research_only_no_execution /
+order_routing_enabled=false**.
+
 ## 2026-08-20 KST — 적대 리뷰 라운드: 25건 발견 → 23건 확정 → 전건 수정·회귀봉인
 
 배치 전체 diff에 대해 5-차원 헌터 → 발견별 회의론자 반증 검증(런타임 재현 의무) 라운드를 돌렸다. 25건 발견, **23건 CONFIRMED / 2건 REFUTED**, 확정 전건을 당일 수정하고 회귀 테스트로 봉인했다(전체 스위트 **4946 passed**, 골든·manifest 스냅샷 바이트 불변, ruff/format/architecture/docs 그린). 핵심 수정:

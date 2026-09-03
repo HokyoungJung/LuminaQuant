@@ -80,20 +80,28 @@ def verify_generated_manifest(root: Path) -> dict[str, Any]:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--vault", required=True, type=Path)
+    parser.add_argument("--namespace", default="LuminaQuant")
     parser.add_argument("--output", required=True, type=Path)
     args = parser.parse_args()
     vault = args.vault.resolve(strict=True)
+    namespace = (vault / args.namespace).resolve(strict=True)
+    if namespace.parent != vault or not namespace.is_dir():
+        raise ValueError("namespace must name one direct vault directory")
     all_notes = sorted(vault.rglob("*.md"))
+    resolvable = [path for path in all_notes if ".luminaquant-generated-backups" not in path.parts]
     authoritative = [
-        path for path in all_notes if ".luminaquant-generated-backups" not in path.parts
+        path
+        for path in namespace.rglob("*.md")
+        if ".luminaquant-generated-backups" not in path.parts
     ]
     ids: dict[str, list[str]] = defaultdict(list)
     missing_ids: list[str] = []
     by_stem: dict[str, list[Path]] = defaultdict(list)
     path_casefold: dict[str, list[str]] = defaultdict(list)
+    for path in resolvable:
+        by_stem[path.stem].append(path)
     for path in authoritative:
         relative = path.relative_to(vault).as_posix()
-        by_stem[path.stem].append(path)
         path_casefold[relative.casefold()].append(relative)
         note_id = frontmatter(path).get("id")
         if type(note_id) is str and note_id:
@@ -121,7 +129,7 @@ def main() -> int:
                         ],
                     }
                 )
-    strategy_root = vault / "LuminaQuant" / "Strategies"
+    strategy_root = namespace / "Strategies"
     canonical_strategies = sorted(strategy_root.glob("*.md"))
     numeric_without_evaluation: list[str] = []
     rejected_without_decision: list[str] = []
@@ -149,11 +157,12 @@ def main() -> int:
     ]
     graph_path = vault / ".obsidian" / "graph.json"
     graph = json.loads(graph_path.read_text(encoding="utf-8"))
-    generated_root = vault / "LuminaQuant" / "Strategy Research Generated"
+    generated_root = namespace / "Strategy Research Generated"
     generated_manifest = verify_generated_manifest(generated_root)
     receipt = {
         "artifact_kind": "luminaquant_obsidian_strategy_graph_audit.v1",
         "vault": str(vault),
+        "namespace": str(namespace.relative_to(vault)),
         "order_routing_enabled": False,
         "total_markdown_notes": len(all_notes),
         "authoritative_note_count": len(authoritative),

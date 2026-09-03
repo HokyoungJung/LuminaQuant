@@ -1,5 +1,10 @@
 {
   "artifacts": {
+    "artifact:all-strategy-selection-20260903": {
+      "path": "docs/research_note/all_strategy_selection_20260903.json",
+      "performance_evidence": true,
+      "sha256": "1722d78b98e2aa5d1cedf77e94a084cb3e09b6b9b01603be666e0d14e562c708"
+    },
     "artifact:g003-allocation-input": {
       "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/named_quant_full_suite/g003_20260820/selection-v11/allocation_input.json",
       "sha256": "07df53f1ce4042687714240de91f4d4db64132827d1ed61e695e114066605d2b"
@@ -42,8 +47,27 @@
       "sha256": "8c570fca57aeb41393ef89de6b369bb47798d75468e268608bbad590102f22ba"
     }
   },
-  "as_of_utc": "2026-08-23T00:00:00Z",
+  "as_of_utc": "2026-09-03T10:00:00Z",
   "evaluations": [
+    {
+      "artifact_refs": [
+        "artifact:all-strategy-selection-20260903"
+      ],
+      "evaluated": 162,
+      "evaluation_outcome": "screened",
+      "execution_status": "completed",
+      "id": "eval:all-strategy-selection-20260903",
+      "independent_oos": false,
+      "order_routing_enabled": false,
+      "passed": 120,
+      "promotion_authority": false,
+      "resource_excluded": 11,
+      "selected": 11,
+      "window": {
+        "end_utc": "2026-08-12T00:00:00Z",
+        "start_utc": "2026-07-01T00:00:00Z"
+      }
+    },
     {
       "active_return_panels": 20,
       "allocator_emitted": false,

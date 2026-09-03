@@ -34,6 +34,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--validation-feature-root", required=True)
     parser.add_argument("--embargo-raw-root", required=True)
     parser.add_argument("--embargo-feature-root", required=True)
+    parser.add_argument("--max-training-workers", type=int, choices=(1, 2, 3), default=2)
     return parser
 
 
@@ -61,6 +62,7 @@ def _execute(
         validation_feature_root=args.validation_feature_root,
         embargo_raw_root=args.embargo_raw_root,
         embargo_feature_root=args.embargo_feature_root,
+        max_training_workers=args.max_training_workers,
         bootstrap_implementation_inventory=bootstrap_implementation_inventory,
     )
     return result.exit_code

@@ -41,6 +41,12 @@ def test_actual_engine_config_receipt_accepts_pinned_proc_fd_path() -> None:
             receipt.canonical_path,
             artifact_id="alpha_max_config",
         )
+        evidence._alpha_max_verify_file_receipt(
+            activation_receipt=receipt,
+            expected_sha256=receipt.sha256,
+            expected_byte_count=receipt.byte_count,
+            artifact_id="alpha_max_config",
+        )
     finally:
         os.close(descriptor)
 

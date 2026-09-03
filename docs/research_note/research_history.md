@@ -20,6 +20,29 @@ then reconcile any conclusion against the current canonical graph.
 
 ## Manual addenda after generated ledger
 
+### 2026-09-03 — alpha_max_retirement_and_bounded_strategy_selection
+
+- Alpha-Max precompute checkpoint 압축 완료 후 816-fold validation의
+  `/proc/self/fd` requested-path false negative를 semantic receipt 비교로 수정.
+- 동일 실패가 두 번 재현된 816/680 실행은 재계산하지 않고 checkpoint와 함께
+  폐기했으며 canonical DB와 phase roots는 보존.
+- 동일 기간 결과 141개를 재사용하고 누락 21개만 실행해 registry 162개를
+  통합: pass 120, excluded 14, fail 17, resource-excluded 11.
+- 상위 선별: PriceVolumeCorrContinuation, RebalancingPremiumHarvest,
+  DisagreementGatedEnsemble.
+- 2026-08-21~09-02 구간은 1m OHLCV 불완전으로 전부 fail-closed 처리하고
+  선별에서 제외.
+
+### 2026-09-02 — alpha_max_pipeline_reorder_and_tradfi_snapshot_refresh
+- Research dates: 2026-09-02
+- Source type: `official_exchange_info + canonical_integration_contract`
+- Title/path: Alpha-Max integration-first pipeline order and Binance TradFi snapshot refresh — `docs/research_note/evaluation_contract.md`, `var/g003-data-refresh/TRADFI_UNIVERSE_REFRESH_AUDIT_20260902.json`
+- Content summary: Reclassified 1,588-unit precompute/parity, 816 validation folds, and 680 historical report-only folds as stages of one backtest pipeline; observability is the acceptance projection. Refreshed the static research-only TradFi snapshot from 100 to 182 symbols using strict `TRADIFI_PERPETUAL + USDT + TRADING` filtering.
+- What was used: Binance USD-M `/fapi/v1/exchangeInfo` fetched at `2026-09-02T10:09:40Z`, source SHA-256 `78780e56d0a49a88ab8d326d68cd4198fc9ef9ffd3ef0278310993c0173a13aa`.
+- Decision impact: Integration, current data evidence, lineage/storage/routing audit, and immutable input materialization must precede the single Alpha-Max backtest launch. No paper/testnet/live/real-money execution or allocation is authorized.
+- Staleness/recheck: Recheck when Binance changes the active TradFi contract roster or before a new full-universe evaluation. / `True`
+- Do-not-repeat note: Do not create sequential goals or supervisor version churn for pipeline-internal stages, and do not include non-USDT or non-TRADIFI contracts in the canonical TradFi snapshot.
+
 ### 2026-08-12 — one_minute_strategy_inventory_evidence_and_common_screen
 - Research dates: 2026-08-12
 - Source type: `registry_inventory + exact_1m_common_screen + primary_literature + generated_knowledge_graph`

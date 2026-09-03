@@ -1,5 +1,5 @@
 {
-  "as_of_utc": "2026-08-27T00:00:00Z",
+  "as_of_utc": "2026-09-02T10:09:40Z",
   "edges": [
     {
       "confidence": "high",
@@ -2398,6 +2398,141 @@
       "source_id": "tradfi_kill_switch_overlay_ma_rotation_1d_v1",
       "status": "observed",
       "target_id": "tradfi_ma_score_vol_target_1d_v1"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": ["catalog:strategy-research-20260902"],
+      "relation": "member_of",
+      "source_id": "BasisFundingGapConvergenceStrategy",
+      "status": "observed",
+      "target_id": "derivatives_carry"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": ["catalog:strategy-research-20260902"],
+      "relation": "member_of",
+      "source_id": "CrossSectionalResidualTakerFlowStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": ["catalog:strategy-research-20260902"],
+      "relation": "member_of",
+      "source_id": "EquityCurveKillSwitchOverlayStrategy",
+      "status": "observed",
+      "target_id": "volatility_risk_overlay"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": ["catalog:strategy-research-20260902"],
+      "relation": "member_of",
+      "source_id": "KalmanPairsStatArbStrategy",
+      "status": "observed",
+      "target_id": "mean_reversion_relative_value"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": ["catalog:strategy-research-20260902"],
+      "relation": "member_of",
+      "source_id": "MaScoreVolTargetRotationStrategy",
+      "status": "observed",
+      "target_id": "trend_momentum"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": ["catalog:strategy-research-20260902"],
+      "relation": "member_of",
+      "source_id": "NoiseFilteredVolatilityBreakoutStrategy",
+      "status": "observed",
+      "target_id": "breakout"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": ["catalog:strategy-research-20260902"],
+      "relation": "member_of",
+      "source_id": "OffSessionBasisDislocationStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": ["catalog:strategy-research-20260902"],
+      "relation": "member_of",
+      "source_id": "OpenInterestGrowthPressureStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": ["catalog:strategy-research-20260902"],
+      "relation": "member_of",
+      "source_id": "PcaResidualStatArbStrategy",
+      "status": "observed",
+      "target_id": "mean_reversion_relative_value"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": ["catalog:strategy-research-20260902"],
+      "relation": "member_of",
+      "source_id": "PrevDayBoxQuartileReversionStrategy",
+      "status": "observed",
+      "target_id": "mean_reversion_relative_value"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": ["catalog:strategy-research-20260902"],
+      "relation": "member_of",
+      "source_id": "ProspectTheoryValueStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": ["catalog:strategy-research-20260902"],
+      "relation": "member_of",
+      "source_id": "RsiDivergenceScaleOutStrategy",
+      "status": "observed",
+      "target_id": "mean_reversion_relative_value"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": ["catalog:strategy-research-20260902"],
+      "relation": "member_of",
+      "source_id": "SalienceTheoryValueStrategy",
+      "status": "observed",
+      "target_id": "cross_sectional"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": ["catalog:strategy-research-20260902"],
+      "relation": "member_of",
+      "source_id": "TrendGatedIbsReversionStrategy",
+      "status": "observed",
+      "target_id": "mean_reversion_relative_value"
+    },
+    {
+      "confidence": "high",
+      "evidence_class": "observed_catalog",
+      "evidence_refs": ["catalog:strategy-research-20260902"],
+      "relation": "member_of",
+      "source_id": "TurtleUnitPyramidingStrategy",
+      "status": "observed",
+      "target_id": "breakout"
     }
   ],
   "nodes": [
@@ -3014,6 +3149,66 @@
       "type": "strategy_or_candidate"
     },
     {
+      "id": "BasisFundingGapConvergenceStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "CrossSectionalResidualTakerFlowStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "EquityCurveKillSwitchOverlayStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "KalmanPairsStatArbStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "MaScoreVolTargetRotationStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "NoiseFilteredVolatilityBreakoutStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "OffSessionBasisDislocationStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "OpenInterestGrowthPressureStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "PcaResidualStatArbStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "PrevDayBoxQuartileReversionStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "ProspectTheoryValueStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "RsiDivergenceScaleOutStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "SalienceTheoryValueStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "TrendGatedIbsReversionStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
+      "id": "TurtleUnitPyramidingStrategy",
+      "type": "strategy_or_candidate"
+    },
+    {
       "id": "alpha_max_g003",
       "type": "control_evidence_or_state"
     },
@@ -3063,6 +3258,10 @@
     },
     {
       "id": "derivatives_directional_crowding",
+      "type": "family_or_axis"
+    },
+    {
+      "id": "derivatives_carry",
       "type": "family_or_axis"
     },
     {
