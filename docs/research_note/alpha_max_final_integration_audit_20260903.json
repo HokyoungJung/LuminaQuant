@@ -7,7 +7,7 @@
     "mutated_by_cleanup": false,
     "path": "/home/hoky/Quants-agent/LuminaQuant/data/market_parquet"
   },
-  "completed_at_utc": "2026-09-03T11:43:07.123129+00:00",
+  "completed_at_utc": "2026-09-03T11:45:38.823880+00:00",
   "created_at_utc": "2026-09-03T11:03:50.968114+00:00",
   "evidence": [
     {
@@ -82,5 +82,12 @@
       "xfailed": 3
     },
     "ruff": "passed"
+  },
+  "windows_storage": {
+    "c_free_gib": 50.56,
+    "compact_required_after_wsl_shutdown": true,
+    "note": "Linux free space is real inside ext4; Windows does not regain sparse VHDX file length until offline compact.",
+    "trimmed_bytes": 733461176320,
+    "wsl_vhdx_size_gib": 491.46
   }
 }
