@@ -151,7 +151,7 @@ def symbols_from_selection(path: Path, *, limit: int) -> tuple[str, ...]:
         if type(row) is dict and type(row.get("strategy")) is str
     ]
     if not strategy_names:
-        raise ValueError("selection artifact contains no finalist strategies")
+        return ()
     return tuple(
         dict.fromkeys(
             symbol
@@ -266,6 +266,24 @@ def main(argv: Sequence[str] | None = None) -> int:
                 limit=max(1, int(args.selection_limit)),
             )
         )
+    if not symbols:
+        payload = {
+            "artifact_kind": "lumina_quant.execution_model_tick_validation.v1",
+            "status": "skip_no_finalists",
+            "data_root": str(args.data_root.resolve()),
+            "config": {
+                "path": str(args.config.resolve()),
+                "sha256": _sha256(args.config.resolve()),
+            },
+            "exchange": str(args.exchange),
+            "symbols": [],
+            "order_routing_enabled": False,
+            "results": [],
+            "completed_at_utc": datetime.now(UTC).isoformat(),
+        }
+        _atomic_write(args.output.resolve(), payload)
+        print(json.dumps({"status": payload["status"], "symbols": 0}))
+        return 0
     payload = validate_ticks(
         data_root=args.data_root.resolve(),
         config_path=args.config.resolve(),

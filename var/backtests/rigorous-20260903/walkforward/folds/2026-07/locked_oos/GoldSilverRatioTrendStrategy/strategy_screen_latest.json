@@ -1,0 +1,156 @@
+{
+  "annual_periods": 525600,
+  "artifact_kind": "strategy_backtest_scoreboard",
+  "data_audits": {
+    "GoldSilverRatioTrendStrategy": [
+      {
+        "buy_hold_return": -0.06707024722218347,
+        "configured_max_gap_ratio": 0.0,
+        "end": "2026-06-30T23:59:00Z",
+        "errors": [],
+        "expected_1m_bars": 23040,
+        "expected_last_bar": "2026-06-30T23:59:00Z",
+        "first_close": 4296.54,
+        "gap_ratio": 0.0,
+        "last_close": 4008.37,
+        "missing_1m_bars": 0,
+        "requested_end_exclusive": "2026-07-01T00:00:00Z",
+        "requested_start": "2026-06-15T00:00:00Z",
+        "rows": 23040,
+        "source_lineage": {
+          "direct_only_rows": 1003,
+          "direct_rows": 23040,
+          "effective_direct_rows": 1003,
+          "effective_resampled_rows": 22037,
+          "first_overlap_conflict_timestamp_ms": 1781481900000,
+          "overlap_conflict_rows": 9699,
+          "overlap_conflict_sha256": "c452311c149a2565e9531cd211e92302d2a35b697fc25db77000535ff2f71af1",
+          "overlap_equal_rows": 12338,
+          "overlap_rows": 22037,
+          "precedence": "resampled_1s_derived_over_direct_1m",
+          "resampled_only_rows": 0,
+          "resampled_rows": 22037
+        },
+        "start": "2026-06-15T00:00:00Z",
+        "status": "pass",
+        "symbol": "XAU/USDT",
+        "unique_timestamps": 23040,
+        "warnings": [],
+        "window_contract": "[start,end)"
+      },
+      {
+        "buy_hold_return": -0.16898806139852185,
+        "configured_max_gap_ratio": 0.0,
+        "end": "2026-06-30T23:59:00Z",
+        "errors": [],
+        "expected_1m_bars": 23040,
+        "expected_last_bar": "2026-06-30T23:59:00Z",
+        "first_close": 70.36,
+        "gap_ratio": 0.0,
+        "last_close": 58.47,
+        "missing_1m_bars": 0,
+        "requested_end_exclusive": "2026-07-01T00:00:00Z",
+        "requested_start": "2026-06-15T00:00:00Z",
+        "rows": 23040,
+        "source_lineage": {
+          "direct_only_rows": 1003,
+          "direct_rows": 23040,
+          "effective_direct_rows": 1003,
+          "effective_resampled_rows": 22037,
+          "first_overlap_conflict_timestamp_ms": 1781482020000,
+          "overlap_conflict_rows": 6578,
+          "overlap_conflict_sha256": "608ef2bfa7cff60dbc0974b6685af7b33e9a6fadbde788608ca29c71da480587",
+          "overlap_equal_rows": 15459,
+          "overlap_rows": 22037,
+          "precedence": "resampled_1s_derived_over_direct_1m",
+          "resampled_only_rows": 0,
+          "resampled_rows": 22037
+        },
+        "start": "2026-06-15T00:00:00Z",
+        "status": "pass",
+        "symbol": "XAG/USDT",
+        "unique_timestamps": 23040,
+        "warnings": [
+          "volume_zero:14"
+        ],
+        "window_contract": "[start,end)"
+      }
+    ]
+  },
+  "data_root": "/home/hoky/Quants-agent/LuminaQuant/data/market_parquet",
+  "end": "2026-07-01T00:00:00Z",
+  "exchange": "binance",
+  "exchange_symbol_audit": {
+    "checked_symbols": [
+      "XAGUSDT",
+      "XAUUSDT"
+    ],
+    "enabled": false,
+    "status": "skipped",
+    "unmatched_symbols": []
+  },
+  "feature_audits": {
+    "GoldSilverRatioTrendStrategy": {
+      "required_features": [],
+      "status": "not_required",
+      "symbols": {}
+    }
+  },
+  "generated_at": "2026-09-03T14:04:30.590095Z",
+  "git_commit": "451828831fbe87faf5a0bb93e375cb6cb554d402",
+  "integrity_policy": {
+    "duplicate_timestamp_policy": "fail_closed_before_simulation",
+    "execution_model": "repository Backtest + Portfolio + SimulatedExecutionHandler",
+    "feature_staleness_policy": "FeaturePointLookup bounded <= 8h forward-fill only",
+    "missing_bar_policy": "exact_[start,end)_minute_grid_fail_closed_before_simulation",
+    "no_gap_fill": true,
+    "no_interpolation": true,
+    "no_synthetic_rows": true
+  },
+  "issues": [
+    {
+      "message": "ValueError(\"require_funding_coverage: missing exact funding settlement data for symbol 'XAU/USDT' at boundary 1781539200000\")",
+      "scope": "GoldSilverRatioTrendStrategy",
+      "severity": "fail"
+    }
+  ],
+  "max_gap_ratio": 0.0,
+  "new_strategy_source_files": [
+    "src/lumina_quant/strategies/external_alpha_sleeves.py",
+    "src/lumina_quant/strategies/robust_alpha_sleeves.py",
+    "src/lumina_quant/strategies/adaptive_crypto_alpha_sleeves.py",
+    "src/lumina_quant/strategies/cross_asset_tradfi_alpha_sleeves.py",
+    "src/lumina_quant/indicators/alpha_features.py"
+  ],
+  "output_paths": {
+    "latest_json": "/home/hoky/Quants-agent/LuminaQuant/var/backtests/rigorous-20260903/walkforward/folds/2026-07/locked_oos/GoldSilverRatioTrendStrategy/strategy_screen_latest.json"
+  },
+  "scope": "all",
+  "start": "2026-06-15T00:00:00Z",
+  "strategy_results": [
+    {
+      "benchmark_return_first_symbol": -0.06707024722218347,
+      "error": "ValueError(\"require_funding_coverage: missing exact funding settlement data for symbol 'XAU/USDT' at boundary 1781539200000\")",
+      "exclusion_reason": "",
+      "fast_stats": {},
+      "feature_audit_status": "not_required",
+      "fills": 0,
+      "market_events": 0,
+      "orders": 0,
+      "signals": 0,
+      "status": "fail",
+      "strategy": "GoldSilverRatioTrendStrategy",
+      "symbols": [
+        "XAU/USDT",
+        "XAG/USDT"
+      ],
+      "tier": "live_default",
+      "total_return": 0.0,
+      "trade_count": 0,
+      "zero_trade_reason": ""
+    }
+  ],
+  "timeframe": "1m",
+  "top_n": 20,
+  "window_contract": "[start,end)"
+}
