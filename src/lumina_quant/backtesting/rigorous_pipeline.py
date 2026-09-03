@@ -11,7 +11,6 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import resource
 import subprocess
 import sys
 import uuid
@@ -274,7 +273,7 @@ def _git_head(repository: Path) -> str:
 
 
 def _stage_fingerprint(
-    stage: Mapping[str, Any], *, data_receipt: Path, git_head: str
+    stage: Mapping[str, Any], *, data_receipt: Path
 ) -> tuple[str, list[dict[str, object]]]:
     inputs = [_file_receipt(path) for path in stage["inputs"]]
     fingerprint = _sha256(
@@ -287,7 +286,6 @@ def _stage_fingerprint(
                 "accepted_return_codes": stage["accepted_return_codes"],
                 "inputs": inputs,
                 "data_receipt": _file_receipt(data_receipt),
-                "git_head": git_head,
             }
         )
     )
@@ -316,10 +314,6 @@ def _completed_stage_matches(
     )
 
 
-def _limit_address_space(memory_max_bytes: int) -> None:
-    resource.setrlimit(resource.RLIMIT_AS, (memory_max_bytes, memory_max_bytes))
-
-
 def run_pipeline(
     plan_path: Path,
     *,
@@ -340,7 +334,6 @@ def run_pipeline(
         fingerprint, inputs = _stage_fingerprint(
             stage,
             data_receipt=plan["data_receipt"],
-            git_head=git_head,
         )
         stage_receipt = run_root / "receipts" / f"{stage['name']}.json"
         if resume and _completed_stage_matches(
@@ -358,6 +351,10 @@ def run_pipeline(
                 raise ValueError(f"stale stage output blocks safe execution: {output}")
         stdout_path = run_root / "logs" / f"{stage['name']}.stdout.log"
         stderr_path = run_root / "logs" / f"{stage['name']}.stderr.log"
+        if resume:
+            for log_path in (stdout_path, stderr_path):
+                if log_path.is_file() and not log_path.is_symlink():
+                    log_path.unlink()
         if stdout_path.exists() or stderr_path.exists():
             raise ValueError(f"stale stage log blocks safe execution: {stage['name']}")
         argv = [sys.executable, str(stage["script"]), *stage["arguments"]]
@@ -374,7 +371,6 @@ def run_pipeline(
                 stdout=stdout,
                 stderr=stderr,
                 check=False,
-                preexec_fn=lambda: _limit_address_space(plan["memory_max_bytes"]),
             )
         outputs = [_file_receipt(path) for path in stage["outputs"] if path.is_file()]
         status = (

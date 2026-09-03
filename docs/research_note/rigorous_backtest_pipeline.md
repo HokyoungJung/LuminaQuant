@@ -41,7 +41,10 @@ git commit, explicit inputs, canonical data receipt and output hashes all match.
 
 - Use `uv sync --frozen`, then `uv run python scripts/build_native_backends.py`;
   the CPU Rust/PyO3 backend is built into the uv environment.
-- The plan sets one `memory_max_bytes` value, capped at 7 GiB.
+- The plan records one `memory_max_bytes` value, capped at 7 GiB. Production
+  execution runs in a systemd cgroup with matching `MemoryMax`; Python
+  `RLIMIT_AS` is deliberately not used because mapped Rust/Python libraries
+  consume virtual address space without consuming equivalent resident memory.
 - Every stage runs in a fresh child process, so Python/Polars allocations are returned
   between stages.
 - Stage inputs are hashed with streaming 1 MiB reads. The canonical database is bound
