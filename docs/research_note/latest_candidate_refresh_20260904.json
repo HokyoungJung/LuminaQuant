@@ -1,0 +1,114 @@
+{
+  "artifact_kind": "lumina_quant.latest_candidate_refresh.v1",
+  "candidate_verdict": "watch_only_insufficient_evidence",
+  "cost_profile": "configs/profiles/backtest_cost_realistic.yaml",
+  "generated_at_utc": "2026-09-04T02:15:32.303209+00:00",
+  "order_routing_enabled": false,
+  "positive_return_count": 1,
+  "results": [
+    {
+      "max_drawdown": 0.0008013682458573385,
+      "sharpe": 2.36663702605375,
+      "status": "pass",
+      "strategy": "TrendGatedResidualMomentumStrategy",
+      "total_return": 0.0003900898585418311,
+      "trade_count": 3
+    },
+    {
+      "max_drawdown": 0.0012588161993032905,
+      "sharpe": -4.804527747024002,
+      "status": "pass",
+      "strategy": "CompressionBreakoutContinuationStrategy",
+      "total_return": -0.0006134361867341509,
+      "trade_count": 6
+    },
+    {
+      "max_drawdown": 0.0024285070503570986,
+      "sharpe": -3.47272339181475,
+      "status": "pass",
+      "strategy": "BitcoinBuyHoldStrategy",
+      "total_return": -0.0012257191489787322,
+      "trade_count": 2
+    },
+    {
+      "max_drawdown": 0.003981064416356094,
+      "sharpe": -4.058310322352726,
+      "status": "pass",
+      "strategy": "CrossSectionalIntermediateEchoMomentumStrategy",
+      "total_return": -0.0021707776046250293,
+      "trade_count": 17
+    },
+    {
+      "max_drawdown": 0.004565366229862441,
+      "sharpe": -5.766537863334353,
+      "status": "pass",
+      "strategy": "FalseBreakoutReversalStrategy",
+      "total_return": -0.002570723658985141,
+      "trade_count": 162
+    },
+    {
+      "max_drawdown": 0.003951081200345834,
+      "sharpe": -12.132580114799053,
+      "status": "pass",
+      "strategy": "MomentumCrashDynamicScalingOverlayStrategy",
+      "total_return": -0.0039510812003458184,
+      "trade_count": 14
+    },
+    {
+      "max_drawdown": 0.003951081200345834,
+      "sharpe": -12.132580114799053,
+      "status": "pass",
+      "strategy": "LowTurnoverTrendPersistenceStrategy",
+      "total_return": -0.0039510812003458184,
+      "trade_count": 14
+    },
+    {
+      "max_drawdown": 0.00413137658560936,
+      "sharpe": -11.433137197418509,
+      "status": "pass",
+      "strategy": "PriceVolumeCorrContinuationStrategy",
+      "total_return": -0.004131376585609359,
+      "trade_count": 16
+    },
+    {
+      "max_drawdown": 0.0059441434113006834,
+      "sharpe": -7.8811905745242745,
+      "status": "pass",
+      "strategy": "CrossSectionalPathConvexityStrategy",
+      "total_return": -0.005525484326970198,
+      "trade_count": 21
+    },
+    {
+      "max_drawdown": 0.019200655707278202,
+      "sharpe": -14.268681991350618,
+      "status": "pass",
+      "strategy": "RebalancingPremiumHarvestStrategy",
+      "total_return": -0.019200655707278247,
+      "trade_count": 64
+    },
+    {
+      "max_drawdown": 0.17216242948768146,
+      "sharpe": -35.61515276253588,
+      "status": "pass",
+      "strategy": "DisagreementGatedEnsembleStrategy",
+      "total_return": -0.16322023666129204,
+      "trade_count": 266
+    }
+  ],
+  "source_result": {
+    "path": "var/backtests/latest_candidate_refresh_20260904/strategy_screen_latest.json",
+    "sha256": "e607dceb83a479a6bdfa67cb4bfaf4b9e112e6e51c9f33a909ed80844719e569"
+  },
+  "status": "complete",
+  "universe_policy": {
+    "candidate_count": 11,
+    "excluded_delisted_symbols": [
+      "TON/USDT"
+    ],
+    "source": "docs/research_note/all_strategy_selection_20260903.json"
+  },
+  "window": {
+    "end_exclusive": "2026-09-03T00:00:00Z",
+    "start": "2026-08-22T00:00:00Z"
+  }
+}

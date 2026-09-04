@@ -21,7 +21,7 @@ import math
 import os
 import time
 import urllib.request
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from itertools import pairwise
@@ -120,14 +120,22 @@ def _strategy_specs(
     selected: list[str] | None = None,
     *,
     scope: str = "latest",
+    excluded_symbols: Sequence[str] = (),
 ) -> list[StrategyRunSpec]:
     available = set(get_strategy_names(include_research_only=True))
     requested = tuple(selected or _strategy_names_for_scope(scope))
+    excluded = {normalize_symbol(symbol) for symbol in excluded_symbols}
     specs: list[StrategyRunSpec] = []
     for strategy in requested:
         if strategy not in available:
             raise ValueError(f"Unknown strategy: {strategy}")
-        symbols = research_symbols_for_strategy(strategy)
+        symbols = tuple(
+            symbol
+            for symbol in research_symbols_for_strategy(strategy)
+            if normalize_symbol(symbol) not in excluded
+        )
+        if not symbols:
+            raise ValueError(f"Symbol exclusions remove the entire universe for {strategy}")
         specs.append(StrategyRunSpec(strategy=strategy, symbols=tuple(symbols)))
     return specs
 
@@ -807,7 +815,11 @@ def run_strategy_screen(args: argparse.Namespace) -> dict[str, Any]:
 
     scope = str(getattr(args, "scope", "latest") or "latest")
     top_n = int(getattr(args, "top_n", 20) or 20)
-    specs = _strategy_specs(args.strategy, scope=scope)
+    specs = _strategy_specs(
+        args.strategy,
+        scope=scope,
+        excluded_symbols=tuple(args.exclude_symbol or ()),
+    )
     all_symbols = sorted({symbol for spec in specs for symbol in spec.symbols})
     exchange_audit = _audit_exchange_symbols(
         all_symbols,
@@ -1053,6 +1065,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--strategy",
         action="append",
         help="Run one named strategy; repeat to select multiple. Defaults to the selected --scope.",
+    )
+    parser.add_argument(
+        "--exclude-symbol",
+        action="append",
+        help="Exclude an unavailable/delisted symbol from every selected strategy universe.",
     )
     parser.add_argument(
         "--scope",

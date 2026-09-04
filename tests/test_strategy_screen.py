@@ -51,6 +51,16 @@ def test_strategy_research_universe_is_centralized():
     assert len(subject._strategy_specs(scope="all")) >= len(subject._strategy_specs(scope="live"))
 
 
+def test_strategy_specs_apply_explicit_delisted_symbol_exclusion() -> None:
+    spec = subject._strategy_specs(
+        ["PriceVolumeCorrContinuationStrategy"],
+        excluded_symbols=("TON/USDT",),
+    )[0]
+
+    assert "TON/USDT" not in spec.symbols
+    assert "BTC/USDT" in spec.symbols
+
+
 def test_canonical_output_mode_writes_no_timestamp_or_markdown_copies(
     tmp_path: Path,
 ) -> None:

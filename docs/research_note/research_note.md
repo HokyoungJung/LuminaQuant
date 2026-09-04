@@ -1,4 +1,14 @@
 # Research Note
+## 2026-09-04 KST — latest active-universe candidate refresh
+
+이전에 coarse screen에서 유력했던 11개 전략을 최신 공식 데이터 구간
+`[2026-08-22, 2026-09-03)`에서 realistic-cost profile로 다시 평가했다.
+delivery가 끝난 TONUSDT는 명시적으로 제외했으며 나머지 중앙 research
+universe는 그대로 유지했다. 11/11 실행은 완료됐지만 10개가 순손실이었다.
+유일한 양수 전략은 `TrendGatedResidualMomentumStrategy`로 수익률 0.039%,
+Sharpe 2.367, MDD 0.080%, 거래 3회였다. 표본이 세 거래뿐이므로 watch-only로
+유지하며 승격·포트폴리오·주문 권한 근거로 사용하지 않는다.
+
 ## 2026-09-04 KST — CUDA 13, canonical funding repair, and rigorous portfolio gate
 
 환경 baseline을 Python 3.14/Pandas 3, CUDA 13, RAPIDS cuDF 26.8,
