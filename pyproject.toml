@@ -64,7 +64,7 @@ dashboard = [
 ]
 mcp = [
     # Read-only MCP stdio bridge (opt-in; server never started by default).
-    "mcp>=1.2.0",
+    "mcp>=2.3.0",
 ]
 mt5 = [
     "MetaTrader5>=5.0.0; platform_system == 'Windows'",
