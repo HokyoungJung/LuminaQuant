@@ -170,7 +170,7 @@ indent-style = "space"
 dev = [
     "maturin>=1.13.3",
     "pytest>=8.0.0",
-    "ruff>=0.15.1",
+    "ruff>=0.17.3",
     # Optimizer deps in the default dev sync so optuna/numba test paths never
     # skip in local runs (also published to users via the "optimize" extra).
     "optuna>=4.0",
